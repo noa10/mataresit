@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -89,7 +88,8 @@ export default function UploadZone() {
         total: 0,
         currency: "USD",
         status: "unreviewed",
-        image_url: imageUrl
+        image_url: imageUrl,
+        user_id: user.id
       }, [], {
         merchant: 0,
         date: 0,
