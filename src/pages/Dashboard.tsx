@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
-import { Upload, Search, Filter, SlidersHorizontal, PlusCircle } from "lucide-react";
+import { Upload, Search, Filter, SlidersHorizontal, PlusCircle, XCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
 import { Receipt } from "@/types/receipt";
@@ -137,7 +136,7 @@ export default function Dashboard() {
             className="glass-card p-12 text-center"
           >
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Receipt size={24} className="text-primary" />
+              <PlusCircle size={24} className="text-primary" />
             </div>
             <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
             <p className="text-muted-foreground mb-6">
@@ -188,7 +187,7 @@ export default function Dashboard() {
                   currency={receipt.currency}
                   imageUrl={receipt.image_url || "/placeholder.svg"}
                   status={receipt.status}
-                  confidence={receipt.confidence?.merchant || 0}
+                  confidence={0} // Default value if confidence is not available
                 />
               </motion.div>
             ))}
@@ -208,12 +207,4 @@ export default function Dashboard() {
       </footer>
     </div>
   );
-}
-
-function Receipt(props: any) {
-  return <PlusCircle {...props} />;
-}
-
-function XCircle(props: any) {
-  return <div {...props} />;
 }

@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, LineItem, ConfidenceScore, ReceiptWithDetails } from "@/types/receipt";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export async function fetchReceipts(): Promise<Receipt[]> {
   try {
@@ -11,7 +12,7 @@ export async function fetchReceipts(): Promise<Receipt[]> {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return data as Receipt[] || [];
   } catch (error: any) {
     console.error("Error fetching receipts:", error.message);
     toast.error("Failed to load receipts");
@@ -52,7 +53,7 @@ export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails |
     }
 
     return {
-      ...receipt,
+      ...(receipt as Receipt),
       lineItems: lineItems || [],
       confidence: confidence || null
     };
@@ -64,15 +65,22 @@ export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails |
 }
 
 export async function createReceipt(
-  receipt: Omit<Receipt, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+  receipt: Omit<Receipt, 'id' | 'created_at' | 'updated_at'>,
   lineItems?: Omit<LineItem, 'id' | 'receipt_id' | 'created_at' | 'updated_at'>[],
   confidenceScore?: Omit<ConfidenceScore, 'id' | 'receipt_id' | 'created_at' | 'updated_at'>
 ): Promise<string | null> {
   try {
-    // Insert receipt
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Insert receipt with user_id
     const { data: receiptData, error: receiptError } = await supabase
       .from('receipts')
-      .insert(receipt)
+      .insert({
+        ...receipt,
+        user_id: user.id
+      })
       .select('id')
       .single();
 
