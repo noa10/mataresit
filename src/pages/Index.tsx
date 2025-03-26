@@ -5,8 +5,11 @@ import UploadZone from "@/components/UploadZone";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Upload, ChevronRight, Check, ShieldCheck, Clock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Index() {
+  const { user } = useAuth();
+  
   // Animation variants
   const container = {
     hidden: { opacity: 0 },
@@ -89,31 +92,50 @@ export default function Index() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mt-8 flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Button asChild size="lg" className="gap-2">
-              <Link to="/dashboard">
-                View Dashboard
-                <ArrowRight size={16} />
-              </Link>
-            </Button>
+            {user ? (
+              <Button asChild size="lg" className="gap-2">
+                <Link to="/dashboard">
+                  View Dashboard
+                  <ArrowRight size={16} />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild size="lg" className="gap-2">
+                  <Link to="/auth">
+                    Get Started
+                    <ArrowRight size={16} />
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline" className="gap-2">
+                  <Link to="/auth">
+                    Log In
+                    <ArrowRight size={16} />
+                  </Link>
+                </Button>
+              </>
+            )}
           </motion.div>
         </motion.section>
         
         {/* Upload Section */}
-        <motion.section 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="glass-card p-6 md:p-8 max-w-4xl mx-auto"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-semibold">Upload Your Receipt</h2>
-            <p className="text-muted-foreground mt-2">
-              Start by uploading your receipt image or PDF
-            </p>
-          </div>
-          
-          <UploadZone />
-        </motion.section>
+        {user && (
+          <motion.section 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="glass-card p-6 md:p-8 max-w-4xl mx-auto"
+          >
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold">Upload Your Receipt</h2>
+              <p className="text-muted-foreground mt-2">
+                Start by uploading your receipt image or PDF
+              </p>
+            </div>
+            
+            <UploadZone />
+          </motion.section>
+        )}
         
         {/* Features Section */}
         <motion.section 
@@ -159,12 +181,21 @@ export default function Index() {
           <p className="text-muted-foreground mb-8">
             Join thousands of users who save time with automated receipt processing.
           </p>
-          <Button asChild size="lg">
-            <Link to="/dashboard" className="gap-2">
-              Get Started
-              <ChevronRight size={16} />
-            </Link>
-          </Button>
+          {!user ? (
+            <Button asChild size="lg">
+              <Link to="/auth" className="gap-2">
+                Get Started
+                <ChevronRight size={16} />
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild size="lg">
+              <Link to="/dashboard" className="gap-2">
+                Go to Dashboard
+                <ChevronRight size={16} />
+              </Link>
+            </Button>
+          )}
         </motion.section>
       </main>
       
