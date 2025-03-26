@@ -6,21 +6,23 @@ import ReceiptCard from "@/components/ReceiptCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockReceipts, ReceiptData } from "@/utils/mockData";
 import { Link } from "react-router-dom";
 import { Upload, Search, Filter, SlidersHorizontal, PlusCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchReceipts } from "@/services/receiptService";
+import { Receipt } from "@/types/receipt";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Dashboard() {
-  const [receipts, setReceipts] = useState<ReceiptData[]>([]);
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   
-  useEffect(() => {
-    // Simulate loading data
-    setTimeout(() => {
-      setReceipts(mockReceipts);
-    }, 500);
-  }, []);
+  const { data: receipts = [], isLoading, error } = useQuery({
+    queryKey: ['receipts'],
+    queryFn: fetchReceipts,
+    enabled: !!user, // Only run if user is logged in
+  });
   
   const filteredReceipts = receipts.filter(receipt => {
     const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
@@ -102,7 +104,32 @@ export default function Dashboard() {
         </motion.div>
         
         {/* Receipts Grid */}
-        {receipts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+          </div>
+        ) : error ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="glass-card p-12 text-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <XCircle size={24} className="text-destructive" />
+            </div>
+            <h3 className="text-xl font-medium mb-2">Error loading receipts</h3>
+            <p className="text-muted-foreground mb-6">
+              There was a problem loading your receipts. Please try again.
+            </p>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </motion.div>
+        ) : receipts.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -159,9 +186,9 @@ export default function Dashboard() {
                   date={receipt.date}
                   total={receipt.total}
                   currency={receipt.currency}
-                  imageUrl={receipt.imageUrl}
+                  imageUrl={receipt.image_url || "/placeholder.svg"}
                   status={receipt.status}
-                  confidence={receipt.confidence.merchant}
+                  confidence={receipt.confidence?.merchant || 0}
                 />
               </motion.div>
             ))}
@@ -185,4 +212,8 @@ export default function Dashboard() {
 
 function Receipt(props: any) {
   return <PlusCircle {...props} />;
+}
+
+function XCircle(props: any) {
+  return <div {...props} />;
 }

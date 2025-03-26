@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { createReceipt, uploadReceiptImage } from "@/services/receiptService";
 
 export default function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
@@ -12,6 +14,7 @@ export default function UploadZone() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -38,7 +41,13 @@ export default function UploadZone() {
     }
   };
 
-  const handleFiles = (files: FileList) => {
+  const handleFiles = async (files: FileList) => {
+    if (!user) {
+      toast.error("Please login first");
+      navigate("/auth");
+      return;
+    }
+
     const validFiles = Array.from(files).filter(file => {
       const fileType = file.type;
       return fileType === 'image/jpeg' || 
@@ -51,25 +60,57 @@ export default function UploadZone() {
       return;
     }
     
-    // Mock upload process for demo
     setIsUploading(true);
+    setUploadProgress(10);
     
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 10;
-      if (progress > 100) progress = 100;
-      setUploadProgress(Math.round(progress));
+    try {
+      // For now, just process the first file
+      const file = validFiles[0];
       
-      if (progress === 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setIsUploading(false);
-          toast.success("Receipt uploaded successfully!");
-          navigate("/dashboard");
-        }, 500);
+      // Simulate OCR processing
+      setUploadProgress(30);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Upload the image
+      setUploadProgress(50);
+      const imageUrl = await uploadReceiptImage(file, user.id);
+      
+      if (!imageUrl) {
+        throw new Error("Failed to upload image");
       }
-    }, 300);
+      
+      setUploadProgress(70);
+      
+      // Create a mock receipt record
+      const today = new Date().toISOString().split('T')[0];
+      const receiptId = await createReceipt({
+        merchant: "Unknown Merchant",
+        date: today,
+        total: 0,
+        currency: "USD",
+        status: "unreviewed",
+        image_url: imageUrl
+      }, [], {
+        merchant: 0,
+        date: 0,
+        total: 0
+      });
+      
+      setUploadProgress(100);
+      
+      if (receiptId) {
+        toast.success("Receipt uploaded successfully!");
+        setTimeout(() => {
+          navigate(`/receipt/${receiptId}`);
+        }, 500);
+      } else {
+        throw new Error("Failed to create receipt");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("There was an error uploading your receipt");
+      setIsUploading(false);
+    }
   };
   
   const openFileDialog = () => {

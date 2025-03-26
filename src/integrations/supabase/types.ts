@@ -9,6 +9,85 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      confidence_scores: {
+        Row: {
+          created_at: string
+          date: number | null
+          id: string
+          line_items: number | null
+          merchant: number | null
+          receipt_id: string
+          tax: number | null
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date?: number | null
+          id?: string
+          line_items?: number | null
+          merchant?: number | null
+          receipt_id: string
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: number | null
+          id?: string
+          line_items?: number | null
+          merchant?: number | null
+          receipt_id?: string
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "confidence_scores_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      line_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          receipt_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          receipt_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          receipt_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -30,6 +109,51 @@ export type Database = {
           id?: string
           last_name?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      receipts: {
+        Row: {
+          created_at: string
+          currency: string | null
+          date: string
+          id: string
+          image_url: string | null
+          merchant: string
+          payment_method: string | null
+          status: string | null
+          tax: number | null
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          date: string
+          id?: string
+          image_url?: string | null
+          merchant: string
+          payment_method?: string | null
+          status?: string | null
+          tax?: number | null
+          total: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          date?: string
+          id?: string
+          image_url?: string | null
+          merchant?: string
+          payment_method?: string | null
+          status?: string | null
+          tax?: number | null
+          total?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

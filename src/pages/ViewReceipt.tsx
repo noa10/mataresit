@@ -5,38 +5,42 @@ import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { Button } from "@/components/ui/button";
-import { getReceiptById, ReceiptData } from "@/utils/mockData";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
-  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
   
-  useEffect(() => {
-    // Simulate loading data
-    setTimeout(() => {
-      if (id) {
-        const foundReceipt = getReceiptById(id);
-        if (foundReceipt) {
-          setReceipt(foundReceipt);
-        } else {
-          toast.error("Receipt not found");
-          navigate("/dashboard");
-        }
+  const { data: receipt, isLoading, error } = useQuery({
+    queryKey: ['receipt', id],
+    queryFn: () => fetchReceiptById(id!),
+    enabled: !!id && !!user,
+  });
+  
+  const deleteMutation = useMutation({
+    mutationFn: (receiptId: string) => deleteReceipt(receiptId),
+    onSuccess: (success) => {
+      if (success) {
+        navigate("/dashboard");
       }
-      setLoading(false);
-    }, 800);
-  }, [id, navigate]);
+    },
+  });
   
   const handleDelete = () => {
-    toast.success("Receipt deleted successfully");
-    navigate("/dashboard");
+    if (!id) return;
+    
+    // Ask for confirmation
+    if (window.confirm("Are you sure you want to delete this receipt?")) {
+      deleteMutation.mutate(id);
+    }
   };
   
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
         <Navbar />
@@ -47,7 +51,7 @@ export default function ViewReceipt() {
     );
   }
   
-  if (!receipt) {
+  if (error || !receipt) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
         <Navbar />
@@ -87,7 +91,7 @@ export default function ViewReceipt() {
             <div>
               <h1 className="text-2xl font-bold">{receipt.merchant}</h1>
               <p className="text-muted-foreground">
-                {receipt.date} • {new Intl.NumberFormat('en-US', {
+                {new Date(receipt.date).toLocaleDateString()} • {new Intl.NumberFormat('en-US', {
                   style: 'currency',
                   currency: receipt.currency,
                 }).format(receipt.total)}
@@ -99,13 +103,19 @@ export default function ViewReceipt() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
+            className="flex gap-2"
           >
             <Button 
               variant="outline" 
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleDelete}
+              disabled={deleteMutation.isPending}
             >
-              <Trash2 size={16} />
+              {deleteMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Trash2 size={16} />
+              )}
               Delete Receipt
             </Button>
           </motion.div>
