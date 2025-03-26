@@ -1,8 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, LineItem, ConfidenceScore, ReceiptWithDetails } from "@/types/receipt";
+import { Receipt, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult } from "@/types/receipt";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 export async function fetchReceipts(): Promise<Receipt[]> {
   try {
@@ -229,6 +228,41 @@ export async function uploadReceiptImage(file: File, userId: string): Promise<st
   } catch (error: any) {
     console.error("Error uploading receipt image:", error.message);
     toast.error("Failed to upload receipt image");
+    return null;
+  }
+}
+
+export async function processReceiptWithOCR(receiptId: string): Promise<OCRResult | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Authentication required");
+      return null;
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-receipt-endpoint`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ receiptId }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'OCR processing failed');
+    }
+
+    const result = await response.json();
+    toast.success("Receipt processed successfully");
+    return result;
+  } catch (error: any) {
+    console.error("Error processing receipt with OCR:", error.message);
+    toast.error(error.message || "Failed to process receipt");
     return null;
   }
 }

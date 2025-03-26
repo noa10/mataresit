@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -5,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { createReceipt, uploadReceiptImage } from "@/services/receiptService";
+import { createReceipt, uploadReceiptImage, processReceiptWithOCR } from "@/services/receiptService";
 
 export default function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
@@ -66,24 +67,20 @@ export default function UploadZone() {
       // For now, just process the first file
       const file = validFiles[0];
       
-      // Simulate OCR processing
-      setUploadProgress(30);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       // Upload the image
-      setUploadProgress(50);
+      setUploadProgress(30);
       const imageUrl = await uploadReceiptImage(file, user.id);
       
       if (!imageUrl) {
         throw new Error("Failed to upload image");
       }
       
-      setUploadProgress(70);
+      setUploadProgress(50);
       
-      // Create a mock receipt record
+      // Create a receipt record with placeholder data
       const today = new Date().toISOString().split('T')[0];
       const receiptId = await createReceipt({
-        merchant: "Unknown Merchant",
+        merchant: "Processing...",
         date: today,
         total: 0,
         currency: "USD",
@@ -96,15 +93,29 @@ export default function UploadZone() {
         total: 0
       });
       
+      if (!receiptId) {
+        throw new Error("Failed to create receipt");
+      }
+      
+      setUploadProgress(70);
+      
+      // Process the receipt with OCR
+      const ocrResult = await processReceiptWithOCR(receiptId);
+      
       setUploadProgress(100);
       
-      if (receiptId) {
-        toast.success("Receipt uploaded successfully!");
+      if (ocrResult) {
+        toast.success("Receipt processed successfully!");
         setTimeout(() => {
           navigate(`/receipt/${receiptId}`);
         }, 500);
       } else {
-        throw new Error("Failed to create receipt");
+        // Still navigate to receipt even if OCR fails
+        // User can manually edit
+        toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
+        setTimeout(() => {
+          navigate(`/receipt/${receiptId}`);
+        }, 500);
       }
     } catch (error) {
       console.error("Upload error:", error);
