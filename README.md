@@ -1,69 +1,291 @@
-# Welcome to your Lovable project
 
-## Project info
+# Automated Receipt Processing Application
 
-**URL**: https://lovable.dev/projects/c42ed42a-b743-487c-bea8-278f04f52631
+A web-based application for automating receipt data extraction using OCR technology with Amazon Textract and integrating with Zoho for expense tracking.
 
-## How can I edit this code?
+## Table of Contents
 
-There are several ways of editing your application.
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Database Schema](#database-schema)
+4. [API Endpoints](#api-endpoints)
+5. [Component Structure](#component-structure)
+6. [External Integrations](#external-integrations)
+7. [Development Guide](#development-guide)
 
-**Use Lovable**
+## Overview
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c42ed42a-b743-487c-bea8-278f04f52631) and start prompting.
+The Automated Receipt Processing Application streamlines the digitization and management of paper receipts through a complete workflow:
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Upload** - Users upload receipt images in JPEG, PNG, or PDF formats
+2. **Process** - Amazon Textract extracts text and data from the receipt
+3. **Extract** - Intelligent parsing identifies key information (date, merchant, amount, etc.)
+4. **Verify** - Side-by-side interface for users to review and edit data
+5. **Sync** - Integration with Zoho Expense for seamless expense tracking
 
-**Use your preferred IDE**
+### Key Features
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- OCR-powered data extraction with confidence scores
+- Receipt image manipulation (zoom, rotate)
+- Side-by-side editing with original image
+- Reimbursement tracking
+- Multi-currency support
+- Secure Zoho OAuth integration
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Architecture
 
-Follow these steps:
+The application follows a modern web architecture:
+
+```
+┌─────────────┐     ┌───────────────┐     ┌──────────────┐
+│ React       │     │ Supabase Edge │     │ Amazon       │
+│ Frontend    │◄────┤ Functions     │◄────┤ Textract     │
+│ Components  │     │               │     │              │
+└─────────────┘     └───────────────┘     └──────────────┘
+       ▲                    ▲                    ▲
+       │                    │                    │
+       ▼                    ▼                    │
+┌─────────────┐     ┌───────────────┐           │
+│ Supabase    │     │ Supabase      │           │
+│ Auth        │     │ Database      │           │
+└─────────────┘     └───────────────┘           │
+                            ▲                   │
+                            │                   │
+                            ▼                   │
+                    ┌───────────────┐           │
+                    │ Supabase      │◄──────────┘
+                    │ Storage       │
+                    └───────────────┘
+                            ▲
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │ Zoho          │
+                    │ Integration   │
+                    └───────────────┘
+```
+
+### Data Flow
+
+1. User uploads a receipt image through the React frontend
+2. Image is stored in Supabase Storage
+3. Edge Function triggers OCR processing with Amazon Textract
+4. Extracted data is stored in Supabase Database
+5. Frontend displays data alongside image for user verification
+6. Verified data can be synced to Zoho Expense
+
+## Database Schema
+
+### Tables
+
+#### `receipts`
+- `id` (UUID, PK) - Unique identifier
+- `user_id` (UUID, FK) - Reference to the user
+- `merchant` (VARCHAR) - Store/vendor name
+- `date` (DATE) - Receipt date
+- `total` (DECIMAL) - Total amount
+- `tax` (DECIMAL) - Tax amount
+- `currency` (VARCHAR) - Currency code (default: USD)
+- `payment_method` (VARCHAR) - Payment method
+- `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
+- `image_url` (TEXT) - URL to stored receipt image
+- `created_at` (TIMESTAMP) - Creation timestamp
+- `updated_at` (TIMESTAMP) - Last update timestamp
+
+#### `line_items`
+- `id` (UUID, PK) - Unique identifier
+- `receipt_id` (UUID, FK) - Reference to parent receipt
+- `description` (TEXT) - Item description
+- `amount` (DECIMAL) - Item amount
+- `created_at` (TIMESTAMP) - Creation timestamp
+- `updated_at` (TIMESTAMP) - Last update timestamp
+
+#### `confidence_scores`
+- `id` (UUID, PK) - Unique identifier
+- `receipt_id` (UUID, FK) - Reference to parent receipt
+- `merchant` (INTEGER) - Confidence score for merchant field
+- `date` (INTEGER) - Confidence score for date field
+- `total` (INTEGER) - Confidence score for total field
+- `tax` (INTEGER) - Confidence score for tax field
+- `line_items` (INTEGER) - Confidence score for line items
+- `created_at` (TIMESTAMP) - Creation timestamp
+- `updated_at` (TIMESTAMP) - Last update timestamp
+
+### Storage Buckets
+
+- `receipt_images` - Storage for receipt image files
+
+## API Endpoints
+
+### Receipt Processing
+
+#### Upload & Process Receipt
+- **Endpoint**: `POST /api/receipts/upload`
+- **Function**: Upload and process receipt image
+- **Parameters**: Image file (JPEG, PNG, PDF)
+- **Returns**: Receipt ID and processing status
+
+#### Process Receipt
+- **Endpoint**: `POST /api/receipts/:id/process`
+- **Function**: Process existing receipt with OCR
+- **Returns**: Extracted data with confidence scores
+
+#### Get Receipt
+- **Endpoint**: `GET /api/receipts/:id`
+- **Function**: Retrieve receipt details
+- **Returns**: Receipt data with line items and confidence scores
+
+#### Update Receipt
+- **Endpoint**: `PUT /api/receipts/:id`
+- **Function**: Update receipt information
+- **Parameters**: Updated receipt fields
+- **Returns**: Updated receipt data
+
+#### Delete Receipt
+- **Endpoint**: `DELETE /api/receipts/:id`
+- **Function**: Delete receipt and associated data
+- **Returns**: Success status
+
+### Zoho Integration
+
+#### Connect Zoho
+- **Endpoint**: `GET /api/zoho/connect`
+- **Function**: Initiate OAuth flow with Zoho
+- **Returns**: OAuth authorization URL
+
+#### Zoho Callback
+- **Endpoint**: `GET /api/zoho/callback`
+- **Function**: Handle OAuth callback from Zoho
+- **Parameters**: OAuth code
+- **Returns**: Success status and tokens
+
+#### Sync Receipt to Zoho
+- **Endpoint**: `POST /api/receipts/:id/sync-to-zoho`
+- **Function**: Sync receipt data to Zoho Expense
+- **Returns**: Sync status and Zoho expense ID
+
+## Component Structure
+
+### Pages
+
+#### Dashboard (`/dashboard`)
+- Receipt list and filtering
+- Upload button
+- Summary statistics
+
+#### Receipt View (`/receipt/:id`)
+- Side-by-side receipt image and data editor
+- Confidence score indicators
+- Zoom and rotate controls
+- Sync to Zoho button
+
+#### Authentication (`/auth`)
+- Login/Signup form
+- Zoho connection management
+
+### Core Components
+
+#### `UploadZone`
+- Drag & drop or file select interface
+- Upload progress indicator
+- File validation
+
+#### `ReceiptViewer`
+- Side-by-side layout for image and data
+- Image manipulation controls
+- Data editing interface with confidence indicators
+
+#### `ReceiptCard`
+- Summary display of receipt for listings
+- Status indicator
+- Quick actions
+
+#### `ConfidenceIndicator`
+- Visual display of confidence scores
+- Color-coded indicators (green/yellow/red)
+
+## External Integrations
+
+### Amazon Textract
+
+The application uses Amazon Textract for OCR processing and data extraction.
+
+#### Implementation
+
+1. **Edge Function**: `process-receipt`
+   - Receives image from storage
+   - Sends to Amazon Textract API
+   - Processes raw results and extracts structured data
+   - Stores results with confidence scores
+
+#### Required Configuration
+
+- AWS credentials stored as Supabase secrets:
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
+  - `AWS_REGION`
+
+### Zoho Integration
+
+The application integrates with Zoho Expense for expense tracking.
+
+#### Implementation
+
+1. **OAuth Flow**:
+   - Edge Function: `zoho-connect` - Initiates OAuth connection
+   - Edge Function: `zoho-callback` - Handles OAuth response
+
+2. **Data Sync**:
+   - Edge Function: `sync-to-zoho` - Sends receipt data to Zoho API
+   - Attaches receipt image to expense record
+   - Updates local status after successful sync
+
+#### Required Configuration
+
+- Zoho API credentials stored as Supabase secrets:
+  - `ZOHO_CLIENT_ID`
+  - `ZOHO_CLIENT_SECRET`
+  - `ZOHO_REDIRECT_URI`
+
+## Development Guide
+
+### Prerequisites
+
+- Node.js & npm installed
+- Supabase account
+- Amazon AWS account with Textract access
+- Zoho developer account
+
+### Local Development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+# Install dependencies
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Required Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+These will be stored as Supabase secrets:
 
-**Use GitHub Codespaces**
+- `AWS_ACCESS_KEY_ID` - Amazon AWS access key
+- `AWS_SECRET_ACCESS_KEY` - Amazon AWS secret key
+- `AWS_REGION` - Amazon AWS region
+- `ZOHO_CLIENT_ID` - Zoho API client ID
+- `ZOHO_CLIENT_SECRET` - Zoho API client secret
+- `ZOHO_REDIRECT_URI` - OAuth redirect URI
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Deployment
 
-## What technologies are used for this project?
+Automated deployment is available through Lovable's publishing feature:
 
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c42ed42a-b743-487c-bea8-278f04f52631) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+1. Open [Lovable](https://lovable.dev/projects/c42ed42a-b743-487c-bea8-278f04f52631)
+2. Click on Share -> Publish
