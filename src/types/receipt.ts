@@ -14,8 +14,7 @@ export interface Receipt {
   updated_at: string;
   tax?: number;
   payment_method?: string;
-  confidence?: number;
-  line_items?: ReceiptLineItem[];
+  // Remove the confidence property from the base Receipt interface
 }
 
 export interface ReceiptLineItem {
