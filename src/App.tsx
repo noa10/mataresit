@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/receipt/:id" element={<ViewReceipt />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -6,32 +7,80 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
-import { Upload, Search, Filter, SlidersHorizontal, PlusCircle, XCircle } from "lucide-react";
+import { 
+  Upload, Search, Filter, SlidersHorizontal, 
+  PlusCircle, XCircle, Calendar, DollarSign 
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
 import { Receipt } from "@/types/receipt";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [filterByCurrency, setFilterByCurrency] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">("newest");
   
-  const { data: receipts = [], isLoading, error } = useQuery({
+  const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
     queryFn: fetchReceipts,
     enabled: !!user, // Only run if user is logged in
   });
   
-  const filteredReceipts = receipts.filter(receipt => {
-    const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (activeTab === "all") return matchesSearch;
-    return matchesSearch && receipt.status === activeTab;
-  });
+  // Process receipts with filters and sorting
+  const processedReceipts = receipts
+    .filter(receipt => {
+      // Filter by search query
+      const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Filter by tab status
+      const matchesTab = activeTab === "all" || receipt.status === activeTab;
+      
+      // Filter by currency
+      const matchesCurrency = !filterByCurrency || receipt.currency === filterByCurrency;
+      
+      return matchesSearch && matchesTab && matchesCurrency;
+    })
+    .sort((a, b) => {
+      // Sort by selected order
+      if (sortOrder === "newest") {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      } else if (sortOrder === "oldest") {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else if (sortOrder === "highest") {
+        return b.total - a.total;
+      } else {
+        return a.total - b.total;
+      }
+    });
+  
+  // Get unique currencies from receipts
+  const currencies = [...new Set(receipts.map(r => r.currency))];
+  
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  };
   
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+  };
+  
+  const clearFilters = () => {
+    setSearchQuery("");
+    setActiveTab("all");
+    setFilterByCurrency(null);
+    setSortOrder("newest");
   };
 
   return (
@@ -84,10 +133,64 @@ export default function Dashboard() {
                 onChange={handleSearch}
               />
             </div>
-            <Button variant="outline" className="gap-2">
-              <SlidersHorizontal size={16} />
-              Filters
-            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <SlidersHorizontal size={16} />
+                  Filters
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Sort by</h4>
+                  <ToggleGroup type="single" value={sortOrder} onValueChange={(value) => value && setSortOrder(value as any)}>
+                    <ToggleGroupItem value="newest" aria-label="Sort by newest first">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Newest
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="oldest" aria-label="Sort by oldest first">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Oldest
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="highest" aria-label="Sort by highest amount">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Highest
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Lowest
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  
+                  {currencies.length > 0 && (
+                    <>
+                      <h4 className="font-medium pt-2">Currency</h4>
+                      <ToggleGroup 
+                        type="single" 
+                        value={filterByCurrency || "all"} 
+                        onValueChange={(value) => setFilterByCurrency(value === "all" ? null : value)}
+                      >
+                        <ToggleGroupItem value="all" aria-label="Show all currencies">
+                          All
+                        </ToggleGroupItem>
+                        {currencies.map(currency => (
+                          <ToggleGroupItem key={currency} value={currency} aria-label={`Filter by ${currency}`}>
+                            {currency}
+                          </ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    </>
+                  )}
+                  
+                  <div className="pt-2">
+                    <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div className="mt-4">
@@ -123,7 +226,7 @@ export default function Dashboard() {
             </p>
             <Button 
               variant="outline" 
-              onClick={() => window.location.reload()}
+              onClick={() => refetch()}
             >
               Retry
             </Button>
@@ -149,7 +252,7 @@ export default function Dashboard() {
               </Link>
             </Button>
           </motion.div>
-        ) : filteredReceipts.length === 0 ? (
+        ) : processedReceipts.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -163,16 +266,13 @@ export default function Dashboard() {
             <p className="text-muted-foreground mb-6">
               Try adjusting your search or filters
             </p>
-            <Button variant="outline" onClick={() => {
-              setSearchQuery("");
-              setActiveTab("all");
-            }}>
+            <Button variant="outline" onClick={clearFilters}>
               Clear Filters
             </Button>
           </motion.div>
         ) : (
           <div className="receipt-container">
-            {filteredReceipts.map((receipt, index) => (
+            {processedReceipts.map((receipt, index) => (
               <motion.div
                 key={receipt.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -182,12 +282,12 @@ export default function Dashboard() {
                 <ReceiptCard
                   id={receipt.id}
                   merchant={receipt.merchant}
-                  date={receipt.date}
+                  date={formatDate(receipt.date)}
                   total={receipt.total}
                   currency={receipt.currency}
                   imageUrl={receipt.image_url || "/placeholder.svg"}
                   status={receipt.status}
-                  confidence={0} // Default value if confidence is not available
+                  confidence={receipt.confidence || 0}
                 />
               </motion.div>
             ))}

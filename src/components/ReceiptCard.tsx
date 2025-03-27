@@ -1,10 +1,10 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Calendar, Store, DollarSign, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ReceiptCardProps {
   id: string;
@@ -28,6 +28,36 @@ export default function ReceiptCard({
   confidence,
 }: ReceiptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [imageSource, setImageSource] = useState<string>(imageUrl);
+  
+  useEffect(() => {
+    async function getImageUrl() {
+      // Only try to get from Supabase if it's a storage URL and not a placeholder or external URL
+      if (imageUrl && imageUrl.startsWith('receipts/')) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('receipts')
+            .createSignedUrl(imageUrl, 3600); // 1 hour expiry
+          
+          if (data && !error) {
+            setImageSource(data.signedUrl);
+          } else {
+            console.error("Error getting signed URL:", error);
+            // Fallback to placeholder if there's an error
+            setImageSource("/placeholder.svg");
+          }
+        } catch (error) {
+          console.error("Error in getImageUrl:", error);
+          setImageSource("/placeholder.svg");
+        }
+      } else {
+        // Keep the original URL for placeholders or external URLs
+        setImageSource(imageUrl);
+      }
+    }
+    
+    getImageUrl();
+  }, [imageUrl]);
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -62,9 +92,10 @@ export default function ReceiptCard({
     >
       <div className="relative h-48 overflow-hidden">
         <img 
-          src={imageUrl} 
+          src={imageSource} 
           alt={`Receipt from ${merchant}`}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+          onError={() => setImageSource("/placeholder.svg")}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         
