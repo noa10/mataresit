@@ -12,6 +12,8 @@ export interface Receipt {
   status: ReceiptStatus;
   created_at: string;
   updated_at: string;
+  tax?: number;
+  payment_method?: string;
   confidence?: number;
   line_items?: ReceiptLineItem[];
 }
@@ -20,7 +22,54 @@ export interface ReceiptLineItem {
   id: string;
   receipt_id: string;
   description: string;
-  quantity: number;
-  unit_price: number;
+  amount: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LineItem {
+  id?: string;
+  receipt_id?: string;
+  description: string;
+  amount: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConfidenceScore {
+  id: string;
+  receipt_id: string;
+  merchant: number;
+  date: number;
   total: number;
+  tax?: number;
+  line_items?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReceiptWithDetails extends Receipt {
+  lineItems?: ReceiptLineItem[];
+  confidence?: {
+    merchant?: number;
+    date?: number;
+    total?: number;
+    tax?: number;
+    line_items?: number;
+  };
+}
+
+export interface OCRResult {
+  merchant: string;
+  date: string;
+  total: number;
+  tax?: number;
+  line_items?: LineItem[];
+  confidence: {
+    merchant: number;
+    date: number;
+    total: number;
+    tax?: number;
+    line_items?: number;
+  };
 }

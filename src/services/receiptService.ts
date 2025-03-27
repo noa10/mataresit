@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult } from "@/types/receipt";
 import { toast } from "sonner";
@@ -75,7 +76,8 @@ export async function createReceipt(
 
     if (lineItems && lineItems.length > 0) {
       const formattedLineItems = lineItems.map(item => ({
-        ...item,
+        description: item.description,
+        amount: item.amount,
         receipt_id: receiptId
       }));
 
@@ -133,7 +135,8 @@ export async function updateReceipt(
 
       if (lineItems.length > 0) {
         const formattedLineItems = lineItems.map(item => ({
-          ...item,
+          description: item.description,
+          amount: item.amount,
           receipt_id: id
         }));
 

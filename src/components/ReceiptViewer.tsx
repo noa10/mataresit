@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails } from "@/types/receipt";
+import { ReceiptWithDetails, ReceiptLineItem } from "@/types/receipt";
 import { updateReceipt } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -96,7 +96,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   };
   
   const handleAddLineItem = () => {
-    const newLineItem = {
+    const newLineItem: ReceiptLineItem = {
       id: `temp-${Date.now()}`,
       receipt_id: receipt.id,
       description: "New item",
