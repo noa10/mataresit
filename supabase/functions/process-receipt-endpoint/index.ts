@@ -23,7 +23,7 @@ serve(async (req) => {
     }
     
     // Get the authorization header
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('Authorization') || '';
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
@@ -96,7 +96,7 @@ serve(async (req) => {
     const ocrData = processResult.data;
     
     // Create line items from extracted data
-    const lineItems = ocrData.lineItems.items.map((item) => ({
+    const lineItems = ocrData.lineItems.items.map((item: any) => ({
       description: item.description,
       amount: item.amount,
       receipt_id: receiptId,
@@ -129,11 +129,21 @@ serve(async (req) => {
       throw new Error(`Failed to update receipt: ${updateError.message}`);
     }
     
+    // Delete existing line items first
+    const { error: deleteLineItemsError } = await supabase
+      .from('line_items')
+      .delete()
+      .eq('receipt_id', receiptId);
+      
+    if (deleteLineItemsError) {
+      console.error("Error deleting existing line items:", deleteLineItemsError);
+    }
+    
     // Insert line items
     if (lineItems.length > 0) {
       const { error: lineItemsError } = await supabase
         .from('line_items')
-        .upsert(lineItems);
+        .insert(lineItems);
         
       if (lineItemsError) {
         console.error("Error inserting line items:", lineItemsError);
@@ -166,7 +176,7 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in process-receipt-endpoint function:', error);
     
     return new Response(

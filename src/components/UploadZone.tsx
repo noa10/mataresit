@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -40,7 +39,7 @@ export default function UploadZone() {
       handleFiles(e.target.files);
     }
   };
-
+  
   const handleFiles = async (files: FileList) => {
     if (!user) {
       toast.error("Please login first");

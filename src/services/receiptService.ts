@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult } from "@/types/receipt";
 import { toast } from "sonner";
@@ -21,7 +20,6 @@ export async function fetchReceipts(): Promise<Receipt[]> {
 
 export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails | null> {
   try {
-    // Fetch the receipt
     const { data: receipt, error: receiptError } = await supabase
       .from('receipts')
       .select('*')
@@ -31,7 +29,6 @@ export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails |
     if (receiptError) throw receiptError;
     if (!receipt) return null;
 
-    // Fetch line items
     const { data: lineItems, error: lineItemsError } = await supabase
       .from('line_items')
       .select('*')
@@ -39,7 +36,6 @@ export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails |
 
     if (lineItemsError) throw lineItemsError;
 
-    // Fetch confidence scores
     const { data: confidence, error: confidenceError } = await supabase
       .from('confidence_scores')
       .select('*')
@@ -47,7 +43,6 @@ export async function fetchReceiptById(id: string): Promise<ReceiptWithDetails |
       .single();
 
     if (confidenceError && confidenceError.code !== 'PGRST116') {
-      // PGRST116 is "Results contain 0 rows" - this is OK as confidence might not exist
       throw confidenceError;
     }
 
@@ -69,24 +64,15 @@ export async function createReceipt(
   confidenceScore?: Omit<ConfidenceScore, 'id' | 'receipt_id' | 'created_at' | 'updated_at'>
 ): Promise<string | null> {
   try {
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    // Insert receipt with user_id
     const { data: receiptData, error: receiptError } = await supabase
       .from('receipts')
-      .insert({
-        ...receipt,
-        user_id: user.id
-      })
+      .insert(receipt)
       .select('id')
       .single();
 
     if (receiptError) throw receiptError;
     const receiptId = receiptData.id;
 
-    // Insert line items if provided
     if (lineItems && lineItems.length > 0) {
       const formattedLineItems = lineItems.map(item => ({
         ...item,
@@ -100,7 +86,6 @@ export async function createReceipt(
       if (lineItemsError) throw lineItemsError;
     }
 
-    // Insert confidence score if provided
     if (confidenceScore) {
       const { error: confidenceError } = await supabase
         .from('confidence_scores')
@@ -128,7 +113,6 @@ export async function updateReceipt(
   confidenceScore?: Partial<Omit<ConfidenceScore, 'id' | 'receipt_id' | 'created_at' | 'updated_at'>>
 ): Promise<boolean> {
   try {
-    // Update receipt
     const { error: receiptError } = await supabase
       .from('receipts')
       .update({
@@ -139,9 +123,7 @@ export async function updateReceipt(
 
     if (receiptError) throw receiptError;
 
-    // Handle line items if provided
     if (lineItems) {
-      // First delete existing line items
       const { error: deleteError } = await supabase
         .from('line_items')
         .delete()
@@ -149,7 +131,6 @@ export async function updateReceipt(
 
       if (deleteError) throw deleteError;
 
-      // Then insert new ones
       if (lineItems.length > 0) {
         const formattedLineItems = lineItems.map(item => ({
           ...item,
@@ -164,7 +145,6 @@ export async function updateReceipt(
       }
     }
 
-    // Update confidence score if provided
     if (confidenceScore) {
       const { error: confidenceError } = await supabase
         .from('confidence_scores')
@@ -188,7 +168,6 @@ export async function updateReceipt(
 
 export async function deleteReceipt(id: string): Promise<boolean> {
   try {
-    // Delete receipt (cascade will handle line items and confidence scores)
     const { error } = await supabase
       .from('receipts')
       .delete()
@@ -219,7 +198,6 @@ export async function uploadReceiptImage(file: File, userId: string): Promise<st
     
     if (uploadError) throw uploadError;
     
-    // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('receipt_images')
       .getPublicUrl(fileName);
