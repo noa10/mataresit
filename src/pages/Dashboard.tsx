@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -32,7 +31,7 @@ export default function Dashboard() {
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
     queryFn: fetchReceipts,
-    enabled: !!user, // Only run if user is logged in
+    enabled: !!user,
   });
   
   const processedReceipts = receipts
@@ -197,7 +196,7 @@ export default function Dashboard() {
           </div>
           
           <div className="mt-4">
-            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+            <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | ReceiptStatus)}>
               <TabsList className="bg-background/50">
                 <TabsTrigger value="all">All Receipts</TabsTrigger>
                 <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>

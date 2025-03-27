@@ -90,22 +90,50 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
 // Upload a receipt image to Supabase Storage
 export const uploadReceiptImage = async (file: File, userId: string): Promise<string | null> => {
   try {
+    // Create a unique file name to avoid collisions
     const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const timestamp = new Date().getTime();
+    const fileId = Math.random().toString(36).substring(2, 15);
+    const fileName = `${userId}_${fileId}.${fileExt}`;
     
+    // Log upload attempt details to help diagnose the issue
+    console.log("Uploading file:", {
+      name: fileName,
+      type: file.type,
+      size: file.size,
+      bucket: 'receipt_images'
+    });
+    
+    // Check if storage bucket exists, if not create it
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.find(bucket => bucket.name === 'receipt_images')) {
+      console.log("Receipt images bucket not found, need to create it");
+      toast.error("Storage not properly configured. Please contact support.");
+      return null;
+    }
+    
+    // Upload the file
     const { data, error } = await supabase.storage
       .from('receipt_images')
-      .upload(filePath, file);
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
     
     if (error) {
+      console.error("Storage upload error:", error);
       throw error;
     }
     
+    if (!data?.path) {
+      throw new Error("Upload successful but no path returned");
+    }
+    
+    console.log("Upload successful:", data);
     return data.path;
   } catch (error) {
     console.error("Error uploading image:", error);
-    toast.error("Failed to upload receipt image");
+    toast.error("Failed to upload receipt image. Please try again.");
     return null;
   }
 };

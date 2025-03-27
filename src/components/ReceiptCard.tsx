@@ -130,7 +130,7 @@ export default function ReceiptCard({
         <div className="absolute top-2 right-2 flex gap-2">
           <Badge 
             variant="outline"
-            className="text-xs font-medium bg-white/90 backdrop-blur-sm text-foreground"
+            className="text-xs font-medium bg-black/60 backdrop-blur-sm text-white border-white/20"
           >
             <span className={`mr-1.5 inline-block w-2 h-2 rounded-full ${getStatusColor()}`}></span>
             {status.charAt(0).toUpperCase() + status.slice(1)}
