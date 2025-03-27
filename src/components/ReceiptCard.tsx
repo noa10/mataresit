@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -5,6 +6,7 @@ import { Calendar, Store, DollarSign, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ReceiptCardProps {
   id: string;
@@ -28,22 +30,31 @@ export default function ReceiptCard({
   confidence,
 }: ReceiptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [imageSource, setImageSource] = useState<string>(imageUrl);
+  const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
   
   useEffect(() => {
     async function getImageUrl() {
-      // Only try to get from Supabase if it's a storage URL and not a placeholder or external URL
-      if (imageUrl && imageUrl.startsWith('receipts/')) {
+      // Check if imageUrl is empty or a placeholder
+      if (!imageUrl || imageUrl === "/placeholder.svg") {
+        setImageSource("/placeholder.svg");
+        return;
+      }
+      
+      // Handle various URL formats
+      if (imageUrl.startsWith('http')) {
+        // Already a full URL, use it directly
+        setImageSource(imageUrl);
+      } else if (imageUrl.includes('receipt_images/')) {
+        // It's a storage path, get a signed URL
         try {
           const { data, error } = await supabase.storage
-            .from('receipts')
-            .createSignedUrl(imageUrl, 3600); // 1 hour expiry
+            .from('receipt_images')
+            .createSignedUrl(imageUrl.replace('receipt_images/', ''), 3600); // 1 hour expiry
           
           if (data && !error) {
             setImageSource(data.signedUrl);
           } else {
             console.error("Error getting signed URL:", error);
-            // Fallback to placeholder if there's an error
             setImageSource("/placeholder.svg");
           }
         } catch (error) {
@@ -51,8 +62,21 @@ export default function ReceiptCard({
           setImageSource("/placeholder.svg");
         }
       } else {
-        // Keep the original URL for placeholders or external URLs
-        setImageSource(imageUrl);
+        // Try to get from public bucket
+        try {
+          const { data: publicUrlData } = supabase.storage
+            .from('receipt_images')
+            .getPublicUrl(imageUrl);
+            
+          if (publicUrlData?.publicUrl) {
+            setImageSource(publicUrlData.publicUrl);
+          } else {
+            setImageSource("/placeholder.svg");
+          }
+        } catch (error) {
+          console.error("Error getting public URL:", error);
+          setImageSource("/placeholder.svg");
+        }
       }
     }
     
@@ -95,7 +119,10 @@ export default function ReceiptCard({
           src={imageSource} 
           alt={`Receipt from ${merchant}`}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-          onError={() => setImageSource("/placeholder.svg")}
+          onError={() => {
+            console.log("Image failed to load:", imageUrl);
+            setImageSource("/placeholder.svg");
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         

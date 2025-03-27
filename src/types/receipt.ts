@@ -14,7 +14,13 @@ export interface Receipt {
   updated_at: string;
   tax?: number;
   payment_method?: string;
-  // Remove the confidence property from the base Receipt interface
+  confidence_scores?: {
+    merchant?: number;
+    date?: number;
+    total?: number;
+    tax?: number;
+    line_items?: number;
+  };
 }
 
 export interface ReceiptLineItem {

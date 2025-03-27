@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -32,22 +31,14 @@ export default function Dashboard() {
     enabled: !!user, // Only run if user is logged in
   });
   
-  // Process receipts with filters and sorting
   const processedReceipts = receipts
     .filter(receipt => {
-      // Filter by search query
       const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Filter by tab status
       const matchesTab = activeTab === "all" || receipt.status === activeTab;
-      
-      // Filter by currency
       const matchesCurrency = !filterByCurrency || receipt.currency === filterByCurrency;
-      
       return matchesSearch && matchesTab && matchesCurrency;
     })
     .sort((a, b) => {
-      // Sort by selected order
       if (sortOrder === "newest") {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       } else if (sortOrder === "oldest") {
@@ -59,10 +50,8 @@ export default function Dashboard() {
       }
     });
   
-  // Get unique currencies from receipts
   const currencies = [...new Set(receipts.map(r => r.currency))];
   
-  // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -88,7 +77,6 @@ export default function Dashboard() {
       <Navbar />
       
       <main className="container px-4 py-8">
-        {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -108,7 +96,7 @@ export default function Dashboard() {
             className="flex gap-3"
           >
             <Button asChild className="gap-2">
-              <Link to="/">
+              <Link to="/upload">
                 <Upload size={16} />
                 Upload New
               </Link>
@@ -116,7 +104,6 @@ export default function Dashboard() {
           </motion.div>
         </div>
         
-        {/* Filters and Search */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,28 +123,33 @@ export default function Dashboard() {
             
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2 whitespace-nowrap">
                   <SlidersHorizontal size={16} />
                   Filters
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80">
+              <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
                 <div className="space-y-4">
                   <h4 className="font-medium">Sort by</h4>
-                  <ToggleGroup type="single" value={sortOrder} onValueChange={(value) => value && setSortOrder(value as any)}>
-                    <ToggleGroupItem value="newest" aria-label="Sort by newest first">
+                  <ToggleGroup 
+                    type="single" 
+                    value={sortOrder} 
+                    onValueChange={(value) => value && setSortOrder(value as any)}
+                    className="flex flex-wrap justify-start gap-2"
+                  >
+                    <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
                       <Calendar className="h-4 w-4 mr-2" />
                       Newest
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="oldest" aria-label="Sort by oldest first">
+                    <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
                       <Calendar className="h-4 w-4 mr-2" />
                       Oldest
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="highest" aria-label="Sort by highest amount">
+                    <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
                       <DollarSign className="h-4 w-4 mr-2" />
                       Highest
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount">
+                    <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount" className="flex-grow-0">
                       <DollarSign className="h-4 w-4 mr-2" />
                       Lowest
                     </ToggleGroupItem>
@@ -170,12 +162,18 @@ export default function Dashboard() {
                         type="single" 
                         value={filterByCurrency || "all"} 
                         onValueChange={(value) => setFilterByCurrency(value === "all" ? null : value)}
+                        className="flex flex-wrap justify-start gap-2"
                       >
-                        <ToggleGroupItem value="all" aria-label="Show all currencies">
+                        <ToggleGroupItem value="all" aria-label="Show all currencies" className="flex-grow-0">
                           All
                         </ToggleGroupItem>
                         {currencies.map(currency => (
-                          <ToggleGroupItem key={currency} value={currency} aria-label={`Filter by ${currency}`}>
+                          <ToggleGroupItem 
+                            key={currency} 
+                            value={currency} 
+                            aria-label={`Filter by ${currency}`}
+                            className="flex-grow-0"
+                          >
                             {currency}
                           </ToggleGroupItem>
                         ))}
@@ -205,7 +203,6 @@ export default function Dashboard() {
           </div>
         </motion.div>
         
-        {/* Receipts Grid */}
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
             <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
@@ -272,30 +269,36 @@ export default function Dashboard() {
           </motion.div>
         ) : (
           <div className="receipt-container">
-            {processedReceipts.map((receipt, index) => (
-              <motion.div
-                key={receipt.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
-              >
-                <ReceiptCard
-                  id={receipt.id}
-                  merchant={receipt.merchant}
-                  date={formatDate(receipt.date)}
-                  total={receipt.total}
-                  currency={receipt.currency}
-                  imageUrl={receipt.image_url || "/placeholder.svg"}
-                  status={receipt.status}
-                  confidence={receipt.confidence || 0}
-                />
-              </motion.div>
-            ))}
+            {processedReceipts.map((receipt, index) => {
+              const confidenceScore = 
+                receipt.confidence_scores && 
+                receipt.confidence_scores.merchant ? 
+                Math.round(receipt.confidence_scores.merchant * 100) : 0;
+              
+              return (
+                <motion.div
+                  key={receipt.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
+                >
+                  <ReceiptCard
+                    id={receipt.id}
+                    merchant={receipt.merchant}
+                    date={formatDate(receipt.date)}
+                    total={receipt.total}
+                    currency={receipt.currency}
+                    imageUrl={receipt.image_url || "/placeholder.svg"}
+                    status={receipt.status}
+                    confidence={confidenceScore}
+                  />
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </main>
       
-      {/* Footer */}
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
