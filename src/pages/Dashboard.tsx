@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -8,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { 
   Upload, Search, Filter, SlidersHorizontal, 
-  PlusCircle, XCircle, Calendar, DollarSign 
+  PlusCircle, XCircle, Calendar, DollarSign, X 
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
@@ -17,6 +18,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import UploadZone from "@/components/UploadZone";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -24,6 +27,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("all");
   const [filterByCurrency, setFilterByCurrency] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">("newest");
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
@@ -95,11 +99,12 @@ export default function Dashboard() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex gap-3"
           >
-            <Button asChild className="gap-2">
-              <Link to="/upload">
-                <Upload size={16} />
-                Upload New
-              </Link>
+            <Button 
+              className="gap-2"
+              onClick={() => setIsUploadDialogOpen(true)}
+            >
+              <Upload size={16} />
+              Upload New
             </Button>
           </motion.div>
         </div>
@@ -128,7 +133,7 @@ export default function Dashboard() {
                   Filters
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
+              <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] bg-background/95 backdrop-blur-sm border border-border">
                 <div className="space-y-4">
                   <h4 className="font-medium">Sort by</h4>
                   <ToggleGroup 
@@ -242,11 +247,9 @@ export default function Dashboard() {
             <p className="text-muted-foreground mb-6">
               Upload your first receipt to get started
             </p>
-            <Button asChild>
-              <Link to="/" className="gap-2">
-                <PlusCircle size={16} />
-                Upload Receipt
-              </Link>
+            <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
+              <PlusCircle size={16} />
+              Upload Receipt
             </Button>
           </motion.div>
         ) : processedReceipts.length === 0 ? (
@@ -298,6 +301,18 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Receipt</DialogTitle>
+          </DialogHeader>
+          <UploadZone onUploadComplete={() => {
+            setIsUploadDialogOpen(false);
+            refetch();
+          }} />
+        </DialogContent>
+      </Dialog>
       
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">

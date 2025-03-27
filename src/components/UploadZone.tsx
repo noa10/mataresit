@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -7,7 +8,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { createReceipt, uploadReceiptImage, processReceiptWithOCR } from "@/services/receiptService";
 
-export default function UploadZone() {
+interface UploadZoneProps {
+  onUploadComplete?: () => void;
+}
+
+export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -105,16 +110,30 @@ export default function UploadZone() {
       
       if (ocrResult) {
         toast.success("Receipt processed successfully!");
-        setTimeout(() => {
-          navigate(`/receipt/${receiptId}`);
-        }, 500);
+        if (onUploadComplete) {
+          setTimeout(() => {
+            onUploadComplete();
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        } else {
+          setTimeout(() => {
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        }
       } else {
         // Still navigate to receipt even if OCR fails
         // User can manually edit
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
-        setTimeout(() => {
-          navigate(`/receipt/${receiptId}`);
-        }, 500);
+        if (onUploadComplete) {
+          setTimeout(() => {
+            onUploadComplete();
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        } else {
+          setTimeout(() => {
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        }
       }
     } catch (error) {
       console.error("Upload error:", error);

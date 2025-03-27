@@ -124,12 +124,12 @@ export default function ReceiptCard({
             setImageSource("/placeholder.svg");
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
         
         <div className="absolute top-2 right-2 flex gap-2">
           <Badge 
             variant="outline"
-            className={`text-xs font-medium bg-white/80 backdrop-blur-sm`}
+            className="text-xs font-medium bg-white/90 backdrop-blur-sm text-foreground"
           >
             <span className={`mr-1.5 inline-block w-2 h-2 rounded-full ${getStatusColor()}`}></span>
             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -137,13 +137,13 @@ export default function ReceiptCard({
         </div>
         
         <div className="absolute bottom-3 left-3 right-3">
-          <h3 className="text-white font-semibold text-lg truncate">{merchant}</h3>
+          <h3 className="text-white font-semibold text-lg truncate drop-shadow-md">{merchant}</h3>
           <div className="flex justify-between items-end">
-            <p className="text-white/90 text-sm flex items-center gap-1">
+            <p className="text-white/90 text-sm flex items-center gap-1 drop-shadow-md">
               <Calendar size={14} />
               {date}
             </p>
-            <p className="text-white font-bold">
+            <p className="text-white font-bold drop-shadow-md">
               {formatCurrency(total)}
             </p>
           </div>
