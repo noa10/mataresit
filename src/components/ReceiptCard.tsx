@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ReceiptStatus } from "@/types/receipt";
 
 interface ReceiptCardProps {
   id: string;
@@ -15,7 +16,7 @@ interface ReceiptCardProps {
   total: number;
   currency: string;
   imageUrl: string;
-  status: "unreviewed" | "reviewed" | "synced";
+  status: ReceiptStatus;
   confidence: number;
 }
 

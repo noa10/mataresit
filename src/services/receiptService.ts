@@ -1,7 +1,14 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult } from "@/types/receipt";
+import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus } from "@/types/receipt";
 import { toast } from "sonner";
+
+// Ensure status is of type ReceiptStatus
+const validateStatus = (status: string): ReceiptStatus => {
+  if (status === "unreviewed" || status === "reviewed" || status === "synced") {
+    return status;
+  }
+  return "unreviewed"; // Default fallback
+};
 
 // Fetch all receipts for the current user
 export const fetchReceipts = async (): Promise<Receipt[]> => {
@@ -23,7 +30,11 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
     return [];
   }
   
-  return data || [];
+  // Validate and convert status to ReceiptStatus type
+  return (data || []).map(receipt => ({
+    ...receipt,
+    status: validateStatus(receipt.status || "unreviewed")
+  }));
 };
 
 // Fetch a single receipt by ID with line items
@@ -66,6 +77,7 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
   
   return {
     ...receipt,
+    status: validateStatus(receipt.status || "unreviewed"),
     lineItems: lineItems || [],
     confidence: confidence || {
       merchant: 0,
@@ -348,7 +360,7 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
 };
 
 // Update receipt status
-export const updateReceiptStatus = async (id: string, status: "unreviewed" | "reviewed" | "synced"): Promise<boolean> => {
+export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from("receipts")

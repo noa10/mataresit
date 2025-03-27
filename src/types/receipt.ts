@@ -53,7 +53,7 @@ export interface ConfidenceScore {
   updated_at: string;
 }
 
-export interface ReceiptWithDetails extends Receipt {
+export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
   lineItems?: ReceiptLineItem[];
   confidence?: {
     merchant?: number;
