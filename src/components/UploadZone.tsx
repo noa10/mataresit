@@ -16,6 +16,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -52,6 +53,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       return;
     }
 
+    setError(null);
     const validFiles = Array.from(files).filter(file => {
       const fileType = file.type;
       return fileType === 'image/jpeg' || 
@@ -98,47 +100,39 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       });
       
       if (!receiptId) {
-        throw new Error("Failed to create receipt");
+        throw new Error("Failed to create receipt record");
       }
       
       setUploadProgress(70);
       
-      // Process the receipt with OCR
-      const ocrResult = await processReceiptWithOCR(receiptId);
-      
-      setUploadProgress(100);
-      
-      if (ocrResult) {
+      // Process the receipt with OCR (if OCR fails, we still have the uploaded receipt)
+      try {
+        await processReceiptWithOCR(receiptId);
+        setUploadProgress(100);
         toast.success("Receipt processed successfully!");
-        if (onUploadComplete) {
-          setTimeout(() => {
-            onUploadComplete();
-            navigate(`/receipt/${receiptId}`);
-          }, 500);
-        } else {
-          setTimeout(() => {
-            navigate(`/receipt/${receiptId}`);
-          }, 500);
-        }
-      } else {
-        // Still navigate to receipt even if OCR fails
-        // User can manually edit
+      } catch (ocrError) {
+        console.error("OCR processing error:", ocrError);
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
-        if (onUploadComplete) {
-          setTimeout(() => {
-            onUploadComplete();
-            navigate(`/receipt/${receiptId}`);
-          }, 500);
-        } else {
-          setTimeout(() => {
-            navigate(`/receipt/${receiptId}`);
-          }, 500);
-        }
+        setUploadProgress(100);
       }
-    } catch (error) {
+      
+      // Navigate to the receipt page regardless of OCR success/failure
+      if (onUploadComplete) {
+        setTimeout(() => {
+          onUploadComplete();
+          navigate(`/receipt/${receiptId}`);
+        }, 500);
+      } else {
+        setTimeout(() => {
+          navigate(`/receipt/${receiptId}`);
+        }, 500);
+      }
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("There was an error uploading your receipt");
+      setError(error.message || "There was an error uploading your receipt");
+      toast.error(error.message || "There was an error uploading your receipt");
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
   
@@ -146,6 +140,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+  
+  const retryUpload = () => {
+    setError(null);
+    setIsUploading(false);
+    setUploadProgress(0);
   };
 
   return (
@@ -187,6 +187,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           >
             {isUploading ? (
               <Loader2 size={30} className="text-primary animate-spin" />
+            ) : error ? (
+              <XCircle size={30} className="text-destructive" />
             ) : (
               <Upload size={30} className="text-primary" />
             )}
@@ -194,12 +196,18 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           
           <div className="text-center space-y-2">
             <h3 className="text-lg font-medium">
-              {isUploading ? "Uploading..." : "Upload Receipt"}
+              {isUploading 
+                ? "Uploading..." 
+                : error 
+                  ? "Upload Failed" 
+                  : "Upload Receipt"}
             </h3>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto">
               {isUploading 
                 ? `Processing your receipt (${uploadProgress}%)`
-                : "Drag & drop your receipt images or PDFs here, or click to browse"
+                : error
+                  ? error
+                  : "Drag & drop your receipt images or PDFs here, or click to browse"
               }
             </p>
           </div>
@@ -215,6 +223,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 />
               </div>
             </div>
+          ) : error ? (
+            <Button 
+              onClick={retryUpload}
+              variant="default" 
+              className="mt-2"
+            >
+              Try Again
+            </Button>
           ) : (
             <Button 
               onClick={openFileDialog}

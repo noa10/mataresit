@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus } from "@/types/receipt";
 import { toast } from "sonner";
@@ -94,9 +95,8 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     const fileExt = file.name.split('.').pop();
     const timestamp = new Date().getTime();
     const fileId = Math.random().toString(36).substring(2, 15);
-    const fileName = `${userId}_${fileId}.${fileExt}`;
+    const fileName = `${userId}/${timestamp}_${fileId}.${fileExt}`;
     
-    // Log upload attempt details to help diagnose the issue
     console.log("Uploading file:", {
       name: fileName,
       type: file.type,
@@ -104,12 +104,34 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       bucket: 'receipt_images'
     });
     
-    // Check if storage bucket exists, if not create it
-    const { data: buckets } = await supabase.storage.listBuckets();
-    if (!buckets?.find(bucket => bucket.name === 'receipt_images')) {
-      console.log("Receipt images bucket not found, need to create it");
-      toast.error("Storage not properly configured. Please contact support.");
+    // First check if the bucket exists
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
+      toast.error("Error checking storage configuration");
       return null;
+    }
+    
+    // If receipt_images bucket doesn't exist, create it
+    const bucketExists = buckets?.some(bucket => bucket.name === 'receipt_images');
+    
+    if (!bucketExists) {
+      console.log("Receipt images bucket not found, attempting to create it");
+      
+      const { data: newBucket, error: createError } = await supabase.storage.createBucket('receipt_images', {
+        public: true,
+        fileSizeLimit: 10485760, // 10MB
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'application/pdf']
+      });
+      
+      if (createError) {
+        console.error("Error creating bucket:", createError);
+        toast.error("Failed to configure storage. Please contact support.");
+        return null;
+      }
+      
+      console.log("Bucket created successfully:", newBucket);
     }
     
     // Upload the file
@@ -125,12 +147,17 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       throw error;
     }
     
-    if (!data?.path) {
-      throw new Error("Upload successful but no path returned");
+    // Get the public URL for the file
+    const { data: publicUrlData } = supabase.storage
+      .from('receipt_images')
+      .getPublicUrl(fileName);
+      
+    if (!publicUrlData?.publicUrl) {
+      throw new Error("Upload successful but couldn't get public URL");
     }
     
-    console.log("Upload successful:", data);
-    return data.path;
+    console.log("Upload successful:", publicUrlData.publicUrl);
+    return publicUrlData.publicUrl;
   } catch (error) {
     console.error("Error uploading image:", error);
     toast.error("Failed to upload receipt image. Please try again.");
@@ -153,6 +180,7 @@ export const createReceipt = async (
       .single();
     
     if (error) {
+      console.error("Error creating receipt:", error);
       throw error;
     }
     
@@ -367,7 +395,17 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
     
     // Delete the image from storage if it exists
     if (receipt?.image_url) {
-      const imagePath = receipt.image_url.replace('receipt_images/', '');
+      // Extract path from URL if needed
+      let imagePath = receipt.image_url;
+      
+      // If it's a full URL, extract the path
+      if (imagePath.includes('receipt_images/')) {
+        const pathParts = imagePath.split('receipt_images/');
+        if (pathParts.length > 1) {
+          imagePath = pathParts[1];
+        }
+      }
+      
       const { error: storageError } = await supabase.storage
         .from('receipt_images')
         .remove([imagePath]);
