@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,9 +8,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 
-// Lazy load pages for better performance
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+// Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 
@@ -40,16 +39,16 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Suspense fallback={<PageLoading />}>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="*" element={<NotFound />} />
+            <Suspense fallback={<PageLoading />}>
               <Route path="/receipt/:id" element={<ViewReceipt />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+            </Suspense>
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
