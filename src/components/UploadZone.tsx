@@ -78,7 +78,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       const imageUrl = await uploadReceiptImage(file, user.id);
       
       if (!imageUrl) {
-        throw new Error("Failed to upload image");
+        throw new Error("Failed to upload image. Please try again later.");
       }
       
       setUploadProgress(50);
@@ -110,7 +110,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         await processReceiptWithOCR(receiptId);
         setUploadProgress(100);
         toast.success("Receipt processed successfully!");
-      } catch (ocrError) {
+      } catch (ocrError: any) {
         console.error("OCR processing error:", ocrError);
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
         setUploadProgress(100);

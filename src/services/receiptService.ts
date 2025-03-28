@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus } from "@/types/receipt";
 import { toast } from "sonner";
@@ -104,37 +103,8 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       bucket: 'receipt_images'
     });
     
-    // First check if the bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error("Error listing buckets:", bucketsError);
-      toast.error("Error checking storage configuration");
-      return null;
-    }
-    
-    // If receipt_images bucket doesn't exist, create it
-    const bucketExists = buckets?.some(bucket => bucket.name === 'receipt_images');
-    
-    if (!bucketExists) {
-      console.log("Receipt images bucket not found, attempting to create it");
-      
-      const { data: newBucket, error: createError } = await supabase.storage.createBucket('receipt_images', {
-        public: true,
-        fileSizeLimit: 10485760, // 10MB
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'application/pdf']
-      });
-      
-      if (createError) {
-        console.error("Error creating bucket:", createError);
-        toast.error("Failed to configure storage. Please contact support.");
-        return null;
-      }
-      
-      console.log("Bucket created successfully:", newBucket);
-    }
-    
-    // Upload the file
+    // Skip bucket checks and creation - the bucket should be created via SQL migration
+    // Upload the file directly - this will fail if the bucket doesn't exist
     const { data, error } = await supabase.storage
       .from('receipt_images')
       .upload(fileName, file, {
@@ -144,7 +114,15 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     
     if (error) {
       console.error("Storage upload error:", error);
-      throw error;
+      
+      // Provide a more specific error message based on the error type
+      if (error.message.includes("bucket not found")) {
+        throw new Error("Receipt storage is not properly configured. Please contact support.");
+      } else if (error.message.includes("row-level security policy")) {
+        throw new Error("You don't have permission to upload files. Please log in again.");
+      } else {
+        throw error;
+      }
     }
     
     // Get the public URL for the file
@@ -160,7 +138,7 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     return publicUrlData.publicUrl;
   } catch (error) {
     console.error("Error uploading image:", error);
-    toast.error("Failed to upload receipt image. Please try again.");
+    toast.error(error.message || "Failed to upload receipt image. Please try again.");
     return null;
   }
 };
