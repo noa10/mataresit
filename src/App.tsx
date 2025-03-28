@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,10 +45,16 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
-            <Suspense fallback={<PageLoading />}>
-              <Route path="/receipt/:id" element={<ViewReceipt />} />
-              <Route path="/profile" element={<Profile />} />
-            </Suspense>
+            <Route path="/receipt/:id" element={
+              <Suspense fallback={<PageLoading />}>
+                <ViewReceipt />
+              </Suspense>
+            } />
+            <Route path="/profile" element={
+              <Suspense fallback={<PageLoading />}>
+                <Profile />
+              </Suspense>
+            } />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
