@@ -264,8 +264,27 @@ export const updateReceipt = async (
 // Process a receipt with OCR using Supabase Edge Function
 export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResult | null> => {
   try {
-    const { data, error } = await supabase.functions.invoke('process-receipt-endpoint', {
-      body: { receiptId },
+    // Get the receipt to get the image URL
+    const { data: receipt, error: receiptError } = await supabase
+      .from("receipts")
+      .select("image_url")
+      .eq("id", receiptId)
+      .single();
+    
+    if (receiptError || !receipt) {
+      console.error("Error fetching receipt:", receiptError);
+      toast.error("Failed to find receipt for OCR processing");
+      return null;
+    }
+    
+    console.log("Calling OCR process function with receipt:", { receiptId, imageUrl: receipt.image_url });
+    
+    // Make sure we're calling the correct function name
+    const { data, error } = await supabase.functions.invoke('process-receipt', {
+      body: { 
+        receiptId, 
+        imageUrl: receipt.image_url 
+      },
     });
     
     if (error) {
@@ -273,6 +292,8 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       toast.error("Failed to process receipt with OCR");
       return null;
     }
+    
+    console.log("OCR processing response:", data);
     
     if (!data || !data.success) {
       console.error("OCR processing failed:", data?.error || "Unknown error");
@@ -285,13 +306,31 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     
     const updateData: Partial<Receipt> = {
       merchant,
-      date: date || new Date().toISOString().split('T')[0],
-      total: total || 0,
       status: "unreviewed"
     };
     
-    if (tax !== undefined) {
-      updateData.tax = tax;
+    // Only update fields if they have values
+    if (date) {
+      // Try to parse the date string into a valid date format
+      try {
+        const parsedDate = new Date(date);
+        if (!isNaN(parsedDate.getTime())) {
+          updateData.date = parsedDate.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        // If date parsing fails, use the string as-is if it seems valid
+        if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(date)) {
+          updateData.date = date;
+        }
+      }
+    }
+    
+    if (total !== undefined && total !== null) {
+      updateData.total = typeof total === 'number' ? total : parseFloat(total);
+    }
+    
+    if (tax !== undefined && tax !== null) {
+      updateData.tax = typeof tax === 'number' ? tax : parseFloat(tax);
     }
     
     // Update receipt with extracted data
@@ -317,7 +356,7 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     
     toast.success("Receipt processed successfully!");
     return data.result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in OCR processing:", error);
     toast.error("Failed to process receipt with OCR");
     return null;

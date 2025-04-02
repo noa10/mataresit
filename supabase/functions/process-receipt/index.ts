@@ -123,6 +123,8 @@ function extractLineItems(text: string): { items: { description: string; amount:
 // Main function to process receipt image and extract data
 async function processReceiptImage(imageBytes: Uint8Array) {
   try {
+    console.log("Calling Amazon Textract for OCR processing...");
+    
     // Call Amazon Textract to analyze the document
     const command = new AnalyzeDocumentCommand({
       Document: { Bytes: imageBytes },
@@ -130,6 +132,7 @@ async function processReceiptImage(imageBytes: Uint8Array) {
     })
     
     const response = await textractClient.send(command)
+    console.log("Received response from Amazon Textract");
     
     // Extract the full text from Textract response
     let fullText = ''
@@ -141,6 +144,8 @@ async function processReceiptImage(imageBytes: Uint8Array) {
       }
     }
     
+    console.log("Extracted full text:", fullText.substring(0, 100) + "...");
+    
     // Extract key fields from the text
     const merchant = extractMerchant(fullText)
     const date = extractDate(fullText)
@@ -150,100 +155,103 @@ async function processReceiptImage(imageBytes: Uint8Array) {
     
     // Return the extracted data with confidence scores
     return {
-      merchant: {
-        value: merchant.value,
-        confidence: merchant.confidence,
-      },
-      date: {
-        value: date.value,
-        confidence: date.confidence,
-      },
-      total: {
-        value: total.value,
-        confidence: total.confidence,
-      },
-      tax: {
-        value: tax.value,
-        confidence: tax.confidence,
-      },
-      lineItems: {
-        items: lineItems.items,
-        confidence: lineItems.confidence,
+      merchant: merchant.value,
+      date: date.value,
+      total: total.value,
+      tax: tax.value,
+      line_items: lineItems.items,
+      confidence: {
+        merchant: merchant.confidence,
+        date: date.confidence,
+        total: total.confidence,
+        tax: tax.confidence,
+        line_items: lineItems.confidence,
       },
       fullText,
     }
   } catch (error) {
-    console.error('Error processing receipt with Textract:', error)
-    throw new Error('Failed to process receipt image')
+    console.error('Error processing receipt with Textract:', error);
+    throw new Error(`Failed to process receipt image: ${error.message}`);
   }
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
   
   try {
+    console.log("Received request to process receipt");
+    
     // Only accept POST requests
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
         { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
     
     // Parse request body
-    const requestData = await req.json()
+    const requestData = await req.json();
+    console.log("Request data received:", JSON.stringify(requestData).substring(0, 200) + "...");
     
     // Extract and validate required parameters
-    const { imageUrl, receiptId } = requestData
+    const { imageUrl, receiptId } = requestData;
     
     if (!imageUrl) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameter: imageUrl' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
     
     if (!receiptId) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameter: receiptId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
     
+    console.log("Fetching image from URL:", imageUrl);
+    
     // Fetch the image from the provided URL
-    const imageResponse = await fetch(imageUrl)
+    const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
+      console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch image from URL' }),
+        JSON.stringify({ error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
     
     // Convert image to binary data
-    const imageArrayBuffer = await imageResponse.arrayBuffer()
-    const imageBytes = new Uint8Array(imageArrayBuffer)
+    const imageArrayBuffer = await imageResponse.arrayBuffer();
+    const imageBytes = new Uint8Array(imageArrayBuffer);
+    console.log(`Image fetched successfully, size: ${imageBytes.length} bytes`);
     
     // Process the receipt image with OCR
-    const extractedData = await processReceiptImage(imageBytes)
+    const extractedData = await processReceiptImage(imageBytes);
+    console.log("Data extraction complete");
     
     // Return the extracted data
     return new Response(
       JSON.stringify({
         success: true,
         receiptId,
-        data: extractedData,
+        result: extractedData,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error in process-receipt function:', error)
+    console.error('Error in process-receipt function:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ 
+        error: error.message || 'Internal server error',
+        success: false 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   }
-})
+});

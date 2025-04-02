@@ -11,29 +11,24 @@ export function StorageStatus() {
   useEffect(() => {
     const checkStorageAvailability = async () => {
       try {
-        // Try to list buckets to check storage availability
-        const { data, error } = await supabase.storage.listBuckets();
+        // Try to list objects in the receipt_images bucket instead of checking if it exists
+        const { data, error } = await supabase.storage
+          .from('receipt_images')
+          .list('', { limit: 1 });
         
         if (error) {
           console.error("Error checking storage:", error);
           setStatus("unavailable");
-          setErrorMessage(error.message);
+          setErrorMessage(error.message || "Error accessing receipt_images bucket");
           return;
         }
         
-        // Check if receipt_images bucket exists
-        const receiptBucket = data.find(bucket => bucket.name === 'receipt_images');
-        
-        if (!receiptBucket) {
-          setStatus("unavailable");
-          setErrorMessage("Receipt images storage bucket not found");
-        } else {
-          setStatus("available");
-        }
+        // If we get here, the bucket exists and is accessible
+        setStatus("available");
       } catch (error: any) {
         console.error("Error checking storage:", error);
         setStatus("unavailable");
-        setErrorMessage(error.message);
+        setErrorMessage(error.message || "Unknown error accessing storage");
       }
     };
 
