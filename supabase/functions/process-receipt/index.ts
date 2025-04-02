@@ -90,6 +90,26 @@ function extractTax(text: string): { value: number; confidence: number } {
   return { value: 0, confidence: 0 }
 }
 
+// Helper to extract payment method from OCR text
+function extractPaymentMethod(text: string): { value: string; confidence: number } {
+  // Look for common payment methods
+  const paymentRegexes = [
+    /(visa|mastercard|mc|amex|american express|discover|diners|jcb)/i,
+    /(credit|debit|card)/i,
+    /(cash|check|cheque)/i,
+    /(paypal|venmo|zelle|apple pay|google pay)/i,
+  ]
+  
+  for (const regex of paymentRegexes) {
+    const match = text.match(regex)
+    if (match) {
+      return { value: match[0].trim(), confidence: 65 }
+    }
+  }
+  
+  return { value: '', confidence: 0 }
+}
+
 // Helper to extract line items from OCR text
 function extractLineItems(text: string): { items: { description: string; amount: number }[]; confidence: number } {
   const lines = text.split('\n')
@@ -151,6 +171,7 @@ async function processReceiptImage(imageBytes: Uint8Array) {
     const date = extractDate(fullText)
     const total = extractTotal(fullText)
     const tax = extractTax(fullText)
+    const paymentMethod = extractPaymentMethod(fullText)
     const lineItems = extractLineItems(fullText)
     
     // Return the extracted data with confidence scores
@@ -159,12 +180,14 @@ async function processReceiptImage(imageBytes: Uint8Array) {
       date: date.value,
       total: total.value,
       tax: tax.value,
+      payment_method: paymentMethod.value,
       line_items: lineItems.items,
       confidence: {
         merchant: merchant.confidence,
         date: date.confidence,
         total: total.confidence,
         tax: tax.confidence,
+        payment_method: paymentMethod.confidence,
         line_items: lineItems.confidence,
       },
       fullText,
@@ -215,12 +238,36 @@ serve(async (req) => {
     
     console.log("Fetching image from URL:", imageUrl);
     
+    // For Supabase Storage URLs, ensure we have the right authorization
+    const headers: Record<string, string> = {};
+    const urlObj = new URL(imageUrl);
+    
+    // If it's a Supabase Storage URL, we need to use a token or make it public
+    if (urlObj.hostname.includes('supabase')) {
+      // For authenticated access, we could add a token here if needed
+      // headers['Authorization'] = `Bearer ${token}`;
+      
+      // Ensure we're requesting the public URL
+      if (!imageUrl.includes('/object/public/')) {
+        const modifiedUrl = imageUrl.replace('/object/', '/object/public/');
+        console.log("Modified image URL to public access:", modifiedUrl);
+        imageUrl = modifiedUrl;
+      }
+    }
+    
     // Fetch the image from the provided URL
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { headers });
+    
     if (!imageResponse.ok) {
       console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
+      const responseBody = await imageResponse.text();
+      console.error("Response body:", responseBody);
+      
       return new Response(
-        JSON.stringify({ error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}` }),
+        JSON.stringify({ 
+          error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`,
+          details: responseBody
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

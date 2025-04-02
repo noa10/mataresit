@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus } from "@/types/receipt";
 import { toast } from "sonner";
@@ -279,7 +280,7 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     
     console.log("Calling OCR process function with receipt:", { receiptId, imageUrl: receipt.image_url });
     
-    // Make sure we're calling the correct function name
+    // Call the process-receipt Edge Function
     const { data, error } = await supabase.functions.invoke('process-receipt', {
       body: { 
         receiptId, 
@@ -302,7 +303,7 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     }
     
     // Update the receipt with the extracted data
-    const { merchant, date, total, tax, line_items, confidence } = data.result;
+    const { merchant, date, total, tax, payment_method, line_items, confidence } = data.result;
     
     const updateData: Partial<Receipt> = {
       merchant,
@@ -310,6 +311,10 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     };
     
     // Only update fields if they have values
+    if (payment_method) {
+      updateData.payment_method = payment_method;
+    }
+    
     if (date) {
       // Try to parse the date string into a valid date format
       try {
@@ -346,7 +351,8 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
           date: confidence.date || 0,
           total: confidence.total || 0,
           tax: confidence.tax,
-          line_items: confidence.line_items
+          line_items: confidence.line_items,
+          payment_method: confidence.payment_method
         });
       
       if (confidenceError) {

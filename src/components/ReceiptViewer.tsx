@@ -42,6 +42,11 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      toast.success("Receipt updated successfully!");
+    },
+    onError: (error) => {
+      console.error("Failed to update receipt:", error);
+      toast.error("Failed to update receipt");
     }
   });
   
@@ -173,16 +178,28 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         </div>
         
         <div className="overflow-auto h-[500px] flex items-center justify-center bg-secondary/30 rounded-lg">
-          <div 
-            className="min-h-full flex items-center justify-center p-4 transition-transform duration-200"
-            style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
-          >
-            <img 
-              src={receipt.image_url || "/placeholder.svg"} 
-              alt={`Receipt from ${receipt.merchant}`}
-              className="max-w-full max-h-full object-contain shadow-lg"
-            />
-          </div>
+          {receipt.image_url ? (
+            <div 
+              className="min-h-full flex items-center justify-center p-4 transition-transform duration-200"
+              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+            >
+              <img 
+                src={receipt.image_url} 
+                alt={`Receipt from ${receipt.merchant}`}
+                className="max-w-full max-h-full object-contain shadow-lg"
+                onError={(e) => {
+                  console.error("Error loading receipt image:", e);
+                  e.currentTarget.src = "/placeholder.svg";
+                  toast.error("Failed to load receipt image");
+                }}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+              <Receipt size={64} className="mb-4 opacity-30" />
+              <p>No receipt image available</p>
+            </div>
+          )}
         </div>
       </motion.div>
       

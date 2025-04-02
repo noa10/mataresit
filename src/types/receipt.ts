@@ -20,6 +20,7 @@ export interface Receipt {
     total?: number;
     tax?: number;
     line_items?: number;
+    payment_method?: number;
   };
 }
 
@@ -49,6 +50,7 @@ export interface ConfidenceScore {
   total: number;
   tax?: number;
   line_items?: number;
+  payment_method?: number;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +63,7 @@ export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
     total?: number;
     tax?: number;
     line_items?: number;
+    payment_method?: number;
   };
 }
 
@@ -69,6 +72,7 @@ export interface OCRResult {
   date: string;
   total: number;
   tax?: number;
+  payment_method?: string;
   line_items?: LineItem[];
   confidence: {
     merchant: number;
@@ -76,5 +80,7 @@ export interface OCRResult {
     total: number;
     tax?: number;
     line_items?: number;
+    payment_method?: number;
   };
+  fullText?: string;
 }
