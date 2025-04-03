@@ -8,6 +8,7 @@ import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
@@ -18,15 +19,22 @@ export default function ViewReceipt() {
     queryKey: ['receipt', id],
     queryFn: () => fetchReceiptById(id!),
     enabled: !!id && !!user,
+    staleTime: 0, // Don't cache the data to ensure fresh data is loaded
+    retry: 1,     // Only retry once to avoid excessive requests if there's a problem
   });
   
   const deleteMutation = useMutation({
     mutationFn: (receiptId: string) => deleteReceipt(receiptId),
     onSuccess: (success) => {
       if (success) {
+        toast.success("Receipt deleted successfully");
         navigate("/dashboard");
       }
     },
+    onError: (error) => {
+      toast.error("Failed to delete receipt");
+      console.error("Delete error:", error);
+    }
   });
   
   const handleDelete = () => {
