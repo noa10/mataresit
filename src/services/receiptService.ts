@@ -278,13 +278,19 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       return null;
     }
     
-    console.log("Calling OCR process function with receipt:", { receiptId, imageUrl: receipt.image_url });
+    // Format the image URL to ensure it's publicly accessible
+    let imageUrl = receipt.image_url;
+    if (imageUrl && imageUrl.includes('supabase.co') && !imageUrl.includes('/public/')) {
+      imageUrl = imageUrl.replace('/object/', '/object/public/');
+    }
+    
+    console.log("Calling OCR process function with receipt:", { receiptId, imageUrl });
     
     // Call the process-receipt Edge Function
     const { data, error } = await supabase.functions.invoke('process-receipt', {
       body: { 
         receiptId, 
-        imageUrl: receipt.image_url 
+        imageUrl
       },
     });
     
@@ -303,7 +309,7 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     }
     
     // Update the receipt with the extracted data
-    const { merchant, date, total, tax, payment_method, line_items, confidence } = data.result;
+    const { merchant, date, total, tax, payment_method, line_items, confidence, fullText } = data.result;
     
     const updateData: Partial<Receipt> = {
       merchant,
@@ -336,6 +342,11 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     
     if (tax !== undefined && tax !== null) {
       updateData.tax = typeof tax === 'number' ? tax : parseFloat(tax);
+    }
+    
+    // Store the fullText from OCR
+    if (fullText) {
+      updateData.fullText = fullText;
     }
     
     // Update receipt with extracted data

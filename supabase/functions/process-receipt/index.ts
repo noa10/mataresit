@@ -238,58 +238,54 @@ serve(async (req) => {
     
     console.log("Fetching image from URL:", imageUrl);
     
-    // For Supabase Storage URLs, ensure we have the right authorization
-    const headers: Record<string, string> = {};
+    // Format URL properly to ensure it's accessible
     const urlObj = new URL(imageUrl);
     
-    // If it's a Supabase Storage URL, we need to use a token or make it public
-    if (urlObj.hostname.includes('supabase')) {
-      // For authenticated access, we could add a token here if needed
-      // headers['Authorization'] = `Bearer ${token}`;
-      
-      // Ensure we're requesting the public URL
-      if (!imageUrl.includes('/object/public/')) {
-        const modifiedUrl = imageUrl.replace('/object/', '/object/public/');
-        console.log("Modified image URL to public access:", modifiedUrl);
-        imageUrl = modifiedUrl;
-      }
-    }
-    
     // Fetch the image from the provided URL
-    const imageResponse = await fetch(imageUrl, { headers });
-    
-    if (!imageResponse.ok) {
-      console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
-      const responseBody = await imageResponse.text();
-      console.error("Response body:", responseBody);
+    try {
+      const imageResponse = await fetch(imageUrl);
+      
+      if (!imageResponse.ok) {
+        console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
+        
+        return new Response(
+          JSON.stringify({ 
+            error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`,
+            success: false
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Convert image to binary data
+      const imageArrayBuffer = await imageResponse.arrayBuffer();
+      const imageBytes = new Uint8Array(imageArrayBuffer);
+      console.log(`Image fetched successfully, size: ${imageBytes.length} bytes`);
+      
+      // Process the receipt image with OCR
+      const extractedData = await processReceiptImage(imageBytes);
+      console.log("Data extraction complete");
+      
+      // Return the extracted data
+      return new Response(
+        JSON.stringify({
+          success: true,
+          receiptId,
+          result: extractedData,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (fetchError) {
+      console.error("Error fetching image:", fetchError);
       
       return new Response(
         JSON.stringify({ 
-          error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`,
-          details: responseBody
+          error: `Failed to fetch image: ${fetchError.message}`,
+          success: false 
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    // Convert image to binary data
-    const imageArrayBuffer = await imageResponse.arrayBuffer();
-    const imageBytes = new Uint8Array(imageArrayBuffer);
-    console.log(`Image fetched successfully, size: ${imageBytes.length} bytes`);
-    
-    // Process the receipt image with OCR
-    const extractedData = await processReceiptImage(imageBytes);
-    console.log("Data extraction complete");
-    
-    // Return the extracted data
-    return new Response(
-      JSON.stringify({
-        success: true,
-        receiptId,
-        result: extractedData,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error in process-receipt function:', error);
     

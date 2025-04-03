@@ -14,6 +14,7 @@ export interface Receipt {
   updated_at: string;
   tax?: number;
   payment_method?: string;
+  fullText?: string;
   confidence_scores?: {
     merchant?: number;
     date?: number;
@@ -65,6 +66,7 @@ export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
     line_items?: number;
     payment_method?: number;
   };
+  fullText?: string;
 }
 
 export interface OCRResult {

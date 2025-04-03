@@ -1,12 +1,10 @@
 
-import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -89,12 +87,12 @@ export default function ViewReceipt() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{receipt.merchant}</h1>
+              <h1 className="text-2xl font-bold">{receipt.merchant || "Unnamed Receipt"}</h1>
               <p className="text-muted-foreground">
-                {new Date(receipt.date).toLocaleDateString()} • {new Intl.NumberFormat('en-US', {
+                {receipt.date ? new Date(receipt.date).toLocaleDateString() : "No date"} • {receipt.total ? new Intl.NumberFormat('en-US', {
                   style: 'currency',
-                  currency: receipt.currency,
-                }).format(receipt.total)}
+                  currency: receipt.currency || 'USD',
+                }).format(receipt.total) : "$0.00"}
               </p>
             </div>
           </motion.div>
