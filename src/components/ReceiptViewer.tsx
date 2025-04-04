@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [showFullTextData, setShowFullTextData] = useState(false);
   const queryClient = useQueryClient();
   
-  // Update editedReceipt when receipt changes
   useEffect(() => {
     setEditedReceipt(receipt);
   }, [receipt]);
@@ -65,7 +63,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
         toast.success("Receipt processed successfully!");
         
-        // Update the edited receipt with the new data to reflect changes immediately
         setEditedReceipt(prev => ({
           ...prev,
           merchant: data.merchant || prev.merchant,
@@ -167,7 +164,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   };
   
   const handleSyncToZoho = () => {
-    // Update status to synced
     updateReceipt(receipt.id, { status: "synced" })
       .then(() => {
         toast.success("Receipt synced to Zoho successfully!");
@@ -192,13 +188,14 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     setShowFullTextData(!showFullTextData);
   };
 
-  // Function to format image URL if needed
   const getFormattedImageUrl = (url: string | undefined) => {
     if (!url) return "";
     
-    // Handle URLs with storage URL format
+    if (url.includes('receipt_images/')) {
+      return url.replace('receipt_images/', 'receipt-images/');
+    }
+    
     if (url.includes('supabase.co') && !url.includes('/public/')) {
-      // Add 'public' to the URL path if it's missing
       return url.replace('/object/', '/object/public/');
     }
     
@@ -207,7 +204,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-      {/* Left side - Receipt Image */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -255,6 +251,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                 className="max-w-full max-h-full object-contain shadow-lg"
                 onError={(e) => {
                   console.error("Error loading receipt image:", e);
+                  console.error("Image URL was:", getFormattedImageUrl(receipt.image_url));
                   setImageError(true);
                 }}
               />
@@ -269,7 +266,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                     The image URL may be invalid or the image may no longer exist.
                   </p>
                   <p className="text-xs break-all text-muted-foreground mb-4">
-                    URL: {receipt.image_url || "No URL provided"}
+                    URL: {getFormattedImageUrl(receipt.image_url) || "No URL provided"}
                   </p>
                 </>
               ) : (
@@ -322,7 +319,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         </div>
       </motion.div>
       
-      {/* Right side - Receipt Data */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
