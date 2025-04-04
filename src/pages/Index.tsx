@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowRight } from "lucide-react";
+import UploadZone from "@/components/UploadZone";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -37,6 +38,19 @@ export default function Index() {
                 Go to Dashboard
                 <ArrowRight size={16} className="ml-1" />
               </Button>
+            </div>
+          </motion.div>
+          
+          {/* Upload Receipt Section - Added back */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-16 w-full max-w-3xl"
+          >
+            <div className="bg-card/60 backdrop-blur-sm p-6 rounded-xl shadow-sm">
+              <h2 className="text-2xl font-bold mb-6 text-center">Upload Your Receipt</h2>
+              <UploadZone />
             </div>
           </motion.div>
           

@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, MoveHorizontal, MoveVertical, X, AlertTriangle, Receipt } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, MoveHorizontal, AlertTriangle, Receipt } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ImageViewerProps {
@@ -16,7 +16,6 @@ export default function ImageViewer({ imageUrl, altText = "Image", onError }: Im
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -47,16 +46,6 @@ export default function ImageViewer({ imageUrl, altText = "Image", onError }: Im
   // Handle rotation functionality
   const handleRotate = () => {
     setRotation(prev => (prev + 90) % 360);
-  };
-  
-  // Handle fullscreen toggle
-  const toggleFullscreen = () => {
-    setFullscreen(prev => !prev);
-    // Reset position and zoom when toggling fullscreen
-    if (!fullscreen) {
-      setPosition({ x: 0, y: 0 });
-      setZoom(1);
-    }
   };
   
   // Handle image error
@@ -93,31 +82,6 @@ export default function ImageViewer({ imageUrl, altText = "Image", onError }: Im
     setIsDragging(false);
   };
   
-  // Exit fullscreen on ESC key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && fullscreen) {
-        setFullscreen(false);
-      }
-    };
-    
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [fullscreen]);
-  
-  // Prevent scrolling when in fullscreen
-  useEffect(() => {
-    if (fullscreen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [fullscreen]);
-  
   // Reset position when zoom changes to 1
   useEffect(() => {
     if (zoom === 1) {
@@ -126,15 +90,17 @@ export default function ImageViewer({ imageUrl, altText = "Image", onError }: Im
   }, [zoom]);
 
   return (
-    <>
-      <div 
-        ref={containerRef}
-        className={`relative ${fullscreen ? 'fixed inset-0 z-50 bg-background/95 flex items-center justify-center p-4' : 'overflow-hidden'}`}
+    <div 
+      ref={containerRef}
+      className="relative overflow-hidden"
+    >
+      {/* Image Container */}
+      <ScrollArea 
+        className="h-[500px] flex items-center justify-center bg-secondary/30 rounded-lg relative"
+        ref={viewerRef}
       >
-        {/* Toolbar */}
-        <div 
-          className={`${fullscreen ? 'absolute top-4 left-1/2 transform -translate-x-1/2 bg-background/80 backdrop-blur-sm rounded-lg shadow-lg' : ''} flex justify-center gap-1 p-2 z-10`}
-        >
+        {/* Toolbar - now positioned at the top of the image container */}
+        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-background/80 backdrop-blur-sm rounded-lg shadow-lg z-10 flex justify-center gap-1 p-2">
           <Button 
             variant="outline" 
             size="icon" 
@@ -170,79 +136,54 @@ export default function ImageViewer({ imageUrl, altText = "Image", onError }: Im
           >
             <MoveHorizontal size={18} />
           </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={toggleFullscreen}
-            title={fullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          >
-            {fullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </Button>
-          {fullscreen && (
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={toggleFullscreen}
-              title="Close"
-              className="text-destructive hover:text-destructive"
-            >
-              <X size={18} />
-            </Button>
-          )}
         </div>
         
-        {/* Image Container */}
-        <ScrollArea 
-          className={`${fullscreen ? 'w-full h-full' : 'h-[500px]'} flex items-center justify-center bg-secondary/30 rounded-lg`}
-          ref={viewerRef}
+        <div 
+          className={`min-h-full min-w-full flex items-center justify-center p-4 ${isDragging ? 'cursor-grabbing' : zoom > 1 ? 'cursor-grab' : 'cursor-default'}`}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         >
-          <div 
-            className={`min-h-full min-w-full flex items-center justify-center p-4 ${isDragging ? 'cursor-grabbing' : zoom > 1 ? 'cursor-grab' : 'cursor-default'}`}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            {formattedImageUrl && !imageError ? (
-              <motion.div
-                className="flex items-center justify-center"
-                style={{
-                  transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                  transition: isDragging ? 'none' : 'transform 0.2s ease'
-                }}
-              >
-                <img 
-                  src={formattedImageUrl} 
-                  alt={altText}
-                  className="max-w-full max-h-full object-contain shadow-lg select-none"
-                  draggable={false}
-                  onError={handleImageError}
-                />
-              </motion.div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-muted-foreground p-4">
-                {imageError ? (
-                  <>
-                    <AlertTriangle size={64} className="mb-4 text-amber-500" />
-                    <p className="text-center mb-2">Failed to load image</p>
-                    <p className="text-xs text-center text-muted-foreground mb-4">
-                      The image URL may be invalid or the image may no longer exist.
-                    </p>
-                    <p className="text-xs break-all text-muted-foreground mb-4">
-                      URL: {imageUrl || "No URL provided"}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Receipt size={64} className="mb-4 opacity-30" />
-                    <p>No image available</p>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-    </>
+          {formattedImageUrl && !imageError ? (
+            <motion.div
+              className="flex items-center justify-center"
+              style={{
+                transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+                transition: isDragging ? 'none' : 'transform 0.2s ease'
+              }}
+            >
+              <img 
+                src={formattedImageUrl} 
+                alt={altText}
+                className="max-w-full max-h-full object-contain shadow-lg select-none"
+                draggable={false}
+                onError={handleImageError}
+              />
+            </motion.div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-muted-foreground p-4">
+              {imageError ? (
+                <>
+                  <AlertTriangle size={64} className="mb-4 text-amber-500" />
+                  <p className="text-center mb-2">Failed to load image</p>
+                  <p className="text-xs text-center text-muted-foreground mb-4">
+                    The image URL may be invalid or the image may no longer exist.
+                  </p>
+                  <p className="text-xs break-all text-muted-foreground mb-4">
+                    URL: {imageUrl || "No URL provided"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Receipt size={64} className="mb-4 opacity-30" />
+                  <p>No image available</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
