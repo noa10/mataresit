@@ -1,22 +1,24 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, History, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem } from "@/types/receipt";
 import { updateReceipt, processReceiptWithOCR } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import ImageViewer from "./ImageViewer";
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
 }
 
 export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -95,6 +97,25 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     }).format(amount);
   };
   
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.25, 3));
+  };
+  
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.25, 0.5));
+  };
+  
+  const handleRotate = () => {
+    setRotation(prev => (prev + 90) % 360);
+  };
+  
+  const getConfidenceColor = (value?: number) => {
+    if (!value) return "bg-gray-300";
+    if (value >= 80) return "bg-green-500";
+    if (value >= 60) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+  
   const handleInputChange = (field: string, value: string | number) => {
     setEditedReceipt(prev => ({
       ...prev,
@@ -171,15 +192,17 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     setShowFullTextData(!showFullTextData);
   };
 
-  const handleImageError = () => {
-    setImageError(true);
-  };
-
-  const getConfidenceColor = (value?: number) => {
-    if (!value) return "bg-gray-300";
-    if (value >= 80) return "bg-green-500";
-    if (value >= 60) return "bg-yellow-500";
-    return "bg-red-500";
+  // Function to format image URL if needed
+  const getFormattedImageUrl = (url: string | undefined) => {
+    if (!url) return "";
+    
+    // Handle URLs with storage URL format
+    if (url.includes('supabase.co') && !url.includes('/public/')) {
+      // Add 'public' to the URL path if it's missing
+      return url.replace('/object/', '/object/public/');
+    }
+    
+    return url;
   };
 
   return (
@@ -193,13 +216,71 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       >
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-medium">Receipt Image</h3>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleZoomOut}
+              disabled={zoom <= 0.5}
+            >
+              <ZoomOut size={18} />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleZoomIn}
+              disabled={zoom >= 3}
+            >
+              <ZoomIn size={18} />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleRotate}
+            >
+              <RotateCw size={18} />
+            </Button>
+          </div>
         </div>
         
-        <ImageViewer 
-          imageUrl={receipt.image_url} 
-          altText={`Receipt from ${receipt.merchant || 'Unknown'}`}
-          onError={handleImageError}
-        />
+        <div className="overflow-auto h-[500px] flex items-center justify-center bg-secondary/30 rounded-lg">
+          {receipt.image_url && !imageError ? (
+            <div 
+              className="min-h-full flex items-center justify-center p-4 transition-transform duration-200"
+              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+            >
+              <img 
+                src={getFormattedImageUrl(receipt.image_url)} 
+                alt={`Receipt from ${receipt.merchant}`}
+                className="max-w-full max-h-full object-contain shadow-lg"
+                onError={(e) => {
+                  console.error("Error loading receipt image:", e);
+                  setImageError(true);
+                }}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-muted-foreground p-4">
+              {imageError ? (
+                <>
+                  <AlertTriangle size={64} className="mb-4 text-amber-500" />
+                  <p className="text-center mb-2">Failed to load receipt image</p>
+                  <p className="text-xs text-center text-muted-foreground mb-4">
+                    The image URL may be invalid or the image may no longer exist.
+                  </p>
+                  <p className="text-xs break-all text-muted-foreground mb-4">
+                    URL: {receipt.image_url || "No URL provided"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Receipt size={64} className="mb-4 opacity-30" />
+                  <p>No receipt image available</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         
         <div className="mt-4">
           <Button 

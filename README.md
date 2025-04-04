@@ -26,10 +26,8 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 ### Key Features
 
 - OCR-powered data extraction with confidence scores
-- Enhanced receipt image viewing with zoom, rotate, and fullscreen capabilities
-- Side-by-side editing with original image for verification
-- Raw OCR text viewing for detailed analysis
-- Reprocessing option for improved extraction results
+- Receipt image manipulation (zoom, rotate)
+- Side-by-side editing with original image
 - Reimbursement tracking
 - Multi-currency support
 - Secure Zoho OAuth integration
@@ -70,7 +68,7 @@ The application follows a modern web architecture:
 ### Data Flow
 
 1. User uploads a receipt image through the React frontend
-2. Image is stored in Supabase Storage ("Receipt Images" bucket)
+2. Image is stored in Supabase Storage
 3. Edge Function triggers OCR processing with Amazon Textract
 4. Extracted data is stored in Supabase Database
 5. Frontend displays data alongside image for user verification
@@ -91,7 +89,6 @@ The application follows a modern web architecture:
 - `payment_method` (VARCHAR) - Payment method
 - `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
 - `image_url` (TEXT) - URL to stored receipt image
-- `full_text` (TEXT) - Raw OCR text from Textract
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
 
@@ -111,13 +108,12 @@ The application follows a modern web architecture:
 - `total` (INTEGER) - Confidence score for total field
 - `tax` (INTEGER) - Confidence score for tax field
 - `line_items` (INTEGER) - Confidence score for line items
-- `payment_method` (INTEGER) - Confidence score for payment method
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
 
 ### Storage Buckets
 
-- `Receipt Images` - Storage for receipt image files
+- `receipt_images` - Storage for receipt image files
 
 ## API Endpoints
 
@@ -178,11 +174,9 @@ The application follows a modern web architecture:
 - Summary statistics
 
 #### Receipt View (`/receipt/:id`)
-- Advanced image viewer with zoom, rotate, and fullscreen
 - Side-by-side receipt image and data editor
 - Confidence score indicators
-- Raw OCR text viewing
-- Reprocess with OCR option
+- Zoom and rotate controls
 - Sync to Zoho button
 
 #### Authentication (`/auth`)
@@ -196,15 +190,10 @@ The application follows a modern web architecture:
 - Upload progress indicator
 - File validation
 
-#### `ImageViewer`
-- Enhanced image viewing capabilities
-- Zoom, rotate, pan, and fullscreen options
-- Error handling for missing images
-
 #### `ReceiptViewer`
 - Side-by-side layout for image and data
+- Image manipulation controls
 - Data editing interface with confidence indicators
-- Raw OCR text display option
 
 #### `ReceiptCard`
 - Summary display of receipt for listings

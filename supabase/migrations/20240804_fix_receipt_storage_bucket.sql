@@ -1,10 +1,5 @@
 
--- Drop existing policies if they exist to avoid conflicts
-DROP POLICY IF EXISTS "Allow authenticated users to upload files" ON storage.objects;
-DROP POLICY IF EXISTS "Allow authenticated users to read their own files" ON storage.objects;
-DROP POLICY IF EXISTS "Allow public access to receipt images" ON storage.objects;
-
--- Create storage bucket with the correct name "Receipt Images" (with a space)
+-- Create receipt_images storage bucket if it doesn't exist
 INSERT INTO storage.buckets (id, name, public, avif_autodetection, file_size_limit, allowed_mime_types)
 VALUES ('receipt_images', 'receipt_images', true, false, 10485760, ARRAY['image/jpeg', 'image/png', 'application/pdf'])
 ON CONFLICT (id) DO NOTHING;

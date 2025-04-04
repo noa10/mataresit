@@ -3,10 +3,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { 
-  User, LogOut, ChevronRight, 
+  User, Moon, Sun, LogOut, ChevronRight, 
   Mail, Edit, Camera
 } from "lucide-react";
-import { NavbarWrapper } from "@/components/NavbarWrapper";
+import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,11 +16,33 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isDarkMode, setIsDarkMode] = useState(
+    document.documentElement.classList.contains('dark')
+  );
+  
+  // Handle dark mode toggle
+  const toggleDarkMode = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+    setIsDarkMode(!isDarkMode);
+    
+    toast({
+      title: `${!isDarkMode ? 'Dark' : 'Light'} mode activated`,
+      description: `The application theme has been changed to ${!isDarkMode ? 'dark' : 'light'} mode.`,
+      duration: 2000,
+    });
+  };
   
   // Get user initials for avatar
   const getUserInitials = () => {
@@ -48,7 +70,7 @@ export default function Profile() {
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <NavbarWrapper />
+      <Navbar />
       
       <main className="container px-4 py-8">
         {/* Profile Header */}
@@ -134,11 +156,44 @@ export default function Profile() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <Tabs defaultValue="security">
+            <Tabs defaultValue="preferences">
               <TabsList className="mb-4 w-full bg-background/50">
+                <TabsTrigger value="preferences" className="flex-1">Preferences</TabsTrigger>
                 <TabsTrigger value="security" className="flex-1">Security</TabsTrigger>
                 <TabsTrigger value="notifications" className="flex-1">Notifications</TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="preferences">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Appearance Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center">
+                          {isDarkMode ? (
+                            <Moon className="mr-2" size={18} />
+                          ) : (
+                            <Sun className="mr-2" size={18} />
+                          )}
+                          <Label htmlFor="dark-mode">Dark Mode</Label>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Switch between light and dark theme
+                        </p>
+                      </div>
+                      <Switch 
+                        id="dark-mode" 
+                        checked={isDarkMode}
+                        onCheckedChange={toggleDarkMode}
+                      />
+                    </div>
+                    <Separator />
+                    {/* Additional preferences can be added here */}
+                  </CardContent>
+                </Card>
+              </TabsContent>
               
               <TabsContent value="security">
                 <Card>
