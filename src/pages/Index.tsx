@@ -1,100 +1,85 @@
 
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronRight, Receipt, FileText, Upload, PieChart } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import UploadZone from "@/components/UploadZone";
-import { StorageStatus } from "@/components/StorageStatus";
 import Navbar from "@/components/Navbar";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { FileText, ArrowRight } from "lucide-react";
 
 export default function Index() {
-  useEffect(() => {
-    document.title = "Receipt Scanner - Home";
-  }, []);
-
+  const navigate = useNavigate();
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
       
-      <div className="container max-w-5xl py-8 space-y-12">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center space-y-4 py-8"
-        >
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            Smart Receipt Processing
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload your receipt, and we'll automatically extract key information like merchant, date, 
-            total amount, and line items using OCR technology.
-          </p>
-          
-          {/* Storage Status Check */}
-          <div className="max-w-xl mx-auto mt-4 mb-6">
-            <StorageStatus />
-          </div>
-        </motion.div>
-        
-        <UploadZone />
-        
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16"
-        >
-          <div className="bg-card rounded-xl p-6 shadow-sm border">
-            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
-              <Upload className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Fast Upload</h3>
-            <p className="text-muted-foreground mb-4">
-              Upload receipt images or PDFs in seconds with our drag-and-drop interface.
+      <main className="container px-4 py-8 md:py-16">
+        <div className="flex flex-col items-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="max-w-3xl"
+          >
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+              Automated Receipt Processing
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-8">
+              Streamline your expense management with AI-powered receipt extraction
             </p>
-            <Link to="/dashboard">
-              <Button variant="link" className="px-0 text-primary">
-                Get Started <ChevronRight className="ml-1 h-4 w-4" />
+            
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Button 
+                size="lg" 
+                onClick={() => navigate("/dashboard")} 
+                className="gap-2"
+              >
+                <FileText size={20} />
+                Go to Dashboard
+                <ArrowRight size={16} className="ml-1" />
               </Button>
-            </Link>
-          </div>
-          
-          <div className="bg-card rounded-xl p-6 shadow-sm border">
-            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
-              <FileText className="h-6 w-6 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">OCR Extraction</h3>
-            <p className="text-muted-foreground mb-4">
-              Our AI automatically extracts merchant info, date, amount, and line items.
-            </p>
-            <Link to="/dashboard">
-              <Button variant="link" className="px-0 text-primary">
-                Learn More <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+          </motion.div>
           
-          <div className="bg-card rounded-xl p-6 shadow-sm border">
-            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
-              <PieChart className="h-6 w-6 text-primary" />
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="mt-16 md:mt-24 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 text-left w-full max-w-5xl"
+          >
+            <div className="bg-card/60 backdrop-blur-sm p-6 rounded-xl shadow-sm">
+              <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+                <FileText size={24} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Upload & Process</h3>
+              <p className="text-muted-foreground">
+                Upload your receipts in JPEG, PNG, or PDF format and let our AI extract the data automatically.
+              </p>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Easy Tracking</h3>
-            <p className="text-muted-foreground mb-4">
-              View all your receipts in one place, with analytics and export options.
-            </p>
-            <Link to="/dashboard">
-              <Button variant="link" className="px-0 text-primary">
-                Go to Dashboard <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
-      </div>
+            
+            <div className="bg-card/60 backdrop-blur-sm p-6 rounded-xl shadow-sm">
+              <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+                <FileText size={24} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Verify & Edit</h3>
+              <p className="text-muted-foreground">
+                Review the extracted data with our powerful image viewer and edit if needed.
+              </p>
+            </div>
+            
+            <div className="bg-card/60 backdrop-blur-sm p-6 rounded-xl shadow-sm">
+              <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+                <FileText size={24} className="text-primary" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Sync & Track</h3>
+              <p className="text-muted-foreground">
+                Sync your verified receipts with Zoho Expense for seamless expense management.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </main>
       
-      {/* Footer */}
-      <footer className="border-t border-border/40 mt-12">
+      <footer className="border-t border-border/40 mt-auto">
         <div className="container px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-sm text-muted-foreground">
