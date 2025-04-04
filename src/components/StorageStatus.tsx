@@ -11,15 +11,15 @@ export function StorageStatus() {
   useEffect(() => {
     const checkStorageAvailability = async () => {
       try {
-        // Try to list objects in the receipt_images bucket instead of checking if it exists
+        // Try to list objects in the receipt-images bucket instead of checking if it exists
         const { data, error } = await supabase.storage
-          .from('receipt_images')
+          .from('receipt-images')
           .list('', { limit: 1 });
         
         if (error) {
           console.error("Error checking storage:", error);
           setStatus("unavailable");
-          setErrorMessage(error.message || "Error accessing receipt_images bucket");
+          setErrorMessage(error.message || "Error accessing receipt-images bucket");
           return;
         }
         

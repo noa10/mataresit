@@ -101,13 +101,13 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       name: fileName,
       type: file.type,
       size: file.size,
-      bucket: 'receipt_images'
+      bucket: 'receipt-images'
     });
     
     // Skip bucket checks and creation - the bucket should be created via SQL migration
     // Upload the file directly - this will fail if the bucket doesn't exist
     const { data, error } = await supabase.storage
-      .from('receipt_images')
+      .from('receipt-images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false
@@ -128,7 +128,7 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     
     // Get the public URL for the file
     const { data: publicUrlData } = supabase.storage
-      .from('receipt_images')
+      .from('receipt-images')
       .getPublicUrl(fileName);
       
     if (!publicUrlData?.publicUrl) {

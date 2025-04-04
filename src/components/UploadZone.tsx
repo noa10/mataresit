@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";

@@ -45,12 +45,12 @@ export default function ReceiptCard({
       if (imageUrl.startsWith('http')) {
         // Already a full URL, use it directly
         setImageSource(imageUrl);
-      } else if (imageUrl.includes('receipt_images/')) {
+      } else if (imageUrl.includes('receipt-images/')) {
         // It's a storage path, get a signed URL
         try {
           const { data, error } = await supabase.storage
-            .from('receipt_images')
-            .createSignedUrl(imageUrl.replace('receipt_images/', ''), 3600); // 1 hour expiry
+            .from('receipt-images')
+            .createSignedUrl(imageUrl.replace('receipt-images/', ''), 3600); // 1 hour expiry
           
           if (data && !error) {
             setImageSource(data.signedUrl);
@@ -66,7 +66,7 @@ export default function ReceiptCard({
         // Try to get from public bucket
         try {
           const { data: publicUrlData } = supabase.storage
-            .from('receipt_images')
+            .from('receipt-images')
             .getPublicUrl(imageUrl);
             
           if (publicUrlData?.publicUrl) {
