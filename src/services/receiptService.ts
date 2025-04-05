@@ -100,13 +100,12 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       name: fileName,
       type: file.type,
       size: file.size,
-      bucket: 'receipt_images'
+      bucket: 'receipt-images'
     });
     
-    // Skip bucket checks and creation - the bucket should be created via SQL migration
-    // Upload the file directly - this will fail if the bucket doesn't exist
+    // Upload the file directly to the receipt-images bucket
     const { data, error } = await supabase.storage
-      .from('receipt_images')
+      .from('receipt-images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false
@@ -127,7 +126,7 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     
     // Get the public URL for the file
     const { data: publicUrlData } = supabase.storage
-      .from('receipt_images')
+      .from('receipt-images')
       .getPublicUrl(fileName);
       
     if (!publicUrlData?.publicUrl) {
@@ -541,24 +540,29 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
     
     // Delete the image from storage if it exists
     if (receipt?.image_url) {
-      // Extract path from URL if needed
-      let imagePath = receipt.image_url;
-      
-      // If it's a full URL, extract the path
-      if (imagePath.includes('receipt_images/')) {
-        const pathParts = imagePath.split('receipt_images/');
-        if (pathParts.length > 1) {
-          imagePath = pathParts[1];
+      try {
+        // Extract path from URL if needed
+        let imagePath = receipt.image_url;
+        
+        // If it's a full URL, extract the path
+        if (imagePath.includes('receipt-images/')) {
+          const pathParts = imagePath.split('receipt-images/');
+          if (pathParts.length > 1) {
+            imagePath = pathParts[1];
+          }
         }
-      }
-      
-      const { error: storageError } = await supabase.storage
-        .from('receipt_images')
-        .remove([imagePath]);
-      
-      if (storageError) {
-        console.error("Error deleting receipt image:", storageError);
-        // Don't fail the operation, just log it
+        
+        const { error: storageError } = await supabase.storage
+          .from('receipt-images')
+          .remove([imagePath]);
+        
+        if (storageError) {
+          console.error("Error deleting receipt image:", storageError);
+          // Don't fail the operation, just log it
+        }
+      } catch (extractError) {
+        console.error("Error extracting image path:", extractError);
+        // Continue with the operation
       }
     }
     

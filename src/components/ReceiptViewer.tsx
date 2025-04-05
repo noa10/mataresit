@@ -30,7 +30,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const queryClient = useQueryClient();
   
-  // Update editedReceipt when receipt changes
   useEffect(() => {
     setEditedReceipt(receipt);
   }, [receipt]);
@@ -70,7 +69,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
         toast.success("Receipt processed successfully!");
         
-        // Update the edited receipt with the new data to reflect changes immediately
         setEditedReceipt(prev => ({
           ...prev,
           merchant: data.merchant || prev.merchant,
@@ -172,7 +170,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   };
   
   const handleSyncToZoho = () => {
-    // Update status to synced
     updateReceipt(receipt.id, { status: "synced" })
       .then(() => {
         toast.success("Receipt synced to Zoho successfully!");
@@ -387,7 +384,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-      {/* Left side - Receipt Image */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -450,7 +446,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                     The image URL may be invalid or the image may no longer exist.
                   </p>
                   <p className="text-xs break-all text-muted-foreground mb-4">
-                    URL: {receipt.image_url || "No URL provided"}
+                    URL: {getFormattedImageUrl(receipt.image_url) || "No URL provided"}
                   </p>
                 </>
               ) : (
@@ -548,7 +544,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         </div>
       </motion.div>
       
-      {/* Right side - Receipt Data */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}

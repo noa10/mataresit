@@ -40,43 +40,35 @@ export default function ReceiptCard({
         return;
       }
       
-      // Handle various URL formats
-      if (imageUrl.startsWith('http')) {
-        // Already a full URL, use it directly
-        setImageSource(imageUrl);
-      } else if (imageUrl.includes('receipt_images/')) {
-        // It's a storage path, get a signed URL
-        try {
-          const { data, error } = await supabase.storage
-            .from('receipt_images')
-            .createSignedUrl(imageUrl.replace('receipt_images/', ''), 3600); // 1 hour expiry
-          
-          if (data && !error) {
-            setImageSource(data.signedUrl);
+      try {
+        // Handle various URL formats
+        if (imageUrl.startsWith('http')) {
+          // For full URLs, make sure we're using the correct bucket name format
+          if (imageUrl.includes('receipt_images/')) {
+            // Convert old format URLs to new format
+            const correctedUrl = imageUrl.replace('receipt_images/', 'receipt-images/');
+            setImageSource(correctedUrl);
           } else {
-            console.error("Error getting signed URL:", error);
-            setImageSource("/placeholder.svg");
+            // Already correct or different format
+            setImageSource(imageUrl);
           }
-        } catch (error) {
-          console.error("Error in getImageUrl:", error);
-          setImageSource("/placeholder.svg");
-        }
-      } else {
-        // Try to get from public bucket
-        try {
+        } else {
+          // It's a storage path, get a public URL
           const { data: publicUrlData } = supabase.storage
-            .from('receipt_images')
+            .from('receipt-images')
             .getPublicUrl(imageUrl);
             
           if (publicUrlData?.publicUrl) {
+            console.log("Generated public URL:", publicUrlData.publicUrl);
             setImageSource(publicUrlData.publicUrl);
           } else {
+            console.error("Failed to generate public URL");
             setImageSource("/placeholder.svg");
           }
-        } catch (error) {
-          console.error("Error getting public URL:", error);
-          setImageSource("/placeholder.svg");
         }
+      } catch (error) {
+        console.error("Error in getImageUrl:", error);
+        setImageSource("/placeholder.svg");
       }
     }
     
@@ -119,8 +111,8 @@ export default function ReceiptCard({
           src={imageSource} 
           alt={`Receipt from ${merchant}`}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-          onError={(e) => {
-            console.error("Image failed to load:", imageUrl, e);
+          onError={() => {
+            console.log("Image failed to load:", imageUrl);
             setImageSource("/placeholder.svg");
           }}
         />

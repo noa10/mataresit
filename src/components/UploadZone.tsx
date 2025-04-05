@@ -78,6 +78,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       // For now, just process the first file
       const file = validFiles[0];
       
+      // Log for debugging
+      console.log("Starting upload process with bucket: receipt-images");
+      
       // Upload the image
       setUploadProgress(30);
       const imageUrl = await uploadReceiptImage(file, user.id);
@@ -86,6 +89,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         throw new Error("Failed to upload image. Please try again later.");
       }
       
+      console.log("Image uploaded successfully:", imageUrl);
       setUploadProgress(50);
       
       // Create a receipt record with placeholder data
