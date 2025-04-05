@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -87,7 +86,7 @@ export default function ReceiptCard({
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || 'USD',
+      currency: currency || 'MYR',
     }).format(amount);
   };
   
@@ -120,8 +119,8 @@ export default function ReceiptCard({
           src={imageSource} 
           alt={`Receipt from ${merchant}`}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-          onError={() => {
-            console.log("Image failed to load:", imageUrl);
+          onError={(e) => {
+            console.error("Image failed to load:", imageUrl, e);
             setImageSource("/placeholder.svg");
           }}
         />

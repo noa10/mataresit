@@ -1,4 +1,3 @@
-
 # Automated Receipt Processing Application
 
 A web-based application for automating receipt data extraction using OCR technology with Amazon Textract and integrating with Zoho for expense tracking.
@@ -31,6 +30,7 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 - Reimbursement tracking
 - Multi-currency support
 - Secure Zoho OAuth integration
+- Real-time processing logs during upload and OCR
 
 ## Architecture
 
@@ -89,6 +89,7 @@ The application follows a modern web architecture:
 - `payment_method` (VARCHAR) - Payment method
 - `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
 - `image_url` (TEXT) - URL to stored receipt image
+- `fullText` (TEXT) - Raw text extracted by OCR
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
 
@@ -110,6 +111,13 @@ The application follows a modern web architecture:
 - `line_items` (INTEGER) - Confidence score for line items
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
+
+#### `processing_logs`
+- `id` (UUID, PK) - Unique identifier for the log entry
+- `receipt_id` (UUID, FK) - Reference to the associated receipt
+- `created_at` (TIMESTAMPTZ) - Timestamp when the log was created
+- `status_message` (TEXT) - Description of the processing step or status
+- `step_name` (TEXT) - Name of the processing step (e.g., FETCH, OCR, GEMINI, SAVE)
 
 ### Storage Buckets
 
@@ -189,11 +197,13 @@ The application follows a modern web architecture:
 - Drag & drop or file select interface
 - Upload progress indicator
 - File validation
+- Real-time display of processing logs during upload
 
 #### `ReceiptViewer`
 - Side-by-side layout for image and data
 - Image manipulation controls
 - Data editing interface with confidence indicators
+- Real-time display of processing logs for the viewed receipt (toggleable)
 
 #### `ReceiptCard`
 - Summary display of receipt for listings

@@ -1,5 +1,4 @@
-
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, Check, Loader2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -7,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { createReceipt, uploadReceiptImage, processReceiptWithOCR } from "@/services/receiptService";
+import { ProcessingLog } from "@/types/receipt";
+import { supabase } from "@/integrations/supabase/client";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
@@ -17,6 +20,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -54,6 +58,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     }
 
     setError(null);
+    setProcessLogs([]);
     const validFiles = Array.from(files).filter(file => {
       const fileType = file.type;
       return fileType === 'image/jpeg' || 
@@ -89,7 +94,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         merchant: "Processing...",
         date: today,
         total: 0,
-        currency: "USD",
+        currency: "MYR",
         status: "unreviewed",
         image_url: imageUrl,
         user_id: user.id
@@ -104,6 +109,46 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       setUploadProgress(70);
+
+      // Subscribe to logs for this receipt
+      const channel = supabase.channel(`receipt-logs-${receiptId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'processing_logs',
+            filter: `receipt_id=eq.${receiptId}`
+          },
+          (payload) => {
+            const newLog = payload.new as ProcessingLog;
+            console.log('New upload log received:', newLog);
+            
+            // Add new log to the list
+            setProcessLogs((prev) => {
+              // Check if we already have this log (avoid duplicates)
+              if (prev.some(log => log.id === newLog.id)) {
+                return prev;
+              }
+              // Add and sort by created_at
+              return [...prev, newLog].sort((a, b) =>
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+            });
+          }
+        )
+        .subscribe();
+      
+      // Also fetch initial logs in case some were missed before subscription setup
+      const { data: initialLogs } = await supabase
+        .from('processing_logs')
+        .select('*')
+        .eq('receipt_id', receiptId)
+        .order('created_at', { ascending: true });
+      
+      if (initialLogs && initialLogs.length > 0) {
+        setProcessLogs(initialLogs);
+      }
       
       // Process the receipt with OCR (if OCR fails, we still have the uploaded receipt)
       try {
@@ -115,6 +160,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
         setUploadProgress(100);
       }
+      
+      // Clean up subscription
+      setTimeout(() => {
+        channel.unsubscribe();
+      }, 5000); // Unsubscribe after 5 seconds to allow for final logs
       
       // Navigate to the receipt page regardless of OCR success/failure
       if (onUploadComplete) {
@@ -146,6 +196,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setError(null);
     setIsUploading(false);
     setUploadProgress(0);
+  };
+
+  // Function to get step color for visual display
+  const getStepColor = (step: string | null) => {
+    switch (step) {
+      case 'START':
+        return 'text-blue-500';
+      case 'FETCH':
+        return 'text-indigo-500';
+      case 'OCR':
+        return 'text-purple-500';
+      case 'EXTRACT':
+        return 'text-violet-500';
+      case 'GEMINI':
+        return 'text-fuchsia-500';
+      case 'SAVE':
+        return 'text-pink-500';
+      case 'COMPLETE':
+        return 'text-green-500';
+      case 'ERROR':
+        return 'text-red-500';
+      default:
+        return 'text-gray-500';
+    }
   };
 
   return (
@@ -222,6 +296,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                   transition={{ duration: 0.1 }}
                 />
               </div>
+              
+              {/* Display processing logs */}
+              {processLogs.length > 0 && (
+                <div className="mt-4">
+                  <ScrollArea className="h-[150px] w-full rounded-md border mt-2 bg-background/80 p-2">
+                    <div className="space-y-1">
+                      {processLogs.map((log, index) => (
+                        <div key={log.id || index} className="text-xs flex">
+                          <span className={`font-medium mr-2 ${getStepColor(log.step_name)}`}>
+                            {log.step_name || 'INFO'}:
+                          </span>
+                          <span className="text-muted-foreground">{log.status_message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
             </div>
           ) : error ? (
             <Button 

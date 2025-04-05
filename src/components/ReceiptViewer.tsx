@@ -1,16 +1,19 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails, ReceiptLineItem } from "@/types/receipt";
+import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog } from "@/types/receipt";
 import { updateReceipt, processReceiptWithOCR } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -23,6 +26,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
+  const [showProcessLogs, setShowProcessLogs] = useState(false);
+  const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const queryClient = useQueryClient();
   
   // Update editedReceipt when receipt changes
@@ -93,7 +98,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: receipt.currency || 'USD',
+      currency: receipt.currency || 'MYR',
     }).format(amount);
   };
   
@@ -192,17 +197,192 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     setShowFullTextData(!showFullTextData);
   };
 
+  const handleToggleProcessLogs = () => {
+    setShowProcessLogs(!showProcessLogs);
+  };
+  
+  // Subscribe to processing logs for this receipt
+  useEffect(() => {
+    if (!receipt?.id) return;
+    
+    // Fetch initial logs
+    const fetchInitialLogs = async () => {
+      const { data, error } = await supabase
+        .from('processing_logs')
+        .select('*')
+        .eq('receipt_id', receipt.id)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching logs:', error);
+      } else if (data) {
+        setProcessLogs(data as ProcessingLog[]);
+      }
+    };
+    
+    fetchInitialLogs();
+    
+    // Set up realtime subscription
+    const channel = supabase.channel(`receipt-logs-${receipt.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processing_logs',
+          filter: `receipt_id=eq.${receipt.id}`
+        },
+        (payload) => {
+          const newLog = payload.new as ProcessingLog;
+          console.log('New log received:', newLog);
+          
+          // Add new log to the list
+          setProcessLogs((prev) => {
+            // Check if we already have this log (avoid duplicates)
+            if (prev.some(log => log.id === newLog.id)) {
+              return prev;
+            }
+            // Add and sort by created_at
+            return [...prev, newLog].sort((a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Subscribed to processing logs');
+        }
+        if (err) {
+          console.error('Error subscribing to logs:', err);
+        }
+      });
+    
+    // Clean up subscription on unmount
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [receipt?.id]);
+
+  // Function to format log timestamp
+  const formatLogTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  
+  // Function to get step color
+  const getStepColor = (step: string | null) => {
+    switch (step) {
+      case 'START':
+        return 'bg-blue-500';
+      case 'FETCH':
+        return 'bg-indigo-500';
+      case 'OCR':
+        return 'bg-purple-500';
+      case 'EXTRACT':
+        return 'bg-violet-500';
+      case 'GEMINI':
+        return 'bg-fuchsia-500';
+      case 'SAVE':
+        return 'bg-pink-500';
+      case 'COMPLETE':
+        return 'bg-green-500';
+      case 'ERROR':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
   // Function to format image URL if needed
   const getFormattedImageUrl = (url: string | undefined) => {
     if (!url) return "";
     
-    // Handle URLs with storage URL format
-    if (url.includes('supabase.co') && !url.includes('/public/')) {
-      // Add 'public' to the URL path if it's missing
-      return url.replace('/object/', '/object/public/');
+    console.log("Original URL:", url);
+    
+    // For local development or testing with placeholder
+    if (url.startsWith('/')) {
+      console.log("Local URL detected, returning as is");
+      return url;
     }
     
-    return url;
+    try {
+      // Check if the URL is already a complete Supabase URL
+      if (url.includes('supabase.co') && url.includes('/storage/v1/object/')) {
+        // If it already has public/ in the path, return as is
+        if (url.includes('/public/')) {
+          console.log("Complete Supabase URL with public path detected, returning as is");
+          return url;
+        }
+        // Add 'public/' to the path if it's missing
+        const formatted = url.replace('/object/', '/object/public/');
+        console.log("Added public/ to Supabase URL:", formatted);
+        return formatted;
+      }
+      
+      // Special case: URL contains another Supabase URL inside it
+      if (url.includes('receipt_images/https://')) {
+        console.log("Detected nested Supabase URL with receipt_images prefix");
+        // Extract the actual URL after receipt_images/
+        const actualUrl = url.substring(url.indexOf('receipt_images/') + 'receipt_images/'.length);
+        console.log("Extracted actual URL:", actualUrl);
+        
+        // Recursively call this function with the extracted URL
+        return getFormattedImageUrl(actualUrl);
+      }
+      
+      // Another special case: URL might have two supabase.co domains (duplicated URL)
+      if ((url.match(/supabase\.co/g) || []).length > 1) {
+        console.log("Detected multiple Supabase domains in URL");
+        // Find where the second URL starts (likely after the first one)
+        const secondUrlStart = url.indexOf('https://', url.indexOf('supabase.co') + 1);
+        if (secondUrlStart !== -1) {
+          const actualUrl = url.substring(secondUrlStart);
+          console.log("Extracted second URL:", actualUrl);
+          return getFormattedImageUrl(actualUrl);
+        }
+      }
+      
+      // Check if the URL is a full URL that doesn't need processing
+      if (url.startsWith('http') && !url.includes('receipt_images/')) {
+        console.log("Full URL that doesn't need processing detected, returning as is");
+        return url;
+      }
+      
+      // Handle relative paths that might be just storage keys
+      if (!url.includes('supabase.co')) {
+        // Check if this looks like a UUID-based path
+        if (url.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/.*$/i)) {
+          console.log("Detected UUID-based file path");
+          const { data } = supabase.storage
+            .from('receipt_images')
+            .getPublicUrl(url);
+          
+          console.log("Generated publicUrl from UUID path:", data?.publicUrl);
+          return data?.publicUrl || url;
+        }
+        
+        // Extract just the filename if there's a path
+        const fileName = url.includes('/') 
+          ? url.substring(url.lastIndexOf('/') + 1) 
+          : url.replace('receipt_images/', '');
+          
+        console.log("Processing as storage key, extracted filename:", fileName);
+        
+        const { data } = supabase.storage
+          .from('receipt_images')
+          .getPublicUrl(fileName);
+        
+        console.log("Generated publicUrl:", data?.publicUrl);
+        return data?.publicUrl || url;
+      }
+      
+      console.log("URL didn't match any formatting rules, returning as is");
+      return url;
+    } catch (error) {
+      console.error("Error formatting image URL:", error);
+      return url; // Return original URL on error
+    }
   };
 
   return (
@@ -255,6 +435,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                 className="max-w-full max-h-full object-contain shadow-lg"
                 onError={(e) => {
                   console.error("Error loading receipt image:", e);
+                  console.error("Image URL attempted:", getFormattedImageUrl(receipt.image_url));
                   setImageError(true);
                 }}
               />
@@ -302,6 +483,50 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
             )}
           </Button>
           
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <BarChart2 size={16} className="text-muted-foreground" />
+              <span className="text-sm">Processing Logs</span>
+            </div>
+            <Switch 
+              checked={showProcessLogs}
+              onCheckedChange={handleToggleProcessLogs}
+            />
+          </div>
+          
+          {showProcessLogs && (
+            <ScrollArea className="mt-2 h-[200px] rounded-md border">
+              {processLogs.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No processing logs available
+                </div>
+              ) : (
+                <div className="p-4 space-y-2">
+                  {processLogs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-2 text-xs">
+                      <div className="min-w-[60px] text-muted-foreground">
+                        {formatLogTime(log.created_at)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {log.step_name && (
+                            <Badge 
+                              variant="outline" 
+                              className={`px-1.5 py-0 text-[10px] ${getStepColor(log.step_name)} text-white`}
+                            >
+                              {log.step_name}
+                            </Badge>
+                          )}
+                          <span>{log.status_message}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          )}
+          
           {receipt.fullText && (
             <div className="mt-4">
               <Button
@@ -319,6 +544,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               )}
             </div>
           )}
+          
         </div>
       </motion.div>
       
@@ -407,7 +633,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               <Label htmlFor="currency">Currency</Label>
               <Input
                 id="currency"
-                value={editedReceipt.currency || "USD"}
+                value={editedReceipt.currency || "MYR"}
                 onChange={(e) => handleInputChange('currency', e.target.value)}
                 className="bg-background/50"
               />

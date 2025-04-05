@@ -1,4 +1,3 @@
-
 export type ReceiptStatus = "unreviewed" | "reviewed" | "synced";
 
 export interface Receipt {
@@ -85,4 +84,13 @@ export interface OCRResult {
     payment_method?: number;
   };
   fullText?: string;
+}
+
+// Interface for processing logs
+export interface ProcessingLog {
+  id: string;
+  receipt_id: string;
+  created_at: string;
+  status_message: string;
+  step_name: string | null;
 }

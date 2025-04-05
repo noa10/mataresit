@@ -157,6 +157,37 @@ export type Database = {
         }
         Relationships: []
       }
+      processing_logs: {
+        Row: {
+          id: string
+          receipt_id: string
+          created_at: string
+          status_message: string
+          step_name: string | null
+        }
+        Insert: {
+          id?: string
+          receipt_id: string
+          created_at?: string
+          status_message: string
+          step_name?: string | null
+        }
+        Update: {
+          id?: string
+          receipt_id?: string
+          created_at?: string
+          status_message?: string
+          step_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,11 +1,14 @@
-
+/// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { TextractClient, AnalyzeDocumentCommand } from 'npm:@aws-sdk/client-textract'
+import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textract'
+import { ProcessingLogger } from './shared/db-logger.ts'
 
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 // Configure AWS Textract client
@@ -17,183 +20,207 @@ const textractClient = new TextractClient({
   },
 })
 
-// Helper to extract date from OCR text
-function extractDate(text: string): { value: string; confidence: number } {
-  // Common date formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD
-  const dateRegexes = [
-    /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/,
-    /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,
-  ]
-  
-  for (const regex of dateRegexes) {
-    const match = text.match(regex)
-    if (match) {
-      // Basic validation would go here
-      return { value: match[0], confidence: 85 }
-    }
-  }
-  
-  return { value: '', confidence: 0 }
-}
-
-// Helper to extract total amount from OCR text
-function extractTotal(text: string): { value: number; confidence: number } {
-  // Look for common patterns like "Total: $123.45"
-  const totalRegexes = [
-    /total[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-    /sum[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-    /amount[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-    /[$€£]\s*(\d+[.,]\d{2})/i,
-  ]
-  
-  for (const regex of totalRegexes) {
-    const match = text.match(regex)
-    if (match) {
-      const amount = parseFloat(match[1].replace(',', '.'))
-      return { value: amount, confidence: 80 }
-    }
-  }
-  
-  return { value: 0, confidence: 0 }
-}
-
-// Helper to extract merchant name from OCR text
-function extractMerchant(text: string): { value: string; confidence: number } {
-  // Usually the merchant name is at the top of the receipt
-  const lines = text.split('\n').filter(line => line.trim().length > 0)
-  
-  if (lines.length > 0) {
-    // Take the first non-empty line as the merchant name
-    return { value: lines[0].trim(), confidence: 70 }
-  }
-  
-  return { value: '', confidence: 0 }
-}
-
-// Helper to extract tax amount from OCR text
-function extractTax(text: string): { value: number; confidence: number } {
-  // Look for common patterns like "Tax: $12.34" or "VAT: $12.34"
-  const taxRegexes = [
-    /tax[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-    /vat[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-    /gst[^0-9$€£]*[$€£]?\s*(\d+[.,]\d{2})/i,
-  ]
-  
-  for (const regex of taxRegexes) {
-    const match = text.match(regex)
-    if (match) {
-      const amount = parseFloat(match[1].replace(',', '.'))
-      return { value: amount, confidence: 75 }
-    }
-  }
-  
-  return { value: 0, confidence: 0 }
-}
-
-// Helper to extract payment method from OCR text
-function extractPaymentMethod(text: string): { value: string; confidence: number } {
-  // Look for common payment methods
-  const paymentRegexes = [
-    /(visa|mastercard|mc|amex|american express|discover|diners|jcb)/i,
-    /(credit|debit|card)/i,
-    /(cash|check|cheque)/i,
-    /(paypal|venmo|zelle|apple pay|google pay)/i,
-  ]
-  
-  for (const regex of paymentRegexes) {
-    const match = text.match(regex)
-    if (match) {
-      return { value: match[0].trim(), confidence: 65 }
-    }
-  }
-  
-  return { value: '', confidence: 0 }
-}
-
-// Helper to extract line items from OCR text
-function extractLineItems(text: string): { items: { description: string; amount: number }[]; confidence: number } {
-  const lines = text.split('\n')
-  const items: { description: string; amount: number }[] = []
-  let confidence = 0
-  
-  // Simple regex to find lines with a product and price
-  const itemRegex = /(.+?)[$€£]?\s*(\d+[.,]\d{2})\s*$/
-  
-  for (const line of lines) {
-    const match = line.match(itemRegex)
-    if (match) {
-      const description = match[1].trim()
-      const amount = parseFloat(match[2].replace(',', '.'))
-      
-      // Basic validation to filter out invalid items
-      if (description.length > 2 && amount > 0) {
-        items.push({ description, amount })
-      }
-    }
-  }
-  
-  // Assign confidence based on number of items found
-  if (items.length > 0) {
-    confidence = 65
-  }
-  
-  return { items, confidence }
-}
-
 // Main function to process receipt image and extract data
-async function processReceiptImage(imageBytes: Uint8Array) {
+async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, receiptId: string) {
+  const logger = new ProcessingLogger(receiptId);
+  
   try {
+    await logger.log("Starting OCR processing with Amazon Textract", "OCR");
     console.log("Calling Amazon Textract for OCR processing...");
     
-    // Call Amazon Textract to analyze the document
-    const command = new AnalyzeDocumentCommand({
+    // Call Amazon Textract to analyze the expense document (receipt/invoice)
+    const command = new AnalyzeExpenseCommand({
       Document: { Bytes: imageBytes },
-      FeatureTypes: ['FORMS', 'TABLES'],
     })
     
     const response = await textractClient.send(command)
     console.log("Received response from Amazon Textract");
+    await logger.log("Amazon Textract analysis complete", "OCR");
     
-    // Extract the full text from Textract response
-    let fullText = ''
-    if (response.Blocks) {
-      for (const block of response.Blocks) {
-        if (block.BlockType === 'LINE' && block.Text) {
-          fullText += block.Text + '\n'
+    // Extract structured data from the Textract response
+    const result = {
+      merchant: '',
+      date: '',
+      total: 0,
+      tax: 0,
+      payment_method: '',
+      currency: 'MYR', // Default to MYR instead of USD
+      line_items: [] as { description: string; amount: number }[],
+      fullText: '',
+      confidence: {
+        merchant: 0,
+        date: 0,
+        total: 0,
+        tax: 0,
+        payment_method: 0,
+        line_items: 0,
+      },
+    };
+    
+    // Process the structured data from ExpenseDocuments
+    if (response.ExpenseDocuments && response.ExpenseDocuments.length > 0) {
+      const expenseDoc = response.ExpenseDocuments[0];
+      
+      // Extract full text for backup processing
+      let fullText = '';
+      
+      // Process summary fields
+      if (expenseDoc.SummaryFields) {
+        for (const field of expenseDoc.SummaryFields) {
+          if (field.Type?.Text && field.ValueDetection?.Text) {
+            const fieldType = field.Type.Text;
+            const fieldValue = field.ValueDetection.Text;
+            // Convert confidence from decimal (0-1) to percentage (0-100)
+            const confidence = field.ValueDetection.Confidence ? Math.round(field.ValueDetection.Confidence) : 0;
+            
+            // Add to full text
+            fullText += `${field.LabelDetection?.Text || field.Type.Text}: ${fieldValue}\n`;
+            
+            // Map Textract fields to our data structure
+            switch (fieldType) {
+              case 'VENDOR_NAME':
+                result.merchant = fieldValue;
+                result.confidence.merchant = confidence;
+                break;
+              case 'INVOICE_RECEIPT_DATE':
+                result.date = fieldValue;
+                result.confidence.date = confidence;
+                break;
+              case 'TOTAL':
+                // Remove currency symbols and convert to number
+                result.total = parseFloat(fieldValue.replace(/[$€£RM]/g, ''));
+                result.confidence.total = confidence;
+                break;
+              case 'TAX':
+                result.tax = parseFloat(fieldValue.replace(/[$€£RM]/g, ''));
+                result.confidence.tax = confidence;
+                break;
+              case 'PAYMENT_TERMS':
+                result.payment_method = fieldValue;
+                result.confidence.payment_method = confidence;
+                break;
+            }
+          }
         }
       }
+      
+      // Process line items
+      if (expenseDoc.LineItemGroups) {
+        for (const group of expenseDoc.LineItemGroups) {
+          if (group.LineItems) {
+            for (const lineItem of group.LineItems) {
+              let description = '';
+              let amount = 0;
+              
+              // Extract expense line items
+              if (lineItem.LineItemExpenseFields) {
+                for (const field of lineItem.LineItemExpenseFields) {
+                  if (field.Type?.Text === 'ITEM' && field.ValueDetection?.Text) {
+                    description = field.ValueDetection.Text;
+                  } else if (field.Type?.Text === 'PRICE' && field.ValueDetection?.Text) {
+                    amount = parseFloat(field.ValueDetection.Text.replace(/[$€£RM]/g, ''));
+                  }
+                }
+                
+                if (description && amount > 0) {
+                  result.line_items.push({ description, amount });
+                }
+              }
+            }
+          }
+        }
+        
+        // Set confidence for line items
+        if (result.line_items.length > 0) {
+          result.confidence.line_items = 90; // High confidence if line items were detected
+        }
+      }
+      
+      result.fullText = fullText;
     }
     
-    console.log("Extracted full text:", fullText.substring(0, 100) + "...");
+    await logger.log(`Extracted data: Merchant=${result.merchant}, Total=${result.total}, Items=${result.line_items.length}`, "EXTRACT");
     
-    // Extract key fields from the text
-    const merchant = extractMerchant(fullText)
-    const date = extractDate(fullText)
-    const total = extractTotal(fullText)
-    const tax = extractTax(fullText)
-    const paymentMethod = extractPaymentMethod(fullText)
-    const lineItems = extractLineItems(fullText)
-    
-    // Return the extracted data with confidence scores
-    return {
-      merchant: merchant.value,
-      date: date.value,
-      total: total.value,
-      tax: tax.value,
-      payment_method: paymentMethod.value,
-      line_items: lineItems.items,
-      confidence: {
-        merchant: merchant.confidence,
-        date: date.confidence,
-        total: total.confidence,
-        tax: tax.confidence,
-        payment_method: paymentMethod.confidence,
-        line_items: lineItems.confidence,
-      },
-      fullText,
+    // NEW: Call Gemini AI to enhance the data
+    try {
+      await logger.log("Starting Gemini AI enhancement", "GEMINI");
+      console.log("Calling Gemini AI to enhance receipt data...");
+      
+      // Call the enhance-receipt-data function
+      const enhanceResponse = await fetch(
+        "http://localhost:54321/functions/v1/enhance-receipt-data",
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            textractData: result,
+            fullText: result.fullText,
+            receiptId: receiptId
+          }),
+        }
+      );
+      
+      if (enhanceResponse.ok) {
+        const enhancedData = await enhanceResponse.json();
+        console.log("Received enhanced data from Gemini:", enhancedData);
+        await logger.log("Gemini AI enhancement complete", "GEMINI");
+        
+        // Merge enhanced data with Textract data if enhancement was successful
+        if (enhancedData.success && enhancedData.result) {
+          // Currency enhancement
+          if (enhancedData.result.currency) {
+            result.currency = enhancedData.result.currency;
+            await logger.log(`Currency detected: ${enhancedData.result.currency}`, "GEMINI");
+          }
+          
+          // Payment method enhancement
+          if (enhancedData.result.payment_method) {
+            result.payment_method = enhancedData.result.payment_method;
+            await logger.log(`Payment method detected: ${enhancedData.result.payment_method}`, "GEMINI");
+            
+            // Update confidence score for payment method
+            if (enhancedData.result.confidence?.payment_method) {
+              result.confidence.payment_method = enhancedData.result.confidence.payment_method;
+            } else {
+              result.confidence.payment_method = 85; // Default high confidence for Gemini results
+            }
+          }
+          
+          // Other field enhancements if provided by Gemini
+          if (enhancedData.result.merchant && (!result.merchant || enhancedData.result.confidence?.merchant > result.confidence.merchant)) {
+            result.merchant = enhancedData.result.merchant;
+            await logger.log(`Merchant enhanced to: ${enhancedData.result.merchant}`, "GEMINI");
+            if (enhancedData.result.confidence?.merchant) {
+              result.confidence.merchant = enhancedData.result.confidence.merchant;
+            }
+          }
+          
+          if (enhancedData.result.total && (!result.total || enhancedData.result.confidence?.total > result.confidence.total)) {
+            result.total = enhancedData.result.total;
+            await logger.log(`Total enhanced to: ${enhancedData.result.total}`, "GEMINI");
+            if (enhancedData.result.confidence?.total) {
+              result.confidence.total = enhancedData.result.confidence.total;
+            }
+          }
+        }
+      } else {
+        console.error("Error calling Gemini enhancement:", await enhanceResponse.text());
+        await logger.log("Gemini AI enhancement failed", "GEMINI");
+        // Continue with Textract data only
+      }
+    } catch (enhanceError) {
+      console.error("Error during Gemini enhancement:", enhanceError);
+      await logger.log(`Gemini AI error: ${enhanceError.message}`, "ERROR");
+      // Continue with Textract data only
     }
+    
+    await logger.log("Processing complete", "COMPLETE");
+    return result;
   } catch (error) {
     console.error('Error processing receipt with Textract:', error);
+    await logger.log(`Error processing receipt: ${error.message}`, "ERROR");
     throw new Error(`Failed to process receipt image: ${error.message}`);
   }
 }
@@ -201,7 +228,7 @@ async function processReceiptImage(imageBytes: Uint8Array) {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
   
   try {
@@ -236,7 +263,19 @@ serve(async (req) => {
       );
     }
     
+    // Create a logger for this process
+    const logger = new ProcessingLogger(
+      receiptId, 
+      Deno.env.get('SUPABASE_URL') || '', 
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
+    
+    await logger.initialize();
+    await logger.log("Starting receipt processing", "START");
+    
+    await logger.log("Fetching receipt data", "FETCH");
     console.log("Fetching image from URL:", imageUrl);
+    await logger.log("Fetching receipt image", "FETCH");
     
     // Format URL properly to ensure it's accessible
     const urlObj = new URL(imageUrl);
@@ -247,6 +286,7 @@ serve(async (req) => {
       
       if (!imageResponse.ok) {
         console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
+        await logger.log(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`, "ERROR");
         
         return new Response(
           JSON.stringify({ 
@@ -261,12 +301,19 @@ serve(async (req) => {
       const imageArrayBuffer = await imageResponse.arrayBuffer();
       const imageBytes = new Uint8Array(imageArrayBuffer);
       console.log(`Image fetched successfully, size: ${imageBytes.length} bytes`);
+      await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
       
       // Process the receipt image with OCR
-      const extractedData = await processReceiptImage(imageBytes);
+      const extractedData = await processReceiptImage(imageBytes, imageUrl, receiptId);
       console.log("Data extraction complete");
       
+      await logger.log("Extracting receipt data", "EXTRACT");
+      await logger.log(`Extracted data: Merchant=${extractedData.merchant}, Total=${extractedData.total}, Items=${extractedData.line_items.length}`, "EXTRACT");
+      
+      await logger.log("Saving processing results", "SAVE");
+      
       // Return the extracted data
+      await logger.log("Receipt processing completed", "COMPLETE");
       return new Response(
         JSON.stringify({
           success: true,
@@ -277,6 +324,7 @@ serve(async (req) => {
       );
     } catch (fetchError) {
       console.error("Error fetching image:", fetchError);
+      await logger.log(`Error fetching image: ${fetchError.message}`, "ERROR");
       
       return new Response(
         JSON.stringify({ 
@@ -288,6 +336,17 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error in process-receipt function:', error);
+    
+    // Try to log the error if possible
+    try {
+      const { receiptId } = await req.json();
+      if (receiptId) {
+        const logger = new ProcessingLogger(receiptId);
+        await logger.log(`Server error: ${error.message}`, "ERROR");
+      }
+    } catch (logError) {
+      // Ignore errors during error logging
+    }
     
     return new Response(
       JSON.stringify({ 

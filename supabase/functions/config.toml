@@ -1,3 +1,19 @@
+# Update this to your own host
+# If omitted, the system default will be used
+# host = "host.docker.internal"
+# Functions to skip building
+# excluded_functions = ["hello-world"]
+
+[env]
+# Relative to the config.toml
+# file_path = ".env"
+# Rename/add keys that match the environment variable names
+# used in your function
+# MY_API_KEY = "key"
+
+[env.production]
+# Uncomment the line below to use a different path for your production environment
+# file_path = ".env"
 
 project_id = "mpmkbtsufihzdelrlszs"
 
