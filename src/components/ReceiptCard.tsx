@@ -43,26 +43,18 @@ export default function ReceiptCard({
       try {
         // Handle various URL formats
         if (imageUrl.startsWith('http')) {
-          // For full URLs, make sure we're using the correct bucket name format
-          if (imageUrl.includes('receipt_images/')) {
-            // Convert old format URLs to new format
-            const correctedUrl = imageUrl.replace('receipt_images/', 'receipt-images/');
-            setImageSource(correctedUrl);
-          } else {
-            // Already correct or different format
-            setImageSource(imageUrl);
-          }
+          // Use the URL directly if it starts with http
+          setImageSource(imageUrl);
         } else {
           // It's a storage path, get a public URL
           const { data: publicUrlData } = supabase.storage
-            .from('receipt-images')
+            .from('receipt_images')
             .getPublicUrl(imageUrl);
             
           if (publicUrlData?.publicUrl) {
-            console.log("Generated public URL:", publicUrlData.publicUrl);
             setImageSource(publicUrlData.publicUrl);
           } else {
-            console.error("Failed to generate public URL");
+            console.error("Failed to generate public URL for path:", imageUrl);
             setImageSource("/placeholder.svg");
           }
         }
