@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Upload, Check, Loader2, XCircle } from "lucide-react";
+import { Upload, Check, Loader2, XCircle, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,65 @@ import { ProcessingLog } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// Define processing stages with their details
+const PROCESSING_STAGES = {
+  QUEUED: {
+    name: "Queued",
+    description: "Receipt is queued for processing",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-blue-400 border-blue-400"
+  },
+  START: {
+    name: "Started",
+    description: "Processing has started",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-blue-500 border-blue-500"
+  },
+  FETCH: {
+    name: "Fetching",
+    description: "Fetching receipt image",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-indigo-500 border-indigo-500"
+  },
+  OCR: {
+    name: "OCR",
+    description: "Performing OCR on receipt",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-purple-500 border-purple-500"
+  },
+  EXTRACT: {
+    name: "Extracting",
+    description: "Extracting data from OCR results",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-violet-500 border-violet-500"
+  },
+  GEMINI: {
+    name: "Analyzing",
+    description: "Analyzing receipt with AI",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-fuchsia-500 border-fuchsia-500"
+  },
+  SAVE: {
+    name: "Saving",
+    description: "Saving processed data",
+    icon: <Loader2 size={16} className="animate-spin" />,
+    color: "text-pink-500 border-pink-500"
+  },
+  COMPLETE: {
+    name: "Complete",
+    description: "Processing complete",
+    icon: <Check size={16} />,
+    color: "text-green-500 border-green-500"
+  },
+  ERROR: {
+    name: "Error",
+    description: "An error occurred during processing",
+    icon: <XCircle size={16} />,
+    color: "text-red-500 border-red-500"
+  }
+};
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
@@ -21,9 +80,42 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [stageHistory, setStageHistory] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Effect to update current stage when new logs come in
+  useEffect(() => {
+    if (processLogs.length > 0) {
+      const latestLog = processLogs[processLogs.length - 1];
+      if (latestLog.step_name) {
+        setCurrentStage(latestLog.step_name);
+        
+        // Update stage history (don't add duplicates)
+        setStageHistory(prev => {
+          if (!prev.includes(latestLog.step_name!)) {
+            return [...prev, latestLog.step_name!];
+          }
+          return prev;
+        });
+        
+        // Set progress based on stage
+        // This is a basic heuristic - could be refined with more specific progress info
+        const stageIndex = Object.keys(PROCESSING_STAGES).indexOf(latestLog.step_name);
+        const totalStages = Object.keys(PROCESSING_STAGES).length - 2; // Exclude ERROR and QUEUED
+        if (latestLog.step_name === 'COMPLETE') {
+          setUploadProgress(100);
+        } else if (latestLog.step_name === 'ERROR') {
+          // Keep current progress but show error state
+        } else if (stageIndex > 0) {
+          const newProgress = Math.round((stageIndex / totalStages) * 100);
+          setUploadProgress(Math.max(newProgress, uploadProgress));
+        }
+      }
+    }
+  }, [processLogs]);
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -59,6 +151,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
     setError(null);
     setProcessLogs([]);
+    setStageHistory([]);
+    setCurrentStage('QUEUED');
+    
     const validFiles = Array.from(files).filter(file => {
       const fileType = file.type;
       return fileType === 'image/jpeg' || 
@@ -163,6 +258,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         console.error("OCR processing error:", ocrError);
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
         setUploadProgress(100);
+        setCurrentStage('ERROR');
       }
       
       // Clean up subscription
@@ -187,6 +283,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       toast.error(error.message || "There was an error uploading your receipt");
       setIsUploading(false);
       setUploadProgress(0);
+      setCurrentStage('ERROR');
     }
   };
   
@@ -200,30 +297,100 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setError(null);
     setIsUploading(false);
     setUploadProgress(0);
+    setCurrentStage(null);
+    setStageHistory([]);
+    setProcessLogs([]);
   };
 
   // Function to get step color for visual display
   const getStepColor = (step: string | null) => {
-    switch (step) {
-      case 'START':
-        return 'text-blue-500';
-      case 'FETCH':
-        return 'text-indigo-500';
-      case 'OCR':
-        return 'text-purple-500';
-      case 'EXTRACT':
-        return 'text-violet-500';
-      case 'GEMINI':
-        return 'text-fuchsia-500';
-      case 'SAVE':
-        return 'text-pink-500';
-      case 'COMPLETE':
-        return 'text-green-500';
-      case 'ERROR':
-        return 'text-red-500';
-      default:
-        return 'text-gray-500';
-    }
+    if (!step) return 'text-gray-500';
+    
+    const stageInfo = PROCESSING_STAGES[step as keyof typeof PROCESSING_STAGES];
+    if (stageInfo) return stageInfo.color.split(' ')[0];
+    return 'text-gray-500';
+  };
+
+  // Render the processing timeline
+  const renderProcessingTimeline = () => {
+    const orderedStages = ['START', 'FETCH', 'OCR', 'EXTRACT', 'GEMINI', 'SAVE', 'COMPLETE'];
+    
+    return (
+      <div className="mt-4 pt-2">
+        <div className="flex items-center justify-between relative">
+          {/* Progress bar behind the steps */}
+          <div className="absolute left-0 top-1/2 w-full h-0.5 bg-muted -translate-y-1/2">
+            <motion.div 
+              className="h-full bg-primary"
+              initial={{ width: "0%" }}
+              animate={{ width: `${uploadProgress}%` }}
+              transition={{ duration: 0.2 }}
+            />
+          </div>
+          
+          {/* Steps */}
+          {orderedStages.map((stage, idx) => {
+            const stageConfig = PROCESSING_STAGES[stage as keyof typeof PROCESSING_STAGES];
+            const isCurrent = currentStage === stage;
+            const isCompleted = stageHistory.includes(stage) || 
+                                currentStage === 'COMPLETE' || 
+                                orderedStages.indexOf(currentStage || '') > idx;
+            const isError = currentStage === 'ERROR';
+            
+            let stateClass = "bg-muted text-muted-foreground border-muted"; // default/future
+            if (isCompleted) stateClass = "bg-primary text-primary-foreground border-primary";
+            else if (isCurrent) stateClass = `bg-background ${stageConfig.color}`;
+            
+            return (
+              <TooltipProvider key={stage}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="z-10 flex flex-col items-center gap-1">
+                      <motion.div 
+                        className={`relative flex items-center justify-center w-8 h-8 rounded-full border-2 ${stateClass}`}
+                        animate={{ scale: isCurrent ? [1, 1.1, 1] : 1 }}
+                        transition={{ duration: 0.5, repeat: isCurrent ? Infinity : 0, repeatDelay: 1 }}
+                      >
+                        {isCompleted ? (
+                          <Check size={16} />
+                        ) : isCurrent ? (
+                          stageConfig.icon
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                        )}
+                      </motion.div>
+                      <span className="text-[10px] uppercase font-medium hidden sm:block">
+                        {stageConfig.name}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{stageConfig.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Render error state
+  const renderErrorState = () => {
+    if (!error) return null;
+    
+    return (
+      <div className="mt-4 p-3 bg-destructive/10 border border-destructive rounded-md text-sm">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-destructive">Processing Error</p>
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -275,14 +442,18 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           <div className="text-center space-y-2">
             <h3 className="text-lg font-medium">
               {isUploading 
-                ? "Uploading..." 
+                ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..." 
                 : error 
                   ? "Upload Failed" 
                   : "Upload Receipt"}
             </h3>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto">
               {isUploading 
-                ? `Processing your receipt (${uploadProgress}%)`
+                ? currentStage === 'ERROR'
+                  ? "An error occurred during processing"
+                  : currentStage
+                    ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.description || `Processing your receipt (${uploadProgress}%)`
+                    : `Processing your receipt (${uploadProgress}%)`
                 : error
                   ? error
                   : "Drag & drop your receipt images or PDFs here, or click to browse"
@@ -290,24 +461,25 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             </p>
           </div>
           
+          {isUploading && renderProcessingTimeline()}
+          
           {isUploading ? (
             <div className="w-full max-w-xs">
-              <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-primary"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${uploadProgress}%` }}
-                  transition={{ duration: 0.1 }}
-                />
-              </div>
-              
               {/* Display processing logs */}
               {processLogs.length > 0 && (
                 <div className="mt-4">
+                  <div className="flex justify-between items-center mb-1">
+                    <h4 className="text-sm font-medium">Processing Log</h4>
+                    {currentStage && (
+                      <Badge variant="outline" className={getStepColor(currentStage)}>
+                        {PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || currentStage}
+                      </Badge>
+                    )}
+                  </div>
                   <ScrollArea className="h-[150px] w-full rounded-md border mt-2 bg-background/80 p-2">
                     <div className="space-y-1">
                       {processLogs.map((log, index) => (
-                        <div key={log.id || index} className="text-xs flex">
+                        <div key={log.id || index} className="text-xs flex items-start">
                           <span className={`font-medium mr-2 ${getStepColor(log.step_name)}`}>
                             {log.step_name || 'INFO'}:
                           </span>
@@ -318,6 +490,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                   </ScrollArea>
                 </div>
               )}
+              
+              {currentStage === 'ERROR' && renderErrorState()}
             </div>
           ) : error ? (
             <Button 

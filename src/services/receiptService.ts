@@ -100,12 +100,12 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
       name: fileName,
       type: file.type,
       size: file.size,
-      bucket: 'receipt-images'
+      bucket: 'receipt_images'
     });
     
-    // Upload the file directly to the receipt-images bucket
+    // Upload the file directly to the receipt_images bucket
     const { data, error } = await supabase.storage
-      .from('receipt-images')
+      .from('receipt_images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false
@@ -126,7 +126,7 @@ export const uploadReceiptImage = async (file: File, userId: string): Promise<st
     
     // Get the public URL for the file
     const { data: publicUrlData } = supabase.storage
-      .from('receipt-images')
+      .from('receipt_images')
       .getPublicUrl(fileName);
       
     if (!publicUrlData?.publicUrl) {
@@ -545,15 +545,15 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
         let imagePath = receipt.image_url;
         
         // If it's a full URL, extract the path
-        if (imagePath.includes('receipt-images/')) {
-          const pathParts = imagePath.split('receipt-images/');
+        if (imagePath.includes('receipt_images/')) {
+          const pathParts = imagePath.split('receipt_images/');
           if (pathParts.length > 1) {
             imagePath = pathParts[1];
           }
         }
         
         const { error: storageError } = await supabase.storage
-          .from('receipt-images')
+          .from('receipt_images')
           .remove([imagePath]);
         
         if (storageError) {
