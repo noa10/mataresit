@@ -74,6 +74,8 @@ interface UploadZoneProps {
   onUploadComplete?: () => void;
 }
 
+// Note: This component is designed to be placed inside a Modal/Dialog Content area.
+// The modal trigger and container should be handled by the parent component.
 export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -102,7 +104,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         });
         
         // Set progress based on stage
-        // This is a basic heuristic - could be refined with more specific progress info
         const stageIndex = Object.keys(PROCESSING_STAGES).indexOf(latestLog.step_name);
         const totalStages = Object.keys(PROCESSING_STAGES).length - 2; // Exclude ERROR and QUEUED
         if (latestLog.step_name === 'COMPLETE') {
@@ -173,7 +174,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       // For now, just process the first file
       const file = validFiles[0];
       
-      // Log for debugging
       console.log("Starting upload process with bucket: receipt-images");
       
       // Upload the image
@@ -223,13 +223,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             const newLog = payload.new as ProcessingLog;
             console.log('New upload log received:', newLog);
             
-            // Add new log to the list
             setProcessLogs((prev) => {
-              // Check if we already have this log (avoid duplicates)
               if (prev.some(log => log.id === newLog.id)) {
                 return prev;
               }
-              // Add and sort by created_at
               return [...prev, newLog].sort((a, b) =>
                 new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
               );
@@ -238,7 +235,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         )
         .subscribe();
       
-      // Also fetch initial logs in case some were missed before subscription setup
+      // Also fetch initial logs
       const { data: initialLogs } = await supabase
         .from('processing_logs')
         .select('*')
@@ -249,7 +246,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         setProcessLogs(initialLogs);
       }
       
-      // Process the receipt with OCR (if OCR fails, we still have the uploaded receipt)
+      // Process the receipt with OCR
       try {
         await processReceiptWithOCR(receiptId);
         setUploadProgress(100);
@@ -264,17 +261,17 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       // Clean up subscription
       setTimeout(() => {
         channel.unsubscribe();
-      }, 5000); // Unsubscribe after 5 seconds to allow for final logs
+      }, 5000); 
       
-      // Navigate to the receipt page regardless of OCR success/failure
+      // Navigate or call callback on completion
       if (onUploadComplete) {
         setTimeout(() => {
           onUploadComplete();
-          navigate(`/receipt/${receiptId}`);
+          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
         }, 500);
       } else {
         setTimeout(() => {
-          navigate(`/receipt/${receiptId}`);
+          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
         }, 500);
       }
     } catch (error: any) {
@@ -302,24 +299,20 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setProcessLogs([]);
   };
 
-  // Function to get step color for visual display
   const getStepColor = (step: string | null) => {
     if (!step) return 'text-gray-500';
-    
     const stageInfo = PROCESSING_STAGES[step as keyof typeof PROCESSING_STAGES];
     if (stageInfo) return stageInfo.color.split(' ')[0];
     return 'text-gray-500';
   };
 
-  // Render the processing timeline
   const renderProcessingTimeline = () => {
     const orderedStages = ['START', 'FETCH', 'OCR', 'EXTRACT', 'GEMINI', 'SAVE', 'COMPLETE'];
-    
     return (
-      <div className="mt-4 pt-2">
-        <div className="flex items-center justify-between relative">
+      <div className="mt-6 pt-4 w-full">
+        <div className="flex items-start justify-between relative px-2">
           {/* Progress bar behind the steps */}
-          <div className="absolute left-0 top-1/2 w-full h-0.5 bg-muted -translate-y-1/2">
+          <div className="absolute left-0 top-[20px] w-full h-1 bg-muted -translate-y-1/2">
             <motion.div 
               className="h-full bg-primary"
               initial={{ width: "0%" }}
@@ -333,38 +326,41 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             const stageConfig = PROCESSING_STAGES[stage as keyof typeof PROCESSING_STAGES];
             const isCurrent = currentStage === stage;
             const isCompleted = stageHistory.includes(stage) || 
-                                currentStage === 'COMPLETE' || 
-                                orderedStages.indexOf(currentStage || '') > idx;
+                               currentStage === 'COMPLETE' || 
+                               orderedStages.indexOf(currentStage || '') > idx;
             const isError = currentStage === 'ERROR';
             
-            let stateClass = "bg-muted text-muted-foreground border-muted"; // default/future
-            if (isCompleted) stateClass = "bg-primary text-primary-foreground border-primary";
-            else if (isCurrent) stateClass = `bg-background ${stageConfig.color}`;
+            let stateClass = "bg-muted text-muted-foreground border-muted";
+            if (isCompleted && !isError) stateClass = "bg-primary text-primary-foreground border-primary";
+            else if (isCurrent && !isError) stateClass = `bg-background ${stageConfig.color}`;
+            else if (isError && (isCurrent || isCompleted)) stateClass = `bg-destructive/20 ${PROCESSING_STAGES.ERROR.color}`;
             
             return (
               <TooltipProvider key={stage}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="z-10 flex flex-col items-center gap-1">
+                    <div className="z-10 flex flex-col items-center gap-2 flex-1 min-w-0 px-1">
                       <motion.div 
-                        className={`relative flex items-center justify-center w-8 h-8 rounded-full border-2 ${stateClass}`}
-                        animate={{ scale: isCurrent ? [1, 1.1, 1] : 1 }}
-                        transition={{ duration: 0.5, repeat: isCurrent ? Infinity : 0, repeatDelay: 1 }}
+                        className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 ${stateClass}`}
+                        animate={{ scale: isCurrent && !isError ? [1, 1.1, 1] : 1 }}
+                        transition={{ duration: 0.5, repeat: isCurrent && !isError ? Infinity : 0, repeatDelay: 1 }}
                       >
-                        {isCompleted ? (
-                          <Check size={16} />
+                        {isError && (isCurrent || isCompleted) ? (
+                          PROCESSING_STAGES.ERROR.icon
+                        ) : isCompleted ? (
+                          <Check size={18} />
                         ) : isCurrent ? (
                           stageConfig.icon
                         ) : (
-                          <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                          <div className="w-2 h-2 rounded-full bg-current" />
                         )}
                       </motion.div>
-                      <span className="text-[10px] uppercase font-medium hidden sm:block">
+                      <span className="text-xs uppercase font-medium text-center break-words w-full">
                         {stageConfig.name}
                       </span>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent>
+                  <TooltipContent className="px-4 py-3 text-sm max-w-[200px] text-center bg-background border shadow-md">
                     <p>{stageConfig.description}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -376,14 +372,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     );
   };
 
-  // Render error state
   const renderErrorState = () => {
     if (!error) return null;
-    
     return (
-      <div className="mt-4 p-3 bg-destructive/10 border border-destructive rounded-md text-sm">
-        <div className="flex items-start gap-2">
-          <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
+      <div className="mt-4 p-4 bg-destructive/10 border border-destructive rounded-md text-sm w-full">
+        <div className="flex items-start gap-3">
+          <AlertCircle size={20} className="text-destructive shrink-0 mt-0.5" />
           <div>
             <p className="font-medium text-destructive">Processing Error</p>
             <p className="text-muted-foreground">{error}</p>
@@ -394,60 +388,57 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className={`relative overflow-hidden rounded-xl p-8 border-2 border-dashed transition-all duration-300 ${
-          isDragging 
-            ? "border-primary bg-primary/5" 
-            : "border-border bg-background/50"
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <input
-          type="file"
-          className="hidden"
-          ref={fileInputRef}
-          onChange={handleFileInputChange}
-          multiple
-          accept="image/jpeg,image/png,application/pdf"
-        />
-        
-        <div className="flex flex-col items-center justify-center gap-4 py-4">
+    // Removed the outer container div (w-full max-w-3xl mx-auto)
+    // Removed the outer motion.div
+    // Adjusted padding and container for modal context
+    <div 
+      className={`relative w-full h-full flex flex-col overflow-hidden rounded-md p-6 border-2 border-dashed transition-all duration-300 ${ 
+        isDragging 
+          ? "border-primary bg-primary/10" 
+          : "border-border bg-background/50" 
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input
+        type="file"
+        className="hidden"
+        ref={fileInputRef}
+        onChange={handleFileInputChange}
+        multiple
+        accept="image/jpeg,image/png,application/pdf"
+      />
+      
+      <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
+        {/* Top section (Icon & Text) - Adjusted gap */}
+        <div className="flex flex-col items-center gap-3">
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 260, 
-              damping: 20 
-            }}
-            className={`rounded-full p-5 ${
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className={`rounded-full p-6 ${
               isDragging ? "bg-primary/10" : "bg-secondary"
             }`}
           >
             {isUploading ? (
-              <Loader2 size={30} className="text-primary animate-spin" />
+              <Loader2 size={36} className="text-primary animate-spin" />
             ) : error ? (
-              <XCircle size={30} className="text-destructive" />
+              <XCircle size={36} className="text-destructive" />
             ) : (
-              <Upload size={30} className="text-primary" />
+              <Upload size={36} className="text-primary" />
             )}
           </motion.div>
           
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-medium">
+          <div className="space-y-2">
+            <h3 className="text-xl font-medium">
               {isUploading 
                 ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..." 
                 : error 
                   ? "Upload Failed" 
                   : "Upload Receipt"}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+            <p className="text-base text-muted-foreground max-w-md mx-auto">
               {isUploading 
                 ? currentStage === 'ERROR'
                   ? "An error occurred during processing"
@@ -460,44 +451,18 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               }
             </p>
           </div>
-          
-          {isUploading && renderProcessingTimeline()}
-          
+        </div>
+
+        {/* Middle section (Timeline or Buttons) */}
+        <div className="w-full flex justify-center items-center mt-4">
           {isUploading ? (
-            <div className="w-full max-w-xs">
-              {/* Display processing logs */}
-              {processLogs.length > 0 && (
-                <div className="mt-4">
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="text-sm font-medium">Processing Log</h4>
-                    {currentStage && (
-                      <Badge variant="outline" className={getStepColor(currentStage)}>
-                        {PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || currentStage}
-                      </Badge>
-                    )}
-                  </div>
-                  <ScrollArea className="h-[150px] w-full rounded-md border mt-2 bg-background/80 p-2">
-                    <div className="space-y-1">
-                      {processLogs.map((log, index) => (
-                        <div key={log.id || index} className="text-xs flex items-start">
-                          <span className={`font-medium mr-2 ${getStepColor(log.step_name)}`}>
-                            {log.step_name || 'INFO'}:
-                          </span>
-                          <span className="text-muted-foreground">{log.status_message}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
-              
-              {currentStage === 'ERROR' && renderErrorState()}
-            </div>
+            renderProcessingTimeline()
           ) : error ? (
             <Button 
               onClick={retryUpload}
               variant="default" 
-              className="mt-2"
+              className="mt-4 px-6 py-2 text-base"
+              size="lg"
             >
               Try Again
             </Button>
@@ -505,17 +470,46 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             <Button 
               onClick={openFileDialog}
               variant="default" 
-              className="mt-2"
+              className="mt-4 px-6 py-2 text-base"
+              size="lg"
             >
               Select Files
             </Button>
           )}
         </div>
-      </motion.div>
-      
-      <div className="mt-6 text-center text-sm text-muted-foreground">
-        <p>Supported formats: JPEG, PNG, PDF</p>
+
+        {/* Bottom section (Logs / Error Details) */} 
+        <div className="w-full max-w-2xl mt-auto">
+          {isUploading && processLogs.length > 0 && (
+            <div className="mt-6">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-base font-medium">Processing Log</h4>
+                {currentStage && (
+                  <Badge variant="outline" className={`px-3 py-1 text-sm ${getStepColor(currentStage)}`}>
+                    {PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || currentStage}
+                  </Badge>
+                )}
+              </div>
+              <ScrollArea className="h-[180px] w-full rounded-md border mt-3 bg-background/80 p-4">
+                <div className="space-y-2">
+                  {processLogs.map((log, index) => (
+                    <div key={log.id || index} className="text-sm flex items-start">
+                      <span className={`font-medium mr-2 ${getStepColor(log.step_name)}`}>
+                        {log.step_name || 'INFO'}:
+                      </span>
+                      <span className="text-muted-foreground break-all">{log.status_message}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          
+          {currentStage === 'ERROR' && renderErrorState()}
+        </div>
+
       </div>
+      {/* Removed the final 'Supported formats' text div */}
     </div>
   );
 }

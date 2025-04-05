@@ -195,9 +195,12 @@ The application follows a modern web architecture:
 
 #### `UploadZone`
 - Drag & drop or file select interface
-- Upload progress indicator
-- File validation
-- Real-time display of processing logs during upload
+- Designed for use within a modal dialog.
+- File validation for JPEG, PNG, PDF.
+- Real-time display of detailed backend processing stages (e.g., Queued, Fetching, OCR, Analyzing, Saving, Complete, Error) using a visual timeline.
+- Leverages Supabase Realtime for live updates on processing status.
+- Shows detailed processing logs.
+- Clear error state display with retry option.
 
 #### `ReceiptViewer`
 - Side-by-side layout for image and data
