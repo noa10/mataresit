@@ -1,13 +1,21 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Upload, Loader2, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
-import { createReceipt, uploadReceiptImage, processReceiptWithOCR } from "@/services/receiptService";
-import { ProcessingLog } from "@/types/receipt";
+import { 
+  createReceipt, 
+  uploadReceiptImage, 
+  processReceiptWithOCR, 
+  subscribeToReceiptUpdates 
+} from "@/services/receiptService";
+import { ProcessingLog, ProcessingStatus } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
@@ -28,6 +36,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [stageHistory, setStageHistory] = useState<string[]>([]);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [realtimeChannel, setRealtimeChannel] = useState<RealtimeChannel | null>(null);
+  const [processingLogsChannel, setProcessingLogsChannel] = useState<RealtimeChannel | null>(null);
   
   const {
     isDragging,
@@ -50,6 +61,103 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Update UI state based on processing status
+  const updateUIForProcessingStatus = (status: ProcessingStatus, errorMsg?: string | null) => {
+    if (!status) return;
+
+    // Map processing status to UI state
+    switch (status) {
+      case "queued":
+        setCurrentStage("QUEUED");
+        setUploadProgress(5);
+        break;
+      case "uploading":
+        setCurrentStage("FETCH");
+        // Don't update progress here as we get more granular progress from the upload function
+        break;
+      case "uploaded":
+        setCurrentStage("START");
+        setUploadProgress(30);
+        break;
+      case "processing_ocr":
+        setCurrentStage("OCR");
+        setUploadProgress(50);
+        break;
+      case "processing_ai":
+        setCurrentStage("GEMINI");
+        setUploadProgress(70);
+        break;
+      case "complete":
+        setCurrentStage("COMPLETE");
+        setUploadProgress(100);
+        break;
+      case "failed_ocr":
+      case "failed_ai":
+        setCurrentStage("ERROR");
+        setError(errorMsg || "Processing failed");
+        break;
+    }
+
+    if (status !== "uploading") {
+      setStageHistory(prev => {
+        if (currentStage && !prev.includes(currentStage)) {
+          return [...prev, currentStage];
+        }
+        return prev;
+      });
+    }
+  };
+  
+  // Handle real-time updates to receipt processing status
+  useEffect(() => {
+    if (!receiptId) return;
+
+    const channel = subscribeToReceiptUpdates(receiptId, (payload) => {
+      const newData = payload.new;
+      console.log("Receipt update received:", newData);
+      
+      if (newData.processing_status) {
+        updateUIForProcessingStatus(newData.processing_status as ProcessingStatus, newData.processing_error);
+      }
+
+      // Handle completion
+      if (newData.processing_status === "complete") {
+        toast.success("Receipt processed successfully!");
+        
+        if (document.getElementById('upload-status')) {
+          document.getElementById('upload-status')!.textContent = 'Receipt processed successfully';
+        }
+        
+        if (onUploadComplete) {
+          setTimeout(() => {
+            onUploadComplete();
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        } else {
+          setTimeout(() => {
+            navigate(`/receipt/${receiptId}`);
+          }, 500);
+        }
+      }
+      
+      // Handle errors
+      if (newData.processing_status === "failed_ocr" || newData.processing_status === "failed_ai") {
+        toast.error(newData.processing_error || "There was an error processing your receipt");
+        
+        if (document.getElementById('upload-status')) {
+          document.getElementById('upload-status')!.textContent = 
+            'Upload failed: ' + (newData.processing_error || "Unknown error");
+        }
+      }
+    });
+    
+    setRealtimeChannel(channel);
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [receiptId, navigate, onUploadComplete]);
   
   useEffect(() => {
     if (processLogs.length > 0) {
@@ -80,8 +188,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   useEffect(() => {
     return () => {
       cleanupPreviews();
+      // Clean up channels on unmount
+      if (realtimeChannel) realtimeChannel.unsubscribe();
+      if (processingLogsChannel) processingLogsChannel.unsubscribe();
     };
-  }, []);
+  }, [cleanupPreviews, realtimeChannel, processingLogsChannel]);
   
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,6 +214,40 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     };
   }, [openFileDialog]);
   
+  const setupProcessingLogsSubscription = (receiptId: string) => {
+    const channel = supabase.channel(`receipt-logs-${receiptId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processing_logs',
+          filter: `receipt_id=eq.${receiptId}`
+        },
+        (payload) => {
+          const newLog = payload.new as ProcessingLog;
+          console.log('New upload log received:', newLog);
+          
+          setProcessLogs((prev) => {
+            if (prev.some(log => log.id === newLog.id)) {
+              return prev;
+            }
+            return [...prev, newLog].sort((a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+          
+          if (document.getElementById('upload-status') && newLog.status_message) {
+            document.getElementById('upload-status')!.textContent = newLog.status_message;
+          }
+        }
+      )
+      .subscribe();
+    
+    setProcessingLogsChannel(channel);
+    return channel;
+  };
+
   const processUploadedFiles = async (files: File[]) => {
     if (!user) {
       toast.error("Please login first");
@@ -115,40 +260,25 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setStageHistory([]);
     setCurrentStage('QUEUED');
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(5);
     
     try {
       const file = files[0];
       
       const ariaLiveRegion = document.getElementById('upload-status');
       if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = `Uploading ${file.name}`;
+        ariaLiveRegion.textContent = `Preparing to upload ${file.name}`;
       }
       
-      console.log("Starting upload process with bucket: receipt-images");
-      
-      setUploadProgress(30);
-      const imageUrl = await uploadReceiptImage(file, user.id);
-      
-      if (!imageUrl) {
-        throw new Error("Failed to upload image. Please try again later.");
-      }
-      
-      console.log("Image uploaded successfully:", imageUrl);
-      setUploadProgress(50);
-      
-      if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = 'Image uploaded successfully, creating receipt record';
-      }
-      
+      // Create the receipt record with initial status
       const today = new Date().toISOString().split('T')[0];
-      const receiptId = await createReceipt({
+      const newReceiptId = await createReceipt({
         merchant: "Processing...",
         date: today,
         total: 0,
         currency: "MYR",
         status: "unreviewed",
-        image_url: imageUrl,
+        image_url: "",
         user_id: user.id
       }, [], {
         merchant: 0,
@@ -156,88 +286,70 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         total: 0
       });
       
-      if (!receiptId) {
+      if (!newReceiptId) {
         throw new Error("Failed to create receipt record");
       }
       
-      setUploadProgress(70);
+      setReceiptId(newReceiptId);
       
-      if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = 'Processing receipt with OCR';
-      }
-
-      const channel = supabase.channel(`receipt-logs-${receiptId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'processing_logs',
-            filter: `receipt_id=eq.${receiptId}`
-          },
-          (payload) => {
-            const newLog = payload.new as ProcessingLog;
-            console.log('New upload log received:', newLog);
-            
-            setProcessLogs((prev) => {
-              if (prev.some(log => log.id === newLog.id)) {
-                return prev;
-              }
-              return [...prev, newLog].sort((a, b) =>
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-              );
-            });
-            
-            if (ariaLiveRegion && newLog.status_message) {
-              ariaLiveRegion.textContent = newLog.status_message;
-            }
-          }
-        )
-        .subscribe();
+      // Set up subscription to processing logs
+      const logsChannel = setupProcessingLogsSubscription(newReceiptId);
       
+      // Fetch any existing logs
       const { data: initialLogs } = await supabase
         .from('processing_logs')
         .select('*')
-        .eq('receipt_id', receiptId)
+        .eq('receipt_id', newReceiptId)
         .order('created_at', { ascending: true });
       
       if (initialLogs && initialLogs.length > 0) {
         setProcessLogs(initialLogs);
       }
       
-      try {
-        await processReceiptWithOCR(receiptId);
-        setUploadProgress(100);
-        toast.success("Receipt processed successfully!");
+      if (ariaLiveRegion) {
+        ariaLiveRegion.textContent = `Uploading ${file.name}`;
+      }
+      
+      // Upload the receipt image with progress tracking
+      const imageUrl = await uploadReceiptImage(
+        file, 
+        user.id, 
+        newReceiptId,
+        (progress) => setUploadProgress(Math.min(30 + Math.round(progress * 0.2), 50))
+      );
+      
+      if (!imageUrl) {
+        throw new Error("Failed to upload image. Please try again later.");
+      }
+      
+      // Update the receipt with the image URL
+      const { error: updateError } = await supabase
+        .from("receipts")
+        .update({ image_url: imageUrl })
+        .eq("id", newReceiptId);
         
-        if (ariaLiveRegion) {
-          ariaLiveRegion.textContent = 'Receipt processed successfully';
-        }
+      if (updateError) {
+        console.error("Error updating receipt with image URL:", updateError);
+      }
+      
+      console.log("Image uploaded successfully:", imageUrl);
+      
+      if (ariaLiveRegion) {
+        ariaLiveRegion.textContent = 'Image uploaded successfully, processing with OCR';
+      }
+      
+      try {
+        // Process the receipt with OCR
+        await processReceiptWithOCR(newReceiptId);
       } catch (ocrError: any) {
         console.error("OCR processing error:", ocrError);
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
-        setUploadProgress(100);
-        setCurrentStage('ERROR');
         
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'OCR processing failed. Please edit the receipt manually.';
         }
       }
       
-      setTimeout(() => {
-        channel.unsubscribe();
-      }, 5000); 
-      
-      if (onUploadComplete) {
-        setTimeout(() => {
-          onUploadComplete();
-          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
-        }, 500);
-      } else {
-        setTimeout(() => {
-          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
-        }, 500);
-      }
     } catch (error: any) {
       console.error("Upload error:", error);
       setError(error.message || "There was an error uploading your receipt");
@@ -268,7 +380,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setCurrentStage(null);
     setStageHistory([]);
     setProcessLogs([]);
+    setReceiptId(null);
     resetUpload();
+    
+    // Clean up any existing subscriptions
+    if (realtimeChannel) realtimeChannel.unsubscribe();
+    if (processingLogsChannel) processingLogsChannel.unsubscribe();
+    setRealtimeChannel(null);
+    setProcessingLogsChannel(null);
   };
 
   const getBorderStyle = () => {
@@ -362,6 +481,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             </p>
           </div>
         </div>
+
+        {isUploading && (
+          <div className="w-full max-w-md mt-2">
+            <Progress value={uploadProgress} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-1 text-right">{uploadProgress}%</p>
+          </div>
+        )}
 
         <AnimatePresence>
           {filePreviews.length > 0 && (
