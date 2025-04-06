@@ -1,7 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus, ProcessingLog } from "@/types/receipt";
+import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions } from "@/types/receipt";
 import { toast } from "sonner";
-import { RealtimeChannel } from "@supabase/supabase-js";
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
@@ -93,12 +93,7 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
 };
 
 // Upload a receipt image to Supabase Storage
-export const uploadReceiptImage = async (
-  file: File, 
-  userId: string, 
-  receiptId: string,
-  onProgress?: (progress: number) => void
-): Promise<string | null> => {
+export const uploadReceiptImage = async (file: File, userId: string): Promise<string | null> => {
   try {
     // Create a unique file name to avoid collisions
     const fileExt = file.name.split('.').pop();
@@ -112,34 +107,17 @@ export const uploadReceiptImage = async (
       size: file.size,
       bucket: 'receipt_images'
     });
-
-    // Update receipt with uploading status
-    await updateReceiptProcessingStatus(receiptId, "uploading");
     
     // Upload the file directly to the receipt_images bucket
     const { data, error } = await supabase.storage
       .from('receipt_images')
       .upload(fileName, file, {
         cacheControl: '3600',
-        upsert: false,
-        onUploadProgress: (progress) => {
-          // Calculate percentage and report progress
-          const percentage = Math.round((progress.loaded / progress.total) * 100);
-          if (onProgress) {
-            onProgress(percentage);
-          }
-        }
+        upsert: false
       });
     
     if (error) {
       console.error("Storage upload error:", error);
-      
-      // Update receipt with error status
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        error.message || "Failed to upload receipt image"
-      );
       
       // Provide a more specific error message based on the error type
       if (error.message.includes("bucket not found")) {
@@ -157,16 +135,8 @@ export const uploadReceiptImage = async (
       .getPublicUrl(fileName);
       
     if (!publicUrlData?.publicUrl) {
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        "Upload successful but couldn't get public URL"
-      );
       throw new Error("Upload successful but couldn't get public URL");
     }
-    
-    // Update receipt with uploaded status
-    await updateReceiptProcessingStatus(receiptId, "uploaded");
     
     console.log("Upload successful:", publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
@@ -177,53 +147,17 @@ export const uploadReceiptImage = async (
   }
 };
 
-// Helper function to update receipt processing status
-export const updateReceiptProcessingStatus = async (
-  receiptId: string,
-  status: ProcessingStatus,
-  error?: string | null
-): Promise<boolean> => {
-  try {
-    const updateData: { 
-      processing_status: ProcessingStatus,
-      processing_error?: string | null 
-    } = { processing_status: status };
-    
-    if (error !== undefined) {
-      updateData.processing_error = error;
-    }
-    
-    const { error: updateError } = await supabase
-      .from("receipts")
-      .update(updateData)
-      .eq("id", receiptId);
-    
-    if (updateError) {
-      console.error("Error updating receipt processing status:", updateError);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error("Error updating receipt processing status:", error);
-    return false;
-  }
-};
-
-// Create a new receipt in the database with initial processing status
+// Create a new receipt in the database
 export const createReceipt = async (
-  receipt: Omit<Receipt, "id" | "created_at" | "updated_at" | "processing_status">,
+  receipt: Omit<Receipt, "id" | "created_at" | "updated_at">,
   lineItems: Omit<ReceiptLineItem, "id" | "created_at" | "updated_at">[],
   confidenceScores: Omit<ConfidenceScore, "id" | "receipt_id" | "created_at" | "updated_at">
 ): Promise<string | null> => {
   try {
-    // Insert the receipt with initial processing status
+    // Insert the receipt
     const { data, error } = await supabase
       .from("receipts")
-      .insert({
-        ...receipt,
-        processing_status: "queued"
-      })
+      .insert(receipt)
       .select("id")
       .single();
     
@@ -345,11 +279,6 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     
     if (receiptError || !receipt) {
       console.error("Error fetching receipt to process:", receiptError);
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        "Receipt not found"
-      );
       throw new Error("Receipt not found");
     }
     
@@ -387,16 +316,8 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
         hasKey: !!supabaseKey,
         sessionData: anon
       });
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        "Unable to get Supabase configuration"
-      );
       throw new Error("Unable to get Supabase configuration");
     }
-    
-    // Update status to processing_ocr before calling OCR function
-    await updateReceiptProcessingStatus(receiptId, "processing_ocr");
     
     // Send to OCR processing function
     const processingUrl = `${supabaseUrl}/functions/v1/process-receipt`;
@@ -418,11 +339,6 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     if (!processingResponse.ok) {
       const errorText = await processingResponse.text();
       console.error("Processing error:", errorText);
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        `Processing failed: ${processingResponse.status} ${processingResponse.statusText}`
-      );
       throw new Error(`Processing failed: ${processingResponse.status} ${processingResponse.statusText}`);
     }
     
@@ -430,19 +346,11 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     console.log("Processing result:", processingResult);
     
     if (!processingResult.success) {
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ocr", 
-        processingResult.error || "Unknown processing error"
-      );
       throw new Error(processingResult.error || "Unknown processing error");
     }
     
     // Extract OCR results
     const ocrResult = processingResult.result as OCRResult;
-    
-    // Update status to processing_ai before calling AI enhancement
-    await updateReceiptProcessingStatus(receiptId, "processing_ai");
     
     // Send to enhance-receipt-data function to get additional fields
     const enhancementUrl = `${supabaseUrl}/functions/v1/enhance-receipt-data`;
@@ -465,11 +373,6 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     if (!enhanceResponse.ok) {
       const errorText = await enhanceResponse.text();
       console.error("Enhancement error:", errorText);
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ai", 
-        `Enhancement failed: ${enhanceResponse.status} ${enhanceResponse.statusText}`
-      );
       throw new Error(`Enhancement failed: ${enhanceResponse.status} ${enhanceResponse.statusText}`);
     }
     
@@ -492,9 +395,7 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
         ai_suggestions,
         predicted_category,
         status: 'unreviewed',
-        fullText: ocrResult.fullText, // Persist fullText
-        processing_status: 'complete', // Set to complete on success
-        processing_error: null        // Clear any errors
+        fullText: ocrResult.fullText // Persist fullText
       };
       
       // Apply any better matches from Gemini if provided
@@ -510,11 +411,6 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       
       if (updateError) {
         console.error("Error updating receipt with enhanced data:", updateError);
-        await updateReceiptProcessingStatus(
-          receiptId, 
-          "failed_ai", 
-          "Error updating receipt with enhanced data"
-        );
         throw updateError;
       }
       
@@ -592,17 +488,6 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
     return ocrResult;
   } catch (error) {
     console.error("Error in processReceiptWithOCR:", error);
-    // Update status to failed if not already set
-    try {
-      await updateReceiptProcessingStatus(
-        receiptId, 
-        "failed_ai", 
-        error.message || "Unknown processing error"
-      );
-    } catch (statusError) {
-      console.error("Failed to update processing status:", statusError);
-    }
-    
     toast.error("Failed to process receipt: " + (error.message || "Unknown error"));
     return null;
   }
@@ -858,28 +743,4 @@ export const logCorrections = async (
     console.error("Error in logCorrections function:", error);
     // Prevent this function from crashing the parent operation (updateReceipt)
   }
-};
-
-// Subscribe to receipt updates using Supabase Realtime
-export const subscribeToReceiptUpdates = (
-  receiptId: string, 
-  callback: (payload: any) => void
-): RealtimeChannel => {
-  const channel = supabase.channel(`receipt-updates-${receiptId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'receipts',
-        filter: `id=eq.${receiptId}`
-      },
-      (payload) => {
-        console.log('Receipt update received:', payload);
-        callback(payload);
-      }
-    )
-    .subscribe();
-  
-  return channel;
 };

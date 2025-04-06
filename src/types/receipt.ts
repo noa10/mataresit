@@ -1,16 +1,4 @@
-
 export type ReceiptStatus = "unreviewed" | "reviewed" | "synced";
-
-export type ProcessingStatus = 
-  | "queued"
-  | "uploading" 
-  | "uploaded" 
-  | "processing_ocr" 
-  | "processing_ai" 
-  | "complete" 
-  | "failed_ocr" 
-  | "failed_ai" 
-  | null; // Represents not started or finished old flow
 
 export interface Receipt {
   id: string;
@@ -21,8 +9,6 @@ export interface Receipt {
   currency: string;
   image_url: string;
   status: ReceiptStatus;
-  processing_status?: ProcessingStatus;
-  processing_error?: string | null;
   created_at: string;
   updated_at: string;
   tax?: number;
