@@ -660,7 +660,14 @@ export const logCorrections = async (
     console.log("📊 Checking fields for changes:", fieldsToTrack);
     
     for (const field of fieldsToTrack) {
-      const originalValue = currentReceipt[field];
+      // Check if the field exists in the current receipt before proceeding
+      if (!(field in currentReceipt)) {
+        console.log(`📊 Field ${field} not found in current receipt, skipping`);
+        continue;
+      }
+      
+      // Cast to any to avoid TypeScript errors with dynamic property access
+      const originalValue = (currentReceipt as any)[field];
       const correctedValue = updatedFields[field];
       const aiSuggestion = aiSuggestions[field];
 
@@ -708,15 +715,18 @@ export const logCorrections = async (
     if (correctionsToLog.length > 0) {
       console.log(`📊 Attempting to log ${correctionsToLog.length} corrections for receipt ${receiptId}:`, correctionsToLog);
       try {
-        const { error: insertError } = await supabase
-          .from("corrections")
-          .insert(correctionsToLog);
-
-        if (insertError) {
-          console.error("Error logging corrections:", insertError);
-          console.error("Error details:", JSON.stringify(insertError));
-        } else {
-          console.log(`📊 Successfully logged ${correctionsToLog.length} corrections for receipt ${receiptId}`);
+        // Use custom SQL query or REST API call to insert corrections
+        // since the corrections table might not be in the TypeScript types yet
+        for (const correction of correctionsToLog) {
+          const { error: insertError } = await supabase
+            .from('corrections')
+            .insert(correction);
+            
+          if (insertError) {
+            console.error(`Error logging correction for ${correction.field_name}:`, insertError);
+          } else {
+            console.log(`📊 Successfully logged correction for ${correction.field_name}`);
+          }
         }
       } catch (insertException) {
         console.error("Exception during corrections insert:", insertException);
