@@ -46,17 +46,32 @@ ${JSON.stringify(textractData, null, 2)}
 Based on the receipt text above, please:
 1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous but likely Malaysian.
 2. Identify the PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
-3. If you can identify other fields more accurately than Textract, include those too.
+3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+4. Provide SUGGESTIONS for potential OCR errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
 
 Return your findings in the following JSON format:
 {
   "currency": "The currency code (e.g., MYR, USD)",
   "payment_method": "The payment method used",
+  "predicted_category": "One of the categories from the list above",
   "merchant": "The merchant name if you find a better match than Textract",
   "total": "The total amount if you find a better match than Textract",
+  "suggestions": {
+    "merchant": "A suggested correction for merchant name if OCR made errors",
+    "date": "A suggested date correction in YYYY-MM-DD format if needed",
+    "total": "A suggested total amount correction if needed",
+    "tax": "A suggested tax amount correction if needed"
+  },
   "confidence": {
     "currency": "Confidence score 0-100 for currency",
-    "payment_method": "Confidence score 0-100 for payment method"
+    "payment_method": "Confidence score 0-100 for payment method",
+    "predicted_category": "Confidence score 0-100 for category prediction",
+    "suggestions": {
+      "merchant": "Confidence score 0-100 for merchant suggestion",
+      "date": "Confidence score 0-100 for date suggestion",
+      "total": "Confidence score 0-100 for total suggestion",
+      "tax": "Confidence score 0-100 for tax suggestion"
+    }
   }
 }`;
     
@@ -132,6 +147,19 @@ Return your findings in the following JSON format:
       // Log payment method if detected
       if (enhancedData.payment_method) {
         await logger.log(`Detected payment method: ${enhancedData.payment_method}`, "GEMINI");
+      }
+      
+      // Log category if detected
+      if (enhancedData.predicted_category) {
+        await logger.log(`Predicted category: ${enhancedData.predicted_category}`, "GEMINI");
+      }
+      
+      // Log suggestions if any
+      if (enhancedData.suggestions) {
+        const suggestionFields = Object.keys(enhancedData.suggestions);
+        if (suggestionFields.length > 0) {
+          await logger.log(`Found ${suggestionFields.length} suggestion(s) for: ${suggestionFields.join(', ')}`, "GEMINI");
+        }
       }
       
       await logger.log("Gemini AI processing complete", "GEMINI");

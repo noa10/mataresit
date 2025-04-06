@@ -1,0 +1,18 @@
+-- Add AI-related columns to receipts table
+ALTER TABLE receipts 
+ADD COLUMN IF NOT EXISTS ai_suggestions JSONB NULL,
+ADD COLUMN IF NOT EXISTS predicted_category TEXT NULL;
+
+-- Create corrections table for feedback loop
+CREATE TABLE IF NOT EXISTS corrections (
+  id SERIAL PRIMARY KEY,
+  receipt_id UUID REFERENCES receipts(id) ON DELETE CASCADE,
+  field_name TEXT NOT NULL,
+  original_value TEXT,
+  ai_suggestion TEXT,
+  corrected_value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_corrections_receipt_id ON corrections(receipt_id); 

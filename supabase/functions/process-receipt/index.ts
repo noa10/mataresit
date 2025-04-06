@@ -47,6 +47,8 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
       currency: 'MYR', // Default to MYR instead of USD
       line_items: [] as { description: string; amount: number }[],
       fullText: '',
+      predicted_category: '',
+      ai_suggestions: {} as Record<string, any>,
       confidence: {
         merchant: 0,
         date: 0,
@@ -186,6 +188,18 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
             } else {
               result.confidence.payment_method = 85; // Default high confidence for Gemini results
             }
+          }
+          
+          // Category prediction
+          if (enhancedData.result.predicted_category) {
+            result.predicted_category = enhancedData.result.predicted_category;
+            await logger.log(`Category predicted: ${enhancedData.result.predicted_category}`, "GEMINI");
+          }
+          
+          // AI Suggestions
+          if (enhancedData.result.suggestions) {
+            result.ai_suggestions = enhancedData.result.suggestions;
+            await logger.log(`AI suggestions generated for ${Object.keys(enhancedData.result.suggestions).length} fields`, "GEMINI");
           }
           
           // Other field enhancements if provided by Gemini

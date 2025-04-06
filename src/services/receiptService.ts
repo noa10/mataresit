@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus } from "@/types/receipt";
+import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions } from "@/types/receipt";
 import { toast } from "sonner";
 
 // Ensure status is of type ReceiptStatus
@@ -210,6 +210,9 @@ export const updateReceipt = async (
   lineItems?: LineItem[]
 ): Promise<boolean> => {
   try {
+    // Call logCorrections before updating the receipt
+    await logCorrections(id, receipt);
+    
     // Update the receipt
     const { error } = await supabase
       .from("receipts")
@@ -260,10 +263,9 @@ export const updateReceipt = async (
   }
 };
 
-// Process a receipt with OCR using Supabase Edge Function
+// Process a receipt with OCR
 export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResult | null> => {
   try {
-    // Get the receipt to get the image URL
     const { data: receipt, error: receiptError } = await supabase
       .from("receipts")
       .select("image_url")
@@ -271,222 +273,217 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       .single();
     
     if (receiptError || !receipt) {
-      console.error("Error fetching receipt:", receiptError);
-      toast.error("Failed to find receipt for OCR processing");
-      return null;
+      console.error("Error fetching receipt to process:", receiptError);
+      throw new Error("Receipt not found");
     }
     
-    // Format the image URL to ensure it's publicly accessible
-    let imageUrl = receipt.image_url;
-    if (imageUrl && imageUrl.includes('supabase.co') && !imageUrl.includes('/public/')) {
-      imageUrl = imageUrl.replace('/object/', '/object/public/');
-    }
+    const imageUrl = receipt.image_url;
     
-    console.log("Calling OCR process function with receipt:", { receiptId, imageUrl });
-    
-    // Call the process-receipt Edge Function with retry logic
-    const maxRetries = 3;
-    let retryCount = 0;
-    let data;
-    let error;
-    
-    while (retryCount < maxRetries) {
-      try {
-        const response = await supabase.functions.invoke('process-receipt', {
-          body: { 
-            receiptId, 
-            imageUrl
-          },
-        });
-        
-        data = response.data;
-        error = response.error;
-        
-        if (!error) {
-          break;
+    // Extract the Supabase URL from a storage URL - more reliable than env vars in browser
+    let supabaseUrl = '';
+    try {
+      // This is a workaround to get the base URL by using the storage URL pattern
+      const { data: urlData } = supabase.storage.from('receipt_images').getPublicUrl('test.txt');
+      if (urlData?.publicUrl) {
+        // Extract base URL (e.g., https://mpmkbtsufihzdelrlszs.supabase.co)
+        const matches = urlData.publicUrl.match(/(https:\/\/[^\/]+)/);
+        if (matches && matches[1]) {
+          supabaseUrl = matches[1];
         }
-        
-        // If we get a CORS error or network error, retry
-        retryCount++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-      } catch (invokeError) {
-        console.error(`Attempt ${retryCount + 1} failed:`, invokeError);
-        error = invokeError;
-        retryCount++;
-        
-        if (retryCount >= maxRetries) {
-          break;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
       }
+    } catch (e) {
+      console.error("Error extracting Supabase URL:", e);
     }
     
-    if (error) {
-      console.error("OCR processing error after retries:", error);
-      toast.error("Failed to process receipt with OCR");
-      return null;
+    // Fallback to known project URL if extraction fails
+    if (!supabaseUrl) {
+      // This is the project URL based on the error logs
+      supabaseUrl = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+      console.log("Using fallback Supabase URL:", supabaseUrl);
     }
     
-    console.log("OCR processing response:", data);
+    const { data: anon } = await supabase.auth.getSession();
+    const supabaseKey = anon.session?.access_token || '';
     
-    if (!data || !data.success) {
-      console.error("OCR processing failed:", data?.error || "Unknown error");
-      toast.error(data?.error || "OCR processing failed");
-      return null;
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Supabase configuration error:", { 
+        hasUrl: !!supabaseUrl, 
+        hasKey: !!supabaseKey,
+        sessionData: anon
+      });
+      throw new Error("Unable to get Supabase configuration");
     }
     
-    // Update the receipt with the extracted data
-    const { merchant, date, total, tax, payment_method, line_items, confidence, fullText } = data.result;
+    // Send to OCR processing function
+    const processingUrl = `${supabaseUrl}/functions/v1/process-receipt`;
     
-    const updateData: Partial<Receipt> = {
-      merchant,
-      status: "unreviewed"
-    };
+    console.log("Sending receipt for OCR processing...");
+    console.log("Processing URL:", processingUrl);
+    const processingResponse = await fetch(processingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        receiptId,
+        imageUrl
+      })
+    });
     
-    // Only update fields if they have values
-    if (payment_method) {
-      updateData.payment_method = payment_method;
+    if (!processingResponse.ok) {
+      const errorText = await processingResponse.text();
+      console.error("Processing error:", errorText);
+      throw new Error(`Processing failed: ${processingResponse.status} ${processingResponse.statusText}`);
     }
     
-    if (date) {
-      try {
-        // Try different date formats
-        let parsedDate: Date | null = null;
-        
-        // First check if it's in a standard format that Date can parse
-        const dateObj = new Date(date);
-        if (!isNaN(dateObj.getTime())) {
-          parsedDate = dateObj;
-        } 
-        // Check if it's in format like "02 Apr 2025"
-        else if (/^\d{1,2}\s+[a-zA-Z]{3}\s+\d{4}$/.test(date)) {
-          const parts = date.split(' ');
-          const monthMap: Record<string, number> = {
-            'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
-            'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-          };
-          const day = parseInt(parts[0], 10);
-          const month = monthMap[parts[1].toLowerCase()];
-          const year = parseInt(parts[2], 10);
-          
-          if (!isNaN(day) && month !== undefined && !isNaN(year)) {
-            parsedDate = new Date(year, month, day);
-          }
-        }
-        // Check for MM/DD/YYYY or DD/MM/YYYY
-        else if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(date)) {
-          // Use a regex to extract parts - this is a simplification
-          const parts = date.split(/[\/\-\.]/);
-          if (parts.length === 3) {
-            // Try MM/DD/YYYY format first
-            const month = parseInt(parts[0], 10) - 1;
-            const day = parseInt(parts[1], 10);
-            let year = parseInt(parts[2], 10);
-            
-            // Adjust 2-digit year
-            if (year < 100) {
-              year += year < 50 ? 2000 : 1900;
-            }
-            
-            parsedDate = new Date(year, month, day);
-            
-            // If invalid, try DD/MM/YYYY
-            if (isNaN(parsedDate.getTime()) || parsedDate.getMonth() !== month) {
-              const day2 = parseInt(parts[0], 10);
-              const month2 = parseInt(parts[1], 10) - 1;
-              parsedDate = new Date(year, month2, day2);
-            }
-          }
-        }
-        
-        if (parsedDate && !isNaN(parsedDate.getTime())) {
-          // Format as YYYY-MM-DD for database
-          const yyyy = parsedDate.getFullYear();
-          const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
-          const dd = String(parsedDate.getDate()).padStart(2, '0');
-          updateData.date = `${yyyy}-${mm}-${dd}`;
-        }
-      } catch (e) {
-        console.error("Error parsing date:", e);
-        // Don't set the date if we can't parse it
+    const processingResult = await processingResponse.json();
+    console.log("Processing result:", processingResult);
+    
+    if (!processingResult.success) {
+      throw new Error(processingResult.error || "Unknown processing error");
+    }
+    
+    // Extract OCR results
+    const ocrResult = processingResult.result as OCRResult;
+    
+    // Send to enhance-receipt-data function to get additional fields
+    const enhancementUrl = `${supabaseUrl}/functions/v1/enhance-receipt-data`;
+    
+    console.log("Enhancing receipt data...");
+    const enhanceResponse = await fetch(enhancementUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        textractData: ocrResult,
+        fullText: ocrResult.fullText,
+        receiptId: receiptId,
+        imageUrl: imageUrl
+      })
+    });
+    
+    if (!enhanceResponse.ok) {
+      const errorText = await enhanceResponse.text();
+      console.error("Enhancement error:", errorText);
+      throw new Error(`Enhancement failed: ${enhanceResponse.status} ${enhanceResponse.statusText}`);
+    }
+    
+    const enhancementResult = await enhanceResponse.json();
+    console.log("Enhancement result:", enhancementResult);
+    
+    if (enhancementResult.success && enhancementResult.result) {
+      const enhancedData = enhancementResult.result;
+      
+      // Extract the enhanced data
+      const currency = enhancedData.currency || 'MYR';
+      const payment_method = enhancedData.payment_method || '';
+      const ai_suggestions = enhancedData.suggestions || {};
+      const predicted_category = enhancedData.predicted_category || null;
+      
+      // Prepare data for update
+      const updateData: any = {
+        currency,
+        payment_method,
+        ai_suggestions,
+        predicted_category,
+        status: 'unreviewed',
+        fullText: ocrResult.fullText // Persist fullText
+      };
+      
+      // Apply any better matches from Gemini if provided
+      if (enhancedData.merchant) updateData.merchant = enhancedData.merchant;
+      if (enhancedData.total) updateData.total = enhancedData.total;
+      if (enhancedData.date) updateData.date = enhancedData.date; // Add date if Gemini suggests it
+      
+      // Update the receipt with enhanced data
+      const { error: updateError } = await supabase
+        .from('receipts')
+        .update(updateData)
+        .eq('id', receiptId);
+      
+      if (updateError) {
+        console.error("Error updating receipt with enhanced data:", updateError);
+        throw updateError;
       }
-    }
-    
-    if (total !== undefined && total !== null) {
-      updateData.total = typeof total === 'number' ? total : parseFloat(total);
-    }
-    
-    if (tax !== undefined && tax !== null) {
-      updateData.tax = typeof tax === 'number' ? tax : parseFloat(tax);
-    }
-    
-    // Always include fullText if available - column should exist due to migration
-    if (fullText) {
-      updateData.fullText = fullText;
-      console.log("Including fullText in update data, length:", fullText.length);
-    }
-    
-    // Update receipt with extracted data
-    await updateReceipt(receiptId, updateData, line_items);
-    
-    // Update confidence scores with schema validation check
-    if (confidence) {
-      try {
-        // Check if payment_method column exists in confidence_scores
-        const { error: confCheckError } = await supabase
-          .from("confidence_scores")
-          .select("payment_method")
-          .limit(1);
-        
-        // Create properly typed object for confidence scores
-        const confidenceData: {
-          receipt_id: string;
-          merchant: number;
-          date: number;
-          total: number;
-          tax?: number;
-          line_items?: number;
-          payment_method?: number;
-        } = {
-          receipt_id: receiptId,
-          merchant: confidence.merchant || 0,
-          date: confidence.date || 0,
-          total: confidence.total || 0
-        };
-        
-        // Only add these fields if they exist in the schema
-        if (!confCheckError && confidence.tax !== undefined) {
-          confidenceData.tax = confidence.tax || 0;
+      
+      // Update line items based on OCR results
+      if (ocrResult.line_items && ocrResult.line_items.length > 0) {
+        // Delete existing line items first
+        const { error: deleteError } = await supabase
+          .from("line_items")
+          .delete()
+          .eq("receipt_id", receiptId);
+
+        if (deleteError) {
+          console.error("Error deleting old line items during reprocessing:", deleteError);
+          // Log but continue trying to insert
         }
-        
-        if (!confCheckError && confidence.line_items !== undefined) {
-          confidenceData.line_items = confidence.line_items || 0;
+
+        // Insert new line items from OCR result
+        const formattedLineItems = ocrResult.line_items.map(item => ({
+          description: item.description,
+          amount: item.amount,
+          receipt_id: receiptId
+        }));
+
+        const { error: insertError } = await supabase
+          .from("line_items")
+          .insert(formattedLineItems);
+
+        if (insertError) {
+          console.error("Error inserting new line items during reprocessing:", insertError);
+          // Log but don't fail the whole operation
         }
-        
-        if (!confCheckError && confidence.payment_method !== undefined) {
-          confidenceData.payment_method = confidence.payment_method || 0;
-        }
-        
+      } else {
+         // If OCR returned no line items, ensure any old ones are deleted
+         const { error: deleteError } = await supabase
+          .from("line_items")
+          .delete()
+          .eq("receipt_id", receiptId);
+         if (deleteError) {
+          console.error("Error deleting old line items when OCR returned none:", deleteError);
+         }
+      }
+      
+      // Update confidence scores if provided by Gemini
+      if (enhancedData.confidence) {
         const { error: confidenceError } = await supabase
-          .from("confidence_scores")
-          .upsert(confidenceData);
+          .from('confidence_scores')
+          .upsert({
+            receipt_id: receiptId,
+            merchant: ocrResult.confidence.merchant || 0,
+            date: ocrResult.confidence.date || 0,
+            total: ocrResult.confidence.total || 0,
+            tax: ocrResult.confidence.tax || 0,
+            line_items: ocrResult.confidence.line_items || 0,
+            payment_method: enhancedData.confidence.payment_method || 0
+          });
         
         if (confidenceError) {
           console.error("Error updating confidence scores:", confidenceError);
           // Don't fail the whole operation
         }
-      } catch (error) {
-        console.error("Error checking confidence_scores schema:", error);
-        // Continue with the operation
       }
+      
+      // Merge the OCR and enhanced data for return
+      const combinedResult = {
+        ...ocrResult,
+        currency,
+        payment_method,
+        ai_suggestions,
+        predicted_category
+      };
+      
+      return combinedResult;
     }
     
-    toast.success("Receipt processed successfully!");
-    return data.result;
-  } catch (error: any) {
-    console.error("Error in OCR processing:", error);
-    toast.error("Failed to process receipt with OCR");
+    return ocrResult;
+  } catch (error) {
+    console.error("Error in processReceiptWithOCR:", error);
+    toast.error("Failed to process receipt: " + (error.message || "Unknown error"));
     return null;
   }
 };
@@ -621,5 +618,114 @@ export const syncReceiptToZoho = async (id: string): Promise<boolean> => {
     console.error("Error syncing to Zoho:", error);
     toast.error("Failed to sync receipt to Zoho");
     return false;
+  }
+};
+
+// Log corrections when user edits receipt data
+export const logCorrections = async (
+  receiptId: string,
+  updatedFields: Partial<Omit<Receipt, "id" | "created_at" | "updated_at" | "user_id">>
+): Promise<void> => {
+  try {
+    console.log("📊 logCorrections called with:", { receiptId, updatedFields });
+    
+    // Fetch the original receipt including potentially relevant fields and AI suggestions
+    const { data: currentReceipt, error: fetchError } = await supabase
+      .from("receipts")
+      .select("merchant, date, total, tax, payment_method, predicted_category, ai_suggestions")
+      .eq("id", receiptId)
+      .maybeSingle(); // Use maybeSingle to handle potential null return without error
+
+    if (fetchError) {
+      console.error("Error fetching original receipt data for correction logging:", fetchError);
+      return; // Exit if we can't fetch the original receipt
+    }
+
+    if (!currentReceipt) {
+      console.warn(`Receipt with ID ${receiptId} not found for correction logging.`);
+      return; // Exit if the receipt doesn't exist
+    }
+
+    console.log("📊 Original receipt data:", currentReceipt);
+    
+    // Ensure ai_suggestions is treated as an object, even if null/undefined in DB
+    const aiSuggestions = (currentReceipt.ai_suggestions as AISuggestions | null) || {};
+    console.log("📊 AI Suggestions:", aiSuggestions);
+    
+    const correctionsToLog: Omit<Correction, "id" | "created_at">[] = [];
+
+    // Define the fields we want to track corrections for
+    const fieldsToTrack = ['merchant', 'date', 'total', 'tax', 'payment_method', 'predicted_category'];
+
+    console.log("📊 Checking fields for changes:", fieldsToTrack);
+    
+    for (const field of fieldsToTrack) {
+      const originalValue = currentReceipt[field];
+      const correctedValue = updatedFields[field];
+      const aiSuggestion = aiSuggestions[field];
+
+      console.log(`📊 Field: ${field}`, {
+        originalValue,
+        correctedValue,
+        aiSuggestion,
+        wasUpdated: correctedValue !== undefined,
+        valueChanged: originalValue !== correctedValue,
+        hasSuggestion: aiSuggestion !== undefined && aiSuggestion !== null
+      });
+
+      // Check if the field was included in the update payload
+      if (correctedValue !== undefined) {
+        // Convert values to string for consistent comparison, handle null/undefined
+        const originalValueStr = originalValue === null || originalValue === undefined ? null : String(originalValue);
+        const correctedValueStr = String(correctedValue); // correctedValue is already checked for undefined
+        const aiSuggestionStr = aiSuggestion === null || aiSuggestion === undefined ? null : String(aiSuggestion);
+        
+        console.log(`📊 Field: ${field} (as strings)`, {
+          originalValueStr,
+          correctedValueStr,
+          aiSuggestionStr,
+          valueChanged: originalValueStr !== correctedValueStr,
+          hasSuggestion: aiSuggestionStr !== null
+        });
+
+        // Log any change the user made, regardless of whether there was an AI suggestion
+        if (originalValueStr !== correctedValueStr) {
+          correctionsToLog.push({
+            receipt_id: receiptId,
+            field_name: field,
+            original_value: originalValueStr,
+            ai_suggestion: aiSuggestionStr, // This can be null if no AI suggestion existed
+            corrected_value: correctedValueStr,
+          });
+          console.log(`📊 Added correction for ${field}`);
+        } else {
+          console.log(`📊 No correction for ${field}: Value not changed`);
+        }
+      }
+    }
+
+    // Insert corrections if any were generated
+    if (correctionsToLog.length > 0) {
+      console.log(`📊 Attempting to log ${correctionsToLog.length} corrections for receipt ${receiptId}:`, correctionsToLog);
+      try {
+        const { error: insertError } = await supabase
+          .from("corrections")
+          .insert(correctionsToLog);
+
+        if (insertError) {
+          console.error("Error logging corrections:", insertError);
+          console.error("Error details:", JSON.stringify(insertError));
+        } else {
+          console.log(`📊 Successfully logged ${correctionsToLog.length} corrections for receipt ${receiptId}`);
+        }
+      } catch (insertException) {
+        console.error("Exception during corrections insert:", insertException);
+      }
+    } else {
+      console.log(`📊 No corrections to log for receipt ${receiptId} - no values were changed.`);
+    }
+  } catch (error) {
+    console.error("Error in logCorrections function:", error);
+    // Prevent this function from crashing the parent operation (updateReceipt)
   }
 };

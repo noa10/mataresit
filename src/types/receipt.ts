@@ -14,6 +14,8 @@ export interface Receipt {
   tax?: number;
   payment_method?: string;
   fullText?: string;
+  ai_suggestions?: AISuggestions;
+  predicted_category?: string;
   confidence_scores?: {
     merchant?: number;
     date?: number;
@@ -66,6 +68,8 @@ export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
     payment_method?: number;
   };
   fullText?: string;
+  ai_suggestions?: AISuggestions;
+  predicted_category?: string;
 }
 
 export interface OCRResult {
@@ -93,4 +97,24 @@ export interface ProcessingLog {
   created_at: string;
   status_message: string;
   step_name: string | null;
+}
+
+// Interface for AI suggestions
+export interface AISuggestions {
+  merchant?: string;
+  date?: string;
+  total?: number;
+  tax?: number;
+  [key: string]: any;
+}
+
+// Interface for corrections (feedback loop)
+export interface Correction {
+  id: number;
+  receipt_id: string;
+  field_name: string;
+  original_value: string | null;
+  ai_suggestion: string | null;
+  corrected_value: string;
+  created_at: string;
 }

@@ -25,8 +25,13 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 ### Key Features
 
 - OCR-powered data extraction with confidence scores
+- **AI-powered data enhancement (Gemini)**:
+  - Suggests corrections for OCR-extracted fields
+  - Predicts expense categories
+  - Identifies payment methods and currency
 - Receipt image manipulation (zoom, rotate)
 - Side-by-side editing with original image
+- **User Feedback Loop**: Logs corrections to improve AI suggestions over time
 - Reimbursement tracking
 - Multi-currency support
 - Secure Zoho OAuth integration
@@ -34,45 +39,63 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 
 ## Architecture
 
-The application follows a modern web architecture:
+The application follows a modern web architecture, now incorporating AI enhancement:
 
-```
-┌─────────────┐     ┌───────────────┐     ┌──────────────┐
-│ React       │     │ Supabase Edge │     │ Amazon       │
-│ Frontend    │◄────┤ Functions     │◄────┤ Textract     │
-│ Components  │     │               │     │              │
-└─────────────┘     └───────────────┘     └──────────────┘
-       ▲                    ▲                    ▲
-       │                    │                    │
-       ▼                    ▼                    │
-┌─────────────┐     ┌───────────────┐           │
-│ Supabase    │     │ Supabase      │           │
-│ Auth        │     │ Database      │           │
-└─────────────┘     └───────────────┘           │
-                            ▲                   │
-                            │                   │
-                            ▼                   │
-                    ┌───────────────┐           │
-                    │ Supabase      │◄──────────┘
-                    │ Storage       │
-                    └───────────────┘
-                            ▲
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ Zoho          │
-                    │ Integration   │
-                    └───────────────┘
+```mermaid
+graph TD
+    subgraph User Interaction
+        FE[React Frontend]
+    end
+
+    subgraph Supabase Backend
+        Auth[Supabase Auth]
+        DB[(Supabase DB)]
+        Store[(Supabase Storage)]
+        Func_Process[process-receipt (Edge Fn)]
+        Func_Enhance[enhance-receipt-data (Edge Fn)]
+        Func_Zoho[Zoho Functions (Edge Fn)]
+    end
+
+    subgraph External Services
+        Textract[Amazon Textract]
+        Gemini[Google Gemini]
+        Zoho[Zoho Expense]
+    end
+
+    FE -- Upload Image --> Store
+    FE -- Trigger Process --> Func_Process
+    Func_Process -- Image URL --> Textract
+    Textract -- OCR Data --> Func_Process
+    Func_Process -- Textract Data --> Func_Enhance
+    Func_Enhance -- Prompt --> Gemini
+    Gemini -- Enhanced Data --> Func_Enhance
+    Func_Enhance -- AI Suggestions, Category --> Func_Process
+    Func_Process -- Save Combined Data --> DB(receipts, line_items, confidence_scores)
+    FE -- Fetch Receipt --> DB
+    FE -- Display Data + AI --> FE
+    FE -- Save Edits --> DB(UPDATE receipts, DELETE/INSERT line_items)
+    FE -- Log Correction --> DB(INSERT corrections)
+    FE -- Trigger Sync --> Func_Zoho
+    Func_Zoho -- Data --> Zoho
+    FE -- Login/Signup --> Auth
 ```
 
 ### Data Flow
 
 1. User uploads a receipt image through the React frontend
 2. Image is stored in Supabase Storage
-3. Edge Function triggers OCR processing with Amazon Textract
-4. Extracted data is stored in Supabase Database
-5. Frontend displays data alongside image for user verification
-6. Verified data can be synced to Zoho Expense
+3. Edge Function `process-receipt` triggers:
+   - Sends image to Amazon Textract for OCR
+   - Receives OCR data
+   - Calls `enhance-receipt-data` Edge Function with OCR data
+4. Edge Function `enhance-receipt-data`:
+   - Sends data to Google Gemini API for analysis
+   - Receives AI suggestions (corrections, category)
+   - Returns enhanced data to `process-receipt`
+5. `process-receipt` combines OCR and AI data, saves to Supabase Database (`receipts`, `line_items`, `confidence_scores`)
+6. Frontend displays combined data, AI suggestions, and category for user verification
+7. User edits data; corrections are logged to `corrections` table (Feedback Loop)
+8. Verified data can be synced to Zoho Expense
 
 ## Database Schema
 
@@ -85,8 +108,10 @@ The application follows a modern web architecture:
 - `date` (DATE) - Receipt date
 - `total` (DECIMAL) - Total amount
 - `tax` (DECIMAL) - Tax amount
-- `currency` (VARCHAR) - Currency code (default: USD)
+- `currency` (VARCHAR) - Currency code (e.g., MYR, USD)
 - `payment_method` (VARCHAR) - Payment method
+- `predicted_category` (TEXT) - AI-predicted expense category
+- `ai_suggestions` (JSONB) - AI-generated suggestions for field corrections
 - `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
 - `image_url` (TEXT) - URL to stored receipt image
 - `fullText` (TEXT) - Raw text extracted by OCR
@@ -109,6 +134,7 @@ The application follows a modern web architecture:
 - `total` (INTEGER) - Confidence score for total field
 - `tax` (INTEGER) - Confidence score for tax field
 - `line_items` (INTEGER) - Confidence score for line items
+- `payment_method` (INTEGER) - Confidence score for payment method field
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
 
@@ -118,6 +144,16 @@ The application follows a modern web architecture:
 - `created_at` (TIMESTAMPTZ) - Timestamp when the log was created
 - `status_message` (TEXT) - Description of the processing step or status
 - `step_name` (TEXT) - Name of the processing step (e.g., FETCH, OCR, GEMINI, SAVE)
+
+#### `corrections`
+- `id` (SERIAL, PK) - Unique identifier for the correction entry
+- `receipt_id` (UUID, FK) - Reference to the receipt being corrected
+- `field_name` (TEXT) - Name of the field that was corrected (e.g., 'merchant', 'total')
+- `original_value` (TEXT) - The original value extracted by OCR/AI
+- `ai_suggestion` (TEXT) - The suggestion provided by the AI for this field
+- `corrected_value` (TEXT) - The final value saved by the user
+- `created_at` (TIMESTAMP WITH TIME ZONE) - Timestamp when the correction was made
+- **Note**: This table has Row-Level Security (RLS) enabled, allowing users to insert, view, update, and delete only their own correction records.
 
 ### Storage Buckets
 
@@ -206,6 +242,7 @@ The application follows a modern web architecture:
 - Side-by-side layout for image and data
 - Image manipulation controls
 - Data editing interface with confidence indicators
+- **AI Features**: Displays AI-predicted category and field suggestions with "Accept" buttons
 - Real-time display of processing logs for the viewed receipt (toggleable)
 
 #### `ReceiptCard`
@@ -221,7 +258,7 @@ The application follows a modern web architecture:
 
 ### Amazon Textract
 
-The application uses Amazon Textract for OCR processing and data extraction.
+The application uses Amazon Textract for initial OCR processing and data extraction.
 
 #### Implementation
 
@@ -229,7 +266,7 @@ The application uses Amazon Textract for OCR processing and data extraction.
    - Receives image from storage
    - Sends to Amazon Textract API
    - Processes raw results and extracts structured data
-   - Stores results with confidence scores
+   - **Passes data to `enhance-receipt-data` function**
 
 #### Required Configuration
 
@@ -237,6 +274,24 @@ The application uses Amazon Textract for OCR processing and data extraction.
   - `AWS_ACCESS_KEY_ID`
   - `AWS_SECRET_ACCESS_KEY`
   - `AWS_REGION`
+
+### Google Gemini
+
+The application uses the Google Gemini API via the `enhance-receipt-data` Edge Function to provide AI-powered suggestions and categorization.
+
+#### Implementation
+
+1. **Edge Function**: `enhance-receipt-data`
+   - Receives Textract data and full text from `process-receipt`
+   - Constructs a prompt for Gemini asking for currency, payment method, category, and field suggestions
+   - Calls the Gemini API
+   - Parses the JSON response containing AI enhancements
+   - Returns the enhanced data back to `process-receipt`
+
+#### Required Configuration
+
+- Gemini API Key stored as a Supabase secret:
+  - `GEMINI_API_KEY`
 
 ### Zoho Integration
 
@@ -267,6 +322,7 @@ The application integrates with Zoho Expense for expense tracking.
 - Node.js & npm installed
 - Supabase account
 - Amazon AWS account with Textract access
+- Google Cloud account with Gemini API enabled
 - Zoho developer account
 
 ### Local Development
@@ -292,6 +348,7 @@ These will be stored as Supabase secrets:
 - `AWS_ACCESS_KEY_ID` - Amazon AWS access key
 - `AWS_SECRET_ACCESS_KEY` - Amazon AWS secret key
 - `AWS_REGION` - Amazon AWS region
+- `GEMINI_API_KEY` - Google Gemini API Key
 - `ZOHO_CLIENT_ID` - Zoho API client ID
 - `ZOHO_CLIENT_SECRET` - Zoho API client secret
 - `ZOHO_REDIRECT_URI` - OAuth redirect URI

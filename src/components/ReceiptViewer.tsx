@@ -4,16 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2 } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog } from "@/types/receipt";
-import { updateReceipt, processReceiptWithOCR } from "@/services/receiptService";
+import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions } from "@/types/receipt";
+import { updateReceipt, processReceiptWithOCR, logCorrections } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import ReactPanZoom from "react-image-pan-zoom-rotate";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -27,12 +35,40 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
   const [showProcessLogs, setShowProcessLogs] = useState(false);
+  const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const queryClient = useQueryClient();
+  
+  // Define available expense categories
+  const expenseCategories = [
+    "Groceries", "Dining", "Transportation", "Utilities", 
+    "Entertainment", "Travel", "Shopping", "Healthcare", 
+    "Education", "Other"
+  ];
   
   useEffect(() => {
     setEditedReceipt(receipt);
   }, [receipt]);
+  
+  // Add useEffect to check if image loads properly
+  useEffect(() => {
+    // Reset image error state when receipt changes
+    setImageError(false);
+    
+    if (receipt.image_url) {
+      const img = new Image();
+      img.src = getFormattedImageUrl(receipt.image_url);
+      
+      img.onload = () => {
+        setImageError(false);
+      };
+      
+      img.onerror = () => {
+        console.error("Error loading receipt image:", receipt.image_url);
+        setImageError(true);
+      };
+    }
+  }, [receipt.image_url]);
   
   const updateMutation = useMutation({
     mutationFn: () => updateReceipt(
@@ -44,6 +80,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         tax: editedReceipt.tax,
         currency: editedReceipt.currency,
         payment_method: editedReceipt.payment_method,
+        predicted_category: editedReceipt.predicted_category,
         status: "reviewed"
       },
       editedReceipt.lineItems?.map(item => ({
@@ -113,9 +150,13 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   };
   
   const getConfidenceColor = (value?: number) => {
-    if (!value) return "bg-gray-300";
-    if (value >= 80) return "bg-green-500";
-    if (value >= 60) return "bg-yellow-500";
+    if (value === undefined || value === null) return "bg-gray-300";
+    
+    // Convert decimal (0.0-1.0) to percentage (0-100) if needed
+    const percentage = value <= 1 ? value * 100 : value;
+    
+    if (percentage >= 80) return "bg-green-500";
+    if (percentage >= 60) return "bg-yellow-500";
     return "bg-red-500";
   };
   
@@ -124,6 +165,20 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       ...prev,
       [field]: value
     }));
+    
+    // Update confidence scores in real-time when user edits a field
+    // This simulates confidence based on user verification
+    if (receipt.confidence) {
+      const updatedConfidence = { ...receipt.confidence };
+      
+      // Set confidence to 100% for manually edited fields
+      if (field in updatedConfidence) {
+        updatedConfidence[field as keyof typeof updatedConfidence] = 100;
+        
+        // Update receipt object with new confidence scores
+        receipt.confidence = updatedConfidence;
+      }
+    }
   };
   
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
@@ -382,8 +437,82 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     }
   };
 
+  // Function to accept an AI suggestion
+  const handleAcceptSuggestion = (field: string, value: string | number) => {
+    setEditedReceipt(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    toast.success(`Applied AI suggestion for ${field}`);
+  };
+  
+  // Check if we have AI suggestions for a field
+  const hasSuggestion = (field: string): boolean => {
+    return !!(receipt.ai_suggestions && receipt.ai_suggestions[field]);
+  };
+  
+  // Get suggestion for a field
+  const getSuggestion = (field: string): string | number | null => {
+    if (!receipt.ai_suggestions) return null;
+    return receipt.ai_suggestions[field] || null;
+  };
+  
+  // Get suggestion confidence for a field
+  const getSuggestionConfidence = (field: string): number => {
+    if (!receipt.ai_suggestions || 
+        !receipt.ai_suggestions.confidence || 
+        !receipt.ai_suggestions.confidence.suggestions) {
+      return 0;
+    }
+    return receipt.ai_suggestions.confidence.suggestions[field] || 0;
+  };
+  
+  // Render a suggestion badge with acceptance button if available
+  const renderSuggestion = (field: string, label: string) => {
+    if (!hasSuggestion(field)) return null;
+    
+    const suggestion = getSuggestion(field);
+    const confidence = getSuggestionConfidence(field);
+    
+    if (!suggestion) return null;
+    
+    return (
+      <div className="mt-1 flex items-center gap-2">
+        <Badge 
+          variant="outline" 
+          className={`flex items-center gap-1 ${
+            confidence >= 80 ? 'border-green-500 text-green-700' : 
+            confidence >= 60 ? 'border-yellow-500 text-yellow-700' : 
+            'border-red-500 text-red-700'
+          }`}
+        >
+          <Sparkles size={12} />
+          <span>Suggested {label}: {suggestion.toString()}</span>
+        </Badge>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6 rounded-full"
+          onClick={() => handleAcceptSuggestion(field, suggestion)}
+          title={`Accept suggestion (${confidence}% confidence)`}
+        >
+          <Check size={14} className="text-green-600" />
+        </Button>
+      </div>
+    );
+  };
+
+  // Add category change handler
+  const handleCategoryChange = (value: string) => {
+    setEditedReceipt(prev => ({
+      ...prev,
+      predicted_category: value
+    }));
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -392,52 +521,18 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       >
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-medium">Receipt Image</h3>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={handleZoomOut}
-              disabled={zoom <= 0.5}
-            >
-              <ZoomOut size={18} />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={handleZoomIn}
-              disabled={zoom >= 3}
-            >
-              <ZoomIn size={18} />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={handleRotate}
-            >
-              <RotateCw size={18} />
-            </Button>
-          </div>
         </div>
         
-        <div className="overflow-auto h-[500px] flex items-center justify-center bg-secondary/30 rounded-lg">
+        <div className="overflow-hidden h-[500px] rounded-lg relative bg-secondary/30">
           {receipt.image_url && !imageError ? (
-            <div 
-              className="min-h-full flex items-center justify-center p-4 transition-transform duration-200"
-              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
-            >
-              <img 
-                src={getFormattedImageUrl(receipt.image_url)} 
+            <div className="w-full h-full">
+              <ReactPanZoom
+                image={getFormattedImageUrl(receipt.image_url)}
                 alt={`Receipt from ${receipt.merchant}`}
-                className="max-w-full max-h-full object-contain shadow-lg"
-                onError={(e) => {
-                  console.error("Error loading receipt image:", e);
-                  console.error("Image URL attempted:", getFormattedImageUrl(receipt.image_url));
-                  setImageError(true);
-                }}
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center text-muted-foreground p-4">
+            <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
               {imageError ? (
                 <>
                   <AlertTriangle size={64} className="mb-4 text-amber-500" />
@@ -578,6 +673,29 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               onChange={(e) => handleInputChange('merchant', e.target.value)}
               className="bg-background/50"
             />
+            {renderSuggestion('merchant', 'merchant name')}
+          </div>
+          
+          {/* Add Category Selector */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Select 
+              value={editedReceipt.predicted_category || ""} 
+              onValueChange={handleCategoryChange}
+            >
+              <SelectTrigger id="category" className="bg-background/50">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {expenseCategories.map(category => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Optional: Add suggestion rendering for category if Gemini provides it */}
+            {/* {renderSuggestion('predicted_category', 'category')} */}
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -597,8 +715,9 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                   onChange={(e) => handleInputChange('date', e.target.value)}
                   className="bg-background/50 pl-9"
                 />
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
               </div>
+              {renderSuggestion('date', 'date')}
             </div>
             
             <div className="space-y-2">
@@ -618,14 +737,17 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                   onChange={(e) => handleInputChange('total', parseFloat(e.target.value))}
                   className="bg-background/50 pl-9"
                 />
-                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
               </div>
+              {renderSuggestion('total', 'amount')}
             </div>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <div className="flex justify-between">
+                <Label htmlFor="currency">Currency</Label>
+              </div>
               <Input
                 id="currency"
                 value={editedReceipt.currency || "MYR"}
@@ -649,7 +771,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                   onChange={(e) => handleInputChange('payment_method', e.target.value)}
                   className="bg-background/50 pl-9"
                 />
-                <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
               </div>
             </div>
           </div>
