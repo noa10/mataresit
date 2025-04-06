@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions } from "@/types/receipt";
 import { toast } from "sonner";
@@ -30,10 +31,12 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
     return [];
   }
   
-  // Validate and convert status to ReceiptStatus type
+  // Convert Supabase JSON to our TypeScript types and validate status
   return (data || []).map(receipt => ({
     ...receipt,
-    status: validateStatus(receipt.status || "unreviewed")
+    status: validateStatus(receipt.status || "unreviewed"),
+    // Explicitly type cast the JSON field to our TypeScript type
+    ai_suggestions: (receipt.ai_suggestions as unknown as AISuggestions) || undefined
   }));
 };
 
@@ -83,7 +86,9 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
       merchant: 0,
       date: 0,
       total: 0
-    }
+    },
+    // Explicitly type cast to match our TypeScript type
+    ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
   };
 };
 
@@ -649,7 +654,7 @@ export const logCorrections = async (
     console.log("📊 Original receipt data:", currentReceipt);
     
     // Ensure ai_suggestions is treated as an object, even if null/undefined in DB
-    const aiSuggestions = (currentReceipt.ai_suggestions as AISuggestions | null) || {};
+    const aiSuggestions = (currentReceipt.ai_suggestions as unknown as AISuggestions | null) || {};
     console.log("📊 AI Suggestions:", aiSuggestions);
     
     const correctionsToLog: Omit<Correction, "id" | "created_at">[] = [];
