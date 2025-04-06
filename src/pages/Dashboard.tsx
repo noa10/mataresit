@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -8,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { 
   Upload, Search, Filter, SlidersHorizontal, 
-  PlusCircle, XCircle, Calendar, DollarSign, X 
+  PlusCircle, XCircle, Calendar, DollarSign, X,
+  LayoutGrid, LayoutList, Table as TableIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
@@ -19,6 +21,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import UploadZone from "@/components/UploadZone";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+
+// Define view mode types
+type ViewMode = "grid" | "list" | "table";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -27,6 +40,7 @@ export default function Dashboard() {
   const [filterByCurrency, setFilterByCurrency] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">("newest");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid"); // Default view mode
   
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
@@ -75,6 +89,216 @@ export default function Dashboard() {
     setSortOrder("newest");
   };
 
+  // Render different view modes
+  const renderReceiptContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+        </div>
+      );
+    }
+    
+    if (error) {
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <XCircle size={24} className="text-destructive" />
+          </div>
+          <h3 className="text-xl font-medium mb-2">Error loading receipts</h3>
+          <p className="text-muted-foreground mb-6">
+            There was a problem loading your receipts. Please try again.
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={() => refetch()}
+          >
+            Retry
+          </Button>
+        </motion.div>
+      );
+    }
+    
+    if (receipts.length === 0) {
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <PlusCircle size={24} className="text-primary" />
+          </div>
+          <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
+          <p className="text-muted-foreground mb-6">
+            Upload your first receipt to get started
+          </p>
+          <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
+            <PlusCircle size={16} />
+            Upload Receipt
+          </Button>
+        </motion.div>
+      );
+    }
+    
+    if (processedReceipts.length === 0) {
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="glass-card p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Search size={24} className="text-primary" />
+          </div>
+          <h3 className="text-xl font-medium mb-2">No matching receipts</h3>
+          <p className="text-muted-foreground mb-6">
+            Try adjusting your search or filters
+          </p>
+          <Button variant="outline" onClick={clearFilters}>
+            Clear Filters
+          </Button>
+        </motion.div>
+      );
+    }
+    
+    // Grid view (original card layout)
+    if (viewMode === "grid") {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {processedReceipts.map((receipt, index) => {
+            const confidenceScore = 
+              receipt.confidence_scores && 
+              receipt.confidence_scores.merchant ? 
+              Math.round(receipt.confidence_scores.merchant * 100) : 0;
+            
+            return (
+              <motion.div
+                key={receipt.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
+              >
+                <ReceiptCard
+                  id={receipt.id}
+                  merchant={receipt.merchant}
+                  date={formatDate(receipt.date)}
+                  total={receipt.total}
+                  currency={receipt.currency}
+                  imageUrl={receipt.image_url || "/placeholder.svg"}
+                  status={receipt.status}
+                  confidence={confidenceScore}
+                />
+              </motion.div>
+            );
+          })}
+        </div>
+      );
+    }
+    
+    // List view
+    else if (viewMode === "list") {
+      return (
+        <div className="flex flex-col gap-3">
+          {processedReceipts.map((receipt, index) => {
+            const confidenceScore = 
+              receipt.confidence_scores && 
+              receipt.confidence_scores.merchant ? 
+              Math.round(receipt.confidence_scores.merchant * 100) : 0;
+            
+            return (
+              <motion.div
+                key={receipt.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
+                className="border rounded-lg overflow-hidden bg-card hover:bg-accent/5 transition-colors"
+              >
+                <Link to={`/receipt/${receipt.id}`} className="flex items-center p-4 gap-4">
+                  <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                    <img 
+                      src={receipt.image_url || "/placeholder.svg"} 
+                      alt={receipt.merchant} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="flex-grow min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium truncate">{receipt.merchant}</h3>
+                      <span className="font-semibold whitespace-nowrap">
+                        {receipt.currency} {receipt.total.toFixed(2)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                      <span>{formatDate(receipt.date)}</span>
+                      <div className="flex items-center">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                          receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                          'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        }`}>
+                          {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      );
+    }
+    
+    // Table view
+    else {
+      return (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Merchant</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {processedReceipts.map((receipt) => (
+                <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => window.location.href = `/receipt/${receipt.id}`}>
+                  <TableCell className="font-medium">{receipt.merchant}</TableCell>
+                  <TableCell>{formatDate(receipt.date)}</TableCell>
+                  <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    }`}>
+                      {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
@@ -98,6 +322,23 @@ export default function Dashboard() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex gap-3"
           >
+            <ToggleGroup 
+              type="single" 
+              value={viewMode}
+              onValueChange={(value) => value && setViewMode(value as ViewMode)}
+              className="border rounded-md bg-background/60 backdrop-blur-sm"
+            >
+              <ToggleGroupItem value="grid" aria-label="Grid view" title="Grid view">
+                <LayoutGrid size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="List view" title="List view">
+                <LayoutList size={18} />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="table" aria-label="Table view" title="Table view">
+                <TableIcon size={18} />
+              </ToggleGroupItem>
+            </ToggleGroup>
+
             <Button 
               className="gap-2"
               onClick={() => setIsUploadDialogOpen(true)}
@@ -207,98 +448,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
         
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
-          </div>
-        ) : error ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="glass-card p-12 text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <XCircle size={24} className="text-destructive" />
-            </div>
-            <h3 className="text-xl font-medium mb-2">Error loading receipts</h3>
-            <p className="text-muted-foreground mb-6">
-              There was a problem loading your receipts. Please try again.
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={() => refetch()}
-            >
-              Retry
-            </Button>
-          </motion.div>
-        ) : receipts.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className="glass-card p-12 text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <PlusCircle size={24} className="text-primary" />
-            </div>
-            <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Upload your first receipt to get started
-            </p>
-            <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
-              <PlusCircle size={16} />
-              Upload Receipt
-            </Button>
-          </motion.div>
-        ) : processedReceipts.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className="glass-card p-12 text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Search size={24} className="text-primary" />
-            </div>
-            <h3 className="text-xl font-medium mb-2">No matching receipts</h3>
-            <p className="text-muted-foreground mb-6">
-              Try adjusting your search or filters
-            </p>
-            <Button variant="outline" onClick={clearFilters}>
-              Clear Filters
-            </Button>
-          </motion.div>
-        ) : (
-          <div className="receipt-container">
-            {processedReceipts.map((receipt, index) => {
-              const confidenceScore = 
-                receipt.confidence_scores && 
-                receipt.confidence_scores.merchant ? 
-                Math.round(receipt.confidence_scores.merchant * 100) : 0;
-              
-              return (
-                <motion.div
-                  key={receipt.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
-                >
-                  <ReceiptCard
-                    id={receipt.id}
-                    merchant={receipt.merchant}
-                    date={formatDate(receipt.date)}
-                    total={receipt.total}
-                    currency={receipt.currency}
-                    imageUrl={receipt.image_url || "/placeholder.svg"}
-                    status={receipt.status}
-                    confidence={confidenceScore}
-                  />
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+        {renderReceiptContent()}
       </main>
       
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>

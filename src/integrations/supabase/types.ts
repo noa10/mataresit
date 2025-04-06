@@ -16,6 +16,7 @@ export type Database = {
           id: string
           line_items: number | null
           merchant: number | null
+          payment_method: number | null
           receipt_id: string
           tax: number | null
           total: number | null
@@ -27,6 +28,7 @@ export type Database = {
           id?: string
           line_items?: number | null
           merchant?: number | null
+          payment_method?: number | null
           receipt_id: string
           tax?: number | null
           total?: number | null
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           line_items?: number | null
           merchant?: number | null
+          payment_method?: number | null
           receipt_id?: string
           tax?: number | null
           total?: number | null
@@ -46,6 +49,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "confidence_scores_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      corrections: {
+        Row: {
+          ai_suggestion: string | null
+          corrected_value: string
+          created_at: string | null
+          field_name: string
+          id: number
+          original_value: string | null
+          receipt_id: string | null
+        }
+        Insert: {
+          ai_suggestion?: string | null
+          corrected_value: string
+          created_at?: string | null
+          field_name: string
+          id?: number
+          original_value?: string | null
+          receipt_id?: string | null
+        }
+        Update: {
+          ai_suggestion?: string | null
+          corrected_value?: string
+          created_at?: string | null
+          field_name?: string
+          id?: number
+          original_value?: string | null
+          receipt_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrections_receipt_id_fkey"
             columns: ["receipt_id"]
             isOneToOne: false
             referencedRelation: "receipts"
@@ -88,6 +129,45 @@ export type Database = {
           },
         ]
       }
+      processing_logs: {
+        Row: {
+          created_at: string
+          id: string
+          receipt_id: string
+          status_message: string
+          step_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          receipt_id: string
+          status_message: string
+          step_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          receipt_id?: string
+          status_message?: string
+          step_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "processing_logs_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -114,13 +194,16 @@ export type Database = {
       }
       receipts: {
         Row: {
+          ai_suggestions: Json | null
           created_at: string
           currency: string | null
           date: string
+          fullText: string | null
           id: string
           image_url: string | null
           merchant: string
           payment_method: string | null
+          predicted_category: string | null
           status: string | null
           tax: number | null
           total: number
@@ -128,13 +211,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_suggestions?: Json | null
           created_at?: string
           currency?: string | null
           date: string
+          fullText?: string | null
           id?: string
           image_url?: string | null
           merchant: string
           payment_method?: string | null
+          predicted_category?: string | null
           status?: string | null
           tax?: number | null
           total: number
@@ -142,13 +228,16 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_suggestions?: Json | null
           created_at?: string
           currency?: string | null
           date?: string
+          fullText?: string | null
           id?: string
           image_url?: string | null
           merchant?: string
           payment_method?: string | null
+          predicted_category?: string | null
           status?: string | null
           tax?: number | null
           total?: number
@@ -156,37 +245,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      processing_logs: {
-        Row: {
-          id: string
-          receipt_id: string
-          created_at: string
-          status_message: string
-          step_name: string | null
-        }
-        Insert: {
-          id?: string
-          receipt_id: string
-          created_at?: string
-          status_message: string
-          step_name?: string | null
-        }
-        Update: {
-          id?: string
-          receipt_id?: string
-          created_at?: string
-          status_message?: string
-          step_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_receipt"
-            columns: ["receipt_id"]
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          }
-        ]
       }
     }
     Views: {
