@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import { Upload, Check, Loader2, XCircle, AlertCircle } from "lucide-react";
-import { motion } from "framer-motion";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Upload, Check, Loader2, XCircle, AlertCircle, Image, FileText, File } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 // Define processing stages with their details
 const PROCESSING_STAGES = {
@@ -70,6 +72,89 @@ const PROCESSING_STAGES = {
   }
 };
 
+// SVG illustrations for drop zone states
+const DropZoneIllustrations = {
+  default: (
+    <motion.div className="flex flex-col items-center gap-2">
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="12" y="12" width="56" height="56" rx="6" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+        <motion.path 
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          d="M40 28V52" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+        />
+        <motion.path 
+          initial={{ opacity: 0, x: 5 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          d="M28 40H52" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+        />
+      </svg>
+      <motion.span 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+        className="text-sm text-muted-foreground"
+      >
+        Add receipts
+      </motion.span>
+    </motion.div>
+  ),
+  drag: (
+    <motion.div 
+      animate={{ scale: [1, 1.05, 1] }}
+      transition={{ duration: 1, repeat: Infinity, repeatType: "loop" }}
+      className="flex flex-col items-center gap-2"
+    >
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="12" y="12" width="56" height="56" rx="6" stroke="currentColor" strokeWidth="2" />
+        <path d="M40 28V52" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M28 40H52" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <span className="text-sm font-medium">Drop files here</span>
+    </motion.div>
+  ),
+  error: (
+    <motion.div 
+      initial={{ scale: 1 }}
+      animate={{ scale: [1, 1.05, 0.95, 1.05, 1] }}
+      transition={{ duration: 0.4 }}
+      className="flex flex-col items-center gap-2 text-destructive"
+    >
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="12" y="12" width="56" height="56" rx="6" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+        <circle cx="40" cy="40" r="16" stroke="currentColor" strokeWidth="2" />
+        <path d="M34 34L46 46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M46 34L34 46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <span className="text-sm font-medium">Invalid file type</span>
+    </motion.div>
+  )
+};
+
+// File type icon selector
+const getFileTypeIcon = (type: string) => {
+  if (type.startsWith('image/')) {
+    return <Image size={24} className="text-blue-500" />;
+  } else if (type === 'application/pdf') {
+    return <FileText size={24} className="text-red-500" />;
+  }
+  return <File size={24} className="text-gray-500" />;
+};
+
+interface FilePreview {
+  id: string;
+  file: File;
+  preview: string;
+}
+
 interface UploadZoneProps {
   onUploadComplete?: () => void;
 }
@@ -78,13 +163,18 @@ interface UploadZoneProps {
 // The modal trigger and container should be handled by the parent component.
 export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isInvalidFile, setIsInvalidFile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [stageHistory, setStageHistory] = useState<string[]>([]);
+  const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
+  const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -117,30 +207,107 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
     }
   }, [processLogs]);
+
+  // Clean up file previews when component unmounts
+  useEffect(() => {
+    return () => {
+      filePreviews.forEach(filePreview => {
+        if (filePreview.preview.startsWith('blob:')) {
+          URL.revokeObjectURL(filePreview.preview);
+        }
+      });
+    };
+  }, [filePreviews]);
   
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!uploadZoneRef.current) return;
+      
+      // Focus the upload zone when the user presses Tab
+      if (e.key === 'Tab' && document.activeElement === uploadZoneRef.current) {
+        uploadZoneRef.current.setAttribute('aria-selected', 'true');
+      }
+      
+      // Trigger file input when user presses Enter or Space on the upload zone
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === uploadZoneRef.current) {
+        e.preventDefault();
+        openFileDialog();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
   
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+      
+      // Check if files are valid
+      const isValid = Array.from(e.dataTransfer.items).every(item => {
+        const { type } = item;
+        return type === 'image/jpeg' || type === 'image/png' || type === 'application/pdf';
+      });
+      
+      setIsInvalidFile(!isValid);
+    }
+  }, []);
+  
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+      setIsInvalidFile(false);
+    }
+  }, []);
+  
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+  
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     setIsDragging(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    setIsInvalidFile(false);
+    dragCounterRef.current = 0;
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files);
     }
-  };
+  }, []);
   
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
     }
+  }, []);
+  
+  const validateFile = (file: File): boolean => {
+    const fileType = file.type;
+    return fileType === 'image/jpeg' || 
+           fileType === 'image/png' || 
+           fileType === 'application/pdf';
+  };
+  
+  const createFilePreview = (file: File): string => {
+    if (file.type === 'application/pdf') {
+      // For PDFs, we could use a generic PDF icon or fetch the first page
+      return './placeholder.svg';
+    }
+    return URL.createObjectURL(file);
   };
   
   const handleFiles = async (files: FileList) => {
@@ -155,24 +322,37 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setStageHistory([]);
     setCurrentStage('QUEUED');
     
-    const validFiles = Array.from(files).filter(file => {
-      const fileType = file.type;
-      return fileType === 'image/jpeg' || 
-             fileType === 'image/png' || 
-             fileType === 'application/pdf';
-    });
+    const validFiles = Array.from(files).filter(validateFile);
     
     if (validFiles.length === 0) {
       toast.error("Invalid file format. Please upload JPEG, PNG, or PDF files.");
+      setIsInvalidFile(true);
+      setTimeout(() => setIsInvalidFile(false), 2000);
       return;
     }
     
+    // Create previews for all valid files
+    const newFilePreviews = validFiles.map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      preview: createFilePreview(file)
+    }));
+    
+    setFilePreviews(newFilePreviews);
+    setSelectedFileIndex(0);
     setIsUploading(true);
     setUploadProgress(10);
     
     try {
-      // For now, just process the first file
+      // Process each file sequentially
+      // For now, just process the first file as the API might not support batch processing
       const file = validFiles[0];
+      
+      // Update ARIA live region for screen readers
+      const ariaLiveRegion = document.getElementById('upload-status');
+      if (ariaLiveRegion) {
+        ariaLiveRegion.textContent = `Uploading ${file.name}`;
+      }
       
       console.log("Starting upload process with bucket: receipt-images");
       
@@ -186,6 +366,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       
       console.log("Image uploaded successfully:", imageUrl);
       setUploadProgress(50);
+      
+      if (ariaLiveRegion) {
+        ariaLiveRegion.textContent = 'Image uploaded successfully, creating receipt record';
+      }
       
       // Create a receipt record with placeholder data
       const today = new Date().toISOString().split('T')[0];
@@ -208,6 +392,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       setUploadProgress(70);
+      
+      if (ariaLiveRegion) {
+        ariaLiveRegion.textContent = 'Processing receipt with OCR';
+      }
 
       // Subscribe to logs for this receipt
       const channel = supabase.channel(`receipt-logs-${receiptId}`)
@@ -231,6 +419,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
               );
             });
+            
+            // Update ARIA live region for processing updates
+            if (ariaLiveRegion && newLog.status_message) {
+              ariaLiveRegion.textContent = newLog.status_message;
+            }
           }
         )
         .subscribe();
@@ -251,11 +444,19 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         await processReceiptWithOCR(receiptId);
         setUploadProgress(100);
         toast.success("Receipt processed successfully!");
+        
+        if (ariaLiveRegion) {
+          ariaLiveRegion.textContent = 'Receipt processed successfully';
+        }
       } catch (ocrError: any) {
         console.error("OCR processing error:", ocrError);
         toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
         setUploadProgress(100);
         setCurrentStage('ERROR');
+        
+        if (ariaLiveRegion) {
+          ariaLiveRegion.textContent = 'OCR processing failed. Please edit the receipt manually.';
+        }
       }
       
       // Clean up subscription
@@ -281,23 +482,28 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentStage('ERROR');
+      
+      if (document.getElementById('upload-status')) {
+        document.getElementById('upload-status')!.textContent = 'Upload failed: ' + (error.message || "Unknown error");
+      }
     }
   };
   
-  const openFileDialog = () => {
+  const openFileDialog = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
-  };
+  }, []);
   
-  const retryUpload = () => {
+  const retryUpload = useCallback(() => {
     setError(null);
     setIsUploading(false);
     setUploadProgress(0);
     setCurrentStage(null);
     setStageHistory([]);
     setProcessLogs([]);
-  };
+    setFilePreviews([]);
+  }, []);
 
   const getStepColor = (step: string | null) => {
     if (!step) return 'text-gray-500';
@@ -387,19 +593,75 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     );
   };
 
+  const renderFilePreview = () => {
+    if (filePreviews.length === 0) return null;
+    const selectedFile = filePreviews[selectedFileIndex];
+    
+    return (
+      <div className="mt-4 w-full">
+        <div className="relative aspect-[3/4] max-w-[200px] mx-auto rounded-lg overflow-hidden border border-border">
+          {selectedFile.file.type === 'application/pdf' ? (
+            <div className="absolute inset-0 bg-muted flex items-center justify-center">
+              <FileText size={48} className="text-primary/50" />
+              <span className="absolute bottom-2 text-xs text-muted-foreground">{selectedFile.file.name}</span>
+            </div>
+          ) : (
+            <img 
+              src={selectedFile.preview} 
+              alt={selectedFile.file.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+        </div>
+        
+        {filePreviews.length > 1 && (
+          <div className="mt-3 flex justify-center gap-2 overflow-x-auto px-2 max-w-full">
+            {filePreviews.map((preview, index) => (
+              <button
+                key={preview.id}
+                className={`relative min-w-12 w-12 h-12 border-2 rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
+                  index === selectedFileIndex ? 'border-primary' : 'border-border'
+                }`}
+                onClick={() => setSelectedFileIndex(index)}
+                aria-label={`Select file ${index + 1}: ${preview.file.name}`}
+              >
+                {preview.file.type === 'application/pdf' ? (
+                  <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                    <FileText size={16} className="text-primary/70" />
+                  </div>
+                ) : (
+                  <img 
+                    src={preview.preview} 
+                    alt={`Thumbnail ${index + 1}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getBorderStyle = () => {
+    if (isInvalidFile) return "border-destructive animate-[shake_0.5s_ease-in-out]";
+    if (isDragging) return "border-primary bg-primary/5 shadow-[0_0_0_4px_rgba(var(--primary)/15%)]";
+    return "border-border bg-background/50";
+  };
+
   return (
-    // Removed the outer container div (w-full max-w-3xl mx-auto)
-    // Removed the outer motion.div
-    // Adjusted padding and container for modal context
     <div 
-      className={`relative w-full h-full flex flex-col overflow-hidden rounded-md p-6 border-2 border-dashed transition-all duration-300 ${ 
-        isDragging 
-          ? "border-primary bg-primary/10" 
-          : "border-border bg-background/50" 
-      }`}
+      className={`relative w-full h-full flex flex-col overflow-hidden rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      ref={uploadZoneRef}
+      tabIndex={0}
+      role="button"
+      aria-label="Upload receipt files: JPEG, PNG, or PDF"
+      aria-describedby="upload-zone-description upload-status"
     >
       <input
         type="file"
@@ -408,23 +670,37 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         onChange={handleFileInputChange}
         multiple
         accept="image/jpeg,image/png,application/pdf"
+        aria-hidden="true"
       />
       
+      {/* ARIA live region for accessibility */}
+      <div 
+        id="upload-status" 
+        className="sr-only" 
+        aria-live="polite" 
+        aria-atomic="true"
+      >
+        {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
+      </div>
+      
       <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
-        {/* Top section (Icon & Text) - Adjusted gap */}
+        {/* Top section (Icon & Text) */}
         <div className="flex flex-col items-center gap-3">
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
+            whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className={`rounded-full p-6 ${
-              isDragging ? "bg-primary/10" : "bg-secondary"
+            className={`relative rounded-full p-6 ${
+              isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
             }`}
           >
             {isUploading ? (
               <Loader2 size={36} className="text-primary animate-spin" />
             ) : error ? (
               <XCircle size={36} className="text-destructive" />
+            ) : isDragging ? (
+              <Upload size={36} className="text-primary" />
             ) : (
               <Upload size={36} className="text-primary" />
             )}
@@ -436,9 +712,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..." 
                 : error 
                   ? "Upload Failed" 
-                  : "Upload Receipt"}
+                  : isDragging
+                    ? "Drop Files Here"
+                    : "Upload Receipt"}
             </h3>
-            <p className="text-base text-muted-foreground max-w-md mx-auto">
+            <p 
+              id="upload-zone-description"
+              className="text-base text-muted-foreground max-w-md mx-auto"
+            >
               {isUploading 
                 ? currentStage === 'ERROR'
                   ? "An error occurred during processing"
@@ -447,11 +728,47 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                     : `Processing your receipt (${uploadProgress}%)`
                 : error
                   ? error
-                  : "Drag & drop your receipt images or PDFs here, or click to browse"
+                  : isDragging
+                    ? isInvalidFile
+                      ? "This file type is not supported"
+                      : "Release to start upload"
+                    : "Drag & drop your receipt images or PDFs here, or click to browse"
               }
             </p>
           </div>
         </div>
+
+        {/* File Previews (if any) */}
+        <AnimatePresence>
+          {filePreviews.length > 0 && isUploading && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full"
+            >
+              {renderFilePreview()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* SVG Illustrations for various states */}
+        <AnimatePresence>
+          {!isUploading && !error && !filePreviews.length && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="my-4"
+            >
+              {isInvalidFile 
+                ? DropZoneIllustrations.error 
+                : isDragging 
+                  ? DropZoneIllustrations.drag 
+                  : DropZoneIllustrations.default}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Middle section (Timeline or Buttons) */}
         <div className="w-full flex justify-center items-center mt-4">
@@ -470,10 +787,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             <Button 
               onClick={openFileDialog}
               variant="default" 
-              className="mt-4 px-6 py-2 text-base"
+              className="mt-4 px-6 py-2 text-base group"
               size="lg"
             >
-              Select Files
+              <span className="mr-2">Select Files</span>
+              <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
+                JPG, PNG, PDF
+              </span>
             </Button>
           )}
         </div>
@@ -507,9 +827,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           
           {currentStage === 'ERROR' && renderErrorState()}
         </div>
-
       </div>
-      {/* Removed the final 'Supported formats' text div */}
     </div>
   );
 }
+
