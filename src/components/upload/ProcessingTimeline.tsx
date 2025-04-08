@@ -1,4 +1,3 @@
-
 import React from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
@@ -12,7 +11,7 @@ interface ProcessingTimelineProps {
 }
 
 export function ProcessingTimeline({ currentStage, stageHistory, uploadProgress }: ProcessingTimelineProps) {
-  const orderedStages = ['START', 'FETCH', 'OCR', 'EXTRACT', 'GEMINI', 'SAVE', 'COMPLETE'];
+  const orderedStages = ['START', 'FETCH', 'OCR', 'GEMINI', 'SAVE', 'COMPLETE'];
   
   return (
     <div className="mt-6 pt-4 w-full">

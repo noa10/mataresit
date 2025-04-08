@@ -1,5 +1,29 @@
 export type ReceiptStatus = "unreviewed" | "reviewed" | "synced";
 
+// New processing status type for real-time updates
+export type ProcessingStatus = 
+  | 'uploading' 
+  | 'uploaded' 
+  | 'processing_ocr' 
+  | 'processing_ai' 
+  | 'failed_ocr' 
+  | 'failed_ai' 
+  | 'complete' 
+  | null;
+
+// Interface for managing the state during file upload and processing
+export interface ReceiptUpload {
+  id: string; // Unique ID for tracking the upload instance
+  file: File; // The actual file object
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
+  uploadProgress: number; // Percentage 0-100
+  processingStage?: 'queueing' | 'ocr' | 'ai_enhancement' | 'categorization' | string;
+  error?: {
+    code: 'FILE_TYPE' | 'SIZE_LIMIT' | 'UPLOAD_FAILED' | 'PROCESSING_FAILED' | string;
+    message: string;
+  } | null;
+}
+
 export interface Receipt {
   id: string;
   user_id: string;
@@ -16,6 +40,9 @@ export interface Receipt {
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
+  // New fields for real-time status updates
+  processing_status?: ProcessingStatus;
+  processing_error?: string | null;
   confidence_scores?: {
     merchant?: number;
     date?: number;
@@ -24,6 +51,7 @@ export interface Receipt {
     line_items?: number;
     payment_method?: number;
   };
+  processing_time?: number; // Time taken for backend processing (e.g., in seconds)
 }
 
 export interface ReceiptLineItem {
@@ -70,6 +98,10 @@ export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
+  // Ensure these fields are also in ReceiptWithDetails
+  processing_status?: ProcessingStatus;
+  processing_error?: string | null;
+  processing_time?: number; // Added
 }
 
 export interface OCRResult {

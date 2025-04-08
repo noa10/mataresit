@@ -2,16 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Upload, Loader2, XCircle, AlertCircle } from "lucide-react";
+import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { createReceipt, uploadReceiptImage, processReceiptWithOCR } from "@/services/receiptService";
-import { ProcessingLog } from "@/types/receipt";
+import { 
+  createReceipt, 
+  uploadReceiptImage, 
+  processReceiptWithOCR, 
+  markReceiptUploaded,
+  fixProcessingStatus 
+} from "@/services/receiptService";
+import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
-import { FilePreview, FilePreviewType } from "./upload/FilePreview";
 import { ProcessingTimeline } from "./upload/ProcessingTimeline";
 import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
@@ -28,11 +33,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [stageHistory, setStageHistory] = useState<string[]>([]);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
   const {
     isDragging,
     isInvalidFile,
-    filePreviews,
+    receiptUploads,
     selectedFileIndex,
     fileInputRef,
     setSelectedFileIndex,
@@ -44,45 +52,147 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     handleFiles,
     openFileDialog,
     resetUpload,
-    cleanupPreviews
   } = useFileUpload();
   
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  // Map processing status to UI stages
+  const mapStatusToStage = (status: ProcessingStatus): string | null => {
+    switch (status) {
+      case 'uploading':
+        return 'START';
+      case 'uploaded':
+        return 'FETCH';
+      case 'processing_ocr':
+        return 'OCR';
+      case 'processing_ai':
+        return 'GEMINI';
+      case 'failed_ocr':
+      case 'failed_ai':
+        return 'ERROR';
+      case 'complete':
+        return 'COMPLETE';
+      default:
+        return null;
+    }
+  };
+
+  // Update UI based on processing status
   useEffect(() => {
-    if (processLogs.length > 0) {
-      const latestLog = processLogs[processLogs.length - 1];
-      if (latestLog.step_name) {
-        setCurrentStage(latestLog.step_name);
-        
-        setStageHistory(prev => {
-          if (!prev.includes(latestLog.step_name!)) {
-            return [...prev, latestLog.step_name!];
+    if (processingStatus) {
+      const stage = mapStatusToStage(processingStatus);
+      if (stage) {
+        // Only update if the stage is different or adding to history
+        if (stage !== currentStage) {
+          setCurrentStage(stage);
+          // Add to history if not already there
+          if (!stageHistory.includes(stage)) {
+            setStageHistory(prev => [...prev, stage]);
           }
-          return prev;
-        });
-        
-        const stageIndex = Object.keys(PROCESSING_STAGES).indexOf(latestLog.step_name);
-        const totalStages = Object.keys(PROCESSING_STAGES).length - 2;
-        if (latestLog.step_name === 'COMPLETE') {
-          setUploadProgress(100);
-        } else if (latestLog.step_name === 'ERROR') {
-        } else if (stageIndex > 0) {
-          const newProgress = Math.round((stageIndex / totalStages) * 100);
-          setUploadProgress(Math.max(newProgress, uploadProgress));
+        }
+
+        // Update progress based on stage
+        switch (processingStatus) {
+          case 'uploading':
+            setUploadProgress(30);
+            break;
+          case 'uploaded':
+            setUploadProgress(50);
+            break;
+          case 'processing_ocr':
+            setUploadProgress(70);
+            break;
+          case 'processing_ai':
+            setUploadProgress(85);
+            break;
+          case 'complete':
+            setUploadProgress(100);
+            break;
+          case 'failed_ocr':
+          case 'failed_ai':
+            setUploadProgress(100);
+            break;
+        }
+
+        // Update ARIA live region for accessibility
+        const ariaLiveRegion = document.getElementById('upload-status');
+        if (ariaLiveRegion) {
+          ariaLiveRegion.textContent = `Receipt processing ${processingStatus.replace('_', ' ')}`;
+          if (processingStatus === 'complete') {
+            ariaLiveRegion.textContent = 'Receipt processed successfully';
+          } else if (processingStatus === 'failed_ocr' || processingStatus === 'failed_ai') {
+            ariaLiveRegion.textContent = `Receipt processing failed: ${processingStatus}`;
+          }
         }
       }
     }
-  }, [processLogs, uploadProgress]);
+  }, [processingStatus, currentStage, stageHistory]);
 
+  // Subscribe to receipt processing status updates
   useEffect(() => {
+    if (!receiptId) return;
+
+    const statusChannel = supabase.channel(`receipt-status-${receiptId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'receipts',
+          filter: `id=eq.${receiptId}`
+        },
+        (payload) => {
+          console.log('Receipt status update:', payload.new);
+          const newStatus = payload.new.processing_status as ProcessingStatus;
+          const newError = payload.new.processing_error;
+          
+          setProcessingStatus(newStatus);
+          
+          if (newError) {
+            setError(newError);
+            toast.error(`Processing error: ${newError}`);
+          } else if (newStatus === 'complete') {
+            toast.success("Receipt processed successfully!");
+          } else if (newStatus === 'failed_ocr' || newStatus === 'failed_ai') {
+            const errorMsg = newStatus === 'failed_ocr' 
+              ? "OCR processing failed. Please edit manually."
+              : "AI analysis failed. Please edit manually.";
+            setError(errorMsg);
+            toast.error(errorMsg);
+          }
+        }
+      )
+      .subscribe();
+
+    // Clean up subscription when component unmounts or receiptId changes
     return () => {
-      cleanupPreviews();
+      statusChannel.unsubscribe();
     };
-  }, []);
-  
+  }, [receiptId]);
+
+  // Effect to manage preview URL for the first file
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    const firstUpload = receiptUploads[0];
+
+    if (firstUpload && firstUpload.file && firstUpload.file.type !== 'application/pdf') {
+      objectUrl = URL.createObjectURL(firstUpload.file);
+      setPreviewUrl(objectUrl);
+    } else {
+      setPreviewUrl(null); // Reset if no file, first file is PDF, or uploads are cleared
+    }
+
+    // Cleanup function to revoke the object URL
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        setPreviewUrl(null); // Clear state on cleanup too
+      }
+    };
+  }, [receiptUploads]); // Re-run when uploads change
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!uploadZoneRef.current) return;
@@ -128,7 +238,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       console.log("Starting upload process with bucket: receipt-images");
       
       setUploadProgress(30);
-      const imageUrl = await uploadReceiptImage(file, user.id);
+      setProcessingStatus('uploading');
+      const imageUrl = await uploadReceiptImage(file, user.id, (progress) => {
+        // Update progress percentage based on upload progress
+        const scaledProgress = Math.floor(progress * 0.5); // Scale to 0-50%
+        setUploadProgress(scaledProgress);
+      });
       
       if (!imageUrl) {
         throw new Error("Failed to upload image. Please try again later.");
@@ -142,38 +257,43 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       const today = new Date().toISOString().split('T')[0];
-      const receiptId = await createReceipt({
+      const newReceiptId = await createReceipt({
         merchant: "Processing...",
         date: today,
         total: 0,
         currency: "MYR",
         status: "unreviewed",
         image_url: imageUrl,
-        user_id: user.id
+        user_id: user.id,
+        processing_status: 'uploading' // Initialize with uploading status
       }, [], {
         merchant: 0,
         date: 0,
         total: 0
       });
       
-      if (!receiptId) {
+      if (!newReceiptId) {
         throw new Error("Failed to create receipt record");
       }
       
-      setUploadProgress(70);
+      setReceiptId(newReceiptId);
+      setUploadProgress(60);
+      
+      // Mark receipt as uploaded
+      await markReceiptUploaded(newReceiptId);
       
       if (ariaLiveRegion) {
         ariaLiveRegion.textContent = 'Processing receipt with OCR';
       }
 
-      const channel = supabase.channel(`receipt-logs-${receiptId}`)
+      const channel = supabase.channel(`receipt-logs-${newReceiptId}`)
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'processing_logs',
-            filter: `receipt_id=eq.${receiptId}`
+            filter: `receipt_id=eq.${newReceiptId}`
           },
           (payload) => {
             const newLog = payload.new as ProcessingLog;
@@ -198,7 +318,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       const { data: initialLogs } = await supabase
         .from('processing_logs')
         .select('*')
-        .eq('receipt_id', receiptId)
+        .eq('receipt_id', newReceiptId)
         .order('created_at', { ascending: true });
       
       if (initialLogs && initialLogs.length > 0) {
@@ -206,9 +326,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       try {
-        await processReceiptWithOCR(receiptId);
+        await processReceiptWithOCR(newReceiptId);
         setUploadProgress(100);
-        toast.success("Receipt processed successfully!");
         
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
@@ -226,16 +345,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       
       setTimeout(() => {
         channel.unsubscribe();
-      }, 5000); 
+      }, 5000);
       
       if (onUploadComplete) {
         setTimeout(() => {
           onUploadComplete();
-          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
+          if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       } else {
         setTimeout(() => {
-          if(currentStage !== 'ERROR') navigate(`/receipt/${receiptId}`);
+          if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       }
     } catch (error: any) {
@@ -253,9 +372,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   const handleStartUpload = () => {
-    if (filePreviews.length > 0) {
-      const files = filePreviews.map(preview => preview.file);
-      processUploadedFiles(files);
+    // Use receiptUploads to get the file
+    const fileToUpload = receiptUploads[0]?.file;
+    if (fileToUpload) {
+      processUploadedFiles([fileToUpload]); // Pass as array as function expects it
     } else {
       openFileDialog();
     }
@@ -268,6 +388,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setCurrentStage(null);
     setStageHistory([]);
     setProcessLogs([]);
+    setProcessingStatus(null);
+    setReceiptId(null);
     resetUpload();
   };
 
@@ -364,24 +486,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         </div>
 
         <AnimatePresence>
-          {filePreviews.length > 0 && (
+          {receiptUploads.length > 0 && !isUploading && !error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="w-full"
+              className="w-full max-w-md mt-4 p-4 border rounded-lg bg-secondary/50 flex items-center space-x-4"
             >
-              <FilePreview
-                filePreviews={filePreviews}
-                selectedFileIndex={selectedFileIndex}
-                setSelectedFileIndex={setSelectedFileIndex}
-              />
+              {receiptUploads[0].file.type === 'application/pdf' ? (
+                <FileText className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+              ) : previewUrl ? (
+                <img src={previewUrl} alt={`Preview of ${receiptUploads[0].file.name}`} className="w-16 h-16 object-cover rounded flex-shrink-0" />
+              ) : (
+                <FileImage className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+              )}
+              <div className="flex-grow overflow-hidden">
+                <p className="text-sm font-medium truncate">{receiptUploads[0].file.name}</p>
+                <p className="text-xs text-muted-foreground">{(receiptUploads[0].file.size / 1024).toFixed(1)} KB</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         <AnimatePresence>
-          {!isUploading && !error && !filePreviews.length && (
+          {!isUploading && !error && !receiptUploads.length && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -421,7 +549,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               size="lg"
             >
               <span className="mr-2">
-                {filePreviews.length > 0 ? "Upload Files" : "Select Files"}
+                {receiptUploads.length > 0 ? "Upload File" : "Select File"}
               </span>
               <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
                 JPG, PNG, PDF

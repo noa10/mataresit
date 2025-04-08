@@ -204,6 +204,9 @@ export type Database = {
           merchant: string
           payment_method: string | null
           predicted_category: string | null
+          processing_error: string | null
+          processing_status: string | null
+          processing_time: number | null
           status: string | null
           tax: number | null
           total: number
@@ -221,6 +224,9 @@ export type Database = {
           merchant: string
           payment_method?: string | null
           predicted_category?: string | null
+          processing_error?: string | null
+          processing_status?: string | null
+          processing_time?: number | null
           status?: string | null
           tax?: number | null
           total: number
@@ -238,6 +244,9 @@ export type Database = {
           merchant?: string
           payment_method?: string | null
           predicted_category?: string | null
+          processing_error?: string | null
+          processing_status?: string | null
+          processing_time?: number | null
           status?: string | null
           tax?: number | null
           total?: number
@@ -281,8 +290,7 @@ export type Tables<
     : never
   : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
         PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+    ? (PublicSchema["Tables"] & PublicSchema["Views"])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
@@ -195,6 +194,7 @@ export default function Dashboard() {
                   imageUrl={receipt.image_url || "/placeholder.svg"}
                   status={receipt.status}
                   confidence={confidenceScore}
+                  processingStatus={receipt.processing_status}
                 />
               </motion.div>
             );

@@ -1,12 +1,11 @@
-
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { FilePreviewType } from "@/components/upload/FilePreview";
+import { ReceiptUpload } from "@/types/receipt";
 
 export function useFileUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [isInvalidFile, setIsInvalidFile] = useState(false);
-  const [filePreviews, setFilePreviews] = useState<FilePreviewType[]>([]);
+  const [receiptUploads, setReceiptUploads] = useState<ReceiptUpload[]>([]);
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -16,14 +15,6 @@ export function useFileUpload() {
     return fileType === 'image/jpeg' || 
            fileType === 'image/png' || 
            fileType === 'application/pdf';
-  };
-  
-  const createFilePreview = (file: File): string => {
-    if (file.type === 'application/pdf') {
-      // For PDFs, we could use a generic PDF icon or fetch the first page
-      return './placeholder.svg';
-    }
-    return URL.createObjectURL(file);
   };
   
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -89,14 +80,15 @@ export function useFileUpload() {
       return null;
     }
     
-    // Create previews for all valid files
-    const newFilePreviews = validFiles.map(file => ({
+    // Create ReceiptUpload objects for all valid files
+    const newUploads: ReceiptUpload[] = validFiles.map(file => ({
       id: crypto.randomUUID(),
       file,
-      preview: createFilePreview(file)
+      status: 'pending', // Initial status
+      uploadProgress: 0,
     }));
     
-    setFilePreviews(newFilePreviews);
+    setReceiptUploads(prevUploads => [...prevUploads, ...newUploads]);
     setSelectedFileIndex(0);
     
     return validFiles;
@@ -109,23 +101,14 @@ export function useFileUpload() {
   }, []);
   
   const resetUpload = useCallback(() => {
-    setFilePreviews([]);
+    setReceiptUploads([]);
     setSelectedFileIndex(0);
   }, []);
-  
-  // Clean up previews when component unmounts
-  const cleanupPreviews = () => {
-    filePreviews.forEach(filePreview => {
-      if (filePreview.preview.startsWith('blob:')) {
-        URL.revokeObjectURL(filePreview.preview);
-      }
-    });
-  };
   
   return {
     isDragging,
     isInvalidFile,
-    filePreviews,
+    receiptUploads,
     selectedFileIndex,
     fileInputRef,
     setSelectedFileIndex,
@@ -137,6 +120,5 @@ export function useFileUpload() {
     handleFiles,
     openFileDialog,
     resetUpload,
-    cleanupPreviews
   };
 }

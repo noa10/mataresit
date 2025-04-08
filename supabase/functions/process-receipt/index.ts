@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textract'
 import { ProcessingLogger } from './shared/db-logger.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -23,6 +24,8 @@ const textractClient = new TextractClient({
 // Main function to process receipt image and extract data
 async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, receiptId: string) {
   const logger = new ProcessingLogger(receiptId);
+  const startTime = performance.now(); // Record start time
+  let processingTime = 0;
   
   try {
     await logger.log("Starting OCR processing with Amazon Textract", "OCR");
@@ -50,12 +53,12 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
       predicted_category: '',
       ai_suggestions: {} as Record<string, any>,
       confidence: {
-        merchant: 0,
-        date: 0,
-        total: 0,
-        tax: 0,
-        payment_method: 0,
-        line_items: 0,
+        merchant: 50, // Default to medium confidence instead of 0
+        date: 50,     // Default to medium confidence instead of 0
+        total: 50,     // Default to medium confidence instead of 0
+        tax: 50,       // Default to medium confidence instead of 0
+        payment_method: 50, // Default to medium confidence instead of 0
+        line_items: 50,    // Default to medium confidence instead of 0
       },
     };
     
@@ -82,24 +85,80 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
             switch (fieldType) {
               case 'VENDOR_NAME':
                 result.merchant = fieldValue;
-                result.confidence.merchant = confidence;
+                // Adjust confidence based on field value quality
+                result.confidence.merchant = calculateFieldConfidence(confidence, fieldValue, 'merchant');
                 break;
               case 'INVOICE_RECEIPT_DATE':
-                result.date = fieldValue;
-                result.confidence.date = confidence;
+                // Normalize date format - convert to YYYY-MM-DD
+                let normalizedDate = fieldValue;
+                
+                // Try to parse different date formats
+                // Check for DD-MM-YYYY format (e.g., 19-03-2025)
+                const ddmmyyyyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+                const ddmmyyyyMatch = fieldValue.match(ddmmyyyyRegex);
+                
+                if (ddmmyyyyMatch) {
+                  // Convert DD-MM-YYYY to YYYY-MM-DD
+                  const day = ddmmyyyyMatch[1].padStart(2, '0');
+                  const month = ddmmyyyyMatch[2].padStart(2, '0');
+                  const year = ddmmyyyyMatch[3];
+                  normalizedDate = `${year}-${month}-${day}`;
+                  console.log(`Normalized date from ${fieldValue} to ${normalizedDate}`);
+                } else {
+                  // Try other formats - MM-DD-YYYY or MM/DD/YYYY
+                  const mmddyyyyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+                  const mmddyyyyMatch = fieldValue.match(mmddyyyyRegex);
+                  
+                  if (mmddyyyyMatch) {
+                    // For US format, assume it's MM-DD-YYYY
+                    // Convert to YYYY-MM-DD
+                    const month = mmddyyyyMatch[1].padStart(2, '0');
+                    const day = mmddyyyyMatch[2].padStart(2, '0');
+                    const year = mmddyyyyMatch[3];
+                    
+                    // Validate month/day values to avoid invalid dates
+                    if (parseInt(month) <= 12 && parseInt(day) <= 31) {
+                      normalizedDate = `${year}-${month}-${day}`;
+                      console.log(`Normalized date from ${fieldValue} to ${normalizedDate}`);
+                    }
+                  }
+                }
+                
+                // If already in YYYY-MM-DD format, keep as is
+                const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+                if (!isoRegex.test(normalizedDate)) {
+                  // As a fallback, try Date object parsing as a last resort
+                  try {
+                    const dateObj = new Date(fieldValue);
+                    if (!isNaN(dateObj.getTime())) {
+                      normalizedDate = dateObj.toISOString().split('T')[0];
+                      console.log(`Date fallback parsing: ${fieldValue} -> ${normalizedDate}`);
+                    }
+                  } catch (e) {
+                    console.error(`Failed to parse date: ${fieldValue}`, e);
+                  }
+                }
+                
+                // Save normalized date to result
+                result.date = normalizedDate;
+                
+                // Adjust confidence based on date validation success
+                const dateFormatConfidence = normalizedDate !== fieldValue ? 90 : confidence;
+                result.confidence.date = calculateFieldConfidence(dateFormatConfidence, normalizedDate, 'date');
                 break;
               case 'TOTAL':
                 // Remove currency symbols and convert to number
                 result.total = parseFloat(fieldValue.replace(/[$€£RM]/g, ''));
-                result.confidence.total = confidence;
+                // Adjust confidence based on parsed value
+                result.confidence.total = calculateFieldConfidence(confidence, result.total.toString(), 'total');
                 break;
               case 'TAX':
                 result.tax = parseFloat(fieldValue.replace(/[$€£RM]/g, ''));
-                result.confidence.tax = confidence;
+                result.confidence.tax = calculateFieldConfidence(confidence, result.tax.toString(), 'tax');
                 break;
               case 'PAYMENT_TERMS':
                 result.payment_method = fieldValue;
-                result.confidence.payment_method = confidence;
+                result.confidence.payment_method = calculateFieldConfidence(confidence, fieldValue, 'payment_method');
                 break;
             }
           }
@@ -134,7 +193,11 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
         
         // Set confidence for line items
         if (result.line_items.length > 0) {
-          result.confidence.line_items = 90; // High confidence if line items were detected
+          // Calculate confidence based on number of items detected
+          const count = result.line_items.length;
+          // More items = higher confidence in overall structure detection
+          const lineItemConfidence = Math.min(75 + (count * 5), 95); 
+          result.confidence.line_items = lineItemConfidence;
         }
       }
       
@@ -230,13 +293,91 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
       // Continue with Textract data only
     }
     
-    await logger.log("Processing complete", "COMPLETE");
-    return result;
+    const endTime = performance.now(); // Record end time
+    processingTime = (endTime - startTime) / 1000; // Calculate duration in seconds
+
+    await logger.log(`Processing complete in ${processingTime.toFixed(2)} seconds`, "COMPLETE");
+
+    // Include processing time in the result
+    return { ...result, processing_time: processingTime };
   } catch (error) {
     console.error('Error processing receipt with Textract:', error);
     await logger.log(`Error processing receipt: ${error.message}`, "ERROR");
     throw new Error(`Failed to process receipt image: ${error.message}`);
   }
+}
+
+// Add this helper function below the processReceiptImage function
+// Helper function to calculate more meaningful confidence scores
+function calculateFieldConfidence(baseConfidence: number, value: string, fieldType: string): number {
+  // Start with the base confidence from OCR
+  let adjustedConfidence = baseConfidence || 50;
+  
+  // Don't allow very low confidence - minimum of 30%
+  adjustedConfidence = Math.max(adjustedConfidence, 30);
+  
+  if (!value || value.trim() === '') {
+    return 30; // Very low confidence for empty values
+  }
+  
+  // Add field-specific confidence boost based on format and content
+  switch (fieldType) {
+    case 'merchant':
+      // Longer merchant names are usually more reliable
+      if (value.length > 5) {
+        adjustedConfidence += 10;
+      }
+      // All caps is likely a header/company name
+      if (value === value.toUpperCase() && value.length > 3) {
+        adjustedConfidence += 5;
+      }
+      break;
+      
+    case 'date':
+      // If it's a valid ISO date, high confidence
+      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        adjustedConfidence += 15;
+      }
+      
+      // Check if date is reasonable (not in the far future)
+      try {
+        const dateObj = new Date(value);
+        const now = new Date();
+        // Date should be within last 2 years or next 1 year
+        if (dateObj <= new Date(now.getFullYear() + 1, 11, 31) && 
+            dateObj >= new Date(now.getFullYear() - 2, 0, 1)) {
+          adjustedConfidence += 10;
+        }
+      } catch (e) {
+        // Invalid date reduces confidence
+        adjustedConfidence -= 10;
+      }
+      break;
+      
+    case 'total':
+      // If it's a valid number with 2 decimal places, very likely correct
+      if (/^\d+\.\d{2}$/.test(value)) {
+        adjustedConfidence += 15;
+      }
+      
+      // Reasonable total amount (not extreme values)
+      const totalAmount = parseFloat(value);
+      if (!isNaN(totalAmount) && totalAmount > 0 && totalAmount < 10000) {
+        adjustedConfidence += 10;
+      }
+      break;
+      
+    case 'payment_method':
+      // Common payment methods get higher confidence
+      const commonMethods = ['cash', 'credit', 'credit card', 'debit', 'debit card', 'visa', 'mastercard'];
+      if (commonMethods.some(method => value.toLowerCase().includes(method))) {
+        adjustedConfidence += 20;
+      }
+      break;
+  }
+  
+  // Ensure confidence is within 0-100 range
+  return Math.min(Math.max(adjustedConfidence, 30), 100);
 }
 
 serve(async (req) => {
@@ -285,6 +426,13 @@ serve(async (req) => {
     );
     
     await logger.initialize();
+
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     await logger.log("Starting receipt processing", "START");
     
     await logger.log("Fetching receipt data", "FETCH");
@@ -321,18 +469,162 @@ serve(async (req) => {
       const extractedData = await processReceiptImage(imageBytes, imageUrl, receiptId);
       console.log("Data extraction complete");
       
-      await logger.log("Extracting receipt data", "EXTRACT");
-      await logger.log(`Extracted data: Merchant=${extractedData.merchant}, Total=${extractedData.total}, Items=${extractedData.line_items.length}`, "EXTRACT");
+      await logger.log("Saving processing results to database", "SAVE");
+
+      // Prepare data for saving to Supabase `receipts` table
+      const updateData: Record<string, any> = {
+        merchant: extractedData.merchant,
+        date: extractedData.date, // Ensure date is in a compatible format (YYYY-MM-DD)
+        total: extractedData.total,
+        tax: extractedData.tax,
+        currency: extractedData.currency,
+        payment_method: extractedData.payment_method,
+        fullText: extractedData.fullText,
+        ai_suggestions: extractedData.ai_suggestions,
+        predicted_category: extractedData.predicted_category,
+        processing_status: 'complete', // Update status to complete
+        processing_time: extractedData.processing_time, // Add processing time
+        updated_at: new Date().toISOString(),
+      };
+
+      // CRITICAL: Double-check and fix date format before saving to database
+      // This ensures dates like "19-03-2025" are converted to "2025-03-19"
+      if (updateData.date && typeof updateData.date === 'string') {
+        const dateValue = updateData.date;
+        console.log(`Date before validation: ${dateValue}`);
+        
+        // Check if the date is already in YYYY-MM-DD format
+        const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!isoRegex.test(dateValue)) {
+          // Try to extract components from the date string (DD-MM-YYYY format)
+          const ddmmyyyyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+          const ddmmyyyyMatch = dateValue.match(ddmmyyyyRegex);
+          
+          if (ddmmyyyyMatch) {
+            // Convert DD-MM-YYYY to YYYY-MM-DD
+            const day = ddmmyyyyMatch[1].padStart(2, '0');
+            const month = ddmmyyyyMatch[2].padStart(2, '0');
+            const year = ddmmyyyyMatch[3];
+            updateData.date = `${year}-${month}-${day}`;
+            console.log(`Fixed date format from ${dateValue} to ${updateData.date}`);
+            await logger.log(`Fixed date format from ${dateValue} to ${updateData.date}`, "DATE_FIX");
+          } else {
+            // As a last resort, try standard Date parsing
+            try {
+              const dateObj = new Date(dateValue);
+              if (!isNaN(dateObj.getTime())) {
+                updateData.date = dateObj.toISOString().split('T')[0];
+                console.log(`Date object parsing: ${dateValue} -> ${updateData.date}`);
+                await logger.log(`Date object parsing: ${dateValue} -> ${updateData.date}`, "DATE_FIX");
+              } else {
+                // If everything fails, use current date as fallback
+                updateData.date = new Date().toISOString().split('T')[0];
+                console.log(`Using current date as fallback: ${updateData.date}`);
+                await logger.log(`Failed to parse date '${dateValue}', using current date`, "WARNING");
+              }
+            } catch (e) {
+              // If date parsing fails entirely, use current date
+              updateData.date = new Date().toISOString().split('T')[0];
+              console.log(`Date parsing exception, using current date: ${updateData.date}`);
+              await logger.log(`Exception parsing date '${dateValue}', using current date`, "WARNING");
+            }
+          }
+        } else {
+          console.log(`Date is already in correct format: ${dateValue}`);
+        }
+      } else if (!updateData.date) {
+        // If date is missing, use current date
+        updateData.date = new Date().toISOString().split('T')[0];
+        console.log(`No date found, using current date: ${updateData.date}`);
+        await logger.log("No date found, using current date", "WARNING");
+      }
+
+      // Remove null/undefined fields before updating
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === null || updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+
+      // --- Save to Supabase `receipts` table ---
+      const { error: updateError } = await supabase
+        .from('receipts')
+        .update(updateData)
+        .eq('id', receiptId);
+
+      if (updateError) {
+        console.error("Error updating receipt in database:", updateError);
+        await logger.log(`Error saving results: ${updateError.message}`, "ERROR");
+        throw new Error(`Failed to update receipt record: ${updateError.message}`);
+      }
       
-      await logger.log("Saving processing results", "SAVE");
+      // Save confidence scores to the confidence_scores table
+      const confidenceData = {
+        receipt_id: receiptId,
+        merchant: extractedData.confidence.merchant || 0,
+        date: extractedData.confidence.date || 0,
+        total: extractedData.confidence.total || 0,
+        tax: extractedData.confidence.tax || 0,
+        line_items: extractedData.confidence.line_items || 0,
+        payment_method: extractedData.confidence.payment_method || 0
+      };
       
-      // Return the extracted data
-      await logger.log("Receipt processing completed", "COMPLETE");
+      // Check if confidence record already exists
+      const { data: existingConfidence, error: fetchError } = await supabase
+        .from('confidence_scores')
+        .select('id')
+        .eq('receipt_id', receiptId)
+        .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') { // Not Found error code
+        console.error("Error checking for existing confidence scores:", fetchError);
+        await logger.log(`Error checking confidence scores: ${fetchError.message}`, "ERROR");
+        // Continue processing - non-critical error
+      }
+      
+      let confidenceError;
+      
+      if (existingConfidence?.id) {
+        // Update existing confidence scores
+        const { error } = await supabase
+          .from('confidence_scores')
+          .update(confidenceData)
+          .eq('id', existingConfidence.id);
+        
+        confidenceError = error;
+      } else {
+        // Insert new confidence scores
+        const { error } = await supabase
+          .from('confidence_scores')
+          .insert(confidenceData);
+        
+        confidenceError = error;
+      }
+      
+      if (confidenceError) {
+        console.error("Error saving confidence scores:", confidenceError);
+        await logger.log(`Error saving confidence scores: ${confidenceError.message}`, "WARNING");
+        // Don't fail the process for confidence score errors
+      } else {
+        await logger.log("Confidence scores saved successfully", "SAVE");
+      }
+
+      // --- Handle line items (Optional: Assuming separate handling or basic logging for now) ---
+      if (extractedData.line_items && extractedData.line_items.length > 0) {
+        await logger.log(`Extracted ${extractedData.line_items.length} line items (saving not implemented in this function)`, "SAVE_LINE_ITEMS");
+        // TODO: Implement line item saving if necessary within this function
+        // This might involve deleting existing items and inserting new ones
+      }
+
+      await logger.log("Processing results saved successfully", "SAVE");
+
+      // Return the extracted data (including processing time)
+      await logger.log("Receipt processing completed successfully", "COMPLETE");
       return new Response(
         JSON.stringify({
           success: true,
           receiptId,
-          result: extractedData,
+          result: extractedData, // Return the full result including processing time
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

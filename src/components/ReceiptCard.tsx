@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Calendar, Store, DollarSign, Eye } from "lucide-react";
+import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ReceiptStatus } from "@/types/receipt";
+import { ReceiptStatus, ProcessingStatus } from "@/types/receipt";
 
 interface ReceiptCardProps {
   id: string;
@@ -17,6 +17,7 @@ interface ReceiptCardProps {
   imageUrl: string;
   status: ReceiptStatus;
   confidence: number;
+  processingStatus?: ProcessingStatus;
 }
 
 export default function ReceiptCard({
@@ -28,6 +29,7 @@ export default function ReceiptCard({
   imageUrl,
   status,
   confidence,
+  processingStatus
 }: ReceiptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
@@ -88,6 +90,45 @@ export default function ReceiptCard({
     return "text-red-500";
   };
 
+  const getProcessingInfo = () => {
+    if (!processingStatus || processingStatus === 'complete') return null;
+    
+    let statusText = 'Processing...';
+    let icon = <Loader2 size={12} className="animate-spin mr-1" />;
+    let colorClass = 'border-blue-500 text-blue-500';
+    
+    switch (processingStatus) {
+      case 'uploading':
+        statusText = 'Uploading...';
+        colorClass = 'border-blue-500 text-blue-500';
+        break;
+      case 'uploaded':
+        statusText = 'Uploaded';
+        colorClass = 'border-indigo-500 text-indigo-500';
+        break;
+      case 'processing_ocr':
+        statusText = 'OCR...';
+        colorClass = 'border-violet-500 text-violet-500';
+        break;
+      case 'processing_ai':
+        statusText = 'AI Analysis...';
+        colorClass = 'border-purple-500 text-purple-500';
+        break;
+      case 'failed_ocr':
+        statusText = 'OCR Failed';
+        icon = <AlertTriangle size={12} className="mr-1" />;
+        colorClass = 'border-red-500 text-red-500';
+        break;
+      case 'failed_ai':
+        statusText = 'AI Failed';
+        icon = <AlertTriangle size={12} className="mr-1" />;
+        colorClass = 'border-red-500 text-red-500';
+        break;
+    }
+    
+    return { statusText, icon, colorClass };
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -120,6 +161,28 @@ export default function ReceiptCard({
           </Badge>
         </div>
         
+        {/* Processing indicator overlay */}
+        {processingStatus && processingStatus !== 'complete' && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="text-white flex flex-col items-center">
+              {processingStatus === 'uploading' || processingStatus === 'uploaded' || 
+               processingStatus === 'processing_ocr' || processingStatus === 'processing_ai' ? (
+                <Loader2 size={32} className="animate-spin mb-3" />
+              ) : (
+                <AlertTriangle size={32} className="mb-3 text-red-500" />
+              )}
+              <p className="text-sm font-medium">
+                {processingStatus === 'uploading' && 'Uploading...'}
+                {processingStatus === 'uploaded' && 'Processing...'}
+                {processingStatus === 'processing_ocr' && 'OCR Processing...'}
+                {processingStatus === 'processing_ai' && 'AI Analysis...'}
+                {processingStatus === 'failed_ocr' && 'OCR Failed'}
+                {processingStatus === 'failed_ai' && 'AI Failed'}
+              </p>
+            </div>
+          </div>
+        )}
+        
         <div className="absolute bottom-3 left-3 right-3">
           <h3 className="text-white font-semibold text-lg truncate drop-shadow-md">{merchant}</h3>
           <div className="flex justify-between items-end">
@@ -141,10 +204,22 @@ export default function ReceiptCard({
             <span className="text-sm font-medium">{merchant}</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-xs">Confidence:</span>
-            <span className={`text-xs font-semibold ${getConfidenceColor()}`}>
-              {confidence}%
-            </span>
+            {getProcessingInfo() ? (
+              <Badge 
+                variant="outline"
+                className={`text-xs font-medium flex items-center ${getProcessingInfo()?.colorClass}`}
+              >
+                {getProcessingInfo()?.icon}
+                {getProcessingInfo()?.statusText}
+              </Badge>
+            ) : (
+              <>
+                <span className="text-xs">Confidence:</span>
+                <span className={`text-xs font-semibold ${getConfidenceColor()}`}>
+                  {confidence}%
+                </span>
+              </>
+            )}
           </div>
         </div>
         

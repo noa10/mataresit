@@ -16,11 +16,11 @@ A web-based application for automating receipt data extraction using OCR technol
 
 The Automated Receipt Processing Application streamlines the digitization and management of paper receipts through a complete workflow:
 
-1. **Upload** - Users upload receipt images in JPEG, PNG, or PDF formats
-2. **Process** - Amazon Textract extracts text and data from the receipt
-3. **Extract** - Intelligent parsing identifies key information (date, merchant, amount, etc.)
-4. **Verify** - Side-by-side interface for users to review and edit data
-5. **Sync** - Integration with Zoho Expense for seamless expense tracking
+1. **Upload** - Users upload receipt images in JPEG, PNG, or PDF formats. The UI provides real-time feedback on upload progress and processing status.
+2. **Process** - Amazon Textract extracts text and data from the receipt.
+3. **Enhance** - Google Gemini enhances the data, suggests corrections, and predicts categories.
+4. **Verify** - Side-by-side interface for users to review and edit data, with real-time updates if processing is still ongoing.
+5. **Sync** - Integration with Zoho Expense for seamless expense tracking.
 
 ### Key Features
 
@@ -35,7 +35,7 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 - Reimbursement tracking
 - Multi-currency support
 - Secure Zoho OAuth integration
-- Real-time processing logs during upload and OCR
+- **Real-time Processing Status**: Users see live updates during upload, OCR, and AI processing stages.
 
 ## Architecture
 
@@ -113,6 +113,8 @@ graph TD
 - `predicted_category` (TEXT) - AI-predicted expense category
 - `ai_suggestions` (JSONB) - AI-generated suggestions for field corrections
 - `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
+- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'failed_ai', 'complete')
+- `processing_error` (TEXT) - Stores error messages if processing fails
 - `image_url` (TEXT) - URL to stored receipt image
 - `fullText` (TEXT) - Raw text extracted by OCR
 - `created_at` (TIMESTAMP) - Creation timestamp
@@ -233,21 +235,25 @@ graph TD
 - Drag & drop or file select interface
 - Designed for use within a modal dialog.
 - File validation for JPEG, PNG, PDF.
-- Real-time display of detailed backend processing stages (e.g., Queued, Fetching, OCR, Analyzing, Saving, Complete, Error) using a visual timeline.
-- Leverages Supabase Realtime for live updates on processing status.
-- Shows detailed processing logs.
-- Clear error state display with retry option.
+- **Real-time display of detailed backend processing stages** (e.g., Uploading, OCR, AI Analysis, Complete, Error) using a visual timeline (`ProcessingTimeline`).
+- Leverages Supabase Realtime for live updates on `processing_status`.
+- Shows detailed processing logs (`ProcessingLogs`).
+- Clear error state display (`ErrorState`) with retry option.
 
 #### `ReceiptViewer`
 - Side-by-side layout for image and data
 - Image manipulation controls
 - Data editing interface with confidence indicators
 - **AI Features**: Displays AI-predicted category and field suggestions with "Accept" buttons
+- **Real-time processing status indicator** displayed prominently.
+- Overlay shown on image during active processing or if processing failed.
+- Option to "Mark as fixed" if processing failed (triggers `fixProcessingStatus`).
 - Real-time display of processing logs for the viewed receipt (toggleable)
 
 #### `ReceiptCard`
 - Summary display of receipt for listings
-- Status indicator
+- Status indicator (unreviewed/reviewed/synced)
+- **Processing Status**: Displays a badge indicating the current processing status (e.g., 'Uploading...', 'OCR Failed') if not 'complete'. Shows an overlay during active processing.
 - Quick actions
 
 #### `ConfidenceIndicator`

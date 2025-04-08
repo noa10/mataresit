@@ -7,8 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions } from "@/types/receipt";
-import { updateReceipt, processReceiptWithOCR, logCorrections } from "@/services/receiptService";
+import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
+import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
@@ -27,16 +27,94 @@ interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
 }
 
+// Define a type alias for the confidence structure in ReceiptWithDetails
+type ReceiptConfidence = {
+  merchant?: number;
+  date?: number;
+  total?: number;
+  tax?: number;
+  line_items?: number;
+  payment_method?: number;
+};
+
+// Then use it in our state and default values
+const defaultConfidence: ReceiptConfidence = {
+  merchant: 0,
+  date: 0,
+  total: 0,
+  tax: 0,
+  payment_method: 0,
+  line_items: 0,
+};
+
+// Helper function to normalize confidence (handles decimal/percentage)
+const normalizeConfidence = (score?: number | null): number => {
+  if (score === undefined || score === null) return 50; // Default to 50% instead of 0
+  const numScore = Number(score);
+  if (isNaN(numScore)) return 50; // Default to 50% if invalid
+  // Assume scores > 1 are already percentages, otherwise convert decimal
+  return numScore > 1 ? Math.round(numScore) : Math.round(numScore * 100);
+};
+
+// Enhanced Confidence indicator component with better visual feedback and tooltips
+function ConfidenceIndicator({ score, loading = false }: { score?: number, loading?: boolean }) {
+  // Show loading state while processing
+  if (loading) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="inline-block w-4 h-1 rounded bg-gray-300 animate-pulse"></span>
+        <span className="text-xs text-gray-400">Processing...</span>
+      </div>
+    );
+  }
+
+  const normalizedScore = normalizeConfidence(score);
+  
+  // More granular color scale with 4 levels
+  const color = normalizedScore >= 80 ? 'bg-green-500' :
+                normalizedScore >= 60 ? 'bg-yellow-500' : 
+                normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
+  
+  // Add confidence labels for accessibility
+  const label = normalizedScore >= 80 ? 'High' :
+               normalizedScore >= 60 ? 'Medium' :
+               normalizedScore >= 40 ? 'Low' : 'Very Low';
+
+  return (
+    <div className="flex items-center gap-1 group relative">
+      <span className={`inline-block w-4 h-1 rounded ${color}`}></span>
+      <span className="text-xs">{normalizedScore}%</span>
+      
+      {/* Tooltip showing confidence explanation */}
+      <div className="absolute bottom-full right-0 mb-2 p-2 bg-gray-800 text-white text-xs rounded 
+                    opacity-0 group-hover:opacity-100 transition-opacity w-48 z-10 pointer-events-none shadow-lg">
+        <p className="font-medium">{label} confidence</p>
+        <p className="text-gray-300 text-[10px] mt-1">
+          {normalizedScore === 100 
+            ? 'Verified by user' 
+            : `AI detection with ${label.toLowerCase()} confidence`}
+        </p>
+        {normalizedScore < 100 && (
+          <p className="text-gray-300 text-[10px] mt-1">Edit this field to verify.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
+  // State for confidence scores using ReceiptConfidence type
+  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence || defaultConfidence);
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
   const [showProcessLogs, setShowProcessLogs] = useState(false);
   const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const queryClient = useQueryClient();
   
   // Define available expense categories
@@ -48,7 +126,57 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   
   useEffect(() => {
     setEditedReceipt(receipt);
+    // Initialize/Update editedConfidence when receipt changes
+    setEditedConfidence(receipt.confidence || defaultConfidence);
+    setProcessingStatus(receipt.processing_status || null);
   }, [receipt]);
+  
+  // Subscribe to real-time updates for the receipt processing status
+  useEffect(() => {
+    if (!receipt.id) return;
+    
+    const statusChannel = supabase.channel(`receipt-status-${receipt.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'receipts',
+          filter: `id=eq.${receipt.id}`
+        },
+        (payload) => {
+          console.log('Receipt status update in viewer:', payload.new);
+          const newStatus = payload.new.processing_status as ProcessingStatus;
+          const newError = payload.new.processing_error;
+          // Get potential confidence update from confidence_scores table via relation/trigger or separate fetch
+          // Assuming confidence is not directly on the receipts table payload
+          // const newConfidence = payload.new.confidence as ConfidenceScore;
+
+          setProcessingStatus(newStatus);
+          // Update confidence if it changed (e.g., after reprocessing)
+          // This might require re-fetching the receipt data which includes confidence
+          // if (!newConfidence) {
+          //   // Potentially refetch to get latest confidence
+          // } else {
+          //   setEditedConfidence(prev => ({ ...defaultConfidence, ...newConfidence, receipt_id: receipt.id, id: newConfidence.id || prev.id }));
+          // }
+
+          if (newError) {
+            toast.error(`Processing error: ${newError}`);
+          } else if (newStatus === 'complete') {
+            toast.success("Receipt processed successfully!");
+            // Refresh data - this will also re-run the first useEffect to update confidence
+            queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+          }
+        }
+      )
+      .subscribe();
+    
+    // Clean up the subscription when component unmounts
+    return () => {
+      statusChannel.unsubscribe();
+    };
+  }, [receipt.id, queryClient]);
   
   // Add useEffect to check if image loads properly
   useEffect(() => {
@@ -71,6 +199,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   }, [receipt.image_url]);
   
   const updateMutation = useMutation({
+    // Update mutation only handles the 'receipts' table update
     mutationFn: () => updateReceipt(
       receipt.id,
       {
@@ -81,17 +210,73 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         currency: editedReceipt.currency,
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
-        status: "reviewed"
+        status: "reviewed",
       },
       editedReceipt.lineItems?.map(item => ({
         description: item.description,
         amount: item.amount
       }))
     ),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Save confidence scores separately after receipt update succeeds
+      try {
+        // Create a new confidence record or update existing one
+        const { data: existingConfidence, error: fetchError } = await supabase
+          .from('confidence_scores')
+          .select('id')
+          .eq('receipt_id', receipt.id)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error("Error fetching existing confidence:", fetchError);
+        }
+
+        const confidenceToSave: any = {
+          receipt_id: receipt.id,
+          merchant: editedConfidence.merchant || 0,
+          date: editedConfidence.date || 0,
+          total: editedConfidence.total || 0,
+          tax: editedConfidence.tax || 0,
+          payment_method: editedConfidence.payment_method || 0,
+          line_items: editedConfidence.line_items || 0,
+        };
+
+        if (existingConfidence?.id) {
+          // Update existing record
+          const { error: updateError } = await supabase
+            .from('confidence_scores')
+            .update(confidenceToSave)
+            .eq('id', existingConfidence.id);
+
+          if (updateError) {
+            console.error("Error updating confidence scores:", updateError);
+            toast.error("Failed to update confidence scores.");
+          }
+        } else {
+          // Insert new record
+          const { error: insertError } = await supabase
+            .from('confidence_scores')
+            .insert(confidenceToSave);
+
+          if (insertError) {
+            console.error("Error inserting confidence scores:", insertError);
+            toast.error("Failed to save confidence scores.");
+          }
+        }
+      } catch (error) {
+        console.error("Exception saving confidence scores:", error);
+        toast.error("An error occurred while saving confidence scores.");
+      }
+
+      // Invalidate queries to refetch data including updated confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       toast.success("Receipt updated successfully!");
+
+      // If the receipt was in a failed state, try to mark it as fixed
+      if (processingStatus === 'failed_ocr' || processingStatus === 'failed_ai') {
+        fixProcessingStatus(receipt.id);
+      }
     },
     onError: (error) => {
       console.error("Failed to update receipt:", error);
@@ -103,25 +288,9 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     mutationFn: () => processReceiptWithOCR(receipt.id),
     onSuccess: (data) => {
       if (data) {
+        // Invalidate query, the useEffect hook will handle state update
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
         toast.success("Receipt processed successfully!");
-        
-        setEditedReceipt(prev => ({
-          ...prev,
-          merchant: data.merchant || prev.merchant,
-          date: data.date || prev.date,
-          total: data.total || prev.total,
-          tax: data.tax || prev.tax,
-          payment_method: data.payment_method || prev.payment_method,
-          lineItems: data.line_items?.map(item => ({
-            id: `temp-${Date.now()}-${Math.random()}`,
-            receipt_id: receipt.id,
-            description: item.description,
-            amount: item.amount,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })) || prev.lineItems
-        }));
       }
     },
     onError: (error) => {
@@ -130,11 +299,12 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     }
   });
   
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount?: number | null) => {
+    // Use editedReceipt for currency preference if available
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: receipt.currency || 'MYR',
-    }).format(amount);
+      currency: editedReceipt.currency || 'MYR',
+    }).format(amount || 0); // Handle potential null/undefined amount
   };
   
   const handleZoomIn = () => {
@@ -149,49 +319,48 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     setRotation(prev => (prev + 90) % 360);
   };
   
-  const getConfidenceColor = (value?: number) => {
-    if (value === undefined || value === null) return "bg-gray-300";
-    
-    // Convert decimal (0.0-1.0) to percentage (0-100) if needed
-    const percentage = value <= 1 ? value * 100 : value;
-    
-    if (percentage >= 80) return "bg-green-500";
-    if (percentage >= 60) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-  
   const handleInputChange = (field: string, value: string | number) => {
     setEditedReceipt(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Update confidence scores in real-time when user edits a field
-    // This simulates confidence based on user verification
-    if (receipt.confidence) {
-      const updatedConfidence = { ...receipt.confidence };
+    // Update confidence scores in state when user edits a field
+    // Check if the field is a valid field on our ReceiptConfidence type
+    if (field in defaultConfidence) {
+      setEditedConfidence(prev => ({
+        ...prev,
+        [field]: 100 // Set confidence to 100%
+      }));
       
-      // Set confidence to 100% for manually edited fields
-      if (field in updatedConfidence) {
-        updatedConfidence[field as keyof typeof updatedConfidence] = 100;
-        
-        // Update receipt object with new confidence scores
-        receipt.confidence = updatedConfidence;
-      }
+      // Show visual feedback that the field has been verified
+      toast.success(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} verified`, {
+        duration: 1500,
+        position: 'bottom-right',
+        icon: '✓'
+      });
     }
   };
   
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
     const updatedLineItems = [...(editedReceipt.lineItems || [])];
-    updatedLineItems[index] = {
-      ...updatedLineItems[index],
-      [field]: value
-    };
-    
-    setEditedReceipt(prev => ({
-      ...prev,
-      lineItems: updatedLineItems
-    }));
+    // Ensure the item exists before updating
+    if(updatedLineItems[index]) {
+        updatedLineItems[index] = {
+        ...updatedLineItems[index],
+        [field]: value
+      };
+
+      setEditedReceipt(prev => ({
+        ...prev,
+        lineItems: updatedLineItems
+      }));
+      // Optionally set line_items confidence to 100 if any item is edited
+      setEditedConfidence(prev => ({
+        ...prev,
+        line_items: 100
+      }));
+    }
   };
   
   const handleSaveChanges = () => {
@@ -200,7 +369,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   
   const handleAddLineItem = () => {
     const newLineItem: ReceiptLineItem = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${Date.now()}-${Math.random()}`, // Use random for better temp key
       receipt_id: receipt.id,
       description: "New item",
       amount: 0,
@@ -212,6 +381,11 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       ...prev,
       lineItems: [...(prev.lineItems || []), newLineItem]
     }));
+     // Set line_items confidence to 100 when adding items
+    setEditedConfidence(prev => ({
+      ...prev,
+      line_items: 100
+    }));
   };
   
   const handleRemoveLineItem = (index: number) => {
@@ -221,6 +395,11 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     setEditedReceipt(prev => ({
       ...prev,
       lineItems: updatedLineItems
+    }));
+     // Set line_items confidence to 100 when removing items
+    setEditedConfidence(prev => ({
+      ...prev,
+      line_items: 100
     }));
   };
   
@@ -237,9 +416,28 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   };
   
   const handleReprocessReceipt = () => {
-    setIsProcessing(true);
+    if (isProcessing) return; // Prevent multiple simultaneous processing
+    
+    setIsProcessing(true); // Show loading state in confidence indicators
+    
+    // First set processing status to indicate starting OCR
+    setProcessingStatus('processing_ocr');
+    
+    // Reset confidence scores temporarily to show loading state
+    setEditedConfidence(prev => ({
+      ...prev,
+      merchant: 50,
+      date: 50,
+      total: 50,
+      tax: 50,
+      payment_method: 50,
+      line_items: 50
+    }));
+    
+    // Call the reprocess mutation
     reprocessMutation.mutate(undefined, {
       onSettled: () => {
+        // Whether success or error, we're no longer processing
         setIsProcessing(false);
       }
     });
@@ -444,28 +642,43 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       [field]: value
     }));
     
+    // Also update confidence to 100% when accepting AI suggestion  
+    if (field in defaultConfidence) {
+      setEditedConfidence(prev => ({
+        ...prev,
+        [field]: 100
+      }));
+    }
+
     toast.success(`Applied AI suggestion for ${field}`);
   };
   
   // Check if we have AI suggestions for a field
   const hasSuggestion = (field: string): boolean => {
-    return !!(receipt.ai_suggestions && receipt.ai_suggestions[field]);
+    // Check specifically for the field in the suggestions object
+    // Need to refine this check based on actual AISuggestions structure
+    return !!(receipt.ai_suggestions && receipt.ai_suggestions[field as keyof AISuggestions]);
   };
   
   // Get suggestion for a field
   const getSuggestion = (field: string): string | number | null => {
     if (!receipt.ai_suggestions) return null;
-    return receipt.ai_suggestions[field] || null;
+    // Use keyof AISuggestions for type safety if structure is known
+    return receipt.ai_suggestions[field as keyof AISuggestions] || null;
   };
   
   // Get suggestion confidence for a field
   const getSuggestionConfidence = (field: string): number => {
-    if (!receipt.ai_suggestions || 
-        !receipt.ai_suggestions.confidence || 
+    // Confidence for suggestions might be structured differently, adjust as needed
+    if (!receipt.ai_suggestions ||
+        !receipt.ai_suggestions.confidence ||
         !receipt.ai_suggestions.confidence.suggestions) {
       return 0;
     }
-    return receipt.ai_suggestions.confidence.suggestions[field] || 0;
+    // Use keyof ConfidenceScore for type safety if suggestions map to these fields
+    const suggestionField = field as keyof ConfidenceScore; // Adjust if suggestion keys differ
+    // Assuming suggestions confidence structure matches ConfidenceScore fields
+    return normalizeConfidence(receipt.ai_suggestions.confidence.suggestions[suggestionField]);
   };
   
   // Render a suggestion badge with acceptance button if available
@@ -475,7 +688,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     const suggestion = getSuggestion(field);
     const confidence = getSuggestionConfidence(field);
     
-    if (!suggestion) return null;
+    // Only render if there is a suggestion value
+    if (suggestion === null || suggestion === undefined || suggestion === '') return null;
     
     return (
       <div className="mt-1 flex items-center gap-2">
@@ -489,6 +703,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         >
           <Sparkles size={12} />
           <span>Suggested {label}: {suggestion.toString()}</span>
+          <span className="text-xs opacity-70">({confidence}%)</span> {/* Show suggestion confidence */}
         </Badge>
         <Button 
           variant="ghost" 
@@ -509,6 +724,73 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       ...prev,
       predicted_category: value
     }));
+     // Category confidence is not directly part of ConfidenceScore, handle separately if needed
+    // setEditedConfidence(prev => ({
+    //   ...prev,
+    //   predicted_category: 100 // This field might not exist on ConfidenceScore type
+    // }));
+  };
+
+  // Add helper to render processing status indicator
+  const renderProcessingStatus = () => {
+    // Use processingStatus state, not receipt.processing_status
+    const currentStatus = processingStatus;
+
+    // Don't render anything if complete
+    if (!currentStatus || currentStatus === 'complete') return null;
+
+    let statusText = 'Processing...';
+    let icon = <Loader2 className="h-4 w-4 animate-spin mr-2" />;
+    let colorClass = 'bg-blue-500';
+    
+    switch (currentStatus) {
+      case 'uploading':
+        statusText = 'Uploading...';
+        colorClass = 'bg-blue-500';
+        break;
+      case 'uploaded':
+        statusText = 'Preparing for OCR...';
+        colorClass = 'bg-indigo-500';
+        break;
+      case 'processing_ocr':
+        statusText = 'Running OCR...';
+        colorClass = 'bg-violet-500';
+        break;
+      case 'processing_ai':
+        statusText = 'AI Analysis...';
+        colorClass = 'bg-purple-500';
+        break;
+      case 'failed_ocr':
+        statusText = 'OCR Failed';
+        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+        colorClass = 'bg-red-500';
+        break;
+      case 'failed_ai':
+        statusText = 'AI Analysis Failed';
+        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+        colorClass = 'bg-red-500';
+        break;
+    }
+    
+    return (
+      <div className="mb-4 flex items-center gap-2">
+        <Badge variant="outline" className={`text-white ${colorClass} flex items-center`}>
+          {icon}
+          {statusText}
+        </Badge>
+        {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="h-7"
+            onClick={() => fixProcessingStatus(receipt.id)}
+          >
+            <Check className="h-3.5 w-3.5 mr-1" />
+            Mark as fixed
+          </Button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -517,18 +799,34 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4 }}
-        className="glass-card p-4 overflow-hidden"
+        className="glass-card p-4 overflow-hidden flex flex-col" // Use flex column
       >
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-start mb-3"> {/* items-start */}
           <h3 className="font-medium">Receipt Image</h3>
+           {/* Moved status indicator to here */}
+           {renderProcessingStatus()}
         </div>
         
-        <div className="overflow-hidden h-[500px] rounded-lg relative bg-secondary/30">
+        <div className="overflow-hidden h-[500px] rounded-lg relative bg-secondary/30 flex-shrink-0"> {/* Added flex-shrink-0 */}
+          {processingStatus && !['complete', 'failed_ocr', 'failed_ai'].includes(processingStatus) && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
+              <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
+                <Loader2 size={40} className="animate-spin mb-2" />
+                <span className="text-lg font-medium">
+                  {processingStatus === 'uploading' && 'Uploading Receipt...'}
+                  {processingStatus === 'uploaded' && 'Preparing for OCR...'}
+                  {processingStatus === 'processing_ocr' && 'Running OCR...'}
+                  {processingStatus === 'processing_ai' && 'AI Analysis...'}
+                </span>
+              </div>
+            </div>
+          )}
+          
           {receipt.image_url && !imageError ? (
             <div className="w-full h-full">
               <ReactPanZoom
                 image={getFormattedImageUrl(receipt.image_url)}
-                alt={`Receipt from ${receipt.merchant}`}
+                alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`} // Use editedReceipt and provide fallback
               />
             </div>
           ) : (
@@ -554,12 +852,14 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
           )}
         </div>
         
-        <div className="mt-4">
-          <Button 
-            variant="outline" 
-            className="w-full gap-2" 
+        {/* Controls and Logs section */}
+        <div className="mt-4 flex-grow flex flex-col gap-4"> {/* Added flex-grow */}
+          <Button
+            variant="outline"
+            className="w-full gap-2"
             onClick={handleReprocessReceipt}
-            disabled={isProcessing || !receipt.image_url}
+            // Disable if processing, no image, or already complete/failed (user should save changes first or mark as fixed)
+            disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed_ocr', 'failed_ai', 'complete'].includes(processingStatus))}
           >
             {isProcessing ? (
               <>
@@ -573,20 +873,20 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               </>
             )}
           </Button>
-          
-          <div className="mt-4 flex items-center justify-between">
+
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <BarChart2 size={16} className="text-muted-foreground" />
               <span className="text-sm">Processing Logs</span>
             </div>
-            <Switch 
+            <Switch
               checked={showProcessLogs}
               onCheckedChange={handleToggleProcessLogs}
             />
           </div>
-          
+
           {showProcessLogs && (
-            <ScrollArea className="mt-2 h-[200px] rounded-md border">
+            <ScrollArea className="h-[200px] rounded-md border flex-shrink-0"> {/* Added flex-shrink-0 */}
               {processLogs.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   No processing logs available
@@ -617,9 +917,9 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               )}
             </ScrollArea>
           )}
-          
+
           {receipt.fullText && (
-            <div className="mt-4">
+            <div className="mt-auto"> {/* Push Raw Text to bottom */}
               <Button
                 variant="secondary"
                 className="w-full"
@@ -627,15 +927,15 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               >
                 {showFullTextData ? "Hide Raw OCR Text" : "Show Raw OCR Text"}
               </Button>
-              
+
               {showFullTextData && (
-                <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                  {receipt.fullText}
-                </div>
+                <ScrollArea className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] whitespace-pre-wrap"> {/* Max height */}
+                    {receipt.fullText}
+                </ScrollArea>
               )}
             </div>
           )}
-          
+
         </div>
       </motion.div>
       
@@ -643,245 +943,265 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="glass-card p-4"
+        className="glass-card p-4 flex flex-col" // Use flex column
       >
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-shrink-0"> {/* Added flex-shrink-0 */}
           <h3 className="font-medium">Receipt Details</h3>
-          <Button 
-            onClick={handleSyncToZoho} 
+          <Button
+            onClick={handleSyncToZoho}
             className="gap-2"
-            disabled={receipt.status === "synced"}
+            disabled={editedReceipt.status === "synced"} // Use editedReceipt status
           >
             <Send size={16} />
-            {receipt.status === "synced" ? "Synced to Zoho" : "Sync to Zoho"}
+            {editedReceipt.status === "synced" ? "Synced to Zoho" : "Sync to Zoho"}
           </Button>
         </div>
-        
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label htmlFor="merchant">Merchant</Label>
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">Confidence:</span>
-                <span className={`inline-block w-4 h-1 rounded ${getConfidenceColor(receipt.confidence?.merchant)}`}></span>
-                <span className="text-xs">{receipt.confidence?.merchant || 0}%</span>
-              </div>
-            </div>
-            <Input
-              id="merchant"
-              value={editedReceipt.merchant || ""}
-              onChange={(e) => handleInputChange('merchant', e.target.value)}
-              className="bg-background/50"
-            />
-            {renderSuggestion('merchant', 'merchant name')}
+
+        {/* Display Processing Time */}
+        {editedReceipt.processing_time !== undefined && editedReceipt.processing_time !== null && editedReceipt.processing_time > 0 && (
+          <div className="text-sm text-muted-foreground mb-4 flex-shrink-0"> {/* Added flex-shrink-0 */}
+            Processing Time: {editedReceipt.processing_time.toFixed(2)} seconds
           </div>
-          
-          {/* Add Category Selector */}
-          <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Select 
-              value={editedReceipt.predicted_category || ""} 
-              onValueChange={handleCategoryChange}
-            >
-              <SelectTrigger id="category" className="bg-background/50">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {expenseCategories.map(category => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* Optional: Add suggestion rendering for category if Gemini provides it */}
-            {/* {renderSuggestion('predicted_category', 'category')} */}
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="date">Date</Label>
-                <div className="flex items-center gap-1">
-                  <span className={`inline-block w-4 h-1 rounded ${getConfidenceColor(receipt.confidence?.date)}`}></span>
-                  <span className="text-xs">{receipt.confidence?.date || 0}%</span>
+        )}
+
+        {/* Scrollable Form Area */}
+        <ScrollArea className="flex-grow pr-3"> {/* Added flex-grow */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="merchant">Merchant</Label>
+                  {/* Use ConfidenceIndicator with loading state */}
+                  <ConfidenceIndicator score={editedConfidence?.merchant} loading={isProcessing} />
                 </div>
-              </div>
-              <div className="relative">
                 <Input
-                  id="date"
-                  type="date"
-                  value={typeof editedReceipt.date === 'string' ? editedReceipt.date.split('T')[0] : editedReceipt.date || ""}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  className="bg-background/50 pl-9"
+                  id="merchant"
+                  value={editedReceipt.merchant || ""}
+                  onChange={(e) => handleInputChange('merchant', e.target.value)}
+                  className="bg-background/50"
                 />
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                {renderSuggestion('merchant', 'merchant name')}
               </div>
-              {renderSuggestion('date', 'date')}
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="total">Total Amount</Label>
-                <div className="flex items-center gap-1">
-                  <span className={`inline-block w-4 h-1 rounded ${getConfidenceColor(receipt.confidence?.total)}`}></span>
-                  <span className="text-xs">{receipt.confidence?.total || 0}%</span>
-                </div>
+
+              {/* Add Category Selector */}
+              <div className="space-y-2">
+                 <div className="flex justify-between">
+                   <Label htmlFor="category">Category</Label>
+                    {/* Category confidence might not be tracked in ConfidenceScore table directly */}
+                    {/* <ConfidenceIndicator score={editedConfidence?.predicted_category} /> */}
+                 </div>
+                <Select
+                  value={editedReceipt.predicted_category || ""}
+                  onValueChange={handleCategoryChange}
+                >
+                  <SelectTrigger id="category" className="bg-background/50">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Render suggestion for category */}
+                {renderSuggestion('predicted_category', 'category')}
               </div>
-              <div className="relative">
-                <Input
-                  id="total"
-                  type="number"
-                  step="0.01"
-                  value={editedReceipt.total || 0}
-                  onChange={(e) => handleInputChange('total', parseFloat(e.target.value))}
-                  className="bg-background/50 pl-9"
-                />
-                <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
-              </div>
-              {renderSuggestion('total', 'amount')}
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="currency">Currency</Label>
-              </div>
-              <Input
-                id="currency"
-                value={editedReceipt.currency || "MYR"}
-                onChange={(e) => handleInputChange('currency', e.target.value)}
-                className="bg-background/50"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="paymentMethod">Payment Method</Label>
-                <div className="flex items-center gap-1">
-                  <span className={`inline-block w-4 h-1 rounded ${getConfidenceColor(receipt.confidence?.payment_method)}`}></span>
-                  <span className="text-xs">{receipt.confidence?.payment_method || 0}%</span>
-                </div>
-              </div>
-              <div className="relative">
-                <Input
-                  id="paymentMethod"
-                  value={editedReceipt.payment_method || ""}
-                  onChange={(e) => handleInputChange('payment_method', e.target.value)}
-                  className="bg-background/50 pl-9"
-                />
-                <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Label>Line Items</Label>
-                <div className="flex items-center gap-1">
-                  <span className={`inline-block w-4 h-1 rounded ${getConfidenceColor(receipt.confidence?.line_items)}`}></span>
-                  <span className="text-xs">{receipt.confidence?.line_items || 0}%</span>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1 h-7"
-                onClick={handleAddLineItem}
-              >
-                <Plus size={14} />
-                Add Item
-              </Button>
-            </div>
-            
-            <Card className="bg-background/50 border border-border/50">
-              <div className="p-3 max-h-[200px] overflow-y-auto space-y-2">
-                {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
-                  editedReceipt.lineItems.map((item, index) => (
-                    <div 
-                      key={item.id}
-                      className="flex justify-between items-center py-2 border-b border-border/50 last:border-0"
-                    >
-                      <Input
-                        value={item.description}
-                        onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
-                        className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm flex-1 mr-2"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.amount}
-                          onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value))}
-                          className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right w-24"
-                        />
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemoveLineItem(index)}
-                        >
-                          <Minus size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-6 text-center text-muted-foreground">
-                    <Receipt size={24} className="mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">No line items detected</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="date">Date</Label>
+                    {/* Use ConfidenceIndicator with loading state */}
+                     <ConfidenceIndicator score={editedConfidence?.date} loading={isProcessing} />
                   </div>
-                )}
+                  <div className="relative">
+                    <Input
+                      id="date"
+                      type="date"
+                      // Handle potential non-string date values safely
+                      value={typeof editedReceipt.date === 'string' ? editedReceipt.date.split('T')[0] : ''}
+                      onChange={(e) => handleInputChange('date', e.target.value)}
+                      className="bg-background/50 pl-9"
+                    />
+                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                  </div>
+                  {renderSuggestion('date', 'date')}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="total">Total Amount</Label>
+                     {/* Use ConfidenceIndicator with loading state */}
+                     <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="total"
+                      type="number"
+                      step="0.01"
+                      value={editedReceipt.total || 0}
+                      onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)} // Ensure value is number
+                      className="bg-background/50 pl-9"
+                    />
+                    <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                  </div>
+                  {renderSuggestion('total', 'total amount')}
+                </div>
               </div>
-            </Card>
-          </div>
-          
-          <div className="pt-4 border-t border-border/50">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Subtotal:</span>
-              <span>{formatCurrency(editedReceipt.total - (editedReceipt.tax || 0))}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm mt-1">
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Tax:</span>
-                <span className={`inline-block w-2 h-1 rounded ${getConfidenceColor(receipt.confidence?.tax)}`}></span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="currency">Currency</Label>
+                     {/* Currency confidence might not be tracked in ConfidenceScore table directly */}
+                     {/* <ConfidenceIndicator score={editedConfidence?.currency} /> */}
+                  </div>
+                  <Input
+                    id="currency"
+                    value={editedReceipt.currency || "MYR"}
+                    onChange={(e) => handleInputChange('currency', e.target.value)}
+                    className="bg-background/50"
+                  />
+                   {renderSuggestion('currency', 'currency')}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                     {/* Use ConfidenceIndicator with loading state */}
+                     <ConfidenceIndicator score={editedConfidence?.payment_method} loading={isProcessing} />
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="paymentMethod"
+                      value={editedReceipt.payment_method || ""}
+                      onChange={(e) => handleInputChange('payment_method', e.target.value)}
+                      className="bg-background/50 pl-9"
+                    />
+                    <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                  </div>
+                   {renderSuggestion('payment_method', 'payment method')}
+                </div>
               </div>
-              <div className="relative w-24">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editedReceipt.tax || 0}
-                  onChange={(e) => handleInputChange('tax', parseFloat(e.target.value))}
-                  className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
-                />
+
+              {/* Line Items Section */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Label>Line Items</Label>
+                     {/* Use ConfidenceIndicator with loading state */}
+                     <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 h-7"
+                    onClick={handleAddLineItem}
+                  >
+                    <Plus size={14} />
+                    Add Item
+                  </Button>
+                </div>
+
+                <Card className="bg-background/50 border border-border/50">
+                  <ScrollArea className="p-3 max-h-[180px]"> {/* Adjusted max height */}
+                    <div className="space-y-2">
+                        {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
+                        editedReceipt.lineItems.map((item, index) => (
+                            <div
+                            key={item.id || `temp-${index}`} // Use index as fallback key for unsaved items
+                            className="flex justify-between items-center py-2 border-b border-border/50 last:border-0"
+                            >
+                            <Input
+                                value={item.description || ""}
+                                onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
+                                className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm flex-1 mr-2"
+                                placeholder="Item description"
+                            />
+                            <div className="flex items-center gap-2">
+                                <Input
+                                type="number"
+                                step="0.01"
+                                value={item.amount || 0}
+                                onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value) || 0)} // Ensure value is number
+                                className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right w-24"
+                                placeholder="Amount"
+                                />
+                                <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleRemoveLineItem(index)}
+                                >
+                                <Minus size={14} />
+                                </Button>
+                            </div>
+                            </div>
+                        ))
+                        ) : (
+                        <div className="py-6 text-center text-muted-foreground">
+                            <Receipt size={24} className="mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">No line items detected</p>
+                        </div>
+                        )}
+                    </div>
+                  </ScrollArea>
+                </Card>
+              </div>
+
+              {/* Totals Section */}
+              <div className="pt-4 border-t border-border/50">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  {/* Calculate subtotal dynamically */}
+                  <span>{formatCurrency((editedReceipt.total || 0) - (editedReceipt.tax || 0))}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mt-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Tax:</span>
+                     {/* Use ConfidenceIndicator with loading state */}
+                     <ConfidenceIndicator score={editedConfidence?.tax} loading={isProcessing} />
+                  </div>
+                  <div className="relative w-24">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editedReceipt.tax || 0}
+                      onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)} // Ensure value is number
+                      className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
+                      placeholder="Tax"
+                    />
+                  </div>
+                   {renderSuggestion('tax', 'tax amount')}
+                </div>
+                <Separator className="my-2" />
+                <div className="flex justify-between items-center font-semibold mt-2">
+                  <span>Total:</span>
+                  <span>{formatCurrency(editedReceipt.total || 0)}</span> {/* Ensure total has default value */}
+                </div>
               </div>
             </div>
-            <div className="flex justify-between items-center font-semibold mt-2">
-              <span>Total:</span>
-              <span>{formatCurrency(editedReceipt.total || 0)}</span>
-            </div>
-          </div>
-          
-          <div className="pt-4 flex justify-between">
-            <Button variant="outline" className="gap-2">
-              <History size={16} />
-              View History
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={handleSaveChanges}
-              disabled={updateMutation.isPending}
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : "Save Changes"}
-            </Button>
-          </div>
+        </ScrollArea>
+
+        {/* Action Buttons */}
+        <div className="pt-4 mt-auto flex justify-between flex-shrink-0"> {/* Added mt-auto and flex-shrink-0 */}
+          <Button variant="outline" className="gap-2">
+            <History size={16} />
+            View History
+          </Button>
+          <Button
+            variant="default"
+            onClick={handleSaveChanges}
+            disabled={updateMutation.isPending}
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 size={16} className="mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : "Save Changes"}
+          </Button>
         </div>
       </motion.div>
     </div>
