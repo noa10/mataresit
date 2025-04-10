@@ -21,12 +21,12 @@ const AVAILABLE_MODELS = {
     supportsVision: true,
     description: 'More accurate but slower than Flash'
   },
-  'claude-3-5-sonnet': {
-    id: 'claude-3-5-sonnet',
-    name: 'Claude 3.5 Sonnet',
+  'gemini-2.0-flash-lite': {
+    id: 'gemini-2.0-flash-lite',
+    name: 'Gemini 2.0 Flash Lite',
     supportsText: true,
-    supportsVision: false,
-    description: 'Text only, high accuracy'
+    supportsVision: true,
+    description: 'Newest fast model, supports text & vision'
   }
 };
 
@@ -44,7 +44,7 @@ export function ReceiptProcessingOptions({
   onModelChange,
   onCompareChange,
   defaultMethod = 'ocr-ai',
-  defaultModel = 'gemini-1.5-flash',
+  defaultModel = 'gemini-2.0-flash-lite',
   defaultCompare = false
 }: ReceiptProcessingOptionsProps) {
   const [method, setMethod] = useState<'ocr-ai' | 'ai-vision'>(defaultMethod);
@@ -88,7 +88,8 @@ export function ReceiptProcessingOptions({
           onMethodChange(value);
           
           // Reset model to a default that supports the selected method
-          const defaultForMethod = value === 'ocr-ai' ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
+          // Default to the new flash model as it supports both text and vision
+          const defaultForMethod = 'gemini-2.0-flash-lite';
           setSelectedModel(defaultForMethod);
           onModelChange(defaultForMethod);
         }}

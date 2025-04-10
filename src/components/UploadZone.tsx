@@ -42,7 +42,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
   // AI processing options
   const [processingMethod, setProcessingMethod] = useState<'ocr-ai' | 'ai-vision'>('ocr-ai');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-1.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.0-flash-lite');
   const [compareWithAlternative, setCompareWithAlternative] = useState<boolean>(false);
   
   const {
