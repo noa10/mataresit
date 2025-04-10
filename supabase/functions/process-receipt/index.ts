@@ -22,25 +22,243 @@ const textractClient = new TextractClient({
 })
 
 // Main function to process receipt image and extract data
-async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, receiptId: string) {
+async function processReceiptImage(
+  imageBytes: Uint8Array, 
+  imageUrl: string, 
+  receiptId: string,
+  primaryMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai',
+  modelId: string = '',
+  compareWithAlternative: boolean = false
+) {
   const logger = new ProcessingLogger(receiptId);
   const startTime = performance.now(); // Record start time
   let processingTime = 0;
   
   try {
+    // Initialize results for primary and alternative methods
+    let primaryResult: any = null;
+    let alternativeResult: any = null;
+    let discrepancies: any[] = [];
+    let modelUsed = '';
+    
+    // Process with primary method
+    if (primaryMethod === 'ocr-ai') {
+      // OCR + AI method
+      await logger.log("Using OCR + AI as primary method", "METHOD");
+      
+      // Step 1: Perform OCR with Amazon Textract
     await logger.log("Starting OCR processing with Amazon Textract", "OCR");
     console.log("Calling Amazon Textract for OCR processing...");
     
     // Call Amazon Textract to analyze the expense document (receipt/invoice)
     const command = new AnalyzeExpenseCommand({
       Document: { Bytes: imageBytes },
-    })
+      });
     
-    const response = await textractClient.send(command)
+      const response = await textractClient.send(command);
     console.log("Received response from Amazon Textract");
     await logger.log("Amazon Textract analysis complete", "OCR");
     
-    // Extract structured data from the Textract response
+      // Step 2: Extract structured data from Textract response
+      const textractResult = extractTextractData(response, logger);
+      
+      // Step 3: Enhance with selected AI model
+      await logger.log("Starting AI enhancement of OCR data", "AI");
+      console.log("Calling AI to enhance OCR data...");
+      
+      try {
+        const enhanceResponse = await fetch(
+          "http://localhost:54321/functions/v1/enhance-receipt-data",
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              textractData: textractResult,
+              fullText: textractResult.fullText,
+              receiptId: receiptId,
+              modelId: modelId
+            }),
+          }
+        );
+        
+        if (enhanceResponse.ok) {
+          const enhancedData = await enhanceResponse.json();
+          console.log("Received enhanced data from AI:", enhancedData);
+          await logger.log("AI enhancement complete", "AI");
+          
+          // Update results with AI enhanced data
+          primaryResult = mergeTextractAndAIData(textractResult, enhancedData.result);
+          modelUsed = enhancedData.model_used;
+        } else {
+          console.error("Error calling AI enhancement:", await enhanceResponse.text());
+          await logger.log("AI enhancement failed", "AI");
+          // Continue with Textract data only
+          primaryResult = textractResult;
+        }
+      } catch (enhanceError) {
+        console.error("Error during AI enhancement:", enhanceError);
+        await logger.log(`AI error: ${enhanceError.message}`, "ERROR");
+        // Continue with Textract data only
+        primaryResult = textractResult;
+      }
+    } else {
+      // AI Vision method - send image directly to AI
+      await logger.log("Using AI Vision as primary method", "METHOD");
+      console.log("Calling AI Vision for direct image processing...");
+      
+      try {
+        const visionResponse = await fetch(
+          "http://localhost:54321/functions/v1/enhance-receipt-data",
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imageData: {
+                data: Array.from(imageBytes),
+                mimeType: 'image/jpeg' // Assuming JPEG format, could be determined from the URL
+              },
+              receiptId: receiptId,
+              modelId: modelId
+            }),
+          }
+        );
+        
+        if (visionResponse.ok) {
+          const visionData = await visionResponse.json();
+          console.log("Received data from AI Vision:", visionData);
+          await logger.log("AI Vision processing complete", "AI");
+          
+          primaryResult = formatAIVisionResult(visionData.result);
+          modelUsed = visionData.model_used;
+        } else {
+          console.error("Error calling AI Vision:", await visionResponse.text());
+          await logger.log("AI Vision processing failed", "AI");
+          throw new Error("AI Vision processing failed");
+        }
+      } catch (visionError) {
+        console.error("Error during AI Vision processing:", visionError);
+        await logger.log(`AI Vision error: ${visionError.message}`, "ERROR");
+        throw visionError; // Rethrow since we don't have a fallback
+      }
+    }
+    
+    // If comparison is requested, process with alternative method
+    if (compareWithAlternative) {
+      await logger.log("Starting comparison with alternative method", "COMPARE");
+      
+      if (primaryMethod === 'ocr-ai') {
+        // Primary was OCR+AI, alternative is AI Vision
+        await logger.log("Using AI Vision as alternative method", "METHOD");
+        
+        try {
+          const visionResponse = await fetch(
+            "http://localhost:54321/functions/v1/enhance-receipt-data",
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                imageData: {
+                  data: Array.from(imageBytes),
+                  mimeType: 'image/jpeg'
+                },
+                receiptId: `${receiptId}-alt`, // Use different ID for logging
+                modelId: '' // Use default vision model
+              }),
+            }
+          );
+          
+          if (visionResponse.ok) {
+            const visionData = await visionResponse.json();
+            console.log("Received data from alternative AI Vision:", visionData);
+            await logger.log("Alternative AI Vision processing complete", "AI");
+            
+            alternativeResult = formatAIVisionResult(visionData.result);
+          }
+        } catch (altError) {
+          console.error("Error during alternative method:", altError);
+          await logger.log(`Alternative method error: ${altError.message}`, "ERROR");
+        }
+      } else {
+        // Primary was AI Vision, alternative is OCR+AI
+        await logger.log("Using OCR + AI as alternative method", "METHOD");
+        
+        try {
+          // Step 1: Perform OCR with Amazon Textract
+          const command = new AnalyzeExpenseCommand({
+            Document: { Bytes: imageBytes },
+          });
+          
+          const response = await textractClient.send(command);
+          
+          // Step 2: Extract structured data from Textract response
+          const textractResult = extractTextractData(response, logger);
+          
+          // Step 3: Enhance with default text model
+          const enhanceResponse = await fetch(
+            "http://localhost:54321/functions/v1/enhance-receipt-data",
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                textractData: textractResult,
+                fullText: textractResult.fullText,
+                receiptId: `${receiptId}-alt`, // Use different ID for logging
+                modelId: '' // Use default text model
+              }),
+            }
+          );
+          
+          if (enhanceResponse.ok) {
+            const enhancedData = await enhanceResponse.json();
+            await logger.log("Alternative OCR + AI processing complete", "AI");
+            
+            alternativeResult = mergeTextractAndAIData(textractResult, enhancedData.result);
+          }
+        } catch (altError) {
+          console.error("Error during alternative method:", altError);
+          await logger.log(`Alternative method error: ${altError.message}`, "ERROR");
+        }
+      }
+      
+      // Compare results and identify discrepancies if alternative method was successful
+      if (alternativeResult) {
+        discrepancies = findDiscrepancies(primaryResult, alternativeResult);
+        await logger.log(`Found ${discrepancies.length} discrepancies between methods`, "COMPARE");
+      }
+    }
+    
+    const endTime = performance.now(); // Record end time
+    processingTime = (endTime - startTime) / 1000; // Calculate duration in seconds
+    
+    await logger.log(`Processing complete in ${processingTime.toFixed(2)} seconds`, "COMPLETE");
+    
+    // Include processing time and comparison results in the result
+    return { 
+      ...primaryResult, 
+      processing_time: processingTime,
+      alternativeResult: alternativeResult,
+      discrepancies: discrepancies,
+      modelUsed: modelUsed,
+      primaryMethod: primaryMethod
+    };
+  } catch (error) {
+    console.error('Error processing receipt:', error);
+    await logger.log(`Error processing receipt: ${error.message}`, "ERROR");
+    throw new Error(`Failed to process receipt image: ${error.message}`);
+  }
+}
+
+// Helper function to extract structured data from Textract response
+function extractTextractData(response: any, logger: ProcessingLogger) {
+  // Initialize the result structure
     const result = {
       merchant: '',
       date: '',
@@ -204,107 +422,147 @@ async function processReceiptImage(imageBytes: Uint8Array, imageUrl: string, rec
       result.fullText = fullText;
     }
     
-    await logger.log(`Extracted data: Merchant=${result.merchant}, Total=${result.total}, Items=${result.line_items.length}`, "EXTRACT");
-    
-    // NEW: Call Gemini AI to enhance the data
-    try {
-      await logger.log("Starting Gemini AI enhancement", "GEMINI");
-      console.log("Calling Gemini AI to enhance receipt data...");
-      
-      // Call the enhance-receipt-data function
-      const enhanceResponse = await fetch(
-        "http://localhost:54321/functions/v1/enhance-receipt-data",
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            textractData: result,
-            fullText: result.fullText,
-            receiptId: receiptId
-          }),
-        }
-      );
-      
-      if (enhanceResponse.ok) {
-        const enhancedData = await enhanceResponse.json();
-        console.log("Received enhanced data from Gemini:", enhancedData);
-        await logger.log("Gemini AI enhancement complete", "GEMINI");
-        
-        // Merge enhanced data with Textract data if enhancement was successful
-        if (enhancedData.success && enhancedData.result) {
+  return result;
+}
+
+// Merge Textract and AI enhanced data
+function mergeTextractAndAIData(textractData: any, enhancedData: any) {
+  const result = { ...textractData };
+  
           // Currency enhancement
-          if (enhancedData.result.currency) {
-            result.currency = enhancedData.result.currency;
-            await logger.log(`Currency detected: ${enhancedData.result.currency}`, "GEMINI");
+  if (enhancedData.currency) {
+    result.currency = enhancedData.currency;
           }
           
           // Payment method enhancement
-          if (enhancedData.result.payment_method) {
-            result.payment_method = enhancedData.result.payment_method;
-            await logger.log(`Payment method detected: ${enhancedData.result.payment_method}`, "GEMINI");
+  if (enhancedData.payment_method) {
+    result.payment_method = enhancedData.payment_method;
             
             // Update confidence score for payment method
-            if (enhancedData.result.confidence?.payment_method) {
-              result.confidence.payment_method = enhancedData.result.confidence.payment_method;
+    if (enhancedData.confidence?.payment_method) {
+      result.confidence.payment_method = enhancedData.confidence.payment_method;
             } else {
-              result.confidence.payment_method = 85; // Default high confidence for Gemini results
+      result.confidence.payment_method = 85; // Default high confidence for AI results
             }
           }
           
           // Category prediction
-          if (enhancedData.result.predicted_category) {
-            result.predicted_category = enhancedData.result.predicted_category;
-            await logger.log(`Category predicted: ${enhancedData.result.predicted_category}`, "GEMINI");
+  if (enhancedData.predicted_category) {
+    result.predicted_category = enhancedData.predicted_category;
           }
           
           // AI Suggestions
-          if (enhancedData.result.suggestions) {
-            result.ai_suggestions = enhancedData.result.suggestions;
-            await logger.log(`AI suggestions generated for ${Object.keys(enhancedData.result.suggestions).length} fields`, "GEMINI");
-          }
-          
-          // Other field enhancements if provided by Gemini
-          if (enhancedData.result.merchant && (!result.merchant || enhancedData.result.confidence?.merchant > result.confidence.merchant)) {
-            result.merchant = enhancedData.result.merchant;
-            await logger.log(`Merchant enhanced to: ${enhancedData.result.merchant}`, "GEMINI");
-            if (enhancedData.result.confidence?.merchant) {
-              result.confidence.merchant = enhancedData.result.confidence.merchant;
-            }
-          }
-          
-          if (enhancedData.result.total && (!result.total || enhancedData.result.confidence?.total > result.confidence.total)) {
-            result.total = enhancedData.result.total;
-            await logger.log(`Total enhanced to: ${enhancedData.result.total}`, "GEMINI");
-            if (enhancedData.result.confidence?.total) {
-              result.confidence.total = enhancedData.result.confidence.total;
-            }
-          }
-        }
-      } else {
-        console.error("Error calling Gemini enhancement:", await enhanceResponse.text());
-        await logger.log("Gemini AI enhancement failed", "GEMINI");
-        // Continue with Textract data only
-      }
-    } catch (enhanceError) {
-      console.error("Error during Gemini enhancement:", enhanceError);
-      await logger.log(`Gemini AI error: ${enhanceError.message}`, "ERROR");
-      // Continue with Textract data only
-    }
-    
-    const endTime = performance.now(); // Record end time
-    processingTime = (endTime - startTime) / 1000; // Calculate duration in seconds
-
-    await logger.log(`Processing complete in ${processingTime.toFixed(2)} seconds`, "COMPLETE");
-
-    // Include processing time in the result
-    return { ...result, processing_time: processingTime };
-  } catch (error) {
-    console.error('Error processing receipt with Textract:', error);
-    await logger.log(`Error processing receipt: ${error.message}`, "ERROR");
-    throw new Error(`Failed to process receipt image: ${error.message}`);
+  if (enhancedData.suggestions) {
+    result.ai_suggestions = enhancedData.suggestions;
   }
+  
+  // Other field enhancements if provided by AI
+  if (enhancedData.merchant && (!result.merchant || enhancedData.confidence?.merchant > result.confidence.merchant)) {
+    result.merchant = enhancedData.merchant;
+    if (enhancedData.confidence?.merchant) {
+      result.confidence.merchant = enhancedData.confidence.merchant;
+    }
+  }
+  
+  if (enhancedData.total && (!result.total || enhancedData.confidence?.total > result.confidence.total)) {
+    result.total = enhancedData.total;
+    if (enhancedData.confidence?.total) {
+      result.confidence.total = enhancedData.confidence.total;
+    }
+  }
+  
+  return result;
+}
+
+// Format the AI Vision result to match our expected structure
+function formatAIVisionResult(visionData: any) {
+  const result = {
+    merchant: visionData.merchant || '',
+    date: visionData.date || '',
+    total: parseFloat(visionData.total) || 0,
+    tax: parseFloat(visionData.tax) || 0,
+    payment_method: visionData.payment_method || '',
+    currency: visionData.currency || 'MYR',
+    line_items: [] as { description: string; amount: number }[],
+    fullText: '', // Vision doesn't have full text
+    predicted_category: visionData.predicted_category || '',
+    ai_suggestions: {},
+    confidence: {
+      merchant: visionData.confidence?.merchant || 75,
+      date: visionData.confidence?.date || 75,
+      total: visionData.confidence?.total || 75,
+      tax: visionData.confidence?.tax || 75,
+      payment_method: visionData.confidence?.payment_method || 75,
+      line_items: visionData.confidence?.line_items || 75,
+    },
+  };
+  
+  // Convert line items format if present
+  if (visionData.line_items && Array.isArray(visionData.line_items)) {
+    result.line_items = visionData.line_items.map((item: any) => ({
+      description: item.description || '',
+      amount: parseFloat(item.amount) || 0
+    }));
+  }
+  
+  return result;
+}
+
+// Find discrepancies between primary and alternative results
+function findDiscrepancies(primaryResult: any, alternativeResult: any) {
+  const discrepancies: any[] = [];
+  
+  // Compare key fields
+  const fieldsToCompare = [
+    'merchant', 
+    'date', 
+    'total', 
+    'tax', 
+    'currency', 
+    'payment_method', 
+    'predicted_category'
+  ];
+  
+  for (const field of fieldsToCompare) {
+    // Skip if either value is missing
+    if (!primaryResult[field] && !alternativeResult[field]) continue;
+    
+    // For numeric fields, compare with tolerance
+    if (field === 'total' || field === 'tax') {
+      const numPrimary = parseFloat(primaryResult[field]) || 0;
+      const numAlternative = parseFloat(alternativeResult[field]) || 0;
+      const diff = Math.abs(numPrimary - numAlternative);
+      
+      // If difference is more than 1% of the larger value and more than 0.1
+      const tolerance = Math.max(Math.max(numPrimary, numAlternative) * 0.01, 0.1);
+      if (diff > tolerance) {
+        discrepancies.push({
+          field,
+          primaryValue: numPrimary,
+          alternativeValue: numAlternative
+        });
+      }
+    } 
+    // String comparison for other fields
+    else if (primaryResult[field]?.toString() !== alternativeResult[field]?.toString()) {
+      discrepancies.push({
+        field,
+        primaryValue: primaryResult[field],
+        alternativeValue: alternativeResult[field]
+      });
+    }
+  }
+  
+  // Compare line items count as a basic check
+  if (primaryResult.line_items?.length !== alternativeResult.line_items?.length) {
+    discrepancies.push({
+      field: 'line_items_count',
+      primaryValue: primaryResult.line_items?.length || 0,
+      alternativeValue: alternativeResult.line_items?.length || 0
+    });
+  }
+  
+  return discrepancies;
 }
 
 // Add this helper function below the processReceiptImage function
@@ -402,7 +660,13 @@ serve(async (req) => {
     console.log("Request data received:", JSON.stringify(requestData).substring(0, 200) + "...");
     
     // Extract and validate required parameters
-    const { imageUrl, receiptId } = requestData;
+    const { 
+      imageUrl, 
+      receiptId, 
+      primaryMethod = 'ocr-ai', // Default to OCR + AI
+      modelId = '', // Use default model based on method 
+      compareWithAlternative = false // Don't compare by default
+    } = requestData;
     
     if (!imageUrl) {
       return new Response(
@@ -414,6 +678,14 @@ serve(async (req) => {
     if (!receiptId) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameter: receiptId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate primaryMethod
+    if (primaryMethod !== 'ocr-ai' && primaryMethod !== 'ai-vision') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid primaryMethod. Use "ocr-ai" or "ai-vision"' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -466,7 +738,15 @@ serve(async (req) => {
       await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
       
       // Process the receipt image with OCR
-      const extractedData = await processReceiptImage(imageBytes, imageUrl, receiptId);
+      const extractedData = await processReceiptImage(
+        imageBytes, 
+        imageUrl, 
+        receiptId,
+        primaryMethod,
+        modelId,
+        compareWithAlternative
+      );
+      
       console.log("Data extraction complete");
       
       await logger.log("Saving processing results to database", "SAVE");
@@ -474,7 +754,7 @@ serve(async (req) => {
       // Prepare data for saving to Supabase `receipts` table
       const updateData: Record<string, any> = {
         merchant: extractedData.merchant,
-        date: extractedData.date, // Ensure date is in a compatible format (YYYY-MM-DD)
+        date: extractedData.date,
         total: extractedData.total,
         tax: extractedData.tax,
         currency: extractedData.currency,
@@ -482,9 +762,16 @@ serve(async (req) => {
         fullText: extractedData.fullText,
         ai_suggestions: extractedData.ai_suggestions,
         predicted_category: extractedData.predicted_category,
-        processing_status: 'complete', // Update status to complete
-        processing_time: extractedData.processing_time, // Add processing time
+        processing_status: 'complete',
+        processing_time: extractedData.processing_time,
         updated_at: new Date().toISOString(),
+        // Add new fields for AI enhancement features
+        model_used: extractedData.modelUsed,
+        primary_method: extractedData.primaryMethod,
+        has_alternative_data: !!extractedData.alternativeResult,
+        discrepancies: extractedData.discrepancies || [],
+        // ADDED: Save confidence scores directly to receipts table
+        confidence_scores: extractedData.confidence
       };
 
       // CRITICAL: Double-check and fix date format before saving to database
@@ -558,56 +845,57 @@ serve(async (req) => {
         throw new Error(`Failed to update receipt record: ${updateError.message}`);
       }
       
-      // Save confidence scores to the confidence_scores table
-      const confidenceData = {
-        receipt_id: receiptId,
-        merchant: extractedData.confidence.merchant || 0,
-        date: extractedData.confidence.date || 0,
-        total: extractedData.confidence.total || 0,
-        tax: extractedData.confidence.tax || 0,
-        line_items: extractedData.confidence.line_items || 0,
-        payment_method: extractedData.confidence.payment_method || 0
-      };
-      
-      // Check if confidence record already exists
-      const { data: existingConfidence, error: fetchError } = await supabase
-        .from('confidence_scores')
-        .select('id')
-        .eq('receipt_id', receiptId)
-        .single();
-      
-      if (fetchError && fetchError.code !== 'PGRST116') { // Not Found error code
-        console.error("Error checking for existing confidence scores:", fetchError);
-        await logger.log(`Error checking confidence scores: ${fetchError.message}`, "ERROR");
-        // Continue processing - non-critical error
-      }
-      
-      let confidenceError;
-      
-      if (existingConfidence?.id) {
-        // Update existing confidence scores
-        const { error } = await supabase
-          .from('confidence_scores')
-          .update(confidenceData)
-          .eq('id', existingConfidence.id);
-        
-        confidenceError = error;
-      } else {
-        // Insert new confidence scores
-        const { error } = await supabase
-          .from('confidence_scores')
-          .insert(confidenceData);
-        
-        confidenceError = error;
-      }
-      
-      if (confidenceError) {
-        console.error("Error saving confidence scores:", confidenceError);
-        await logger.log(`Error saving confidence scores: ${confidenceError.message}`, "WARNING");
-        // Don't fail the process for confidence score errors
-      } else {
-        await logger.log("Confidence scores saved successfully", "SAVE");
-      }
+      // --- COMMENTED OUT: Saving confidence scores to separate table is no longer needed ---
+      // const confidenceData = {
+      //   receipt_id: receiptId,
+      //   merchant: extractedData.confidence.merchant || 0,
+      //   date: extractedData.confidence.date || 0,
+      //   total: extractedData.confidence.total || 0,
+      //   tax: extractedData.confidence.tax || 0,
+      //   line_items: extractedData.confidence.line_items || 0,
+      //   payment_method: extractedData.confidence.payment_method || 0
+      // };
+      //
+      // // Check if confidence record already exists
+      // const { data: existingConfidence, error: fetchError } = await supabase
+      //   .from('confidence_scores')
+      //   .select('id')
+      //   .eq('receipt_id', receiptId)
+      //   .single();
+      //
+      // if (fetchError && fetchError.code !== 'PGRST116') { // Not Found error code
+      //   console.error("Error checking for existing confidence scores:", fetchError);
+      //   await logger.log(`Error checking confidence scores: ${fetchError.message}`, "ERROR");
+      //   // Continue processing - non-critical error
+      // }
+      //
+      // let confidenceError;
+      //
+      // if (existingConfidence?.id) {
+      //   // Update existing confidence scores
+      //   const { error } = await supabase
+      //     .from('confidence_scores')
+      //     .update(confidenceData)
+      //     .eq('id', existingConfidence.id);
+      //
+      //   confidenceError = error;
+      // } else {
+      //   // Insert new confidence scores
+      //   const { error } = await supabase
+      //     .from('confidence_scores')
+      //     .insert(confidenceData);
+      //
+      //   confidenceError = error;
+      // }
+      //
+      // if (confidenceError) {
+      //   console.error("Error saving confidence scores:", confidenceError);
+      //   await logger.log(`Error saving confidence scores: ${confidenceError.message}`, "WARNING");
+      //   // Don't fail the process for confidence score errors
+      // } else {
+      //   await logger.log("Confidence scores saved successfully", "SAVE");
+      // }
+      // --- END COMMENTED OUT BLOCK ---
 
       // --- Handle line items (Optional: Assuming separate handling or basic logging for now) ---
       if (extractedData.line_items && extractedData.line_items.length > 0) {
@@ -625,6 +913,11 @@ serve(async (req) => {
           success: true,
           receiptId,
           result: extractedData, // Return the full result including processing time
+          // Include additional information for the client
+          model_used: extractedData.modelUsed,
+          primary_method: extractedData.primaryMethod,
+          has_alternative_data: !!extractedData.alternativeResult,
+          discrepancies: extractedData.discrepancies || []
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

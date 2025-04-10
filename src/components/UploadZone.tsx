@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage } from "lucide-react";
+import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -21,6 +21,8 @@ import { ProcessingTimeline } from "./upload/ProcessingTimeline";
 import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
 import { useFileUpload } from "@/hooks/useFileUpload";
+import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
@@ -36,6 +38,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
+
+  // AI processing options
+  const [processingMethod, setProcessingMethod] = useState<'ocr-ai' | 'ai-vision'>('ocr-ai');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-1.5-flash');
+  const [compareWithAlternative, setCompareWithAlternative] = useState<boolean>(false);
   
   const {
     isDragging,
@@ -265,7 +273,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         status: "unreviewed",
         image_url: imageUrl,
         user_id: user.id,
-        processing_status: 'uploading' // Initialize with uploading status
+        processing_status: 'uploading', // Initialize with uploading status
+        primary_method: processingMethod, // Add processing method
+        model_used: selectedModel, // Add model info
+        has_alternative_data: compareWithAlternative // Track if comparison is enabled
       }, [], {
         merchant: 0,
         date: 0,
@@ -283,7 +294,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       await markReceiptUploaded(newReceiptId);
       
       if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = 'Processing receipt with OCR';
+        ariaLiveRegion.textContent = `Processing receipt with ${processingMethod === 'ocr-ai' ? 'OCR + AI' : 'AI Vision'}`;
       }
 
       const channel = supabase.channel(`receipt-logs-${newReceiptId}`)
@@ -326,20 +337,25 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       try {
-        await processReceiptWithOCR(newReceiptId);
+        // Process with selected options
+        await processReceiptWithOCR(newReceiptId, {
+          primaryMethod: processingMethod,
+          modelId: selectedModel,
+          compareWithAlternative: compareWithAlternative
+        });
         setUploadProgress(100);
         
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
         }
       } catch (ocrError: any) {
-        console.error("OCR processing error:", ocrError);
-        toast.info("Receipt uploaded, but OCR processing failed. Please edit manually.");
+        console.error("Processing error:", ocrError);
+        toast.info("Receipt uploaded, but processing failed. Please edit manually.");
         setUploadProgress(100);
         setCurrentStage('ERROR');
         
         if (ariaLiveRegion) {
-          ariaLiveRegion.textContent = 'OCR processing failed. Please edit the receipt manually.';
+          ariaLiveRegion.textContent = 'Processing failed. Please edit the receipt manually.';
         }
       }
       
@@ -524,6 +540,40 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Add processing options */}
+        {!isUploading && receiptUploads.length > 0 && !error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="w-full max-w-md mt-2"
+          >
+            <Collapsible open={showOptions} onOpenChange={setShowOptions}>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+                  <Settings size={14} />
+                  Advanced Processing Options
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {showOptions ? "Hide" : "Show"}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <ReceiptProcessingOptions
+                  onMethodChange={setProcessingMethod}
+                  onModelChange={setSelectedModel}
+                  onCompareChange={setCompareWithAlternative}
+                  defaultMethod={processingMethod}
+                  defaultModel={selectedModel}
+                  defaultCompare={compareWithAlternative}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          </motion.div>
+        )}
 
         <div className="w-full flex justify-center items-center mt-4">
           {isUploading ? (

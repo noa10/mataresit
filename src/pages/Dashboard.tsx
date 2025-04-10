@@ -32,6 +32,37 @@ import {
 // Define view mode types
 type ViewMode = "grid" | "list" | "table";
 
+// Add this function before the Dashboard component
+const calculateAggregateConfidence = (receipt: Receipt) => {
+  if (!receipt.confidence_scores) return 0;
+  
+  // Define weights for each field (total = 1.0)
+  const weights = {
+    merchant: 0.3,  // 30% weight for merchant name
+    date: 0.2,      // 20% weight for date
+    total: 0.3,     // 30% weight for total amount
+    payment_method: 0.1,  // 10% weight for payment method
+    tax: 0.1        // 10% weight for tax
+  };
+
+  // Calculate weighted average
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (const [field, weight] of Object.entries(weights)) {
+    if (receipt.confidence_scores[field] !== undefined) {
+      weightedSum += (receipt.confidence_scores[field] * weight);
+      totalWeight += weight;
+    }
+  }
+
+  // If we have no valid scores, return 0
+  if (totalWeight === 0) return 0;
+
+  // Return rounded percentage
+  return Math.round((weightedSum / totalWeight) * 100);
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -173,10 +204,7 @@ export default function Dashboard() {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {processedReceipts.map((receipt, index) => {
-            const confidenceScore = 
-              receipt.confidence_scores && 
-              receipt.confidence_scores.merchant ? 
-              Math.round(receipt.confidence_scores.merchant * 100) : 0;
+            const confidenceScore = calculateAggregateConfidence(receipt);
             
             return (
               <motion.div
@@ -208,10 +236,7 @@ export default function Dashboard() {
       return (
         <div className="flex flex-col gap-3">
           {processedReceipts.map((receipt, index) => {
-            const confidenceScore = 
-              receipt.confidence_scores && 
-              receipt.confidence_scores.merchant ? 
-              Math.round(receipt.confidence_scores.merchant * 100) : 0;
+            const confidenceScore = calculateAggregateConfidence(receipt);
             
             return (
               <motion.div
@@ -243,13 +268,20 @@ export default function Dashboard() {
                     
                     <div className="flex justify-between text-sm text-muted-foreground mt-1">
                       <span>{formatDate(receipt.date)}</span>
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                           receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
                           'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         }`}>
                           {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                        </span>
+                        <span className={`text-xs ${
+                          confidenceScore >= 80 ? 'text-green-600' :
+                          confidenceScore >= 60 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {confidenceScore}% confidence
                         </span>
                       </div>
                     </div>
@@ -273,25 +305,39 @@ export default function Dashboard() {
                 <TableHead>Date</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Confidence</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {processedReceipts.map((receipt) => (
-                <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => window.location.href = `/receipt/${receipt.id}`}>
-                  <TableCell className="font-medium">{receipt.merchant}</TableCell>
-                  <TableCell>{formatDate(receipt.date)}</TableCell>
-                  <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
-                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {processedReceipts.map((receipt) => {
+                const confidenceScore = calculateAggregateConfidence(receipt);
+                
+                return (
+                  <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => window.location.href = `/receipt/${receipt.id}`}>
+                    <TableCell className="font-medium">{receipt.merchant}</TableCell>
+                    <TableCell>{formatDate(receipt.date)}</TableCell>
+                    <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-sm font-medium ${
+                        confidenceScore >= 80 ? 'text-green-600' :
+                        confidenceScore >= 60 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {confidenceScore}%
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

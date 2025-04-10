@@ -52,6 +52,15 @@ export interface Receipt {
     payment_method?: number;
   };
   processing_time?: number; // Time taken for backend processing (e.g., in seconds)
+  // New fields for AI model selection
+  model_used?: string; // The AI model used for processing
+  primary_method?: 'ocr-ai' | 'ai-vision'; // The primary processing method
+  has_alternative_data?: boolean; // Whether alternative data is available
+  discrepancies?: Array<{
+    field: string;
+    primaryValue: any;
+    alternativeValue: any;
+  }>; // Discrepancies between primary and alternative methods
 }
 
 export interface ReceiptLineItem {
@@ -85,16 +94,18 @@ export interface ConfidenceScore {
   updated_at: string;
 }
 
-export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
+// ReceiptWithDetails now inherits confidence_scores from Receipt
+export interface ReceiptWithDetails extends Receipt {
   lineItems?: ReceiptLineItem[];
-  confidence?: {
-    merchant?: number;
-    date?: number;
-    total?: number;
-    tax?: number;
-    line_items?: number;
-    payment_method?: number;
-  };
+  // REMOVED: Separate 'confidence' field is no longer needed
+  // confidence?: {
+  //   merchant?: number;
+  //   date?: number;
+  //   total?: number;
+  //   tax?: number;
+  //   line_items?: number;
+  //   payment_method?: number;
+  // };
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
@@ -102,6 +113,15 @@ export interface ReceiptWithDetails extends Omit<Receipt, 'confidence_scores'> {
   processing_status?: ProcessingStatus;
   processing_error?: string | null;
   processing_time?: number; // Added
+  // New fields for AI model selection
+  model_used?: string;
+  primary_method?: 'ocr-ai' | 'ai-vision';
+  has_alternative_data?: boolean;
+  discrepancies?: Array<{
+    field: string;
+    primaryValue: any;
+    alternativeValue: any;
+  }>;
 }
 
 export interface OCRResult {
@@ -120,6 +140,20 @@ export interface OCRResult {
     payment_method?: number;
   };
   fullText?: string;
+  // New fields from AI enhancement
+  currency?: string;
+  ai_suggestions?: AISuggestions;
+  predicted_category?: string;
+  // New fields for model selection and comparison
+  modelUsed?: string;
+  primaryMethod?: 'ocr-ai' | 'ai-vision';
+  alternativeResult?: any; // The result from the alternative method
+  discrepancies?: Array<{
+    field: string;
+    primaryValue: any;
+    alternativeValue: any;
+  }>; // Discrepancies between primary and alternative methods
+  processing_time?: number;
 }
 
 // Interface for processing logs

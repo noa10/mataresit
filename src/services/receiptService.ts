@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus } from "@/types/receipt";
 import { toast } from "sonner";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { normalizeMerchant } from '../lib/receipts/validation';
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
@@ -32,12 +33,13 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
   }
   
   // Convert Supabase JSON to our TypeScript types and validate status
-  return (data || []).map(receipt => ({
-    ...receipt,
-    status: validateStatus(receipt.status || "unreviewed"),
-    // Explicitly type cast the JSON field to our TypeScript type
-    ai_suggestions: (receipt.ai_suggestions as unknown as AISuggestions) || undefined
-  }));
+  return (data || []).map(item => {
+    const receipt = item as unknown as Receipt;
+    return {
+      ...receipt,
+      status: validateStatus(receipt.status || "unreviewed"),
+    };
+  });
 };
 
 // Fetch a single receipt by ID with line items
@@ -66,27 +68,28 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     // Don't fail the whole operation, just log and continue
   }
   
-  // Get confidence scores
-  const { data: confidence, error: confidenceError } = await supabase
-    .from("confidence_scores")
-    .select("*")
-    .eq("receipt_id", id)
-    .single();
-  
-  if (confidenceError && confidenceError.code !== 'PGRST116') {
-    console.error("Error fetching confidence scores:", confidenceError);
-    // Don't fail the whole operation, just log and continue
-  }
+  // REMOVED: Confidence scores are now fetched directly with the receipt object
+  // const { data: confidence, error: confidenceError } = await supabase
+  //   .from("confidence_scores")
+  //   .select("*")
+  //   .eq("receipt_id", id)
+  //   .single();
+  //
+  // if (confidenceError && confidenceError.code !== 'PGRST116') {
+  //   console.error("Error fetching confidence scores:", confidenceError);
+  //   // Don't fail the whole operation, just log and continue
+  // }
   
   return {
     ...receipt,
     status: validateStatus(receipt.status || "unreviewed"),
     lineItems: lineItems || [],
-    confidence: confidence || {
+    // Use confidence_scores directly from the receipt object
+    confidence: receipt.confidence_scores || {
       merchant: 0,
       date: 0,
       total: 0
-    },
+    }, // Provide default if missing
     // Explicitly type cast to match our TypeScript type
     ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
   };
@@ -349,10 +352,27 @@ export const updateReceipt = async (
   }
 };
 
+// Interface for processing options
+export interface ProcessingOptions {
+  primaryMethod?: 'ocr-ai' | 'ai-vision';
+  modelId?: string;
+  compareWithAlternative?: boolean;
+}
+
 // Process a receipt with OCR
-export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResult | null> => {
+export const processReceiptWithOCR = async (
+  receiptId: string, 
+  options?: ProcessingOptions
+): Promise<OCRResult | null> => {
   try {
-    // Update status to start OCR processing
+    // Use default options if not provided
+    const processingOptions: ProcessingOptions = {
+      primaryMethod: options?.primaryMethod || 'ocr-ai',
+      modelId: options?.modelId || '',
+      compareWithAlternative: options?.compareWithAlternative || false
+    };
+    
+    // Update status to start processing
     await updateReceiptProcessingStatus(receiptId, 'processing_ocr');
     
     const { data: receipt, error: receiptError } = await supabase
@@ -407,11 +427,13 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       throw new Error(errorMsg);
     }
     
-    // Send to OCR processing function
+    // Send to processing function
     const processingUrl = `${supabaseUrl}/functions/v1/process-receipt`;
     
-    console.log("Sending receipt for OCR processing...");
+    console.log("Sending receipt for processing...");
     console.log("Processing URL:", processingUrl);
+    console.log("Processing options:", processingOptions);
+    
     let processingResponse;
     try {
       processingResponse = await fetch(processingUrl, {
@@ -422,12 +444,15 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
         },
         body: JSON.stringify({
           receiptId,
-          imageUrl
+          imageUrl,
+          primaryMethod: processingOptions.primaryMethod,
+          modelId: processingOptions.modelId,
+          compareWithAlternative: processingOptions.compareWithAlternative
         })
       });
     } catch (fetchError) {
-      const errorMsg = `OCR API request failed: ${fetchError.message}`;
-      console.error("OCR fetch error:", fetchError);
+      const errorMsg = `Processing API request failed: ${fetchError.message}`;
+      console.error("Processing fetch error:", fetchError);
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
@@ -449,89 +474,48 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
       throw new Error(errorMsg);
     }
     
-    // Extract OCR results
-    const ocrResult = processingResult.result as OCRResult;
+    // Extract results
+    const result = processingResult.result as OCRResult;
     
-    // Update status to AI enhancement stage
-    await updateReceiptProcessingStatus(receiptId, 'processing_ai');
-    
-    // Send to enhance-receipt-data function to get additional fields
-    const enhancementUrl = `${supabaseUrl}/functions/v1/enhance-receipt-data`;
-    
-    console.log("Enhancing receipt data...");
-    let enhanceResponse;
-    try {
-      enhanceResponse = await fetch(enhancementUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
-        },
-        body: JSON.stringify({
-          textractData: ocrResult,
-          fullText: ocrResult.fullText,
-          receiptId: receiptId,
-          imageUrl: imageUrl
-        })
-      });
-    } catch (fetchError) {
-      const errorMsg = `AI enhancement API request failed: ${fetchError.message}`;
-      console.error("Enhancement fetch error:", fetchError);
-      await updateReceiptProcessingStatus(receiptId, 'failed_ai', errorMsg);
-      throw new Error(errorMsg);
-    }
-    
-    if (!enhanceResponse.ok) {
-      const errorText = await enhanceResponse.text();
-      const errorMsg = `Enhancement failed: ${enhanceResponse.status} ${enhanceResponse.statusText}`;
-      console.error("Enhancement error:", errorText);
-      await updateReceiptProcessingStatus(receiptId, 'failed_ai', errorMsg);
-      throw new Error(errorMsg);
-    }
-    
-    const enhancementResult = await enhanceResponse.json();
-    console.log("Enhancement result:", enhancementResult);
-    
-    if (enhancementResult.success && enhancementResult.result) {
-      const enhancedData = enhancementResult.result;
+    // If processing is complete (direct vision processing might not need enhancement)
+    if (processingOptions.primaryMethod === 'ai-vision') {
+      // For vision processing, we're done
+      await updateReceiptProcessingStatus(receiptId, 'complete');
       
-      // Extract the enhanced data
-      const currency = enhancedData.currency || 'MYR';
-      const payment_method = enhancedData.payment_method || '';
-      const ai_suggestions = enhancedData.suggestions || {};
-      const predicted_category = enhancedData.predicted_category || null;
-      
-      // Prepare data for update
+      // Update the receipt with the processed data
       const updateData: any = {
-        currency,
-        payment_method,
-        ai_suggestions,
-        predicted_category,
+        merchant: result.merchant || '',
+        date: result.date || '',
+        total: result.total || 0,
+        tax: result.tax || 0,
+        currency: result.currency || 'MYR',
+        payment_method: result.payment_method || '',
+        fullText: result.fullText || '',
+        ai_suggestions: result.ai_suggestions || {},
+        predicted_category: result.predicted_category || null,
         status: 'unreviewed',
-        fullText: ocrResult.fullText, // Persist fullText
-        processing_status: 'complete' // Mark as complete
+        processing_status: 'complete',
+        has_alternative_data: !!result.alternativeResult,
+        discrepancies: result.discrepancies || [],
+        model_used: result.modelUsed || processingOptions.modelId,
+        primary_method: processingOptions.primaryMethod
       };
       
-      // Apply any better matches from Gemini if provided
-      if (enhancedData.merchant) updateData.merchant = enhancedData.merchant;
-      if (enhancedData.total) updateData.total = enhancedData.total;
-      if (enhancedData.date) updateData.date = enhancedData.date; // Add date if Gemini suggests it
-      
-      // Update the receipt with enhanced data
+      // Update the receipt with the data
       const { error: updateError } = await supabase
         .from('receipts')
         .update(updateData)
         .eq('id', receiptId);
       
       if (updateError) {
-        const errorMsg = `Failed to update receipt with enhanced data: ${updateError.message}`;
-        console.error("Error updating receipt with enhanced data:", updateError);
-        await updateReceiptProcessingStatus(receiptId, 'failed_ai', errorMsg);
+        const errorMsg = `Failed to update receipt with processed data: ${updateError.message}`;
+        console.error("Error updating receipt with processed data:", updateError);
+        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
         throw updateError;
       }
       
-      // Update line items based on OCR results
-      if (ocrResult.line_items && ocrResult.line_items.length > 0) {
+      // Update line items if available
+      if (result.line_items && result.line_items.length > 0) {
         // Delete existing line items first
         const { error: deleteError } = await supabase
           .from("line_items")
@@ -539,12 +523,12 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
           .eq("receipt_id", receiptId);
 
         if (deleteError) {
-          console.error("Error deleting old line items during reprocessing:", deleteError);
+          console.error("Error deleting old line items:", deleteError);
           // Log but continue trying to insert
         }
 
-        // Insert new line items from OCR result
-        const formattedLineItems = ocrResult.line_items.map(item => ({
+        // Insert new line items
+        const formattedLineItems = result.line_items.map(item => ({
           description: item.description,
           amount: item.amount,
           receipt_id: receiptId
@@ -555,56 +539,82 @@ export const processReceiptWithOCR = async (receiptId: string): Promise<OCRResul
           .insert(formattedLineItems);
 
         if (insertError) {
-          console.error("Error inserting new line items during reprocessing:", insertError);
-          // Log but don't fail the whole operation
-        }
-      } else {
-         // If OCR returned no line items, ensure any old ones are deleted
-         const { error: deleteError } = await supabase
-          .from("line_items")
-          .delete()
-          .eq("receipt_id", receiptId);
-         if (deleteError) {
-          console.error("Error deleting old line items when OCR returned none:", deleteError);
-         }
-      }
-      
-      // Update confidence scores if provided by Gemini
-      if (enhancedData.confidence) {
-        const { error: confidenceError } = await supabase
-          .from('confidence_scores')
-          .upsert({
-            receipt_id: receiptId,
-            merchant: ocrResult.confidence.merchant || 0,
-            date: ocrResult.confidence.date || 0,
-            total: ocrResult.confidence.total || 0,
-            tax: ocrResult.confidence.tax || 0,
-            line_items: ocrResult.confidence.line_items || 0,
-            payment_method: enhancedData.confidence.payment_method || 0
-          });
-        
-        if (confidenceError) {
-          console.error("Error updating confidence scores:", confidenceError);
-          // Don't fail the whole operation
+          console.error("Error inserting line items:", insertError);
+          // Non-critical error, don't throw
         }
       }
       
-      // Merge the OCR and enhanced data for return
-      const combinedResult = {
-        ...ocrResult,
-        currency,
-        payment_method,
-        ai_suggestions,
-        predicted_category
-      };
-      
-      return combinedResult;
+      return result;
     }
     
-    // If we reach here, the enhancement didn't produce expected results but OCR succeeded
-    // Mark as complete but with OCR data only
-    await updateReceiptProcessingStatus(receiptId, 'complete');
-    return ocrResult;
+    // For OCR+AI, we need to update status for the AI enhancement step
+    await updateReceiptProcessingStatus(receiptId, 'processing_ai');
+    
+    // No need to send to enhance-receipt-data again as it's already done in process-receipt
+    
+    // Update the receipt with the processed data
+    const updateData: any = {
+      merchant: result.merchant || '',
+      date: result.date || '',
+      total: result.total || 0,
+      tax: result.tax || 0,
+      currency: result.currency || 'MYR',
+      payment_method: result.payment_method || '',
+      fullText: result.fullText || '',
+      ai_suggestions: result.ai_suggestions || {},
+      predicted_category: result.predicted_category || null,
+      status: 'unreviewed',
+      processing_status: 'complete',
+      has_alternative_data: !!result.alternativeResult,
+      discrepancies: result.discrepancies || [],
+      model_used: result.modelUsed || processingOptions.modelId,
+      primary_method: processingOptions.primaryMethod
+    };
+    
+    // Update the receipt with enhanced data
+    const { error: updateError } = await supabase
+      .from('receipts')
+      .update(updateData)
+      .eq('id', receiptId);
+    
+    if (updateError) {
+      const errorMsg = `Failed to update receipt with enhanced data: ${updateError.message}`;
+      console.error("Error updating receipt with enhanced data:", updateError);
+      await updateReceiptProcessingStatus(receiptId, 'failed_ai', errorMsg);
+      throw updateError;
+    }
+    
+    // Update line items based on results
+    if (result.line_items && result.line_items.length > 0) {
+      // Delete existing line items first
+      const { error: deleteError } = await supabase
+        .from("line_items")
+        .delete()
+        .eq("receipt_id", receiptId);
+
+      if (deleteError) {
+        console.error("Error deleting old line items during reprocessing:", deleteError);
+        // Log but continue trying to insert
+      }
+
+      // Insert new line items from OCR result
+      const formattedLineItems = result.line_items.map(item => ({
+        description: item.description,
+        amount: item.amount,
+        receipt_id: receiptId
+      }));
+
+      const { error: insertError } = await supabase
+        .from("line_items")
+        .insert(formattedLineItems);
+
+      if (insertError) {
+        console.error("Error inserting line items during reprocessing:", insertError);
+        // Non-critical error, don't throw
+      }
+    }
+    
+    return result;
   } catch (error) {
     console.error("Error in processReceiptWithOCR:", error);
     // Try to update status to failed if not already done
@@ -964,4 +974,100 @@ export const fixProcessingStatus = async (id: string): Promise<boolean> => {
 // Update the receipt's processing status to 'uploaded' after image upload
 export const markReceiptUploaded = async (id: string): Promise<boolean> => {
   return await updateReceiptProcessingStatus(id, 'uploaded');
+};
+
+// Interface for batch processing result
+interface BatchProcessingResult {
+  successes: Array<{
+    receiptId: string;
+    result: OCRResult;
+  }>;
+  failures: Array<{
+    receiptId: string;
+    error: string;
+  }>;
+  totalProcessed: number;
+  processingTime: number;
+}
+
+// Process multiple receipts in parallel
+export const processBatchReceipts = async (
+  receiptIds: string[],
+  options?: ProcessingOptions
+): Promise<BatchProcessingResult> => {
+  const startTime = performance.now();
+  
+  // Initialize results
+  const result: BatchProcessingResult = {
+    successes: [],
+    failures: [],
+    totalProcessed: 0,
+    processingTime: 0
+  };
+
+  try {
+    // Process receipts in parallel with Promise.all
+    const results = await Promise.all(
+      receiptIds.map(async (receiptId) => {
+        try {
+          const processedResult = await processReceiptWithOCR(receiptId, options);
+          if (processedResult) {
+            return {
+              success: true,
+              receiptId,
+              result: processedResult
+            };
+          } else {
+            return {
+              success: false,
+              receiptId,
+              error: "Processing failed with null result"
+            };
+          }
+        } catch (error) {
+          console.error(`Error processing receipt ${receiptId}:`, error);
+          return {
+            success: false,
+            receiptId,
+            error: error.message || "Unknown error during processing"
+          };
+        }
+      })
+    );
+
+    // Categorize results
+    results.forEach((item) => {
+      if (item.success) {
+        result.successes.push({
+          receiptId: item.receiptId,
+          result: item.result
+        });
+      } else {
+        result.failures.push({
+          receiptId: item.receiptId,
+          error: item.error
+        });
+      }
+    });
+
+    result.totalProcessed = results.length;
+    result.processingTime = (performance.now() - startTime) / 1000; // Convert to seconds
+
+    return result;
+  } catch (error) {
+    console.error("Batch processing error:", error);
+    throw new Error(`Batch processing failed: ${error.message}`);
+  }
+};
+
+// Cache for merchant name mappings
+const merchantCache = new Map<string, string>();
+
+// Function to get normalized merchant name with caching
+export const getNormalizedMerchant = (merchant: string): string => {
+  const key = merchant.toLowerCase();
+  if (!merchantCache.has(key)) {
+    merchantCache.set(key, normalizeMerchant(merchant));
+  }
+  return merchantCache.get(key)!;
 };

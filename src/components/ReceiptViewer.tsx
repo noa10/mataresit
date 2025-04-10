@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import ReactPanZoom from "react-image-pan-zoom-rotate";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   Select,
   SelectContent,
@@ -107,7 +107,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
   // State for confidence scores using ReceiptConfidence type
-  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence || defaultConfidence);
+  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence_scores || defaultConfidence);
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
@@ -127,7 +127,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   useEffect(() => {
     setEditedReceipt(receipt);
     // Initialize/Update editedConfidence when receipt changes
-    setEditedConfidence(receipt.confidence || defaultConfidence);
+    setEditedConfidence(receipt.confidence_scores || defaultConfidence);
     setProcessingStatus(receipt.processing_status || null);
   }, [receipt]);
   
@@ -793,6 +793,48 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     );
   };
 
+  // Add delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!receipt.id) throw new Error("No receipt ID provided");
+      
+      // Delete the image from storage first
+      if (receipt.image_url) {
+        const fileName = receipt.image_url.split('/').pop();
+        if (fileName) {
+          const { error: storageError } = await supabase.storage
+            .from('receipt_images')
+            .remove([fileName]);
+          
+          if (storageError) {
+            console.error("Error deleting image from storage:", storageError);
+            throw storageError;
+          }
+        }
+      }
+      
+      // Then delete the receipt record
+      const { error: dbError } = await supabase
+        .from('receipts')
+        .delete()
+        .eq('id', receipt.id);
+        
+      if (dbError) {
+        console.error("Error deleting receipt record:", dbError);
+        throw dbError;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Receipt deleted successfully");
+      // Redirect to dashboard
+      window.location.href = '/';
+    },
+    onError: (error) => {
+      console.error("Failed to delete receipt:", error);
+      toast.error("Failed to delete receipt");
+    }
+  });
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
       <motion.div
@@ -824,10 +866,136 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
           
           {receipt.image_url && !imageError ? (
             <div className="w-full h-full">
-              <ReactPanZoom
-                image={getFormattedImageUrl(receipt.image_url)}
-                alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`} // Use editedReceipt and provide fallback
-              />
+              <TransformWrapper
+                initialScale={1}
+                minScale={0.1}
+                maxScale={8}
+                centerOnInit={true}
+                limitToBounds={false}
+                smooth={true}
+                wheel={{ smoothStep: 0.04 }}
+                pinch={{ step: 5 }}
+              >
+                {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
+                  <>
+                    <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => zoomIn()}
+                          title="Zoom In"
+                        >
+                          <ZoomIn size={16} />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => zoomOut()}
+                          title="Zoom Out"
+                        >
+                          <ZoomOut size={16} />
+                        </Button>
+                      </div>
+
+                      <div className="flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => {
+                            const newRotation = (rotation - 90) % 360;
+                            setRotation(newRotation);
+                            setTransform(0, 0, 1);
+                          }}
+                          title="Rotate Left"
+                        >
+                          <RotateCcw size={16} />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => {
+                            const newRotation = (rotation + 90) % 360;
+                            setRotation(newRotation);
+                            setTransform(0, 0, 1);
+                          }}
+                          title="Rotate Right"
+                        >
+                          <RotateCw size={16} />
+                        </Button>
+                      </div>
+
+                      <div className="flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => {
+                            resetTransform();
+                            setRotation(0);
+                          }}
+                          title="Reset View"
+                        >
+                          <RotateCw size={16} />
+                        </Button>
+                      </div>
+
+                      <div className="flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = getFormattedImageUrl(receipt.image_url);
+                            link.download = `receipt-${receipt.id}.jpg`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          title="Download Image"
+                        >
+                          <Download size={16} />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+                              deleteMutation.mutate();
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          title="Delete Receipt"
+                        >
+                          {deleteMutation.isPending ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <TransformComponent
+                      wrapperClass="w-full h-full"
+                      contentClass="w-full h-full"
+                    >
+                      <img
+                        src={getFormattedImageUrl(receipt.image_url)}
+                        alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
+                        className="receipt-image w-full h-full object-contain transition-transform"
+                        style={{ transform: `rotate(${rotation}deg)` }}
+                        onError={() => setImageError(true)}
+                      />
+                    </TransformComponent>
+                  </>
+                )}
+              </TransformWrapper>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
@@ -1105,7 +1273,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                 </div>
 
                 <Card className="bg-background/50 border border-border/50">
-                  <ScrollArea className="p-3 max-h-[180px]"> {/* Adjusted max height */}
+                  <ScrollArea className="p-3 h-[180px]"> {/* Fixed height for consistent scrolling */}
                     <div className="space-y-2">
                         {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
                         editedReceipt.lineItems.map((item, index) => (
