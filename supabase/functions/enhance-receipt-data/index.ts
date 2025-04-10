@@ -1,5 +1,8 @@
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { ProcessingLogger } from './shared/db-logger.ts'
+import { encodeBase64, decodeBase64 } from "jsr:@std/encoding/base64";
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -229,7 +232,7 @@ Return your findings in the following JSON format:
           {
             inlineData: {
               mimeType: input.imageData.mimeType,
-              data: btoa(String.fromCharCode(...new Uint8Array(input.imageData.data)))
+              data: encodeBase64(input.imageData.data)
             }
           }
         ]
@@ -523,7 +526,7 @@ serve(async (req) => {
       input = {
         type: 'image',
         imageData: {
-          data: new Uint8Array(Object.values(imageData.data)),
+          data: imageData.isBase64 ? decodeBase64(imageData.data) : new Uint8Array(Object.values(imageData.data)),
           mimeType: imageData.mimeType || 'image/jpeg'
         }
       };

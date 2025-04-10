@@ -99,20 +99,20 @@ const AVAILABLE_MODELS = {
     supportsText: true,
     supportsVision: true // Supports both text and vision
   },
-  'claude-3-5-sonnet': {
-    id: 'claude-3-5-sonnet',
-    name: 'Claude 3.5 Sonnet',
-    endpoint: 'https://api.anthropic.com/v1/messages',
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+  'gemini-2.0-flash-lite': {
+    id: 'gemini-2.0-flash-lite',
+    name: 'Gemini 2.0 Flash Lite',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.3,
-    maxTokens: 1024,
+    maxTokens: 2048,
     supportsText: true,
-    supportsVision: false // Currently text-only
+    supportsVision: true
   }
 };
 
-const DEFAULT_TEXT_MODEL = 'gemini-1.5-flash';
-const DEFAULT_VISION_MODEL = 'gemini-1.5-pro';
+const DEFAULT_TEXT_MODEL = 'gemini-2.0-flash-lite';
+const DEFAULT_VISION_MODEL = 'gemini-2.0-flash-lite';
 ```
 
 ### API Call Structure
@@ -150,7 +150,7 @@ async function callAIModel(input: string | Image, modelConfig: ModelConfig, apiK
 
 ✅ Implemented as `ReceiptProcessingOptions` component with the following features:
 - Selection between OCR+AI and AI Vision processing methods
-- Model selection based on method capabilities
+- Model selection based on method capabilities (including Gemini 2.0 Flash Lite)
 - Option to compare results from both methods
 - Detailed tooltips explaining each option
 
@@ -183,13 +183,13 @@ async function callAIModel(input: string | Image, modelConfig: ModelConfig, apiK
       "alternativeValue": "Wal-Mart"
     }
   ],
-  "modelUsed": "gemini-1.5-pro"
+  "modelUsed": "gemini-2.0-flash-lite"
 }
 ```
 
 ## User Experience Considerations
 
-1. ✅ **Default Selection**: Using "OCR + AI" with Gemini 1.5 Flash for a balance of speed and accuracy.
+1. ✅ **Default Selection**: Using "OCR + AI" with Gemini 2.0 Flash Lite as the new default model for speed and capability.
 2. ✅ **Clear Descriptions**: Added tooltips explaining "OCR + AI" vs. "AI Vision" and the benefits of comparison.
 3. ✅ **Visual Feedback**: Processing status is displayed with appropriate indicators and progress tracking.
 4. ✅ **Performance Expectations**: Users are notified that enabling comparison may increase processing time.
@@ -240,5 +240,9 @@ async function callAIModel(input: string | Image, modelConfig: ModelConfig, apiK
 4. ✅ **Types and Interfaces**
    - Updated `Receipt`, `ReceiptWithDetails`, and `OCRResult` interfaces to include new fields for AI model selection and comparison features.
    - Added proper typing for processing methods, results, and discrepancies.
+
+5. ✅ **Model Registry Update**
+   - Added `gemini-2.0-flash-lite` to the list of available models in both frontend (`ReceiptProcessingOptions`) and backend (`enhance-receipt-data`).
+   - Updated the default model for both text and vision processing to `gemini-2.0-flash-lite` in the backend and frontend components (`UploadZone`, `ReceiptProcessingOptions`).
 
 These updates have successfully implemented all core features outlined in the original enhancement plan while maintaining an elegant user experience and creating a flexible foundation for future improvements.

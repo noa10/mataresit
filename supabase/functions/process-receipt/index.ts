@@ -1,8 +1,10 @@
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 /// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textract'
 import { ProcessingLogger } from './shared/db-logger.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encodeBase64 } from "jsr:@std/encoding/base64"
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -11,6 +13,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
+
+// Construct the target function URL dynamically
+const enhanceFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/enhance-receipt-data`;
 
 // Configure AWS Textract client
 const textractClient = new TextractClient({
@@ -28,7 +33,8 @@ async function processReceiptImage(
   receiptId: string,
   primaryMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai',
   modelId: string = '',
-  compareWithAlternative: boolean = false
+  compareWithAlternative: boolean = false,
+  requestHeaders: { Authorization: string | null; apikey: string | null }
 ) {
   const logger = new ProcessingLogger(receiptId);
   const startTime = performance.now(); // Record start time
@@ -41,24 +47,35 @@ async function processReceiptImage(
     let discrepancies: any[] = [];
     let modelUsed = '';
     
+    // Prepare headers for the internal fetch call
+    const internalFetchHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (requestHeaders.Authorization) {
+      internalFetchHeaders['Authorization'] = requestHeaders.Authorization;
+    }
+    if (requestHeaders.apikey) {
+      internalFetchHeaders['apikey'] = requestHeaders.apikey;
+    }
+    
     // Process with primary method
     if (primaryMethod === 'ocr-ai') {
       // OCR + AI method
       await logger.log("Using OCR + AI as primary method", "METHOD");
       
       // Step 1: Perform OCR with Amazon Textract
-    await logger.log("Starting OCR processing with Amazon Textract", "OCR");
-    console.log("Calling Amazon Textract for OCR processing...");
-    
-    // Call Amazon Textract to analyze the expense document (receipt/invoice)
-    const command = new AnalyzeExpenseCommand({
-      Document: { Bytes: imageBytes },
+      await logger.log("Starting OCR processing with Amazon Textract", "OCR");
+      console.log("Calling Amazon Textract for OCR processing...");
+      
+      // Call Amazon Textract to analyze the expense document (receipt/invoice)
+      const command = new AnalyzeExpenseCommand({
+        Document: { Bytes: imageBytes },
       });
-    
+      
       const response = await textractClient.send(command);
-    console.log("Received response from Amazon Textract");
-    await logger.log("Amazon Textract analysis complete", "OCR");
-    
+      console.log("Received response from Amazon Textract");
+      await logger.log("Amazon Textract analysis complete", "OCR");
+      
       // Step 2: Extract structured data from Textract response
       const textractResult = extractTextractData(response, logger);
       
@@ -68,12 +85,10 @@ async function processReceiptImage(
       
       try {
         const enhanceResponse = await fetch(
-          "http://localhost:54321/functions/v1/enhance-receipt-data",
+          enhanceFunctionUrl,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: internalFetchHeaders,
             body: JSON.stringify({
               textractData: textractResult,
               fullText: textractResult.fullText,
@@ -108,18 +123,21 @@ async function processReceiptImage(
       await logger.log("Using AI Vision as primary method", "METHOD");
       console.log("Calling AI Vision for direct image processing...");
       
+      // Log the target URL
+      console.log(`Attempting to call enhance-receipt-data at: ${enhanceFunctionUrl}`);
+      await logger.log(`Calling enhance-receipt-data at: ${enhanceFunctionUrl}`, "DEBUG");
+      
       try {
         const visionResponse = await fetch(
-          "http://localhost:54321/functions/v1/enhance-receipt-data",
+          enhanceFunctionUrl,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: internalFetchHeaders,
             body: JSON.stringify({
               imageData: {
-                data: Array.from(imageBytes),
-                mimeType: 'image/jpeg' // Assuming JPEG format, could be determined from the URL
+                data: encodeBase64(imageBytes),
+                mimeType: 'image/jpeg',
+                isBase64: true
               },
               receiptId: receiptId,
               modelId: modelId
@@ -135,14 +153,17 @@ async function processReceiptImage(
           primaryResult = formatAIVisionResult(visionData.result);
           modelUsed = visionData.model_used;
         } else {
-          console.error("Error calling AI Vision:", await visionResponse.text());
-          await logger.log("AI Vision processing failed", "AI");
-          throw new Error("AI Vision processing failed");
+          // Log status and error text if fetch was not ok
+          const errorText = await visionResponse.text();
+          console.error(`Error calling AI Vision: Status ${visionResponse.status} ${visionResponse.statusText}, Response: ${errorText}`);
+          await logger.log(`AI Vision fetch failed: Status ${visionResponse.status}, Error: ${errorText}`, "ERROR");
+          throw new Error(`AI Vision processing failed with status ${visionResponse.status}`);
         }
       } catch (visionError) {
-        console.error("Error during AI Vision processing:", visionError);
-        await logger.log(`AI Vision error: ${visionError.message}`, "ERROR");
-        throw visionError; // Rethrow since we don't have a fallback
+        // Log the full error object
+        console.error("Error during AI Vision processing fetch call:", visionError);
+        await logger.log(`AI Vision fetch exception: ${visionError.message}, Stack: ${visionError.stack}`, "ERROR");
+        throw visionError; // Rethrow to propagate
       }
     }
     
@@ -156,16 +177,15 @@ async function processReceiptImage(
         
         try {
           const visionResponse = await fetch(
-            "http://localhost:54321/functions/v1/enhance-receipt-data",
+            enhanceFunctionUrl,
             {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: internalFetchHeaders,
               body: JSON.stringify({
                 imageData: {
-                  data: Array.from(imageBytes),
-                  mimeType: 'image/jpeg'
+                  data: encodeBase64(imageBytes),
+                  mimeType: 'image/jpeg',
+                  isBase64: true
                 },
                 receiptId: `${receiptId}-alt`, // Use different ID for logging
                 modelId: '' // Use default vision model
@@ -201,12 +221,10 @@ async function processReceiptImage(
           
           // Step 3: Enhance with default text model
           const enhanceResponse = await fetch(
-            "http://localhost:54321/functions/v1/enhance-receipt-data",
+            enhanceFunctionUrl,
             {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: internalFetchHeaders,
               body: JSON.stringify({
                 textractData: textractResult,
                 fullText: textractResult.fullText,
@@ -647,6 +665,16 @@ serve(async (req) => {
   try {
     console.log("Received request to process receipt");
     
+    // Capture headers from the incoming request
+    const authorization = req.headers.get('Authorization');
+    const apikey = req.headers.get('apikey');
+
+    // Check for required headers (optional but good practice)
+    if (!authorization || !apikey) {
+      console.warn("Authorization or apikey header missing from incoming request.");
+      // Decide if this is an error or just a warning depending on your security model
+    }
+
     // Only accept POST requests
     if (req.method !== 'POST') {
       return new Response(
@@ -744,7 +772,8 @@ serve(async (req) => {
         receiptId,
         primaryMethod,
         modelId,
-        compareWithAlternative
+        compareWithAlternative,
+        { Authorization: authorization, apikey: apikey }
       );
       
       console.log("Data extraction complete");
