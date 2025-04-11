@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ReceiptHistoryModal } from "./ReceiptHistoryModal"; // Added import
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -115,6 +116,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false); // Added state for history modal
   const queryClient = useQueryClient();
   
   // Define available expense categories

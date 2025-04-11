@@ -45,17 +45,20 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
 // Fetch a single receipt by ID with line items
 export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails | null> => {
   // First get the receipt
-  const { data: receipt, error: receiptError } = await supabase
+  const { data: receiptData, error: receiptError } = await supabase
     .from("receipts")
-    .select("*, processing_time")
+    .select("*")
     .eq("id", id)
     .single();
   
-  if (receiptError || !receipt) {
+  if (receiptError || !receiptData) {
     console.error("Error fetching receipt:", receiptError);
     toast.error("Failed to load receipt details");
     return null;
   }
+
+  // Explicitly cast to Receipt after error check
+  const receipt = receiptData as unknown as Receipt;
   
   // Then get the line items
   const { data: lineItems, error: lineItemsError } = await supabase
@@ -85,12 +88,12 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     status: validateStatus(receipt.status || "unreviewed"),
     lineItems: lineItems || [],
     // Use confidence_scores directly from the receipt object
-    confidence: receipt.confidence_scores || {
+    confidence_scores: receipt.confidence_scores || {
       merchant: 0,
       date: 0,
       total: 0
     }, // Provide default if missing
-    // Explicitly type cast to match our TypeScript type
+    // Explicitly type cast ai_suggestions if needed (already casted here)
     ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
   };
 };
@@ -882,6 +885,29 @@ export const logCorrections = async (
   } catch (error) {
     console.error("Error in logCorrections function:", error);
     // Prevent this function from crashing the parent operation (updateReceipt)
+  }
+};
+
+// Fetch correction history for a specific receipt
+export const fetchCorrections = async (receiptId: string): Promise<Correction[]> => {
+  try {
+    const { data, error } = await supabase
+      .from("corrections")
+      .select("*")
+      .eq("receipt_id", receiptId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching corrections:", error);
+      toast.error("Failed to load correction history.");
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("Unexpected error fetching corrections:", error);
+    toast.error("An unexpected error occurred while fetching correction history.");
+    return [];
   }
 };
 
