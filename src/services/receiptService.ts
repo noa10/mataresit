@@ -60,12 +60,23 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     console.error("Error fetching line items:", lineItemsError);
   }
   
-  return {
-    ...receipt,
+  const receiptWithDetails: ReceiptWithDetails = {
+    ...receipt as unknown as Omit<ReceiptWithDetails, 'discrepancies'>,
     status: validateStatus(receipt.status || "unreviewed"),
     lineItems: lineItems || [],
-    ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
-  } as ReceiptWithDetails;
+    ai_suggestions: receipt.ai_suggestions as unknown as AISuggestions,
+    discrepancies: receipt.discrepancies ? 
+      (Array.isArray(receipt.discrepancies) ? 
+        receipt.discrepancies.map(d => ({
+          field: d.field || '',
+          primaryValue: d.primaryValue,
+          alternativeValue: d.alternativeValue
+        })) : 
+        []
+      ) : []
+  };
+  
+  return receiptWithDetails;
 };
 
 export const uploadReceiptImage = async (

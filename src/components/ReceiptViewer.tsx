@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ interface ReceiptViewerProps {
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
-type ReceiptConfidence = {
+type ConfidenceScores = {
   merchant?: number;
   date?: number;
   total?: number;
@@ -39,7 +40,7 @@ type ReceiptConfidence = {
 };
 
 // Then use it in our state and default values
-const defaultConfidence: ReceiptConfidence = {
+const defaultConfidence: ConfidenceScores = {
   merchant: 0,
   date: 0,
   total: 0,
@@ -107,8 +108,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
-  // State for confidence scores using ReceiptConfidence type
-  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence_scores || defaultConfidence);
+  // State for confidence scores using ConfidenceScores type (fixed from ConfidenceScore)
+  const [editedConfidence, setEditedConfidence] = useState<ConfidenceScores>(receipt.confidence_scores || defaultConfidence);
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
