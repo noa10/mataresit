@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
+import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus } from "@/types/receipt";
 import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -213,6 +212,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
         status: "reviewed",
+        // Update confidence scores directly on the receipt object
+        confidence_scores: editedConfidence
       },
       editedReceipt.lineItems?.map(item => ({
         description: item.description,
@@ -220,57 +221,9 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       }))
     ),
     onSuccess: async () => {
-      // Save confidence scores separately after receipt update succeeds
-      try {
-        // Create a new confidence record or update existing one
-        const { data: existingConfidence, error: fetchError } = await supabase
-          .from('confidence_scores')
-          .select('id')
-          .eq('receipt_id', receipt.id)
-          .single();
+      // No need for separate confidence table update - we now store it in the receipt
 
-        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found
-          console.error("Error fetching existing confidence:", fetchError);
-        }
-
-        const confidenceToSave: any = {
-          receipt_id: receipt.id,
-          merchant: editedConfidence.merchant || 0,
-          date: editedConfidence.date || 0,
-          total: editedConfidence.total || 0,
-          tax: editedConfidence.tax || 0,
-          payment_method: editedConfidence.payment_method || 0,
-          line_items: editedConfidence.line_items || 0,
-        };
-
-        if (existingConfidence?.id) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from('confidence_scores')
-            .update(confidenceToSave)
-            .eq('id', existingConfidence.id);
-
-          if (updateError) {
-            console.error("Error updating confidence scores:", updateError);
-            toast.error("Failed to update confidence scores.");
-          }
-        } else {
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from('confidence_scores')
-            .insert(confidenceToSave);
-
-          if (insertError) {
-            console.error("Error inserting confidence scores:", insertError);
-            toast.error("Failed to save confidence scores.");
-          }
-        }
-      } catch (error) {
-        console.error("Exception saving confidence scores:", error);
-        toast.error("An error occurred while saving confidence scores.");
-      }
-
-      // Invalidate queries to refetch data including updated confidence
+      // Invalidate queries to refetch data
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       toast.success("Receipt updated successfully!");

@@ -83,7 +83,7 @@ export function ReceiptHistory({ receiptId, open, onOpenChange }: ReceiptHistory
     });
   };
   
-  // Get the action badge props
+  // Get the action badge props - fixing the "success" variant issue
   const getActionBadge = (action: HistoryEntry['action']) => {
     switch (action) {
       case 'create':
@@ -93,7 +93,8 @@ export function ReceiptHistory({ receiptId, open, onOpenChange }: ReceiptHistory
       case 'process':
         return { variant: 'secondary' as const, children: 'Processed' };
       case 'sync':
-        return { variant: 'success' as const, children: 'Synced' };
+        // Change this from 'success' to 'secondary' as 'success' is not a valid variant
+        return { variant: 'secondary' as const, children: 'Synced' };
       default:
         return { variant: 'outline' as const, children: action };
     }
