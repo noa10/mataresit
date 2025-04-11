@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { ViewHistoryButton } from "@/components/receipt/ViewHistoryButton";
 import {
   Select,
   SelectContent,

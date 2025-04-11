@@ -1,7 +1,8 @@
+
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronRight, Receipt, FileText, Upload, PieChart } from "lucide-react";
+import { ChevronRight, Receipt, FileText, Upload, PieChart, Settings, ZoomIn, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UploadZone from "@/components/UploadZone";
 import { StorageStatus } from "@/components/StorageStatus";
@@ -27,8 +28,8 @@ export default function Index() {
             Smart Receipt Processing
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Upload your receipt, and we'll automatically extract key information like merchant, date, 
-            total amount, and line items using OCR technology.
+            Upload your receipts and our AI will automatically extract key information including merchant details, 
+            dates, totals, and itemized entries with high confidence scoring.
           </p>
           
           {/* Storage Status Check */}
@@ -49,43 +50,95 @@ export default function Index() {
             <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
               <Upload className="h-6 w-6 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Fast Upload</h3>
+            <h3 className="text-xl font-semibold mb-2">Intelligent Upload</h3>
             <p className="text-muted-foreground mb-4">
-              Upload receipt images or PDFs in seconds with our drag-and-drop interface.
+              Drag & drop receipts in various formats with real-time processing status updates as our AI works.
             </p>
             <Link to="/dashboard">
               <Button variant="link" className="px-0 text-primary">
-                Get Started <ChevronRight className="ml-1 h-4 w-4" />
+                Start Scanning <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
           </div>
           
           <div className="bg-card rounded-xl p-6 shadow-sm border">
             <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
-              <FileText className="h-6 w-6 text-primary" />
+              <Receipt className="h-6 w-6 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">OCR Extraction</h3>
+            <h3 className="text-xl font-semibold mb-2">Confidence Scoring</h3>
             <p className="text-muted-foreground mb-4">
-              Our AI automatically extracts merchant info, date, amount, and line items.
+              Our AI provides confidence scores for each extracted field, so you know what needs verification.
             </p>
             <Link to="/dashboard">
               <Button variant="link" className="px-0 text-primary">
-                Learn More <ChevronRight className="ml-1 h-4 w-4" />
+                See Examples <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
           </div>
           
           <div className="bg-card rounded-xl p-6 shadow-sm border">
             <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
-              <PieChart className="h-6 w-6 text-primary" />
+              <Settings className="h-6 w-6 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Easy Tracking</h3>
+            <h3 className="text-xl font-semibold mb-2">Processing Options</h3>
             <p className="text-muted-foreground mb-4">
-              View all your receipts in one place, with analytics and export options.
+              Choose between OCR+AI or Vision AI methods, select model accuracy, and customize processing.
+            </p>
+            <Link to="/settings">
+              <Button variant="link" className="px-0 text-primary">
+                Configure Settings <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          <div className="bg-card rounded-xl p-6 shadow-sm border">
+            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+              <ZoomIn className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Interactive Viewing</h3>
+            <p className="text-muted-foreground mb-4">
+              Zoom, rotate, and examine receipt images with powerful tools while editing extracted data.
             </p>
             <Link to="/dashboard">
               <Button variant="link" className="px-0 text-primary">
-                Go to Dashboard <ChevronRight className="ml-1 h-4 w-4" />
+                Try It Out <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          
+          <div className="bg-card rounded-xl p-6 shadow-sm border">
+            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+              <History className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Edit History</h3>
+            <p className="text-muted-foreground mb-4">
+              Track changes and processing steps with detailed history for each receipt.
+            </p>
+            <Link to="/dashboard">
+              <Button variant="link" className="px-0 text-primary">
+                View Dashboard <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          
+          <div className="bg-card rounded-xl p-6 shadow-sm border">
+            <div className="rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center mb-4">
+              <Database className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">External Integration</h3>
+            <p className="text-muted-foreground mb-4">
+              Sync processed receipts with Zoho Expense for seamless expense management and tracking.
+            </p>
+            <Link to="/dashboard">
+              <Button variant="link" className="px-0 text-primary">
+                Explore Integrations <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
           </div>
