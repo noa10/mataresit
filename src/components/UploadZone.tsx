@@ -14,6 +14,7 @@ import {
 } from "@/services/receiptService";
 import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/hooks/useSettings";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
@@ -40,10 +41,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
 
-  // AI processing options
-  const [processingMethod, setProcessingMethod] = useState<'ocr-ai' | 'ai-vision'>('ocr-ai');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.0-flash-lite');
-  const [compareWithAlternative, setCompareWithAlternative] = useState<boolean>(false);
+  // Use settings hook instead of local state
+  const { settings } = useSettings();
   
   const {
     isDragging,
@@ -274,9 +273,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         image_url: imageUrl,
         user_id: user.id,
         processing_status: 'uploading', // Initialize with uploading status
-        primary_method: processingMethod, // Add processing method
-        model_used: selectedModel, // Add model info
-        has_alternative_data: compareWithAlternative // Track if comparison is enabled
+        primary_method: settings.processingMethod, // Use settings from the hook
+        model_used: settings.selectedModel, // Use settings from the hook
+        has_alternative_data: settings.compareWithAlternative // Use settings from the hook
       }, [], {
         merchant: 0,
         date: 0,
@@ -294,7 +293,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       await markReceiptUploaded(newReceiptId);
       
       if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = `Processing receipt with ${processingMethod === 'ocr-ai' ? 'OCR + AI' : 'AI Vision'}`;
+        ariaLiveRegion.textContent = `Processing receipt with ${settings.processingMethod === 'ocr-ai' ? 'OCR + AI' : 'AI Vision'}`;
       }
 
       const channel = supabase.channel(`receipt-logs-${newReceiptId}`)
@@ -337,11 +336,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       try {
-        // Process with selected options
+        // Process with settings from the hook
         await processReceiptWithOCR(newReceiptId, {
-          primaryMethod: processingMethod,
-          modelId: selectedModel,
-          compareWithAlternative: compareWithAlternative
+          primaryMethod: settings.processingMethod,
+          modelId: settings.selectedModel,
+          compareWithAlternative: settings.compareWithAlternative
         });
         setUploadProgress(100);
         
@@ -541,39 +540,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           )}
         </AnimatePresence>
 
-        {/* Add processing options */}
-        {!isUploading && receiptUploads.length > 0 && !error && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="w-full max-w-md mt-2"
-          >
-            <Collapsible open={showOptions} onOpenChange={setShowOptions}>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
-                  <Settings size={14} />
-                  Advanced Processing Options
-                </div>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    {showOptions ? "Hide" : "Show"}
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
-              <CollapsibleContent>
-                <ReceiptProcessingOptions
-                  onMethodChange={setProcessingMethod}
-                  onModelChange={setSelectedModel}
-                  onCompareChange={setCompareWithAlternative}
-                  defaultMethod={processingMethod}
-                  defaultModel={selectedModel}
-                  defaultCompare={compareWithAlternative}
-                />
-              </CollapsibleContent>
-            </Collapsible>
-          </motion.div>
-        )}
+        {/* Processing options removed - now managed in settings page */}
 
         <div className="w-full flex justify-center items-center mt-4">
           {isUploading ? (

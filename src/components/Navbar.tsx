@@ -1,7 +1,6 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LogOut, Menu, User, X } from "lucide-react";
+import { LogOut, Menu, User, X, Settings } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,6 +106,12 @@ export default function Navbar() {
                       <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="font-normal">
+                    <Link to="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -133,6 +138,12 @@ export default function Navbar() {
                     <Link to="/profile">
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="font-normal">
+                    <Link to="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -190,12 +201,20 @@ export default function Navbar() {
               )}
               
               {user && (
-                <Link
-                  to="/profile"
-                  className="px-2 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                >
-                  Profile
-                </Link>
+                <>
+                  <Link
+                    to="/profile"
+                    className="px-2 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    to="/settings"
+                    className="px-2 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  >
+                    Settings
+                  </Link>
+                </>
               )}
             </div>
           </motion.div>

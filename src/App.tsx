@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import SettingsPage from "./pages/SettingsPage";
 
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
@@ -45,6 +45,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/receipt/:id" element={
               <Suspense fallback={<PageLoading />}>
                 <ViewReceipt />

@@ -16,30 +16,43 @@ A web-based application for automating receipt data extraction using OCR technol
 
 The Automated Receipt Processing Application streamlines the digitization and management of paper receipts through a complete workflow:
 
-1. **Upload** - Users upload receipt images in JPEG, PNG, or PDF formats. The UI provides real-time feedback on upload progress and processing status.
-2. **Process** - Amazon Textract extracts text and data from the receipt.
-3. **Enhance** - Google Gemini enhances the data, suggests corrections, and predicts categories.
-4. **Verify** - Side-by-side interface for users to review and edit data, with real-time updates if processing is still ongoing.
-5. **Sync** - Integration with Zoho Expense for seamless expense tracking.
+1. **Upload** - Users upload receipt images (JPEG, PNG, PDF). The UI provides real-time feedback on upload progress and backend processing stages.
+2. **Process** - Amazon Textract performs OCR, extracting text and structured data.
+3. **Enhance** - Google Gemini enhances the data, validates formats, normalizes fields (merchant, payment method), suggests corrections, predicts categories, and calculates confidence scores.
+4. **Verify** - A side-by-side interface allows users to review OCR data alongside the receipt image, accept AI suggestions, and make corrections. Confidence indicators highlight potentially inaccurate fields.
+5. **Feedback & Store** - User corrections are logged to a `corrections` table, creating a feedback loop for future AI improvements. Final data is stored in the Supabase database.
+6. **Sync** - Verified expenses can be optionally synced to Zoho Expense.
 
 ### Key Features
 
-- OCR-powered data extraction with confidence scores
-- **AI-powered data enhancement (Gemini)**:
-  - Suggests corrections for OCR-extracted fields
-  - Predicts expense categories
-  - Identifies payment methods and currency
-- Receipt image manipulation (zoom, rotate)
-- Side-by-side editing with original image
-- **User Feedback Loop**: Logs corrections to improve AI suggestions over time
-- Reimbursement tracking
-- Multi-currency support
-- Secure Zoho OAuth integration
-- **Real-time Processing Status**: Users see live updates during upload, OCR, and AI processing stages.
+- **OCR Data Extraction**: Utilizes Amazon Textract for robust text and data extraction.
+- **AI-Powered Data Enhancement (Gemini)**:
+    - **Normalization**: Standardizes merchant names and payment methods.
+    - **Validation**: Checks date formats and flags inconsistencies.
+    - **Categorization**: Predicts expense categories (e.g., Groceries, Dining, Travel).
+    - **Suggestions**: Provides field-level correction suggestions for potential OCR errors.
+    - **Currency Identification**: Detects currency (with basic USD->MYR conversion).
+- **Confidence Scoring**:
+    - Multi-stage scoring (OCR -> AI -> User Verification).
+    - Scores assigned to key fields (merchant, date, total, etc.).
+    - UI indicators (color-coded) highlight low-confidence fields.
+    - User edits automatically set score to 100%.
+- **User Feedback Loop**: Logs user corrections vs. original/AI values to the `corrections` table, enabling future model tuning.
+- **Interactive Review UI**:
+    - Side-by-side image viewer and data editor.
+    - Image manipulation (zoom, rotate).
+    - "Accept Suggestion" buttons for quick AI correction application.
+- **Real-time Processing Feedback**:
+    - Detailed upload status tracking (`ReceiptUpload` state).
+    - Live updates on backend processing stages (OCR, AI Enhancement) via Supabase Realtime.
+    - Displays final processing time.
+- **Secure Authentication**: Managed by Supabase Auth.
+- **Zoho Expense Integration**: Optional synchronization of verified expenses (requires OAuth setup).
+- **Multi-currency Support**: Handles different currencies, primarily MYR and USD.
 
 ## Architecture
 
-The application follows a modern web architecture, now incorporating AI enhancement:
+The application follows a modern web architecture, integrating cloud services for specialized tasks:
 
 ```mermaid
 graph TD
@@ -82,20 +95,25 @@ graph TD
 
 ### Data Flow
 
-1. User uploads a receipt image through the React frontend
-2. Image is stored in Supabase Storage
-3. Edge Function `process-receipt` triggers:
-   - Sends image to Amazon Textract for OCR
-   - Receives OCR data
-   - Calls `enhance-receipt-data` Edge Function with OCR data
-4. Edge Function `enhance-receipt-data`:
-   - Sends data to Google Gemini API for analysis
-   - Receives AI suggestions (corrections, category)
-   - Returns enhanced data to `process-receipt`
-5. `process-receipt` combines OCR and AI data, saves to Supabase Database (`receipts`, `line_items`, `confidence_scores`)
-6. Frontend displays combined data, AI suggestions, and category for user verification
-7. User edits data; corrections are logged to `corrections` table (Feedback Loop)
-8. Verified data can be synced to Zoho Expense
+1. User uploads a receipt image via the React frontend (`UploadZone`). Frontend tracks upload state (`ReceiptUpload`).
+2. Image is stored in Supabase Storage.
+3. An initial `receipts` record is created/updated in Supabase DB.
+4. Edge Function `process-receipt` is triggered (records start time).
+5. `process-receipt` sends the image URL to Amazon Textract for OCR.
+6. Textract returns OCR data (text, fields) to `process-receipt`.
+7. `process-receipt` calls the `enhance-receipt-data` Edge Function with OCR data.
+8. `enhance-receipt-data`:
+    - Constructs a prompt for Google Gemini, requesting normalization, validation, categorization, suggestions, and confidence scores.
+    - Sends prompt to Gemini API.
+    - Receives structured JSON response (enhanced data, `ai_suggestions`, `predicted_category`, potentially refined confidence scores).
+    - Returns enhanced data to `process-receipt`.
+9. `process-receipt` combines OCR and AI data. It calculates the total `processing_time` (end time - start time).
+10. `process-receipt` saves the final data, including `ai_suggestions`, `predicted_category`, `processing_time`, and `confidence_scores`, to the Supabase Database (`receipts`, `line_items`, `confidence_scores` tables). Updates `processing_status`.
+11. Frontend (`ReceiptViewer`) displays combined data, AI suggestions (with "Accept" buttons), predicted category, and confidence indicators, potentially updated via Supabase Realtime subscriptions.
+12. User reviews, accepts suggestions, or manually edits data.
+13. On save, frontend compares initial vs. final data and logs differences to the `corrections` table via `receiptService.logCorrections`.
+14. Final, user-verified data is updated in the `receipts` and related tables.
+15. Verified data can optionally be synced to Zoho Expense via `Func_Zoho`.
 
 ## Database Schema
 
@@ -103,22 +121,25 @@ graph TD
 
 #### `receipts`
 - `id` (UUID, PK) - Unique identifier
-- `user_id` (UUID, FK) - Reference to the user
-- `merchant` (VARCHAR) - Store/vendor name
+- `user_id` (UUID, FK `auth.users`) - Reference to the user
+- `merchant` (VARCHAR) - Original merchant name from OCR/user
+- `normalized_merchant` (TEXT) - Standardized merchant name (optional, added via migration)
 - `date` (DATE) - Receipt date
 - `total` (DECIMAL) - Total amount
-- `tax` (DECIMAL) - Tax amount
+- `tax` (DECIMAL) - Tax amount (optional)
 - `currency` (VARCHAR) - Currency code (e.g., MYR, USD)
-- `payment_method` (VARCHAR) - Payment method
+- `currency_converted` (BOOLEAN, DEFAULT FALSE) - Flag indicating if currency was converted (e.g., USD to MYR) (optional, added via migration)
+- `payment_method` (VARCHAR) - Payment method (standardized)
 - `predicted_category` (TEXT) - AI-predicted expense category
-- `ai_suggestions` (JSONB) - AI-generated suggestions for field corrections
-- `status` (VARCHAR) - Status (unreviewed, reviewed, synced)
-- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'failed_ai', 'complete')
+- `ai_suggestions` (JSONB) - AI-generated suggestions (e.g., `{"merchant": "Suggestion A", "total": "Suggestion B"}`)
+- `status` (VARCHAR) - Review status (e.g., `unreviewed`, `reviewed`, `synced`)
+- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'processing_ai', 'failed_ai', 'complete')
 - `processing_error` (TEXT) - Stores error messages if processing fails
-- `image_url` (TEXT) - URL to stored receipt image
-- `fullText` (TEXT) - Raw text extracted by OCR
-- `created_at` (TIMESTAMP) - Creation timestamp
-- `updated_at` (TIMESTAMP) - Last update timestamp
+- `processing_time` (FLOAT) - Time taken for backend processing in seconds (optional, added via migration)
+- `image_url` (TEXT) - URL to stored receipt image in Supabase Storage
+- `fullText` (TEXT) - Raw text extracted by OCR (optional)
+- `created_at` (TIMESTAMP WITH TIME ZONE) - Creation timestamp
+- `updated_at` (TIMESTAMP WITH TIME ZONE) - Last update timestamp
 
 #### `line_items`
 - `id` (UUID, PK) - Unique identifier
@@ -130,32 +151,33 @@ graph TD
 
 #### `confidence_scores`
 - `id` (UUID, PK) - Unique identifier
-- `receipt_id` (UUID, FK) - Reference to parent receipt
-- `merchant` (INTEGER) - Confidence score for merchant field
-- `date` (INTEGER) - Confidence score for date field
-- `total` (INTEGER) - Confidence score for total field
-- `tax` (INTEGER) - Confidence score for tax field
-- `line_items` (INTEGER) - Confidence score for line items
-- `payment_method` (INTEGER) - Confidence score for payment method field
-- `created_at` (TIMESTAMP) - Creation timestamp
-- `updated_at` (TIMESTAMP) - Last update timestamp
+- `receipt_id` (UUID, FK `receipts.id` ON DELETE CASCADE) - Reference to parent receipt
+- `merchant` (INTEGER, 0-100) - Confidence score for merchant field
+- `date` (INTEGER, 0-100) - Confidence score for date field
+- `total` (INTEGER, 0-100) - Confidence score for total field
+- `tax` (INTEGER, 0-100) - Confidence score for tax field (optional)
+- `line_items` (INTEGER, 0-100) - Overall confidence score for line items (optional)
+- `payment_method` (INTEGER, 0-100) - Confidence score for payment method field
+- `predicted_category` (INTEGER, 0-100) - Confidence score for the AI category prediction
+- `created_at` (TIMESTAMP WITH TIME ZONE) - Creation timestamp
+- `updated_at` (TIMESTAMP WITH TIME ZONE) - Last update timestamp
 
 #### `processing_logs`
 - `id` (UUID, PK) - Unique identifier for the log entry
 - `receipt_id` (UUID, FK) - Reference to the associated receipt
 - `created_at` (TIMESTAMPTZ) - Timestamp when the log was created
 - `status_message` (TEXT) - Description of the processing step or status
-- `step_name` (TEXT) - Name of the processing step (e.g., FETCH, OCR, GEMINI, SAVE)
+- `step_name` (TEXT) - Name of the processing step (e.g., UPLOAD, OCR, AI_ENHANCE, SAVE)
 
 #### `corrections`
 - `id` (SERIAL, PK) - Unique identifier for the correction entry
-- `receipt_id` (UUID, FK) - Reference to the receipt being corrected
-- `field_name` (TEXT) - Name of the field that was corrected (e.g., 'merchant', 'total')
-- `original_value` (TEXT) - The original value extracted by OCR/AI
-- `ai_suggestion` (TEXT) - The suggestion provided by the AI for this field
-- `corrected_value` (TEXT) - The final value saved by the user
-- `created_at` (TIMESTAMP WITH TIME ZONE) - Timestamp when the correction was made
-- **Note**: This table has Row-Level Security (RLS) enabled, allowing users to insert, view, update, and delete only their own correction records.
+- `receipt_id` (UUID, FK `receipts.id` ON DELETE CASCADE) - Reference to the receipt being corrected
+- `field_name` (TEXT NOT NULL) - Name of the field that was corrected (e.g., 'merchant', 'total')
+- `original_value` (TEXT) - The original value extracted by OCR
+- `ai_suggestion` (TEXT) - The suggestion provided by the AI for this field, if any
+- `corrected_value` (TEXT NOT NULL) - The final value saved by the user
+- `created_at` (TIMESTAMP WITH TIME ZONE DEFAULT NOW()) - Timestamp when the correction was made
+- **Row-Level Security (RLS)**: Enabled. Policies ensure users can only INSERT, SELECT, UPDATE, and DELETE their own correction records, enforced by matching `receipt.user_id` to `auth.uid()`.
 
 ### Storage Buckets
 
@@ -232,23 +254,26 @@ graph TD
 ### Core Components
 
 #### `UploadZone`
-- Drag & drop or file select interface
-- Designed for use within a modal dialog.
-- File validation for JPEG, PNG, PDF.
-- **Real-time display of detailed backend processing stages** (e.g., Uploading, OCR, AI Analysis, Complete, Error) using a visual timeline (`ProcessingTimeline`).
-- Leverages Supabase Realtime for live updates on `processing_status`.
-- Shows detailed processing logs (`ProcessingLogs`).
-- Clear error state display (`ErrorState`) with retry option.
+- Drag & drop or file select interface.
+- File validation (JPEG, PNG, PDF).
+- **Real-time Detailed Status**: Uses `ReceiptUpload` interface to track and display:
+    - Overall status (`pending`, `uploading`, `processing`, `completed`, `error`).
+    - Upload progress percentage.
+    - Current backend processing stage (`queueing`, `ocr`, `ai_enhancement`).
+    - Specific error details if failure occurs.
+- Leverages Supabase Realtime for live updates on `processing_status` from the `receipts` table.
+- Can display processing logs (`ProcessingLogs`) and error states (`ErrorState`).
 
 #### `ReceiptViewer`
-- Side-by-side layout for image and data
-- Image manipulation controls
-- Data editing interface with confidence indicators
-- **AI Features**: Displays AI-predicted category and field suggestions with "Accept" buttons
-- **Real-time processing status indicator** displayed prominently.
-- Overlay shown on image during active processing or if processing failed.
-- Option to "Mark as fixed" if processing failed (triggers `fixProcessingStatus`).
-- Real-time display of processing logs for the viewed receipt (toggleable)
+- Side-by-side layout for image and data.
+- Image manipulation controls (zoom, rotate).
+- Data editing interface.
+- **Confidence Indicators**: Displays color-coded indicators next to fields based on `confidence_scores`.
+- **AI Features**:
+    - Displays AI-predicted category (e.g., in a dropdown).
+    - Shows AI field suggestions (`ai_suggestions`) alongside relevant fields with "Accept" buttons.
+- **Real-time Processing Status**: Shows indicator during active processing or if processing failed.
+- **Feedback Logging**: Triggers `logCorrections` on save to record user changes in the `corrections` table.
 
 #### `ReceiptCard`
 - Summary display of receipt for listings
@@ -365,3 +390,46 @@ Automated deployment is available through Lovable's publishing feature:
 
 1. Open [Lovable](https://lovable.dev/projects/c42ed42a-b743-487c-bea8-278f04f52631)
 2. Click on Share -> Publish
+
+## Confidence Scoring
+
+The application employs a multi-stage confidence scoring system:
+1. **Initial OCR Scores**: Textract provides baseline confidence scores. (Note: Plans mention enhancing this, e.g., with a base 50% + validation bonuses/penalties, but current implementation might rely directly on Textract).
+2. **AI Enhancement**: Gemini may refine scores based on its analysis, format validation, and pattern matching (e.g., known merchants, valid date formats). Confidence for `predicted_category` is also generated.
+3. **User Verification**: When a user manually edits and saves a field, its confidence score is implicitly set to 100%.
+4. **Display**: Scores are visualized in the `ReceiptViewer` using color-coded indicators (e.g., Green >80%, Yellow 60-80%, Red <60%) to guide user review.
+
+## Data Normalization & Validation
+
+To improve data consistency and quality, the backend process (primarily within the `enhance-receipt-data` function via Gemini prompts, potentially some logic in `process-receipt`) performs:
+- **Merchant Name Normalization**: Removes extra whitespace/line breaks, standardizes casing (e.g., to uppercase), and potentially maps known aliases.
+- **Payment Method Normalization**: Maps variations (e.g., "MASTER", "MASTERCARD") to standard terms (e.g., "Mastercard"). Defaults to "Unknown" if missing.
+- **Date Validation**: Checks for valid date formats (YYYY-MM-DD preferred). Invalid or far-future dates might be flagged or rejected.
+- **Currency Handling**: Standardizes currency codes (e.g., "MYR", "USD"). Includes basic logic to convert USD to MYR if detected (using a fixed rate - requires updating for production).
+
+## Troubleshooting
+
+Based on implementation experiences, common issues and resolutions include:
+- **Database Migrations Out of Sync**:
+    - **Symptom**: Local migrations fail because the remote schema differs (e.g., missing initial table creations).
+    - **Resolution**:
+        1. Use `supabase db pull --schema public > supabase/migrations/YYYYMMDDHHMMSS_remote_schema.sql` to capture the current remote schema as a new migration file. Ensure this file has the *earliest* timestamp if it contains foundational `CREATE TABLE` statements missing locally.
+        2. Use `supabase migration repair --status <failed_migration_version>` to mark problematic remote migrations as resolved if they were manually applied or are inconsistent.
+        3. Use `supabase migration list` to check the status locally and remotely.
+        4. Run `supabase migration up` again.
+- **Row-Level Security (RLS) Violations on `corrections` Table**:
+    - **Symptom**: Users receive "new row violates row-level security policy" errors when trying to save corrections after editing a receipt.
+    - **Cause**: RLS policies were missing or incorrect for the `corrections` table.
+    - **Resolution**: Ensure RLS is enabled on the `corrections` table and appropriate policies exist (via migrations `add_corrections_rls_policy.sql`, `add_corrections_additional_policies.sql`) allowing authenticated users `INSERT`, `SELECT`, `UPDATE`, `DELETE` based on `auth.uid() == (SELECT user_id FROM receipts WHERE id = receipt_id)`.
+
+## Future Enhancements
+
+Potential improvements based on planning documents:
+- **Advanced Currency Conversion**: Integrate a live exchange rate API (e.g., via a scheduled Supabase Edge Function).
+- **Improved AI Prompting**: Refine Gemini prompts with more few-shot examples and fine-tuning based on `corrections` data analysis.
+- **AI Prediction for Missing Fields**: Train models or enhance prompts to predict missing data (e.g., payment method if not found).
+- **Line Item Extraction & Categorization**: Expand AI capabilities to extract and categorize individual line items.
+- **Duplicate Detection**: Implement logic to flag potential duplicate receipts based on merchant, date, and total.
+- **Batch Processing**: Enhance backend functions to process multiple receipts in parallel.
+- **Reporting Dashboard**: Build a simple UI dashboard showing expense trends, spending by category/merchant, and AI confidence metrics.
+- **Enhanced Confidence Scoring Algorithm**: Implement more granular scoring logic with explicit bonuses/penalties for format validation, pattern matching, etc., as outlined in `SCORING_ALGORITHM_IMPROVEMENTS.md`.
