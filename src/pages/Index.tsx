@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -55,11 +54,9 @@ export default function Index() {
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      {/* Using the shared Navbar component */}
       <Navbar />
       
       <div className="relative">
-        {/* Background Pattern */}
         <div className="absolute inset-0 overflow-hidden z-0">
           <img 
             src={backgroundPattern} 
@@ -68,7 +65,6 @@ export default function Index() {
           />
         </div>
         
-        {/* Hero Section */}
         <section className="relative z-10 py-16 md:py-24 container">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <motion.div
@@ -108,7 +104,6 @@ export default function Index() {
                 alt="Receipt Processing" 
                 className="w-full rounded-lg shadow-xl"
                 onError={(e) => {
-                  // Fallback if image doesn't exist
                   e.currentTarget.style.display = 'none';
                 }}
               />
@@ -116,7 +111,6 @@ export default function Index() {
           </div>
         </section>
         
-        {/* Features Section */}
         <section className="relative z-10 py-16 bg-secondary/10 backdrop-blur-sm">
           <div className="container">
             <motion.div
@@ -156,7 +150,6 @@ export default function Index() {
           </div>
         </section>
         
-        {/* Dashboard Preview Section (only if logged in) */}
         {user && (
           <section className="relative z-10 py-16 container">
             <div className="grid grid-cols-1 gap-6">
@@ -179,7 +172,6 @@ export default function Index() {
         )}
       </div>
       
-      {/* Footer */}
       <footer className="border-t py-8">
         <div className="container">
           <div className="flex flex-col md:flex-row justify-between items-center">

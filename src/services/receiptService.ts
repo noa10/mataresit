@@ -1,8 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus } from "@/types/receipt";
+import { Receipt, ReceiptLineItem, LineItem, ReceiptWithDetails, OCRResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus } from "@/types/receipt";
 import { toast } from "sonner";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { normalizeMerchant } from '../lib/receipts/validation';
 
 const validateStatus = (status: string): ReceiptStatus => {
   if (status === "unreviewed" || status === "reviewed" || status === "synced") {
@@ -66,7 +65,7 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     status: validateStatus(receipt.status || "unreviewed"),
     lineItems: lineItems || [],
     ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
-  };
+  } as ReceiptWithDetails;
 };
 
 export const uploadReceiptImage = async (
@@ -187,7 +186,7 @@ const uploadWithProgress = async (
 export const createReceipt = async (
   receipt: Omit<Receipt, "id" | "created_at" | "updated_at">,
   lineItems: Omit<ReceiptLineItem, "id" | "created_at" | "updated_at">[],
-  confidenceScores: Omit<ConfidenceScore, "id" | "receipt_id" | "created_at" | "updated_at">
+  confidenceScores: Record<string, number>
 ): Promise<string | null> => {
   try {
     const receiptWithStatus = {
@@ -224,15 +223,13 @@ export const createReceipt = async (
     }
     
     if (confidenceScores) {
-      const { error: confidenceError } = await supabase
-        .from("confidence_scores")
-        .insert({
-          receipt_id: receiptId,
-          ...confidenceScores
-        });
+      const { error: updateError } = await supabase
+        .from("receipts")
+        .update({ confidence_scores: confidenceScores })
+        .eq("id", receiptId);
       
-      if (confidenceError) {
-        console.error("Error inserting confidence scores:", confidenceError);
+      if (updateError) {
+        console.error("Error updating confidence scores:", updateError);
       }
     }
     
@@ -408,24 +405,26 @@ export const processReceiptWithOCR = async (
       throw new Error(errorMsg);
     }
     
+    const ocrResult = processingResult.data;
+    
     if (processingOptions.primaryMethod === 'ai-vision') {
       await updateReceiptProcessingStatus(receiptId, 'complete');
       
       const updateData: any = {
-        merchant: result.merchant || '',
-        date: result.date || '',
-        total: result.total || 0,
-        tax: result.tax || 0,
-        currency: result.currency || 'MYR',
-        payment_method: result.payment_method || '',
-        fullText: result.fullText || '',
-        ai_suggestions: result.ai_suggestions || {},
-        predicted_category: result.predicted_category || null,
+        merchant: ocrResult.merchant || '',
+        date: ocrResult.date || '',
+        total: ocrResult.total || 0,
+        tax: ocrResult.tax || 0,
+        currency: ocrResult.currency || 'MYR',
+        payment_method: ocrResult.payment_method || '',
+        fullText: ocrResult.fullText || '',
+        ai_suggestions: ocrResult.ai_suggestions || {},
+        predicted_category: ocrResult.predicted_category || null,
         status: 'unreviewed',
         processing_status: 'complete',
-        has_alternative_data: !!result.alternativeResult,
-        discrepancies: result.discrepancies || [],
-        model_used: result.modelUsed || processingOptions.modelId,
+        has_alternative_data: !!ocrResult.alternativeResult,
+        discrepancies: ocrResult.discrepancies || [],
+        model_used: ocrResult.modelUsed || processingOptions.modelId,
         primary_method: processingOptions.primaryMethod
       };
       
@@ -441,8 +440,8 @@ export const processReceiptWithOCR = async (
         throw updateError;
       }
       
-      if (result.line_items && result.line_items.length > 0) {
-        const formattedLineItems = result.line_items.map(item => ({
+      if (ocrResult.line_items && ocrResult.line_items.length > 0) {
+        const formattedLineItems = ocrResult.line_items.map(item => ({
           description: item.description,
           amount: item.amount,
           receipt_id: receiptId
@@ -457,26 +456,26 @@ export const processReceiptWithOCR = async (
         }
       }
       
-      return result;
+      return ocrResult;
     }
     
     await updateReceiptProcessingStatus(receiptId, 'processing_ai');
     
     const updateData: any = {
-      merchant: result.merchant || '',
-      date: result.date || '',
-      total: result.total || 0,
-      tax: result.tax || 0,
-      currency: result.currency || 'MYR',
-      payment_method: result.payment_method || '',
-      fullText: result.fullText || '',
-      ai_suggestions: result.ai_suggestions || {},
-      predicted_category: result.predicted_category || null,
+      merchant: ocrResult.merchant || '',
+      date: ocrResult.date || '',
+      total: ocrResult.total || 0,
+      tax: ocrResult.tax || 0,
+      currency: ocrResult.currency || 'MYR',
+      payment_method: ocrResult.payment_method || '',
+      fullText: ocrResult.fullText || '',
+      ai_suggestions: ocrResult.ai_suggestions || {},
+      predicted_category: ocrResult.predicted_category || null,
       status: 'unreviewed',
       processing_status: 'complete',
-      has_alternative_data: !!result.alternativeResult,
-      discrepancies: result.discrepancies || [],
-      model_used: result.modelUsed || processingOptions.modelId,
+      has_alternative_data: !!ocrResult.alternativeResult,
+      discrepancies: ocrResult.discrepancies || [],
+      model_used: ocrResult.modelUsed || processingOptions.modelId,
       primary_method: processingOptions.primaryMethod
     };
     
@@ -492,8 +491,8 @@ export const processReceiptWithOCR = async (
       throw updateError;
     }
     
-    if (result.line_items && result.line_items.length > 0) {
-      const formattedLineItems = result.line_items.map(item => ({
+    if (ocrResult.line_items && ocrResult.line_items.length > 0) {
+      const formattedLineItems = ocrResult.line_items.map(item => ({
         description: item.description,
         amount: item.amount,
         receipt_id: receiptId
@@ -508,7 +507,7 @@ export const processReceiptWithOCR = async (
       }
     }
     
-    return result;
+    return ocrResult;
   } catch (error) {
     console.error("Error in processReceiptWithOCR:", error);
     try {
@@ -523,6 +522,50 @@ export const processReceiptWithOCR = async (
     
     toast.error("Failed to process receipt: " + (error.message || "Unknown error"));
     return null;
+  }
+};
+
+export const fixProcessingStatus = async (receiptId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("receipts")
+      .update({ 
+        processing_status: 'complete',
+        processing_error: null 
+      })
+      .eq("id", receiptId);
+    
+    if (error) {
+      console.error("Error fixing processing status:", error);
+      toast.error("Failed to update processing status");
+      return false;
+    }
+    
+    toast.success("Receipt processing status updated");
+    return true;
+  } catch (error) {
+    console.error("Error in fixProcessingStatus:", error);
+    toast.error("Failed to update receipt status");
+    return false;
+  }
+};
+
+export const markReceiptUploaded = async (receiptId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("receipts")
+      .update({ processing_status: 'uploaded' })
+      .eq("id", receiptId);
+    
+    if (error) {
+      console.error("Error marking receipt as uploaded:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in markReceiptUploaded:", error);
+    return false;
   }
 };
 
@@ -545,15 +588,6 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
     
     if (lineItemsError) {
       console.error("Error deleting line items:", lineItemsError);
-    }
-    
-    const { error: confidenceError } = await supabase
-      .from("confidence_scores")
-      .delete()
-      .eq("receipt_id", id);
-    
-    if (confidenceError) {
-      console.error("Error deleting confidence scores:", confidenceError);
     }
     
     const { error } = await supabase
