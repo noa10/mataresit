@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
 import { TransactionSummary } from '@/components/dashboard/TransactionSummary';
 import Navbar from '@/components/Navbar';
-import { ArrowRight, Upload, FileSpreadsheet, AreaChart, RotateCw, Settings, HistoryIcon } from "lucide-react";
+import { ArrowRight, Upload, FileSpreadsheet, AreaChart, RotateCw, Settings, History as HistoryIcon } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import backgroundPattern from '@/assets/background-pattern.svg';

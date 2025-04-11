@@ -93,7 +93,7 @@ export function ReceiptHistory({ receiptId, open, onOpenChange }: ReceiptHistory
       case 'process':
         return { variant: 'secondary' as const, children: 'Processed' };
       case 'sync':
-        // Change this from 'success' to 'secondary' as 'success' is not a valid variant
+        // Change 'success' to an allowed variant
         return { variant: 'secondary' as const, children: 'Synced' };
       default:
         return { variant: 'outline' as const, children: action };
