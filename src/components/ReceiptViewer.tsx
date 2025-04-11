@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus } from "@/types/receipt";
+import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
 import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import { ViewHistoryButton } from "@/components/receipt/ViewHistoryButton";
 import {
   Select,
   SelectContent,
@@ -30,7 +28,7 @@ interface ReceiptViewerProps {
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
-type ConfidenceScores = {
+type ReceiptConfidence = {
   merchant?: number;
   date?: number;
   total?: number;
@@ -40,7 +38,7 @@ type ConfidenceScores = {
 };
 
 // Then use it in our state and default values
-const defaultConfidence: ConfidenceScores = {
+const defaultConfidence: ReceiptConfidence = {
   merchant: 0,
   date: 0,
   total: 0,
@@ -108,8 +106,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
-  // State for confidence scores using ConfidenceScores type (fixed from ConfidenceScore)
-  const [editedConfidence, setEditedConfidence] = useState<ConfidenceScores>(receipt.confidence_scores || defaultConfidence);
+  // State for confidence scores using ReceiptConfidence type
+  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence_scores || defaultConfidence);
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
@@ -213,8 +211,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
         status: "reviewed",
-        // Update confidence scores directly on the receipt object
-        confidence_scores: editedConfidence
       },
       editedReceipt.lineItems?.map(item => ({
         description: item.description,
@@ -222,9 +218,57 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       }))
     ),
     onSuccess: async () => {
-      // No need for separate confidence table update - we now store it in the receipt
+      // Save confidence scores separately after receipt update succeeds
+      try {
+        // Create a new confidence record or update existing one
+        const { data: existingConfidence, error: fetchError } = await supabase
+          .from('confidence_scores')
+          .select('id')
+          .eq('receipt_id', receipt.id)
+          .single();
 
-      // Invalidate queries to refetch data
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error("Error fetching existing confidence:", fetchError);
+        }
+
+        const confidenceToSave: any = {
+          receipt_id: receipt.id,
+          merchant: editedConfidence.merchant || 0,
+          date: editedConfidence.date || 0,
+          total: editedConfidence.total || 0,
+          tax: editedConfidence.tax || 0,
+          payment_method: editedConfidence.payment_method || 0,
+          line_items: editedConfidence.line_items || 0,
+        };
+
+        if (existingConfidence?.id) {
+          // Update existing record
+          const { error: updateError } = await supabase
+            .from('confidence_scores')
+            .update(confidenceToSave)
+            .eq('id', existingConfidence.id);
+
+          if (updateError) {
+            console.error("Error updating confidence scores:", updateError);
+            toast.error("Failed to update confidence scores.");
+          }
+        } else {
+          // Insert new record
+          const { error: insertError } = await supabase
+            .from('confidence_scores')
+            .insert(confidenceToSave);
+
+          if (insertError) {
+            console.error("Error inserting confidence scores:", insertError);
+            toast.error("Failed to save confidence scores.");
+          }
+        }
+      } catch (error) {
+        console.error("Exception saving confidence scores:", error);
+        toast.error("An error occurred while saving confidence scores.");
+      }
+
+      // Invalidate queries to refetch data including updated confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       toast.success("Receipt updated successfully!");

@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      confidence_scores: {
+        Row: {
+          created_at: string
+          date: number | null
+          id: string
+          line_items: number | null
+          merchant: number | null
+          payment_method: number | null
+          receipt_id: string
+          tax: number | null
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date?: number | null
+          id?: string
+          line_items?: number | null
+          merchant?: number | null
+          payment_method?: number | null
+          receipt_id: string
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: number | null
+          id?: string
+          line_items?: number | null
+          merchant?: number | null
+          payment_method?: number | null
+          receipt_id?: string
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "confidence_scores_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       corrections: {
         Row: {
           ai_suggestion: string | null
@@ -38,13 +85,6 @@ export type Database = {
           receipt_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "corrections_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "corrections_receipt_id_fkey"
             columns: ["receipt_id"]
@@ -84,13 +124,6 @@ export type Database = {
             foreignKeyName: "line_items_receipt_id_fkey"
             columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "line_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
             referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
@@ -123,21 +156,7 @@ export type Database = {
             foreignKeyName: "fk_receipt"
             columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_receipt"
-            columns: ["receipt_id"]
-            isOneToOne: false
             referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "processing_logs_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
             referencedColumns: ["id"]
           },
           {
@@ -173,82 +192,18 @@ export type Database = {
         }
         Relationships: []
       }
-      receipt_confidence_scores: {
-        Row: {
-          category_confidence: number | null
-          created_at: string | null
-          date_confidence: number | null
-          id: string
-          merchant_confidence: number | null
-          overall_confidence: number | null
-          payment_method_confidence: number | null
-          receipt_id: string
-          total_confidence: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          category_confidence?: number | null
-          created_at?: string | null
-          date_confidence?: number | null
-          id?: string
-          merchant_confidence?: number | null
-          overall_confidence?: number | null
-          payment_method_confidence?: number | null
-          receipt_id: string
-          total_confidence?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          category_confidence?: number | null
-          created_at?: string | null
-          date_confidence?: number | null
-          id?: string
-          merchant_confidence?: number | null
-          overall_confidence?: number | null
-          payment_method_confidence?: number | null
-          receipt_id?: string
-          total_confidence?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receipt_confidence_scores_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receipt_confidence_scores_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       receipts: {
         Row: {
           ai_suggestions: Json | null
-          confidence_scores: Json | null
           created_at: string
           currency: string | null
-          currency_converted: boolean | null
           date: string
-          discrepancies: Json | null
           fullText: string | null
-          has_alternative_data: boolean | null
           id: string
           image_url: string | null
           merchant: string
-          model_used: string | null
-          normalized_merchant: string | null
           payment_method: string | null
           predicted_category: string | null
-          primary_method: string | null
-          processing_error: string | null
-          processing_status: string | null
-          processing_time: number | null
           status: string | null
           tax: number | null
           total: number
@@ -257,25 +212,15 @@ export type Database = {
         }
         Insert: {
           ai_suggestions?: Json | null
-          confidence_scores?: Json | null
           created_at?: string
           currency?: string | null
-          currency_converted?: boolean | null
           date: string
-          discrepancies?: Json | null
           fullText?: string | null
-          has_alternative_data?: boolean | null
           id?: string
           image_url?: string | null
           merchant: string
-          model_used?: string | null
-          normalized_merchant?: string | null
           payment_method?: string | null
           predicted_category?: string | null
-          primary_method?: string | null
-          processing_error?: string | null
-          processing_status?: string | null
-          processing_time?: number | null
           status?: string | null
           tax?: number | null
           total: number
@@ -284,25 +229,15 @@ export type Database = {
         }
         Update: {
           ai_suggestions?: Json | null
-          confidence_scores?: Json | null
           created_at?: string
           currency?: string | null
-          currency_converted?: boolean | null
           date?: string
-          discrepancies?: Json | null
           fullText?: string | null
-          has_alternative_data?: boolean | null
           id?: string
           image_url?: string | null
           merchant?: string
-          model_used?: string | null
-          normalized_merchant?: string | null
           payment_method?: string | null
           predicted_category?: string | null
-          primary_method?: string | null
-          processing_error?: string | null
-          processing_status?: string | null
-          processing_time?: number | null
           status?: string | null
           tax?: number | null
           total?: number
@@ -313,46 +248,10 @@ export type Database = {
       }
     }
     Views: {
-      monthly_expenses: {
-        Row: {
-          currency: string | null
-          month: string | null
-          normalized_merchant: string | null
-          total_spent: number | null
-          transaction_count: number | null
-        }
-        Relationships: []
-      }
-      receipt_confidence_analysis: {
-        Row: {
-          category_confidence: number | null
-          confidence_scored_at: string | null
-          date: string | null
-          date_confidence: number | null
-          id: string | null
-          merchant: string | null
-          merchant_confidence: number | null
-          normalized_merchant: string | null
-          overall_confidence: number | null
-          payment_method: string | null
-          payment_method_confidence: number | null
-          predicted_category: string | null
-          processing_status: string | null
-          total: number | null
-          total_confidence: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
-      column_exists: {
-        Args: { p_table: string; p_column: string; p_schema?: string }
-        Returns: boolean
-      }
-      update_processing_status_if_failed: {
-        Args: { receipt_id: string }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
@@ -363,29 +262,27 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type PublicSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  PublicTableNameOrOptions extends
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
     | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -393,22 +290,20 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -416,22 +311,20 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -439,23 +332,21 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
     | { schema: keyof Database },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof PublicSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
@@ -464,12 +355,6 @@ export type CompositeTypes<
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const
