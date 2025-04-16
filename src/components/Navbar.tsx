@@ -76,6 +76,7 @@ export default function Navbar() {
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard", auth: true },
+    { href: "/analysis", label: "Analysis", auth: true },
   ];
 
   // Filter links based on authentication status

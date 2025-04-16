@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -88,5 +87,49 @@
 @layer utilities {
   .dark-theme-toggle {
     @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+/* Responsive Table Styles for Mobile (max-width: 640px) */
+@media (max-width: 640px) {
+  .responsive-table {
+    @apply block w-full;
+  }
+  .responsive-table thead {
+    @apply hidden; /* Hide table headers on mobile */
+  }
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    @apply block w-full;
+  }
+  .responsive-table tr {
+    @apply mb-4 rounded-lg border border-border p-2;
+  }
+  .responsive-table td {
+    @apply flex items-center justify-between border-b border-border px-0 py-2 text-left;
+    /* Remove bottom border for the last cell in a row */
+    &:last-child {
+      @apply border-b-0;
+    }
+  }
+  /* Add data-label content before the cell data */
+  .responsive-table td::before {
+    content: attr(data-label);
+    @apply mr-2 font-semibold text-muted-foreground;
+  }
+  /* Ensure text alignment works correctly */
+  .responsive-table td[data-label="Total Spent"] {
+     @apply justify-end;
+     /* Keep the text content on the right side */
+     &::before {
+        @apply mr-auto; /* Push label to the left */
+     }
+  }
+  .responsive-table td[data-label="Receipts"] {
+     @apply justify-end;
+     &::before {
+        @apply mr-auto;
+     }
   }
 }

@@ -14,6 +14,7 @@ import SettingsPage from "./pages/SettingsPage";
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
+const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -54,6 +55,11 @@ const App = () => (
             <Route path="/profile" element={
               <Suspense fallback={<PageLoading />}>
                 <Profile />
+              </Suspense>
+            } />
+            <Route path="/analysis" element={
+              <Suspense fallback={<PageLoading />}>
+                <AnalysisPage />
               </Suspense>
             } />
           </Routes>
