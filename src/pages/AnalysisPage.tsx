@@ -22,7 +22,7 @@ import { Calendar as CalendarIcon, Terminal } from "lucide-react"; // Import Cal
 import { cn } from "@/lib/utils"; // Import cn utility
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Import Dialog components
 
-import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData } from '@/services/supabase/analysis';
+import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 // Import ReceiptViewer and related types/functions
@@ -146,6 +146,15 @@ const ReceiptListModalContent = ({ receiptIds, date, onReceiptSelect }: ReceiptL
   );
 };
 
+// Define the enhanced data structure for the table
+type EnhancedDailySpendingData = {
+  date: string;
+  total: number;
+  receiptIds: string[];
+  topMerchant: string;
+  paymentMethod: string;
+};
+
 const AnalysisPage = () => {
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
@@ -174,46 +183,75 @@ const AnalysisPage = () => {
   // Add 1 day to 'to' date and set to start of day for inclusive range in Supabase query
   const endDateISO = date?.to ? startOfDay(addDays(date.to, 1)).toISOString() : null;
 
-  // Fetch daily spending data - passing date range
-  const { data: dailySpendingData, isLoading: isLoadingDaily, error: dailyError } = useQuery<DailySpendingData[], Error>({
-    queryKey: ['dailySpending', startDateISO, endDateISO], // Use date range in key
-    queryFn: () => fetchDailySpending(startDateISO, endDateISO), // Pass dates to fetch function
-    enabled: !!date, // Only fetch if date range is set
-  });
-
-  // Fetch category breakdown data - passing date range
-  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<
-    CategorySpendingData[],
-    Error
+  // Fetch daily spending data - using new function and select transformation
+  const { data: enhancedDailySpendingData, isLoading: isLoadingDaily, error: dailyError } = useQuery<
+    ReceiptSummary[], // Fetch raw summaries
+    Error,
+    EnhancedDailySpendingData[] // Select transforms to this
   >({
-    queryKey: ['spendingByCategory', startDateISO, endDateISO], // Use date range in key
-    queryFn: () => fetchSpendingByCategory(startDateISO, endDateISO), // Pass dates to fetch function
+    queryKey: ['dailySpendingDetails', startDateISO, endDateISO], // Updated queryKey
+    queryFn: () => fetchReceiptDetailsForRange(startDateISO, endDateISO), // Use the new fetch function
+    select: (receipts) => { // Apply the transformation logic
+      const grouped = receipts.reduce((acc, receipt) => {
+        // Ensure date is handled correctly (extract date part)
+        const date = (receipt.date || '').split('T')[0]; 
+        if (!date) return acc; // Skip if date is invalid
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(receipt);
+        return acc;
+      }, {} as Record<string, ReceiptSummary[]>);
+  
+      const dailyData: EnhancedDailySpendingData[] = Object.entries(grouped).map(([date, dayReceipts]) => {
+        const total = dayReceipts.reduce((sum, r) => sum + (r.total || 0), 0);
+        const receiptIds = dayReceipts.map(r => r.id);
+        
+        // Find receipt with highest total (handle empty dayReceipts)
+        const topReceipt = dayReceipts.length > 0 
+          ? dayReceipts.reduce((max, r) => ((r.total || 0) > (max?.total || 0) ? r : max), dayReceipts[0])
+          : null; // Handle cases with no receipts for a day
+          
+        const topMerchant = topReceipt?.merchant || 'Unknown';
+        // Use payment_method from top receipt, default to N/A
+        const paymentMethod = topReceipt?.payment_method || 'N/A';
+        
+        return { date, total, receiptIds, topMerchant, paymentMethod };
+      });
+  
+      // Ensure data is sorted by date descending by default for the table view later
+      // Although fetched ascending, the select output might not preserve order strictly
+      return dailyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    },
     enabled: !!date, // Only fetch if date range is set
   });
 
-  // Data for the line chart (already sorted by fetch function)
+  // Fetch category breakdown data (remains the same)
+  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategorySpendingData[], Error>({ 
+    queryKey: ['spendingByCategory', startDateISO, endDateISO],
+    queryFn: () => fetchSpendingByCategory(startDateISO, endDateISO),
+    enabled: !!date,
+  });
+
+  // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
-    return dailySpendingData || [];
-  }, [dailySpendingData]);
+    // Create data suitable for the chart (date, total) from enhanced data
+    // Ensure it's sorted chronologically for the line chart
+    return [...(enhancedDailySpendingData || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [enhancedDailySpendingData]);
 
-  // Data for the table (original fetch order or reverse)
-  const aggregatedTableData = React.useMemo(() => {
-    // Return the raw data, sorting will be handled separately
-    return dailySpendingData || [];
-  }, [dailySpendingData]);
+  // Data for the table (already transformed by select)
+  // No need for aggregatedTableData anymore, use enhancedDailySpendingData directly for sorting
 
-  // Calculate total spending from aggregated data
+  // Calculate total spending from transformed data
   const totalSpending = React.useMemo(() => {
-    return dailySpendingData?.reduce((sum, item) => sum + item.total, 0) || 0;
-  }, [dailySpendingData]);
+    return enhancedDailySpendingData?.reduce((sum, item) => sum + item.total, 0) || 0;
+  }, [enhancedDailySpendingData]);
 
-  // Calculate average per receipt
+  // Calculate average per receipt from transformed data
   const averagePerReceipt = React.useMemo(() => {
-    // Count total number of receipts across all days in the range
-    const totalReceipts = dailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0;
+    const totalReceipts = enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0;
     if (totalReceipts === 0) return 0;
     return totalSpending / totalReceipts;
-  }, [dailySpendingData, totalSpending]);
+  }, [enhancedDailySpendingData, totalSpending]);
 
   // Format selected date range for display
   const formattedDateRange = React.useMemo(() => {
@@ -228,18 +266,20 @@ const AnalysisPage = () => {
 
   // Sort data for the table based on current sort state
   const sortedData = React.useMemo(() => {
-    const data = [...aggregatedTableData]; // Use the unsorted aggregated data
+    // Use the already transformed enhancedDailySpendingData
+    const data = [...(enhancedDailySpendingData || [])]; 
     data.sort((a, b) => {
       if (sortColumn === 'date') {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
+        // Keep descending sort logic from select, but allow user override
         return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
       } else { // sortColumn === 'total'
         return sortDirection === 'asc' ? a.total - b.total : b.total - a.total;
       }
     });
     return data;
-  }, [aggregatedTableData, sortColumn, sortDirection]);
+  }, [enhancedDailySpendingData, sortColumn, sortDirection]); // Depend on transformed data
 
   // Handler to open the Receipt Viewer modal from the list modal
   const handleReceiptSelect = (receiptId: string) => {
@@ -390,13 +430,13 @@ const AnalysisPage = () => {
                 </LineChart>
               </ResponsiveContainer>
             )}
-             {!isLoadingDaily && !dailyError && aggregatedTableData.length > 0 && (
+             {!isLoadingDaily && !dailyError && enhancedDailySpendingData && enhancedDailySpendingData.length > 0 && (
                <>
                 <h4 className="text-lg font-semibold mb-2">Daily Spending Details</h4>
                 <Table className="responsive-table">
                   <TableHeader>
                     <TableRow>
-                      {/* Date Header */}
+                      {/* Date Header (Sortable) */}
                       <TableHead
                         className="w-[150px] cursor-pointer"
                         onClick={() => {
@@ -409,7 +449,11 @@ const AnalysisPage = () => {
                       </TableHead>
                       {/* Receipts Header */}
                       <TableHead>Receipts</TableHead>
-                      {/* Total Spent Header */}
+                      {/* NEW: Top Merchant Header */}
+                      <TableHead>Top Merchant</TableHead>
+                      {/* NEW: Payment Method Header */}
+                      <TableHead>Payment Method</TableHead>
+                      {/* Total Spent Header (Sortable) */}
                       <TableHead
                         className="text-right cursor-pointer"
                         onClick={() => {
@@ -423,10 +467,9 @@ const AnalysisPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedData.map(({ date, total, receiptIds = [] }, index) => ( // Default receiptIds to []
+                    {sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
                       <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
                         <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
-                        {/* Updated Receipts Cell */}
                         <TableCell data-label="Receipts">
                           {receiptIds.length > 0 ? (
                             <Button
@@ -446,6 +489,10 @@ const AnalysisPage = () => {
                             <span className="text-xs text-muted-foreground">No Receipts</span>
                           )}
                         </TableCell>
+                        {/* NEW: Top Merchant Cell */}
+                        <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
+                        {/* NEW: Payment Method Cell */}
+                        <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
                         <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
                       </TableRow>
                     ))}
@@ -453,7 +500,7 @@ const AnalysisPage = () => {
                 </Table>
                </>
              )}
-            {!isLoadingDaily && !dailyError && aggregatedChartData.length === 0 && (
+            {!isLoadingDaily && !dailyError && (!enhancedDailySpendingData || enhancedDailySpendingData.length === 0) && (
               <p className="text-muted-foreground">No spending data available for this period.</p>
             )}
           </CardContent>

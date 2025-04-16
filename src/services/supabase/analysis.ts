@@ -120,5 +120,45 @@ export const fetchSpendingByCategory = async (startDateISO?: string | null, endD
     */
 };
 
+// Define the shape for summary receipt data needed for analysis
+export interface ReceiptSummary {
+  id: string;
+  date: string;
+  total: number | null;
+  merchant: string | null;
+  payment_method: string | null;
+}
+
+// Fetch detailed receipt summaries for a date range
+export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, endDateISO?: string | null): Promise<ReceiptSummary[]> => {
+  let query = supabase
+    .from('receipts')
+    // Select necessary fields
+    .select('id, date, total, merchant, payment_method');
+
+  if (startDateISO) {
+    query = query.gte('date', startDateISO);
+  }
+  if (endDateISO) {
+    query = query.lte('date', endDateISO);
+  }
+
+  // Order by date for easier processing in the select function
+  query = query.order('date', { ascending: true });
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching receipt details for range:', error);
+    throw new Error('Could not fetch detailed receipts data');
+  }
+
+  // Ensure correct types, default total to 0 if null/undefined
+  return (data || []).map(item => ({
+    ...item,
+    total: Number(item.total) || 0, // Convert null/undefined total to 0
+  })) as ReceiptSummary[];
+};
+
 // Potential future improvement: Aggregate directly in Supabase using an RPC function
 // const { data, error } = await supabase.rpc('get_daily_spending_summary'); 
