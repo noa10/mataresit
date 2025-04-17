@@ -252,7 +252,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   yPosition += 7
 
   const grandTotal = receipts.reduce((sum, receipt) => sum + receipt.total, 0)
-  pdf.text(`Total Amount: $${grandTotal.toFixed(2)}`, 20, yPosition)
+  pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition)
   yPosition += 10
 
   pdf.setFont('helvetica', 'normal')
@@ -302,7 +302,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
       yPosition += 6
     }
     if (receipt.tax) {
-      pdf.text(`Tax: $${receipt.tax.toFixed(2)}`, 20, yPosition)
+      pdf.text(`Tax: RM ${receipt.tax.toFixed(2)}`, 20, yPosition)
       yPosition += 6
     }
     yPosition += 5
@@ -311,7 +311,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
     if (receipt.line_items && receipt.line_items.length > 0) {
       autoTable(pdf, {
         startY: yPosition,
-        head: [['Item Description', 'Amount ($)']],
+        head: [['Item Description', 'Amount (RM)']],
         body: receipt.line_items.map(item => [
           item.description,
           item.amount.toFixed(2)
@@ -338,7 +338,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
     pdf.setFillColor(230, 230, 250) // Light purple background
     pdf.rect(120, yPosition - 5, 70, 10, 'F')
     pdf.setFont('helvetica', 'bold')
-    pdf.text(`Total: $${receipt.total.toFixed(2)}`, 170, yPosition, { align: 'right' })
+    pdf.text(`Total: RM ${receipt.total.toFixed(2)}`, 170, yPosition, { align: 'right' })
     pdf.setFont('helvetica', 'normal')
     yPosition += 15
 
@@ -443,7 +443,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
 
   autoTable(pdf, {
     startY: 75, // Increased from 55 to 75 for more space
-    head: [['Merchant', 'Time', 'Payment Method', 'Amount ($)']],
+    head: [['Merchant', 'Time', 'Payment Method', 'Amount (RM)']],
     body: summaryData,
     styles: {
       fontSize: 10,
@@ -470,7 +470,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(12)
   pdf.setTextColor(255, 255, 255) // White text
-  pdf.text(`Grand Total: $${grandTotal.toFixed(2)}`, 170, finalY, { align: 'right' })
+  pdf.text(`Grand Total: RM ${grandTotal.toFixed(2)}`, 170, finalY, { align: 'right' })
   pdf.setTextColor(0, 0, 0) // Reset text color
 
   // Add some statistics
@@ -479,15 +479,15 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.text('Expense Statistics:', 20, finalY + 15)
 
   const avgExpense = grandTotal / receipts.length
-  pdf.text(`• Average expense per receipt: $${avgExpense.toFixed(2)}`, 25, finalY + 25)
+  pdf.text(`• Average expense per receipt: RM ${avgExpense.toFixed(2)}`, 25, finalY + 25)
 
   // Find highest and lowest expenses
   const highestExpense = Math.max(...receipts.map(r => r.total))
   const lowestExpense = Math.min(...receipts.map(r => r.total))
   const highestMerchant = receipts.find(r => r.total === highestExpense)?.merchant || 'Unknown'
 
-  pdf.text(`• Highest expense: $${highestExpense.toFixed(2)} (${highestMerchant})`, 25, finalY + 35)
-  pdf.text(`• Lowest expense: $${lowestExpense.toFixed(2)}`, 25, finalY + 45)
+  pdf.text(`• Highest expense: RM ${highestExpense.toFixed(2)} (${highestMerchant})`, 25, finalY + 35)
+  pdf.text(`• Lowest expense: RM ${lowestExpense.toFixed(2)}`, 25, finalY + 45)
 
   // Add footer with page numbers
   addFooter()

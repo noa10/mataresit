@@ -34,7 +34,7 @@ import Navbar from '@/components/Navbar'; // Import Navbar
 import { supabase } from '@/integrations/supabase/client'; // Corrected supabase client import path
 
 // Currency formatting function
-const formatCurrency = (amount: number, currencyCode: string = 'USD') => {
+const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
 };
 

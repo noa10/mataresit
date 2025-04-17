@@ -33,13 +33,14 @@ export function DailyPDFReportGenerator() {
       const functionUrl = 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/generate-pdf-report';
       
       // Use fetch directly for binary data
+      const dateStr = format(selectedDay, 'yyyy-MM-dd');
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ date: selectedDay.toISOString() })
+        body: JSON.stringify({ date: dateStr })
       });
 
       if (!response.ok) {
@@ -75,7 +76,7 @@ export function DailyPDFReportGenerator() {
       // Create a link element and trigger download
       const link = document.createElement('a');
       link.href = pdfUrl;
-      link.download = `expense-report-${format(selectedDay, 'yyyy-MM-dd')}.pdf`;
+      link.download = `expense-report-${dateStr}.pdf`;
       document.body.appendChild(link);
       link.click();
 
