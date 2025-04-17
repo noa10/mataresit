@@ -108,8 +108,8 @@ async function callAIModel(
   // Get API key for the model
   const apiKey = Deno.env.get(modelConfig.apiKeyEnvVar);
   if (!apiKey) {
-    await logger.log(`${modelConfig.apiKeyEnvVar} not found in environment variables`, "ERROR");
-    throw new Error(`${modelConfig.apiKeyEnvVar} not found in environment variables`);
+    await logger.log(`${modelConfig.apiKeyEnvVar} not found in environment variables. Please ensure this secret is set in the Supabase dashboard.`, "ERROR");
+    return new Response(JSON.stringify({ error: `${modelConfig.apiKeyEnvVar} not found in environment variables` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   
   // Handle model-specific API calls
@@ -575,4 +575,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-}); 
+});

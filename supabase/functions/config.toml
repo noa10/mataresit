@@ -28,3 +28,6 @@ verify_jwt = false
 
 [sync-to-zoho]
 verify_jwt = true
+
+[generate-pdf-report]
+verify_jwt = true
