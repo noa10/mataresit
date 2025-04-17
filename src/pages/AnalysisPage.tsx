@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarIcon, Terminal } from "lucide-react"; // Import Calendar icon
 import { cn } from "@/lib/utils"; // Import cn utility
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Import Dialog components
+import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
 
 import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
@@ -289,222 +290,221 @@ const AnalysisPage = () => {
   };
 
   return (
-    // Wrap content with a Fragment or Div if needed, add Navbar
-    <>
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
-      <div className="container mx-auto p-4 space-y-6 mt-4"> {/* Add margin-top */}
-        <h1 className="text-3xl font-bold mb-6">Expense Analysis</h1>
+      
+      <main className="container px-4 py-8">
+        <div className="flex flex-col gap-8">
+          {/* Reports Section */}
+          <section>
+            <h2 className="text-2xl font-bold mb-4">Reports</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <DailyPDFReportGenerator />
+              
+              {/* Add more report types here in the future */}
+            </div>
+          </section>
 
-        {/* Date Range Picker */}
-        <div className="flex items-center space-x-2 mb-4">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn(
-                    "w-[300px] justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
+          {/* Existing Analysis Section */}
+          <section>
+            <h2 className="text-2xl font-bold mb-4">Spending Analysis</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Date Range Picker Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Date Range</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center">
+                    <DayPicker
+                      mode="range"
+                      selected={date}
+                      onSelect={setDate}
+                      numberOfMonths={2}
+                      className="border rounded-lg p-4"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Analysis Cards */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Spending</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingDaily ? (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  ) : dailyError ? (
+                    <p className="text-sm text-destructive">Error</p>
+                  ) : (
+                    <p className="text-2xl font-semibold">{formatCurrency(totalSpending)}</p>
                   )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formattedDateRange}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <DayPicker
-                  mode="range"
-                  defaultMonth={date?.from}
-                  selected={date}
-                  onSelect={setDate}
-                  numberOfMonths={2} // Show two months for easier range selection
-                  showOutsideDays
-                />
-              </PopoverContent>
-            </Popover>
-             {/* Optional: Add a button to clear selection or set predefined ranges */}
-             {date && (
-               <Button variant="ghost" size="sm" onClick={() => setDate(undefined)}>Clear</Button>
-             )}
-          </div>
+                  <p className="text-xs text-muted-foreground">
+                    {date ? formattedDateRange : 'Selected Range'}
+                  </p>
+                </CardContent>
+              </Card>
 
-        {/* Analysis Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Spending</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingDaily ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : dailyError ? (
-                <p className="text-sm text-destructive">Error</p>
-              ) : (
-                <p className="text-2xl font-semibold">{formatCurrency(totalSpending)}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {date ? formattedDateRange : 'Selected Range'}
-              </p>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Spending by Category</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[250px]"> {/* Give fixed height */}
+                  {isLoadingCategories ? (
+                    <p className="text-muted-foreground flex items-center justify-center h-full">Loading...</p>
+                  ) : categoriesError ? (
+                    <p className="text-destructive flex items-center justify-center h-full">Error loading categories</p>
+                  ) : categoryData && categoryData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="total_spent"
+                          nameKey="category"
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-muted-foreground flex items-center justify-center h-full">No category data available.</p>
+                  )}
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Spending by Category</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[250px]"> {/* Give fixed height */}
-              {isLoadingCategories ? (
-                <p className="text-muted-foreground flex items-center justify-center h-full">Loading...</p>
-              ) : categoriesError ? (
-                <p className="text-destructive flex items-center justify-center h-full">Error loading categories</p>
-              ) : categoryData && categoryData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="total_spent"
-                      nameKey="category"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-muted-foreground flex items-center justify-center h-full">No category data available.</p>
-              )}
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Average Per Receipt</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingDaily ? (
+                    <p className="text-sm text-muted-foreground">Loading...</p>
+                  ) : dailyError ? (
+                    <p className="text-sm text-destructive">Error</p>
+                  ) : (
+                    <p className="text-2xl font-semibold">{formatCurrency(averagePerReceipt)}</p>
+                  )}
+                   <p className="text-xs text-muted-foreground">
+                   {date ? formattedDateRange : 'Selected Range'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Average Per Receipt</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingDaily ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : dailyError ? (
-                <p className="text-sm text-destructive">Error</p>
-              ) : (
-                <p className="text-2xl font-semibold">{formatCurrency(averagePerReceipt)}</p>
-              )}
-               <p className="text-xs text-muted-foreground">
-               {date ? formattedDateRange : 'Selected Range'}
-              </p>
-            </CardContent>
-          </Card>
+            {/* Daily Spending Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Daily Spending Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingDaily && <p className="text-muted-foreground">Loading daily spending...</p>}
+                {dailyError && (
+                  <Alert variant="destructive">
+                    <Terminal className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>Failed to load daily spending data: {dailyError.message}</AlertDescription>
+                  </Alert>
+                )}
+                {!isLoadingDaily && !dailyError && aggregatedChartData.length > 0 && (
+                  <ResponsiveContainer width="100%" height={300} className="mb-6">
+                    <LineChart data={aggregatedChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      {/* Use short date format for chart */}
+                      <XAxis dataKey="date" tickFormatter={formatChartDate} />
+                      <YAxis tickFormatter={(value) => formatCurrency(value as number, 'USD').replace(/\\$/,'')} />
+                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                      <Legend />
+                      <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total Spent" dot={false}/>
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+                 {!isLoadingDaily && !dailyError && enhancedDailySpendingData && enhancedDailySpendingData.length > 0 && (
+                   <>
+                    <h4 className="text-lg font-semibold mb-2">Daily Spending Details</h4>
+                    <Table className="responsive-table">
+                      <TableHeader>
+                        <TableRow>
+                          {/* Date Header (Sortable) */}
+                          <TableHead
+                            className="w-[150px] cursor-pointer"
+                            onClick={() => {
+                              const newDirection = sortColumn === 'date' && sortDirection === 'desc' ? 'asc' : 'desc';
+                              setSortColumn('date');
+                              setSortDirection(newDirection);
+                            }}
+                          >
+                            Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          {/* Receipts Header */}
+                          <TableHead>Receipts</TableHead>
+                          {/* NEW: Top Merchant Header */}
+                          <TableHead>Top Merchant</TableHead>
+                          {/* NEW: Payment Method Header */}
+                          <TableHead>Payment Method</TableHead>
+                          {/* Total Spent Header (Sortable) */}
+                          <TableHead
+                            className="text-right cursor-pointer"
+                            onClick={() => {
+                              const newDirection = sortColumn === 'total' && sortDirection === 'desc' ? 'asc' : 'desc';
+                              setSortColumn('total');
+                              setSortDirection(newDirection);
+                            }}
+                          >
+                            Total Spent {sortColumn === 'total' && (sortDirection === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
+                          <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
+                            <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
+                            <TableCell data-label="Receipts">
+                              {receiptIds.length > 0 ? (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => {
+                                    setReceiptsForDay(receiptIds);
+                                    setSelectedDateForList(date);
+                                    setIsListModalOpen(true);
+                                  }}
+                                  className="h-auto p-0 text-xs text-left"
+                                  title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
+                                >
+                                  View {receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No Receipts</span>
+                              )}
+                            </TableCell>
+                            {/* NEW: Top Merchant Cell */}
+                            <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
+                            {/* NEW: Payment Method Cell */}
+                            <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
+                            <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                   </>
+                 )}
+                {!isLoadingDaily && !dailyError && (!enhancedDailySpendingData || enhancedDailySpendingData.length === 0) && (
+                  <p className="text-muted-foreground">No spending data available for this period.</p>
+                )}
+              </CardContent>
+            </Card>
+          </section>
         </div>
-
-        {/* Daily Spending Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Spending Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingDaily && <p className="text-muted-foreground">Loading daily spending...</p>}
-            {dailyError && (
-              <Alert variant="destructive">
-                <Terminal className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>Failed to load daily spending data: {dailyError.message}</AlertDescription>
-              </Alert>
-            )}
-            {!isLoadingDaily && !dailyError && aggregatedChartData.length > 0 && (
-              <ResponsiveContainer width="100%" height={300} className="mb-6">
-                <LineChart data={aggregatedChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  {/* Use short date format for chart */}
-                  <XAxis dataKey="date" tickFormatter={formatChartDate} />
-                  <YAxis tickFormatter={(value) => formatCurrency(value as number, 'USD').replace(/\\$/,'')} />
-                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                  <Legend />
-                  <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total Spent" dot={false}/>
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-             {!isLoadingDaily && !dailyError && enhancedDailySpendingData && enhancedDailySpendingData.length > 0 && (
-               <>
-                <h4 className="text-lg font-semibold mb-2">Daily Spending Details</h4>
-                <Table className="responsive-table">
-                  <TableHeader>
-                    <TableRow>
-                      {/* Date Header (Sortable) */}
-                      <TableHead
-                        className="w-[150px] cursor-pointer"
-                        onClick={() => {
-                          const newDirection = sortColumn === 'date' && sortDirection === 'desc' ? 'asc' : 'desc';
-                          setSortColumn('date');
-                          setSortDirection(newDirection);
-                        }}
-                      >
-                        Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      {/* Receipts Header */}
-                      <TableHead>Receipts</TableHead>
-                      {/* NEW: Top Merchant Header */}
-                      <TableHead>Top Merchant</TableHead>
-                      {/* NEW: Payment Method Header */}
-                      <TableHead>Payment Method</TableHead>
-                      {/* Total Spent Header (Sortable) */}
-                      <TableHead
-                        className="text-right cursor-pointer"
-                        onClick={() => {
-                          const newDirection = sortColumn === 'total' && sortDirection === 'desc' ? 'asc' : 'desc';
-                          setSortColumn('total');
-                          setSortDirection(newDirection);
-                        }}
-                      >
-                        Total Spent {sortColumn === 'total' && (sortDirection === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
-                      <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
-                        <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
-                        <TableCell data-label="Receipts">
-                          {receiptIds.length > 0 ? (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() => {
-                                setReceiptsForDay(receiptIds);
-                                setSelectedDateForList(date);
-                                setIsListModalOpen(true);
-                              }}
-                              className="h-auto p-0 text-xs text-left"
-                              title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
-                            >
-                              View {receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No Receipts</span>
-                          )}
-                        </TableCell>
-                        {/* NEW: Top Merchant Cell */}
-                        <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
-                        {/* NEW: Payment Method Cell */}
-                        <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
-                        <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-               </>
-             )}
-            {!isLoadingDaily && !dailyError && (!enhancedDailySpendingData || enhancedDailySpendingData.length === 0) && (
-              <p className="text-muted-foreground">No spending data available for this period.</p>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Receipt List Modal */}
         {isListModalOpen && selectedDateForList && (
@@ -527,8 +527,8 @@ const AnalysisPage = () => {
             </DialogContent>
           </Dialog>
         )}
-      </div>
-    </>
+      </main>
+    </div>
   );
 };
 

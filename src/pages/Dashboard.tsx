@@ -9,7 +9,8 @@ import { Link } from "react-router-dom";
 import { 
   Upload, Search, Filter, SlidersHorizontal, 
   PlusCircle, XCircle, Calendar, DollarSign, X,
-  LayoutGrid, LayoutList, Table as TableIcon
+  LayoutGrid, LayoutList, Table as TableIcon,
+  FileText
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
@@ -20,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import UploadZone from "@/components/UploadZone";
+import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
 import { 
   Table, 
   TableBody, 
@@ -30,7 +32,7 @@ import {
 } from "@/components/ui/table";
 
 // Define view mode types
-type ViewMode = "grid" | "list" | "table";
+type ViewMode = "grid" | "list" | "table" | "reports";
 
 // Add this function before the Dashboard component
 const calculateAggregateConfidence = (receipt: Receipt) => {
@@ -383,6 +385,9 @@ export default function Dashboard() {
               <ToggleGroupItem value="table" aria-label="Table view" title="Table view">
                 <TableIcon size={18} />
               </ToggleGroupItem>
+              <ToggleGroupItem value="reports" aria-label="Reports view" title="Reports view">
+                <FileText size={18} />
+              </ToggleGroupItem>
             </ToggleGroup>
 
             <Button 
@@ -395,108 +400,118 @@ export default function Dashboard() {
           </motion.div>
         </div>
         
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-          className="glass-card p-4 mb-8"
-        >
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-grow">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by merchant..."
-                className="pl-9 bg-background/50"
-                value={searchQuery}
-                onChange={handleSearch}
-              />
+        {/* Filters and Tabs Section - Conditionally Render based on viewMode */}
+        {viewMode !== 'reports' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            className="glass-card p-4 mb-8"
+          >
+            {/* Search and Filters Row */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-grow">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by merchant..."
+                  className="pl-9 bg-background/50"
+                  value={searchQuery}
+                  onChange={handleSearch}
+                />
+              </div>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2 whitespace-nowrap">
+                    <SlidersHorizontal size={16} />
+                    Filters
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] bg-background/95 backdrop-blur-sm border border-border">
+                  <div className="space-y-4">
+                    {/* Sort By */}
+                    <h4 className="font-medium">Sort by</h4>
+                    <ToggleGroup 
+                      type="single" 
+                      value={sortOrder} 
+                      onValueChange={(value) => value && setSortOrder(value as any)}
+                      className="flex flex-wrap justify-start gap-2"
+                    >
+                      <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
+                        <Calendar className="h-4 w-4 mr-2" /> Newest
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
+                        <Calendar className="h-4 w-4 mr-2" /> Oldest
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
+                        <DollarSign className="h-4 w-4 mr-2" /> Highest
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount" className="flex-grow-0">
+                        <DollarSign className="h-4 w-4 mr-2" /> Lowest
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    
+                    {/* Filter by Currency */}
+                    {currencies.length > 0 && (
+                      <>
+                        <h4 className="font-medium pt-2">Currency</h4>
+                        <ToggleGroup 
+                          type="single" 
+                          value={filterByCurrency || "all"} 
+                          onValueChange={(value) => setFilterByCurrency(value === "all" ? null : value)}
+                          className="flex flex-wrap justify-start gap-2"
+                        >
+                          <ToggleGroupItem value="all" aria-label="Show all currencies" className="flex-grow-0">
+                            All
+                          </ToggleGroupItem>
+                          {currencies.map(currency => (
+                            <ToggleGroupItem 
+                              key={currency} 
+                              value={currency} 
+                              aria-label={`Filter by ${currency}`}
+                              className="flex-grow-0"
+                            >
+                              {currency}
+                            </ToggleGroupItem>
+                          ))}
+                        </ToggleGroup>
+                      </>
+                    )}
+                    
+                    {/* Clear Filters Button */}
+                    <div className="pt-2">
+                      <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2 whitespace-nowrap">
-                  <SlidersHorizontal size={16} />
-                  Filters
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] bg-background/95 backdrop-blur-sm border border-border">
-                <div className="space-y-4">
-                  <h4 className="font-medium">Sort by</h4>
-                  <ToggleGroup 
-                    type="single" 
-                    value={sortOrder} 
-                    onValueChange={(value) => value && setSortOrder(value as any)}
-                    className="flex flex-wrap justify-start gap-2"
-                  >
-                    <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Newest
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Oldest
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Highest
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount" className="flex-grow-0">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Lowest
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  
-                  {currencies.length > 0 && (
-                    <>
-                      <h4 className="font-medium pt-2">Currency</h4>
-                      <ToggleGroup 
-                        type="single" 
-                        value={filterByCurrency || "all"} 
-                        onValueChange={(value) => setFilterByCurrency(value === "all" ? null : value)}
-                        className="flex flex-wrap justify-start gap-2"
-                      >
-                        <ToggleGroupItem value="all" aria-label="Show all currencies" className="flex-grow-0">
-                          All
-                        </ToggleGroupItem>
-                        {currencies.map(currency => (
-                          <ToggleGroupItem 
-                            key={currency} 
-                            value={currency} 
-                            aria-label={`Filter by ${currency}`}
-                            className="flex-grow-0"
-                          >
-                            {currency}
-                          </ToggleGroupItem>
-                        ))}
-                      </ToggleGroup>
-                    </>
-                  )}
-                  
-                  <div className="pt-2">
-                    <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
-                      Clear Filters
-                    </Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          <div className="mt-4">
-            <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | ReceiptStatus)}>
-              <TabsList className="bg-background/50">
-                <TabsTrigger value="all">All Receipts</TabsTrigger>
-                <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
-                <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
-                <TabsTrigger value="synced">Synced to Zoho</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </motion.div>
+            {/* Status Tabs */}
+            <div className="mt-4">
+              <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | ReceiptStatus)}>
+                <TabsList className="bg-background/50">
+                  <TabsTrigger value="all">All Receipts</TabsTrigger>
+                  <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
+                  <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
+                  <TabsTrigger value="synced">Synced to Zoho</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </motion.div>
+        )}
         
-        {renderReceiptContent()}
+        {/* Main Content Area - Switches based on viewMode */}
+        {viewMode === 'reports' ? (
+          <DailyPDFReportGenerator />
+        ) : (
+          renderReceiptContent()
+        )}
       </main>
       
+      {/* Upload Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

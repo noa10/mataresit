@@ -24,19 +24,27 @@ export interface ReceiptUpload {
   } | null;
 }
 
+export interface ReceiptItem {
+  id: string;
+  receipt_id: string;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
 export interface Receipt {
   id: string;
-  user_id: string;
-  merchant: string;
   date: string;
+  merchant: string;
   total: number;
-  currency: string;
-  image_url: string;
+  payment_method: string;
+  image_url?: string;
   status: ReceiptStatus;
   created_at: string;
   updated_at: string;
   tax?: number;
-  payment_method?: string;
+  currency: string;
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
@@ -96,6 +104,7 @@ export interface ConfidenceScore {
 
 // ReceiptWithDetails now inherits confidence_scores from Receipt
 export interface ReceiptWithDetails extends Receipt {
+  items: ReceiptItem[];
   lineItems?: ReceiptLineItem[];
   // REMOVED: Separate 'confidence' field is no longer needed
   // confidence?: {
