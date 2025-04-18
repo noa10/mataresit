@@ -352,12 +352,23 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
         yPosition += 5
 
         // Get the image directly from storage
-        const imagePath = receipt.image_url.replace('receipt-images/', '')
+        let imagePath = receipt.image_url
+        
+        // Handle different URL formats
+        // If full URL, extract path after storage bucket name
+        if (imagePath.includes('storage/v1/object/public/receipt_images/')) {
+          imagePath = imagePath.split('receipt_images/')[1]
+        } 
+        // If it's already a relative path with bucket prefix, remove it
+        else if (imagePath.startsWith('receipt_images/')) {
+          imagePath = imagePath.replace('receipt_images/', '')
+        }
+        
         console.log(`Downloading image: ${imagePath} for receipt ${receipt.id}`)
 
         const { data: imageData, error: imageError } = await supabaseClient
           .storage
-          .from('receipt-images')
+          .from('receipt_images')
           .download(imagePath)
 
         if (imageError || !imageData) {
@@ -371,36 +382,120 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
         const imageBytes = await imageData.arrayBuffer()
         const base64Image = arrayBufferToBase64(imageBytes)
 
-        // Calculate image dimensions to fit nicely on the page
-        // with a maximum width and maintaining aspect ratio
-        const maxImgWidth = 160 // mm
-        const imgWidth = Math.min(maxImgWidth, 160)
-        const imgHeight = 120 // Approximate height, will be adjusted by jsPDF
-
-        // Check if image fits on current page
-        if (yPosition + imgHeight > 260) {
-          pdf.addPage()
-          addHeader()
-          yPosition = 60
+        // Detect image type from the base64 content or filename
+        let imageFormat = 'JPEG' // Default format
+        
+        // Check file extension if present in the path
+        if (imagePath.toLowerCase().endsWith('.png')) {
+          imageFormat = 'PNG'
+        } else if (imagePath.toLowerCase().endsWith('.gif')) {
+          imageFormat = 'GIF'
+        } else if (imagePath.toLowerCase().endsWith('.webp')) {
+          // jsPDF might not support WebP directly
+          console.log('WebP format detected, attempting to use as JPEG')
         }
-
-        // Add a border around the image
-        pdf.setDrawColor(200, 200, 200)
-        pdf.rect(20, yPosition, imgWidth, imgHeight)
-
-        // Add the image to the PDF
-        pdf.addImage(`data:image/jpeg;base64,${base64Image}`, 'JPEG', 20, yPosition, imgWidth, imgHeight)
-        yPosition += imgHeight + 20
+        
+        console.log(`Using image format: ${imageFormat}`)
+        
+        try {
+          // 1) Decide your fixed display height (in mm)
+          const fixedHeight = 60; // Fixed height for all receipt images
+          
+          // 2) Use jsPDF's helper to read the image's natural dimensions
+          const imgProps = pdf.getImageProperties(
+            `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`
+          );
+          const origWidth = imgProps.width;
+          const origHeight = imgProps.height;
+          
+          // 3) Compute the display width that keeps the aspect ratio
+          const displayWidth = origWidth * (fixedHeight / origHeight);
+          console.log(`Original image dimensions: ${origWidth}x${origHeight}, display size: ${displayWidth}mm x ${fixedHeight}mm`);
+          
+          // 4) Check for page break if it won't fit
+          if (yPosition + fixedHeight > 260) {
+            pdf.addPage();
+            addHeader();
+            yPosition = 60;
+          }
+          
+          // 5) Draw a border around the resized image
+          pdf.setDrawColor(200, 200, 200);
+          pdf.rect(20, yPosition, displayWidth, fixedHeight);
+          
+          // 6) Finally, add the image at fixedHeight and computed width
+          pdf.addImage(
+            `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
+            imageFormat,
+            20,            // x
+            yPosition,     // y
+            displayWidth,  // width
+            fixedHeight    // height
+          );
+          
+          // 7) Advance your cursor
+          yPosition += fixedHeight + 20;
+          
+        } catch (addImageError) {
+          console.error('Error adding image with proper aspect ratio:', addImageError);
+          
+          // Fallback to simple approach if getImageProperties doesn't work
+          try {
+            // Simple fallback with fixed dimensions
+            const fallbackHeight = 60;
+            const fallbackWidth = 120;
+            
+            // Check if we need a page break
+            if (yPosition + fallbackHeight > 260) {
+              pdf.addPage();
+              addHeader();
+              yPosition = 60;
+            }
+            
+            // Draw border and add image with fallback dimensions
+            pdf.setDrawColor(200, 200, 200);
+            pdf.rect(20, yPosition, fallbackWidth, fallbackHeight);
+            
+            pdf.addImage(
+              `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
+              imageFormat,
+              20,
+              yPosition,
+              fallbackWidth,
+              fallbackHeight
+            );
+            
+            yPosition += fallbackHeight + 20;
+            console.log('Used fallback fixed dimensions for image');
+          } catch (finalError) {
+            console.error('Failed to add image even with fallback dimensions:', finalError);
+            // Just advance the cursor in case of complete failure
+            yPosition += 20;
+          }
+        }
 
         // Reset text color
         pdf.setTextColor(0, 0, 0)
       } catch (imgError) {
         console.error('Error processing image:', imgError)
+        // Log more detailed error information
+        if (imgError instanceof Error) {
+          console.error(`Image error details: ${imgError.message}`)
+          console.error(`Image path attempted: ${receipt.image_url}`)
+        }
+        
+        // Try to get a better error message
+        let errorMessage = 'Error loading receipt image'
+        if (imgError instanceof Error && imgError.message) {
+          // Show a more specific error but keep it short
+          errorMessage = `Error: ${imgError.message.substring(0, 30)}...`
+        }
+        
         // Add styled message for unavailable image
         pdf.setFillColor(245, 245, 245)
         pdf.rect(20, yPosition, 160, 30, 'F')
         pdf.setTextColor(100, 100, 100)
-        pdf.text('Error loading receipt image', 100, yPosition + 15, { align: 'center' })
+        pdf.text(errorMessage, 100, yPosition + 15, { align: 'center' })
         pdf.setTextColor(0, 0, 0)
         yPosition += 40
       }
