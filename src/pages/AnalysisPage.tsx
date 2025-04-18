@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom'; // Import Link for navigation
-import { format, addDays, startOfDay } from 'date-fns'; // Import date-fns functions
-import { DateRange } from 'react-day-picker'; // Import DateRange type
+import { Link } from 'react-router-dom';
+import { format, addDays, startOfDay } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css'; // Import calendar styles
+import 'react-day-picker/dist/style.css';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,14 +17,18 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Import Popover
-import { Calendar as CalendarIcon, Terminal } from "lucide-react"; // Import Calendar icon
-import { cn } from "@/lib/utils"; // Import cn utility
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Import Dialog components
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
+import { cn } from "@/lib/utils";
 
+// Import Lucide icons
+import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye } from "lucide-react";
+
+// Import services and types
 import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
-import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area } from 'recharts';
 
 // Import ReceiptViewer and related types/functions
 import ReceiptViewer from '@/components/ReceiptViewer';
@@ -58,7 +62,8 @@ const formatFullDate = (dateString: string) => {
     }
   };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D']; // Define COLORS array
+// Define color constants for charts and UI elements
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D'];
 
 // Define ReceiptModalContent component here for simplicity
 interface ReceiptModalContentProps {
@@ -156,28 +161,508 @@ type EnhancedDailySpendingData = {
   paymentMethod: string;
 };
 
+// ExpenseStats Component
+interface ExpenseStatsProps {
+  totalSpending: number;
+  totalReceipts: number;
+  averagePerReceipt: number;
+  dateRange: DateRange | undefined;
+  onDateRangeClick: () => void;
+}
+
+const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
+  // Format date range for display
+  const formattedDateRange = dateRange?.from && dateRange?.to 
+    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+    : 'All time';
+
+  const stats = [
+    {
+      title: "Total Spending",
+      value: formatCurrency(totalSpending),
+      period: formattedDateRange,
+      icon: CreditCard,
+      trend: "",  // We'll leave trends empty since we don't have trend data yet
+      trendUp: true
+    },
+    {
+      title: "Total Receipts",
+      value: totalReceipts.toString(),
+      period: formattedDateRange,
+      icon: Receipt,
+      trend: "",
+      trendUp: true
+    },
+    {
+      title: "Average Per Receipt",
+      value: formatCurrency(averagePerReceipt),
+      period: formattedDateRange,
+      icon: Receipt,
+      trend: "",
+      trendUp: true
+    }
+  ];
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader className="flex flex-row justify-between items-start pb-2">
+        <CardTitle className="text-lg">Financial Summary</CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+          onClick={onDateRangeClick}
+        >
+          <CalendarIcon className="w-4 h-4" />
+          <span>{formattedDateRange}</span>
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6 pt-2">
+        <div className="grid gap-6">
+          {stats.map((stat, index) => (
+            <div key={index} className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">{stat.title}</p>
+                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.period}</p>
+                {stat.trend && (
+                  <p className={`text-sm flex items-center gap-1 ${stat.trendUp ? 'text-green-600' : 'text-red-600'}`}>
+                    <TrendingUp className={`w-4 h-4 ${stat.trendUp ? '' : 'rotate-180'}`} />
+                    {stat.trend}
+                  </p>
+                )}
+              </div>
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <stat.icon className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// CategoryPieChart Component
+interface CategoryPieChartProps {
+  categoryData: CategorySpendingData[];
+  isLoading?: boolean;
+}
+
+const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading }) => {
+  if (isLoading) {
+    return (
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Spending by Category</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[300px]">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const chartData = categoryData.map((category, index) => ({
+    name: category.category || 'Uncategorized',
+    value: category.total_spent,
+    color: COLORS[index % COLORS.length],
+  }));
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader>
+        <CardTitle>Spending by Category</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px]">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value) => formatCurrency(value as number)}
+                  contentStyle={{ background: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No category data available</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// SpendingChart Component
+interface SpendingChartProps {
+  dailyData: EnhancedDailySpendingData[];
+  isLoading?: boolean;
+}
+
+const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading }) => {
+  if (isLoading) {
+    return (
+      <Card className="border border-border/40 shadow-sm">
+        <CardHeader>
+          <CardTitle>Daily Spending Trend</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[350px]">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Process and enhance chart data
+  const sortedData = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const chartData = sortedData.map(day => ({
+    date: formatChartDate(day.date),
+    fullDate: day.date,
+    amount: day.total,
+    receipts: day.receiptIds.length
+  }));
+  
+  // Calculate statistics for annotations
+  const totalSpending = chartData.reduce((sum, day) => sum + day.amount, 0);
+  const avgSpending = totalSpending / (chartData.length || 1);
+  const maxSpending = Math.max(...chartData.map(d => d.amount), 0);
+  const peakDay = chartData.find(d => d.amount === maxSpending);
+  
+  // Custom tooltip to display more information
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="p-3 bg-popover border border-border rounded-md shadow-md">
+          <p className="font-medium text-sm mb-1 text-popover-foreground">{format(new Date(data.fullDate), 'MMM d, yyyy')}</p>
+          <p className="text-sm text-popover-foreground mb-1">
+            <span className="font-medium">Spent:</span> {formatCurrency(data.amount)}
+          </p>
+          <p className="text-xs text-popover-foreground/80">
+            {data.receipts} {data.receipts === 1 ? 'receipt' : 'receipts'}
+          </p>
+          {data.amount > avgSpending && (
+            <p className="text-xs text-destructive mt-1">
+              {((data.amount / avgSpending - 1) * 100).toFixed(0)}% above average
+            </p>
+          )}
+          {data.amount < avgSpending && (
+            <p className="text-xs text-green-500 mt-1">
+              {((1 - data.amount / avgSpending) * 100).toFixed(0)}% below average
+            </p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader className="flex flex-row justify-between items-start">
+        <div>
+          <CardTitle>Daily Spending Trend</CardTitle>
+          {chartData.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Average daily spend: {formatCurrency(avgSpending)}
+            </p>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[350px]">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart 
+                data={chartData} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }} 
+                className="[&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground [&_.recharts-reference-line-label]:fill-foreground dark:[&_.recharts-dot]:stroke-opacity-100 dark:[&_.recharts-dot]:fill-primary/80 dark:[&_.recharts-dot]:stroke-background dark:[&_.recharts-activedot]:stroke-background dark:[&_.recharts-activedot]:fill-primary"
+              >
+                <defs>
+                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="var(--border)" opacity={0.4} className="dark:opacity-60" />
+                
+                <XAxis 
+                  dataKey="date" 
+                  stroke="var(--muted-foreground)" 
+                  fontSize={12} 
+                  tickLine={false} 
+                  axisLine={{stroke: 'var(--border)'}}
+                  padding={{ left: 10, right: 10 }}
+                />
+                
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={{stroke: 'var(--border)'}}
+                  tickFormatter={(value) => `MYR ${value}`}
+                />
+                
+                <Tooltip content={<CustomTooltip />} />
+                
+                {/* Area under the line chart */}
+                <Area 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke="var(--primary)" 
+                  strokeWidth={0} 
+                  fillOpacity={1} 
+                  fill="url(#colorAmount)"
+                  className="dark:opacity-30" 
+                />
+                
+                {/* Average spending reference line */}
+                <ReferenceLine 
+                  y={avgSpending} 
+                  stroke="var(--muted-foreground)" 
+                  strokeDasharray="3 3"
+                  label={{ 
+                    value: 'Average', 
+                    position: 'insideTopRight',
+                    fill: 'var(--muted-foreground)',
+                    fontSize: 11,
+                    className: 'recharts-reference-line-label'
+                  }}
+                />
+                
+                {/* Vertical lines from points to axis */}
+                {chartData.map((entry, index) => (
+                  <ReferenceLine
+                    key={`ref-line-${index}`}
+                    x={entry.date}
+                    stroke="var(--primary)"
+                    strokeOpacity={0.4}
+                    strokeDasharray="3 3"
+                    segment={[{ y: 0 }, { y: entry.amount }]}
+                    className="dark:opacity-60"
+                  />
+                ))}
+
+                {/* Main line */}
+                <Line
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  dot={{
+                    stroke: 'var(--primary)',
+                    strokeWidth: 3,
+                    fill: 'var(--card)',
+                    r: 5,
+                    className: 'dark:stroke-[3px]'
+                  }}
+                  activeDot={{
+                    stroke: 'var(--card)',
+                    strokeWidth: 3,
+                    fill: 'var(--primary)',
+                    r: 7,
+                    className: 'dark:stroke-[3px]'
+                  }}
+                />
+                
+                {/* Peak spending marker */}
+                {peakDay && (
+                  <ReferenceLine 
+                    x={peakDay.date} 
+                    stroke="var(--destructive)" 
+                    label={{ 
+                      value: 'Peak', 
+                      position: 'top',
+                      fill: 'var(--destructive)',
+                      fontSize: 11
+                    }}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No spending data available</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ExpenseTable Component
+interface ExpenseTableProps {
+  sortedData: EnhancedDailySpendingData[];
+  dateRange: DateRange | undefined;
+  setDateRange: (range: DateRange | undefined) => void;
+  onViewReceipts: (date: string, receiptIds: string[]) => void;
+  isLoading?: boolean;
+  isDatePickerOpen: boolean;
+  setIsDatePickerOpen: (isOpen: boolean) => void;
+}
+
+const ExpenseTable: React.FC<ExpenseTableProps> = ({ 
+  sortedData, 
+  dateRange, 
+  setDateRange, 
+  onViewReceipts,
+  isLoading,
+  isDatePickerOpen,
+  setIsDatePickerOpen
+}) => {
+  if (isLoading) {
+    return (
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Daily Spending Details</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[200px]">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <CardTitle>Daily Spending Details</CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Analysis Period:</span>
+            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-2"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  <span>
+                    {dateRange?.from && dateRange?.to ? (
+                      <>
+                        {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d, yyyy')}
+                      </>
+                    ) : (
+                      'Filter by date'
+                    )}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range);
+                    if (range?.from && range?.to) {
+                      setIsDatePickerOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Receipts</TableHead>
+                <TableHead>Top Merchant</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead className="text-right">Total Spent</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedData.length > 0 ? sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
+                <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
+                  <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
+                  <TableCell data-label="Receipts">
+                    {receiptIds.length > 0 ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onViewReceipts(date, receiptIds)}
+                        className="h-auto py-1 px-2 text-xs flex items-center gap-1"
+                        title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
+                      >
+                        <Receipt className="w-3 h-3" />
+                        <span>{receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}</span>
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No Receipts</span>
+                    )}
+                  </TableCell>
+                  <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
+                  <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
+                  <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                    No spending data available for this period
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};;
+
 const AnalysisPage = () => {
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
-    const today = startOfDay(new Date());
+    const today = new Date();
     return {
-      from: addDays(today, -30),
+      from: addDays(today, -30), // Default: last 30 days
       to: today,
     };
   });
+  
+  // State for sorting
+  const [sortColumn, setSortColumn] = useState<string>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // State for table sorting
-  const [sortColumn, setSortColumn] = React.useState<'date' | 'total'>('date');
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
-
-  // State for Receipt Viewer Modal
-  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  // State for modals
+  const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [isViewerModalOpen, setIsViewerModalOpen] = useState(false);
-
-  // State for Receipt List Modal
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [receiptsForDay, setReceiptsForDay] = useState<string[]>([]);
   const [selectedDateForList, setSelectedDateForList] = useState<string | null>(null);
-  const [isListModalOpen, setIsListModalOpen] = useState(false);
+  
+  // State for PDF generation
+  const [selectedDateForPDF, setSelectedDateForPDF] = useState<Date | undefined>(new Date());
+  const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
+
+  // State for date picker popover
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Prepare ISO strings for API calls
   const startDateISO = date?.from ? date.from.toISOString() : null;
@@ -291,232 +776,88 @@ const AnalysisPage = () => {
     setIsViewerModalOpen(true); // Open viewer modal
   };
 
+  // Function to open date range picker
+  const openDateRangePicker = () => {
+    setIsDatePickerOpen(true);
+  };
+
+  // Handler for viewing receipts (to be passed to ExpenseTable)
+  const handleViewReceipts = (date: string, receiptIds: string[]) => {
+    setReceiptsForDay(receiptIds);
+    setSelectedDateForList(date);
+    setIsListModalOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-secondary/20 to-accent/10">
+    <div className="min-h-screen bg-background p-4 md:p-8">
       <Navbar />
-      
-      <main className="container px-4 py-8">
-        <div className="flex flex-col gap-8">
-          {/* Reports Section */}
-          <section>
-            <h2 className="text-3xl font-extrabold mb-4">Reports</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <DailyPDFReportGenerator />
-              
-              {/* Add more report types here in the future */}
-            </div>
-          </section>
-
-          {/* Existing Analysis Section */}
-          <section>
-            <h2 className="text-3xl font-extrabold mb-4">Spending Analysis</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Date Range Picker Card */}
-              <Card className="border-2 border-secondary/30">
-                <CardHeader>
-                  <CardTitle>Select Date Range</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col items-center">
-                    <DayPicker
-                      mode="range"
-                      selected={date}
-                      onSelect={setDate}
-                      numberOfMonths={2}
-                      className="border rounded-lg p-4"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Analysis Cards */}
-              <Card className="border-2 border-secondary/30">
-                <CardHeader>
-                  <CardTitle>Total Spending</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingDaily ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : dailyError ? (
-                    <p className="text-sm text-destructive">Error</p>
-                  ) : (
-                    <p className="text-2xl font-semibold">{formatCurrency(totalSpending)}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {date ? formattedDateRange : 'Selected Range'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-secondary/30">
-                <CardHeader>
-                  <CardTitle>Spending by Category</CardTitle>
-                </CardHeader>
-                <CardContent className="h-[250px]"> {/* Give fixed height */}
-                  {isLoadingCategories ? (
-                    <p className="text-muted-foreground flex items-center justify-center h-full">Loading...</p>
-                  ) : categoriesError ? (
-                    <p className="text-destructive flex items-center justify-center h-full">Error loading categories</p>
-                  ) : categoryData && categoryData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="total_spent"
-                          nameKey="category"
-                        >
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value, name) => [
-                          formatCurrency(value as number),
-                          `${name}: ${((value as number) / totalCategorySpending * 100).toFixed(1)}%`
-                        ]} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p className="text-muted-foreground flex items-center justify-center h-full">No category data available.</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-secondary/30">
-                <CardHeader>
-                  <CardTitle>Average Per Receipt</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingDaily ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : dailyError ? (
-                    <p className="text-sm text-destructive">Error</p>
-                  ) : (
-                    <p className="text-2xl font-semibold">{formatCurrency(averagePerReceipt)}</p>
-                  )}
-                   <p className="text-xs text-muted-foreground">
-                   {date ? formattedDateRange : 'Selected Range'}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Daily Spending Section */}
-            <Card className="border-2 border-secondary/30">
-              <CardHeader>
-                <CardTitle>Daily Spending Trend</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingDaily && <p className="text-muted-foreground">Loading daily spending...</p>}
-                {dailyError && (
-                  <Alert variant="destructive">
-                    <Terminal className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>Failed to load daily spending data: {dailyError.message}</AlertDescription>
-                  </Alert>
-                )}
-                {!isLoadingDaily && !dailyError && aggregatedChartData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={300} className="mb-6">
-                    <LineChart data={aggregatedChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      {/* Use short date format for chart */}
-                      <XAxis dataKey="date" tickFormatter={formatChartDate} />
-                      <YAxis tickFormatter={(value) => formatCurrency(value as number, 'USD').replace(/\$/,'')} />
-                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                      <ReferenceLine y={Math.max(...aggregatedChartData.map(d => d.total))} stroke="red" label="Peak Spend" />
-                      <Legend />
-                      <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total Spent" dot={false}/>
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-                 {!isLoadingDaily && !dailyError && enhancedDailySpendingData && enhancedDailySpendingData.length > 0 && (
-                   <>
-                    <Card className="mb-4 border-2 border-secondary/30">
-                      <CardContent className="flex justify-between">
-                        <p>Total Receipts: {enhancedDailySpendingData.reduce((sum, day) => sum + day.receiptIds.length, 0)}</p>
-                        <p>Avg Daily Spend: {formatCurrency(totalSpending / enhancedDailySpendingData.length)}</p>
-                      </CardContent>
-                    </Card>
-                    <h4 className="text-lg font-semibold mb-2">Daily Spending Details</h4>
-                    <Table className="responsive-table">
-                      <TableHeader>
-                        <TableRow>
-                          {/* Date Header (Sortable) */}
-                          <TableHead
-                            className="w-[150px] cursor-pointer"
-                            onClick={() => {
-                              const newDirection = sortColumn === 'date' && sortDirection === 'desc' ? 'asc' : 'desc';
-                              setSortColumn('date');
-                              setSortDirection(newDirection);
-                            }}
-                          >
-                            Date {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                          </TableHead>
-                          {/* Receipts Header */}
-                          <TableHead>Receipts</TableHead>
-                          {/* NEW: Top Merchant Header */}
-                          <TableHead>Top Merchant</TableHead>
-                          {/* NEW: Payment Method Header */}
-                          <TableHead>Payment Method</TableHead>
-                          {/* Total Spent Header (Sortable) */}
-                          <TableHead
-                            className="text-right cursor-pointer"
-                            onClick={() => {
-                              const newDirection = sortColumn === 'total' && sortDirection === 'desc' ? 'asc' : 'desc';
-                              setSortColumn('total');
-                              setSortDirection(newDirection);
-                            }}
-                          >
-                            Total Spent {sortColumn === 'total' && (sortDirection === 'asc' ? '↑' : '↓')}
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
-                          <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
-                            <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
-                            <TableCell data-label="Receipts">
-                              {receiptIds.length > 0 ? (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  onClick={() => {
-                                    setReceiptsForDay(receiptIds);
-                                    setSelectedDateForList(date);
-                                    setIsListModalOpen(true);
-                                  }}
-                                  className="h-auto p-0 text-xs text-left"
-                                  title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
-                                >
-                                  View {receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}
-                                </Button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">No Receipts</span>
-                              )}
-                            </TableCell>
-                            {/* NEW: Top Merchant Cell */}
-                            <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
-                            {/* NEW: Payment Method Cell */}
-                            <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
-                            <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                   </>
-                 )}
-                {!isLoadingDaily && !dailyError && (!enhancedDailySpendingData || enhancedDailySpendingData.length === 0) && (
-                  <p className="text-muted-foreground">No spending data available for this period.</p>
-                )}
-              </CardContent>
-            </Card>
-          </section>
+      <main className="max-w-7xl mx-auto space-y-6">
+        {/* Dashboard Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Expense Analysis</h1>
+          <p className="text-muted-foreground">Track and analyze your spending patterns</p>
         </div>
+
+        {/* Grid Layout for PDF Report Generator and ExpenseStats */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* PDF Report Generation Card */}
+          <Card className="border border-border/40 shadow-sm">
+            <CardHeader>
+              <CardTitle>Generate Daily Spent Report</CardTitle>
+              <p className="text-sm text-muted-foreground">Select a day to generate a detailed PDF report of all expenses for that day.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Calendar
+                mode="single"
+                selected={selectedDateForPDF}
+                onSelect={setSelectedDateForPDF}
+                className="rounded-md border border-border"
+              />
+              <Button 
+                className="w-full" 
+                onClick={() => setIsPDFModalOpen(true)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Generate PDF Report
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Use the ExpenseStats component */}
+          <ExpenseStats 
+            totalSpending={totalSpending}
+            totalReceipts={enhancedDailySpendingData?.reduce((sum, day) => sum + day.receiptIds.length, 0) || 0}
+            averagePerReceipt={averagePerReceipt}
+            dateRange={date}
+            onDateRangeClick={openDateRangePicker}
+          />
+        </div>
+
+        {/* Grid Layout for Charts */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Use the CategoryPieChart component */}
+          <CategoryPieChart 
+            categoryData={categoryData || []}
+            isLoading={isLoadingCategories}
+          />
+
+          {/* Use the SpendingChart component */}
+          <SpendingChart 
+            dailyData={aggregatedChartData}
+            isLoading={isLoadingDaily}
+          />
+        </div>
+
+        {/* Use the ExpenseTable component */}
+        <ExpenseTable 
+          sortedData={sortedData}
+          dateRange={date}
+          setDateRange={setDate}
+          onViewReceipts={handleViewReceipts}
+          isLoading={isLoadingDaily}
+          isDatePickerOpen={isDatePickerOpen}
+          setIsDatePickerOpen={setIsDatePickerOpen}
+        />
 
         {/* Receipt List Modal */}
         {isListModalOpen && selectedDateForList && (
@@ -539,9 +880,20 @@ const AnalysisPage = () => {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* PDF Generation Modal */}
+        {isPDFModalOpen && selectedDateForPDF && (
+          <Dialog open={isPDFModalOpen} onOpenChange={setIsPDFModalOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Daily Expense Report</DialogTitle>
+              </DialogHeader>
+              <DailyPDFReportGenerator />
+            </DialogContent>
+          </Dialog>
+        )}
       </main>
     </div>
   );
 };
-
-export default AnalysisPage; 
+export default AnalysisPage;
