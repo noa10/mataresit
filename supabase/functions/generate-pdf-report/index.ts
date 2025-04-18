@@ -107,7 +107,7 @@ serve(async (req) => {
     const endTime = endOfDay(selectedDay).toISOString()
 
     // Fetch receipts for the selected day
-    const { data: receipts, error: receiptsError } = await supabaseClient
+    const { data: receiptsData, error: receiptsError } = await supabaseClient
       .from('receipts')
       .select('*')
       .gte('date', startTime)
@@ -121,12 +121,8 @@ serve(async (req) => {
       })
     }
 
-    if (!receipts || receipts.length === 0) {
-      return new Response(JSON.stringify({ error: 'No receipts found for the selected day' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    // Always use an array, even if no receipts found
+    const receipts = receiptsData ?? [];
 
     console.log(`Found ${receipts.length} receipts for ${date}`);
 
@@ -252,13 +248,25 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   yPosition += 7
 
   // Initialize grandTotal here - will be recalculated after processing receipts
-  let grandTotal = receipts.reduce((sum, receipt) => sum + receipt.total, 0)
+  let grandTotal = receipts.reduce((sum, receipt) => sum + (receipt?.total || 0), 0)
   pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition)
   yPosition += 10
 
   pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(11)
   pdf.text('This report contains detailed information for all receipts recorded on the selected date.', 20, yPosition)
   yPosition += 15
+
+  // --- ADDITION: Handle case where there are no receipts ---
+  if (receipts.length === 0) {
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('No receipts were found for this date.', 105, yPosition + 10, { align: 'center' });
+    pdf.setTextColor(0, 0, 0); // Reset color
+    pdf.setFont('helvetica', 'normal'); // Reset font style
+    yPosition += 25; // Add space
+  }
+  // --- END OF ADDITION ---
 
   // Process each receipt
   for (const receipt of receipts) {
