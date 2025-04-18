@@ -251,7 +251,8 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.text(`Total Receipts: ${receipts.length}`, 20, yPosition)
   yPosition += 7
 
-  const grandTotal = receipts.reduce((sum, receipt) => sum + receipt.total, 0)
+  // Initialize grandTotal here - will be recalculated after processing receipts
+  let grandTotal = receipts.reduce((sum, receipt) => sum + receipt.total, 0)
   pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition)
   yPosition += 10
 
@@ -528,32 +529,57 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.setFontSize(11)
   pdf.text('Overview of all expenses for ' + format(selectedDay, 'MMMM d, yyyy'), 105, 68, { align: 'center' })
 
-  // Summary table with improved styling
-  const summaryData = receipts.map(receipt => {
+  // Process receipts for statistics calculation - before summary table generation
+  const processedReceiptsForStats = receipts.map(receipt => {
     // Safely handle potentially null/undefined values
-    // Check if receipt has the necessary properties
     if (!receipt) {
       console.warn('Found null or undefined receipt in receipts array');
-      return ['Unknown', 'Unknown', 'Unknown', '0.00'];
+      return {
+        merchant: 'Unknown',
+        payment_method: '',
+        paid_by: 'Unknown', 
+        total: 0,
+        id: 'unknown'
+      };
     }
     
+    const paymentMethod = (receipt.payment_method || '').toString().toLowerCase();
+    // Define "Mastercard" as any payment method containing 'master'
+    const isMastercard = paymentMethod.includes('master');
+    const paidBy = isMastercard ? 'Abah' : 'Bakaris';
+    
+    // Ensure total is a valid number, default to 0 if not
+    const total = (typeof receipt.total === 'number' && !isNaN(receipt.total)) ? receipt.total : 0;
+
+    return {
+      ...receipt, // Keep original receipt data
+      total: total, // Use the validated/defaulted total
+      paid_by: paidBy
+    };
+  });
+
+  // Recalculate grandTotal using the processed totals to ensure consistency
+  grandTotal = processedReceiptsForStats.reduce((sum, receipt) => sum + receipt.total, 0);
+
+  // Summary table with improved styling - use processedReceiptsForStats
+  const summaryData = processedReceiptsForStats.map(receipt => {
     // Get merchant name safely
     const merchant = receipt.merchant || 'Unknown';
+    
+    // Use pre-calculated paid_by value from processedReceiptsForStats
+    const paidBy = receipt.paid_by;
     
     // Get payment method safely
     const paymentMethod = (receipt.payment_method || '').toString();
     
-    // Check if payment method (case-insensitive) includes 'master'
-    const paidBy = paymentMethod.toLowerCase().includes('master') ? 'Abah' : 'Bakaris';
-    
-    // Get total safely, ensuring it's a number
-    const total = (typeof receipt.total === 'number') ? receipt.total.toFixed(2) : '0.00';
+    // Use the validated total
+    const totalString = receipt.total.toFixed(2);
     
     return [
       merchant,      // Merchant column
       paidBy,        // Paid by column
       paymentMethod, // Payment Method column
-      total          // Amount (RM) column
+      totalString    // Amount (RM) column
     ];
   });
 
@@ -589,21 +615,116 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.text(`Grand Total: RM ${grandTotal.toFixed(2)}`, 170, finalY, { align: 'right' })
   pdf.setTextColor(0, 0, 0) // Reset text color
 
-  // Add some statistics
-  pdf.setFont('helvetica', 'normal')
-  pdf.setFontSize(11)
-  pdf.text('Expense Statistics:', 20, finalY + 15)
+  // --- Calculate Abah vs Bakaris Statistics ---
+  let abahTotal = 0;
+  let abahCount = 0;
+  let bakarisTotal = 0;
+  let bakarisCount = 0;
+  let highestExpenseValue = -Infinity;
+  let highestExpensePayer = 'N/A';
+  let lowestExpenseValue = Infinity;
+  let lowestExpensePayer = 'N/A';
 
-  const avgExpense = grandTotal / receipts.length
-  pdf.text(`• Average expense per receipt: RM ${avgExpense.toFixed(2)}`, 25, finalY + 25)
+  // Use processedReceiptsForStats which includes 'paid_by' and validated 'total'
+  for (const receipt of processedReceiptsForStats) {
+      if (receipt.paid_by === 'Abah') {
+          abahTotal += receipt.total;
+          abahCount++;
+      } else { // Bakaris
+          bakarisTotal += receipt.total;
+          bakarisCount++;
+      }
 
-  // Find highest and lowest expenses
-  const highestExpense = Math.max(...receipts.map(r => r.total))
-  const lowestExpense = Math.min(...receipts.map(r => r.total))
-  const highestMerchant = receipts.find(r => r.total === highestExpense)?.merchant || 'Unknown'
+      if (receipt.total > highestExpenseValue) {
+          highestExpenseValue = receipt.total;
+          highestExpensePayer = receipt.paid_by; // Store who paid
+      }
+      // Ensure lowest check only considers positive expenses
+      if (receipt.total < lowestExpenseValue) { 
+          lowestExpenseValue = receipt.total;
+          lowestExpensePayer = receipt.paid_by; // Store who paid
+      }
+  }
 
-  pdf.text(`• Highest expense: RM ${highestExpense.toFixed(2)} (${highestMerchant})`, 25, finalY + 35)
-  pdf.text(`• Lowest expense: RM ${lowestExpense.toFixed(2)}`, 25, finalY + 45)
+  // Calculate averages (handle division by zero)
+  const abahAverage = abahCount > 0 ? abahTotal / abahCount : 0;
+  const bakarisAverage = bakarisCount > 0 ? bakarisTotal / bakarisCount : 0;
+
+  // Calculate percentages (handle division by zero)
+  const abahPercentage = grandTotal > 0 ? (abahTotal / grandTotal) * 100 : 0;
+  const bakarisPercentage = grandTotal > 0 ? (bakarisTotal / grandTotal) * 100 : 0;
+
+  // Handle edge case where no receipts exist for highest/lowest display
+  if (processedReceiptsForStats.length === 0) {
+      highestExpenseValue = 0;
+      lowestExpenseValue = 0;
+      highestExpensePayer = 'N/A';
+      lowestExpensePayer = 'N/A';
+  }
+  // --- End Statistics Calculation ---
+
+  // --- Add New Statistics Display ---
+  let statsY = finalY + 15; // Start position for stats
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(12); // Slightly larger heading for the section
+  pdf.text('Expense Statistics:', 20, statsY);
+  statsY += 8; // Space after heading
+
+  // Reset font for details
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(11);
+
+  // -- Breakdown by Payer --
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Breakdown by Payer:', 20, statsY);
+  statsY += 7; // Space after sub-heading
+  pdf.setFont('helvetica', 'normal');
+
+  // Abah's Stats
+  pdf.setFont('helvetica', 'bold'); // Payer name bold
+  pdf.text('Abah (Mastercard Payments):', 25, statsY);
+  statsY += 6;
+  pdf.setFont('helvetica', 'normal'); // Details normal
+  pdf.text(`• Total Spent: RM ${abahTotal.toFixed(2)}`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Percentage of Total: ${abahPercentage.toFixed(1)}%`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Number of Transactions: ${abahCount}`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Average Transaction Amount: RM ${abahAverage.toFixed(2)}`, 30, statsY);
+  statsY += 8; // Extra space before Bakaris
+
+  // Bakaris' Stats
+  pdf.setFont('helvetica', 'bold'); // Payer name bold
+  pdf.text('Bakaris (Other Payments):', 25, statsY);
+  statsY += 6;
+  pdf.setFont('helvetica', 'normal'); // Details normal
+  pdf.text(`• Total Spent: RM ${bakarisTotal.toFixed(2)}`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Percentage of Total: ${bakarisPercentage.toFixed(1)}%`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Number of Transactions: ${bakarisCount}`, 30, statsY);
+  statsY += 6;
+  pdf.text(`• Average Transaction Amount: RM ${bakarisAverage.toFixed(2)}`, 30, statsY);
+  statsY += 8; // Extra space before Highlights
+
+  // -- Spending Highlights --
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Spending Highlights:', 20, statsY);
+  statsY += 7; // Space after sub-heading
+  pdf.setFont('helvetica', 'normal');
+
+  // Format highest/lowest strings safely
+  const highestText = processedReceiptsForStats.length > 0 
+      ? `RM ${highestExpenseValue.toFixed(2)} (Paid by ${highestExpensePayer})` 
+      : 'N/A';
+  const lowestText = processedReceiptsForStats.length > 0 
+      ? `RM ${lowestExpenseValue.toFixed(2)} (Paid by ${lowestExpensePayer})` 
+      : 'N/A';
+
+  pdf.text(`• Highest Single Expense: ${highestText}`, 25, statsY);
+  statsY += 6;
+  pdf.text(`• Lowest Single Expense: ${lowestText}`, 25, statsY);
 
   // Add footer with page numbers
   addFooter()
