@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// ReceiptHistoryModal import removed as it was causing errors
+import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -116,7 +116,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
   const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false); // Added state for history modal
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
   
   // Define available expense categories
@@ -1338,7 +1338,11 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
 
         {/* Action Buttons */}
         <div className="pt-4 mt-auto flex justify-between flex-shrink-0"> {/* Added mt-auto and flex-shrink-0 */}
-          <Button variant="outline" className="gap-2" onClick={() => toast.info("History view not implemented yet")}>
+          <Button 
+            variant="outline" 
+            className="gap-2" 
+            onClick={() => setIsHistoryModalOpen(true)}
+          >
             <History size={16} />
             View History
           </Button>
@@ -1356,6 +1360,13 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
           </Button>
         </div>
       </motion.div>
+
+      <ReceiptHistoryModal
+        receiptId={receipt.id}
+        processingLogs={processLogs}
+        open={isHistoryModalOpen}
+        onOpenChange={setIsHistoryModalOpen}
+      />
     </div>
   );
 }
