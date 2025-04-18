@@ -529,16 +529,37 @@ async function generatePDF(receipts, selectedDay, supabaseClient) {
   pdf.text('Overview of all expenses for ' + format(selectedDay, 'MMMM d, yyyy'), 105, 68, { align: 'center' })
 
   // Summary table with improved styling
-  const summaryData = receipts.map(receipt => [
-    receipt.merchant,
-    format(new Date(receipt.date), 'h:mm a'),
-    receipt.payment_method || 'Not specified',
-    receipt.total.toFixed(2)
-  ])
+  const summaryData = receipts.map(receipt => {
+    // Safely handle potentially null/undefined values
+    // Check if receipt has the necessary properties
+    if (!receipt) {
+      console.warn('Found null or undefined receipt in receipts array');
+      return ['Unknown', 'Unknown', 'Unknown', '0.00'];
+    }
+    
+    // Get merchant name safely
+    const merchant = receipt.merchant || 'Unknown';
+    
+    // Get payment method safely
+    const paymentMethod = (receipt.payment_method || '').toString();
+    
+    // Check if payment method (case-insensitive) includes 'master'
+    const paidBy = paymentMethod.toLowerCase().includes('master') ? 'Abah' : 'Bakaris';
+    
+    // Get total safely, ensuring it's a number
+    const total = (typeof receipt.total === 'number') ? receipt.total.toFixed(2) : '0.00';
+    
+    return [
+      merchant,      // Merchant column
+      paidBy,        // Paid by column
+      paymentMethod, // Payment Method column
+      total          // Amount (RM) column
+    ];
+  });
 
   autoTable(pdf, {
     startY: 75, // Increased from 55 to 75 for more space
-    head: [['Merchant', 'Time', 'Payment Method', 'Amount (RM)']],
+    head: [['Merchant', 'Paid by', 'Payment Method', 'Amount (RM)']],
     body: summaryData,
     styles: {
       fontSize: 10,
