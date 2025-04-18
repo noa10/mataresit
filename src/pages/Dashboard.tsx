@@ -5,12 +5,11 @@ import ReceiptCard from "@/components/ReceiptCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { 
   Upload, Search, Filter, SlidersHorizontal, 
   PlusCircle, XCircle, Calendar, DollarSign, X,
-  LayoutGrid, LayoutList, Table as TableIcon,
-  FileText
+  LayoutGrid, LayoutList, Table as TableIcon
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
@@ -21,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import UploadZone from "@/components/UploadZone";
-import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
+
 import { 
   Table, 
   TableBody, 
@@ -32,7 +31,7 @@ import {
 } from "@/components/ui/table";
 
 // Define view mode types
-type ViewMode = "grid" | "list" | "table" | "reports";
+type ViewMode = "grid" | "list" | "table";
 
 // Add this function before the Dashboard component
 const calculateAggregateConfidence = (receipt: Receipt) => {
@@ -67,12 +66,42 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | ReceiptStatus>("all");
-  const [filterByCurrency, setFilterByCurrency] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">("newest");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
+  // Read initial values from URL params or use defaults
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
+  const [activeTab, setActiveTab] = useState<"all" | ReceiptStatus>(
+    (searchParams.get('tab') as ReceiptStatus | null) || "all"
+  );
+  const [filterByCurrency, setFilterByCurrency] = useState<string | null>(
+    searchParams.get('currency') || null
+  );
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
+    (searchParams.get('sort') as any) || "newest"
+  );
+  
+  // Read view mode from URL params first, then local storage, or use default
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (searchParams.get('view') as ViewMode) || (localStorage.getItem('dashboardViewMode') as ViewMode) || "grid";
+  });
+  
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid"); // Default view mode
+  
+  // Helper function to update search parameters
+  const updateSearchParams = (newValues: { [key: string]: string | null }) => {
+    const currentParams = new URLSearchParams(searchParams);
+    Object.entries(newValues).forEach(([key, value]) => {
+      if (value === null || value === '') {
+        // Remove param if value is null or empty
+        currentParams.delete(key);
+      } else {
+        currentParams.set(key, value);
+      }
+    });
+    // Use replace: true to update URL without adding new history entry
+    setSearchParams(currentParams, { replace: true });
+  };
   
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
@@ -111,7 +140,9 @@ export default function Dashboard() {
   };
   
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    const newQuery = e.target.value;
+    setSearchQuery(newQuery);
+    updateSearchParams({ q: newQuery || null });
   };
   
   const clearFilters = () => {
@@ -119,6 +150,10 @@ export default function Dashboard() {
     setActiveTab("all");
     setFilterByCurrency(null);
     setSortOrder("newest");
+    // Don't reset view mode when clearing filters, just keep current value if any
+    const currentViewMode = viewMode !== 'grid' ? viewMode : null;
+    // Clear all search params except view if it's not the default
+    setSearchParams(currentViewMode ? { view: currentViewMode } : {}, { replace: true });
   };
 
   // Render different view modes
@@ -215,17 +250,19 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
               >
-                <ReceiptCard
-                  id={receipt.id}
-                  merchant={receipt.merchant}
-                  date={formatDate(receipt.date)}
-                  total={receipt.total}
-                  currency={receipt.currency}
-                  imageUrl={receipt.image_url || "/placeholder.svg"}
-                  status={receipt.status}
-                  confidence={confidenceScore}
-                  processingStatus={receipt.processing_status}
-                />
+                <Link to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}>
+                  <ReceiptCard
+                    id={receipt.id}
+                    merchant={receipt.merchant}
+                    date={formatDate(receipt.date)}
+                    total={receipt.total}
+                    currency={receipt.currency}
+                    imageUrl={receipt.image_url || "/placeholder.svg"}
+                    status={receipt.status}
+                    confidence={confidenceScore}
+                    processingStatus={receipt.processing_status}
+                  />
+                </Link>
               </motion.div>
             );
           })}
@@ -248,7 +285,7 @@ export default function Dashboard() {
                 transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
                 className="border rounded-lg overflow-hidden bg-card hover:bg-accent/5 transition-colors"
               >
-                <Link to={`/receipt/${receipt.id}`} className="flex items-center p-4 gap-4">
+                <Link to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`} className="flex items-center p-4 gap-4">
                   <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
                     <img 
                       src={receipt.image_url || "/placeholder.svg"} 
@@ -315,7 +352,7 @@ export default function Dashboard() {
                 const confidenceScore = calculateAggregateConfidence(receipt);
                 
                 return (
-                  <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => window.location.href = `/receipt/${receipt.id}`}>
+                  <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => navigate(`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}>
                     <TableCell className="font-medium">{receipt.merchant}</TableCell>
                     <TableCell>{formatDate(receipt.date)}</TableCell>
                     <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
@@ -373,7 +410,14 @@ export default function Dashboard() {
             <ToggleGroup 
               type="single" 
               value={viewMode}
-              onValueChange={(value) => value && setViewMode(value as ViewMode)}
+              onValueChange={(value) => {
+                if (value) {
+                  const newMode = value as ViewMode;
+                  setViewMode(newMode);
+                  localStorage.setItem('dashboardViewMode', newMode);
+                  updateSearchParams({ view: newMode === 'grid' ? null : newMode }); // Update URL params
+                }
+              }}
               className="border rounded-md bg-background/60 backdrop-blur-sm"
             >
               <ToggleGroupItem value="grid" aria-label="Grid view" title="Grid view">
@@ -384,9 +428,6 @@ export default function Dashboard() {
               </ToggleGroupItem>
               <ToggleGroupItem value="table" aria-label="Table view" title="Table view">
                 <TableIcon size={18} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="reports" aria-label="Reports view" title="Reports view">
-                <FileText size={18} />
               </ToggleGroupItem>
             </ToggleGroup>
 
@@ -400,8 +441,7 @@ export default function Dashboard() {
           </motion.div>
         </div>
         
-        {/* Filters and Tabs Section - Conditionally Render based on viewMode */}
-        {viewMode !== 'reports' && (
+        {/* Filters and Tabs Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -434,7 +474,13 @@ export default function Dashboard() {
                     <ToggleGroup 
                       type="single" 
                       value={sortOrder} 
-                      onValueChange={(value) => value && setSortOrder(value as any)}
+                      onValueChange={(value) => {
+                        if (value) {
+                          const newSort = value as any;
+                          setSortOrder(newSort);
+                          updateSearchParams({ sort: newSort === 'newest' ? null : newSort });
+                        }
+                      }}
                       className="flex flex-wrap justify-start gap-2"
                     >
                       <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
@@ -458,7 +504,11 @@ export default function Dashboard() {
                         <ToggleGroup 
                           type="single" 
                           value={filterByCurrency || "all"} 
-                          onValueChange={(value) => setFilterByCurrency(value === "all" ? null : value)}
+                          onValueChange={(value) => {
+                            const newCurrency = value === "all" ? null : value;
+                            setFilterByCurrency(newCurrency);
+                            updateSearchParams({ currency: newCurrency });
+                          }}
                           className="flex flex-wrap justify-start gap-2"
                         >
                           <ToggleGroupItem value="all" aria-label="Show all currencies" className="flex-grow-0">
@@ -491,7 +541,11 @@ export default function Dashboard() {
             
             {/* Status Tabs */}
             <div className="mt-4">
-              <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as "all" | ReceiptStatus)}>
+              <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
+                const newTab = value as "all" | ReceiptStatus;
+                setActiveTab(newTab);
+                updateSearchParams({ tab: newTab === 'all' ? null : newTab });
+              }}>
                 <TabsList className="bg-background/50">
                   <TabsTrigger value="all">All Receipts</TabsTrigger>
                   <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
@@ -501,14 +555,9 @@ export default function Dashboard() {
               </Tabs>
             </div>
           </motion.div>
-        )}
         
-        {/* Main Content Area - Switches based on viewMode */}
-        {viewMode === 'reports' ? (
-          <DailyPDFReportGenerator />
-        ) : (
-          renderReceiptContent()
-        )}
+        {/* Main Content Area */}
+        {renderReceiptContent()}
       </main>
       
       {/* Upload Dialog */}
