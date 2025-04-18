@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
 
 import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
-import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 // Import ReceiptViewer and related types/functions
 import ReceiptViewer from '@/components/ReceiptViewer';
@@ -232,6 +232,8 @@ const AnalysisPage = () => {
     enabled: !!date,
   });
 
+  const totalCategorySpending = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
+
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
     // Create data suitable for the chart (date, total) from enhanced data
@@ -290,15 +292,15 @@ const AnalysisPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+    <div className="min-h-screen bg-gradient-to-b from-background via-secondary/20 to-accent/10">
       <Navbar />
       
       <main className="container px-4 py-8">
         <div className="flex flex-col gap-8">
           {/* Reports Section */}
           <section>
-            <h2 className="text-2xl font-bold mb-4">Reports</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h2 className="text-3xl font-extrabold mb-4">Reports</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <DailyPDFReportGenerator />
               
               {/* Add more report types here in the future */}
@@ -307,10 +309,10 @@ const AnalysisPage = () => {
 
           {/* Existing Analysis Section */}
           <section>
-            <h2 className="text-2xl font-bold mb-4">Spending Analysis</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <h2 className="text-3xl font-extrabold mb-4">Spending Analysis</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Date Range Picker Card */}
-              <Card>
+              <Card className="border-2 border-secondary/30">
                 <CardHeader>
                   <CardTitle>Select Date Range</CardTitle>
                 </CardHeader>
@@ -328,7 +330,7 @@ const AnalysisPage = () => {
               </Card>
 
               {/* Analysis Cards */}
-              <Card>
+              <Card className="border-2 border-secondary/30">
                 <CardHeader>
                   <CardTitle>Total Spending</CardTitle>
                 </CardHeader>
@@ -346,7 +348,7 @@ const AnalysisPage = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-2 border-secondary/30">
                 <CardHeader>
                   <CardTitle>Spending by Category</CardTitle>
                 </CardHeader>
@@ -372,7 +374,10 @@ const AnalysisPage = () => {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Tooltip formatter={(value, name) => [
+                          formatCurrency(value as number),
+                          `${name}: ${((value as number) / totalCategorySpending * 100).toFixed(1)}%`
+                        ]} />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -382,7 +387,7 @@ const AnalysisPage = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-2 border-secondary/30">
                 <CardHeader>
                   <CardTitle>Average Per Receipt</CardTitle>
                 </CardHeader>
@@ -402,7 +407,7 @@ const AnalysisPage = () => {
             </div>
 
             {/* Daily Spending Section */}
-            <Card>
+            <Card className="border-2 border-secondary/30">
               <CardHeader>
                 <CardTitle>Daily Spending Trend</CardTitle>
               </CardHeader>
@@ -421,8 +426,9 @@ const AnalysisPage = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       {/* Use short date format for chart */}
                       <XAxis dataKey="date" tickFormatter={formatChartDate} />
-                      <YAxis tickFormatter={(value) => formatCurrency(value as number, 'USD').replace(/\\$/,'')} />
+                      <YAxis tickFormatter={(value) => formatCurrency(value as number, 'USD').replace(/\$/,'')} />
                       <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                      <ReferenceLine y={Math.max(...aggregatedChartData.map(d => d.total))} stroke="red" label="Peak Spend" />
                       <Legend />
                       <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total Spent" dot={false}/>
                     </LineChart>
@@ -430,6 +436,12 @@ const AnalysisPage = () => {
                 )}
                  {!isLoadingDaily && !dailyError && enhancedDailySpendingData && enhancedDailySpendingData.length > 0 && (
                    <>
+                    <Card className="mb-4 border-2 border-secondary/30">
+                      <CardContent className="flex justify-between">
+                        <p>Total Receipts: {enhancedDailySpendingData.reduce((sum, day) => sum + day.receiptIds.length, 0)}</p>
+                        <p>Avg Daily Spend: {formatCurrency(totalSpending / enhancedDailySpendingData.length)}</p>
+                      </CardContent>
+                    </Card>
                     <h4 className="text-lg font-semibold mb-2">Daily Spending Details</h4>
                     <Table className="responsive-table">
                       <TableHeader>
