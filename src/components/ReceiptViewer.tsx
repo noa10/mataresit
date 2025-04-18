@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ReceiptHistoryModal } from "./ReceiptHistoryModal"; // Added import
+// ReceiptHistoryModal import removed as it was causing errors
 
 interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -405,17 +405,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     }));
   };
   
-  const handleSyncToZoho = () => {
-    updateReceipt(receipt.id, { status: "synced" })
-      .then(() => {
-        toast.success("Receipt synced to Zoho successfully!");
-        queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-        queryClient.invalidateQueries({ queryKey: ['receipts'] });
-      })
-      .catch(() => {
-        toast.error("Failed to sync with Zoho");
-      });
-  };
+  // Removed Zoho sync functionality
   
   const handleReprocessReceipt = () => {
     if (isProcessing) return; // Prevent multiple simultaneous processing
@@ -1099,9 +1089,9 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
               </Button>
 
               {showFullTextData && (
-                <ScrollArea className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] whitespace-pre-wrap"> {/* Max height */}
+                <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] overflow-auto whitespace-pre-wrap">
                     {receipt.fullText}
-                </ScrollArea>
+                </div>
               )}
             </div>
           )}
@@ -1117,14 +1107,6 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       >
         <div className="flex justify-between items-center mb-4 flex-shrink-0"> {/* Added flex-shrink-0 */}
           <h3 className="font-medium">Receipt Details</h3>
-          <Button
-            onClick={handleSyncToZoho}
-            className="gap-2"
-            disabled={editedReceipt.status === "synced"} // Use editedReceipt status
-          >
-            <Send size={16} />
-            {editedReceipt.status === "synced" ? "Synced to Zoho" : "Sync to Zoho"}
-          </Button>
         </div>
 
         {/* Display Processing Time */}
@@ -1135,7 +1117,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
         )}
 
         {/* Scrollable Form Area */}
-        <ScrollArea className="flex-grow pr-3"> {/* Added flex-grow */}
+        <div className="flex-grow pr-3 max-h-[calc(100vh-200px)] overflow-auto"> {/* Simplified to regular div with overflow */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -1194,7 +1176,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                       onChange={(e) => handleInputChange('date', e.target.value)}
                       className="bg-background/50 pl-9"
                     />
-                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary dark:text-primary" />
                   </div>
                   {renderSuggestion('date', 'date')}
                 </div>
@@ -1275,7 +1257,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                 </div>
 
                 <Card className="bg-background/50 border border-border/50">
-                  <ScrollArea className="p-3 h-[180px]"> {/* Fixed height for consistent scrolling */}
+                  <div className="p-3 max-h-[250px] overflow-auto"> {/* Simplified to regular div with overflow */}
                     <div className="space-y-2">
                         {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
                         editedReceipt.lineItems.map((item, index) => (
@@ -1316,7 +1298,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                         </div>
                         )}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </Card>
               </div>
 
@@ -1352,11 +1334,11 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
                 </div>
               </div>
             </div>
-        </ScrollArea>
+        </div>
 
         {/* Action Buttons */}
         <div className="pt-4 mt-auto flex justify-between flex-shrink-0"> {/* Added mt-auto and flex-shrink-0 */}
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => toast.info("History view not implemented yet")}>
             <History size={16} />
             View History
           </Button>
