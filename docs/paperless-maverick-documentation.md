@@ -1,6 +1,6 @@
 # Automated Receipt Processing Application
 
-A web-based application for automating receipt data extraction using OCR technology with Amazon Textract and integrating with Zoho for expense tracking.
+A web-based application for automating receipt data extraction using OCR technology with Amazon Textract.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 3. **Enhance** - Google Gemini enhances the data, validates formats, normalizes fields (merchant, payment method), suggests corrections, predicts categories, and calculates confidence scores.
 4. **Verify** - A side-by-side interface allows users to review OCR data alongside the receipt image, accept AI suggestions, and make corrections. Confidence indicators highlight potentially inaccurate fields.
 5. **Feedback & Store** - User corrections are logged to a `corrections` table, creating a feedback loop for future AI improvements. Final data is stored in the Supabase database.
-6. **Sync** - Verified expenses can be optionally synced to Zoho Expense.
+6. **Sync** - Verified expenses can be optionally synced to an external service.
 
 ### Key Features
 
@@ -47,7 +47,6 @@ The Automated Receipt Processing Application streamlines the digitization and ma
     - Live updates on backend processing stages (OCR, AI Enhancement) via Supabase Realtime.
     - Displays final processing time.
 - **Secure Authentication**: Managed by Supabase Auth.
-- **Zoho Expense Integration**: Optional synchronization of verified expenses (requires OAuth setup).
 - **Multi-currency Support**: Handles different currencies, primarily MYR and USD.
 
 ## Architecture
@@ -66,15 +65,13 @@ graph TD
         Store[(Supabase Storage)]
         Func_Process[process-receipt (Edge Fn)]
         Func_Enhance[enhance-receipt-data (Edge Fn)]
-        Func_Zoho[Zoho Functions (Edge Fn)]
         Func_GenerateReport[generate-pdf-report (Edge Fn)] %% Added Node %%
     end
 
     subgraph External Services
         Textract[Amazon Textract]
         Gemini[Google Gemini]
-        Zoho[Zoho Expense]
-    end
+      end
 
     FE -- Upload Image --> Store
     FE -- Trigger Process --> Func_Process
@@ -89,8 +86,6 @@ graph TD
     FE -- Display Data + AI --> FE
     FE -- Save Edits --> DB(UPDATE receipts, DELETE/INSERT line_items)
     FE -- Log Correction --> DB(INSERT corrections)
-    FE -- Trigger Sync --> Func_Zoho
-    Func_Zoho -- Data --> Zoho
     FE -- Login/Signup --> Auth
     FE -- Trigger Report --> Func_GenerateReport %% Added Interaction %%
     Func_GenerateReport -- Fetch Data --> DB %% Added Interaction %%
@@ -111,12 +106,12 @@ graph TD
     - Receives structured JSON response (enhanced data, `ai_suggestions`, `predicted_category`, potentially refined confidence scores).
     - Returns enhanced data to `process-receipt`.
 9. `process-receipt` combines OCR and AI data. It calculates the total `processing_time` (end time - start time).
-10. `process-receipt` saves the final data, including `ai_suggestions`, `predicted_category`, `processing_time`, and `confidence_scores`, to the Supabase Database (`receipts`, `line_items`, `confidence_scores` tables). Updates `processing_status`.
-11. Frontend (`ReceiptViewer`) displays combined data, AI suggestions (with "Accept" buttons), predicted category, and confidence indicators, potentially updated via Supabase Realtime subscriptions.
-12. User reviews, accepts suggestions, or manually edits data.
+11. `process-receipt` saves the final data, including `ai_suggestions`, `predicted_category`, `processing_time`, and the `confidence_scores` JSON object, to the Supabase Database (`receipts`, `line_items` tables). Updates `processing_status`.
+12. User can trigger PDF report generation from the Analysis Page. The `generate-pdf-report` Edge Function fetches relevant data from the database and generates the PDF.
+13. User reviews, accepts suggestions, or manually edits data.
 13. On save, frontend compares initial vs. final data and logs differences to the `corrections` table via `receiptService.logCorrections`.
 14. Final, user-verified data is updated in the `receipts` and related tables.
-15. Verified data can optionally be synced to Zoho Expense via `Func_Zoho`.
+15. Verified data can optionally be synced to an external service.
 
 ## Database Schema
 
@@ -206,24 +201,6 @@ graph TD
 - **Function**: Delete receipt and associated data
 - **Returns**: Success status
 
-### Zoho Integration
-
-#### Connect Zoho
-- **Endpoint**: `GET /api/zoho/connect`
-- **Function**: Initiate OAuth flow with Zoho
-- **Returns**: OAuth authorization URL
-
-#### Zoho Callback
-- **Endpoint**: `GET /api/zoho/callback`
-- **Function**: Handle OAuth callback from Zoho
-- **Parameters**: OAuth code
-- **Returns**: Success status and tokens
-
-#### Sync Receipt to Zoho
-- **Endpoint**: `POST /api/receipts/:id/sync-to-zoho`
-- **Function**: Sync receipt data to Zoho Expense
-- **Returns**: Sync status and Zoho expense ID
-
 ## Component Structure
 
 ### Pages
@@ -237,7 +214,6 @@ graph TD
 - Side-by-side receipt image and data editor
 - Confidence score indicators
 - Zoom and rotate controls
-- Sync to Zoho button
 
 #### Analysis (`/analysis`)
 - Receipt list and filtering with summary statistics
@@ -250,7 +226,6 @@ graph TD
 
 #### Authentication (`/auth`)
 - Login/Signup form
-- Zoho connection management
 
 ### Core Components
 
@@ -328,28 +303,6 @@ The application uses the Google Gemini API via the `enhance-receipt-data` Edge F
 - Gemini API Key stored as a Supabase secret:
   - `GEMINI_API_KEY`
 
-### Zoho Integration
-
-The application integrates with Zoho Expense for expense tracking.
-
-#### Implementation
-
-1. **OAuth Flow**:
-   - Edge Function: `zoho-connect` - Initiates OAuth connection
-   - Edge Function: `zoho-callback` - Handles OAuth response
-
-2. **Data Sync**:
-   - Edge Function: `sync-to-zoho` - Sends receipt data to Zoho API
-   - Attaches receipt image to expense record
-   - Updates local status after successful sync
-
-#### Required Configuration
-
-- Zoho API credentials stored as Supabase secrets:
-  - `ZOHO_CLIENT_ID`
-  - `ZOHO_CLIENT_SECRET`
-  - `ZOHO_REDIRECT_URI`
-
 ## Development Guide
 
 ### Prerequisites
@@ -358,7 +311,6 @@ The application integrates with Zoho Expense for expense tracking.
 - Supabase account
 - Amazon AWS account with Textract access
 - Google Cloud account with Gemini API enabled
-- Zoho developer account
 
 ### Local Development
 
@@ -384,9 +336,6 @@ These will be stored as Supabase secrets:
 - `AWS_SECRET_ACCESS_KEY` - Amazon AWS secret key
 - `AWS_REGION` - Amazon AWS region
 - `GEMINI_API_KEY` - Google Gemini API Key
-- `ZOHO_CLIENT_ID` - Zoho API client ID
-- `ZOHO_CLIENT_SECRET` - Zoho API client secret
-- `ZOHO_REDIRECT_URI` - OAuth redirect URI
 
 ### Deployment
 

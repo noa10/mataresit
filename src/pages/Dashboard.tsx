@@ -550,7 +550,6 @@ export default function Dashboard() {
                   <TabsTrigger value="all">All Receipts</TabsTrigger>
                   <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
                   <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
-                  <TabsTrigger value="synced">Synced to Zoho</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>

@@ -1,4 +1,4 @@
-export type ReceiptStatus = "unreviewed" | "reviewed" | "synced";
+export type ReceiptStatus = "unreviewed" | "reviewed";
 
 // New processing status type for real-time updates
 export type ProcessingStatus = 
@@ -104,25 +104,13 @@ export interface ConfidenceScore {
 
 // ReceiptWithDetails now inherits confidence_scores from Receipt
 export interface ReceiptWithDetails extends Receipt {
-  items: ReceiptItem[];
   lineItems?: ReceiptLineItem[];
-  // REMOVED: Separate 'confidence' field is no longer needed
-  // confidence?: {
-  //   merchant?: number;
-  //   date?: number;
-  //   total?: number;
-  //   tax?: number;
-  //   line_items?: number;
-  //   payment_method?: number;
-  // };
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
-  // Ensure these fields are also in ReceiptWithDetails
   processing_status?: ProcessingStatus;
   processing_error?: string | null;
-  processing_time?: number; // Added
-  // New fields for AI model selection
+  processing_time?: number;
   model_used?: string;
   primary_method?: 'ocr-ai' | 'ai-vision';
   has_alternative_data?: boolean;

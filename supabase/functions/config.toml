@@ -20,14 +20,5 @@ project_id = "mpmkbtsufihzdelrlszs"
 [process-receipt]
 verify_jwt = true
 
-[zoho-connect]
-verify_jwt = true
-
-[zoho-callback]
-verify_jwt = false
-
-[sync-to-zoho]
-verify_jwt = true
-
 [generate-pdf-report]
 verify_jwt = true

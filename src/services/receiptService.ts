@@ -6,7 +6,7 @@ import { normalizeMerchant } from '../lib/receipts/validation';
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
-  if (status === "unreviewed" || status === "reviewed" || status === "synced") {
+  if (status === "unreviewed" || status === "reviewed") {
     return status;
   }
   return "unreviewed"; // Default fallback
@@ -235,19 +235,29 @@ export const createReceipt = async (
   confidenceScores: Omit<ConfidenceScore, "id" | "receipt_id" | "created_at" | "updated_at">
 ): Promise<string | null> => {
   try {
+    // Get the current user
+    const { data: user } = await supabase.auth.getUser();
+
+    if (!user.user) {
+      console.error("Error creating receipt: User not authenticated");
+      toast.error("You must be logged in to create a receipt.");
+      return null;
+    }
+
     // Ensure the processing status is set, defaulting to 'uploading' if not provided
     const receiptWithStatus = {
       ...receipt,
+      user_id: user.user.id, // Add user_id here
       processing_status: receipt.processing_status || 'uploading' as ProcessingStatus
     };
-    
+
     // Insert the receipt
     const { data, error } = await supabase
       .from("receipts")
       .insert(receiptWithStatus)
       .select("id")
       .single();
-    
+
     if (error) {
       console.error("Error creating receipt:", error);
       throw error;
@@ -737,34 +747,6 @@ export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Pr
   } catch (error) {
     console.error("Error updating receipt status:", error);
     toast.error("Failed to update receipt status");
-    return false;
-  }
-};
-
-// Sync receipt to Zoho
-export const syncReceiptToZoho = async (id: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.functions.invoke('sync-to-zoho', {
-      body: { receiptId: id }
-    });
-    
-    if (error) {
-      throw error;
-    }
-    
-    if (!data.success) {
-      toast.error(data.error || "Failed to sync to Zoho");
-      return false;
-    }
-    
-    // Update receipt status to synced
-    await updateReceiptStatus(id, "synced");
-    
-    toast.success("Receipt synced to Zoho successfully");
-    return true;
-  } catch (error) {
-    console.error("Error syncing to Zoho:", error);
-    toast.error("Failed to sync receipt to Zoho");
     return false;
   }
 };
