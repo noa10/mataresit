@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.cursor/rules/formatting.json
+.cursor/rules/react.json
+.cursor/rules/supabase.json
+.cursor/rules/typescript.json
+.cursor/rules/project-specific.json
+.cursor/rules/README.md
