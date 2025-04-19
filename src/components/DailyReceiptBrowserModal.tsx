@@ -74,7 +74,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
         </DialogHeader>
 
         {/* Main content area: Sidebar (Thumbnails/List) + Viewer */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0">
           {/* Sidebar for Receipt List/Thumbnails */}
           <div className="w-64 border-r border-border flex flex-col">
             <div className="p-4 text-sm font-medium text-muted-foreground border-b border-border">
@@ -112,9 +112,11 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
           </div>
 
           {/* Main Viewer Area */}
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
             {currentReceipt ? (
-              <ReceiptViewer receipt={currentReceipt} onDelete={handleReceiptDelete} />
+              <div className="p-4 flex-1 h-full flex flex-col min-h-0">
+                <ReceiptViewer receipt={currentReceipt} onDelete={handleReceiptDelete} />
+              </div>
             ) : isLoading ? (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading receipt details...</div>
             ) : (

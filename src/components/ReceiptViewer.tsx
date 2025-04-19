@@ -225,7 +225,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       try {
         // Create a new confidence record or update existing one
         const { data: existingConfidence, error: fetchError } = await supabase
-          .from('confidence_scores')
+          .from('receipt_confidence_scores')
           .select('id')
           .eq('receipt_id', receipt.id)
           .single();
@@ -247,7 +247,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         if (existingConfidence?.id) {
           // Update existing record
           const { error: updateError } = await supabase
-            .from('confidence_scores')
+            .from('receipt_confidence_scores')
             .update(confidenceToSave)
             .eq('id', existingConfidence.id);
 
@@ -258,7 +258,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         } else {
           // Insert new record
           const { error: insertError } = await supabase
-            .from('confidence_scores')
+            .from('receipt_confidence_scores')
             .insert(confidenceToSave);
 
           if (insertError) {
@@ -829,12 +829,12 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full h-full min-h-0">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4 }}
-        className="glass-card p-4 overflow-hidden flex flex-col" // Use flex column
+        className="glass-card p-4 flex flex-col h-full min-h-0 overflow-hidden"
       >
         <div className="flex justify-between items-start mb-3"> {/* items-start */}
           <h3 className="font-medium">Receipt Image</h3>
@@ -1014,7 +1014,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         </div>
         
         {/* Controls and Logs section */}
-        <div className="mt-4 flex-grow flex flex-col gap-4"> {/* Added flex-grow */}
+        <div className="mt-4 flex-grow flex flex-col gap-4 min-h-0"> 
           <Button
             variant="outline"
             className="w-full gap-2"
@@ -1047,7 +1047,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           </div>
 
           {showProcessLogs && (
-            <ScrollArea className="h-[200px] rounded-md border flex-shrink-0"> {/* Added flex-shrink-0 */}
+            <ScrollArea className="h-[200px] rounded-md border flex-shrink-0">
               {processLogs.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   No processing logs available
@@ -1104,21 +1104,21 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="glass-card p-4 flex flex-col" // Use flex column
+        className="glass-card p-4 flex flex-col h-full min-h-0"
       >
-        <div className="flex justify-between items-center mb-4 flex-shrink-0"> {/* Added flex-shrink-0 */}
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h3 className="font-medium">Receipt Details</h3>
         </div>
 
         {/* Display Processing Time */}
         {editedReceipt.processing_time !== undefined && editedReceipt.processing_time !== null && editedReceipt.processing_time > 0 && (
-          <div className="text-sm text-muted-foreground mb-4 flex-shrink-0"> {/* Added flex-shrink-0 */}
+          <div className="text-sm text-muted-foreground mb-4 flex-shrink-0">
             Processing Time: {editedReceipt.processing_time.toFixed(2)} seconds
           </div>
         )}
 
         {/* Scrollable Form Area */}
-        <div className="flex-grow pr-3 max-h-[calc(100vh-200px)] overflow-auto"> {/* Simplified to regular div with overflow */}
+        <div className="flex-grow pr-3 min-h-0 overflow-auto">
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
