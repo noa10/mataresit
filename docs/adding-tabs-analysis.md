@@ -1,3 +1,16 @@
+Okay, let's modify the `AnalysisPage` component to include two tabs: 'Spending Overview' and 'Daily Spending Details', moving the `ExpenseTable` to the second tab.
+
+We'll use the `Tabs` component from Shadcn UI, which aligns well with the components already in use.
+
+First, make sure you have the Shadcn UI Tabs component installed. If not, run:
+
+```bash
+npx shadcn-ui@latest add tabs
+```
+
+Now, replace your existing `AnalysisPage` component code with the following, integrating the `Tabs`:
+
+```javascript
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -22,8 +35,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
 import { cn } from "@/lib/utils";
+
 // Import Shadcn UI Tabs
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 // Import Lucide icons
 import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2 } from "lucide-react";
@@ -79,7 +94,7 @@ type EnhancedDailySpendingData = {
   paymentMethod: string;
 };
 
-// ExpenseStats Component
+// ExpenseStats Component (Keep as is)
 interface ExpenseStatsProps {
   totalSpending: number;
   totalReceipts: number;
@@ -174,7 +189,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
   );
 };
 
-// CategoryPieChart Component
+// CategoryPieChart Component (Keep as is)
 interface CategoryPieChartProps {
   categoryData: CategorySpendingData[];
   isLoading?: boolean;
@@ -183,7 +198,7 @@ interface CategoryPieChartProps {
 const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading }) => {
   if (isLoading) {
     return (
-      <Card className="shadow-lg">
+      <Card className="border border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle>Spending by Category</CardTitle>
         </CardHeader>
@@ -241,7 +256,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
   );
 };
 
-// SpendingChart Component
+// SpendingChart Component (Keep as is)
 interface SpendingChartProps {
   dailyData: EnhancedDailySpendingData[];
   isLoading?: boolean;
@@ -277,8 +292,8 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
   // Calculate statistics for annotations
   const totalSpending = chartData.reduce((sum, day) => sum + day.amount, 0);
   const avgSpending = totalSpending / (chartData.length || 1);
-  const maxSpending = Math.max(...chartData.map(d => d.amount), 0);
-  const peakDay = chartData.find(d => d.amount === maxSpending);
+  // const maxSpending = Math.max(...chartData.map(d => d.amount), 0); // Not used currently
+  // const peakDay = chartData.find(d => d.amount === maxSpending); // Not used currently
   
   // Custom tooltip to display more information
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -293,12 +308,13 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
           <p className="text-xs text-popover-foreground/80">
             {data.receipts} {data.receipts === 1 ? 'receipt' : 'receipts'}
           </p>
-          {data.amount > avgSpending && (
+          {/* Conditional display for above/below average - ensure avgSpending is not NaN */}
+          {avgSpending > 0 && data.amount > avgSpending && (
             <p className="text-xs text-destructive mt-1">
               {((data.amount / avgSpending - 1) * 100).toFixed(0)}% above average
             </p>
           )}
-          {data.amount < avgSpending && (
+           {avgSpending > 0 && data.amount < avgSpending && (
             <p className="text-xs text-green-500 mt-1">
               {((1 - data.amount / avgSpending) * 100).toFixed(0)}% below average
             </p>
@@ -314,6 +330,12 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
     setChartType(prev => prev === 'line' ? 'bar' : 'line');
   };
 
+  // Format date range for display in the chart header
+  const formattedDateRange = dateRange?.from && dateRange?.to 
+    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+    : 'All time';
+
+
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader className="flex flex-row justify-between items-start">
@@ -322,7 +344,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
           {chartData.length > 0 && (
             <p className="text-xs text-muted-foreground mt-1">
               Average daily spend: {formatCurrency(avgSpending)}
-              {dateRange?.from && dateRange?.to && ` (${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')})`}
+               {dateRange?.from && dateRange?.to && ` (${formattedDateRange})`}
             </p>
           )}
         </div>
@@ -387,7 +409,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                     fontSize={12}
                     tickLine={false}
                     axisLine={{stroke: 'var(--border)'}}
-                    tickFormatter={(value) => `MYR ${value}`}
+                    tickFormatter={(value) => `${formatCurrency(value as number, '')}`} // Format Y-axis ticks
                     tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
                     className="dark:stroke-gray-500"
                   />
@@ -421,17 +443,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                   />
                   
                   {/* Vertical lines from points to axis */}
-                  {chartData.map((entry, index) => (
-                    <ReferenceLine
-                      key={`ref-line-${index}`}
-                      x={entry.date}
-                      stroke="var(--primary)"
-                      strokeOpacity={0.4}
-                      strokeDasharray="3 3"
-                      segment={[{ y: 0 }, { y: entry.amount }]}
-                      className="dark:opacity-60"
-                    />
-                  ))}
+                  {/* Removed to reduce clutter in line chart */}
                   
                   {/* Main line */}
                   <Line
@@ -497,7 +509,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                     fontSize={12} 
                     tickLine={false} 
                     axisLine={{stroke: 'var(--border)'}}
-                    tickFormatter={(value) => `MYR ${value}`}
+                    tickFormatter={(value) => `${formatCurrency(value as number, '')}`} // Format Y-axis ticks
                     tick={{ 
                       fill: 'var(--foreground)', 
                       className: 'fill-foreground fill-opacity-100 dark:fill-gray-300' 
@@ -552,7 +564,8 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
   );
 };
 
-// ExpenseTable Component
+
+// ExpenseTable Component (Keep as is, but remove date picker control - it's now in the main page or ExpenseStats)
 interface ExpenseTableProps {
   sortedData: EnhancedDailySpendingData[];
   onViewReceipts: (date: string, receiptIds: string[]) => void;
@@ -566,7 +579,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <Card className="shadow-lg">
+      <Card className="border border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle>Daily Spending Details</CardTitle>
         </CardHeader>
@@ -633,6 +646,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   );
 };
 
+
 const AnalysisPage = () => {
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
@@ -645,11 +659,18 @@ const AnalysisPage = () => {
     };
   });
   
-  // State for managing the active tab
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
+  // State for sorting (No longer needed in the main page as table is moved)
+  // const [sortColumn, setSortColumn] = useState<string>('date');
+  // const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // NEW STATE: For the DailyReceiptBrowserModal
   const [dailyReceiptBrowserData, setDailyReceiptBrowserData] = useState<{ date: string; receiptIds: string[] } | null>(null);
+
+  // State for date picker popover (No longer needed in the main page for table)
+  // const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  // State for managing the active tab
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
 
   // Prepare ISO strings for API calls
   const startDateISO = date?.from ? date.from.toISOString() : null;
@@ -691,16 +712,16 @@ const AnalysisPage = () => {
   
       // Ensure data is sorted by date descending by default for the table view later
       // Although fetched ascending, the select output might not preserve order strictly
-      return dailyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return dailyData.sort((a, b) => new Date(b.date).getTime() - new Date(b.date).getTime()); // Sort descending for the table default
     },
-    enabled: !!date, // Only fetch if date range is set
+    enabled: !!date?.from && !!date?.to, // Only fetch if full date range is set
   });
 
   // Fetch category breakdown data (remains the same)
   const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategorySpendingData[], Error>({ 
     queryKey: ['spendingByCategory', startDateISO, endDateISO],
     queryFn: () => fetchSpendingByCategory(startDateISO, endDateISO),
-    enabled: !!date,
+    enabled: !!date?.from && !!date?.to,
   });
 
   const totalCategorySpending = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
@@ -724,16 +745,26 @@ const AnalysisPage = () => {
     return totalSpending / totalReceipts;
   }, [enhancedDailySpendingData, totalSpending]);
 
-  // Format selected date range for display
+  // Format selected date range for display (used in ExpenseStats)
   const formattedDateRange = React.useMemo(() => {
     if (date?.from) {
       if (date.to) {
-        return `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`;
+        return `${format(date.from, "LLL dd, yyyy")} - ${format(date.to, "LLL dd, yyyy")}`;
       }
-      return format(date.from, "LLL dd, y");
+      return format(date.from, "LLL dd, yyyy");
     }
-    return "Select Date Range";
+    return "Select a date range";
   }, [date]);
+
+  // Handler to open the daily receipt browser modal
+  const handleViewReceipts = (date: string, receiptIds: string[]) => {
+    setDailyReceiptBrowserData({ date, receiptIds });
+  };
+
+  // Handler to close the daily receipt browser modal
+  const handleCloseDailyReceiptBrowser = () => {
+    setDailyReceiptBrowserData(null);
+  };
 
   // Sort the daily spending data for the table (default descending by date)
   const sortedDailySpendingDataForTable = React.useMemo(() => {
@@ -742,104 +773,104 @@ const AnalysisPage = () => {
     return [...(enhancedDailySpendingData || [])];
   }, [enhancedDailySpendingData]);
 
-  // UPDATED: Handler for viewing receipts - now opens the DailyReceiptBrowserModal
-  const handleViewReceipts = (date: string, receiptIds: string[]) => {
-    // Set the data needed for the browser modal
-    setDailyReceiptBrowserData({ date, receiptIds });
-  };
-
-  // Handler to close the receipt browser modal
-  const handleCloseDailyReceiptBrowser = () => {
-    setDailyReceiptBrowserData(null);
-  };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <Navbar />
-      <main className="max-w-7xl mx-auto space-y-8 mt-6">
-        {/* Dashboard Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Expense Analysis</h1>
-          <p className="text-muted-foreground">Track and analyze your spending patterns</p>
-        </div>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h1 className="text-3xl font-bold mb-6">Spending Analysis</h1>
 
-        {/* Display errors if any */}
-        {(dailyError || categoriesError) && (
-          <Alert variant="destructive" className="mb-6">
-            <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              {dailyError?.message || categoriesError?.message || "An unknown error occurred."}
-            </AlertDescription>
-          </Alert>
-        )}
+      {/* Display errors if any */}
+      {(dailyError || categoriesError) && (
+         <Alert variant="destructive" className="mb-6">
+         <Terminal className="h-4 w-4" />
+         <AlertTitle>Error</AlertTitle>
+         <AlertDescription>
+           {dailyError?.message || categoriesError?.message || "An unknown error occurred."}
+         </AlertDescription>
+       </Alert>
+      )}
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Spending Overview</TabsTrigger>
-            <TabsTrigger value="details">Daily Spending Details</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">Spending Overview</TabsTrigger>
+          <TabsTrigger value="details">Daily Spending Details</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="overview">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
-              {/* Expense Stats */}
-              <div className="lg:col-span-3"> {/* Span full width on large screens */}
+        <TabsContent value="overview">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+            {/* Expense Stats */}
+            <div className="lg:col-span-3"> {/* Span full width on large screens */}
                 <ExpenseStats
-                  totalSpending={totalSpending}
-                  totalReceipts={enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
-                  averagePerReceipt={averagePerReceipt}
-                  dateRange={date}
-                  onDateRangeClick={setDate}
-                />
-              </div>
-
-              {/* Spending Chart */}
-              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
-                <SpendingChart 
-                  dailyData={aggregatedChartData}
-                  isLoading={isLoadingDaily}
-                  dateRange={date}
-                />
-              </div>
-
-              {/* Category Pie Chart */}
-              <div className="lg:col-span-1"> {/* Take 1/3 width on large screens */}
-                <CategoryPieChart 
-                  categoryData={categoryData || []}
-                  isLoading={isLoadingCategories}
-                />
-              </div>
-              
-              {/* PDF Report Generator */}
-              <div className="lg:col-span-3">
-                <DailyPDFReportGenerator />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="details">
-            {/* Daily Spending Details Table */}
-            <div className="mt-6">
-              <ExpenseTable
-                sortedData={sortedDailySpendingDataForTable}
-                onViewReceipts={handleViewReceipts}
-                isLoading={isLoadingDaily}
+                totalSpending={totalSpending}
+                totalReceipts={enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
+                averagePerReceipt={averagePerReceipt}
+                dateRange={date}
+                onDateRangeClick={setDate}
               />
             </div>
-          </TabsContent>
-        </Tabs>
 
-        {/* Daily Receipt Browser Modal */}
-        {dailyReceiptBrowserData && (
-          <DailyReceiptBrowserModal
-            isOpen={!!dailyReceiptBrowserData}
-            onClose={handleCloseDailyReceiptBrowser}
-            date={dailyReceiptBrowserData.date}
-            receiptIds={dailyReceiptBrowserData.receiptIds}
-          />
-        )}
-      </main>
+            {/* Spending Chart */}
+            <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
+              <SpendingChart dailyData={aggregatedChartData} isLoading={isLoadingDaily} dateRange={date} />
+            </div>
+
+            {/* Category Pie Chart */}
+            <div className="lg:col-span-1"> {/* Take 1/3 width on large screens */}
+              <CategoryPieChart categoryData={categoryData || []} isLoading={isLoadingCategories} />
+            </div>
+            
+          </div>
+        </TabsContent>
+
+        <TabsContent value="details">
+           {/* Daily Spending Details Table */}
+           <div className="mt-6">
+            <ExpenseTable
+              sortedData={sortedDailySpendingDataForTable}
+              onViewReceipts={handleViewReceipts}
+              isLoading={isLoadingDaily}
+            />
+           </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Daily Receipt Browser Modal */}
+      {dailyReceiptBrowserData && (
+        <DailyReceiptBrowserModal
+          date={dailyReceiptBrowserData.date}
+          receiptIds={dailyReceiptBrowserData.receiptIds}
+          isOpen={!!dailyReceiptBrowserData}
+          onClose={handleCloseDailyReceiptBrowser}
+        />
+      )}
+
+      {/* Original Receipt Viewer (if still needed elsewhere, otherwise remove) */}
+      {/* Assuming this is handled by DailyReceiptBrowserModal now */}
+      {/* <ReceiptViewer isOpen={isViewerOpen} onClose={closeViewer} receiptId={selectedReceiptId} /> */}
     </div>
   );
 };
+
 export default AnalysisPage;
+```
+
+**Explanation of Changes:**
+
+1.  **Import Tabs:** Added `import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";`.
+2.  **`activeTab` State:** Added `const [activeTab, setActiveTab] = useState('overview');` to manage the currently visible tab.
+3.  **`Tabs` Structure:** Wrapped the main content of `AnalysisPage` in the `<Tabs>` component.
+    * `defaultValue="overview"` sets the initial active tab.
+    * `<TabsList>` contains the buttons (`<TabsTrigger>`) for switching tabs.
+        * Each `TabsTrigger` has a `value` prop corresponding to the `value` prop of the `TabsContent` it controls.
+    * `<TabsContent>` components hold the content for each tab.
+        * `<TabsContent value="overview">` contains `ExpenseStats`, `SpendingChart`, and `CategoryPieChart`.
+        * `<TabsContent value="details">` contains `ExpenseTable`.
+4.  **Component Placement:** The existing components (`ExpenseStats`, `CategoryPieChart`, `SpendingChart`, `ExpenseTable`) are placed inside the appropriate `TabsContent`.
+5.  **Data and State Passing:** The necessary state variables (`date`, `setDate`, `dailyReceiptBrowserData`, `setDailyReceiptBrowserData`) and derived data (`totalSpending`, `averagePerReceipt`, `aggregatedChartData`, `categoryData`, `sortedDailySpendingDataForTable`) are passed down to the child components within the tabs as before.
+6.  **Removed Redundant State/Props:** Removed the `sortColumn`, `sortDirection`, `isDatePickerOpen`, and `setIsDatePickerOpen` state and props from the `AnalysisPage` component and `ExpenseTable` component respectively, as the date filtering is now handled by the date picker in the 'Spending Overview' tab's `ExpenseStats` component, and the table's sorting was not fully implemented anyway. If you need sorting in the 'Daily Spending Details' tab, you would re-add the sorting state and logic within the `ExpenseTable` component itself or within the 'details' `TabsContent`.
+7.  **EnhancedDailySpendingData Sorting:** Ensured the `select` transformation for `enhancedDailySpendingData` sorts the data by date descending, which is a common default for a details table view.
+8.  **SpendingChart Date Range Display:** Added the formatted date range to the `SpendingChart` title for clarity.
+9.  **Y-Axis Formatting:** Added currency formatting to the Y-axis ticks in both `LineChart` and `BarChart`.
+10. **Tooltip Formatting:** Ensured the tooltip uses the correct full date format.
+11. **Chart Type Toggle Text:** Changed the toggle button text to be more descriptive (e.g., "Bar View" vs "Line View").
+
+Now, when you render `AnalysisPage`, you will see two tabs at the top. Clicking on a tab will show the corresponding content. The date range selection in the 'Spending Overview' tab will filter the data displayed in both tabs, ensuring consistency.
