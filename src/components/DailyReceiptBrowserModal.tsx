@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
-import ReceiptViewer from '@/components/ReceiptViewer';
+import ReceiptViewer, { ReceiptViewerProps } from '@/components/ReceiptViewer';
 
 // Helper function for date formatting
 const formatFullDate = (dateString: string) => {
@@ -35,6 +35,22 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
 
   // State to track the currently selected receipt ID
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+
+  // Handler for when a receipt is deleted
+  const handleReceiptDelete = (deletedId: string) => {
+    if (!receiptsData) return;
+    const idx = receiptsData.findIndex(r => r.id === deletedId);
+    const newReceipts = receiptsData.filter(r => r.id !== deletedId);
+    if (newReceipts.length === 0) {
+      setSelectedReceiptId(null); // No receipts left
+      // Optionally close modal if no receipts remain
+      onClose();
+    } else {
+      // Pick next receipt, or previous if last was deleted
+      const nextIdx = idx < newReceipts.length ? idx : newReceipts.length - 1;
+      setSelectedReceiptId(newReceipts[nextIdx].id);
+    }
+  };
 
   // Effect to set the first receipt as selected when data loads or IDs change
   useEffect(() => {
@@ -98,7 +114,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
           {/* Main Viewer Area */}
           <div className="flex-1 overflow-hidden flex flex-col">
             {currentReceipt ? (
-              <ReceiptViewer receipt={currentReceipt} />
+              <ReceiptViewer receipt={currentReceipt} onDelete={handleReceiptDelete} />
             ) : isLoading ? (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">Loading receipt details...</div>
             ) : (

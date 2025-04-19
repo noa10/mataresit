@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/select";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
 
-interface ReceiptViewerProps {
+export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
+  onDelete?: (deletedId: string) => void; // Notify parent of deletion
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
@@ -103,7 +104,7 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
   );
 }
 
-export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
+export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
@@ -620,7 +621,7 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
       }
       
       console.log("URL didn't match any formatting rules, returning as is");
-      return url;
+      return url; // Return original URL on error
     } catch (error) {
       console.error("Error formatting image URL:", error);
       return url; // Return original URL on error
@@ -818,8 +819,8 @@ export default function ReceiptViewer({ receipt }: ReceiptViewerProps) {
     },
     onSuccess: () => {
       toast.success("Receipt deleted successfully");
-      // Redirect to dashboard
-      window.location.href = '/';
+      if (onDelete) onDelete(receipt.id); // Notify parent
+      // Note: Do not close modal or navigate; let parent handle state
     },
     onError: (error) => {
       console.error("Failed to delete receipt:", error);
