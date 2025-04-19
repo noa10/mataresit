@@ -28,3 +28,4 @@ dist-ssr
 .cursor/rules/typescript.json
 .cursor/rules/project-specific.json
 .cursor/rules/README.md
+.aider*
