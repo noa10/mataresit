@@ -167,7 +167,7 @@ interface ExpenseStatsProps {
   totalReceipts: number;
   averagePerReceipt: number;
   dateRange: DateRange | undefined;
-  onDateRangeClick: () => void;
+  onDateRangeClick: (range: DateRange | undefined) => void;
 }
 
 const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
@@ -207,15 +207,28 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
     <Card className="border border-border/40 shadow-sm">
       <CardHeader className="flex flex-row justify-between items-start pb-2">
         <CardTitle className="text-lg">Financial Summary</CardTitle>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-          onClick={onDateRangeClick}
-        >
-          <CalendarIcon className="w-4 h-4" />
-          <span>{formattedDateRange}</span>
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span>{formattedDateRange}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={dateRange?.from}
+              selected={dateRange}
+              onSelect={onDateRangeClick}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
       </CardHeader>
       <CardContent className="p-6 pt-2">
         <div className="grid gap-6">
@@ -571,6 +584,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar
                   mode="range"
+                  defaultMonth={dateRange?.from}
                   selected={dateRange}
                   onSelect={(range) => {
                     setDateRange(range);
@@ -578,6 +592,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                       setIsDatePickerOpen(false);
                     }
                   }}
+                  numberOfMonths={2}
                   initialFocus
                 />
               </PopoverContent>
@@ -773,8 +788,11 @@ const AnalysisPage = () => {
   };
 
   // Function to open date range picker
-  const openDateRangePicker = () => {
-    setIsDatePickerOpen(true);
+  const openDateRangePicker = (range: DateRange | undefined) => {
+    if (range) {
+      setDate(range);
+    }
+    setIsDatePickerOpen(false);
   };
 
   // Handler for viewing receipts (to be passed to ExpenseTable)
