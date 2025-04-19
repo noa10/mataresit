@@ -834,269 +834,264 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4 }}
-        className="glass-card p-4 flex flex-col h-full min-h-0 overflow-hidden"
+        className="glass-card p-4 flex flex-col h-full min-h-0"
       >
-        <div className="flex justify-between items-start mb-3"> {/* items-start */}
-          <h3 className="font-medium">Receipt Image</h3>
-           {/* Moved status indicator to here */}
-           {renderProcessingStatus()}
-        </div>
-        
-        <div className="overflow-hidden h-[500px] rounded-lg relative bg-secondary/30 flex-shrink-0"> {/* Added flex-shrink-0 */}
-          {processingStatus && !['complete', 'failed_ocr', 'failed_ai'].includes(processingStatus) && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
-              <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
-                <Loader2 size={40} className="animate-spin mb-2" />
-                <span className="text-lg font-medium">
-                  {processingStatus === 'uploading' && 'Uploading Receipt...'}
-                  {processingStatus === 'uploaded' && 'Preparing for OCR...'}
-                  {processingStatus === 'processing_ocr' && 'Running OCR...'}
-                  {processingStatus === 'processing_ai' && 'AI Analysis...'}
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {receipt.image_url && !imageError ? (
-            <div className="w-full h-full">
-              <TransformWrapper
-                initialScale={1}
-                minScale={0.1}
-                maxScale={8}
-                centerOnInit={true}
-                limitToBounds={false}
-                smooth={true}
-                wheel={{ smoothStep: 0.04 }}
-                pinch={{ step: 5 }}
-              >
-                {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
-                  <>
-                    <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
-                      <div className="flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => zoomIn()}
-                          title="Zoom In"
-                        >
-                          <ZoomIn size={16} />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => zoomOut()}
-                          title="Zoom Out"
-                        >
-                          <ZoomOut size={16} />
-                        </Button>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => {
-                            const newRotation = (rotation - 90) % 360;
-                            setRotation(newRotation);
-                            setTransform(0, 0, 1);
-                          }}
-                          title="Rotate Left"
-                        >
-                          <RotateCcw size={16} />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => {
-                            const newRotation = (rotation + 90) % 360;
-                            setRotation(newRotation);
-                            setTransform(0, 0, 1);
-                          }}
-                          title="Rotate Right"
-                        >
-                          <RotateCw size={16} />
-                        </Button>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => {
-                            resetTransform();
-                            setRotation(0);
-                          }}
-                          title="Reset View"
-                        >
-                          <RotateCw size={16} />
-                        </Button>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = getFormattedImageUrl(receipt.image_url);
-                            link.download = `receipt-${receipt.id}.jpg`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                          title="Download Image"
-                        >
-                          <Download size={16} />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
-                              deleteMutation.mutate();
-                            }
-                          }}
-                          disabled={deleteMutation.isPending}
-                          title="Delete Receipt"
-                        >
-                          {deleteMutation.isPending ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                    <TransformComponent
-                      wrapperClass="w-full h-full"
-                      contentClass="w-full h-full"
-                    >
-                      <img
-                        src={getFormattedImageUrl(receipt.image_url)}
-                        alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                        className="receipt-image w-full h-full object-contain transition-transform"
-                        style={{ transform: `rotate(${rotation}deg)` }}
-                        onError={() => setImageError(true)}
-                      />
-                    </TransformComponent>
-                  </>
-                )}
-              </TransformWrapper>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
-              {imageError ? (
-                <>
-                  <AlertTriangle size={64} className="mb-4 text-amber-500" />
-                  <p className="text-center mb-2">Failed to load receipt image</p>
-                  <p className="text-xs text-center text-muted-foreground mb-4">
-                    The image URL may be invalid or the image may no longer exist.
-                  </p>
-                  <p className="text-xs break-all text-muted-foreground mb-4">
-                    URL: {getFormattedImageUrl(receipt.image_url) || "No URL provided"}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Receipt size={64} className="mb-4 opacity-30" />
-                  <p>No receipt image available</p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-        
-        {/* Controls and Logs section */}
-        <div className="mt-4 flex-grow flex flex-col gap-4 min-h-0"> 
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={handleReprocessReceipt}
-            // Disable if processing, no image, or already complete/failed (user should save changes first or mark as fixed)
-            disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed_ocr', 'failed_ai', 'complete'].includes(processingStatus))}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <RotateCw size={16} />
-                Reprocess with OCR
-              </>
-            )}
-          </Button>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <BarChart2 size={16} className="text-muted-foreground" />
-              <span className="text-sm">Processing Logs</span>
-            </div>
-            <Switch
-              checked={showProcessLogs}
-              onCheckedChange={handleToggleProcessLogs}
-            />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="font-medium">Receipt Image</h3>
+            {renderProcessingStatus()}
           </div>
-
-          {showProcessLogs && (
-            <ScrollArea className="h-[200px] rounded-md border flex-shrink-0">
-              {processLogs.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No processing logs available
+          <div className="flex-1 min-h-0 overflow-auto rounded-lg relative bg-secondary/30">
+            {processingStatus && !['complete', 'failed_ocr', 'failed_ai'].includes(processingStatus) && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
+                <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
+                  <Loader2 size={40} className="animate-spin mb-2" />
+                  <span className="text-lg font-medium">
+                    {processingStatus === 'uploading' && 'Uploading Receipt...'}
+                    {processingStatus === 'uploaded' && 'Preparing for OCR...'}
+                    {processingStatus === 'processing_ocr' && 'Running OCR...'}
+                    {processingStatus === 'processing_ai' && 'AI Analysis...'}
+                  </span>
                 </div>
-              ) : (
-                <div className="p-4 space-y-2">
-                  {processLogs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-2 text-xs">
-                      <div className="min-w-[60px] text-muted-foreground">
-                        {formatLogTime(log.created_at)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          {log.step_name && (
-                            <Badge 
-                              variant="outline" 
-                              className={`px-1.5 py-0 text-[10px] ${getStepColor(log.step_name)} text-white`}
-                            >
-                              {log.step_name}
-                            </Badge>
-                          )}
-                          <span>{log.status_message}</span>
+              </div>
+            )}
+            {receipt.image_url && !imageError ? (
+              <div className="w-full h-full">
+                <TransformWrapper
+                  initialScale={1}
+                  minScale={0.1}
+                  maxScale={8}
+                  centerOnInit={true}
+                  limitToBounds={false}
+                  smooth={true}
+                  wheel={{ smoothStep: 0.04 }}
+                  pinch={{ step: 5 }}
+                >
+                  {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
+                    <>
+                      <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
+                        <div className="flex gap-1">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => zoomIn()}
+                            title="Zoom In"
+                          >
+                            <ZoomIn size={16} />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => zoomOut()}
+                            title="Zoom Out"
+                          >
+                            <ZoomOut size={16} />
+                          </Button>
+                        </div>
+
+                        <div className="flex gap-1">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => {
+                              const newRotation = (rotation - 90) % 360;
+                              setRotation(newRotation);
+                              setTransform(0, 0, 1);
+                            }}
+                            title="Rotate Left"
+                          >
+                            <RotateCcw size={16} />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => {
+                              const newRotation = (rotation + 90) % 360;
+                              setRotation(newRotation);
+                              setTransform(0, 0, 1);
+                            }}
+                            title="Rotate Right"
+                          >
+                            <RotateCw size={16} />
+                          </Button>
+                        </div>
+
+                        <div className="flex gap-1">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => {
+                              resetTransform();
+                              setRotation(0);
+                            }}
+                            title="Reset View"
+                          >
+                            <RotateCw size={16} />
+                          </Button>
+                        </div>
+
+                        <div className="flex gap-1">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = getFormattedImageUrl(receipt.image_url);
+                              link.download = `receipt-${receipt.id}.jpg`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            title="Download Image"
+                          >
+                            <Download size={16} />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+                                deleteMutation.mutate();
+                              }
+                            }}
+                            disabled={deleteMutation.isPending}
+                            title="Delete Receipt"
+                          >
+                            {deleteMutation.isPending ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                      <TransformComponent
+                        wrapperClass="w-full h-full"
+                        contentClass="w-full h-full"
+                      >
+                        <img
+                          src={getFormattedImageUrl(receipt.image_url)}
+                          alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
+                          className="receipt-image w-full h-full object-contain transition-transform"
+                          style={{ transform: `rotate(${rotation}deg)` }}
+                          onError={() => setImageError(true)}
+                        />
+                      </TransformComponent>
+                    </>
+                  )}
+                </TransformWrapper>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
+                {imageError ? (
+                  <>
+                    <AlertTriangle size={64} className="mb-4 text-amber-500" />
+                    <p className="text-center mb-2">Failed to load receipt image</p>
+                    <p className="text-xs text-center text-muted-foreground mb-4">
+                      The image URL may be invalid or the image may no longer exist.
+                    </p>
+                    <p className="text-xs break-all text-muted-foreground mb-4">
+                      URL: {getFormattedImageUrl(receipt.image_url) || "No URL provided"}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Receipt size={64} className="mb-4 opacity-30" />
+                    <p>No receipt image available</p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex-grow flex flex-col gap-4 min-h-0">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleReprocessReceipt}
+              disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed_ocr', 'failed_ai', 'complete'].includes(processingStatus))}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <RotateCw size={16} />
+                  Reprocess with OCR
+                </>
               )}
-            </ScrollArea>
-          )}
+            </Button>
 
-          {receipt.fullText && (
-            <div className="mt-auto"> {/* Push Raw Text to bottom */}
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={handleToggleShowFullText}
-              >
-                {showFullTextData ? "Hide Raw OCR Text" : "Show Raw OCR Text"}
-              </Button>
-
-              {showFullTextData && (
-                <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] overflow-auto whitespace-pre-wrap">
-                    {receipt.fullText}
-                </div>
-              )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <BarChart2 size={16} className="text-muted-foreground" />
+                <span className="text-sm">Processing Logs</span>
+              </div>
+              <Switch
+                checked={showProcessLogs}
+                onCheckedChange={handleToggleProcessLogs}
+              />
             </div>
-          )}
 
+            {showProcessLogs && (
+              <ScrollArea className="h-[200px] rounded-md border flex-shrink-0">
+                {processLogs.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No processing logs available
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-2">
+                    {processLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-2 text-xs">
+                        <div className="min-w-[60px] text-muted-foreground">
+                          {formatLogTime(log.created_at)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            {log.step_name && (
+                              <Badge 
+                                variant="outline" 
+                                className={`px-1.5 py-0 text-[10px] ${getStepColor(log.step_name)} text-white`}
+                              >
+                                {log.step_name}
+                              </Badge>
+                            )}
+                            <span>{log.status_message}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            )}
+
+            {receipt.fullText && (
+              <div className="mt-auto">
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={handleToggleShowFullText}
+                >
+                  {showFullTextData ? "Hide Raw OCR Text" : "Show Raw OCR Text"}
+                </Button>
+
+                {showFullTextData && (
+                  <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] overflow-auto whitespace-pre-wrap">
+                      {receipt.fullText}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
       
@@ -1110,20 +1105,17 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           <h3 className="font-medium">Receipt Details</h3>
         </div>
 
-        {/* Display Processing Time */}
         {editedReceipt.processing_time !== undefined && editedReceipt.processing_time !== null && editedReceipt.processing_time > 0 && (
           <div className="text-sm text-muted-foreground mb-4 flex-shrink-0">
             Processing Time: {editedReceipt.processing_time.toFixed(2)} seconds
           </div>
         )}
 
-        {/* Scrollable Form Area */}
         <div className="flex-grow pr-3 min-h-0 overflow-auto">
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <Label htmlFor="merchant">Merchant</Label>
-                  {/* Use ConfidenceIndicator with loading state */}
                   <ConfidenceIndicator score={editedConfidence?.merchant} loading={isProcessing} />
                 </div>
                 <Input
@@ -1135,12 +1127,9 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 {renderSuggestion('merchant', 'merchant name')}
               </div>
 
-              {/* Add Category Selector */}
               <div className="space-y-2">
                  <div className="flex justify-between">
                    <Label htmlFor="category">Category</Label>
-                    {/* Category confidence might not be tracked in ConfidenceScore table directly */}
-                    {/* <ConfidenceIndicator score={editedConfidence?.predicted_category} /> */}
                  </div>
                 <Select
                   value={editedReceipt.predicted_category || ""}
@@ -1157,7 +1146,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                     ))}
                   </SelectContent>
                 </Select>
-                {/* Render suggestion for category */}
                 {renderSuggestion('predicted_category', 'category')}
               </div>
 
@@ -1165,14 +1153,12 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <Label htmlFor="date">Date</Label>
-                    {/* Use ConfidenceIndicator with loading state */}
                      <ConfidenceIndicator score={editedConfidence?.date} loading={isProcessing} />
                   </div>
                   <div className="relative">
                     <Input
                       id="date"
                       type="date"
-                      // Handle potential non-string date values safely
                       value={typeof editedReceipt.date === 'string' ? editedReceipt.date.split('T')[0] : ''}
                       onChange={(e) => handleInputChange('date', e.target.value)}
                       className="bg-background/50 pl-9"
@@ -1185,7 +1171,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <Label htmlFor="total">Total Amount</Label>
-                     {/* Use ConfidenceIndicator with loading state */}
                      <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
                   </div>
                   <div className="relative">
@@ -1194,7 +1179,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       type="number"
                       step="0.01"
                       value={editedReceipt.total || 0}
-                      onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)} // Ensure value is number
+                      onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
                       className="bg-background/50 pl-9"
                     />
                     <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
@@ -1207,8 +1192,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <Label htmlFor="currency">Currency</Label>
-                     {/* Currency confidence might not be tracked in ConfidenceScore table directly */}
-                     {/* <ConfidenceIndicator score={editedConfidence?.currency} /> */}
                   </div>
                   <Input
                     id="currency"
@@ -1222,7 +1205,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <Label htmlFor="paymentMethod">Payment Method</Label>
-                     {/* Use ConfidenceIndicator with loading state */}
                      <ConfidenceIndicator score={editedConfidence?.payment_method} loading={isProcessing} />
                   </div>
                   <div className="relative">
@@ -1238,12 +1220,10 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 </div>
               </div>
 
-              {/* Line Items Section */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Label>Line Items</Label>
-                     {/* Use ConfidenceIndicator with loading state */}
                      <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
                   </div>
                   <Button
@@ -1258,12 +1238,12 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 </div>
 
                 <Card className="bg-background/50 border border-border/50">
-                  <div className="p-3 max-h-[250px] overflow-auto"> {/* Simplified to regular div with overflow */}
+                  <div className="p-3 max-h-[250px] overflow-auto">
                     <div className="space-y-2">
                         {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
                         editedReceipt.lineItems.map((item, index) => (
                             <div
-                            key={item.id || `temp-${index}`} // Use index as fallback key for unsaved items
+                            key={item.id || `temp-${index}`}
                             className="flex justify-between items-center py-2 border-b border-border/50 last:border-0"
                             >
                             <Input
@@ -1277,7 +1257,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                                 type="number"
                                 step="0.01"
                                 value={item.amount || 0}
-                                onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value) || 0)} // Ensure value is number
+                                onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value) || 0)}
                                 className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right w-24"
                                 placeholder="Amount"
                                 />
@@ -1303,17 +1283,14 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 </Card>
               </div>
 
-              {/* Totals Section */}
               <div className="pt-4 border-t border-border/50">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Subtotal:</span>
-                  {/* Calculate subtotal dynamically */}
                   <span>{formatCurrency((editedReceipt.total || 0) - (editedReceipt.tax || 0))}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm mt-1">
                   <div className="flex items-center gap-1">
                     <span className="text-muted-foreground">Tax:</span>
-                     {/* Use ConfidenceIndicator with loading state */}
                      <ConfidenceIndicator score={editedConfidence?.tax} loading={isProcessing} />
                   </div>
                   <div className="relative w-24">
@@ -1321,7 +1298,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       type="number"
                       step="0.01"
                       value={editedReceipt.tax || 0}
-                      onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)} // Ensure value is number
+                      onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)}
                       className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
                       placeholder="Tax"
                     />
@@ -1331,14 +1308,13 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 <Separator className="my-2" />
                 <div className="flex justify-between items-center font-semibold mt-2">
                   <span>Total:</span>
-                  <span>{formatCurrency(editedReceipt.total || 0)}</span> {/* Ensure total has default value */}
+                  <span>{formatCurrency(editedReceipt.total || 0)}</span>
                 </div>
               </div>
             </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="pt-4 mt-auto flex justify-between flex-shrink-0"> {/* Added mt-auto and flex-shrink-0 */}
+        <div className="pt-4 mt-auto flex justify-between flex-shrink-0">
           <Button 
             variant="outline" 
             className="gap-2" 
