@@ -1,0 +1,28 @@
+/* Styling for the receipt calendar */
+.receipt-calendar .day-with-receipt {
+  position: relative;
+}
+
+.receipt-calendar .day-with-receipt::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+}
+
+/* Adjust dot position/color when the day is selected */
+.receipt-calendar .rdp-day_selected.day-with-receipt::after,
+.receipt-calendar .rdp-day_selected:focus.day-with-receipt::after,
+.receipt-calendar .rdp-day_selected:active.day-with-receipt::after {
+  background-color: hsl(var(--primary-foreground));
+}
+
+/* Hide dot if day is outside the current month */
+.receipt-calendar .rdp-day_outside.day-with-receipt::after {
+  display: none;
+} 

@@ -1,0 +1,30 @@
+/* Styling for the receipt calendar */
+.receiptCalendar :global(.day-with-receipt) {
+  position: relative;
+}
+
+.receiptCalendar :global(.day-with-receipt)::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+  opacity: 0.9;
+  z-index: 10;
+}
+
+/* Adjust dot position/color when the day is selected */
+.receiptCalendar :global(.rdp-day_selected.day-with-receipt)::after,
+.receiptCalendar :global(.rdp-day_selected:focus.day-with-receipt)::after,
+.receiptCalendar :global(.rdp-day_selected:active.day-with-receipt)::after {
+  background-color: white;
+}
+
+/* Hide dot if day is outside the current month */
+.receiptCalendar :global(.rdp-day_outside.day-with-receipt)::after {
+  display: none;
+} 

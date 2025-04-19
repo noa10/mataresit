@@ -634,7 +634,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
       </CardContent>
     </Card>
   );
-};;
+};
 
 const AnalysisPage = () => {
   // State for date range picker
@@ -657,10 +657,6 @@ const AnalysisPage = () => {
   const [receiptsForDay, setReceiptsForDay] = useState<string[]>([]);
   const [selectedDateForList, setSelectedDateForList] = useState<string | null>(null);
   
-  // State for PDF generation
-  const [selectedDateForPDF, setSelectedDateForPDF] = useState<Date | undefined>(new Date());
-  const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
-
   // State for date picker popover
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
@@ -800,28 +796,8 @@ const AnalysisPage = () => {
 
         {/* Grid Layout for PDF Report Generator and ExpenseStats */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* PDF Report Generation Card */}
-          <Card className="border border-border/40 shadow-sm">
-            <CardHeader>
-              <CardTitle>Generate Daily Spent Report</CardTitle>
-              <p className="text-sm text-muted-foreground">Select a day to generate a detailed PDF report of all expenses for that day.</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Calendar
-                mode="single"
-                selected={selectedDateForPDF}
-                onSelect={setSelectedDateForPDF}
-                className="rounded-md border border-border"
-              />
-              <Button 
-                className="w-full" 
-                onClick={() => setIsPDFModalOpen(true)}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Generate PDF Report
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Replace the existing Card with DailyPDFReportGenerator */}
+          <DailyPDFReportGenerator />
 
           {/* Use the ExpenseStats component */}
           <ExpenseStats 
@@ -877,18 +853,6 @@ const AnalysisPage = () => {
           <Dialog open={isViewerModalOpen} onOpenChange={setIsViewerModalOpen}>
             <DialogContent className="max-w-4xl p-0 max-h-[85vh] overflow-y-auto">
               <ReceiptModalContent receiptId={selectedReceiptId} />
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* PDF Generation Modal */}
-        {isPDFModalOpen && selectedDateForPDF && (
-          <Dialog open={isPDFModalOpen} onOpenChange={setIsPDFModalOpen}>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Daily Expense Report</DialogTitle>
-              </DialogHeader>
-              <DailyPDFReportGenerator />
             </DialogContent>
           </Dialog>
         )}
