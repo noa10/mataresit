@@ -37,6 +37,9 @@ import { ReceiptWithDetails } from '@/types/receipt';
 import Navbar from '@/components/Navbar'; // Import Navbar
 import { supabase } from '@/integrations/supabase/client'; // Corrected supabase client import path
 
+// Import the new DailyReceiptBrowserModal
+import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
+
 // Currency formatting function
 const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
@@ -64,93 +67,6 @@ const formatFullDate = (dateString: string) => {
 
 // Define color constants for charts and UI elements
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D'];
-
-// Define ReceiptModalContent component here for simplicity
-interface ReceiptModalContentProps {
-  receiptId: string;
-}
-
-const ReceiptModalContent = ({ receiptId }: ReceiptModalContentProps) => {
-  const { data: receipt, isLoading, error } = useQuery<ReceiptWithDetails | null>({ // Allow null return
-    queryKey: ["receipt", receiptId],
-    queryFn: () => fetchReceiptById(receiptId), // Function to fetch receipt by ID
-    enabled: !!receiptId, // Only fetch if receiptId is valid
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
-
-  if (isLoading) return <div className="p-4 min-h-[300px] flex items-center justify-center"><p>Loading receipt...</p></div>;
-  if (error) return <div className="p-4 min-h-[300px] flex items-center justify-center text-destructive"><p>Error loading receipt: {(error as Error).message}</p></div>;
-  if (!receipt) return <div className="p-4 min-h-[300px] flex items-center justify-center"><p>Receipt not found.</p></div>;
-
-  return <ReceiptViewer receipt={receipt} />;
-};
-
-// Define ReceiptListModalContent component
-interface ReceiptListModalContentProps {
-  receiptIds: string[];
-  date: string;
-  onReceiptSelect: (receiptId: string) => void;
-}
-
-const ReceiptListModalContent = ({ receiptIds, date, onReceiptSelect }: ReceiptListModalContentProps) => {
-  // Define the expected type for the query data - using 'merchant' now
-  type ReceiptInfo = { id: string; merchant: string | null };
-
-  // Fetch merchant names for the given IDs
-  const { data: receiptsInfo, isLoading, error } = useQuery<ReceiptInfo[], Error>({ // Use the updated type
-    queryKey: ["receiptsInfoForList", receiptIds], // Changed query key slightly
-    queryFn: async (): Promise<ReceiptInfo[]> => {
-      if (!receiptIds || receiptIds.length === 0) {
-        return [];
-      }
-      const { data, error: dbError } = await supabase
-        .from('receipts')
-        .select('id, merchant') // Select 'merchant' instead of 'merchant_name'
-        .in('id', receiptIds);
-
-      if (dbError) {
-        console.error("Error fetching receipt info:", dbError);
-        throw new Error('Failed to load receipt details for list.'); // Simplified error
-      }
-
-      // Cast might still be needed depending on exact types
-      return (data as ReceiptInfo[] | null) || [];
-    },
-    enabled: receiptIds.length > 0,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  return (
-    <div className="p-4">
-      <DialogHeader className="mb-4">
-        <DialogTitle>Receipts for {formatFullDate(date)}</DialogTitle>
-      </DialogHeader>
-      <div className="flex flex-col space-y-1 max-h-[60vh] overflow-y-auto pr-2">
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm p-4 text-center">Loading receipt list...</p>
-        ) : error ? (
-          <p className="text-destructive text-sm p-4 text-center">{(error as Error).message}</p>
-        ) : receiptsInfo && receiptsInfo.length > 0 ? (
-          receiptsInfo.map(info => (
-            <Button
-              key={info.id}
-              variant="ghost"
-              size="sm"
-              onClick={() => onReceiptSelect(info.id)}
-              className="justify-start text-sm h-auto py-1.5 text-left"
-              title={`View details for ${info.merchant || 'receipt ' + info.id.substring(0,6)}`}
-            >
-              {/* Display merchant or fallback */}
-              {info.merchant || <span className="text-muted-foreground italic">Receipt ({info.id.substring(0, 6)}...)</span>}
-            </Button>
-          ))
-        ) : (
-          <p className="text-muted-foreground text-sm p-4 text-center">No receipts found for this day.</p>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // Define the enhanced data structure for the table
 type EnhancedDailySpendingData = {
@@ -655,8 +571,10 @@ const AnalysisPage = () => {
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
     const today = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(today.getMonth() - 1);
     return {
-      from: addDays(today, -30), // Default: last 30 days
+      from: oneMonthAgo,
       to: today,
     };
   });
@@ -665,19 +583,14 @@ const AnalysisPage = () => {
   const [sortColumn, setSortColumn] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // State for modals
-  const [isListModalOpen, setIsListModalOpen] = useState(false);
-  const [isViewerModalOpen, setIsViewerModalOpen] = useState(false);
-  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
-  const [receiptsForDay, setReceiptsForDay] = useState<string[]>([]);
-  const [selectedDateForList, setSelectedDateForList] = useState<string | null>(null);
-  
+  // NEW STATE: For the DailyReceiptBrowserModal
+  const [dailyReceiptBrowserData, setDailyReceiptBrowserData] = useState<{ date: string; receiptIds: string[] } | null>(null);
+
   // State for date picker popover
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Prepare ISO strings for API calls
   const startDateISO = date?.from ? date.from.toISOString() : null;
-  // Add 1 day to 'to' date and set to start of day for inclusive range in Supabase query
   const endDateISO = date?.to ? startOfDay(addDays(date.to, 1)).toISOString() : null;
 
   // Fetch daily spending data - using new function and select transformation
@@ -737,9 +650,6 @@ const AnalysisPage = () => {
     return [...(enhancedDailySpendingData || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [enhancedDailySpendingData]);
 
-  // Data for the table (already transformed by select)
-  // No need for aggregatedTableData anymore, use enhancedDailySpendingData directly for sorting
-
   // Calculate total spending from transformed data
   const totalSpending = React.useMemo(() => {
     return enhancedDailySpendingData?.reduce((sum, item) => sum + item.total, 0) || 0;
@@ -780,13 +690,6 @@ const AnalysisPage = () => {
     return data;
   }, [enhancedDailySpendingData, sortColumn, sortDirection]); // Depend on transformed data
 
-  // Handler to open the Receipt Viewer modal from the list modal
-  const handleReceiptSelect = (receiptId: string) => {
-    setIsListModalOpen(false); // Close list modal
-    setSelectedReceiptId(receiptId);
-    setIsViewerModalOpen(true); // Open viewer modal
-  };
-
   // Function to open date range picker
   const openDateRangePicker = (range: DateRange | undefined) => {
     if (range) {
@@ -795,11 +698,15 @@ const AnalysisPage = () => {
     setIsDatePickerOpen(false);
   };
 
-  // Handler for viewing receipts (to be passed to ExpenseTable)
+  // UPDATED: Handler for viewing receipts - now opens the DailyReceiptBrowserModal
   const handleViewReceipts = (date: string, receiptIds: string[]) => {
-    setReceiptsForDay(receiptIds);
-    setSelectedDateForList(date);
-    setIsListModalOpen(true);
+    // Set the data needed for the browser modal
+    setDailyReceiptBrowserData({ date, receiptIds });
+  };
+
+  // Handler to close the receipt browser modal
+  const handleCloseDailyReceiptBrowser = () => {
+    setDailyReceiptBrowserData(null);
   };
 
   return (
@@ -814,10 +721,7 @@ const AnalysisPage = () => {
 
         {/* Grid Layout for PDF Report Generator and ExpenseStats */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Replace the existing Card with DailyPDFReportGenerator */}
           <DailyPDFReportGenerator />
-
-          {/* Use the ExpenseStats component */}
           <ExpenseStats 
             totalSpending={totalSpending}
             totalReceipts={enhancedDailySpendingData?.reduce((sum, day) => sum + day.receiptIds.length, 0) || 0}
@@ -829,20 +733,17 @@ const AnalysisPage = () => {
 
         {/* Grid Layout for Charts */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Use the CategoryPieChart component */}
           <CategoryPieChart 
             categoryData={categoryData || []}
             isLoading={isLoadingCategories}
           />
-
-          {/* Use the SpendingChart component */}
           <SpendingChart 
             dailyData={aggregatedChartData}
             isLoading={isLoadingDaily}
           />
         </div>
 
-        {/* Use the ExpenseTable component */}
+        {/* Expense Table */}
         <ExpenseTable 
           sortedData={sortedData}
           dateRange={date}
@@ -853,26 +754,14 @@ const AnalysisPage = () => {
           setIsDatePickerOpen={setIsDatePickerOpen}
         />
 
-        {/* Receipt List Modal */}
-        {isListModalOpen && selectedDateForList && (
-          <Dialog open={isListModalOpen} onOpenChange={setIsListModalOpen}>
-            <DialogContent className="max-w-md">
-              <ReceiptListModalContent
-                receiptIds={receiptsForDay}
-                date={selectedDateForList}
-                onReceiptSelect={handleReceiptSelect}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Receipt Viewer Modal */}
-        {isViewerModalOpen && selectedReceiptId && (
-          <Dialog open={isViewerModalOpen} onOpenChange={setIsViewerModalOpen}>
-            <DialogContent className="max-w-4xl p-0 max-h-[85vh] overflow-y-auto">
-              <ReceiptModalContent receiptId={selectedReceiptId} />
-            </DialogContent>
-          </Dialog>
+        {/* NEW: Daily Receipt Browser Modal */}
+        {dailyReceiptBrowserData && (
+          <DailyReceiptBrowserModal
+            isOpen={!!dailyReceiptBrowserData}
+            onClose={handleCloseDailyReceiptBrowser}
+            date={dailyReceiptBrowserData.date}
+            receiptIds={dailyReceiptBrowserData.receiptIds}
+          />
         )}
       </main>
     </div>

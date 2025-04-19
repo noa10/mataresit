@@ -98,6 +98,62 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
   };
 };
 
+// Fetch multiple receipts by their IDs with line items
+export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDetails[]> => {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+  
+  // First get all the receipts
+  const { data: receiptsData, error: receiptsError } = await supabase
+    .from("receipts")
+    .select("*")
+    .in("id", ids);
+  
+  if (receiptsError || !receiptsData) {
+    console.error("Error fetching receipts by IDs:", receiptsError);
+    throw new Error('Failed to load receipts');
+  }
+
+  // Explicitly cast to Receipt[] after error check
+  const receipts = receiptsData as unknown as Receipt[];
+  
+  // Then get all line items for these receipts in a single query
+  const { data: allLineItems, error: lineItemsError } = await supabase
+    .from("line_items")
+    .select("*")
+    .in("receipt_id", ids);
+  
+  if (lineItemsError) {
+    console.error("Error fetching line items for receipts:", lineItemsError);
+    // Don't fail the whole operation, just log and continue
+  }
+
+  // Group line items by receipt_id for easier lookup
+  const lineItemsByReceiptId = (allLineItems || []).reduce((acc, item) => {
+    if (!acc[item.receipt_id]) {
+      acc[item.receipt_id] = [];
+    }
+    acc[item.receipt_id].push(item);
+    return acc;
+  }, {} as Record<string, ReceiptLineItem[]>);
+  
+  // Combine receipts with their line items
+  return receipts.map(receipt => {
+    return {
+      ...receipt,
+      status: validateStatus(receipt.status || "unreviewed"),
+      lineItems: lineItemsByReceiptId[receipt.id] || [],
+      confidence_scores: receipt.confidence_scores || {
+        merchant: 0,
+        date: 0,
+        total: 0
+      },
+      ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
+    };
+  });
+};
+
 // Upload a receipt image to Supabase Storage
 export const uploadReceiptImage = async (
   file: File, 
