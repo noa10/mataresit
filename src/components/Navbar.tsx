@@ -236,7 +236,7 @@ export default function Navbar() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="glass md:hidden border-b border-border/40 overflow-hidden"
+            className="bg-background md:hidden border-b border-border/40 overflow-hidden"
           >
             <div className="container py-4 flex flex-col space-y-4">
               {filteredLinks.map((link) => (
