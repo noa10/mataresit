@@ -24,11 +24,11 @@ import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
 import { cn } from "@/lib/utils";
 
 // Import Lucide icons
-import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye } from "lucide-react";
+import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2 } from "lucide-react";
 
 // Import services and types
 import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
-import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar } from 'recharts';
 
 // Import ReceiptViewer and related types/functions
 import ReceiptViewer from '@/components/ReceiptViewer';
@@ -246,6 +246,8 @@ interface SpendingChartProps {
 }
 
 const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading }) => {
+  // Add state for chart type toggle
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
   if (isLoading) {
     return (
       <Card className="border border-border/40 shadow-sm">
@@ -304,6 +306,11 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading }) =
     return null;
   };
 
+  // Toggle chart type handler
+  const toggleChartType = () => {
+    setChartType(prev => prev === 'line' ? 'bar' : 'line');
+  };
+
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader className="flex flex-row justify-between items-start">
@@ -315,117 +322,220 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading }) =
             </p>
           )}
         </div>
+        {/* Add chart type toggle button */}
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={toggleChartType}
+          className="flex items-center gap-1"
+        >
+          {chartType === 'line' ? (
+            <>
+              <TrendingUp className="h-4 w-4" />
+              <span className="text-xs">Line</span>
+            </>
+          ) : (
+            <>
+              <BarChart2 className="h-4 w-4" />
+              <span className="text-xs">Bar</span>
+            </>
+          )}
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="h-[350px]">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart 
-                data={chartData} 
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }} 
-                className="[&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground [&_.recharts-reference-line-label]:fill-foreground dark:[&_.recharts-dot]:stroke-opacity-100 dark:[&_.recharts-dot]:fill-primary/80 dark:[&_.recharts-dot]:stroke-background dark:[&_.recharts-activedot]:stroke-background dark:[&_.recharts-activedot]:fill-primary"
-              >
-                <defs>
-                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="var(--border)" opacity={0.4} className="dark:opacity-60" />
-                
-                <XAxis 
-                  dataKey="date" 
-                  stroke="var(--muted-foreground)" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={{stroke: 'var(--border)'}}
-                  padding={{ left: 10, right: 10 }}
-                />
-                
-                <YAxis
-                  stroke="var(--muted-foreground)"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={{stroke: 'var(--border)'}}
-                  tickFormatter={(value) => `MYR ${value}`}
-                />
-                
-                <Tooltip content={<CustomTooltip />} />
-                
-                {/* Area under the line chart */}
-                <Area 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="var(--primary)" 
-                  strokeWidth={0} 
-                  fillOpacity={1} 
-                  fill="url(#colorAmount)"
-                  className="dark:opacity-30" 
-                />
-                
-                {/* Average spending reference line */}
-                <ReferenceLine 
-                  y={avgSpending} 
-                  stroke="var(--muted-foreground)" 
-                  strokeDasharray="3 3"
-                  label={{ 
-                    value: 'Average', 
-                    position: 'insideTopRight',
-                    fill: 'var(--muted-foreground)',
-                    fontSize: 11,
-                    className: 'recharts-reference-line-label'
-                  }}
-                />
-                
-                {/* Vertical lines from points to axis */}
-                {chartData.map((entry, index) => (
-                  <ReferenceLine
-                    key={`ref-line-${index}`}
-                    x={entry.date}
-                    stroke="var(--primary)"
-                    strokeOpacity={0.4}
-                    strokeDasharray="3 3"
-                    segment={[{ y: 0 }, { y: entry.amount }]}
-                    className="dark:opacity-60"
+              {chartType === 'line' ? (
+                <LineChart 
+                  data={chartData} 
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }} 
+                  className="[&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground [&_.recharts-reference-line-label]:fill-foreground dark:[&_.recharts-dot]:stroke-opacity-100 dark:[&_.recharts-dot]:fill-primary/90 dark:[&_.recharts-dot]:stroke-gray-900 dark:[&_.recharts-activedot]:stroke-gray-900 dark:[&_.recharts-activedot]:fill-primary dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-reference-line]:stroke-gray-500"
+                >
+                  <defs>
+                    <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    vertical={true} 
+                    horizontal={true} 
+                    stroke="var(--border)" 
+                    opacity={0.4} 
+                    className="dark:opacity-60" 
                   />
-                ))}
-
-                {/* Main line */}
-                <Line
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  dot={{
-                    stroke: 'var(--primary)',
-                    strokeWidth: 3,
-                    fill: 'var(--card)',
-                    r: 5,
-                    className: 'dark:stroke-[3px]'
-                  }}
-                  activeDot={{
-                    stroke: 'var(--card)',
-                    strokeWidth: 3,
-                    fill: 'var(--primary)',
-                    r: 7,
-                    className: 'dark:stroke-[3px]'
-                  }}
-                />
-                
-                {/* Peak spending marker */}
-                {peakDay && (
+                  
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="var(--muted-foreground)" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={{stroke: 'var(--border)'}}
+                    padding={{ left: 10, right: 10 }}
+                    tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
+                    className="dark:stroke-gray-500"
+                  />
+                  
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{stroke: 'var(--border)'}}
+                    tickFormatter={(value) => `MYR ${value}`}
+                    tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
+                    className="dark:stroke-gray-500"
+                  />
+                  
+                  <Tooltip content={<CustomTooltip />} />
+                  
+                  {/* Area under the line chart */}
+                  <Area 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="var(--primary)" 
+                    strokeWidth={0} 
+                    fillOpacity={1} 
+                    fill="url(#colorAmount)"
+                    className="dark:opacity-30" 
+                  />
+                  
+                  {/* Average spending reference line */}
                   <ReferenceLine 
-                    x={peakDay.date} 
-                    stroke="var(--destructive)" 
+                    y={avgSpending} 
+                    stroke="var(--muted-foreground)" 
+                    strokeDasharray="3 3"
+                    className="dark:stroke-gray-400"
                     label={{ 
-                      value: 'Peak', 
-                      position: 'top',
-                      fill: 'var(--destructive)',
-                      fontSize: 11
+                      value: 'Average', 
+                      position: 'insideTopRight',
+                      fill: 'var(--muted-foreground)',
+                      fontSize: 11,
+                      className: 'recharts-reference-line-label dark:fill-gray-300'
                     }}
                   />
-                )}
-              </LineChart>
+                  
+                  {/* Vertical lines from points to axis */}
+                  {chartData.map((entry, index) => (
+                    <ReferenceLine
+                      key={`ref-line-${index}`}
+                      x={entry.date}
+                      stroke="var(--primary)"
+                      strokeOpacity={0.4}
+                      strokeDasharray="3 3"
+                      segment={[{ y: 0 }, { y: entry.amount }]}
+                      className="dark:opacity-60"
+                    />
+                  ))}
+                  
+                  {/* Main line */}
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="var(--primary)"
+                    strokeWidth={2.5}
+                    className="stroke-primary stroke-opacity-100 dark:stroke-primary dark:stroke-opacity-100 dark:brightness-125"
+                    dot={{
+                      stroke: 'var(--primary)',
+                      strokeWidth: 3,
+                      fill: 'var(--card)',
+                      r: 5,
+                      className: 'stroke-primary fill-card stroke-opacity-100 dark:stroke-primary dark:fill-gray-900 dark:stroke-opacity-100 dark:brightness-125'
+                    }}
+                    activeDot={{
+                      stroke: 'var(--card)',
+                      strokeWidth: 3,
+                      fill: 'var(--primary)',
+                      r: 7,
+                      className: 'stroke-card fill-primary stroke-opacity-100 dark:stroke-gray-900 dark:fill-primary dark:brightness-125'
+                    }}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  className="
+                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground 
+                    [&_.recharts-legend-item-text]:fill-foreground 
+                    [&_.recharts-rectangle]:stroke-opacity-30 
+                    dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 
+                    dark:[&_.recharts-reference-line]:stroke-gray-500 
+                    dark:[&_.recharts-rectangle]:brightness-125
+                    [&_.recharts-cartesian-axis-line]:stroke-border [&_.recharts-cartesian-axis-line]:stroke-opacity-80 dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-cartesian-axis-line]:stroke-opacity-100
+                    [&_.recharts-reference-line-label]:fill-muted-foreground dark:[&_.recharts-reference-line-label]:fill-gray-300
+                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground dark:[&_.recharts-cartesian-axis-tick-value]:fill-gray-300
+                  "
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    vertical={true} 
+                    horizontal={true} 
+                    stroke="var(--border)" 
+                    opacity={0.4} 
+                    className="dark:opacity-60" 
+                  />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="var(--muted-foreground)" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={{stroke: 'var(--border)'}} 
+                    tick={{ 
+                      fill: 'var(--foreground)', 
+                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300' 
+                    }}
+                    className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
+                  />
+                  <YAxis 
+                    stroke="var(--muted-foreground)" 
+                    fontSize={12} 
+                    tickLine={false} 
+                    axisLine={{stroke: 'var(--border)'}}
+                    tickFormatter={(value) => `MYR ${value}`}
+                    tick={{ 
+                      fill: 'var(--foreground)', 
+                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300' 
+                    }}
+                    className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine 
+                    y={avgSpending} 
+                    stroke="var(--muted-foreground)" 
+                    strokeDasharray="3 3"
+                    className="stroke-muted-foreground stroke-opacity-100 stroke-dasharray-3 dark:stroke-gray-400"
+                    label={{ 
+                      value: 'Average', 
+                      position: 'insideTopRight',
+                      fill: 'var(--muted-foreground)', 
+                      fontSize: 11,
+                      className: 'recharts-reference-line-label fill-muted-foreground fill-opacity-100 dark:fill-gray-300'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="amount" 
+                    radius={[4, 4, 0, 0]}
+                    barSize={20}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.amount > avgSpending ? 'var(--destructive)' : 'var(--primary)'}
+                        className={cn(
+                          'fill-opacity-95', 
+                          'stroke-gray-200 stroke-width-1', 
+                          'dark:fill-opacity-100', 
+                          'dark:brightness-125', 
+                          entry.amount > avgSpending ? 'dark:fill-red-300' : 'dark:fill-blue-300', 
+                          'dark:stroke-gray-800 dark:stroke-width-1'
+                        )}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              )}
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -712,23 +822,11 @@ const AnalysisPage = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <Navbar />
-      <main className="max-w-7xl mx-auto space-y-6">
+      <main className="max-w-7xl mx-auto space-y-8 mt-6">
         {/* Dashboard Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Expense Analysis</h1>
           <p className="text-muted-foreground">Track and analyze your spending patterns</p>
-        </div>
-
-        {/* Grid Layout for PDF Report Generator and ExpenseStats */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <DailyPDFReportGenerator />
-          <ExpenseStats 
-            totalSpending={totalSpending}
-            totalReceipts={enhancedDailySpendingData?.reduce((sum, day) => sum + day.receiptIds.length, 0) || 0}
-            averagePerReceipt={averagePerReceipt}
-            dateRange={date}
-            onDateRangeClick={openDateRangePicker}
-          />
         </div>
 
         {/* Grid Layout for Charts */}
@@ -753,6 +851,18 @@ const AnalysisPage = () => {
           isDatePickerOpen={isDatePickerOpen}
           setIsDatePickerOpen={setIsDatePickerOpen}
         />
+
+        {/* Grid Layout for PDF Report Generator and ExpenseStats - moved to bottom */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <ExpenseStats 
+            totalSpending={totalSpending}
+            totalReceipts={enhancedDailySpendingData?.reduce((sum, day) => sum + day.receiptIds.length, 0) || 0}
+            averagePerReceipt={averagePerReceipt}
+            dateRange={date}
+            onDateRangeClick={openDateRangePicker}
+          />
+          <DailyPDFReportGenerator /> {/* Moved to bottom right */}
+        </div>
 
         {/* NEW: Daily Receipt Browser Modal */}
         {dailyReceiptBrowserData && (
