@@ -7,6 +7,9 @@ import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
 import ReceiptViewer, { ReceiptViewerProps } from '@/components/ReceiptViewer';
 
+import './receipt-calendar.css';
+import styles from './receipt-calendar.module.css';
+
 // Helper function for date formatting
 const formatFullDate = (dateString: string) => {
   try {
