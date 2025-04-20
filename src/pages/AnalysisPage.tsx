@@ -754,18 +754,19 @@ const AnalysisPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
-      <main className="max-w-7xl mx-auto space-y-8 mt-6">
+      {/* Apply container, padding, and spacing consistent with Index.tsx */}
+      <main className="container py-16 md:py-24 space-y-16">
         {/* Dashboard Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Expense Analysis</h1>
+        <div className="mb-12"> {/* Adjusted margin bottom for consistency */}
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
           <p className="text-muted-foreground">Track and analyze your spending patterns</p>
         </div>
 
         {/* Display errors if any */}
         {(dailyError || categoriesError) && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-8"> {/* Adjusted margin bottom */}
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>
