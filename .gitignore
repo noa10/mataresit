@@ -29,3 +29,4 @@ dist-ssr
 .cursor/rules/project-specific.json
 .cursor/rules/README.md
 .aider*
+.cursor/rules/pdf-report-generation.mdc
