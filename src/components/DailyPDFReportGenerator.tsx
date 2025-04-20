@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Download, CircleDot, Calendar } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import 'react-day-picker/dist/style.css';
 
 // Define a completely custom day component
@@ -50,6 +52,8 @@ export function DailyPDFReportGenerator() {
   const [receiptDates, setReceiptDates] = useState<Date[]>([]);
   // State to track loading of receipt dates
   const [isLoadingDates, setIsLoadingDates] = useState(false);
+  // State for report mode: 'payer' or 'category'
+  const [reportMode, setReportMode] = useState<'payer' | 'category'>('payer'); // Default mode is 'payer'
 
   // Function to fetch dates with receipts for the current month
   const fetchReceiptDatesForMonth = async (month: Date) => {
@@ -121,6 +125,11 @@ export function DailyPDFReportGenerator() {
     setSelectedDay(day);
   };
 
+  const handleModeChange = (value: 'payer' | 'category') => {
+    setReportMode(value);
+    console.log("Report mode changed to:", value);
+  };
+
   const generatePDF = async () => {
     if (!selectedDay) return;
 
@@ -150,7 +159,7 @@ export function DailyPDFReportGenerator() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr, mode: reportMode })
       });
 
       if (!response.ok) {
@@ -186,7 +195,7 @@ export function DailyPDFReportGenerator() {
       // Create a link element and trigger download
       const link = document.createElement('a');
       link.href = pdfUrl;
-      link.download = `expense-report-${dateStr}.pdf`;
+      link.download = `expense-report-${dateStr}-${reportMode}-mode.pdf`;
       document.body.appendChild(link);
       link.click();
 
@@ -250,11 +259,32 @@ export function DailyPDFReportGenerator() {
             showOutsideDays={true}
           />
         </div>
-        
+
+        {/* Report Mode Selection */}
+        <div className="w-full flex flex-col items-center mt-4">
+          <Label htmlFor="report-mode" className="mb-2 text-sm font-medium">
+            Report Summary & Statistics Mode:
+          </Label>
+          <RadioGroup 
+            defaultValue="payer" 
+            onValueChange={handleModeChange} 
+            className="flex items-center space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="payer" id="mode-payer" />
+              <Label htmlFor="mode-payer">Payer (Abah/Bakaris)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="category" id="mode-category" />
+              <Label htmlFor="mode-category">Category</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
         <Button
           onClick={generatePDF}
           disabled={!selectedDay || isLoading}
-          className="w-full mt-2"
+          className="w-full mt-4"
           type="button"
         >
           {isLoading ? (
@@ -270,8 +300,8 @@ export function DailyPDFReportGenerator() {
           )}
         </Button>
         {selectedDay && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Report will include all receipts from {format(selectedDay, 'MMMM d, yyyy')}
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Report for {format(selectedDay, 'MMMM d, yyyy')} using {reportMode} mode summary.
           </p>
         )}
       </CardContent>

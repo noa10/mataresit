@@ -1,3 +1,350 @@
+Okay, let's implement the functionality to switch between 'Payer' (Abah/Bakaris) mode and 'Category' mode for the Expense Summary table and statistics in your PDF report generation.
+
+We'll modify both the React component (frontend) to add the mode selection and the Supabase Edge Function (backend) to handle the different modes in the PDF generation logic.
+
+**1. Frontend (React Component): Add Mode Selection**
+
+We'll add a `RadioGroup` to let the user select the mode.
+
+*   Install the `shadcn/ui` RadioGroup components if you haven't already:
+    ```bash
+    npx shadcn-ui@latest add radio-group
+    ```
+*   Modify `components/DailyPDFReportGenerator.tsx`:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { DayPicker } from 'react-day-picker';
+import { format, startOfMonth, endOfMonth, parseISO, isSameDay } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, Download, CircleDot, Calendar } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
+import { Label } from "@/components/ui/label"; // Import Label
+import 'react-day-picker/dist/style.css';
+
+// Define a completely custom day component
+function CustomDay(props: any) {
+  const { date, displayMonth, receiptDates = [], selected, disabled, onSelect } = props;
+  const isOutsideMonth = displayMonth && date.getMonth() !== displayMonth.getMonth();
+  const hasReceipt = receiptDates.some((d: Date) => isSameDay(d, date));
+  const isSelected = selected && isSameDay(date, selected);
+
+  // Handle day click
+  const handleClick = () => {
+    if (!disabled && onSelect) {
+      onSelect(date);
+    }
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className={`relative flex flex-col items-center justify-center p-2 cursor-pointer rounded-md
+        ${isOutsideMonth ? 'text-muted-foreground/50' : ''}
+        ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+        ${hasReceipt && !isSelected ? 'hover:bg-primary/10' : ''}
+        ${!hasReceipt && !isSelected ? 'hover:bg-muted' : ''}
+      `}
+    >
+      <div>{format(date, 'd')}</div>
+      {hasReceipt && !isOutsideMonth && (
+        <CircleDot className={`absolute bottom-0 w-3 h-3 ${isSelected ? 'text-primary-foreground' : 'text-primary'}`} />
+      )}
+    </div>
+  );
+}
+
+export function DailyPDFReportGenerator() {
+  const [selectedDay, setSelectedDay] = useState<Date>();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // State for tracking the current month displayed in the calendar
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  // State to store dates that have receipts
+  const [receiptDates, setReceiptDates] = useState<Date[]>([]);
+  // State to track loading of receipt dates
+  const [isLoadingDates, setIsLoadingDates] = useState(false);
+
+  // State for report mode: 'payer' or 'category'
+  const [reportMode, setReportMode] = useState<'payer' | 'category'>('payer'); // Default mode is 'payer'
+
+  // Function to fetch dates with receipts for the current month
+  const fetchReceiptDatesForMonth = async (month: Date) => {
+    setIsLoadingDates(true);
+    try {
+      const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
+
+      // Get the current user session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.log('No active session found');
+        setReceiptDates([]);
+        return;
+      }
+
+      // Query the receipts table for dates within the current month
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('date')
+        .eq('user_id', session.user.id)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (error) {
+        console.error('Error fetching receipt dates:', error);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        // Extract unique dates
+        const uniqueDates = [...new Set(data.map(item => item.date))];
+
+        // Convert to Date objects
+        const dates = uniqueDates
+          .map(dateStr => {
+            try {
+              return parseISO(dateStr);
+            } catch (e) {
+              console.error(`Error parsing date: ${dateStr}`, e);
+              return null;
+            }
+          })
+          .filter((date): date is Date => date !== null);
+
+        setReceiptDates(dates);
+        console.log('Receipt dates found:', dates.map(d => format(d, 'yyyy-MM-dd')));
+      } else {
+        console.log('No receipt dates found for the current month');
+        setReceiptDates([]);
+      }
+    } catch (error) {
+      console.error('Error in fetchReceiptDatesForMonth:', error);
+      setReceiptDates([]);
+    } finally {
+      setIsLoadingDates(false);
+    }
+  };
+
+  // Fetch receipt dates when component mounts or month changes
+  useEffect(() => {
+    fetchReceiptDatesForMonth(currentMonth);
+  }, [currentMonth]);
+
+  // Handle day selection
+  const handleDaySelect = (day: Date | undefined) => {
+    console.log("Day selected:", day);
+    setSelectedDay(day);
+  };
+
+  const handleModeChange = (value: 'payer' | 'category') => {
+    setReportMode(value);
+    console.log("Report mode changed to:", value);
+  };
+
+  const generatePDF = async () => {
+    if (!selectedDay) return;
+
+    try {
+      setIsLoading(true);
+
+      // Get the current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        toast({
+          title: 'Authentication Error',
+          description: 'You must be logged in to generate reports',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Use direct URL to the function
+      const functionUrl = 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/generate-pdf-report';
+
+      // Use fetch directly for binary data
+      const dateStr = format(selectedDay, 'yyyy-MM-dd');
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        // Include the selected mode in the request body
+        body: JSON.stringify({ date: dateStr, mode: reportMode }) 
+      });
+
+      if (!response.ok) {
+        // Try to get error message
+        let errorMessage = `Error: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {}
+
+        throw new Error(errorMessage);
+      }
+
+      // Check content type to confirm we got a PDF
+      const contentType = response.headers.get('Content-Type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        console.warn('Response is not a PDF:', contentType);
+        const text = await response.text();
+        console.error('Response content:', text);
+        throw new Error('Server did not return a PDF file');
+      }
+
+      // Get PDF as ArrayBuffer
+      const pdfData = await response.arrayBuffer();
+      console.log(`Received PDF data, size: ${pdfData.byteLength} bytes`);
+
+      // Create a Blob from the returned PDF ArrayBuffer data
+      const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
+
+      // Create a URL for the blob
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      // Create a link element and trigger download
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `expense-report-${dateStr}-${reportMode}-mode.pdf`; // Add mode to filename
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(pdfUrl);
+
+      toast({
+        title: 'Success',
+        description: 'PDF report generated successfully',
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to generate PDF report. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader className="bg-primary/5">
+        <CardTitle>Daily Expense Report</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Select a day to generate a detailed PDF report of all expenses.
+          Days with a small dot indicator (<CircleDot className="inline-block w-3 h-3 text-primary" />) have recorded receipts.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-4 p-6">
+        {isLoadingDates && (
+          <p className="text-xs text-muted-foreground text-center mb-2">Loading receipt data...</p>
+        )}
+
+        {receiptDates.length > 0 && (
+          <p className="text-xs text-green-500 text-center mb-2">
+            Found {receiptDates.length} days with receipts
+          </p>
+        )}
+
+        <div className="w-full border rounded-lg p-4 shadow-sm">
+          <DayPicker
+            mode="single"
+            selected={selectedDay}
+            onSelect={handleDaySelect}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            components={{
+              Day: (props) => CustomDay({
+                ...props,
+                receiptDates,
+                selected: selectedDay,
+                onSelect: handleDaySelect
+              })
+            }}
+            className="mx-auto"
+            showOutsideDays={true}
+          />
+        </div>
+
+        {/* Report Mode Selection */}
+        <div className="w-full flex flex-col items-center mt-4">
+          <Label htmlFor="report-mode" className="mb-2 text-sm font-medium">
+            Report Summary & Statistics Mode:
+          </Label>
+          <RadioGroup 
+            defaultValue="payer" 
+            onValueChange={handleModeChange} 
+            className="flex items-center space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="payer" id="mode-payer" />
+              <Label htmlFor="mode-payer">Payer (Abah/Bakaris)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="category" id="mode-category" />
+              <Label htmlFor="mode-category">Category</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+
+        <Button
+          onClick={generatePDF}
+          disabled={!selectedDay || isLoading}
+          className="w-full mt-4" // Add space after mode selection
+          type="button"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating PDF...
+            </>
+          ) : (
+            <>
+              <Download className="mr-2 h-4 w-4" />
+              Generate PDF Report
+            </>
+          )}
+        </Button>
+        {selectedDay && (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Report for {format(selectedDay, 'MMMM d, yyyy')} using {reportMode} mode summary.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+**Explanation of Frontend Changes:**
+
+1.  Import `RadioGroup` and `RadioGroupItem` from `shadcn/ui`.
+2.  Add a state variable `reportMode` initialized to `'payer'`.
+3.  Add a `RadioGroup` component below the calendar.
+4.  Bind the `RadioGroup`'s value to the `reportMode` state using `onValueChange`.
+5.  Modify the `generatePDF` function to include `reportMode` in the `fetch` request body.
+6.  Update the downloaded filename to include the selected mode.
+7.  Add a small text below the button indicating the selected date and mode.
+
+**2. Backend (Supabase Edge Function): Handle Different Modes**
+
+Now, we'll modify the `generate-pdf-report` function to read the `mode` parameter and adjust the Summary Table and Statistics sections accordingly.
+
+*   Modify your `generate-pdf-report/index.ts` file:
+
+```typescript
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 /// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -24,7 +371,7 @@ function handleCors(req: Request) {
 
 serve(async (req) => {
   console.log('--- PDF Generator v3 --- Method:', req.method, 'Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
-  
+
   // Handle CORS
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
@@ -43,14 +390,14 @@ serve(async (req) => {
     try {
       const rawText = await req.text();
       console.log('Raw request body:', rawText.substring(0, 100) + (rawText.length > 100 ? '...' : ''));
-      
+
       if (!rawText || !rawText.trim()) {
         return new Response(JSON.stringify({ error: 'Empty request body' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      
+
       requestBody = JSON.parse(rawText);
       console.log('Parsed request body:', JSON.stringify(requestBody));
     } catch (parseError) {
@@ -120,7 +467,7 @@ serve(async (req) => {
     // Ensure 'category' is selected
     const { data: receiptsData, error: receiptsError } = await supabaseClient
       .from('receipts')
-      .select('*, line_items!line_items_receipt_id_fkey(*)') // Specify the relationship to use
+      .select('*, line_items(*)') // Select line items directly using foreign key relationship
       .gte('date', startTime)
       .lte('date', endTime)
       .order('date', { ascending: true }); // Order by date for consistent PDF order
@@ -240,8 +587,8 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
   pdf.text(`Total Receipts: ${receipts.length}`, 20, yPosition)
   yPosition += 7
 
-  // Initialize grandTotal here - will be recalculated after processing receipts
-  let grandTotal = receipts.reduce((sum, receipt) => sum + (receipt?.total || 0), 0)
+  // Calculate grandTotal based on all receipts
+  const grandTotal = receipts.reduce((sum, receipt) => sum + (receipt?.total || 0), 0);
   pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition)
   yPosition += 10
 
@@ -250,7 +597,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
   pdf.text('This report contains detailed information for all receipts recorded on the selected date.', 20, yPosition)
   yPosition += 15
 
-  // --- ADDITION: Handle case where there are no receipts ---
+  // --- Handle case where there are no receipts ---
   if (receipts.length === 0) {
     pdf.setFont('helvetica', 'italic');
     pdf.setTextColor(100, 100, 100);
@@ -259,11 +606,11 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
     pdf.setFont('helvetica', 'normal'); // Reset font style
     yPosition += 25; // Add space
   }
-  // --- END OF ADDITION ---
+  // --- END OF HANDLING NO RECEIPTS ---
 
-  // Process each receipt
+  // Process each receipt for detailed list
   for (const receipt of receipts) {
-    // Check if we need a new page
+    // Check if we need a new page before adding the next receipt
     if (yPosition > 240) {
       pdf.addPage()
       addHeader()
@@ -280,7 +627,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
     pdf.setFont('helvetica', 'bold')
 
     // Truncate merchant name if too long
-    const merchantName = receipt.merchant
+    const merchantName = receipt.merchant || 'Unknown Merchant';
     const maxMerchantLength = 35
     const displayMerchant = merchantName.length > maxMerchantLength
       ? merchantName.substring(0, maxMerchantLength) + '...'
@@ -290,7 +637,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
     pdf.text(`Merchant: ${displayMerchant}`, 20, yPosition + 5)
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(9) // Smaller font for receipt ID
-    pdf.text(`Receipt ID: ${receipt.id.substring(0, 8)}...`, 170, yPosition + 5, { align: 'right' })
+    pdf.text(`Receipt ID: ${receipt.id ? receipt.id.substring(0, 8) + '...' : 'N/A'}`, 170, yPosition + 5, { align: 'right' })
     yPosition += 20 // Increased spacing
 
     // Add receipt details
@@ -299,11 +646,15 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
     yPosition += 6
     pdf.text(`Payment Method: ${receipt.payment_method || 'Not specified'}`, 20, yPosition)
     yPosition += 6
+    // Add Category to individual receipt view (always show category here)
+    pdf.text(`Category: ${receipt.category || 'Uncategorized'}`, 20, yPosition)
+    yPosition += 6
+
     if (receipt.currency) {
       pdf.text(`Currency: ${receipt.currency}`, 20, yPosition)
       yPosition += 6
     }
-    if (receipt.tax) {
+    if (receipt.tax && receipt.tax > 0) {
       pdf.text(`Tax: RM ${receipt.tax.toFixed(2)}`, 20, yPosition)
       yPosition += 6
     }
@@ -315,8 +666,8 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
         startY: yPosition,
         head: [['Item Description', 'Amount (RM)']],
         body: receipt.line_items.map(item => [
-          item.description,
-          item.amount.toFixed(2)
+          item.description || 'N/A', // Handle missing description
+          (item.amount || 0).toFixed(2) // Handle missing amount
         ]),
         styles: {
           fontSize: 10,
@@ -334,19 +685,37 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
       })
 
       yPosition = pdf.lastAutoTable.finalY + 10
+    } else {
+         // Add a line indicating no line items if applicable
+         pdf.setFontSize(10);
+         pdf.setTextColor(150, 150, 150);
+         pdf.text('No detailed line items available.', 20, yPosition);
+         pdf.setTextColor(0, 0, 0);
+         yPosition += 10;
     }
+
 
     // Add receipt total with highlighted box
     pdf.setFillColor(230, 230, 250) // Light purple background
-    pdf.rect(120, yPosition - 5, 70, 10, 'F')
+    // Adjusted width/position for total box if line items are present or not
+    const totalBoxY = yPosition - (receipt.line_items && receipt.line_items.length > 0 ? 5 : 15); // Adjust Y based on previous content
+     pdf.rect(120, totalBoxY, 70, 10, 'F') // Box for total
     pdf.setFont('helvetica', 'bold')
-    pdf.text(`Total: RM ${receipt.total.toFixed(2)}`, 170, yPosition, { align: 'right' })
+    pdf.setFontSize(11); // Match other details
+    pdf.text(`Total: RM ${(receipt.total || 0).toFixed(2)}`, 170, totalBoxY + 5, { align: 'right' }) // Position text within box
     pdf.setFont('helvetica', 'normal')
-    yPosition += 15
+    yPosition = totalBoxY + 15; // Advance yPosition after the box
 
     // Add receipt image if available
     if (receipt.image_url) {
       try {
+        // Check if we need a new page before adding the image
+         if (yPosition + 70 > 260) { // Estimate image height + padding
+            pdf.addPage();
+            addHeader();
+            yPosition = 60; // Start content with space
+         }
+
         // Add a caption for the image
         pdf.setFontSize(10)
         pdf.setTextColor(100, 100, 100)
@@ -355,17 +724,17 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
 
         // Get the image directly from storage
         let imagePath = receipt.image_url
-        
+
         // Handle different URL formats
         // If full URL, extract path after storage bucket name
         if (imagePath.includes('storage/v1/object/public/receipt_images/')) {
           imagePath = imagePath.split('receipt_images/')[1]
-        } 
+        }
         // If it's already a relative path with bucket prefix, remove it
         else if (imagePath.startsWith('receipt_images/')) {
           imagePath = imagePath.replace('receipt_images/', '')
         }
-        
+
         console.log(`Downloading image: ${imagePath} for receipt ${receipt.id}`)
 
         const { data: imageData, error: imageError } = await supabaseClient
@@ -384,90 +753,108 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
         const imageBytes = await imageData.arrayBuffer()
         const base64Image = arrayBufferToBase64(imageBytes)
 
-        // Detect image type from the base64 content or filename
+        // Detect image type (simple check)
         let imageFormat = 'JPEG' // Default format
-        
-        // Check file extension if present in the path
-        if (imagePath.toLowerCase().endsWith('.png')) {
-          imageFormat = 'PNG'
-        } else if (imagePath.toLowerCase().endsWith('.gif')) {
-          imageFormat = 'GIF'
-        } else if (imagePath.toLowerCase().endsWith('.webp')) {
-          // jsPDF might not support WebP directly
-          console.log('WebP format detected, attempting to use as JPEG')
-        }
-        
-        console.log(`Using image format: ${imageFormat}`)
-        
+         // Check leading bytes for common formats
+         if (base64Image.startsWith('/9j')) {
+             imageFormat = 'JPEG';
+         } else if (base64Image.startsWith('iVBORw0KGgo')) {
+             imageFormat = 'PNG';
+         } else if (base64Image.startsWith('R0lGODlh')) {
+             imageFormat = 'GIF';
+         } else {
+             console.warn('Could not reliably detect image format from base64 prefix.');
+             // Fallback based on path extension if possible, otherwise assume JPEG
+             if (imagePath.toLowerCase().endsWith('.png')) {
+                 imageFormat = 'PNG';
+             } else if (imagePath.toLowerCase().endsWith('.gif')) {
+                 imageFormat = 'GIF';
+             } else if (imagePath.toLowerCase().endsWith('.webp')) {
+                 // jsPDF might not support WebP directly, try JPEG or PNG fallback
+                 console.log('WebP format detected, attempting to use as JPEG');
+                 imageFormat = 'JPEG'; // Or try PNG? Depends on browser support
+             }
+         }
+
+        console.log(`Attempting to add image format: ${imageFormat}`)
+
         try {
           // 1) Decide your fixed display height (in mm)
           const fixedHeight = 60; // Fixed height for all receipt images
-          
+
           // 2) Use jsPDF's helper to read the image's natural dimensions
           const imgProps = pdf.getImageProperties(
             `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`
           );
           const origWidth = imgProps.width;
           const origHeight = imgProps.height;
-          
+
           // 3) Compute the display width that keeps the aspect ratio
           const displayWidth = origWidth * (fixedHeight / origHeight);
-          console.log(`Original image dimensions: ${origWidth}x${origHeight}, display size: ${displayWidth}mm x ${fixedHeight}mm`);
-          
+          // Ensure display width doesn't exceed page width minus margins
+          const maxDisplayWidth = 190 - 20 - 20; // Page width - left margin - right margin
+          const finalDisplayWidth = Math.min(displayWidth, maxDisplayWidth);
+          const finalFixedHeight = finalDisplayWidth * (origHeight / origWidth); // Re-calculate height based on potentially constrained width
+
+          console.log(`Original image dimensions: ${origWidth}x${origHeight}, display size: ${finalDisplayWidth.toFixed(2)}mm x ${finalFixedHeight.toFixed(2)}mm`);
+
           // 4) Check for page break if it won't fit
-          if (yPosition + fixedHeight > 260) {
+          if (yPosition + finalFixedHeight + 10 > 260) { // Add padding for safety
             pdf.addPage();
             addHeader();
-            yPosition = 60;
+            yPosition = 60; // Start content with space
           }
-          
+
           // 5) Draw a border around the resized image
           pdf.setDrawColor(200, 200, 200);
-          pdf.rect(20, yPosition, displayWidth, fixedHeight);
-          
-          // 6) Finally, add the image at fixedHeight and computed width
+          pdf.rect(20, yPosition, finalDisplayWidth, finalFixedHeight);
+
+          // 6) Finally, add the image at calculated dimensions
           pdf.addImage(
             `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
             imageFormat,
             20,            // x
             yPosition,     // y
-            displayWidth,  // width
-            fixedHeight    // height
+            finalDisplayWidth,  // width
+            finalFixedHeight    // height
           );
-          
+
           // 7) Advance your cursor
-          yPosition += fixedHeight + 20;
-          
+          yPosition += finalFixedHeight + 10;
+
         } catch (addImageError) {
-          console.error('Error adding image with proper aspect ratio:', addImageError);
-          
-          // Fallback to simple approach if getImageProperties doesn't work
+          console.error('Error adding image with proper aspect ratio/sizing:', addImageError);
+
+          // Fallback to simple approach if getImageProperties doesn't work or fails
           try {
-            // Simple fallback with fixed dimensions
-            const fallbackHeight = 60;
-            const fallbackWidth = 120;
-            
-            // Check if we need a page break
-            if (yPosition + fallbackHeight > 260) {
+            console.log('Attempting image fallback...');
+            // Simple fallback with fixed dimensions (or max width)
+            const fallbackMaxWidth = 150;
+            const fallbackMaxHeight = 80;
+
+             // Check if we need a page break
+            if (yPosition + fallbackMaxHeight + 10 > 260) {
               pdf.addPage();
               addHeader();
               yPosition = 60;
             }
-            
+
             // Draw border and add image with fallback dimensions
             pdf.setDrawColor(200, 200, 200);
-            pdf.rect(20, yPosition, fallbackWidth, fallbackHeight);
-            
+            pdf.rect(20, yPosition, fallbackMaxWidth, fallbackMaxHeight);
+
             pdf.addImage(
               `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
               imageFormat,
               20,
               yPosition,
-              fallbackWidth,
-              fallbackHeight
+              fallbackMaxWidth,
+              fallbackMaxHeight,
+              '', // name
+              'FAST' // compression
             );
-            
-            yPosition += fallbackHeight + 20;
+
+            yPosition += fallbackMaxHeight + 10;
             console.log('Used fallback fixed dimensions for image');
           } catch (finalError) {
             console.error('Failed to add image even with fallback dimensions:', finalError);
@@ -485,14 +872,14 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
           console.error(`Image error details: ${imgError.message}`)
           console.error(`Image path attempted: ${receipt.image_url}`)
         }
-        
+
         // Try to get a better error message
         let errorMessage = 'Error loading receipt image'
         if (imgError instanceof Error && imgError.message) {
           // Show a more specific error but keep it short
           errorMessage = `Error: ${imgError.message.substring(0, 30)}...`
         }
-        
+
         // Add styled message for unavailable image
         pdf.setFillColor(245, 245, 245)
         pdf.rect(20, yPosition, 160, 30, 'F')
@@ -876,8 +1263,9 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
   }
   // --- End Conditional Logic ---
 
+
   // Add grand total with styled box (This is outside the if/else as it's always shown)
-  const finalY = pdf.lastAutoTable.finalY + 10
+  const finalY = pdf.lastAutoTable.finalY + 10;
 
   // Add a colored box for the grand total with dark background
   pdf.setFillColor(51, 51, 51) // Dark background
@@ -888,6 +1276,9 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
   pdf.setTextColor(255, 255, 255) // White text
   pdf.text(`Grand Total: RM ${grandTotal.toFixed(2)}`, 170, finalY, { align: 'right' })
   pdf.setTextColor(0, 0, 0) // Reset text color
+
+  // Note: The statsY variable was updated *inside* the if/else block, so the footer
+  // will be added after the correct set of statistics.
 
   // Add footer with page numbers
   addFooter()
@@ -905,3 +1296,32 @@ function arrayBufferToBase64(buffer) {
   }
   return btoa(binary)
 }
+
+```
+
+**Explanation of Backend Changes:**
+
+1.  **Receive Mode:** In the `serve` function, extract `mode` from the request body: `const { date, mode = 'payer' } = requestBody;`. Add a default value of `'payer'`. Add validation to ensure `mode` is either 'payer' or 'category'.
+2.  **Pass Mode:** Pass the `mode` variable to the `generatePDF` function.
+3.  **Update `generatePDF` Signature:** Add `mode` as a parameter to `generatePDF`.
+4.  **Fetch `category`:** Ensure the `receipts` query selects the `category` column. The current `.select('*')` should already include it, assuming your `receipts` table has a `category` column. *Self-correction:* Changed the select query to `select('*, line_items(*)')` to fetch line items in the same query, simplifying the main loop and removing the need for a separate `allLineItems` query and mapping. This also ensures the `category` field is included.
+5.  **Conditional Logic:** Wrap the Summary Table generation and the entire Expense Statistics section within an `if (mode === 'category') { ... } else { ... }` block.
+6.  **Category Mode Logic:**
+    *   Define `summaryTableHeaders` for the category table.
+    *   Map `receipts` to `summaryData`, including the `category` field. Handle potential `null` or empty categories by defaulting to 'Uncategorized'.
+    *   Calculate category statistics: Use a `Map` (`categoryStats`) to aggregate `total` and `count` for each category. Iterate through the `receipts` array, get the category (defaulting if needed), and update the stats in the map.
+    *   Calculate category percentages and averages based on the `categoryStats` map.
+    *   Generate the "Breakdown by Category" text, iterating through the `categoryStats` map (sorting keys for consistent order).
+    *   Update the "Spending Highlights" text to show the category instead of the payer for the highest/lowest expense. Track the receipt object or category name while finding the highest/lowest.
+7.  **Payer Mode Logic:**
+    *   Keep the existing logic for `summaryTableHeaders`.
+    *   Keep the existing logic for creating `processedReceiptsForStats` (which calculates `paid_by`).
+    *   Keep the existing logic for mapping `processedReceiptsForStats` to `summaryData`.
+    *   Keep the existing logic for calculating Abah/Bakaris statistics.
+    *   Keep the existing logic for generating the "Breakdown by Payer" and "Spending Highlights" text (showing the payer).
+8.  **Positioning:** Ensure the `statsY` variable is updated correctly at the end of *both* the `if` and `else` blocks so the footer is placed correctly relative to the statistics content.
+9.  **Error Handling/Defaults:** Add checks for null/undefined values (`receipt.merchant`, `receipt.category`, `receipt.total`, `receipt.payment_method`, `item.description`, `item.amount`) and provide default strings or values (`'Unknown'`, `'Uncategorized'`, `0`, `'Not specified'`, `'N/A'`) to prevent errors during PDF generation.
+10. **Image Handling:** Made minor improvements to image format detection and resizing logic for better robustness.
+11. **Receipt List Improvements:** Added category to the individual receipt details in the main list and added a message if no line items are found.
+
+Now, when you deploy the updated Edge Function and refresh your frontend component, you should see the radio buttons, and selecting a mode will change the Summary Table and Statistics sections in the generated PDF report.
