@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { 
-  Upload, Search, Filter, SlidersHorizontal, 
+import {
+  Upload, Search, Filter, SlidersHorizontal,
   PlusCircle, XCircle, Calendar, DollarSign, X,
-  LayoutGrid, LayoutList, Table as TableIcon
+  LayoutGrid, LayoutList, Table as TableIcon,
+  Files
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
@@ -20,14 +21,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import UploadZone from "@/components/UploadZone";
+import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
 
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 
 // Define view mode types
@@ -36,7 +38,7 @@ type ViewMode = "grid" | "list" | "table";
 // Add this function before the Dashboard component
 const calculateAggregateConfidence = (receipt: Receipt) => {
   if (!receipt.confidence_scores) return 0;
-  
+
   // Define weights for each field (total = 1.0)
   const weights = {
     merchant: 0.3,  // 30% weight for merchant name
@@ -68,7 +70,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   // Read initial values from URL params or use defaults
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
   const [activeTab, setActiveTab] = useState<"all" | ReceiptStatus>(
@@ -80,14 +82,15 @@ export default function Dashboard() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
     (searchParams.get('sort') as any) || "newest"
   );
-  
+
   // Read view mode from URL params first, then local storage, or use default
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (searchParams.get('view') as ViewMode) || (localStorage.getItem('dashboardViewMode') as ViewMode) || "grid";
   });
-  
+
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  
+  const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
+
   // Helper function to update search parameters
   const updateSearchParams = (newValues: { [key: string]: string | null }) => {
     const currentParams = new URLSearchParams(searchParams);
@@ -102,13 +105,13 @@ export default function Dashboard() {
     // Use replace: true to update URL without adding new history entry
     setSearchParams(currentParams, { replace: true });
   };
-  
+
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
     queryKey: ['receipts'],
     queryFn: fetchReceipts,
     enabled: !!user,
   });
-  
+
   const processedReceipts = receipts
     .filter(receipt => {
       const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
@@ -127,9 +130,9 @@ export default function Dashboard() {
         return a.total - b.total;
       }
     });
-  
+
   const currencies = [...new Set(receipts.map(r => r.currency))];
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -138,13 +141,13 @@ export default function Dashboard() {
       day: 'numeric'
     }).format(date);
   };
-  
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setSearchQuery(newQuery);
     updateSearchParams({ q: newQuery || null });
   };
-  
+
   const clearFilters = () => {
     setSearchQuery("");
     setActiveTab("all");
@@ -165,7 +168,7 @@ export default function Dashboard() {
         </div>
       );
     }
-    
+
     if (error) {
       return (
         <motion.div
@@ -181,8 +184,8 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-6">
             There was a problem loading your receipts. Please try again.
           </p>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => refetch()}
           >
             Retry
@@ -190,7 +193,7 @@ export default function Dashboard() {
         </motion.div>
       );
     }
-    
+
     if (receipts.length === 0) {
       return (
         <motion.div
@@ -206,14 +209,20 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-6">
             Upload your first receipt to get started
           </p>
-          <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
-            <PlusCircle size={16} />
-            Upload Receipt
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
+              <PlusCircle size={16} />
+              Upload Receipt
+            </Button>
+            <Button onClick={() => setIsBatchUploadModalOpen(true)} variant="outline" className="gap-2">
+              <Files size={16} />
+              Batch Upload
+            </Button>
+          </div>
         </motion.div>
       );
     }
-    
+
     if (processedReceipts.length === 0) {
       return (
         <motion.div
@@ -235,14 +244,14 @@ export default function Dashboard() {
         </motion.div>
       );
     }
-    
+
     // Grid view (original card layout)
     if (viewMode === "grid") {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
-            
+
             return (
               <motion.div
                 key={receipt.id}
@@ -269,14 +278,14 @@ export default function Dashboard() {
         </div>
       );
     }
-    
+
     // List view
     else if (viewMode === "list") {
       return (
         <div className="flex flex-col gap-3">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
-            
+
             return (
               <motion.div
                 key={receipt.id}
@@ -287,16 +296,16 @@ export default function Dashboard() {
               >
                 <Link to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`} className="flex items-center p-4 gap-4">
                   <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
-                    <img 
-                      src={receipt.image_url || "/placeholder.svg"} 
-                      alt={receipt.merchant} 
+                    <img
+                      src={receipt.image_url || "/placeholder.svg"}
+                      alt={receipt.merchant}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "/placeholder.svg";
                       }}
                     />
                   </div>
-                  
+
                   <div className="flex-grow min-w-0">
                     <div className="flex justify-between items-start">
                       <h3 className="font-medium truncate">{receipt.merchant}</h3>
@@ -304,13 +313,13 @@ export default function Dashboard() {
                         {receipt.currency} {receipt.total.toFixed(2)}
                       </span>
                     </div>
-                    
+
                     <div className="flex justify-between text-sm text-muted-foreground mt-1">
                       <span>{formatDate(receipt.date)}</span>
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                          receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                          receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                           'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         }`}>
                           {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
@@ -332,7 +341,7 @@ export default function Dashboard() {
         </div>
       );
     }
-    
+
     // Table view
     else {
       return (
@@ -350,7 +359,7 @@ export default function Dashboard() {
             <TableBody>
               {processedReceipts.map((receipt) => {
                 const confidenceScore = calculateAggregateConfidence(receipt);
-                
+
                 return (
                   <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => navigate(`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}>
                     <TableCell className="font-medium">{receipt.merchant}</TableCell>
@@ -359,7 +368,7 @@ export default function Dashboard() {
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                         receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 
+                        receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                         'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       }`}>
                         {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
@@ -387,7 +396,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
-      
+
       <main className="container px-4 py-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <motion.div
@@ -400,15 +409,15 @@ export default function Dashboard() {
               Manage and track all your receipts in one place
             </p>
           </motion.div>
-          
+
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex gap-3"
           >
-            <ToggleGroup 
-              type="single" 
+            <ToggleGroup
+              type="single"
               value={viewMode}
               onValueChange={(value) => {
                 if (value) {
@@ -431,16 +440,27 @@ export default function Dashboard() {
               </ToggleGroupItem>
             </ToggleGroup>
 
-            <Button 
-              className="gap-2"
-              onClick={() => setIsUploadDialogOpen(true)}
-            >
-              <Upload size={16} />
-              Upload New
-            </Button>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setIsBatchUploadModalOpen(true)}
+                title="Upload multiple receipts at once"
+              >
+                <Files size={16} />
+                Batch Upload
+              </Button>
+              <Button
+                className="gap-2"
+                onClick={() => setIsUploadDialogOpen(true)}
+              >
+                <Upload size={16} />
+                Upload New
+              </Button>
+            </div>
           </motion.div>
         </div>
-        
+
         {/* Filters and Tabs Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -459,7 +479,7 @@ export default function Dashboard() {
                   onChange={handleSearch}
                 />
               </div>
-              
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2 whitespace-nowrap">
@@ -471,9 +491,9 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     {/* Sort By */}
                     <h4 className="font-medium">Sort by</h4>
-                    <ToggleGroup 
-                      type="single" 
-                      value={sortOrder} 
+                    <ToggleGroup
+                      type="single"
+                      value={sortOrder}
                       onValueChange={(value) => {
                         if (value) {
                           const newSort = value as any;
@@ -496,14 +516,14 @@ export default function Dashboard() {
                         <DollarSign className="h-4 w-4 mr-2" /> Lowest
                       </ToggleGroupItem>
                     </ToggleGroup>
-                    
+
                     {/* Filter by Currency */}
                     {currencies.length > 0 && (
                       <>
                         <h4 className="font-medium pt-2">Currency</h4>
-                        <ToggleGroup 
-                          type="single" 
-                          value={filterByCurrency || "all"} 
+                        <ToggleGroup
+                          type="single"
+                          value={filterByCurrency || "all"}
                           onValueChange={(value) => {
                             const newCurrency = value === "all" ? null : value;
                             setFilterByCurrency(newCurrency);
@@ -515,9 +535,9 @@ export default function Dashboard() {
                             All
                           </ToggleGroupItem>
                           {currencies.map(currency => (
-                            <ToggleGroupItem 
-                              key={currency} 
-                              value={currency} 
+                            <ToggleGroupItem
+                              key={currency}
+                              value={currency}
                               aria-label={`Filter by ${currency}`}
                               className="flex-grow-0"
                             >
@@ -527,7 +547,7 @@ export default function Dashboard() {
                         </ToggleGroup>
                       </>
                     )}
-                    
+
                     {/* Clear Filters Button */}
                     <div className="pt-2">
                       <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
@@ -538,7 +558,7 @@ export default function Dashboard() {
                 </PopoverContent>
               </Popover>
             </div>
-            
+
             {/* Status Tabs */}
             <div className="mt-4">
               <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
@@ -554,11 +574,11 @@ export default function Dashboard() {
               </Tabs>
             </div>
           </motion.div>
-        
+
         {/* Main Content Area */}
         {renderReceiptContent()}
       </main>
-      
+
       {/* Upload Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -571,7 +591,17 @@ export default function Dashboard() {
           }} />
         </DialogContent>
       </Dialog>
-      
+
+      {/* Batch Upload Modal */}
+      <BatchUploadModal
+        isOpen={isBatchUploadModalOpen}
+        onClose={() => setIsBatchUploadModalOpen(false)}
+        onUploadComplete={() => {
+          setIsBatchUploadModalOpen(false);
+          refetch();
+        }}
+      />
+
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">

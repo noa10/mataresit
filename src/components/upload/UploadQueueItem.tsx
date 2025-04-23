@@ -1,0 +1,210 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { 
+  FileText, 
+  FileImage, 
+  Loader2, 
+  CheckCircle2, 
+  XCircle, 
+  Trash2, 
+  RotateCcw, 
+  ExternalLink 
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { ReceiptUpload } from "@/types/receipt";
+import { Link } from "react-router-dom";
+
+interface UploadQueueItemProps {
+  upload: ReceiptUpload;
+  receiptId?: string;
+  onRemove?: (uploadId: string) => void;
+  onCancel?: (uploadId: string) => void;
+  onRetry?: (uploadId: string) => void;
+}
+
+export function UploadQueueItem({ 
+  upload, 
+  receiptId,
+  onRemove, 
+  onCancel, 
+  onRetry 
+}: UploadQueueItemProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  // Format file size
+  const formatFileSize = (sizeInBytes: number): string => {
+    if (sizeInBytes < 1024) {
+      return `${sizeInBytes} B`;
+    } else if (sizeInBytes < 1024 * 1024) {
+      return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    } else {
+      return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+  };
+  
+  // Get status icon
+  const getStatusIcon = () => {
+    switch (upload.status) {
+      case 'pending':
+        return <FileText className="w-5 h-5 text-muted-foreground" />;
+      case 'uploading':
+      case 'processing':
+        return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
+      case 'completed':
+        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-destructive" />;
+      default:
+        return <FileText className="w-5 h-5 text-muted-foreground" />;
+    }
+  };
+  
+  // Get status text
+  const getStatusText = () => {
+    switch (upload.status) {
+      case 'pending':
+        return "Queued";
+      case 'uploading':
+        return upload.uploadProgress < 50 
+          ? `Uploading (${upload.uploadProgress}%)` 
+          : "Processing image";
+      case 'processing':
+        return `Processing (${upload.uploadProgress}%)`;
+      case 'completed':
+        return "Completed";
+      case 'error':
+        return upload.error?.message || "Failed";
+      default:
+        return "Unknown";
+    }
+  };
+  
+  // Get action buttons based on status
+  const getActionButtons = () => {
+    if (upload.status === 'pending' && onRemove) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onRemove(upload.id)}
+          className="h-8 w-8"
+          aria-label="Remove from queue"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      );
+    }
+    
+    if ((upload.status === 'uploading' || upload.status === 'processing') && onCancel) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onCancel(upload.id)}
+          className="h-8 w-8"
+          aria-label="Cancel upload"
+        >
+          <XCircle className="h-4 w-4" />
+        </Button>
+      );
+    }
+    
+    if (upload.status === 'error' && onRetry) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onRetry(upload.id)}
+          className="h-8 w-8"
+          aria-label="Retry upload"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      );
+    }
+    
+    if (upload.status === 'completed' && receiptId) {
+      return (
+        <Link to={`/receipt/${receiptId}`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="View receipt"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        </Link>
+      );
+    }
+    
+    return null;
+  };
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className={`w-full p-3 border rounded-lg ${
+        upload.status === 'error' 
+          ? 'border-destructive/30 bg-destructive/5' 
+          : upload.status === 'completed'
+            ? 'border-green-500/30 bg-green-500/5'
+            : 'border-border bg-background/50'
+      } flex items-center space-x-3`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* File icon or preview */}
+      <div className="flex-shrink-0">
+        {upload.file.type === 'application/pdf' ? (
+          <FileText className="w-10 h-10 text-muted-foreground" />
+        ) : (
+          <FileImage className="w-10 h-10 text-muted-foreground" />
+        )}
+      </div>
+      
+      {/* File info and progress */}
+      <div className="flex-grow min-w-0">
+        <div className="flex justify-between items-center">
+          <p className="text-sm font-medium truncate" title={upload.file.name}>
+            {upload.file.name}
+          </p>
+          <div className="flex items-center space-x-1 ml-2">
+            {getStatusIcon()}
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {getStatusText()}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center text-xs text-muted-foreground mt-1">
+          <span>{formatFileSize(upload.file.size)}</span>
+        </div>
+        
+        {/* Progress bar for uploading/processing */}
+        {(upload.status === 'uploading' || upload.status === 'processing') && (
+          <Progress 
+            value={upload.uploadProgress} 
+            className="h-1 mt-2" 
+            aria-label={`Upload progress: ${upload.uploadProgress}%`}
+          />
+        )}
+        
+        {/* Error message */}
+        {upload.status === 'error' && upload.error && (
+          <p className="text-xs text-destructive mt-1 truncate" title={upload.error.message}>
+            {upload.error.message}
+          </p>
+        )}
+      </div>
+      
+      {/* Action buttons */}
+      <div className="flex-shrink-0">
+        {getActionButtons()}
+      </div>
+    </motion.div>
+  );
+}

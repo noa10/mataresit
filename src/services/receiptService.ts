@@ -15,23 +15,23 @@ const validateStatus = (status: string): ReceiptStatus => {
 // Fetch all receipts for the current user
 export const fetchReceipts = async (): Promise<Receipt[]> => {
   const { data: user } = await supabase.auth.getUser();
-  
+
   if (!user.user) {
     return [];
   }
-  
+
   const { data, error } = await supabase
     .from("receipts")
     .select("*, processing_time")
     .eq("user_id", user.user.id)
     .order("created_at", { ascending: false });
-  
+
   if (error) {
     console.error("Error fetching receipts:", error);
     toast.error("Failed to load receipts");
     return [];
   }
-  
+
   // Convert Supabase JSON to our TypeScript types and validate status
   return (data || []).map(item => {
     const receipt = item as unknown as Receipt;
@@ -50,7 +50,7 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     .select("*")
     .eq("id", id)
     .single();
-  
+
   if (receiptError || !receiptData) {
     console.error("Error fetching receipt:", receiptError);
     toast.error("Failed to load receipt details");
@@ -59,18 +59,18 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
 
   // Explicitly cast to Receipt after error check
   const receipt = receiptData as unknown as Receipt;
-  
+
   // Then get the line items
   const { data: lineItems, error: lineItemsError } = await supabase
     .from("line_items")
     .select("*")
     .eq("receipt_id", id);
-  
+
   if (lineItemsError) {
     console.error("Error fetching line items:", lineItemsError);
     // Don't fail the whole operation, just log and continue
   }
-  
+
   // REMOVED: Confidence scores are now fetched directly with the receipt object
   // const { data: confidence, error: confidenceError } = await supabase
   //   .from("confidence_scores")
@@ -82,7 +82,7 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
   //   console.error("Error fetching confidence scores:", confidenceError);
   //   // Don't fail the whole operation, just log and continue
   // }
-  
+
   return {
     ...receipt,
     status: validateStatus(receipt.status || "unreviewed"),
@@ -103,13 +103,13 @@ export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDeta
   if (!ids || ids.length === 0) {
     return [];
   }
-  
+
   // First get all the receipts
   const { data: receiptsData, error: receiptsError } = await supabase
     .from("receipts")
     .select("*")
     .in("id", ids);
-  
+
   if (receiptsError || !receiptsData) {
     console.error("Error fetching receipts by IDs:", receiptsError);
     throw new Error('Failed to load receipts');
@@ -117,13 +117,13 @@ export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDeta
 
   // Explicitly cast to Receipt[] after error check
   const receipts = receiptsData as unknown as Receipt[];
-  
+
   // Then get all line items for these receipts in a single query
   const { data: allLineItems, error: lineItemsError } = await supabase
     .from("line_items")
     .select("*")
     .in("receipt_id", ids);
-  
+
   if (lineItemsError) {
     console.error("Error fetching line items for receipts:", lineItemsError);
     // Don't fail the whole operation, just log and continue
@@ -137,7 +137,7 @@ export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDeta
     acc[item.receipt_id].push(item);
     return acc;
   }, {} as Record<string, ReceiptLineItem[]>);
-  
+
   // Combine receipts with their line items
   return receipts.map(receipt => {
     return {
@@ -156,7 +156,7 @@ export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDeta
 
 // Upload a receipt image to Supabase Storage
 export const uploadReceiptImage = async (
-  file: File, 
+  file: File,
   userId: string,
   onProgress?: (progress: number) => void
 ): Promise<string | null> => {
@@ -166,19 +166,19 @@ export const uploadReceiptImage = async (
     const timestamp = new Date().getTime();
     const fileId = Math.random().toString(36).substring(2, 15);
     const fileName = `${userId}/${timestamp}_${fileId}.${fileExt}`;
-    
+
     console.log("Uploading file:", {
       name: fileName,
       type: file.type,
       size: file.size,
       bucket: 'receipt_images'
     });
-    
+
     // If we have a progress callback, we need to use the more manual XHR approach
     if (onProgress) {
       return await uploadWithProgress(file, userId, fileName, onProgress);
     }
-    
+
     // Default upload without progress tracking
     const { data, error } = await supabase.storage
       .from('receipt_images')
@@ -186,10 +186,10 @@ export const uploadReceiptImage = async (
         cacheControl: '3600',
         upsert: false
       });
-    
+
     if (error) {
       console.error("Storage upload error:", error);
-      
+
       // Provide a more specific error message based on the error type
       if (error.message.includes("bucket not found")) {
         throw new Error("Receipt storage is not properly configured. Please contact support.");
@@ -199,16 +199,16 @@ export const uploadReceiptImage = async (
         throw error;
       }
     }
-    
+
     // Get the public URL for the file
     const { data: publicUrlData } = supabase.storage
       .from('receipt_images')
       .getPublicUrl(fileName);
-      
+
     if (!publicUrlData?.publicUrl) {
       throw new Error("Upload successful but couldn't get public URL");
     }
-    
+
     console.log("Upload successful:", publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
   } catch (error) {
@@ -230,18 +230,18 @@ const uploadWithProgress = async (
     const { data: uploadData, error: urlError } = await supabase.storage
       .from('receipt_images')
       .createSignedUploadUrl(fileName);
-    
+
     if (urlError || !uploadData) {
       throw new Error(urlError?.message || "Failed to get upload URL");
     }
-    
+
     // We now have the signed URL for direct upload
     const { signedUrl, token } = uploadData;
-    
+
     // Create a promise that will resolve when the upload is complete
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      
+
       // Set up progress tracking
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -249,7 +249,7 @@ const uploadWithProgress = async (
           onProgress(percentComplete);
         }
       };
-      
+
       // Handle completion
       xhr.onload = async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -257,7 +257,7 @@ const uploadWithProgress = async (
           const { data: publicUrlData } = supabase.storage
             .from('receipt_images')
             .getPublicUrl(fileName);
-            
+
           if (!publicUrlData?.publicUrl) {
             reject(new Error("Upload successful but couldn't get public URL"));
           } else {
@@ -267,12 +267,12 @@ const uploadWithProgress = async (
           reject(new Error(`Upload failed with status ${xhr.status}`));
         }
       };
-      
+
       // Handle errors
       xhr.onerror = () => {
         reject(new Error("Network error during upload"));
       };
-      
+
       // Start the upload
       xhr.open('PUT', signedUrl);
       xhr.setRequestHeader('Content-Type', file.type);
@@ -318,41 +318,32 @@ export const createReceipt = async (
       console.error("Error creating receipt:", error);
       throw error;
     }
-    
+
     const receiptId = data.id;
-    
+
     // Add receipt_id to line items and insert them if any
     if (lineItems && lineItems.length > 0) {
       const formattedLineItems = lineItems.map(item => ({
         ...item,
         receipt_id: receiptId
       }));
-      
+
       const { error: lineItemsError } = await supabase
         .from("line_items")
         .insert(formattedLineItems);
-      
+
       if (lineItemsError) {
         console.error("Error inserting line items:", lineItemsError);
         // Don't fail the whole operation, just log and continue
       }
     }
-    
-    // Insert confidence scores
+
+    // Insert confidence scores - DISABLED due to table not existing
     if (confidenceScores) {
-      const { error: confidenceError } = await supabase
-        .from("confidence_scores")
-        .insert({
-          receipt_id: receiptId,
-          ...confidenceScores
-        });
-      
-      if (confidenceError) {
-        console.error("Error inserting confidence scores:", confidenceError);
-        // Don't fail the whole operation, just log and continue
-      }
+      console.log("[DISABLED] Would insert confidence scores:", confidenceScores);
+      // Feature disabled to avoid 404 errors
     }
-    
+
     return receiptId;
   } catch (error) {
     console.error("Error creating receipt:", error);
@@ -376,11 +367,11 @@ export const updateReceipt = async (
       .from("receipts")
       .update(receipt)
       .eq("id", id);
-    
+
     if (error) {
       throw error;
     }
-    
+
     // If line items are provided, update them
     if (lineItems !== undefined) {
       // First delete existing line items
@@ -388,12 +379,12 @@ export const updateReceipt = async (
         .from("line_items")
         .delete()
         .eq("receipt_id", id);
-      
+
       if (deleteError) {
         console.error("Error deleting line items:", deleteError);
         // Continue with insert
       }
-      
+
       // Then insert new ones if there are any
       if (lineItems.length > 0) {
         const formattedLineItems = lineItems.map(item => ({
@@ -401,18 +392,18 @@ export const updateReceipt = async (
           amount: item.amount,
           receipt_id: id
         }));
-        
+
         const { error: insertError } = await supabase
           .from("line_items")
           .insert(formattedLineItems);
-        
+
         if (insertError) {
           console.error("Error inserting line items:", insertError);
           // Don't fail the whole operation, just log and continue
         }
       }
     }
-    
+
     return true;
   } catch (error) {
     console.error("Error updating receipt:", error);
@@ -430,7 +421,7 @@ export interface ProcessingOptions {
 
 // Process a receipt with OCR
 export const processReceiptWithOCR = async (
-  receiptId: string, 
+  receiptId: string,
   options?: ProcessingOptions
 ): Promise<OCRResult | null> => {
   try {
@@ -440,25 +431,25 @@ export const processReceiptWithOCR = async (
       modelId: options?.modelId || '',
       compareWithAlternative: options?.compareWithAlternative || false
     };
-    
+
     // Update status to start processing
     await updateReceiptProcessingStatus(receiptId, 'processing_ocr');
-    
+
     const { data: receipt, error: receiptError } = await supabase
       .from("receipts")
       .select("image_url")
       .eq("id", receiptId)
       .single();
-    
+
     if (receiptError || !receipt) {
       const errorMsg = "Receipt not found";
       console.error("Error fetching receipt to process:", receiptError);
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     const imageUrl = receipt.image_url;
-    
+
     // Extract the Supabase URL from a storage URL - more reliable than env vars in browser
     let supabaseUrl = '';
     try {
@@ -474,42 +465,61 @@ export const processReceiptWithOCR = async (
     } catch (e) {
       console.error("Error extracting Supabase URL:", e);
     }
-    
+
     // Fallback to known project URL if extraction fails
     if (!supabaseUrl) {
       // This is the project URL based on the error logs
       supabaseUrl = 'https://mpmkbtsufihzdelrlszs.supabase.co';
       console.log("Using fallback Supabase URL:", supabaseUrl);
     }
-    
+
+    // Get the current session for authentication
     const { data: anon } = await supabase.auth.getSession();
     const supabaseKey = anon.session?.access_token || '';
-    
-    if (!supabaseUrl || !supabaseKey) {
-      const errorMsg = "Unable to get Supabase configuration";
-      console.error("Supabase configuration error:", { 
-        hasUrl: !!supabaseUrl, 
-        hasKey: !!supabaseKey,
+
+    // Get the API key as a fallback - use only import.meta.env for Vite projects
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl) {
+      const errorMsg = "Unable to get Supabase URL";
+      console.error("Supabase URL error:", {
+        hasUrl: !!supabaseUrl,
         sessionData: anon
       });
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
-    
+
+    // If we don't have a session token, log a warning but continue with the anon key
+    if (!supabaseKey) {
+      console.warn("No session token available, falling back to anon key");
+      if (!supabaseAnonKey) {
+        const errorMsg = "No authentication available for Supabase functions";
+        console.error("Supabase auth error:", {
+          hasKey: !!supabaseKey,
+          hasAnonKey: !!supabaseAnonKey,
+          sessionData: anon
+        });
+        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+        throw new Error(errorMsg);
+      }
+    }
+
     // Send to processing function
     const processingUrl = `${supabaseUrl}/functions/v1/process-receipt`;
-    
+
     console.log("Sending receipt for processing...");
     console.log("Processing URL:", processingUrl);
     console.log("Processing options:", processingOptions);
-    
-    let processingResponse;
+
+    let processingResponse: Response;
     try {
       processingResponse = await fetch(processingUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
+          'Authorization': `Bearer ${supabaseKey || supabaseAnonKey}`,
+          'apikey': supabaseAnonKey, // Add the apikey header as a fallback
         },
         body: JSON.stringify({
           receiptId,
@@ -525,7 +535,7 @@ export const processReceiptWithOCR = async (
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     if (!processingResponse.ok) {
       const errorText = await processingResponse.text();
       const errorMsg = `Processing failed: ${processingResponse.status} ${processingResponse.statusText}`;
@@ -533,24 +543,24 @@ export const processReceiptWithOCR = async (
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     const processingResult = await processingResponse.json();
     console.log("Processing result:", processingResult);
-    
+
     if (!processingResult.success) {
       const errorMsg = processingResult.error || "Unknown processing error";
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);
     }
-    
+
     // Extract results
     const result = processingResult.result as OCRResult;
-    
+
     // If processing is complete (direct vision processing might not need enhancement)
     if (processingOptions.primaryMethod === 'ai-vision') {
       // For vision processing, we're done
       await updateReceiptProcessingStatus(receiptId, 'complete');
-      
+
       // Update the receipt with the processed data
       const updateData: any = {
         merchant: result.merchant || '',
@@ -569,20 +579,20 @@ export const processReceiptWithOCR = async (
         model_used: result.modelUsed || processingOptions.modelId,
         primary_method: processingOptions.primaryMethod
       };
-      
+
       // Update the receipt with the data
       const { error: updateError } = await supabase
         .from('receipts')
         .update(updateData)
         .eq('id', receiptId);
-      
+
       if (updateError) {
         const errorMsg = `Failed to update receipt with processed data: ${updateError.message}`;
         console.error("Error updating receipt with processed data:", updateError);
         await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
         throw updateError;
       }
-      
+
       // Update line items if available
       if (result.line_items && result.line_items.length > 0) {
         // Delete existing line items first
@@ -612,19 +622,77 @@ export const processReceiptWithOCR = async (
           // Non-critical error, don't throw
         }
       }
-      
+
       return result;
     }
-    
+
     // For OCR+AI, we need to update status for the AI enhancement step
     await updateReceiptProcessingStatus(receiptId, 'processing_ai');
-    
+
     // No need to send to enhance-receipt-data again as it's already done in process-receipt
-    
+
     // Update the receipt with the processed data
+    // Format the date to ensure it's in YYYY-MM-DD format
+    let formattedDate = result.date || '';
+
+    try {
+      // First, try to detect the format based on the value
+      console.log(`Attempting to format date: ${formattedDate}`);
+
+      // Check if date is already in YYYY-MM-DD format
+      if (formattedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        console.log(`Date is already in correct format: ${formattedDate}`);
+        // No conversion needed
+      }
+      // Check if date is in DD/MM/YYYY format
+      else if (formattedDate.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        const [day, month, year] = formattedDate.split('/');
+        formattedDate = `${year}-${month}-${day}`;
+        console.log(`Converted date from DD/MM/YYYY format: ${result.date} to ${formattedDate}`);
+      }
+      // Check if date is in DD/MM/YY format
+      else if (formattedDate.match(/^\d{2}\/\d{2}\/\d{2}$/)) {
+        // Try to determine if it's DD/MM/YY or MM/DD/YY based on values
+        const parts = formattedDate.split('/');
+        const firstNum = parseInt(parts[0], 10);
+        const secondNum = parseInt(parts[1], 10);
+
+        // If first number is > 12, it's likely a day (DD/MM/YY)
+        if (firstNum > 12) {
+          const [day, month, year] = parts;
+          formattedDate = `20${year}-${month}-${day}`;
+          console.log(`Converted date from DD/MM/YY format: ${result.date} to ${formattedDate}`);
+        }
+        // If second number is > 12, it's likely MM/DD/YY
+        else if (secondNum > 12) {
+          const [month, day, year] = parts;
+          formattedDate = `20${year}-${month}-${day}`;
+          console.log(`Converted date from MM/DD/YY format: ${result.date} to ${formattedDate}`);
+        }
+        // If both are <= 12, default to DD/MM/YY format
+        else {
+          const [day, month, year] = parts;
+          formattedDate = `20${year}-${month}-${day}`;
+          console.log(`Defaulting to DD/MM/YY format: ${result.date} to ${formattedDate}`);
+        }
+      }
+      // If date is in any other format, use today's date as a fallback
+      else if (formattedDate && !formattedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        console.warn(`Unrecognized date format: ${formattedDate}, using today's date as fallback`);
+        const today = new Date();
+        formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      }
+    } catch (dateError) {
+      console.error("Error formatting date:", dateError);
+      // Use today's date as a fallback
+      const today = new Date();
+      formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      console.log(`Using today's date as fallback: ${formattedDate}`);
+    }
+
     const updateData: any = {
       merchant: result.merchant || '',
-      date: result.date || '',
+      date: formattedDate,
       total: result.total || 0,
       tax: result.tax || 0,
       currency: result.currency || 'MYR',
@@ -639,20 +707,20 @@ export const processReceiptWithOCR = async (
       model_used: result.modelUsed || processingOptions.modelId,
       primary_method: processingOptions.primaryMethod
     };
-    
+
     // Update the receipt with enhanced data
     const { error: updateError } = await supabase
       .from('receipts')
       .update(updateData)
       .eq('id', receiptId);
-    
+
     if (updateError) {
       const errorMsg = `Failed to update receipt with enhanced data: ${updateError.message}`;
       console.error("Error updating receipt with enhanced data:", updateError);
       await updateReceiptProcessingStatus(receiptId, 'failed_ai', errorMsg);
       throw updateError;
     }
-    
+
     // Update line items based on results
     if (result.line_items && result.line_items.length > 0) {
       // Delete existing line items first
@@ -682,21 +750,21 @@ export const processReceiptWithOCR = async (
         // Non-critical error, don't throw
       }
     }
-    
+
     return result;
   } catch (error) {
     console.error("Error in processReceiptWithOCR:", error);
     // Try to update status to failed if not already done
     try {
       await updateReceiptProcessingStatus(
-        receiptId, 
-        'failed_ocr', 
+        receiptId,
+        'failed_ocr',
         error.message || "Unknown error during receipt processing"
       );
     } catch (statusError) {
       console.error("Failed to update error status:", statusError);
     }
-    
+
     toast.error("Failed to process receipt: " + (error.message || "Unknown error"));
     return null;
   }
@@ -711,50 +779,43 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
       .select("image_url")
       .eq("id", id)
       .single();
-    
+
     if (fetchError) {
       console.error("Error fetching receipt for deletion:", fetchError);
       // Continue with delete anyway
     }
-    
+
     // Delete line items (use cascade delete in DB schema ideally)
     const { error: lineItemsError } = await supabase
       .from("line_items")
       .delete()
       .eq("receipt_id", id);
-    
+
     if (lineItemsError) {
       console.error("Error deleting line items:", lineItemsError);
       // Continue with delete
     }
-    
-    // Delete confidence scores
-    const { error: confidenceError } = await supabase
-      .from("confidence_scores")
-      .delete()
-      .eq("receipt_id", id);
-    
-    if (confidenceError) {
-      console.error("Error deleting confidence scores:", confidenceError);
-      // Continue with delete
-    }
-    
+
+    // Delete confidence scores - DISABLED due to table not existing
+    console.log("[DISABLED] Would delete confidence scores for receipt:", id);
+    // Feature disabled to avoid 404 errors
+
     // Delete the receipt
     const { error } = await supabase
       .from("receipts")
       .delete()
       .eq("id", id);
-    
+
     if (error) {
       throw error;
     }
-    
+
     // Delete the image from storage if it exists
     if (receipt?.image_url) {
       try {
         // Extract path from URL if needed
         let imagePath = receipt.image_url;
-        
+
         // If it's a full URL, extract the path
         if (imagePath.includes('receipt_images/')) {
           const pathParts = imagePath.split('receipt_images/');
@@ -762,11 +823,11 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
             imagePath = pathParts[1];
           }
         }
-        
+
         const { error: storageError } = await supabase.storage
           .from('receipt_images')
           .remove([imagePath]);
-        
+
         if (storageError) {
           console.error("Error deleting receipt image:", storageError);
           // Don't fail the operation, just log it
@@ -776,7 +837,7 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
         // Continue with the operation
       }
     }
-    
+
     toast.success("Receipt deleted successfully");
     return true;
   } catch (error) {
@@ -793,11 +854,11 @@ export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Pr
       .from("receipts")
       .update({ status })
       .eq("id", id);
-    
+
     if (error) {
       throw error;
     }
-    
+
     toast.success(`Receipt marked as ${status}`);
     return true;
   } catch (error) {
@@ -814,7 +875,7 @@ export const logCorrections = async (
 ): Promise<void> => {
   try {
     console.log("📊 logCorrections called with:", { receiptId, updatedFields });
-    
+
     // Fetch the original receipt including potentially relevant fields and AI suggestions
     const { data: currentReceipt, error: fetchError } = await supabase
       .from("receipts")
@@ -833,25 +894,25 @@ export const logCorrections = async (
     }
 
     console.log("📊 Original receipt data:", currentReceipt);
-    
+
     // Ensure ai_suggestions is treated as an object, even if null/undefined in DB
     const aiSuggestions = (currentReceipt.ai_suggestions as unknown as AISuggestions | null) || {};
     console.log("📊 AI Suggestions:", aiSuggestions);
-    
+
     const correctionsToLog: Omit<Correction, "id" | "created_at">[] = [];
 
     // Define the fields we want to track corrections for
     const fieldsToTrack = ['merchant', 'date', 'total', 'tax', 'payment_method', 'predicted_category'];
 
     console.log("📊 Checking fields for changes:", fieldsToTrack);
-    
+
     for (const field of fieldsToTrack) {
       // Check if the field exists in the current receipt before proceeding
       if (!(field in currentReceipt)) {
         console.log(`📊 Field ${field} not found in current receipt, skipping`);
         continue;
       }
-      
+
       // Cast to any to avoid TypeScript errors with dynamic property access
       const originalValue = (currentReceipt as any)[field];
       const correctedValue = updatedFields[field];
@@ -872,7 +933,7 @@ export const logCorrections = async (
         const originalValueStr = originalValue === null || originalValue === undefined ? null : String(originalValue);
         const correctedValueStr = String(correctedValue); // correctedValue is already checked for undefined
         const aiSuggestionStr = aiSuggestion === null || aiSuggestion === undefined ? null : String(aiSuggestion);
-        
+
         console.log(`📊 Field: ${field} (as strings)`, {
           originalValueStr,
           correctedValueStr,
@@ -907,7 +968,7 @@ export const logCorrections = async (
           const { error: insertError } = await supabase
             .from('corrections')
             .insert(correction);
-            
+
           if (insertError) {
             console.error(`Error logging correction for ${correction.field_name}:`, insertError);
           } else {
@@ -951,7 +1012,7 @@ export const fetchCorrections = async (receiptId: string): Promise<Correction[]>
 
 // Subscribe to real-time updates for a receipt
 export const subscribeToReceiptUpdates = (
-  receiptId: string, 
+  receiptId: string,
   callback: (payload: RealtimePostgresChangesPayload<Receipt>) => void
 ): RealtimeChannel => {
   const channel = supabase.channel(`receipt-updates-${receiptId}`)
@@ -978,10 +1039,22 @@ export const subscribeToReceiptUpdates = (
   return channel;
 };
 
+// Log processing status changes - completely disabled due to schema issues
+export const logProcessingStatus = async (
+  receiptId: string,
+  status: ProcessingStatus,
+  message?: string
+): Promise<boolean> => {
+  // Just return true without doing anything - this feature is disabled
+  // to avoid errors with the processing_logs table
+  console.log(`[DISABLED] Would log processing status: ${status} for receipt ${receiptId}${message ? ': ' + message : ''}`);
+  return true;
+};
+
 // Update receipt processing status
 export const updateReceiptProcessingStatus = async (
-  id: string, 
-  processingStatus: ProcessingStatus, 
+  id: string,
+  processingStatus: ProcessingStatus,
   processingError?: string | null
 ): Promise<boolean> => {
   try {
@@ -989,22 +1062,30 @@ export const updateReceiptProcessingStatus = async (
     const updateData: any = {
       processing_status: processingStatus
     };
-    
+
     // Only include processing_error if it's provided
     if (processingError !== undefined) {
       updateData.processing_error = processingError;
     }
-    
+
     const { error } = await supabase
       .from("receipts")
       .update(updateData)
       .eq("id", id);
-    
+
     if (error) {
       console.error("Error updating processing status:", error);
       throw error;
     }
-    
+
+    // Try to log the status change, but don't fail if it doesn't work
+    try {
+      await logProcessingStatus(id, processingStatus, processingError || undefined);
+    } catch (logError) {
+      console.error("Failed to log processing status change:", logError);
+      // Non-critical, continue
+    }
+
     return true;
   } catch (error) {
     console.error("Error in updateReceiptProcessingStatus:", error);
@@ -1019,15 +1100,15 @@ export const fixProcessingStatus = async (id: string): Promise<boolean> => {
     const supabaseAny = supabase as any;
     if (supabaseAny.rpc) {
       try {
-        await supabaseAny.rpc('update_processing_status_if_failed', { 
-          receipt_id: id 
+        await supabaseAny.rpc('update_processing_status_if_failed', {
+          receipt_id: id
         });
       } catch (rpcError) {
         // Ignore errors - likely the function doesn't exist yet
         console.log('Note: Function to fix processing status not available yet');
       }
     }
-    
+
     return true;
   } catch (error) {
     console.error("Error fixing processing status:", error);
@@ -1060,7 +1141,7 @@ export const processBatchReceipts = async (
   options?: ProcessingOptions
 ): Promise<BatchProcessingResult> => {
   const startTime = performance.now();
-  
+
   // Initialize results
   const result: BatchProcessingResult = {
     successes: [],
