@@ -169,63 +169,7 @@ export type Database = {
         }
         Relationships: []
       }
-      expenses: {
-        Row: {
-          amount: number
-          category: string | null
-          created_at: string
-          currency: string | null
-          date: string
-          description: string
-          id: string
-          notes: string | null
-          receipt_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          category?: string | null
-          created_at?: string
-          currency?: string | null
-          date: string
-          description: string
-          id?: string
-          notes?: string | null
-          receipt_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          category?: string | null
-          created_at?: string
-          currency?: string | null
-          date?: string
-          description?: string
-          id?: string
-          notes?: string | null
-          receipt_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "expenses_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "expenses_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      // expenses table removed as it doesn't exist in the database
       line_items: {
         Row: {
           amount: number
@@ -365,60 +309,7 @@ export type Database = {
         }
         Relationships: []
       }
-      receipt_confidence_scores: {
-        Row: {
-          category_confidence: number | null
-          created_at: string | null
-          date_confidence: number | null
-          id: string
-          merchant_confidence: number | null
-          overall_confidence: number | null
-          payment_method_confidence: number | null
-          receipt_id: string
-          total_confidence: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          category_confidence?: number | null
-          created_at?: string | null
-          date_confidence?: number | null
-          id?: string
-          merchant_confidence?: number | null
-          overall_confidence?: number | null
-          payment_method_confidence?: number | null
-          receipt_id: string
-          total_confidence?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          category_confidence?: number | null
-          created_at?: string | null
-          date_confidence?: number | null
-          id?: string
-          merchant_confidence?: number | null
-          overall_confidence?: number | null
-          payment_method_confidence?: number | null
-          receipt_id?: string
-          total_confidence?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receipt_confidence_scores_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receipt_confidence_scores_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      // receipt_confidence_scores table removed as it doesn't exist in the database
       receipt_items: {
         Row: {
           created_at: string

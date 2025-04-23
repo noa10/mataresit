@@ -71,12 +71,12 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
   }
 
   const normalizedScore = normalizeConfidence(score);
-  
+
   // More granular color scale with 4 levels
   const color = normalizedScore >= 80 ? 'bg-green-500' :
-                normalizedScore >= 60 ? 'bg-yellow-500' : 
+                normalizedScore >= 60 ? 'bg-yellow-500' :
                 normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
-  
+
   // Add confidence labels for accessibility
   const label = normalizedScore >= 80 ? 'High' :
                normalizedScore >= 60 ? 'Medium' :
@@ -86,14 +86,14 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
     <div className="flex items-center gap-1 group relative">
       <span className={`inline-block w-4 h-1 rounded ${color}`}></span>
       <span className="text-xs">{normalizedScore}%</span>
-      
+
       {/* Tooltip showing confidence explanation */}
-      <div className="absolute bottom-full right-0 mb-2 p-2 bg-gray-800 text-white text-xs rounded 
+      <div className="absolute bottom-full right-0 mb-2 p-2 bg-gray-800 text-white text-xs rounded
                     opacity-0 group-hover:opacity-100 transition-opacity w-48 z-10 pointer-events-none shadow-lg">
         <p className="font-medium">{label} confidence</p>
         <p className="text-gray-300 text-[10px] mt-1">
-          {normalizedScore === 100 
-            ? 'Verified by user' 
+          {normalizedScore === 100
+            ? 'Verified by user'
             : `AI detection with ${label.toLowerCase()} confidence`}
         </p>
         {normalizedScore < 100 && (
@@ -105,39 +105,59 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
 }
 
 export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps) {
-  const [zoom, setZoom] = useState(1);
+  // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
   // State for confidence scores using ReceiptConfidence type
-  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(receipt.confidence_scores || defaultConfidence);
+  const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(
+    // Check if confidence_scores exists and is not null
+    receipt.confidence_scores ?
+      // If it's a string, try to parse it as JSON
+      (typeof receipt.confidence_scores === 'string' ?
+        JSON.parse(receipt.confidence_scores) : receipt.confidence_scores)
+      : defaultConfidence
+  );
   const [imageError, setImageError] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
   const [showProcessLogs, setShowProcessLogs] = useState(false);
-  const [showAiSuggestions, setShowAiSuggestions] = useState(true);
+  // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  
+
   // Define available expense categories
   const expenseCategories = [
-    "Groceries", "Dining", "Transportation", "Utilities", 
-    "Entertainment", "Travel", "Shopping", "Healthcare", 
+    "Groceries", "Dining", "Transportation", "Utilities",
+    "Entertainment", "Travel", "Shopping", "Healthcare",
     "Education", "Other"
   ];
-  
+
   useEffect(() => {
     setEditedReceipt(receipt);
     // Initialize/Update editedConfidence when receipt changes
-    setEditedConfidence(receipt.confidence_scores || defaultConfidence);
+    // Handle different formats of confidence_scores
+    if (receipt.confidence_scores) {
+      try {
+        const confidenceData = typeof receipt.confidence_scores === 'string'
+          ? JSON.parse(receipt.confidence_scores)
+          : receipt.confidence_scores;
+        setEditedConfidence(confidenceData);
+      } catch (error) {
+        console.error("Error parsing confidence scores:", error);
+        setEditedConfidence(defaultConfidence);
+      }
+    } else {
+      setEditedConfidence(defaultConfidence);
+    }
     setProcessingStatus(receipt.processing_status || null);
   }, [receipt]);
-  
+
   // Subscribe to real-time updates for the receipt processing status
   useEffect(() => {
     if (!receipt.id) return;
-    
+
     const statusChannel = supabase.channel(`receipt-status-${receipt.id}`)
       .on(
         'postgres_changes',
@@ -174,38 +194,103 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         }
       )
       .subscribe();
-    
+
     // Clean up the subscription when component unmounts
     return () => {
       statusChannel.unsubscribe();
     };
   }, [receipt.id, queryClient]);
-  
+
   // Add useEffect to check if image loads properly
   useEffect(() => {
     // Reset image error state when receipt changes
     setImageError(false);
-    
+
     if (receipt.image_url) {
       const img = new Image();
       img.src = getFormattedImageUrl(receipt.image_url);
-      
+
       img.onload = () => {
         setImageError(false);
       };
-      
+
       img.onerror = () => {
         console.error("Error loading receipt image:", receipt.image_url);
         setImageError(true);
       };
     }
   }, [receipt.image_url]);
-  
+
   const updateMutation = useMutation({
     // Update mutation only handles the 'receipts' table update
-    mutationFn: () => updateReceipt(
-      receipt.id,
-      {
+    mutationFn: async () => {
+      // Show a toast to indicate saving has started
+      toast.loading("Saving receipt details...");
+
+      try {
+        // Format the date properly if it's a string
+        let formattedDate = editedReceipt.date;
+        if (typeof formattedDate === 'string' && formattedDate.includes('T')) {
+          formattedDate = formattedDate.split('T')[0];
+        }
+
+        // Ensure line items are properly formatted
+        const formattedLineItems = editedReceipt.lineItems?.map(item => ({
+          description: item.description || '',
+          amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0
+        }));
+
+        // Log the data being sent to the server for debugging
+        console.log("Sending data to updateReceipt:", {
+          id: receipt.id,
+          receipt: {
+            merchant: editedReceipt.merchant,
+            date: formattedDate,
+            total: typeof editedReceipt.total === 'number' ? editedReceipt.total : parseFloat(editedReceipt.total) || 0,
+            tax: typeof editedReceipt.tax === 'number' ? editedReceipt.tax : parseFloat(editedReceipt.tax) || 0,
+            currency: editedReceipt.currency,
+            payment_method: editedReceipt.payment_method,
+            predicted_category: editedReceipt.predicted_category,
+            status: "reviewed",
+          },
+          lineItems: formattedLineItems
+        });
+
+        return await updateReceipt(
+          receipt.id,
+          {
+            merchant: editedReceipt.merchant,
+            date: formattedDate,
+            total: typeof editedReceipt.total === 'number' ? editedReceipt.total : parseFloat(editedReceipt.total) || 0,
+            tax: typeof editedReceipt.tax === 'number' ? editedReceipt.tax : parseFloat(editedReceipt.tax) || 0,
+            currency: editedReceipt.currency,
+            payment_method: editedReceipt.payment_method,
+            predicted_category: editedReceipt.predicted_category,
+            status: "reviewed",
+          },
+          formattedLineItems
+        );
+      } catch (error) {
+        console.error("Error preparing data for update:", error);
+        toast.dismiss();
+        toast.error("Failed to prepare data for update: " + (error.message || "Unknown error"));
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      // Dismiss the loading toast
+      toast.dismiss();
+
+      // Show success message
+      toast.success("Receipt updated successfully");
+
+      // Invalidate the receipt query to force a refresh
+      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+
+      // Update the local state to reflect the changes
+      // This ensures the UI shows the updated data immediately
+      const updatedReceipt: ReceiptWithDetails = {
+        ...receipt,
         merchant: editedReceipt.merchant,
         date: editedReceipt.date,
         total: editedReceipt.total,
@@ -214,62 +299,28 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
         status: "reviewed",
-      },
-      editedReceipt.lineItems?.map(item => ({
-        description: item.description,
-        amount: item.amount
-      }))
-    ),
-    onSuccess: async () => {
-      // Save confidence scores separately after receipt update succeeds
-      try {
-        // Create a new confidence record or update existing one
-        const { data: existingConfidence, error: fetchError } = await supabase
-          .from('receipt_confidence_scores')
-          .select('id')
-          .eq('receipt_id', receipt.id)
-          .single();
+        updated_at: new Date().toISOString()
+      };
 
-        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found
-          console.error("Error fetching existing confidence:", fetchError);
-        }
+      // Force update the UI with the new data
+      setEditedReceipt(updatedReceipt);
 
-        const confidenceToSave: any = {
-          receipt_id: receipt.id,
-          merchant: editedConfidence.merchant || 0,
-          date: editedConfidence.date || 0,
-          total: editedConfidence.total || 0,
-          tax: editedConfidence.tax || 0,
-          payment_method: editedConfidence.payment_method || 0,
-          line_items: editedConfidence.line_items || 0,
-        };
+      // Save confidence scores as part of the receipt update
+      // This is now handled by the update_receipt_final function
+      // We're keeping this code for reference, but it's not needed anymore
+      console.log("Confidence scores are now saved as part of the receipt update");
 
-        if (existingConfidence?.id) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from('receipt_confidence_scores')
-            .update(confidenceToSave)
-            .eq('id', existingConfidence.id);
+      // Update the local state to reflect the new confidence scores
+      const confidenceToSave = {
+        merchant: editedConfidence.merchant || 0,
+        date: editedConfidence.date || 0,
+        total: editedConfidence.total || 0,
+        tax: editedConfidence.tax || 0,
+        payment_method: editedConfidence.payment_method || 0,
+        line_items: editedConfidence.line_items || 0,
+      };
 
-          if (updateError) {
-            console.error("Error updating confidence scores:", updateError);
-            toast.error("Failed to update confidence scores.");
-          }
-        } else {
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from('receipt_confidence_scores')
-            .insert(confidenceToSave);
-
-          if (insertError) {
-            console.error("Error inserting confidence scores:", insertError);
-            toast.error("Failed to save confidence scores.");
-          }
-        }
-      } catch (error) {
-        console.error("Exception saving confidence scores:", error);
-        toast.error("An error occurred while saving confidence scores.");
-      }
+      console.log("Updated confidence scores:", confidenceToSave);
 
       // Invalidate queries to refetch data including updated confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
@@ -281,12 +332,34 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         fixProcessingStatus(receipt.id);
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      // Dismiss the loading toast
+      toast.dismiss();
+
       console.error("Failed to update receipt:", error);
-      toast.error("Failed to update receipt");
+
+      // Provide more detailed error message
+      let errorMessage = "Failed to update receipt";
+
+      if (error.message) {
+        errorMessage += ": " + error.message;
+      } else if (error.code) {
+        errorMessage += ` (Error code: ${error.code})`;
+      }
+
+      // Log additional details for debugging
+      const errorObj = error as Record<string, any>;
+      if (errorObj.details || errorObj.hint) {
+        console.error("Additional error details:", {
+          details: errorObj.details,
+          hint: errorObj.hint
+        });
+      }
+
+      toast.error(errorMessage);
     }
   });
-  
+
   const reprocessMutation = useMutation({
     mutationFn: () => processReceiptWithOCR(receipt.id),
     onSuccess: (data) => {
@@ -301,7 +374,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       toast.error("Failed to process receipt with OCR");
     }
   });
-  
+
   const formatCurrency = (amount?: number | null) => {
     // Use editedReceipt for currency preference if available
     return new Intl.NumberFormat('en-US', {
@@ -309,25 +382,13 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       currency: editedReceipt.currency || 'MYR',
     }).format(amount || 0); // Handle potential null/undefined amount
   };
-  
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
-  };
-  
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.5));
-  };
-  
-  const handleRotate = () => {
-    setRotation(prev => (prev + 90) % 360);
-  };
-  
+
   const handleInputChange = (field: string, value: string | number) => {
     setEditedReceipt(prev => ({
       ...prev,
       [field]: value
     }));
-    
+
     // Update confidence scores in state when user edits a field
     // Check if the field is a valid field on our ReceiptConfidence type
     if (field in defaultConfidence) {
@@ -335,7 +396,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         ...prev,
         [field]: 100 // Set confidence to 100%
       }));
-      
+
       // Show visual feedback that the field has been verified
       toast.success(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} verified`, {
         duration: 1500,
@@ -344,7 +405,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       });
     }
   };
-  
+
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
     const updatedLineItems = [...(editedReceipt.lineItems || [])];
     // Ensure the item exists before updating
@@ -365,11 +426,47 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       }));
     }
   };
-  
+
   const handleSaveChanges = () => {
+    // Log what we're about to save for debugging
+    console.log("Saving receipt details:", {
+      id: receipt.id,
+      merchant: editedReceipt.merchant,
+      date: editedReceipt.date,
+      total: editedReceipt.total,
+      tax: editedReceipt.tax,
+      currency: editedReceipt.currency,
+      payment_method: editedReceipt.payment_method,
+      predicted_category: editedReceipt.predicted_category,
+      lineItems: editedReceipt.lineItems
+    });
+
+    // Validate required fields before saving
+    if (!editedReceipt.merchant) {
+      toast.error("Please enter a merchant name");
+      return;
+    }
+
+    if (!editedReceipt.date) {
+      toast.error("Please enter a date");
+      return;
+    }
+
+    if (editedReceipt.total === undefined || editedReceipt.total === null) {
+      toast.error("Please enter a total amount");
+      return;
+    }
+
+    // Show a loading toast
+    toast.loading("Saving receipt details...");
+
+    // Proceed with the update
     updateMutation.mutate();
+
+    // Removed optimistic update - we'll rely on the mutation's onSuccess callback
+    // and query invalidation to update the UI after successful save
   };
-  
+
   const handleAddLineItem = () => {
     const newLineItem: ReceiptLineItem = {
       id: `temp-${Date.now()}-${Math.random()}`, // Use random for better temp key
@@ -379,7 +476,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    
+
     setEditedReceipt(prev => ({
       ...prev,
       lineItems: [...(prev.lineItems || []), newLineItem]
@@ -390,11 +487,11 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       line_items: 100
     }));
   };
-  
+
   const handleRemoveLineItem = (index: number) => {
     const updatedLineItems = [...(editedReceipt.lineItems || [])];
     updatedLineItems.splice(index, 1);
-    
+
     setEditedReceipt(prev => ({
       ...prev,
       lineItems: updatedLineItems
@@ -405,17 +502,17 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       line_items: 100
     }));
   };
-  
+
   // Removed Zoho sync functionality
-  
+
   const handleReprocessReceipt = () => {
     if (isProcessing) return; // Prevent multiple simultaneous processing
-    
+
     setIsProcessing(true); // Show loading state in confidence indicators
-    
+
     // First set processing status to indicate starting OCR
     setProcessingStatus('processing_ocr');
-    
+
     // Reset confidence scores temporarily to show loading state
     setEditedConfidence(prev => ({
       ...prev,
@@ -426,7 +523,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       payment_method: 50,
       line_items: 50
     }));
-    
+
     // Call the reprocess mutation
     reprocessMutation.mutate(undefined, {
       onSettled: () => {
@@ -435,7 +532,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       }
     });
   };
-  
+
   const handleToggleShowFullText = () => {
     setShowFullTextData(!showFullTextData);
   };
@@ -443,11 +540,11 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   const handleToggleProcessLogs = () => {
     setShowProcessLogs(!showProcessLogs);
   };
-  
+
   // Subscribe to processing logs for this receipt
   useEffect(() => {
     if (!receipt?.id) return;
-    
+
     // Fetch initial logs
     const fetchInitialLogs = async () => {
       const { data, error } = await supabase
@@ -455,16 +552,16 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         .select('*')
         .eq('receipt_id', receipt.id)
         .order('created_at', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching logs:', error);
       } else if (data) {
         setProcessLogs(data as ProcessingLog[]);
       }
     };
-    
+
     fetchInitialLogs();
-    
+
     // Set up realtime subscription
     const channel = supabase.channel(`receipt-logs-${receipt.id}`)
       .on(
@@ -478,7 +575,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         (payload) => {
           const newLog = payload.new as ProcessingLog;
           console.log('New log received:', newLog);
-          
+
           // Add new log to the list
           setProcessLogs((prev) => {
             // Check if we already have this log (avoid duplicates)
@@ -500,7 +597,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           console.error('Error subscribing to logs:', err);
         }
       });
-    
+
     // Clean up subscription on unmount
     return () => {
       channel.unsubscribe();
@@ -512,7 +609,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
-  
+
   // Function to get step color
   const getStepColor = (step: string | null) => {
     switch (step) {
@@ -540,15 +637,15 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   // Function to format image URL if needed
   const getFormattedImageUrl = (url: string | undefined) => {
     if (!url) return "";
-    
+
     console.log("Original URL:", url);
-    
+
     // For local development or testing with placeholder
     if (url.startsWith('/')) {
       console.log("Local URL detected, returning as is");
       return url;
     }
-    
+
     try {
       // Check if the URL is already a complete Supabase URL
       if (url.includes('supabase.co') && url.includes('/storage/v1/object/')) {
@@ -562,18 +659,18 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         console.log("Added public/ to Supabase URL:", formatted);
         return formatted;
       }
-      
+
       // Special case: URL contains another Supabase URL inside it
       if (url.includes('receipt_images/https://')) {
         console.log("Detected nested Supabase URL with receipt_images prefix");
         // Extract the actual URL after receipt_images/
         const actualUrl = url.substring(url.indexOf('receipt_images/') + 'receipt_images/'.length);
         console.log("Extracted actual URL:", actualUrl);
-        
+
         // Recursively call this function with the extracted URL
         return getFormattedImageUrl(actualUrl);
       }
-      
+
       // Another special case: URL might have two supabase.co domains (duplicated URL)
       if ((url.match(/supabase\.co/g) || []).length > 1) {
         console.log("Detected multiple Supabase domains in URL");
@@ -585,13 +682,13 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           return getFormattedImageUrl(actualUrl);
         }
       }
-      
+
       // Check if the URL is a full URL that doesn't need processing
       if (url.startsWith('http') && !url.includes('receipt_images/')) {
         console.log("Full URL that doesn't need processing detected, returning as is");
         return url;
       }
-      
+
       // Handle relative paths that might be just storage keys
       if (!url.includes('supabase.co')) {
         // Check if this looks like a UUID-based path
@@ -600,26 +697,26 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           const { data } = supabase.storage
             .from('receipt_images')
             .getPublicUrl(url);
-          
+
           console.log("Generated publicUrl from UUID path:", data?.publicUrl);
           return data?.publicUrl || url;
         }
-        
+
         // Extract just the filename if there's a path
-        const fileName = url.includes('/') 
-          ? url.substring(url.lastIndexOf('/') + 1) 
+        const fileName = url.includes('/')
+          ? url.substring(url.lastIndexOf('/') + 1)
           : url.replace('receipt_images/', '');
-          
+
         console.log("Processing as storage key, extracted filename:", fileName);
-        
+
         const { data } = supabase.storage
           .from('receipt_images')
           .getPublicUrl(fileName);
-        
+
         console.log("Generated publicUrl:", data?.publicUrl);
         return data?.publicUrl || url;
       }
-      
+
       console.log("URL didn't match any formatting rules, returning as is");
       return url; // Return original URL on error
     } catch (error) {
@@ -634,8 +731,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
       ...prev,
       [field]: value
     }));
-    
-    // Also update confidence to 100% when accepting AI suggestion  
+
+    // Also update confidence to 100% when accepting AI suggestion
     if (field in defaultConfidence) {
       setEditedConfidence(prev => ({
         ...prev,
@@ -645,21 +742,21 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
 
     toast.success(`Applied AI suggestion for ${field}`);
   };
-  
+
   // Check if we have AI suggestions for a field
   const hasSuggestion = (field: string): boolean => {
     // Check specifically for the field in the suggestions object
     // Need to refine this check based on actual AISuggestions structure
     return !!(receipt.ai_suggestions && receipt.ai_suggestions[field as keyof AISuggestions]);
   };
-  
+
   // Get suggestion for a field
   const getSuggestion = (field: string): string | number | null => {
     if (!receipt.ai_suggestions) return null;
     // Use keyof AISuggestions for type safety if structure is known
     return receipt.ai_suggestions[field as keyof AISuggestions] || null;
   };
-  
+
   // Get suggestion confidence for a field
   const getSuggestionConfidence = (field: string): number => {
     // Confidence for suggestions might be structured differently, adjust as needed
@@ -673,24 +770,24 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     // Assuming suggestions confidence structure matches ConfidenceScore fields
     return normalizeConfidence(receipt.ai_suggestions.confidence.suggestions[suggestionField]);
   };
-  
+
   // Render a suggestion badge with acceptance button if available
   const renderSuggestion = (field: string, label: string) => {
     if (!hasSuggestion(field)) return null;
-    
+
     const suggestion = getSuggestion(field);
     const confidence = getSuggestionConfidence(field);
-    
+
     // Only render if there is a suggestion value
     if (suggestion === null || suggestion === undefined || suggestion === '') return null;
-    
+
     return (
       <div className="mt-1 flex items-center gap-2">
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={`flex items-center gap-1 ${
-            confidence >= 80 ? 'border-green-500 text-green-700' : 
-            confidence >= 60 ? 'border-yellow-500 text-yellow-700' : 
+            confidence >= 80 ? 'border-green-500 text-green-700' :
+            confidence >= 60 ? 'border-yellow-500 text-yellow-700' :
             'border-red-500 text-red-700'
           }`}
         >
@@ -698,9 +795,9 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           <span>Suggested {label}: {suggestion.toString()}</span>
           <span className="text-xs opacity-70">({confidence}%)</span> {/* Show suggestion confidence */}
         </Badge>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-6 w-6 rounded-full"
           onClick={() => handleAcceptSuggestion(field, suggestion)}
           title={`Accept suggestion (${confidence}% confidence)`}
@@ -735,7 +832,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     let statusText = 'Processing...';
     let icon = <Loader2 className="h-4 w-4 animate-spin mr-2" />;
     let colorClass = 'bg-blue-500';
-    
+
     switch (currentStatus) {
       case 'uploading':
         statusText = 'Uploading...';
@@ -764,7 +861,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         colorClass = 'bg-red-500';
         break;
     }
-    
+
     return (
       <div className="mb-4 flex items-center gap-2">
         <Badge variant="outline" className={`text-white ${colorClass} flex items-center`}>
@@ -772,9 +869,9 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           {statusText}
         </Badge>
         {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
-          <Button 
-            size="sm" 
-            variant="outline" 
+          <Button
+            size="sm"
+            variant="outline"
             className="h-7"
             onClick={() => fixProcessingStatus(receipt.id)}
           >
@@ -790,7 +887,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!receipt.id) throw new Error("No receipt ID provided");
-      
+
       // Delete the image from storage first
       if (receipt.image_url) {
         const fileName = receipt.image_url.split('/').pop();
@@ -798,20 +895,20 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           const { error: storageError } = await supabase.storage
             .from('receipt_images')
             .remove([fileName]);
-          
+
           if (storageError) {
             console.error("Error deleting image from storage:", storageError);
             throw storageError;
           }
         }
       }
-      
+
       // Then delete the receipt record
       const { error: dbError } = await supabase
         .from('receipts')
         .delete()
         .eq('id', receipt.id);
-        
+
       if (dbError) {
         console.error("Error deleting receipt record:", dbError);
         throw dbError;
@@ -1057,8 +1154,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {log.step_name && (
-                              <Badge 
-                                variant="outline" 
+                              <Badge
+                                variant="outline"
                                 className={`px-1.5 py-0 text-[10px] ${getStepColor(log.step_name)} text-white`}
                               >
                                 {log.step_name}
@@ -1094,7 +1191,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           </div>
         </div>
       </motion.div>
-      
+
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -1315,9 +1412,9 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         </div>
 
         <div className="pt-4 mt-auto flex justify-between flex-shrink-0">
-          <Button 
-            variant="outline" 
-            className="gap-2" 
+          <Button
+            variant="outline"
+            className="gap-2"
             onClick={() => setIsHistoryModalOpen(true)}
           >
             <History size={16} />

@@ -363,13 +363,42 @@ export const updateReceipt = async (
     await logCorrections(id, receipt);
 
     // Update the receipt
-    const { error } = await supabase
-      .from("receipts")
-      .update(receipt)
-      .eq("id", id);
+    console.log("Updating receipt with ID:", id, "Data:", receipt);
 
-    if (error) {
-      throw error;
+    // Create a clean update object with only the fields we need
+    const updateData = {
+      merchant: receipt.merchant,
+      date: receipt.date,
+      total: receipt.total,
+      tax: receipt.tax,
+      currency: receipt.currency,
+      payment_method: receipt.payment_method,
+      predicted_category: receipt.predicted_category,
+      status: receipt.status || 'reviewed',
+      updated_at: new Date().toISOString()
+    };
+
+    console.log("Updating with clean data:", updateData);
+
+    // Use the Supabase client directly to update the receipt
+    try {
+      console.log("Using Supabase client to update receipt");
+
+      // Use the Supabase client to update the receipt
+      const { error: updateError } = await supabase
+        .from("receipts")
+        .update(updateData)
+        .eq("id", id);
+
+      if (updateError) {
+        console.error("Error updating receipt with Supabase client:", updateError);
+        throw updateError;
+      }
+
+      console.log("Receipt updated successfully with Supabase client");
+    } catch (updateError) {
+      console.error("Error during receipt update:", updateError);
+      throw updateError;
     }
 
     // If line items are provided, update them
@@ -382,7 +411,7 @@ export const updateReceipt = async (
 
       if (deleteError) {
         console.error("Error deleting line items:", deleteError);
-        // Continue with insert
+        throw deleteError;
       }
 
       // Then insert new ones if there are any
@@ -399,7 +428,7 @@ export const updateReceipt = async (
 
         if (insertError) {
           console.error("Error inserting line items:", insertError);
-          // Don't fail the whole operation, just log and continue
+          throw insertError;
         }
       }
     }

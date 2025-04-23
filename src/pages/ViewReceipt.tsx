@@ -14,7 +14,7 @@ export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const { data: receipt, isLoading, error } = useQuery({
     queryKey: ['receipt', id],
     queryFn: () => fetchReceiptById(id!),
@@ -22,7 +22,7 @@ export default function ViewReceipt() {
     staleTime: 0, // Don't cache the data to ensure fresh data is loaded
     retry: 1,     // Only retry once to avoid excessive requests if there's a problem
   });
-  
+
   const deleteMutation = useMutation({
     mutationFn: (receiptId: string) => deleteReceipt(receiptId),
     onSuccess: (success) => {
@@ -36,16 +36,16 @@ export default function ViewReceipt() {
       console.error("Delete error:", error);
     }
   });
-  
+
   const handleDelete = () => {
     if (!id) return;
-    
+
     // Ask for confirmation
     if (window.confirm("Are you sure you want to delete this receipt?")) {
       deleteMutation.mutate(id);
     }
   };
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
@@ -56,7 +56,7 @@ export default function ViewReceipt() {
       </div>
     );
   }
-  
+
   if (error || !receipt) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
@@ -77,7 +77,7 @@ export default function ViewReceipt() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
-      
+
       <main className="container px-4 py-8">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -87,9 +87,9 @@ export default function ViewReceipt() {
             transition={{ duration: 0.3 }}
             className="flex items-center gap-2"
           >
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => navigate("/dashboard")}
             >
               <ArrowLeft size={20} />
@@ -104,15 +104,15 @@ export default function ViewReceipt() {
               </p>
             </div>
           </motion.div>
-          
+
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex gap-2"
           >
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
@@ -126,17 +126,23 @@ export default function ViewReceipt() {
             </Button>
           </motion.div>
         </div>
-        
+
         {/* Receipt Viewer */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
         >
-          <ReceiptViewer receipt={receipt} />
+          <ReceiptViewer
+            receipt={receipt}
+            onDelete={(_) => {
+              toast.success("Receipt deleted successfully");
+              navigate("/dashboard");
+            }}
+          />
         </motion.div>
       </main>
-      
+
       {/* Footer */}
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">
