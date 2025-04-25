@@ -90,7 +90,7 @@ interface ExpenseStatsProps {
 
 const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
   // Format date range for display
-  const formattedDateRange = dateRange?.from && dateRange?.to 
+  const formattedDateRange = dateRange?.from && dateRange?.to
     ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
     : 'All time';
 
@@ -223,7 +223,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   formatter={(value) => formatCurrency(value as number)}
                   contentStyle={{ background: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}
                 />
@@ -266,20 +266,20 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
 
   // Process and enhance chart data
   const sortedData = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
+
   const chartData = sortedData.map(day => ({
     date: formatChartDate(day.date),
     fullDate: day.date,
     amount: day.total,
     receipts: day.receiptIds.length
   }));
-  
+
   // Calculate statistics for annotations
   const totalSpending = chartData.reduce((sum, day) => sum + day.amount, 0);
   const avgSpending = totalSpending / (chartData.length || 1);
   const maxSpending = Math.max(...chartData.map(d => d.amount), 0);
   const peakDay = chartData.find(d => d.amount === maxSpending);
-  
+
   // Custom tooltip to display more information
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -327,9 +327,9 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
           )}
         </div>
         {/* Add chart type toggle button */}
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={toggleChartType}
           className="flex items-center gap-1"
         >
@@ -351,9 +351,9 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'line' ? (
-                <LineChart 
-                  data={chartData} 
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }} 
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                   className="[&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground [&_.recharts-reference-line-label]:fill-foreground dark:[&_.recharts-dot]:stroke-opacity-100 dark:[&_.recharts-dot]:fill-primary/90 dark:[&_.recharts-dot]:stroke-gray-900 dark:[&_.recharts-activedot]:stroke-gray-900 dark:[&_.recharts-activedot]:fill-primary dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-reference-line]:stroke-gray-500"
                 >
                   <defs>
@@ -362,26 +362,26 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                       <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    vertical={true} 
-                    horizontal={true} 
-                    stroke="var(--border)" 
-                    opacity={0.4} 
-                    className="dark:opacity-60" 
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={true}
+                    horizontal={true}
+                    stroke="var(--border)"
+                    opacity={0.4}
+                    className="dark:opacity-60"
                   />
-                  
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="var(--muted-foreground)" 
-                    fontSize={12} 
-                    tickLine={false} 
+
+                  <XAxis
+                    dataKey="date"
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
                     axisLine={{stroke: 'var(--border)'}}
                     padding={{ left: 10, right: 10 }}
                     tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
                     className="dark:stroke-gray-500"
                   />
-                  
+
                   <YAxis
                     stroke="var(--muted-foreground)"
                     fontSize={12}
@@ -391,35 +391,35 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                     tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
                     className="dark:stroke-gray-500"
                   />
-                  
+
                   <Tooltip content={<CustomTooltip />} />
-                  
+
                   {/* Area under the line chart */}
-                  <Area 
-                    type="monotone" 
-                    dataKey="amount" 
-                    stroke="var(--primary)" 
-                    strokeWidth={0} 
-                    fillOpacity={1} 
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="var(--primary)"
+                    strokeWidth={0}
+                    fillOpacity={1}
                     fill="url(#colorAmount)"
-                    className="dark:opacity-30" 
+                    className="dark:opacity-30"
                   />
-                  
+
                   {/* Average spending reference line */}
-                  <ReferenceLine 
-                    y={avgSpending} 
-                    stroke="var(--muted-foreground)" 
+                  <ReferenceLine
+                    y={avgSpending}
+                    stroke="var(--muted-foreground)"
                     strokeDasharray="3 3"
                     className="dark:stroke-gray-400"
-                    label={{ 
-                      value: 'Average', 
+                    label={{
+                      value: 'Average',
                       position: 'insideTopRight',
                       fill: 'var(--muted-foreground)',
                       fontSize: 11,
                       className: 'recharts-reference-line-label dark:fill-gray-300'
                     }}
                   />
-                  
+
                   {/* Vertical lines from points to axis */}
                   {chartData.map((entry, index) => (
                     <ReferenceLine
@@ -432,7 +432,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                       className="dark:opacity-60"
                     />
                   ))}
-                  
+
                   {/* Main line */}
                   <Line
                     type="monotone"
@@ -461,78 +461,78 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                   data={chartData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                   className="
-                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground 
-                    [&_.recharts-legend-item-text]:fill-foreground 
-                    [&_.recharts-rectangle]:stroke-opacity-30 
-                    dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 
-                    dark:[&_.recharts-reference-line]:stroke-gray-500 
+                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground
+                    [&_.recharts-legend-item-text]:fill-foreground
+                    [&_.recharts-rectangle]:stroke-opacity-30
+                    dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600
+                    dark:[&_.recharts-reference-line]:stroke-gray-500
                     dark:[&_.recharts-rectangle]:brightness-125
                     [&_.recharts-cartesian-axis-line]:stroke-border [&_.recharts-cartesian-axis-line]:stroke-opacity-80 dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-cartesian-axis-line]:stroke-opacity-100
                     [&_.recharts-reference-line-label]:fill-muted-foreground dark:[&_.recharts-reference-line-label]:fill-gray-300
                     [&_.recharts-cartesian-axis-tick-value]:fill-foreground dark:[&_.recharts-cartesian-axis-tick-value]:fill-gray-300
                   "
                 >
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    vertical={true} 
-                    horizontal={true} 
-                    stroke="var(--border)" 
-                    opacity={0.4} 
-                    className="dark:opacity-60" 
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={true}
+                    horizontal={true}
+                    stroke="var(--border)"
+                    opacity={0.4}
+                    className="dark:opacity-60"
                   />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="var(--muted-foreground)" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={{stroke: 'var(--border)'}} 
-                    tick={{ 
-                      fill: 'var(--foreground)', 
-                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300' 
+                  <XAxis
+                    dataKey="date"
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={{stroke: 'var(--border)'}}
+                    tick={{
+                      fill: 'var(--foreground)',
+                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300'
                     }}
                     className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
                   />
-                  <YAxis 
-                    stroke="var(--muted-foreground)" 
-                    fontSize={12} 
-                    tickLine={false} 
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={12}
+                    tickLine={false}
                     axisLine={{stroke: 'var(--border)'}}
                     tickFormatter={(value) => `MYR ${value}`}
-                    tick={{ 
-                      fill: 'var(--foreground)', 
-                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300' 
+                    tick={{
+                      fill: 'var(--foreground)',
+                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300'
                     }}
                     className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine 
-                    y={avgSpending} 
-                    stroke="var(--muted-foreground)" 
+                  <ReferenceLine
+                    y={avgSpending}
+                    stroke="var(--muted-foreground)"
                     strokeDasharray="3 3"
                     className="stroke-muted-foreground stroke-opacity-100 stroke-dasharray-3 dark:stroke-gray-400"
-                    label={{ 
-                      value: 'Average', 
+                    label={{
+                      value: 'Average',
                       position: 'insideTopRight',
-                      fill: 'var(--muted-foreground)', 
+                      fill: 'var(--muted-foreground)',
                       fontSize: 11,
                       className: 'recharts-reference-line-label fill-muted-foreground fill-opacity-100 dark:fill-gray-300'
                     }}
                   />
-                  <Bar 
-                    dataKey="amount" 
+                  <Bar
+                    dataKey="amount"
                     radius={[4, 4, 0, 0]}
                     barSize={20}
                   >
                     {chartData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
+                      <Cell
+                        key={`cell-${index}`}
                         fill={entry.amount > avgSpending ? 'var(--destructive)' : 'var(--primary)'}
                         className={cn(
-                          'fill-opacity-95', 
-                          'stroke-gray-200 stroke-width-1', 
-                          'dark:fill-opacity-100', 
-                          'dark:brightness-125', 
-                          entry.amount > avgSpending ? 'dark:fill-red-300' : 'dark:fill-blue-300', 
+                          'fill-opacity-95',
+                          'stroke-gray-200 stroke-width-1',
+                          'dark:fill-opacity-100',
+                          'dark:brightness-125',
+                          entry.amount > avgSpending ? 'dark:fill-red-300' : 'dark:fill-blue-300',
                           'dark:stroke-gray-800 dark:stroke-width-1'
                         )}
                       />
@@ -559,8 +559,8 @@ interface ExpenseTableProps {
   isLoading?: boolean;
 }
 
-const ExpenseTable: React.FC<ExpenseTableProps> = ({ 
-  sortedData, 
+const ExpenseTable: React.FC<ExpenseTableProps> = ({
+  sortedData,
   onViewReceipts,
   isLoading
 }) => {
@@ -644,7 +644,7 @@ const AnalysisPage = () => {
       to: today,
     };
   });
-  
+
   // State for managing the active tab
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
 
@@ -666,29 +666,29 @@ const AnalysisPage = () => {
     select: (receipts) => { // Apply the transformation logic
       const grouped = receipts.reduce((acc, receipt) => {
         // Ensure date is handled correctly (extract date part)
-        const date = (receipt.date || '').split('T')[0]; 
+        const date = (receipt.date || '').split('T')[0];
         if (!date) return acc; // Skip if date is invalid
         if (!acc[date]) acc[date] = [];
         acc[date].push(receipt);
         return acc;
       }, {} as Record<string, ReceiptSummary[]>);
-  
+
       const dailyData: EnhancedDailySpendingData[] = Object.entries(grouped).map(([date, dayReceipts]) => {
         const total = dayReceipts.reduce((sum, r) => sum + (r.total || 0), 0);
         const receiptIds = dayReceipts.map(r => r.id);
-        
+
         // Find receipt with highest total (handle empty dayReceipts)
-        const topReceipt = dayReceipts.length > 0 
+        const topReceipt = dayReceipts.length > 0
           ? dayReceipts.reduce((max, r) => ((r.total || 0) > (max?.total || 0) ? r : max), dayReceipts[0])
           : null; // Handle cases with no receipts for a day
-          
+
         const topMerchant = topReceipt?.merchant || 'Unknown';
         // Use payment_method from top receipt, default to N/A
         const paymentMethod = topReceipt?.payment_method || 'N/A';
-        
+
         return { date, total, receiptIds, topMerchant, paymentMethod };
       });
-  
+
       // Ensure data is sorted by date descending by default for the table view later
       // Although fetched ascending, the select output might not preserve order strictly
       return dailyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -697,7 +697,7 @@ const AnalysisPage = () => {
   });
 
   // Fetch category breakdown data (remains the same)
-  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategorySpendingData[], Error>({ 
+  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategorySpendingData[], Error>({
     queryKey: ['spendingByCategory', startDateISO, endDateISO],
     queryFn: () => fetchSpendingByCategory(startDateISO, endDateISO),
     enabled: !!date,
@@ -757,9 +757,9 @@ const AnalysisPage = () => {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
       {/* Apply container, padding, and spacing consistent with Index.tsx */}
-      <main className="container py-16 md:py-24 space-y-16">
+      <main className="container py-6 md:py-8 space-y-8">
         {/* Dashboard Header */}
-        <div className="mb-12"> {/* Adjusted margin bottom for consistency */}
+        <div className="mb-6"> {/* Reduced margin to remove gap */}
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
           <p className="text-muted-foreground">Track and analyze your spending patterns</p>
         </div>
@@ -783,8 +783,25 @@ const AnalysisPage = () => {
 
           <TabsContent value="overview">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
-              {/* Expense Stats */}
-              <div className="lg:col-span-3"> {/* Span full width on large screens */}
+              {/* Category Pie Chart - Now at top-left */}
+              <div className="lg:col-span-1"> {/* Take 1/3 width on large screens */}
+                <CategoryPieChart
+                  categoryData={categoryData || []}
+                  isLoading={isLoadingCategories}
+                />
+              </div>
+
+              {/* Spending Chart - Now at top-right */}
+              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
+                <SpendingChart
+                  dailyData={aggregatedChartData}
+                  isLoading={isLoadingDaily}
+                  dateRange={date}
+                />
+              </div>
+
+              {/* Expense Stats - Now below the top containers */}
+              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
                 <ExpenseStats
                   totalSpending={totalSpending}
                   totalReceipts={enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
@@ -794,25 +811,8 @@ const AnalysisPage = () => {
                 />
               </div>
 
-              {/* Spending Chart */}
-              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
-                <SpendingChart 
-                  dailyData={aggregatedChartData}
-                  isLoading={isLoadingDaily}
-                  dateRange={date}
-                />
-              </div>
-
-              {/* Category Pie Chart */}
-              <div className="lg:col-span-1"> {/* Take 1/3 width on large screens */}
-                <CategoryPieChart 
-                  categoryData={categoryData || []}
-                  isLoading={isLoadingCategories}
-                />
-              </div>
-              
-              {/* PDF Report Generator */}
-              <div className="lg:col-span-3">
+              {/* PDF Report Generator - Now to the right of Financial Summary */}
+              <div className="lg:col-span-1">
                 <DailyPDFReportGenerator />
               </div>
             </div>
