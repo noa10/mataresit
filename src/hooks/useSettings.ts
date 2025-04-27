@@ -4,12 +4,20 @@ export interface ProcessingSettings {
   processingMethod: 'ocr-ai' | 'ai-vision';
   selectedModel: string;
   compareWithAlternative: boolean;
+  batchUpload: {
+    maxConcurrent: number;
+    autoStart: boolean;
+  };
 }
 
 const defaultSettings: ProcessingSettings = {
   processingMethod: 'ocr-ai',
   selectedModel: 'gemini-1.5-flash-latest',
   compareWithAlternative: false,
+  batchUpload: {
+    maxConcurrent: 2,
+    autoStart: false,
+  },
 };
 
 const SETTINGS_STORAGE_KEY = 'receiptProcessingSettings';
@@ -19,10 +27,19 @@ export function useSettings() {
     try {
       const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (storedSettings) {
-        // Basic validation to ensure stored data matches expected structure
+        // Parse stored settings
         const parsed = JSON.parse(storedSettings);
+
+        // Basic validation to ensure stored data has required fields
         if (parsed.processingMethod && parsed.selectedModel && typeof parsed.compareWithAlternative === 'boolean') {
-          return parsed;
+          // Merge with default settings to ensure all properties exist
+          // This handles cases where new properties were added to the settings structure
+          return {
+            ...defaultSettings,
+            ...parsed,
+            // If batchUpload exists in parsed, use it, otherwise use default
+            batchUpload: parsed.batchUpload || defaultSettings.batchUpload
+          };
         }
       }
     } catch (error) {
@@ -48,4 +65,4 @@ export function useSettings() {
   }, []);
 
   return { settings, updateSettings, resetSettings };
-} 
+}

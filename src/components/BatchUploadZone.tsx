@@ -1,30 +1,33 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileUp, Settings } from "lucide-react";
+import { Upload, FileUp, Clock, XCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBatchFileUpload } from "@/hooks/useBatchFileUpload";
+import { useSettings } from "@/hooks/useSettings";
 import { UploadQueueItem } from "@/components/upload/UploadQueueItem";
 import { BatchProcessingControls } from "@/components/upload/BatchProcessingControls";
+import { BatchUploadReview } from "@/components/upload/BatchUploadReview";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/components/ui/use-toast";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
-  maxConcurrent?: number;
-  autoStart?: boolean;
 }
 
 export default function BatchUploadZone({
-  onUploadComplete,
-  maxConcurrent = 2,
-  autoStart = false
+  onUploadComplete
 }: BatchUploadZoneProps) {
-  const [showOptions, setShowOptions] = useState(false);
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef<number>(0);
   const navigate = useNavigate();
+  const { settings } = useSettings();
+
+  // State to track if the review UI should be shown
+  const [showReview, setShowReview] = useState(false);
+  // State to track if all processing is complete
+  const [allProcessingComplete, setAllProcessingComplete] = useState(false);
 
   const {
     isDragging,
@@ -53,7 +56,79 @@ export default function BatchUploadZone({
     cancelUpload,
     retryUpload,
     receiptIds
-  } = useBatchFileUpload({ maxConcurrent, autoStart });
+  } = useBatchFileUpload({
+    maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
+    autoStart: settings?.batchUpload?.autoStart || false
+  });
+
+  // Function to retry all failed uploads
+  const retryAllFailed = useCallback(() => {
+    if (failedUploads.length === 0) return;
+
+    // Retry each failed upload
+    failedUploads.forEach(upload => {
+      retryUpload(upload.id);
+    });
+
+    toast({
+      title: "Retrying Failed Uploads",
+      description: `Retrying ${failedUploads.length} failed ${failedUploads.length === 1 ? 'upload' : 'uploads'}.`,
+    });
+
+    // Hide review UI when retrying
+    setShowReview(false);
+  }, [failedUploads, retryUpload]);
+
+  // Function to reset the batch upload zone
+  const resetBatchUpload = useCallback(() => {
+    clearAllUploads();
+    setShowReview(false);
+    setAllProcessingComplete(false);
+  }, [clearAllUploads]);
+
+  // Check if all processing is complete
+  useEffect(() => {
+    // If there are no active uploads and no queued uploads, and we have at least one upload (completed or failed)
+    if (
+      !isProcessing &&
+      activeUploads.length === 0 &&
+      queuedUploads.length === 0 &&
+      (completedUploads.length > 0 || failedUploads.length > 0)
+    ) {
+      // Set processing complete flag
+      setAllProcessingComplete(true);
+
+      // If we have any completed uploads, show the review UI
+      if (completedUploads.length > 0 || failedUploads.length > 0) {
+        // Small delay to ensure all UI updates are complete
+        setTimeout(() => {
+          setShowReview(true);
+
+          // Show a toast notification
+          const totalUploads = completedUploads.length + failedUploads.length;
+          const successRate = Math.round((completedUploads.length / totalUploads) * 100);
+
+          toast({
+            title: "Batch Upload Complete",
+            description: `${completedUploads.length} of ${totalUploads} receipts processed successfully (${successRate}%)`,
+            variant: failedUploads.length > 0 ? "default" : "default",
+          });
+
+          // Call the onUploadComplete callback if provided
+          if (onUploadComplete) {
+            onUploadComplete();
+          }
+        }, 500);
+      }
+    }
+  }, [
+    isProcessing,
+    activeUploads.length,
+    queuedUploads.length,
+    completedUploads.length,
+    failedUploads.length,
+    onUploadComplete
+  ]);
 
   const getBorderStyle = () => {
     if (isInvalidFile) return "border-destructive animate-[shake_0.5s_ease-in-out]";
@@ -93,10 +168,40 @@ export default function BatchUploadZone({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       console.log('Files dropped:', e.dataTransfer.files);
+
+      // Check for invalid files
+      const files = e.dataTransfer.files;
+      const invalidFiles = Array.from(files).filter(file =>
+        !['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)
+      );
+
+      if (invalidFiles.length > 0) {
+        toast({
+          title: "Invalid Files",
+          description: `${invalidFiles.length} ${invalidFiles.length === 1 ? 'file was' : 'files were'} not added because they are not supported formats.`,
+          variant: "destructive",
+        });
+      }
+
       // Directly add files to batch queue
       addToBatchQueue(e.dataTransfer.files);
     }
   };
+
+  // If showing review UI, render that instead of the upload zone
+  if (showReview) {
+    return (
+      <BatchUploadReview
+        completedUploads={completedUploads}
+        failedUploads={failedUploads}
+        receiptIds={receiptIds}
+        onRetry={retryUpload}
+        onRetryAll={retryAllFailed}
+        onClose={() => setShowReview(false)}
+        onReset={resetBatchUpload}
+      />
+    );
+  }
 
   return (
     <div
@@ -118,6 +223,20 @@ export default function BatchUploadZone({
         onChange={(e) => {
           console.log('File input change in BatchUploadZone:', e.target.files);
           if (e.target.files && e.target.files.length > 0) {
+            // Check for invalid files
+            const files = e.target.files;
+            const invalidFiles = Array.from(files).filter(file =>
+              !['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)
+            );
+
+            if (invalidFiles.length > 0) {
+              toast({
+                title: "Invalid Files",
+                description: `${invalidFiles.length} ${invalidFiles.length === 1 ? 'file was' : 'files were'} not added because they are not supported formats.`,
+                variant: "destructive",
+              });
+            }
+
             // Directly add files to batch queue
             addToBatchQueue(e.target.files);
           }
@@ -143,9 +262,17 @@ export default function BatchUploadZone({
         <div className="flex flex-col items-center gap-3">
           <motion.div
             initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
+            animate={{
+              scale: isDragging ? 1.1 : 1,
+              rotate: isDragging ? [0, -5, 5, -5, 0] : 0
+            }}
             whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            transition={{
+              type: "spring",
+              stiffness: 260,
+              damping: 20,
+              rotate: { duration: 0.5, ease: "easeInOut" }
+            }}
             className={`relative rounded-full p-6 ${
               isDragging ? "bg-primary/10" : "bg-secondary"
             }`}
@@ -210,6 +337,9 @@ export default function BatchUploadZone({
               onPauseProcessing={pauseBatchProcessing}
               onClearQueue={clearBatchQueue}
               onClearAll={clearAllUploads}
+              onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+              onShowReview={() => setShowReview(true)}
+              allComplete={allProcessingComplete}
             />
           )}
         </AnimatePresence>
@@ -223,7 +353,20 @@ export default function BatchUploadZone({
               exit={{ opacity: 0, height: 0 }}
               className="w-full mt-4"
             >
-              <h4 className="text-sm font-medium mb-2 text-left">Files ({batchUploads.length})</h4>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-medium">Files ({batchUploads.length})</h4>
+                {failedUploads.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={retryAllFailed}
+                    className="flex items-center gap-1"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Retry All Failed ({failedUploads.length})
+                  </Button>
+                )}
+              </div>
               <ScrollArea className="h-[300px] w-full rounded-md border">
                 <div className="p-4 space-y-2">
                   {batchUploads.map(upload => (
@@ -234,6 +377,7 @@ export default function BatchUploadZone({
                       onRemove={removeFromBatchQueue}
                       onCancel={cancelUpload}
                       onRetry={retryUpload}
+                      onViewReceipt={(receiptId) => navigate(`/receipts/${receiptId}`)}
                     />
                   ))}
                 </div>
@@ -276,47 +420,27 @@ export default function BatchUploadZone({
           </Button>
         )}
 
-        {/* Processing options */}
-        <Collapsible
-          open={showOptions}
-          onOpenChange={setShowOptions}
-          className="w-full max-w-md mt-4 mb-4"
-        >
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">Advanced Options</h4>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                {showOptions ? "Hide Options" : "Show Options"}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-          <CollapsibleContent className="mt-2">
-            <div className="rounded-md border p-4 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Maximum concurrent uploads: {maxConcurrent}
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Processing multiple receipts at once can speed up batch uploads but may use more resources.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="auto-start"
-                  checked={autoStart}
-                  readOnly
-                  className="rounded border-gray-300"
-                />
-                <label htmlFor="auto-start" className="text-sm">
-                  Automatically start processing when files are added
-                </label>
-              </div>
+        {/* Current settings and link to settings page */}
+        <div className="w-full max-w-md mt-4 mb-4">
+          <div className="flex flex-wrap gap-2 justify-center mb-2">
+            <div className="text-xs px-2 py-1 bg-muted rounded-full">
+              Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
             </div>
-          </CollapsibleContent>
-        </Collapsible>
+            <div className="text-xs px-2 py-1 bg-muted rounded-full">
+              Auto-start: {settings?.batchUpload?.autoStart ? "On" : "Off"}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Configure batch upload settings in the{" "}
+            <Button
+              variant="link"
+              className="h-auto p-0 text-xs"
+              onClick={() => navigate("/settings")}
+            >
+              Settings Page
+            </Button>
+          </p>
+        </div>
       </div>
     </div>
   );

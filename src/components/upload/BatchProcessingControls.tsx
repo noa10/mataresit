@@ -6,7 +6,10 @@ import {
   Upload,
   CheckCircle2,
   XCircle,
-  Loader2
+  Loader2,
+  Clock,
+  ClipboardList,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +28,9 @@ interface BatchProcessingControlsProps {
   onPauseProcessing: () => void;
   onClearQueue: () => void;
   onClearAll: () => void;
+  onRetryAllFailed?: () => void;
+  onShowReview?: () => void;
+  allComplete?: boolean;
 }
 
 export function BatchProcessingControls({
@@ -39,7 +45,10 @@ export function BatchProcessingControls({
   onStartProcessing,
   onPauseProcessing,
   onClearQueue,
-  onClearAll
+  onClearAll,
+  onRetryAllFailed,
+  onShowReview,
+  allComplete = false
 }: BatchProcessingControlsProps) {
   // No files to display
   if (totalFiles === 0) {
@@ -55,65 +64,42 @@ export function BatchProcessingControls({
     >
       <div className="flex flex-col space-y-4">
         {/* Status summary */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col space-y-2">
           <h3 className="text-sm font-medium">Batch Upload Status</h3>
 
-          <div className="flex items-center space-x-4">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center space-x-1">
-                    <Upload className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs">{totalFiles}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Total files</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+              <Upload className="w-4 h-4 mr-1" />
+              <span className="text-xs font-medium">Total: {totalFiles}</span>
+            </div>
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center space-x-1">
-                    <Loader2 className={`w-4 h-4 text-primary ${activeFiles > 0 ? 'animate-spin' : ''}`} />
-                    <span className="text-xs">{activeFiles}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Processing</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {pendingFiles > 0 && (
+              <div className="flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                <Clock className="w-4 h-4 mr-1" />
+                <span className="text-xs font-medium">Queued: {pendingFiles}</span>
+              </div>
+            )}
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center space-x-1">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-xs">{completedFiles}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Completed</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {activeFiles > 0 && (
+              <div className="flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                <span className="text-xs font-medium">Processing: {activeFiles}</span>
+              </div>
+            )}
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center space-x-1">
-                    <XCircle className="w-4 h-4 text-destructive" />
-                    <span className="text-xs">{failedFiles}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Failed</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {completedFiles > 0 && (
+              <div className="flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700">
+                <CheckCircle2 className="w-4 h-4 mr-1" />
+                <span className="text-xs font-medium">Completed: {completedFiles}</span>
+              </div>
+            )}
+
+            {failedFiles > 0 && (
+              <div className="flex items-center px-2 py-1 rounded-full bg-red-100 text-red-700">
+                <XCircle className="w-4 h-4 mr-1" />
+                <span className="text-xs font-medium">Failed: {failedFiles}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -141,44 +127,70 @@ export function BatchProcessingControls({
         </div>
 
         {/* Action buttons */}
-        <div className="flex justify-between">
-          <div className="space-x-2">
-            {/* Start/Pause button */}
-            {isProcessing ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onPauseProcessing}
-                disabled={activeFiles === 0 && pendingFiles === 0}
-                className="h-8"
-              >
-                <Pause className="h-4 w-4 mr-2" />
-                Pause
-              </Button>
-            ) : (
+        <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Show Review Results button when all processing is complete */}
+            {allComplete && onShowReview ? (
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => {
-                  console.log('Start Processing button clicked');
-                  onStartProcessing();
-                }}
-                disabled={pendingFiles === 0}
+                onClick={onShowReview}
                 className="h-8"
               >
-                <Play className="h-4 w-4 mr-2" />
-                {isPaused ? "Resume" : "Start Processing"}
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Review Results
+              </Button>
+            ) : (
+              /* Start/Pause button */
+              isProcessing ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onPauseProcessing}
+                  disabled={activeFiles === 0 && pendingFiles === 0}
+                  className="h-8"
+                >
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pause
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    console.log('Start Processing button clicked');
+                    onStartProcessing();
+                  }}
+                  disabled={pendingFiles === 0}
+                  className="h-8"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {isPaused ? "Resume" : "Start Processing"}
+                </Button>
+              )
+            )}
+
+            {/* Retry all failed button */}
+            {failedFiles > 0 && onRetryAllFailed && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRetryAllFailed}
+                className="h-8"
+              >
+                <XCircle className="h-4 w-4 mr-2 text-destructive" />
+                Retry Failed ({failedFiles})
               </Button>
             )}
           </div>
 
-          <div className="space-x-2">
+          <div className="flex flex-wrap gap-2">
             {/* Clear queue button */}
             <Button
               variant="outline"
               size="sm"
               onClick={onClearQueue}
-              disabled={pendingFiles === 0}
+              disabled={pendingFiles === 0 || allComplete}
               className="h-8"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -190,7 +202,7 @@ export function BatchProcessingControls({
               variant="ghost"
               size="sm"
               onClick={onClearAll}
-              disabled={isProcessing && !isPaused}
+              disabled={(isProcessing && !isPaused) && !allComplete}
               className="h-8"
             >
               <Trash2 className="h-4 w-4 mr-2" />

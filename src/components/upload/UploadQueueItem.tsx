@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { 
-  FileText, 
-  FileImage, 
-  Loader2, 
-  CheckCircle2, 
-  XCircle, 
-  Trash2, 
-  RotateCcw, 
-  ExternalLink 
+import {
+  FileText,
+  FileImage,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  RotateCcw,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -21,17 +21,19 @@ interface UploadQueueItemProps {
   onRemove?: (uploadId: string) => void;
   onCancel?: (uploadId: string) => void;
   onRetry?: (uploadId: string) => void;
+  onViewReceipt?: (receiptId: string) => void;
 }
 
-export function UploadQueueItem({ 
-  upload, 
+export function UploadQueueItem({
+  upload,
   receiptId,
-  onRemove, 
-  onCancel, 
-  onRetry 
+  onRemove,
+  onCancel,
+  onRetry,
+  onViewReceipt
 }: UploadQueueItemProps) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   // Format file size
   const formatFileSize = (sizeInBytes: number): string => {
     if (sizeInBytes < 1024) {
@@ -42,7 +44,7 @@ export function UploadQueueItem({
       return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
     }
   };
-  
+
   // Get status icon
   const getStatusIcon = () => {
     switch (upload.status) {
@@ -59,15 +61,15 @@ export function UploadQueueItem({
         return <FileText className="w-5 h-5 text-muted-foreground" />;
     }
   };
-  
+
   // Get status text
   const getStatusText = () => {
     switch (upload.status) {
       case 'pending':
         return "Queued";
       case 'uploading':
-        return upload.uploadProgress < 50 
-          ? `Uploading (${upload.uploadProgress}%)` 
+        return upload.uploadProgress < 50
+          ? `Uploading (${upload.uploadProgress}%)`
           : "Processing image";
       case 'processing':
         return `Processing (${upload.uploadProgress}%)`;
@@ -79,7 +81,7 @@ export function UploadQueueItem({
         return "Unknown";
     }
   };
-  
+
   // Get action buttons based on status
   const getActionButtons = () => {
     if (upload.status === 'pending' && onRemove) {
@@ -95,7 +97,7 @@ export function UploadQueueItem({
         </Button>
       );
     }
-    
+
     if ((upload.status === 'uploading' || upload.status === 'processing') && onCancel) {
       return (
         <Button
@@ -109,7 +111,7 @@ export function UploadQueueItem({
         </Button>
       );
     }
-    
+
     if (upload.status === 'error' && onRetry) {
       return (
         <Button
@@ -123,33 +125,32 @@ export function UploadQueueItem({
         </Button>
       );
     }
-    
+
     if (upload.status === 'completed' && receiptId) {
       return (
-        <Link to={`/receipt/${receiptId}`}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="View receipt"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="View receipt"
+          onClick={() => onViewReceipt && onViewReceipt(receiptId)}
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
       );
     }
-    
+
     return null;
   };
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       className={`w-full p-3 border rounded-lg ${
-        upload.status === 'error' 
-          ? 'border-destructive/30 bg-destructive/5' 
+        upload.status === 'error'
+          ? 'border-destructive/30 bg-destructive/5'
           : upload.status === 'completed'
             ? 'border-green-500/30 bg-green-500/5'
             : 'border-border bg-background/50'
@@ -165,13 +166,23 @@ export function UploadQueueItem({
           <FileImage className="w-10 h-10 text-muted-foreground" />
         )}
       </div>
-      
+
       {/* File info and progress */}
       <div className="flex-grow min-w-0">
         <div className="flex justify-between items-center">
-          <p className="text-sm font-medium truncate" title={upload.file.name}>
-            {upload.file.name}
-          </p>
+          {upload.status === 'completed' && receiptId && onViewReceipt ? (
+            <button
+              className="text-sm font-medium truncate text-primary hover:underline text-left"
+              title={`View receipt details for ${upload.file.name}`}
+              onClick={() => onViewReceipt(receiptId)}
+            >
+              {upload.file.name}
+            </button>
+          ) : (
+            <p className="text-sm font-medium truncate" title={upload.file.name}>
+              {upload.file.name}
+            </p>
+          )}
           <div className="flex items-center space-x-1 ml-2">
             {getStatusIcon()}
             <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -179,20 +190,20 @@ export function UploadQueueItem({
             </span>
           </div>
         </div>
-        
+
         <div className="flex items-center text-xs text-muted-foreground mt-1">
           <span>{formatFileSize(upload.file.size)}</span>
         </div>
-        
+
         {/* Progress bar for uploading/processing */}
         {(upload.status === 'uploading' || upload.status === 'processing') && (
-          <Progress 
-            value={upload.uploadProgress} 
-            className="h-1 mt-2" 
+          <Progress
+            value={upload.uploadProgress}
+            className="h-1 mt-2"
             aria-label={`Upload progress: ${upload.uploadProgress}%`}
           />
         )}
-        
+
         {/* Error message */}
         {upload.status === 'error' && upload.error && (
           <p className="text-xs text-destructive mt-1 truncate" title={upload.error.message}>
@@ -200,7 +211,7 @@ export function UploadQueueItem({
           </p>
         )}
       </div>
-      
+
       {/* Action buttons */}
       <div className="flex-shrink-0">
         {getActionButtons()}

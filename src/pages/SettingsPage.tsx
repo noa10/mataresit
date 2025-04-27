@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
+import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
+import { Separator } from "@/components/ui/separator";
 import {
   Tabs,
   TabsContent,
@@ -54,7 +56,7 @@ export default function SettingsPage() {
             <TabsTrigger value="processing">Processing</TabsTrigger>
             <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="processing">
             <Card>
               <CardHeader>
@@ -66,15 +68,15 @@ export default function SettingsPage() {
               <CardContent className="space-y-6">
                 <div className="prose prose-sm max-w-none text-muted-foreground">
                   <p>
-                    Choose your preferred method for extracting data from receipts. 
-                    'OCR + AI Enhancement' uses traditional OCR followed by AI for refinement, 
+                    Choose your preferred method for extracting data from receipts.
+                    'OCR + AI Enhancement' uses traditional OCR followed by AI for refinement,
                     while 'AI Vision' uses advanced AI models directly for interpretation (may be slower but potentially more accurate).
                   </p>
                   <p>
                     Enabling 'Compare with Alternative' runs both methods for comparison but increases processing time.
                   </p>
                 </div>
-                
+
                 <ReceiptProcessingOptions
                   defaultMethod={settings.processingMethod}
                   defaultModel={settings.selectedModel}
@@ -83,6 +85,36 @@ export default function SettingsPage() {
                   onModelChange={(model) => updateSettings({ selectedModel: model })}
                   onCompareChange={(compare) => updateSettings({ compareWithAlternative: compare })}
                 />
+
+                <Separator className="my-6" />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Batch Upload Settings</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Configure how multiple receipts are processed when using batch upload.
+                  </p>
+
+                  <BatchUploadSettings
+                    maxConcurrent={settings?.batchUpload?.maxConcurrent || 2}
+                    autoStart={settings?.batchUpload?.autoStart || false}
+                    onMaxConcurrentChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false }),
+                          maxConcurrent: value
+                        }
+                      })
+                    }
+                    onAutoStartChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false }),
+                          autoStart: value
+                        }
+                      })
+                    }
+                  />
+                </div>
                 <div className="flex justify-end space-x-2 pt-4 border-t">
                   <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
                     <AlertDialogTrigger asChild>
@@ -92,7 +124,7 @@ export default function SettingsPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action will reset all processing settings to their default values. 
+                          This action will reset all processing settings to their default values.
                           This cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -106,7 +138,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="usage">
             <UsageStatsPanelPlaceholder />
           </TabsContent>
@@ -114,4 +146,4 @@ export default function SettingsPage() {
       </main>
     </div>
   );
-} 
+}
