@@ -10,18 +10,21 @@ import {
   Upload, Search, Filter, SlidersHorizontal,
   PlusCircle, XCircle, Calendar, DollarSign, X,
   LayoutGrid, LayoutList, Table as TableIcon,
-  Files
+  Files, CheckSquare, Trash2, Loader2, Check
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchReceipts } from "@/services/receiptService";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import UploadZone from "@/components/UploadZone";
 import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
+import { Checkbox } from "@/components/ui/checkbox";
+import { deleteReceipt } from "@/services/receiptService";
+import { toast } from "sonner";
 
 import {
   Table,
@@ -70,6 +73,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Read initial values from URL params or use defaults
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
@@ -82,6 +86,73 @@ export default function Dashboard() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
     (searchParams.get('sort') as any) || "newest"
   );
+
+  // Selection mode state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedReceiptIds, setSelectedReceiptIds] = useState<string[]>([]);
+
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    // Clear selections when exiting selection mode
+    if (selectionMode) {
+      setSelectedReceiptIds([]);
+    }
+  };
+
+  // Handle selection of a receipt
+  const handleSelectReceipt = (receiptId: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedReceiptIds(prev => [...prev, receiptId]);
+    } else {
+      setSelectedReceiptIds(prev => prev.filter(id => id !== receiptId));
+    }
+  };
+
+  // Select or deselect all receipts
+  const handleSelectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedReceiptIds(processedReceipts.map(receipt => receipt.id));
+    } else {
+      setSelectedReceiptIds([]);
+    }
+  };
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (receiptIds: string[]) => {
+      const results = await Promise.allSettled(
+        receiptIds.map(id => deleteReceipt(id))
+      );
+
+      // Count successes and failures
+      const successes = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+      const failures = results.length - successes;
+
+      return { successes, failures };
+    },
+    onSuccess: (result) => {
+      // Show success message
+      if (result.successes > 0) {
+        toast.success(`Successfully deleted ${result.successes} receipt${result.successes !== 1 ? 's' : ''}`);
+      }
+
+      if (result.failures > 0) {
+        toast.error(`Failed to delete ${result.failures} receipt${result.failures !== 1 ? 's' : ''}`);
+      }
+
+      // Clear selection and exit selection mode
+      setSelectedReceiptIds([]);
+      setSelectionMode(false);
+
+      // Refresh the receipts data
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    },
+    onError: (error) => {
+      console.error('Bulk delete error:', error);
+      toast.error('An error occurred while deleting receipts');
+    }
+  });
 
   // Read view mode from URL params first, then local storage, or use default
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -251,6 +322,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
+            const isSelected = selectedReceiptIds.includes(receipt.id);
 
             return (
               <motion.div
@@ -258,20 +330,54 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.2 + index * 0.05 }}
+                className="relative"
               >
-                <Link to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}>
-                  <ReceiptCard
-                    id={receipt.id}
-                    merchant={receipt.merchant}
-                    date={formatDate(receipt.date)}
-                    total={receipt.total}
-                    currency={receipt.currency}
-                    imageUrl={receipt.image_url || "/placeholder.svg"}
-                    status={receipt.status}
-                    confidence={confidenceScore}
-                    processingStatus={receipt.processing_status}
-                  />
-                </Link>
+                {selectionMode && (
+                  <div
+                    className="absolute top-3 left-3 z-10 bg-background/80 backdrop-blur-sm rounded-md p-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSelectReceipt(receipt.id, !isSelected);
+                    }}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                    />
+                  </div>
+                )}
+
+                <div
+                  className={`${selectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                  onClick={(e) => {
+                    if (selectionMode) {
+                      e.preventDefault();
+                      handleSelectReceipt(receipt.id, !isSelected);
+                    }
+                  }}
+                >
+                  <Link
+                    to={selectionMode ? '#' : `/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+                    onClick={(e) => {
+                      if (selectionMode) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    <ReceiptCard
+                      id={receipt.id}
+                      merchant={receipt.merchant}
+                      date={formatDate(receipt.date)}
+                      total={receipt.total}
+                      currency={receipt.currency}
+                      imageUrl={receipt.image_url || "/placeholder.svg"}
+                      status={receipt.status}
+                      confidence={confidenceScore}
+                      processingStatus={receipt.processing_status}
+                    />
+                  </Link>
+                </div>
               </motion.div>
             );
           })}
@@ -285,6 +391,7 @@ export default function Dashboard() {
         <div className="flex flex-col gap-3">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
+            const isSelected = selectedReceiptIds.includes(receipt.id);
 
             return (
               <motion.div
@@ -292,49 +399,112 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
-                className="border rounded-lg overflow-hidden bg-card hover:bg-accent/5 transition-colors"
+                className={`border rounded-lg overflow-hidden bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''}`}
               >
-                <Link to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`} className="flex items-center p-4 gap-4">
-                  <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
-                    <img
-                      src={receipt.image_url || "/placeholder.svg"}
-                      alt={receipt.merchant}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/placeholder.svg";
-                      }}
-                    />
-                  </div>
+                {selectionMode ? (
+                  <div
+                    className="flex items-center p-4 gap-4 cursor-pointer"
+                    onClick={() => handleSelectReceipt(receipt.id, !isSelected)}
+                  >
+                    {selectionMode && (
+                      <div className="flex-shrink-0 mr-1">
+                        <Checkbox
+                          checked={isSelected}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectReceipt(receipt.id, !isSelected);
+                          }}
+                        />
+                      </div>
+                    )}
 
-                  <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-medium truncate">{receipt.merchant}</h3>
-                      <span className="font-semibold whitespace-nowrap">
-                        {receipt.currency} {receipt.total.toFixed(2)}
-                      </span>
+                    <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                      <img
+                        src={receipt.image_url || "/placeholder.svg"}
+                        alt={receipt.merchant}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
                     </div>
 
-                    <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                      <span>{formatDate(receipt.date)}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                          receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                          'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        }`}>
-                          {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                    <div className="flex-grow min-w-0">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-medium truncate">{receipt.merchant}</h3>
+                        <span className="font-semibold whitespace-nowrap">
+                          {receipt.currency} {receipt.total.toFixed(2)}
                         </span>
-                        <span className={`text-xs ${
-                          confidenceScore >= 80 ? 'text-green-600' :
-                          confidenceScore >= 60 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {confidenceScore}% confidence
-                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                        <span>{formatDate(receipt.date)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                            receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          }`}>
+                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                          </span>
+                          <span className={`text-xs ${
+                            confidenceScore >= 80 ? 'text-green-600' :
+                            confidenceScore >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {confidenceScore}% confidence
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </Link>
+                ) : (
+                  <Link
+                    to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+                    className="flex items-center p-4 gap-4"
+                  >
+                    <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                      <img
+                        src={receipt.image_url || "/placeholder.svg"}
+                        alt={receipt.merchant}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex-grow min-w-0">
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-medium truncate">{receipt.merchant}</h3>
+                        <span className="font-semibold whitespace-nowrap">
+                          {receipt.currency} {receipt.total.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                        <span>{formatDate(receipt.date)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                            receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          }`}>
+                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                          </span>
+                          <span className={`text-xs ${
+                            confidenceScore >= 80 ? 'text-green-600' :
+                            confidenceScore >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {confidenceScore}% confidence
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )}
               </motion.div>
             );
           })}
@@ -349,6 +519,15 @@ export default function Dashboard() {
           <Table>
             <TableHeader>
               <TableRow>
+                {selectionMode && (
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={selectedReceiptIds.length === processedReceipts.length && processedReceipts.length > 0}
+                      onCheckedChange={handleSelectAll}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Merchant</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Amount</TableHead>
@@ -359,9 +538,32 @@ export default function Dashboard() {
             <TableBody>
               {processedReceipts.map((receipt) => {
                 const confidenceScore = calculateAggregateConfidence(receipt);
+                const isSelected = selectedReceiptIds.includes(receipt.id);
 
                 return (
-                  <TableRow key={receipt.id} className="cursor-pointer hover:bg-accent/10" onClick={() => navigate(`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}>
+                  <TableRow
+                    key={receipt.id}
+                    className={`hover:bg-accent/10 ${selectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10' : ''}`}
+                    onClick={(e) => {
+                      if (selectionMode) {
+                        handleSelectReceipt(receipt.id, !isSelected);
+                      } else {
+                        navigate(`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`);
+                      }
+                    }}
+                  >
+                    {selectionMode && (
+                      <TableCell className="w-[50px]">
+                        <Checkbox
+                          checked={isSelected}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectReceipt(receipt.id, !isSelected);
+                          }}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium">{receipt.merchant}</TableCell>
                     <TableCell>{formatDate(receipt.date)}</TableCell>
                     <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
@@ -462,23 +664,69 @@ export default function Dashboard() {
         </div>
 
         {/* Filters and Tabs Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            className="glass-card p-4 mb-8"
-          >
-            {/* Search and Filters Row */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-grow">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by merchant..."
-                  className="pl-9 bg-background/50"
-                  value={searchQuery}
-                  onChange={handleSearch}
-                />
-              </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="glass-card p-4 mb-8"
+        >
+          {/* Search and Filters Row */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-grow">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by merchant..."
+                className="pl-9 bg-background/50"
+                value={searchQuery}
+                onChange={handleSearch}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              {/* Selection Mode Toggle */}
+              <Button
+                variant={selectionMode ? "default" : "outline"}
+                className="gap-2 whitespace-nowrap"
+                onClick={toggleSelectionMode}
+              >
+                {selectionMode ? (
+                  <>
+                    <X size={16} />
+                    Cancel Selection
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare size={16} />
+                    Select
+                  </>
+                )}
+              </Button>
+
+              {/* Bulk Actions (visible only in selection mode) */}
+              {selectionMode && selectedReceiptIds.length > 0 && (
+                <Button
+                  variant="destructive"
+                  className="gap-2 whitespace-nowrap"
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete ${selectedReceiptIds.length} receipt${selectedReceiptIds.length !== 1 ? 's' : ''}?`)) {
+                      bulkDeleteMutation.mutate(selectedReceiptIds);
+                    }
+                  }}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  {bulkDeleteMutation.isPending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      Delete ({selectedReceiptIds.length})
+                    </>
+                  )}
+                </Button>
+              )}
 
               <Popover>
                 <PopoverTrigger asChild>
@@ -558,22 +806,22 @@ export default function Dashboard() {
                 </PopoverContent>
               </Popover>
             </div>
-
-            {/* Status Tabs */}
-            <div className="mt-4">
-              <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
-                const newTab = value as "all" | ReceiptStatus;
-                setActiveTab(newTab);
-                updateSearchParams({ tab: newTab === 'all' ? null : newTab });
-              }}>
-                <TabsList className="bg-background/50">
-                  <TabsTrigger value="all">All Receipts</TabsTrigger>
-                  <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
-                  <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </motion.div>
+          </div>
+          {/* Status Tabs */}
+          <div className="mt-4">
+            <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
+              const newTab = value as "all" | ReceiptStatus;
+              setActiveTab(newTab);
+              updateSearchParams({ tab: newTab === 'all' ? null : newTab });
+            }}>
+              <TabsList className="bg-background/50">
+                <TabsTrigger value="all">All Receipts</TabsTrigger>
+                <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
+                <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </motion.div>
 
         {/* Main Content Area */}
         {renderReceiptContent()}

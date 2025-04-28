@@ -40,6 +40,7 @@ export interface Receipt {
   total: number;
   payment_method: string;
   image_url?: string;
+  thumbnail_url?: string | null;
   status: ReceiptStatus;
   created_at: string;
   updated_at: string;

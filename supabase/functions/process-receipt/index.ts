@@ -5,6 +5,8 @@ import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textr
 import { ProcessingLogger } from './shared/db-logger.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encodeBase64 } from "jsr:@std/encoding/base64"
+// Import deno-image for resizing
+import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -727,10 +729,10 @@ serve(async (req) => {
     
     await logger.initialize();
 
-    // Initialize Supabase client
+    // Initialize Supabase client (ensure service role key is used for storage/db updates)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "" // Use Service Role Key
     );
 
     await logger.log("Starting receipt processing", "START");
@@ -762,9 +764,63 @@ serve(async (req) => {
       // Convert image to binary data
       const imageArrayBuffer = await imageResponse.arrayBuffer();
       const imageBytes = new Uint8Array(imageArrayBuffer);
-      console.log(`Image fetched successfully, size: ${imageBytes.length} bytes`);
       await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
       
+      // --- START: THUMBNAIL GENERATION ---
+      let thumbnailUrl: string | null = null;
+      try {
+        await logger.log("Starting thumbnail generation", "THUMBNAIL");
+        console.log("Decoding image for thumbnail...");
+        const image = await Image.decode(imageBytes);
+        console.log(`Original dimensions: ${image.width}x${image.height}`);
+
+        const targetWidth = 400; // Target width for thumbnail
+        image.resize(targetWidth, Image.RESIZE_AUTO); // Resize maintaining aspect ratio
+        console.log(`Resized dimensions: ${image.width}x${image.height}`);
+
+        // Encode as JPEG with quality 75
+        const thumbnailBytes = await image.encodeJPEG(75);
+        console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
+
+        const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`; // Store in a 'thumbnails' folder
+
+        await logger.log(`Uploading thumbnail to ${thumbnailPath}`, "THUMBNAIL_UPLOAD");
+        console.log(`Uploading thumbnail to storage path: ${thumbnailPath}`);
+
+        const { error: thumbUploadError } = await supabase.storage
+          .from('receipt_images') // Assuming same bucket, different folder
+          .upload(thumbnailPath, thumbnailBytes, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600', // Cache for 1 hour
+            upsert: true // Overwrite if exists
+          });
+
+        if (thumbUploadError) {
+          console.error("Error uploading thumbnail:", thumbUploadError);
+          await logger.log(`Error uploading thumbnail: ${thumbUploadError.message}`, "ERROR");
+          // Don't fail the whole process, just log the error
+        } else {
+          // Get public URL for the thumbnail
+          const { data: publicUrlData } = supabase.storage
+            .from('receipt_images')
+            .getPublicUrl(thumbnailPath);
+
+          if (publicUrlData?.publicUrl) {
+            thumbnailUrl = publicUrlData.publicUrl;
+            console.log("Thumbnail uploaded successfully:", thumbnailUrl);
+            await logger.log(`Thumbnail uploaded: ${thumbnailUrl}`, "THUMBNAIL_UPLOAD");
+          } else {
+             console.warn("Could not get public URL for thumbnail:", thumbnailPath);
+             await logger.log("Could not get public URL for thumbnail", "WARNING");
+          }
+        }
+      } catch (thumbError) {
+        console.error("Error generating or uploading thumbnail:", thumbError);
+        await logger.log(`Thumbnail generation/upload error: ${thumbError.message}`, "ERROR");
+        // Continue processing even if thumbnail fails
+      }
+      // --- END: THUMBNAIL GENERATION ---
+
       // Process the receipt image with OCR
       const extractedData = await processReceiptImage(
         imageBytes, 
@@ -800,7 +856,8 @@ serve(async (req) => {
         has_alternative_data: !!extractedData.alternativeResult,
         discrepancies: extractedData.discrepancies || [],
         // ADDED: Save confidence scores directly to receipts table
-        confidence_scores: extractedData.confidence
+        confidence_scores: extractedData.confidence,
+        thumbnail_url: thumbnailUrl // Add the thumbnail URL here
       };
 
       // CRITICAL: Double-check and fix date format before saving to database
@@ -855,7 +912,7 @@ serve(async (req) => {
         await logger.log("No date found, using current date", "WARNING");
       }
 
-      // Remove null/undefined fields before updating
+      // Remove null/undefined fields before updating (including thumbnail_url if it's null)
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === null || updateData[key] === undefined) {
           delete updateData[key];

@@ -12,6 +12,7 @@ import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
+import imageCompression from "browser-image-compression";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -35,6 +36,8 @@ export default function BatchUploadZone({
   const [completedReceiptIds, setCompletedReceiptIds] = useState<string[]>([]);
   // State to store the current date for the browser modal
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // State to track compression status
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const {
     isDragging,
@@ -67,6 +70,78 @@ export default function BatchUploadZone({
     maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
     autoStart: settings?.batchUpload?.autoStart || false
   });
+
+  // Function to compress images and add files to the queue
+  const compressAndAddFiles = useCallback(async (files: FileList | null) => {
+    if (!files) return;
+
+    setIsCompressing(true);
+    console.log('Starting compression for', files.length, 'files');
+
+    const processedFiles: File[] = [];
+    const invalidFiles: File[] = [];
+    const compressionErrors: { name: string; error: unknown }[] = [];
+
+    const compressionOptions = {
+      maxSizeMB: 1, // Max size in MB
+      maxWidthOrHeight: 1920, // Max width or height
+      useWebWorker: true, // Use web worker for performance
+    };
+
+    for (const file of Array.from(files)) {
+      const isImage = ['image/jpeg', 'image/png'].includes(file.type);
+      const isPdf = file.type === 'application/pdf';
+
+      if (isImage) {
+        try {
+          console.log(`Compressing image: ${file.name}, size: ${file.size}`);
+          const compressedFile = await imageCompression(file, compressionOptions);
+          console.log(`Compressed image: ${compressedFile.name}, new size: ${compressedFile.size}`);
+          // Create a new File object with the original name but compressed data
+          processedFiles.push(new File([compressedFile], file.name, { type: file.type, lastModified: file.lastModified }));
+        } catch (error) {
+          console.error(`Error compressing file ${file.name}:`, error);
+          compressionErrors.push({ name: file.name, error });
+          // Add original file if compression fails? Or mark as failed?
+          // For now, let's add the original file but log the error
+          processedFiles.push(file);
+        }
+      } else if (isPdf) {
+        // Keep PDFs as they are
+        processedFiles.push(file);
+      } else {
+        // Track invalid files
+        invalidFiles.push(file);
+      }
+    }
+
+    console.log('Compression finished. Processed:', processedFiles.length, 'Invalid:', invalidFiles.length, 'Errors:', compressionErrors.length);
+    setIsCompressing(false);
+
+    // Show toast for invalid files
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Invalid Files Skipped",
+        description: `${invalidFiles.length} ${invalidFiles.length === 1 ? 'file was' : 'files were'} not added because they are not supported formats (only JPG, PNG, PDF).`,
+        variant: "destructive",
+      });
+    }
+
+    // Show toast for compression errors (optional)
+    if (compressionErrors.length > 0) {
+      toast({
+        title: "Compression Issues",
+        description: `${compressionErrors.length} ${compressionErrors.length === 1 ? 'image' : 'images'} could not be compressed due to errors (original files were added). Check console for details.`,
+        variant: "default",
+      });
+    }
+
+    // Add the processed (compressed or original) files to the batch queue
+    if (processedFiles.length > 0) {
+      addToBatchQueue(processedFiles);
+    }
+
+  }, [addToBatchQueue]);
 
   // Function to retry all failed uploads
   const retryAllFailed = useCallback(() => {
@@ -191,35 +266,18 @@ export default function BatchUploadZone({
   };
 
   // Custom drop handler
-  const handleCustomDrop = (e: React.DragEvent) => {
+  const handleCustomDrop = useCallback((e: React.DragEvent) => {
     console.log('Custom drop handler in BatchUploadZone');
     e.preventDefault();
     e.stopPropagation();
 
-    // No need to call setIsDragging as it's handled by the hook
     dragCounterRef.current = 0;
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       console.log('Files dropped:', e.dataTransfer.files);
-
-      // Check for invalid files
-      const files = e.dataTransfer.files;
-      const invalidFiles = Array.from(files).filter(file =>
-        !['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)
-      );
-
-      if (invalidFiles.length > 0) {
-        toast({
-          title: "Invalid Files",
-          description: `${invalidFiles.length} ${invalidFiles.length === 1 ? 'file was' : 'files were'} not added because they are not supported formats.`,
-          variant: "destructive",
-        });
-      }
-
-      // Directly add files to batch queue
-      addToBatchQueue(e.dataTransfer.files);
+      compressAndAddFiles(e.dataTransfer.files);
     }
-  };
+  }, [compressAndAddFiles]);
 
   // If showing review UI, render that instead of the upload zone
   if (showReview) {
@@ -276,23 +334,9 @@ export default function BatchUploadZone({
         ref={fileInputRef}
         onChange={(e) => {
           console.log('File input change in BatchUploadZone:', e.target.files);
-          if (e.target.files && e.target.files.length > 0) {
-            // Check for invalid files
-            const files = e.target.files;
-            const invalidFiles = Array.from(files).filter(file =>
-              !['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)
-            );
-
-            if (invalidFiles.length > 0) {
-              toast({
-                title: "Invalid Files",
-                description: `${invalidFiles.length} ${invalidFiles.length === 1 ? 'file was' : 'files were'} not added because they are not supported formats.`,
-                variant: "destructive",
-              });
-            }
-
-            // Directly add files to batch queue
-            addToBatchQueue(e.target.files);
+          compressAndAddFiles(e.target.files);
+          if (e.target) {
+            e.target.value = '';
           }
         }}
         multiple
@@ -306,9 +350,11 @@ export default function BatchUploadZone({
         aria-live="polite"
         aria-atomic="true"
       >
-        {isProcessing
-          ? `Processing batch upload: ${completedUploads.length} of ${batchUploads.length} complete`
-          : 'Ready to upload multiple receipt files'}
+        {isCompressing
+          ? `Compressing images...`
+          : isProcessing
+            ? `Processing batch upload: ${completedUploads.length} of ${batchUploads.length} complete`
+            : 'Ready to upload multiple receipt files'}
       </div>
 
       <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
@@ -348,11 +394,13 @@ export default function BatchUploadZone({
               id="batch-upload-zone-description"
               className="text-base text-muted-foreground max-w-md mx-auto"
             >
-              {isInvalidFile
-                ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
-                : isDragging
-                  ? "Release to add files to the queue"
-                  : "Drag & drop multiple receipt files here, or click to browse"}
+              {isCompressing
+                ? "Compressing selected images..."
+                : isInvalidFile
+                  ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
+                  : isDragging
+                    ? "Release to add files to the queue"
+                    : "Drag & drop multiple receipt files here, or click to browse"}
             </p>
           </div>
         </div>

@@ -3,6 +3,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { format, startOfDay, endOfDay } from 'npm:date-fns'
+// Import encodeBase64 from Deno Standard Library
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 // Fix jsPDF import to work with Deno/Edge environment
 import { jsPDF } from 'npm:jspdf'
 import autoTable from 'npm:jspdf-autotable'
@@ -61,8 +63,8 @@ serve(async (req) => {
       });
     }
 
-    // Extract date and mode from the request body
-    const { date, mode = 'payer' } = requestBody; // Default mode to 'payer'
+    // Extract date, mode, and includeImages from the request body
+    const { date, mode = 'payer', includeImages = true } = requestBody; // Default includeImages to true
 
     if (!date) {
       console.error('Date parameter is missing');
@@ -81,7 +83,7 @@ serve(async (req) => {
         });
     }
 
-    console.log(`Processing request for date: ${date}, mode: ${mode}`);
+    console.log(`Processing request for date: ${date}, mode: ${mode}, includeImages: ${includeImages}`);
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
@@ -116,14 +118,14 @@ serve(async (req) => {
     const startTime = startOfDay(selectedDay).toISOString()
     const endTime = endOfDay(selectedDay).toISOString()
 
-    // Fetch receipts for the selected day
-    // Ensure 'category' is selected
+    // Fetch receipts for the selected day, including thumbnail_url
+    console.log("Fetching receipts including thumbnail_url");
     const { data: receiptsData, error: receiptsError } = await supabaseClient
       .from('receipts')
-      .select('*, line_items!line_items_receipt_id_fkey(*)') // Specify the relationship to use
+      .select('*, thumbnail_url, line_items!line_items_receipt_id_fkey(*)') // Add thumbnail_url
       .gte('date', startTime)
       .lte('date', endTime)
-      .order('date', { ascending: true }); // Order by date for consistent PDF order
+      .order('date', { ascending: true });
 
     if (receiptsError) {
       console.error('Error fetching receipts:', receiptsError)
@@ -140,9 +142,9 @@ serve(async (req) => {
     console.log(`Found ${receiptsWithLineItems.length} receipts for ${date}`);
 
     try {
-      // Generate PDF, passing the mode
+      // Generate PDF, passing the mode and includeImages flag
       console.log(`Generating PDF in ${mode} mode...`);
-      const pdfBytes = await generatePDF(receiptsWithLineItems, selectedDay, supabaseClient, mode);
+      const pdfBytes = await generatePDF(receiptsWithLineItems, selectedDay, mode, includeImages);
       console.log(`PDF generated successfully, size: ${pdfBytes.byteLength} bytes`);
 
       // Send PDF as response with correct headers
@@ -171,8 +173,11 @@ serve(async (req) => {
 })
 
 // Function to generate PDF
-async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
-  console.log(`Generating PDF for ${receipts.length} receipts on ${selectedDay} in ${mode} mode`);
+async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
+  console.log(`Generating PDF for ${receipts.length} receipts on ${selectedDay} in ${mode} mode, includeImages: ${includeImages}`);
+
+  // Precompute grandTotal
+  const grandTotal = receipts.reduce((sum, r) => sum + (r?.total || 0), 0);
 
   // Create PDF document
   const pdf = new jsPDF({
@@ -239,9 +244,6 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
   pdf.setFont('helvetica', 'bold')
   pdf.text(`Total Receipts: ${receipts.length}`, 20, yPosition)
   yPosition += 7
-
-  // Initialize grandTotal here - will be recalculated after processing receipts
-  let grandTotal = receipts.reduce((sum, receipt) => sum + (receipt?.total || 0), 0)
   pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition)
   yPosition += 10
 
@@ -344,164 +346,75 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
     pdf.setFont('helvetica', 'normal')
     yPosition += 15
 
-    // Add receipt image if available
-    if (receipt.image_url) {
+    // --- MODIFIED IMAGE HANDLING --- 
+    if (includeImages && receipt.thumbnail_url) {
       try {
-        // Add a caption for the image
-        pdf.setFontSize(10)
-        pdf.setTextColor(100, 100, 100)
-        pdf.text('Receipt Image:', 20, yPosition)
-        yPosition += 5
+        console.time('ImageProcessing');
+        pdf.setFontSize(10);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text('Receipt Thumbnail:', 20, yPosition); // Changed caption
+        yPosition += 5;
 
-        // Get the image directly from storage
-        let imagePath = receipt.image_url
+        console.log(`Fetching thumbnail: ${receipt.thumbnail_url} for receipt ${receipt.id}`);
         
-        // Handle different URL formats
-        // If full URL, extract path after storage bucket name
-        if (imagePath.includes('storage/v1/object/public/receipt_images/')) {
-          imagePath = imagePath.split('receipt_images/')[1]
-        } 
-        // If it's already a relative path with bucket prefix, remove it
-        else if (imagePath.startsWith('receipt_images/')) {
-          imagePath = imagePath.replace('receipt_images/', '')
+        // Fetch the thumbnail directly using its public URL
+        const thumbResponse = await fetch(receipt.thumbnail_url);
+        
+        if (!thumbResponse.ok) {
+          throw new Error(`Failed to fetch thumbnail: ${thumbResponse.status} ${thumbResponse.statusText}`);
         }
         
-        console.log(`Downloading image: ${imagePath} for receipt ${receipt.id}`)
-
-        const { data: imageData, error: imageError } = await supabaseClient
-          .storage
-          .from('receipt_images')
-          .download(imagePath)
-
-        if (imageError || !imageData) {
-          console.error(`Failed to download image: ${imageError?.message || 'Unknown error'}`)
-          throw new Error(`Failed to download image: ${imageError?.message || 'Unknown error'}`)
+        const thumbContentType = thumbResponse.headers.get('content-type') || 'image/jpeg'; // Default to jpeg
+        let imageFormat = 'JPEG';
+        if (thumbContentType.includes('png')) {
+          imageFormat = 'PNG';
+        } else if (thumbContentType.includes('webp')) {
+           imageFormat = 'WEBP'; // jsPDF supports WEBP
+        } else if (thumbContentType.includes('gif')) {
+           imageFormat = 'GIF';
         }
 
-        console.log(`Successfully downloaded image for receipt ${receipt.id}, size: ${imageData.size} bytes`)
+        const imageBytes = await thumbResponse.arrayBuffer(); // Get thumbnail bytes
+        const base64Image = encodeBase64(imageBytes); // USE DENO STANDARD LIBRARY
 
-        // Convert the image to a base64 string
-        const imageBytes = await imageData.arrayBuffer()
-        const base64Image = arrayBufferToBase64(imageBytes)
-
-        // Detect image type from the base64 content or filename
-        let imageFormat = 'JPEG' // Default format
-        
-        // Check file extension if present in the path
-        if (imagePath.toLowerCase().endsWith('.png')) {
-          imageFormat = 'PNG'
-        } else if (imagePath.toLowerCase().endsWith('.gif')) {
-          imageFormat = 'GIF'
-        } else if (imagePath.toLowerCase().endsWith('.webp')) {
-          // jsPDF might not support WebP directly
-          console.log('WebP format detected, attempting to use as JPEG')
+        // Use reduced dimensions for thumbnail
+        const fixedWidth = 80;
+        const fixedHeight = 40;
+        if (yPosition + fixedHeight > 260) { // Check page break
+          pdf.addPage();
+          addHeader();
+          yPosition = 60;
         }
         
-        console.log(`Using image format: ${imageFormat}`)
+        pdf.setDrawColor(200, 200, 200);
+        pdf.rect(20, yPosition, fixedWidth, fixedHeight);
         
-        try {
-          // 1) Decide your fixed display height (in mm)
-          const fixedHeight = 60; // Fixed height for all receipt images
-          
-          // 2) Use jsPDF's helper to read the image's natural dimensions
-          const imgProps = pdf.getImageProperties(
-            `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`
-          );
-          const origWidth = imgProps.width;
-          const origHeight = imgProps.height;
-          
-          // 3) Compute the display width that keeps the aspect ratio
-          const displayWidth = origWidth * (fixedHeight / origHeight);
-          console.log(`Original image dimensions: ${origWidth}x${origHeight}, display size: ${displayWidth}mm x ${fixedHeight}mm`);
-          
-          // 4) Check for page break if it won't fit
-          if (yPosition + fixedHeight > 260) {
-            pdf.addPage();
-            addHeader();
-            yPosition = 60;
-          }
-          
-          // 5) Draw a border around the resized image
-          pdf.setDrawColor(200, 200, 200);
-          pdf.rect(20, yPosition, displayWidth, fixedHeight);
-          
-          // 6) Finally, add the image at fixedHeight and computed width
-          pdf.addImage(
-            `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
-            imageFormat,
-            20,            // x
-            yPosition,     // y
-            displayWidth,  // width
-            fixedHeight    // height
-          );
-          
-          // 7) Advance your cursor
-          yPosition += fixedHeight + 20;
-          
-        } catch (addImageError) {
-          console.error('Error adding image with proper aspect ratio:', addImageError);
-          
-          // Fallback to simple approach if getImageProperties doesn't work
-          try {
-            // Simple fallback with fixed dimensions
-            const fallbackHeight = 60;
-            const fallbackWidth = 120;
-            
-            // Check if we need a page break
-            if (yPosition + fallbackHeight > 260) {
-              pdf.addPage();
-              addHeader();
-              yPosition = 60;
-            }
-            
-            // Draw border and add image with fallback dimensions
-            pdf.setDrawColor(200, 200, 200);
-            pdf.rect(20, yPosition, fallbackWidth, fallbackHeight);
-            
-            pdf.addImage(
-              `data:image/${imageFormat.toLowerCase()};base64,${base64Image}`,
-              imageFormat,
-              20,
-              yPosition,
-              fallbackWidth,
-              fallbackHeight
-            );
-            
-            yPosition += fallbackHeight + 20;
-            console.log('Used fallback fixed dimensions for image');
-          } catch (finalError) {
-            console.error('Failed to add image even with fallback dimensions:', finalError);
-            // Just advance the cursor in case of complete failure
-            yPosition += 20;
-          }
-        }
-
-        // Reset text color
-        pdf.setTextColor(0, 0, 0)
+        // Add the thumbnail Base64 data to the PDF
+        pdf.addImage(
+          `data:${thumbContentType};base64,${base64Image}`,
+          imageFormat,
+          20,
+          yPosition,
+          fixedWidth, // Display width
+          fixedHeight // Display height
+        );
+        yPosition += fixedHeight + 10;
+        
+        pdf.setTextColor(0, 0, 0);
+        console.timeEnd('ImageProcessing');
       } catch (imgError) {
-        console.error('Error processing image:', imgError)
-        // Log more detailed error information
-        if (imgError instanceof Error) {
-          console.error(`Image error details: ${imgError.message}`)
-          console.error(`Image path attempted: ${receipt.image_url}`)
-        }
-        
-        // Try to get a better error message
-        let errorMessage = 'Error loading receipt image'
-        if (imgError instanceof Error && imgError.message) {
-          // Show a more specific error but keep it short
-          errorMessage = `Error: ${imgError.message.substring(0, 30)}...`
-        }
-        
-        // Add styled message for unavailable image
-        pdf.setFillColor(245, 245, 245)
-        pdf.rect(20, yPosition, 160, 30, 'F')
-        pdf.setTextColor(100, 100, 100)
-        pdf.text(errorMessage, 100, yPosition + 15, { align: 'center' })
-        pdf.setTextColor(0, 0, 0)
-        yPosition += 40
+        console.warn(`Thumbnail processing skipped for ${receipt.id}:`, imgError);
+        yPosition += 10; // Add space even if image fails
       }
+    } else if (includeImages && receipt.image_url && !receipt.thumbnail_url) {
+      // Optional: Add a placeholder or message if original image exists but thumbnail doesn't
+      pdf.setFontSize(9);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('[Thumbnail not available]', 20, yPosition + 5);
+      yPosition += 15;
+      pdf.setTextColor(0, 0, 0);
     }
+    // --- END MODIFIED IMAGE HANDLING ---
 
     // Add a divider line between receipts
     if (receipts.indexOf(receipt) < receipts.length - 1) {
@@ -894,14 +807,4 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
 
   // Return the PDF as a Uint8Array
   return pdf.output('arraybuffer')
-}
-
-// Helper function to convert ArrayBuffer to base64
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
 }
