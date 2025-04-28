@@ -597,7 +597,7 @@ export default function Dashboard() {
         isOpen={isBatchUploadModalOpen}
         onClose={() => setIsBatchUploadModalOpen(false)}
         onUploadComplete={() => {
-          setIsBatchUploadModalOpen(false);
+          // Don't close the modal, just refresh the data
           refetch();
         }}
       />

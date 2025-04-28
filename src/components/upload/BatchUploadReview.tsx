@@ -1,24 +1,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  CheckCircle, 
-  XCircle, 
-  ChevronRight, 
-  FileText, 
+import {
+  CheckCircle,
+  XCircle,
+  ChevronRight,
+  FileText,
   RotateCcw,
   ExternalLink,
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import {
   Table,
@@ -38,6 +38,7 @@ interface BatchUploadReviewProps {
   onRetryAll: () => void;
   onClose: () => void;
   onReset: () => void;
+  onViewAllReceipts?: () => void;
 }
 
 export function BatchUploadReview({
@@ -47,7 +48,8 @@ export function BatchUploadReview({
   onRetry,
   onRetryAll,
   onClose,
-  onReset
+  onReset,
+  onViewAllReceipts
 }: BatchUploadReviewProps) {
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState<'completed' | 'failed'>(
@@ -55,17 +57,21 @@ export function BatchUploadReview({
   );
 
   const totalUploads = completedUploads.length + failedUploads.length;
-  const successRate = totalUploads > 0 
-    ? Math.round((completedUploads.length / totalUploads) * 100) 
+  const successRate = totalUploads > 0
+    ? Math.round((completedUploads.length / totalUploads) * 100)
     : 0;
 
   const viewReceipt = (receiptId: string) => {
-    navigate(`/receipts/${receiptId}`);
+    navigate(`/receipt/${receiptId}`);
   };
 
   const viewAllReceipts = () => {
-    navigate('/dashboard');
-    onClose();
+    if (onViewAllReceipts) {
+      onViewAllReceipts();
+    } else {
+      navigate('/dashboard');
+      onClose();
+    }
   };
 
   return (
@@ -225,6 +231,9 @@ export function BatchUploadReview({
         <div className="flex gap-2">
           <Button variant="outline" onClick={onReset}>
             Upload More
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
           </Button>
           <Button onClick={viewAllReceipts}>
             View All Receipts

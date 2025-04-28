@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileUp, Clock, XCircle, RotateCcw } from "lucide-react";
+import { Upload, FileUp, RotateCcw, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBatchFileUpload } from "@/hooks/useBatchFileUpload";
 import { useSettings } from "@/hooks/useSettings";
@@ -11,6 +11,7 @@ import { BatchUploadReview } from "@/components/upload/BatchUploadReview";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
+import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -28,6 +29,12 @@ export default function BatchUploadZone({
   const [showReview, setShowReview] = useState(false);
   // State to track if all processing is complete
   const [allProcessingComplete, setAllProcessingComplete] = useState(false);
+  // State to track if the receipt browser modal should be shown
+  const [showReceiptBrowser, setShowReceiptBrowser] = useState(false);
+  // State to store the completed receipt IDs for the browser modal
+  const [completedReceiptIds, setCompletedReceiptIds] = useState<string[]>([]);
+  // State to store the current date for the browser modal
+  const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const {
     isDragging,
@@ -88,6 +95,15 @@ export default function BatchUploadZone({
 
   // Check if all processing is complete
   useEffect(() => {
+    console.log('Checking if processing is complete:', {
+      isProcessing,
+      activeUploads: activeUploads.length,
+      queuedUploads: queuedUploads.length,
+      completedUploads: completedUploads.length,
+      failedUploads: failedUploads.length,
+      allProcessingComplete
+    });
+
     // If there are no active uploads and no queued uploads, and we have at least one upload (completed or failed)
     if (
       !isProcessing &&
@@ -95,31 +111,47 @@ export default function BatchUploadZone({
       queuedUploads.length === 0 &&
       (completedUploads.length > 0 || failedUploads.length > 0)
     ) {
+      console.log('All processing is complete, showing notification');
+
       // Set processing complete flag
       setAllProcessingComplete(true);
 
-      // If we have any completed uploads, show the review UI
-      if (completedUploads.length > 0 || failedUploads.length > 0) {
-        // Small delay to ensure all UI updates are complete
-        setTimeout(() => {
-          setShowReview(true);
+      // Show a toast notification
+      const totalUploads = completedUploads.length + failedUploads.length;
+      const successRate = Math.round((completedUploads.length / totalUploads) * 100);
 
-          // Show a toast notification
-          const totalUploads = completedUploads.length + failedUploads.length;
-          const successRate = Math.round((completedUploads.length / totalUploads) * 100);
+      toast({
+        title: "Batch Upload Complete",
+        description: `${completedUploads.length} of ${totalUploads} receipts processed successfully (${successRate}%)`,
+        variant: failedUploads.length > 0 ? "default" : "default",
+      });
 
-          toast({
-            title: "Batch Upload Complete",
-            description: `${completedUploads.length} of ${totalUploads} receipts processed successfully (${successRate}%)`,
-            variant: failedUploads.length > 0 ? "default" : "default",
-          });
+      // Extract receipt IDs from completed uploads
+      const successfulReceiptIds = completedUploads
+        .map(uploadId => receiptIds[uploadId])
+        .filter(Boolean) as string[];
 
-          // Call the onUploadComplete callback if provided
-          if (onUploadComplete) {
-            onUploadComplete();
-          }
-        }, 500);
+      // If we have successful uploads, show the receipt browser modal
+      if (successfulReceiptIds.length > 0) {
+        console.log('Opening receipt browser with IDs:', successfulReceiptIds);
+        setCompletedReceiptIds(successfulReceiptIds);
+        setShowReceiptBrowser(true);
       }
+
+      // Call the onUploadComplete callback if provided
+      // This will refresh the data but won't close the modal
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+
+      // Note: We're not automatically showing the review UI anymore
+      // Users will need to click the "Review Results" button
+    } else if (
+      (isProcessing || activeUploads.length > 0 || queuedUploads.length > 0) &&
+      allProcessingComplete
+    ) {
+      // If processing starts again after being complete, reset the flag
+      setAllProcessingComplete(false);
     }
   }, [
     isProcessing,
@@ -127,6 +159,7 @@ export default function BatchUploadZone({
     queuedUploads.length,
     completedUploads.length,
     failedUploads.length,
+    allProcessingComplete,
     onUploadComplete
   ]);
 
@@ -192,30 +225,51 @@ export default function BatchUploadZone({
   if (showReview) {
     return (
       <BatchUploadReview
-        completedUploads={completedUploads}
-        failedUploads={failedUploads}
+        completedUploads={batchUploads.filter(upload => upload.status === 'completed')}
+        failedUploads={batchUploads.filter(upload => upload.status === 'error')}
         receiptIds={receiptIds}
         onRetry={retryUpload}
         onRetryAll={retryAllFailed}
         onClose={() => setShowReview(false)}
         onReset={resetBatchUpload}
+        onViewAllReceipts={() => {
+          // Show the receipt browser modal with all completed receipt IDs
+          const successfulReceiptIds = completedUploads
+            .map(upload => receiptIds[upload.id])
+            .filter(Boolean) as string[];
+
+          if (successfulReceiptIds.length > 0) {
+            setCompletedReceiptIds(successfulReceiptIds);
+            setShowReceiptBrowser(true);
+            setShowReview(false); // Hide the review UI
+          }
+        }}
       />
     );
   }
 
   return (
-    <div
-      className={`relative w-full h-full flex flex-col overflow-auto rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleCustomDrop}
-      ref={uploadZoneRef}
-      tabIndex={0}
-      role="button"
-      aria-label="Upload multiple receipt files: JPEG, PNG, or PDF"
-      aria-describedby="batch-upload-zone-description batch-upload-status"
-    >
+    <>
+      {/* Receipt Browser Modal */}
+      <DailyReceiptBrowserModal
+        date={currentDate}
+        receiptIds={completedReceiptIds}
+        isOpen={showReceiptBrowser}
+        onClose={() => setShowReceiptBrowser(false)}
+      />
+
+      <div
+        className={`relative w-full h-full flex flex-col overflow-auto rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleCustomDrop}
+        ref={uploadZoneRef}
+        tabIndex={0}
+        role="button"
+        aria-label="Upload multiple receipt files: JPEG, PNG, or PDF"
+        aria-describedby="batch-upload-zone-description batch-upload-status"
+      >
       <input
         type="file"
         className="hidden"
@@ -377,7 +431,7 @@ export default function BatchUploadZone({
                       onRemove={removeFromBatchQueue}
                       onCancel={cancelUpload}
                       onRetry={retryUpload}
-                      onViewReceipt={(receiptId) => navigate(`/receipts/${receiptId}`)}
+                      onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
                     />
                   ))}
                 </div>
@@ -406,18 +460,36 @@ export default function BatchUploadZone({
 
         {/* Add more files button when queue exists */}
         {batchUploads.length > 0 && (
-          <Button
-            onClick={() => {
-              console.log('Add More Files button clicked');
-              handleFileSelection();
-            }}
-            variant="outline"
-            className="mt-2"
-            size="sm"
-          >
-            <FileUp className="h-4 w-4 mr-2" />
-            Add More Files
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                console.log('Add More Files button clicked');
+                handleFileSelection();
+              }}
+              variant="outline"
+              className="mt-2"
+              size="sm"
+            >
+              <FileUp className="h-4 w-4 mr-2" />
+              Add More Files
+            </Button>
+
+            {/* Manual review button when all processing is complete */}
+            {allProcessingComplete && (
+              <Button
+                onClick={() => {
+                  console.log('Review Results button clicked');
+                  setShowReview(true);
+                }}
+                variant="default"
+                className="mt-2"
+                size="sm"
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Review Results
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Current settings and link to settings page */}
@@ -443,5 +515,6 @@ export default function BatchUploadZone({
         </div>
       </div>
     </div>
+    </>
   );
 }
