@@ -201,7 +201,7 @@ Please examine this receipt image and extract the following information:
 4. TAX amount (if present)
 5. LINE ITEMS (product/service name and price for each item)
 6. CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous.
-7. PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay)
+7. PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD, CASH).
 8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
 
 Return your findings in the following JSON format:

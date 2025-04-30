@@ -263,6 +263,65 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
   }
   // --- END OF ADDITION ---
 
+  // Fetch images in parallel with timeout and error handling
+  console.time("TotalImageProcessing");
+  const imageCache = new Map();
+  const MAX_IMAGES = 10; // Limit images per report
+  let imageCount = 0;
+
+  async function getCachedImage(url) {
+    if (imageCache.has(url)) return imageCache.get(url);
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const buffer = await response.arrayBuffer();
+      imageCache.set(url, buffer);
+      return buffer;
+    } catch (error) {
+      console.warn(`Failed to fetch image from ${url}:`, error.message);
+      return null;
+    }
+  }
+
+  const imageFetchPromises = receipts.map(async (receipt, index) => {
+    if (!includeImages || !receipt.thumbnail_url || receipt.thumbnail_url.trim() === "" || imageCount >= MAX_IMAGES) {
+      return { index, imageData: null };
+    }
+
+    imageCount++;
+    try {
+      const buffer = await getCachedImage(receipt.thumbnail_url);
+      if (!buffer) return { index, imageData: null };
+      
+      const contentType = "image/jpeg"; // Default content type
+      const base64Image = encodeBase64(buffer); // From Deno std
+      const format = contentType.includes("png") ? "PNG" : "JPEG";
+      
+      return { 
+        index, 
+        imageData: { base64Image, contentType, format } 
+      };
+    } catch (error) {
+      console.warn(`Failed to process image for receipt ${receipt.id}:`, error.message);
+      return { index, imageData: null };
+    }
+  });
+
+  // Resolve all image promises
+  const imageResults = await Promise.all(imageFetchPromises);
+  const imageMap = new Map(imageResults.map(({ index, imageData }) => [index, imageData]));
+  console.timeEnd("TotalImageProcessing");
+
+  // Define fixed dimensions for images (reduced size for optimization)
+  const fixedWidth = 40; // Reduced from 80 to 40 mm
+  const fixedHeight = 20; // Reduced from 40 to 20 mm
+
   // Process each receipt
   for (const receipt of receipts) {
     // Check if we need a new page
@@ -338,6 +397,20 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       yPosition = pdf.lastAutoTable.finalY + 10
     }
 
+    // Add receipt image if available
+    if (includeImages) {
+      const imageData = imageMap.get(receipts.indexOf(receipt))?.imageData;
+      if (imageData) {
+        try {
+          const dataUri = `data:${imageData.contentType};base64,${imageData.base64Image}`;
+          pdf.addImage(dataUri, imageData.format, 20, yPosition, fixedWidth, fixedHeight);
+          yPosition += fixedHeight + 5;
+        } catch (e) {
+          console.error(`Error adding image to PDF for receipt ${receipt.id}:`, e.message);
+        }
+      }
+    }
+
     // Add receipt total with highlighted box
     pdf.setFillColor(230, 230, 250) // Light purple background
     pdf.rect(120, yPosition - 5, 70, 10, 'F')
@@ -345,76 +418,6 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
     pdf.text(`Total: RM ${receipt.total.toFixed(2)}`, 170, yPosition, { align: 'right' })
     pdf.setFont('helvetica', 'normal')
     yPosition += 15
-
-    // --- MODIFIED IMAGE HANDLING --- 
-    if (includeImages && receipt.thumbnail_url) {
-      try {
-        console.time('ImageProcessing');
-        pdf.setFontSize(10);
-        pdf.setTextColor(100, 100, 100);
-        pdf.text('Receipt Thumbnail:', 20, yPosition); // Changed caption
-        yPosition += 5;
-
-        console.log(`Fetching thumbnail: ${receipt.thumbnail_url} for receipt ${receipt.id}`);
-        
-        // Fetch the thumbnail directly using its public URL
-        const thumbResponse = await fetch(receipt.thumbnail_url);
-        
-        if (!thumbResponse.ok) {
-          throw new Error(`Failed to fetch thumbnail: ${thumbResponse.status} ${thumbResponse.statusText}`);
-        }
-        
-        const thumbContentType = thumbResponse.headers.get('content-type') || 'image/jpeg'; // Default to jpeg
-        let imageFormat = 'JPEG';
-        if (thumbContentType.includes('png')) {
-          imageFormat = 'PNG';
-        } else if (thumbContentType.includes('webp')) {
-           imageFormat = 'WEBP'; // jsPDF supports WEBP
-        } else if (thumbContentType.includes('gif')) {
-           imageFormat = 'GIF';
-        }
-
-        const imageBytes = await thumbResponse.arrayBuffer(); // Get thumbnail bytes
-        const base64Image = encodeBase64(imageBytes); // USE DENO STANDARD LIBRARY
-
-        // Use reduced dimensions for thumbnail
-        const fixedWidth = 80;
-        const fixedHeight = 40;
-        if (yPosition + fixedHeight > 260) { // Check page break
-          pdf.addPage();
-          addHeader();
-          yPosition = 60;
-        }
-        
-        pdf.setDrawColor(200, 200, 200);
-        pdf.rect(20, yPosition, fixedWidth, fixedHeight);
-        
-        // Add the thumbnail Base64 data to the PDF
-        pdf.addImage(
-          `data:${thumbContentType};base64,${base64Image}`,
-          imageFormat,
-          20,
-          yPosition,
-          fixedWidth, // Display width
-          fixedHeight // Display height
-        );
-        yPosition += fixedHeight + 10;
-        
-        pdf.setTextColor(0, 0, 0);
-        console.timeEnd('ImageProcessing');
-      } catch (imgError) {
-        console.warn(`Thumbnail processing skipped for ${receipt.id}:`, imgError);
-        yPosition += 10; // Add space even if image fails
-      }
-    } else if (includeImages && receipt.image_url && !receipt.thumbnail_url) {
-      // Optional: Add a placeholder or message if original image exists but thumbnail doesn't
-      pdf.setFontSize(9);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text('[Thumbnail not available]', 20, yPosition + 5);
-      yPosition += 15;
-      pdf.setTextColor(0, 0, 0);
-    }
-    // --- END MODIFIED IMAGE HANDLING ---
 
     // Add a divider line between receipts
     if (receipts.indexOf(receipt) < receipts.length - 1) {

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
+import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUtils";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -126,6 +127,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const [imageSource, setImageSource] = useState("/placeholder.svg");
 
   // Define available expense categories
   const expenseCategories = [
@@ -207,16 +209,55 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     setImageError(false);
 
     if (receipt.image_url) {
-      const img = new Image();
-      img.src = getFormattedImageUrl(receipt.image_url);
-
-      img.onload = () => {
-        setImageError(false);
+      // Track if component is still mounted
+      let isMounted = true;
+      
+      // Use a placeholder initially
+      setImageSource("/placeholder.svg");
+      
+      // Start loading with better error handling
+      const loadImage = async () => {
+        try {
+          // Get properly formatted URL
+          const formattedUrl = await getFormattedImageUrl(receipt.image_url);
+          
+          if (!isMounted) return;
+          
+          // Create a new image to test loading
+          const img = new Image();
+          
+          // Set up load/error handlers
+          img.onload = () => {
+            if (isMounted) {
+              setImageSource(formattedUrl);
+              setImageError(false);
+            }
+          };
+          
+          img.onerror = () => {
+            if (isMounted) {
+              console.error("Error loading receipt image despite async formatting:", receipt.image_url);
+              setImageError(true);
+              setImageSource("/placeholder.svg");
+            }
+          };
+          
+          // Start loading
+          img.src = formattedUrl;
+        } catch (error) {
+          if (isMounted) {
+            console.error("Exception during image loading:", error);
+            setImageError(true);
+            setImageSource("/placeholder.svg");
+          }
+        }
       };
-
-      img.onerror = () => {
-        console.error("Error loading receipt image:", receipt.image_url);
-        setImageError(true);
+      
+      loadImage();
+      
+      // Cleanup function
+      return () => {
+        isMounted = false;
       };
     }
   }, [receipt.image_url]);
@@ -634,97 +675,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     }
   };
 
-  // Function to format image URL if needed
-  const getFormattedImageUrl = (url: string | undefined) => {
-    if (!url) return "";
-
-    console.log("Original URL:", url);
-
-    // For local development or testing with placeholder
-    if (url.startsWith('/')) {
-      console.log("Local URL detected, returning as is");
-      return url;
-    }
-
-    try {
-      // Check if the URL is already a complete Supabase URL
-      if (url.includes('supabase.co') && url.includes('/storage/v1/object/')) {
-        // If it already has public/ in the path, return as is
-        if (url.includes('/public/')) {
-          console.log("Complete Supabase URL with public path detected, returning as is");
-          return url;
-        }
-        // Add 'public/' to the path if it's missing
-        const formatted = url.replace('/object/', '/object/public/');
-        console.log("Added public/ to Supabase URL:", formatted);
-        return formatted;
-      }
-
-      // Special case: URL contains another Supabase URL inside it
-      if (url.includes('receipt_images/https://')) {
-        console.log("Detected nested Supabase URL with receipt_images prefix");
-        // Extract the actual URL after receipt_images/
-        const actualUrl = url.substring(url.indexOf('receipt_images/') + 'receipt_images/'.length);
-        console.log("Extracted actual URL:", actualUrl);
-
-        // Recursively call this function with the extracted URL
-        return getFormattedImageUrl(actualUrl);
-      }
-
-      // Another special case: URL might have two supabase.co domains (duplicated URL)
-      if ((url.match(/supabase\.co/g) || []).length > 1) {
-        console.log("Detected multiple Supabase domains in URL");
-        // Find where the second URL starts (likely after the first one)
-        const secondUrlStart = url.indexOf('https://', url.indexOf('supabase.co') + 1);
-        if (secondUrlStart !== -1) {
-          const actualUrl = url.substring(secondUrlStart);
-          console.log("Extracted second URL:", actualUrl);
-          return getFormattedImageUrl(actualUrl);
-        }
-      }
-
-      // Check if the URL is a full URL that doesn't need processing
-      if (url.startsWith('http') && !url.includes('receipt_images/')) {
-        console.log("Full URL that doesn't need processing detected, returning as is");
-        return url;
-      }
-
-      // Handle relative paths that might be just storage keys
-      if (!url.includes('supabase.co')) {
-        // Check if this looks like a UUID-based path
-        if (url.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/.*$/i)) {
-          console.log("Detected UUID-based file path");
-          const { data } = supabase.storage
-            .from('receipt_images')
-            .getPublicUrl(url);
-
-          console.log("Generated publicUrl from UUID path:", data?.publicUrl);
-          return data?.publicUrl || url;
-        }
-
-        // Extract just the filename if there's a path
-        const fileName = url.includes('/')
-          ? url.substring(url.lastIndexOf('/') + 1)
-          : url.replace('receipt_images/', '');
-
-        console.log("Processing as storage key, extracted filename:", fileName);
-
-        const { data } = supabase.storage
-          .from('receipt_images')
-          .getPublicUrl(fileName);
-
-        console.log("Generated publicUrl:", data?.publicUrl);
-        return data?.publicUrl || url;
-      }
-
-      console.log("URL didn't match any formatting rules, returning as is");
-      return url; // Return original URL on error
-    } catch (error) {
-      console.error("Error formatting image URL:", error);
-      return url; // Return original URL on error
-    }
-  };
-
   // Function to accept an AI suggestion
   const handleAcceptSuggestion = (field: string, value: string | number) => {
     setEditedReceipt(prev => ({
@@ -1039,7 +989,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                             className="h-8 w-8 bg-background/80 backdrop-blur-sm"
                             onClick={() => {
                               const link = document.createElement('a');
-                              link.href = getFormattedImageUrl(receipt.image_url);
+                              link.href = imageSource; // Use the already processed image URL from state
                               link.download = `receipt-${receipt.id}.jpg`;
                               document.body.appendChild(link);
                               link.click();
@@ -1074,7 +1024,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                         contentClass="w-full h-full"
                       >
                         <img
-                          src={getFormattedImageUrl(receipt.image_url)}
+                          src={imageSource}
                           alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
                           className="receipt-image w-full h-full object-contain transition-transform"
                           style={{ transform: `rotate(${rotation}deg)` }}
@@ -1095,7 +1045,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       The image URL may be invalid or the image may no longer exist.
                     </p>
                     <p className="text-xs break-all text-muted-foreground mb-4">
-                      URL: {getFormattedImageUrl(receipt.image_url) || "No URL provided"}
+                      URL: {imageSource || "No URL provided"}
                     </p>
                   </>
                 ) : (

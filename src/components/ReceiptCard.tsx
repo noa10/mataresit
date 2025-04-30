@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReceiptStatus, ProcessingStatus } from "@/types/receipt";
+import { getFormattedImageUrlSync } from "@/utils/imageUtils";
 
 interface ReceiptCardProps {
   id: string;
@@ -18,6 +19,7 @@ interface ReceiptCardProps {
   status: ReceiptStatus;
   confidence: number;
   processingStatus?: ProcessingStatus;
+  disableInternalLink?: boolean;
 }
 
 export default function ReceiptCard({
@@ -29,44 +31,24 @@ export default function ReceiptCard({
   imageUrl,
   status,
   confidence,
-  processingStatus
+  processingStatus,
+  disableInternalLink
 }: ReceiptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
   
   useEffect(() => {
-    async function getImageUrl() {
-      // Check if imageUrl is empty or a placeholder
-      if (!imageUrl || imageUrl === "/placeholder.svg") {
-        setImageSource("/placeholder.svg");
-        return;
-      }
+    function updateImageUrl() {
+      // Use the sync version that handles state updates internally
+      const initialUrl = getFormattedImageUrlSync(imageUrl, (updatedUrl) => {
+        setImageSource(updatedUrl);
+      });
       
-      try {
-        // Handle various URL formats
-        if (imageUrl.startsWith('http')) {
-          // Use the URL directly if it starts with http
-          setImageSource(imageUrl);
-        } else {
-          // It's a storage path, get a public URL
-          const { data: publicUrlData } = supabase.storage
-            .from('receipt_images')
-            .getPublicUrl(imageUrl);
-            
-          if (publicUrlData?.publicUrl) {
-            setImageSource(publicUrlData.publicUrl);
-          } else {
-            console.error("Failed to generate public URL for path:", imageUrl);
-            setImageSource("/placeholder.svg");
-          }
-        }
-      } catch (error) {
-        console.error("Error in getImageUrl:", error);
-        setImageSource("/placeholder.svg");
-      }
+      // Set initial URL immediately
+      setImageSource(initialUrl);
     }
     
-    getImageUrl();
+    updateImageUrl();
   }, [imageUrl]);
   
   const formatCurrency = (amount: number) => {
@@ -78,9 +60,9 @@ export default function ReceiptCard({
   
   const getStatusColor = () => {
     switch (status) {
-      case "synced": return "bg-green-500";
       case "reviewed": return "bg-blue-500";
-      default: return "bg-yellow-500";
+      case "unreviewed": return "bg-yellow-500";
+      default: return "bg-green-500";
     }
   };
   
@@ -224,12 +206,19 @@ export default function ReceiptCard({
         </div>
         
         <div className="mt-4">
-          <Link to={`/receipt/${id}`}>
+          {disableInternalLink ? (
             <Button className="w-full gap-2">
               <Eye size={16} />
               View Details
             </Button>
-          </Link>
+          ) : (
+            <Link to={`/receipt/${id}`}>
+              <Button className="w-full gap-2">
+                <Eye size={16} />
+                View Details
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </motion.div>

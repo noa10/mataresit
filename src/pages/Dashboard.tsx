@@ -375,6 +375,7 @@ export default function Dashboard() {
                       status={receipt.status}
                       confidence={confidenceScore}
                       processingStatus={receipt.processing_status}
+                      disableInternalLink={true} // Disable internal Link to prevent nesting
                     />
                   </Link>
                 </div>
@@ -854,7 +855,7 @@ export default function Dashboard() {
         <div className="container px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} ReceiptScan. All rights reserved.
+              &copy; {new Date().getFullYear()} ReceiptScan. All rights reserved.
             </div>
           </div>
         </div>

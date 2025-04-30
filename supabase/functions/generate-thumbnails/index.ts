@@ -9,127 +9,140 @@ const corsHeaders = {
 };
 
 // Initialize Supabase client (will use service_role key from environment)
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabaseUrl = Deno.env.get('PROJECT_URL')!;
+const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!;
+
+// ---- ADD DEBUG LOGS ----
+console.log(`[DEBUG] Runtime PROJECT_URL: ${supabaseUrl ? supabaseUrl.substring(0, 20) + '...' : 'MISSING!'}`);
+console.log(`[DEBUG] Runtime SERVICE_ROLE_KEY: ${supabaseKey ? supabaseKey.substring(0, 10) + '...' : 'MISSING!'}`);
+// ---- END DEBUG LOGS ----
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Handle CORS preflight requests
-async function handleCors(req: Request) {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// Retry logic with exponential backoff
+async function retry(fn, retries = 3, delay = 1000) {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`Retrying... ${retries} left`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retry(fn, retries - 1, delay * 2);
+    }
+    throw error;
   }
 }
 
-// Generate thumbnail for a single receipt
+// Enhanced thumbnail generator
 async function generateThumbnail(receiptId: string): Promise<string | null> {
   try {
-    console.log(`Processing receipt ${receiptId}`);
-
-    // Fetch the receipt data
+    console.log(`[${receiptId}] Starting thumbnail generation`);
     const { data: receipt, error: fetchError } = await supabase
       .from('receipts')
       .select('id, image_url, thumbnail_url')
       .eq('id', receiptId)
       .single();
 
-    if (fetchError) {
-      throw new Error(`Error fetching receipt: ${fetchError.message}`);
+    if (fetchError) throw new Error(`Error fetching receipt: ${fetchError.message}`);
+
+    if (!receipt.image_url || !receipt.image_url.startsWith('https://')) {
+      console.warn(`Invalid image URL for receipt ${receiptId}: ${receipt.image_url}`);
+      return null;
     }
 
-    // Skip if thumbnail already exists
-    if (receipt.thumbnail_url) {
-      console.log(`Receipt ${receiptId} already has a thumbnail`);
-      return receipt.thumbnail_url;
+    // --- Simplified Path Extraction (for testing) ---
+    const urlString = receipt.image_url;
+    const pathPrefix = '/receipt_images/';
+    const startIndex = urlString.indexOf(pathPrefix);
+    if (startIndex === -1) {
+        throw new Error(`Path prefix '${pathPrefix}' not found in URL: ${urlString}`);
     }
+    const imagePath = urlString.substring(startIndex + pathPrefix.length);
+    // --- End Simplified Path Extraction ---
 
-    // Skip if no image_url
-    if (!receipt.image_url) {
-      throw new Error(`Receipt ${receiptId} has no image URL`);
+    console.log(`[${receiptId}] Original image URL: ${urlString}`);
+    console.log(`[${receiptId}] Extracted image path (simple split): ${imagePath}`);
+
+    // Ensure no leading/trailing spaces or slashes accidentally included
+    const cleanImagePath = imagePath.trim().replace(/^\/+|\/+$/g, '');
+    if (!cleanImagePath) {
+         throw new Error(`Extracted path is empty for URL: ${urlString}`);
     }
+    console.log(`[${receiptId}] Cleaned image path: ${cleanImagePath}`);
 
-    // Extract the path from the full URL
-    let imagePath = receipt.image_url;
-    if (imagePath.includes('/receipt_images/')) {
-      imagePath = imagePath.split('/receipt_images/')[1];
-    } else if (imagePath.includes('/receipt-images/')) {
-      imagePath = imagePath.split('/receipt-images/')[1];
-    }
 
-    if (!imagePath) {
-      throw new Error(`Could not extract image path from URL: ${receipt.image_url}`);
-    }
-
-    console.log(`Downloading image: ${imagePath}`);
-    
-    // Download the image from storage
+    // Download image from storage using the cleaned path
+    const bucketName = 'receipt_images'; // Explicitly define
+    console.log(`[${receiptId}] Attempting download from bucket '${bucketName}' with path: '${cleanImagePath}'`);
     const { data: imageData, error: downloadError } = await supabase.storage
-      .from('receipt_images')
-      .download(imagePath);
+      .from(bucketName)
+      .download(cleanImagePath); // Use cleaned path
+    if (downloadError) {
+      console.error(`[${receiptId}] Full download error:`, JSON.stringify(downloadError, null, 2));
+      throw new Error(`Error downloading image: ${downloadError.message}`);
+    }
+    if (!imageData) {
+      throw new Error('No data received from image download');
+    }
+    console.log(`[${receiptId}] Image downloaded successfully`);
 
-    if (downloadError || !imageData) {
-      throw new Error(`Error downloading image: ${downloadError?.message || 'No data received'}`);
+    // Decode and resize only if needed
+    const imageArrayBuffer = await imageData.arrayBuffer();
+    const image = await Image.decode(imageArrayBuffer);
+    const targetWidth = 400;
+    if (image.width > targetWidth) {
+      image.resize(targetWidth, Image.RESIZE_AUTO);
+      console.log(`[${receiptId}] Image decoded and resized`);
+    } else {
+      console.log(`[${receiptId}] Image decoded (no resize needed)`);
     }
 
-    console.log('Image downloaded successfully');
-    
-    // Convert to ArrayBuffer for ImageScript processing
-    const imageArrayBuffer = await imageData.arrayBuffer();
-    const imageBytes = new Uint8Array(imageArrayBuffer);
-
-    // Generate thumbnail using ImageScript
-    console.log('Decoding image for thumbnail...');
-    const image = await Image.decode(imageBytes);
-    console.log(`Original dimensions: ${image.width}x${image.height}`);
-
-    const targetWidth = 400; // Target width for thumbnail
-    image.resize(targetWidth, Image.RESIZE_AUTO); // Resize maintaining aspect ratio
-    console.log(`Resized dimensions: ${image.width}x${image.height}`);
-
-    // Encode as JPEG with quality 75
-    const thumbnailBytes = await image.encodeJPEG(75);
-    console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
-
-    // Generate thumbnail path based on receipt ID
+    // Lower JPEG quality for faster processing
+    const thumbnailBytes = await image.encodeJPEG(65);
     const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`;
-    
-    console.log(`Uploading thumbnail to ${thumbnailPath}`);
-    
-    // Upload the thumbnail to storage
+
+    // --- START MODIFICATION: Explicit Delete before Upload ---
+    try {
+      // Attempt to delete the existing thumbnail first to ensure clean metadata on upload
+      console.log(`[${receiptId}] Attempting to delete existing thumbnail if present: ${thumbnailPath}`);
+      const { error: deleteError } = await supabase.storage
+        .from('receipt_images')
+        .remove([thumbnailPath]); // .remove() expects an array of paths
+
+      if (deleteError && deleteError.message !== 'The resource was not found') {
+        // Log non-critical deletion errors but proceed with upload attempt
+        console.warn(`[${receiptId}] Error deleting existing thumbnail (continuing upload):`, deleteError.message);
+      } else if (!deleteError) {
+        console.log(`[${receiptId}] Successfully deleted existing thumbnail.`);
+      }
+    } catch (deleteCatchError) {
+        // Catch any unexpected error during delete and log it, but still try uploading
+        console.warn(`[${receiptId}] Caught unexpected error during thumbnail deletion (continuing upload):`, deleteCatchError);
+    }
+
+    // Upload thumbnail (with correct Content-Type and no cache)
+    console.log(`[${receiptId}] Uploading new thumbnail: ${thumbnailPath}`);
     const { error: uploadError } = await supabase.storage
       .from('receipt_images')
       .upload(thumbnailPath, thumbnailBytes, {
         contentType: 'image/jpeg',
-        cacheControl: '3600', // Cache for 1 hour
-        upsert: true // Overwrite if exists
+        upsert: false, // Set to false as we explicitly deleted first
+        cacheControl: '0' // Set cache control to 0 to bypass CDN/browser cache after update
       });
+    if (uploadError) throw new Error(`Error uploading thumbnail: ${uploadError.message}`);
+    console.log(`[${receiptId}] Thumbnail uploaded successfully`);
+    // --- END MODIFICATION ---
 
-    if (uploadError) {
-      throw new Error(`Error uploading thumbnail: ${uploadError.message}`);
-    }
-
-    // Get public URL for the thumbnail
+    // Get public URL
     const { data: publicUrlData } = supabase.storage
       .from('receipt_images')
       .getPublicUrl(thumbnailPath);
+    const thumbnailUrl = publicUrlData?.publicUrl;
+    if (!thumbnailUrl) throw new Error('Failed to get public URL for thumbnail');
 
-    if (!publicUrlData?.publicUrl) {
-      throw new Error('Could not get public URL for thumbnail');
-    }
-
-    const thumbnailUrl = publicUrlData.publicUrl;
-    console.log(`Thumbnail URL: ${thumbnailUrl}`);
-
-    // Update the receipt record with the thumbnail URL
-    const { error: updateError } = await supabase
-      .from('receipts')
-      .update({ thumbnail_url: thumbnailUrl })
-      .eq('id', receiptId);
-
-    if (updateError) {
-      throw new Error(`Error updating receipt: ${updateError.message}`);
-    }
-
-    console.log(`Successfully processed receipt ${receiptId}`);
+    // Update receipt
+    await supabase.from('receipts').update({ thumbnail_url: thumbnailUrl }).eq('id', receiptId);
+    console.log(`[${receiptId}] Thumbnail generated successfully`);
     return thumbnailUrl;
   } catch (error) {
     console.error(`Error processing receipt ${receiptId}:`, error);
@@ -137,54 +150,39 @@ async function generateThumbnail(receiptId: string): Promise<string | null> {
   }
 }
 
-// Process all receipts that don't have thumbnails
-async function generateAllThumbnails(limit: number = 50): Promise<{ processed: number, errors: number }> {
+// Batch thumbnail generation with retry
+async function generateAllThumbnails(limit = 50): Promise<{ processed: number, errors: number }> {
   try {
     console.log(`Starting batch thumbnail generation (limit: ${limit})...`);
-    
-    // Create thumbnails folder in storage if it doesn't exist
+    // Ensure thumbnails folder exists
     try {
-      // Create an empty file to establish the thumbnails folder if needed
       await supabase.storage
         .from('receipt_images')
-        .upload('thumbnails/.placeholder', new Uint8Array(0), {
-          upsert: true,
-        });
-      
+        .upload('thumbnails/.placeholder', new Uint8Array(0), { upsert: true });
       console.log('Ensured thumbnails folder exists');
     } catch (error) {
-      // Ignore error if file already exists
       console.log('Thumbnails folder check completed');
     }
-    
-    // Fetch receipts without thumbnails but with image URLs
+    // Fetch receipts
     const { data: receipts, error } = await supabase
       .from('receipts')
       .select('id, image_url')
       .is('thumbnail_url', null)
       .not('image_url', 'is', null)
       .limit(limit);
-
-    if (error) {
-      throw new Error(`Error fetching receipts: ${error.message}`);
-    }
-
+    if (error) throw new Error(`Error fetching receipts: ${error.message}`);
     console.log(`Found ${receipts.length} receipts without thumbnails`);
-
-    // Process each receipt
     let processed = 0;
     let errors = 0;
-    
     for (const receipt of receipts) {
       try {
-        await generateThumbnail(receipt.id);
+        await retry(() => generateThumbnail(receipt.id));
         processed++;
       } catch (error) {
         console.error(`Error processing receipt ${receipt.id}:`, error);
         errors++;
       }
     }
-
     console.log(`Completed processing. Success: ${processed}, Errors: ${errors}`);
     return { processed, errors };
   } catch (error) {
@@ -194,13 +192,14 @@ async function generateAllThumbnails(limit: number = 50): Promise<{ processed: n
 }
 
 // Main serve function
-serve(async (req: Request) => {
-  // Handle CORS
-  const corsResponse = await handleCors(req);
-  if (corsResponse) return corsResponse;
-
+serve(async (req: Request): Promise<Response> => {
   try {
-    // Only accept POST requests
+    // 1) CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    // 2) Only POST allowed
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
@@ -208,46 +207,42 @@ serve(async (req: Request) => {
       );
     }
 
-    // Parse request body
+    // 3) Parse inbound JSON in here
     const { receiptId, batchProcess, limit } = await req.json();
 
+    // 4) Dispatch to single vs batch
     if (batchProcess) {
-      // Process multiple receipts
       const result = await generateAllThumbnails(limit || 50);
-      
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: `Processed ${result.processed} receipts with ${result.errors} errors`,
-          ...result 
+          ...result
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } else if (receiptId) {
-      // Process a single receipt
-      const thumbnailUrl = await generateThumbnail(receiptId);
-      
+    }
+    else if (receiptId) {
+      const thumbnailUrl = await retry(() => generateThumbnail(receiptId));
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          receiptId, 
-          thumbnailUrl 
-        }),
+        JSON.stringify({ success: true, receiptId, thumbnailUrl }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } else {
+    }
+    else {
       return new Response(
         JSON.stringify({ error: 'Missing receiptId or batchProcess flag' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-  } catch (error) {
-    console.error('Function error:', error);
-    
+
+  } catch (err) {
+    // THIS catches *everything*, even a bare `throw null`
+    console.error('Function error (caught at top level):', err);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
+      JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
+        success: false
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
