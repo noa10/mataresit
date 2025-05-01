@@ -264,6 +264,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
       
       const today = new Date().toISOString().split('T')[0];
+      // Fix line 274 - Remove user_id from the object as it's not in the Receipt type
+      // The createReceipt function adds the user_id internally
       const newReceiptId = await createReceipt({
         merchant: "Processing...",
         date: today,
@@ -271,11 +273,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         currency: "MYR",
         status: "unreviewed",
         image_url: imageUrl,
-        user_id: user.id,
+        // user_id is added by the createReceipt function automatically, remove it here
         processing_status: 'uploading', // Initialize with uploading status
         primary_method: settings.processingMethod, // Use settings from the hook
         model_used: settings.selectedModel, // Use settings from the hook
-        has_alternative_data: settings.compareWithAlternative // Use settings from the hook
+        has_alternative_data: settings.compareWithAlternative, // Use settings from the hook
+        payment_method: "" // Add required field
       }, [], {
         merchant: 0,
         date: 0,

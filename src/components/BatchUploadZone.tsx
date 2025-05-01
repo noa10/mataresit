@@ -203,7 +203,10 @@ export default function BatchUploadZone({
 
       // Extract receipt IDs from completed uploads
       const successfulReceiptIds = completedUploads
-        .map(uploadId => receiptIds[uploadId])
+        .map(uploadId => {
+          // Fix: Use the uploadId string instead of the ReceiptUpload object
+          return receiptIds[uploadId];
+        })
         .filter(Boolean) as string[];
 
       // If we have successful uploads, show the receipt browser modal
