@@ -9,103 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      batch_items: {
-        Row: {
-          batch_id: string
-          created_at: string
-          error: string | null
-          id: string
-          original_filename: string | null
-          receipt_id: string | null
-          status: string
-          storage_path: string
-          temp_id: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          batch_id: string
-          created_at?: string
-          error?: string | null
-          id?: string
-          original_filename?: string | null
-          receipt_id?: string | null
-          status?: string
-          storage_path: string
-          temp_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          batch_id?: string
-          created_at?: string
-          error?: string | null
-          id?: string
-          original_filename?: string | null
-          receipt_id?: string | null
-          status?: string
-          storage_path?: string
-          temp_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "batch_items_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batch_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batch_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      batches: {
-        Row: {
-          created_at: string
-          failed: number
-          id: string
-          status: string | null
-          succeeded: number
-          total_items: number
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          failed?: number
-          id?: string
-          status?: string | null
-          succeeded?: number
-          total_items?: number
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          failed?: number
-          id?: string
-          status?: string | null
-          succeeded?: number
-          total_items?: number
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       corrections: {
         Row: {
           ai_suggestion: string | null
@@ -139,13 +42,6 @@ export type Database = {
             foreignKeyName: "corrections_receipt_id_fkey"
             columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "corrections_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
             referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
@@ -169,7 +65,6 @@ export type Database = {
         }
         Relationships: []
       }
-      // expenses table removed as it doesn't exist in the database
       line_items: {
         Row: {
           amount: number
@@ -200,21 +95,7 @@ export type Database = {
             foreignKeyName: "fk_receipt"
             columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_receipt"
-            columns: ["receipt_id"]
-            isOneToOne: false
             referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "line_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
             referencedColumns: ["id"]
           },
           {
@@ -256,21 +137,7 @@ export type Database = {
             foreignKeyName: "fk_receipt"
             columns: ["receipt_id"]
             isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_receipt"
-            columns: ["receipt_id"]
-            isOneToOne: false
             referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "processing_logs_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
             referencedColumns: ["id"]
           },
           {
@@ -309,55 +176,6 @@ export type Database = {
         }
         Relationships: []
       }
-      // receipt_confidence_scores table removed as it doesn't exist in the database
-      receipt_items: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          quantity: number
-          receipt_id: string
-          total_price: number
-          unit_price: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          quantity?: number
-          receipt_id: string
-          total_price: number
-          unit_price: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          quantity?: number
-          receipt_id?: string
-          total_price?: number
-          unit_price?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receipt_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipt_confidence_analysis"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receipt_items_receipt_id_fkey"
-            columns: ["receipt_id"]
-            isOneToOne: false
-            referencedRelation: "receipts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       receipts: {
         Row: {
           ai_suggestions: Json | null
@@ -383,6 +201,7 @@ export type Database = {
           processing_time: number | null
           status: string | null
           tax: number | null
+          thumbnail_url: string | null
           total: number
           updated_at: string
           user_id: string
@@ -411,6 +230,7 @@ export type Database = {
           processing_time?: number | null
           status?: string | null
           tax?: number | null
+          thumbnail_url?: string | null
           total: number
           updated_at?: string
           user_id: string
@@ -439,54 +259,22 @@ export type Database = {
           processing_time?: number | null
           status?: string | null
           tax?: number | null
+          thumbnail_url?: string | null
           total?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "receipts_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
-      monthly_expenses: {
-        Row: {
-          currency: string | null
-          month: string | null
-          normalized_merchant: string | null
-          total_spent: number | null
-          transaction_count: number | null
-        }
-        Relationships: []
-      }
-      receipt_confidence_analysis: {
-        Row: {
-          category_confidence: number | null
-          confidence_scored_at: string | null
-          date: string | null
-          date_confidence: number | null
-          id: string | null
-          merchant: string | null
-          merchant_confidence: number | null
-          normalized_merchant: string | null
-          overall_confidence: number | null
-          payment_method: string | null
-          payment_method_confidence: number | null
-          predicted_category: string | null
-          processing_status: string | null
-          total: number | null
-          total_confidence: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
+      bytea_to_text: {
+        Args: { data: string }
+        Returns: string
+      }
       column_exists: {
         Args: { p_table: string; p_column: string; p_schema?: string }
         Returns: boolean
@@ -498,20 +286,95 @@ export type Database = {
           receipt_count: number
         }[]
       }
+      http: {
+        Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_delete: {
+        Args:
+          | { uri: string }
+          | { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_get: {
+        Args: { uri: string } | { uri: string; data: Json }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_head: {
+        Args: { uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_header: {
+        Args: { field: string; value: string }
+        Returns: Database["public"]["CompositeTypes"]["http_header"]
+      }
+      http_list_curlopt: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          curlopt: string
+          value: string
+        }[]
+      }
+      http_patch: {
+        Args: { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_post: {
+        Args:
+          | { uri: string; content: string; content_type: string }
+          | { uri: string; data: Json }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_put: {
+        Args: { uri: string; content: string; content_type: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+      }
+      http_reset_curlopt: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      http_set_curlopt: {
+        Args: { curlopt: string; value: string }
+        Returns: boolean
+      }
       increment_batch_counter: {
         Args: { batch_uuid: string; field_name: string }
         Returns: undefined
       }
+      text_to_bytea: {
+        Args: { data: string }
+        Returns: string
+      }
       update_processing_status_if_failed: {
         Args: { receipt_id: string }
         Returns: undefined
+      }
+      urlencode: {
+        Args: { data: Json } | { string: string } | { string: string }
+        Returns: string
       }
     }
     Enums: {
       [_ in never]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      http_header: {
+        field: string | null
+        value: string | null
+      }
+      http_request: {
+        method: unknown | null
+        uri: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content_type: string | null
+        content: string | null
+      }
+      http_response: {
+        status: number | null
+        content_type: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content: string | null
+      }
     }
   }
 }
