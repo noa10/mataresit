@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -202,10 +203,12 @@ export default function BatchUploadZone({
       });
 
       // Extract receipt IDs from completed uploads
+      // Fix: Make sure we're using strings as index keys, not ReceiptUpload objects
       const successfulReceiptIds = completedUploads
         .map(uploadId => {
-          // Fix: Use the uploadId string instead of the ReceiptUpload object
-          return receiptIds[uploadId];
+          // Ensure we're using string IDs, not objects
+          const id = typeof uploadId === 'string' ? uploadId : null;
+          return id ? receiptIds[id] : null;
         })
         .filter(Boolean) as string[];
 
@@ -295,8 +298,12 @@ export default function BatchUploadZone({
         onReset={resetBatchUpload}
         onViewAllReceipts={() => {
           // Show the receipt browser modal with all completed receipt IDs
+          // Fix: Ensure we're using string IDs when accessing the receiptIds object
           const successfulReceiptIds = completedUploads
-            .map(upload => receiptIds[upload.id])
+            .map(uploadId => {
+              const id = typeof uploadId === 'string' ? uploadId : null;
+              return id ? receiptIds[id] : null;
+            })
             .filter(Boolean) as string[];
 
           if (successfulReceiptIds.length > 0) {
