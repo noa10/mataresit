@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +11,13 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SettingsPage from "./pages/SettingsPage";
+import AdminRoute from "./components/admin/AdminRoute";
+import AdminLayoutPage from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UsersManagement from "./pages/admin/UsersManagement";
+import ReceiptsManagement from "./pages/admin/ReceiptsManagement";
+import AnalyticsPage from "./pages/admin/AnalyticsPage";
+import AdminSettingsPage from "./pages/admin/SettingsPage";
 
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
@@ -62,6 +70,17 @@ const App = () => (
                 <AnalysisPage />
               </Suspense>
             } />
+
+            {/* Admin Routes */}
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminLayoutPage />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<UsersManagement />} />
+                <Route path="receipts" element={<ReceiptsManagement />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="settings" element={<AdminSettingsPage />} />
+              </Route>
+            </Route>
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

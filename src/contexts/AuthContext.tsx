@@ -3,11 +3,13 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AppRole, UserWithRole } from "@/types/auth";
 
 type AuthContextType = {
-  user: User | null;
+  user: UserWithRole | null;
   session: Session | null;
   loading: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -16,24 +18,73 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserWithRole | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+
+  // Fetch user roles
+  const fetchUserRoles = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching user roles:', error);
+        return [];
+      }
+
+      return data.map(item => item.role) as AppRole[];
+    } catch (error) {
+      console.error('Error in fetchUserRoles:', error);
+      return [];
+    }
+  };
+
+  // Update user state with roles
+  const updateUserWithRoles = async (currentUser: User | null, currentSession: Session | null) => {
+    if (!currentUser) {
+      setUser(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    try {
+      const roles = await fetchUserRoles(currentUser.id);
+      const userWithRole: UserWithRole = {
+        ...currentUser,
+        roles
+      };
+      
+      setUser(userWithRole);
+      setIsAdmin(roles.includes('admin'));
+    } catch (error) {
+      console.error('Error updating user with roles:', error);
+      setUser(currentUser as UserWithRole);
+      setIsAdmin(false);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, newSession) => {
+        setSession(newSession);
+        
+        // Use setTimeout to avoid auth deadlock issues
+        setTimeout(() => {
+          updateUserWithRoles(newSession?.user ?? null, newSession);
+        }, 0);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      updateUserWithRoles(currentSession?.user ?? null, currentSession);
       setLoading(false);
     });
 
@@ -100,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         loading,
+        isAdmin,
         signUp,
         signIn,
         signOut,
