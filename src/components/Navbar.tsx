@@ -1,97 +1,127 @@
-
-import { Button } from "./ui/button";
-import { NavLink } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronRight, LayoutDashboard, FileText, BarChart2, Settings, LogOut, Shield } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown } from "lucide-react";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "./ui/dropdown-menu";
 
 export default function Navbar() {
   const { user, signOut, isAdmin } = useAuth();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    setIsDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleTheme = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const initial = user?.email?.charAt(0).toUpperCase() ?? "";
 
   return (
-    <nav className="flex flex-col h-full border-r bg-background">
-      <div className="p-4 border-b">
-        <h2 className="font-semibold text-lg flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" />
-          PaperlessMaverick
-        </h2>
-      </div>
+    <header className="w-full bg-background border-b">
+      <div className="container mx-auto flex items-center justify-between py-4 px-4 md:px-8">
+        {/* Brand */}
+        <NavLink to="/" className="flex items-center gap-2 text-xl font-semibold text-foreground">
+          <FileText className="h-6 w-6 text-primary" />
+          ReceiptScan
+        </NavLink>
 
-      <div className="flex-1 overflow-auto py-2">
-        <div className="px-3 py-2">
-          <h3 className="mb-2 px-4 text-xs font-semibold text-foreground">Menu</h3>
-          <div className="space-y-1">
-            <NavLink 
-              to="/dashboard"
-              className={({isActive}) => `
-                flex items-center gap-3 rounded-md px-4 py-2 text-sm font-medium transition-colors 
-                ${isActive 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'hover:bg-accent text-muted-foreground hover:text-accent-foreground'}
-              `}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </NavLink>
-            <NavLink 
-              to="/analysis"
-              className={({isActive}) => `
-                flex items-center gap-3 rounded-md px-4 py-2 text-sm font-medium transition-colors 
-                ${isActive 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'hover:bg-accent text-muted-foreground hover:text-accent-foreground'}
-              `}
-            >
-              <BarChart2 className="h-4 w-4" />
-              Analysis
-            </NavLink>
-            <NavLink 
-              to="/settings"
-              className={({isActive}) => `
-                flex items-center gap-3 rounded-md px-4 py-2 text-sm font-medium transition-colors 
-                ${isActive 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'hover:bg-accent text-muted-foreground hover:text-accent-foreground'}
-              `}
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </NavLink>
-            
-            {/* Admin Link - Only shown to admin users */}
-            {isAdmin && (
-              <NavLink 
-                to="/admin"
-                className={({isActive}) => `
-                  flex items-center gap-3 rounded-md px-4 py-2 text-sm font-medium transition-colors 
-                  ${isActive 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'hover:bg-accent text-muted-foreground hover:text-accent-foreground'}
-                `}
-              >
-                <Shield className="h-4 w-4" />
-                Admin Panel
-              </NavLink>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-auto p-4 border-t">
-        <div className="flex items-center gap-3 py-2">
-          <div>
-            <div className="font-medium">{user?.email}</div>
-            <div className="text-xs text-muted-foreground">User ID: {user?.id?.substring(0, 8)}...</div>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="ml-auto"
-            onClick={() => signOut()}
+        {/* Main nav links */}
+        <nav className="hidden md:flex items-center space-x-6">
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
           >
-            <LogOut className="h-5 w-5" />
+            Home
+          </NavLink>
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            to="/analysis"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
+          >
+            Analysis
+          </NavLink>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
+          >
+            Settings
+          </NavLink>
+        </nav>
+
+        {/* Actions: theme toggle + user menu */}
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
+
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="flex items-center">
+                  <span className="rounded-full bg-primary text-primary-foreground w-8 h-8 flex items-center justify-center font-bold">
+                    {initial}
+                  </span>
+                  <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/profile">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => signOut()}>Sign Out</DropdownMenuItem>
+                {isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">Admin Panel</Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
