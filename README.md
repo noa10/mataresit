@@ -55,7 +55,9 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 -   **Multi-currency Support**: Handles different currencies, primarily MYR and USD.
 -   **Batch Uploading**: Allows uploading and processing multiple receipts concurrently with control over concurrency and auto-start. Includes a review step for batch results.
 -   **Thumbnail Generation**: Creates smaller thumbnail images for faster loading in lists and previews.
--   **Theme Toggle**: Allows switching between light and dark modes.
+-   **Theme Toggle**: Allows switching between light and dark modes with persistent preferences stored in localStorage.
+-   **User Menu**: Enhanced navigation with a dropdown user menu showing profile information and quick access to key functions.
+-   **Responsive Design**: Modern navigation that works well on both desktop and mobile devices.
 -   **Daily PDF Report Generation**: Allows generating PDF reports for a selected day's expenses, summarized by payer or category.
 
 ## Architecture
@@ -274,6 +276,16 @@ The frontend is built using React and utilizes [Shadcn UI](https://ui.shadcn.com
 -   Login/Signup form
 
 ### Core Components
+
+#### `Navbar`
+-   Modern responsive navigation with app branding.
+-   Main navigation links to key application areas.
+-   Theme toggle button for switching between light and dark modes.
+-   User dropdown menu showing user initial and providing access to:
+    -   Profile page
+    -   Sign out function
+    -   Admin panel (for admin users only)
+-   Preserves theme preferences in localStorage.
 
 #### `UploadZone`
 -   Drag & drop or file select interface for single file uploads.
