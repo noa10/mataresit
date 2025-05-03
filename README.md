@@ -59,6 +59,7 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 -   **User Menu**: Enhanced navigation with a dropdown user menu showing profile information and quick access to key functions.
 -   **Responsive Design**: Modern navigation that works well on both desktop and mobile devices.
 -   **Daily PDF Report Generation**: Allows generating PDF reports for a selected day's expenses, summarized by payer or category.
+-   **Role-Based Access Control (RBAC)**: Basic admin role implemented, allowing for future admin-specific features (e.g., Admin Panel link in user menu).
 
 ## Architecture
 
@@ -109,6 +110,8 @@ graph TD
     Func_PDF -- Fetch Receipts --> DB
     Func_PDF -- Generate PDF --> jsPDF
     Func_PDF -- Return PDF --> FE
+
+    Auth -- Check Roles --> DB (via RPC `has_role`)
 ```
 
 ### Data Flow
@@ -265,6 +268,13 @@ The frontend is built using React and utilizes [Shadcn UI](https://ui.shadcn.com
 -   Upload button (triggers Batch Upload Modal)
 -   Summary statistics
 -   Daily PDF Report Generator component
+
+#### Index Page (`/`)
+-   Serves as the main landing/homepage.
+-   Provides an overview of the application's features and workflow.
+-   Includes clear calls-to-action (CTAs) for signing up, logging in, or proceeding to the dashboard/upload page if logged in.
+-   Features sections detailing how the application works, key features, and social proof.
+-   Uses modern UI elements and animations (`framer-motion`).
 
 #### Receipt View (`/receipt/:id`)
 -   Side-by-side receipt image and data editor
