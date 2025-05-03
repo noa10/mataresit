@@ -6,9 +6,8 @@ import { UserWithRole } from "@/types/auth";
 export const adminService = {
   // Get all users
   async getAllUsers() {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('*');
+    // Using raw SQL query instead of accessing the view directly
+    const { data, error } = await supabase.rpc('get_admin_users');
     
     if (error) {
       console.error("Error fetching users:", error);
@@ -20,28 +19,11 @@ export const adminService = {
   
   // Update user role
   async updateUserRole(userId: string, role: 'admin' | 'user') {
-    // Check if the user already has this role
-    const { data: existingRole } = await supabase
-      .from('user_roles')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('role', role)
-      .maybeSingle();
-      
-    if (existingRole) {
-      return { message: 'User already has this role' };
-    }
-    
-    // Remove other roles first (assuming a user can have only one role)
-    await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-      
-    // Add the new role
-    const { data, error } = await supabase
-      .from('user_roles')
-      .insert({ user_id: userId, role });
+    // Use RPC call to avoid direct table access type issues
+    const { data, error } = await supabase.rpc('set_user_role', { 
+      _user_id: userId, 
+      _role: role 
+    });
       
     if (error) {
       console.error("Error updating user role:", error);

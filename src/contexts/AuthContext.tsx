@@ -27,17 +27,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user roles
   const fetchUserRoles = async (userId: string) => {
     try {
+      // Using raw SQL query to avoid type issues with the newly created table
       const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
+        .rpc('has_role', { _user_id: userId, _role: 'admin' });
 
       if (error) {
         console.error('Error fetching user roles:', error);
         return [];
       }
 
-      return data.map(item => item.role) as AppRole[];
+      return data ? ['admin'] : ['user'] as AppRole[];
     } catch (error) {
       console.error('Error in fetchUserRoles:', error);
       return [];
