@@ -13,9 +13,19 @@ additional_redirect_urls = [
   "http://localhost:3000",
   "https://paperless-maverick.vercel.app",
   "https://paperless-maverick.vercel.app/auth",
+  "https://paperless-maverick.vercel.app/auth/",
+  "https://paperless-maverick.vercel.app/auth/callback",
+  "https://paperless-maverick.vercel.app/auth/reset-password",
+  "https://paperless-maverick.vercel.app/auth?type=recovery",
   "http://localhost:8080/auth",
   "http://localhost:5173/auth",
-  "http://localhost:3000/auth"
+  "http://localhost:3000/auth",
+  "http://localhost:8080/auth/callback",
+  "http://localhost:5173/auth/callback",
+  "http://localhost:3000/auth/callback",
+  "http://localhost:8080/auth/reset-password",
+  "http://localhost:5173/auth/reset-password",
+  "http://localhost:3000/auth/reset-password"
 ]
 
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).

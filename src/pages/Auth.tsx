@@ -107,8 +107,60 @@ export default function Auth() {
       const type = url.searchParams.get('type');
       const token = url.searchParams.get('token');
       const code = url.searchParams.get('code');
+      const error = url.searchParams.get('error');
+      const error_description = url.searchParams.get('error_description');
 
-      console.log("URL params:", { type, token: token?.substring(0, 5), code: code?.substring(0, 5) });
+      // Check for hash fragments (access_token, etc.)
+      const hash = window.location.hash;
+      console.log("URL hash:", hash ? "Present" : "None");
+
+      // If we have a hash that contains access_token, this might be from a password reset
+      if (hash && hash.includes('access_token')) {
+        console.log("Found access_token in URL hash, likely from password reset flow");
+
+        // Check if we have both access_token and refresh_token
+        const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
+        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
+
+        if (accessToken && refreshToken) {
+          console.log("Found both access_token and refresh_token in hash");
+          setIsRecoverySession(true);
+          setIsResetPasswordOpen(true);
+
+          // Show a toast to guide the user
+          toast({
+            title: "Password Reset",
+            description: "Please set a new password for your account.",
+          });
+
+          // We don't clean up the URL here as it might break the auth flow
+          return true;
+        } else {
+          console.warn("Found access_token but missing refresh_token in hash");
+        }
+      }
+
+      console.log("URL params:", {
+        type,
+        token: token?.substring(0, 5) + "..." || "None",
+        code: code?.substring(0, 5) + "..." || "None",
+        error,
+        error_description
+      });
+
+      // If there's an error in the URL, show it to the user
+      if (error || error_description) {
+        console.error("Auth error from URL:", error, error_description);
+        toast({
+          title: "Authentication Error",
+          description: error_description || "There was an error processing your request. Please try again.",
+          variant: "destructive",
+        });
+
+        // Clean up URL - keep the base path
+        const basePath = window.location.pathname.split('?')[0];
+        window.history.replaceState({}, document.title, basePath);
+      }
 
       // If recovery indicators are present, set recovery mode
       if (type === 'recovery' || (token && type === 'recovery')) {
@@ -122,9 +174,9 @@ export default function Auth() {
           description: "Please set a new password for your account.",
         });
 
-        // Clean up URL - keep the base path
-        const basePath = window.location.pathname.split('?')[0];
-        window.history.replaceState({}, document.title, basePath);
+        // Clean up URL params but keep the hash - it might contain tokens we need
+        const basePath = window.location.pathname;
+        window.history.replaceState({}, document.title, basePath + window.location.hash);
         return true;
       }
 
@@ -165,8 +217,35 @@ export default function Auth() {
 
   // Listen for auth state changes
   useEffect(() => {
-    // Run the check immediately
-    checkForRecoveryMode();
+    // Check for hash fragment in URL first
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      console.log("Found access_token in URL hash on initial load");
+
+      // Extract both tokens from the hash
+      const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
+      const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
+
+      if (accessToken && refreshToken) {
+        console.log("Successfully extracted access_token and refresh_token from hash");
+
+        // This is likely a password reset flow
+        setIsRecoverySession(true);
+        setIsResetPasswordOpen(true);
+
+        toast({
+          title: "Password Reset",
+          description: "Please set a new password for your account.",
+        });
+      } else {
+        console.warn("Found access_token but missing refresh_token in hash on initial load");
+        // Still try the normal check as a fallback
+        checkForRecoveryMode();
+      }
+    } else {
+      // If no hash with access token, run the normal check
+      checkForRecoveryMode();
+    }
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -190,14 +269,23 @@ export default function Auth() {
         const url = new URL(window.location.href);
         const type = url.searchParams.get('type');
 
-        if (type === 'recovery') {
+        // Also check for hash fragment which might indicate a password reset flow
+        const hash = window.location.hash;
+        const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
+        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
+        const isHashRecovery = hash && accessToken && refreshToken;
+
+        if (type === 'recovery' || isHashRecovery) {
           console.log("Recovery sign-in detected");
           setIsRecoverySession(true);
           setIsResetPasswordOpen(true);
 
-          // Clean up URL - keep the base path
-          const basePath = window.location.pathname.split('?')[0];
-          window.history.replaceState({}, document.title, basePath);
+          // We don't clean up the URL here as it might break the auth flow
+          // Only clean up query parameters, not hash
+          if (type === 'recovery' && !isHashRecovery) {
+            const basePath = window.location.pathname.split('?')[0];
+            window.history.replaceState({}, document.title, basePath + window.location.hash);
+          }
 
           // Show a toast to guide the user
           toast({
@@ -264,25 +352,72 @@ export default function Auth() {
     try {
       console.log("Updating password during recovery flow...");
 
-      // First, make sure we have a valid session
-      const { data: sessionData } = await supabase.auth.getSession();
+      let sessionToUse = null;
+      const { data: existingSessionData } = await supabase.auth.getSession();
+      sessionToUse = existingSessionData.session;
 
-      if (!sessionData.session) {
-        console.log("No active session found, attempting to update password anyway");
+      if (!sessionToUse) {
+        console.warn("No active session found by getSession(). Attempting to set session manually from URL hash.");
+        const hash = window.location.hash;
+        const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
+        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1]; // Extract refresh_token
+
+        if (accessToken && refreshToken) {
+          console.log("Found access_token and refresh_token in hash. Attempting supabase.auth.setSession().");
+          const { data: manualSessionData, error: setError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (setError) {
+            console.error("Error manually setting session:", setError);
+            toast({
+              title: "Session Error",
+              description: `Failed to establish session for password reset: ${setError.message}. Please try the recovery link again.`,
+              variant: "destructive",
+            });
+            setIsLoading(false);
+            return; // Stop execution if session cannot be set
+          }
+          console.log("Manual session set successfully.");
+          sessionToUse = manualSessionData.session; // Use the newly set session
+
+          if (!sessionToUse) {
+            console.error("Session still null after attempting manual setSession.");
+            toast({
+              title: "Session Error",
+              description: "Could not verify session after manual setup. Please try again.",
+              variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          console.error("Access token or refresh token missing in hash. Cannot manually set session.");
+          toast({
+            title: "Recovery Error",
+            description: "Incomplete recovery information in URL. Please use the link from your email again.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return; // Stop execution
+        }
       } else {
-        console.log("Active session found, proceeding with password update");
+        console.log("Active session found via getSession().");
       }
 
-      // Update the password
-      const { data: updateData, error } = await supabase.auth.updateUser({
+      // At this point, sessionToUse should be valid either from getSession() or manual setSession()
+      console.log("Proceeding with password update...");
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: data.password
       });
 
-      if (error) {
-        throw error;
+      if (updateError) {
+        console.error("Supabase updateUser error:", updateError);
+        throw updateError;
       }
 
-      console.log("Password update successful:", updateData ? "User updated" : "No update");
+      console.log("Password update successful:", updateData ? "User updated" : "No update data returned");
 
       // Reset the recovery session state
       setIsRecoverySession(false);
@@ -292,8 +427,11 @@ export default function Auth() {
       // Show success message
       toast({
         title: "Password updated",
-        description: "Your password has been updated successfully. You can now use your new password to log in.",
+        description: "Your password has been updated successfully. You will be signed out and can now log in with your new password.",
       });
+
+      // Clean the hash from the URL as it's no longer needed and contains sensitive tokens
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
       // Sign out the user to make them log in with the new password
       await supabase.auth.signOut();
