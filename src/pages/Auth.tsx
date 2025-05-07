@@ -107,8 +107,30 @@ export default function Auth() {
       const type = url.searchParams.get('type');
       const token = url.searchParams.get('token');
       const code = url.searchParams.get('code');
+      const error = url.searchParams.get('error');
+      const error_description = url.searchParams.get('error_description');
 
-      console.log("URL params:", { type, token: token?.substring(0, 5), code: code?.substring(0, 5) });
+      console.log("URL params:", {
+        type,
+        token: token?.substring(0, 5) + "...",
+        code: code?.substring(0, 5) + "...",
+        error,
+        error_description
+      });
+
+      // If there's an error in the URL, show it to the user
+      if (error || error_description) {
+        console.error("Auth error from URL:", error, error_description);
+        toast({
+          title: "Authentication Error",
+          description: error_description || "There was an error processing your request. Please try again.",
+          variant: "destructive",
+        });
+
+        // Clean up URL - keep the base path
+        const basePath = window.location.pathname.split('?')[0];
+        window.history.replaceState({}, document.title, basePath);
+      }
 
       // If recovery indicators are present, set recovery mode
       if (type === 'recovery' || (token && type === 'recovery')) {

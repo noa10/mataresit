@@ -177,13 +177,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Make sure path starts with a slash
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
-    // Get the base URL (origin) of the current environment
+    // Check if we're in a Vercel environment
+    const isVercel = window.location.hostname.includes('vercel.app');
+
+    // For Vercel deployments, use the hardcoded production URL to ensure consistency
+    if (isVercel) {
+      const productionUrl = 'https://paperless-maverick.vercel.app';
+      const redirectUrl = `${productionUrl}${normalizedPath}`;
+      console.log(`Using Vercel production redirect URL: ${redirectUrl}`);
+      return redirectUrl;
+    }
+
+    // For local development, use the current origin
     const baseUrl = window.location.origin;
-
-    // Construct the full redirect URL
     const redirectUrl = `${baseUrl}${normalizedPath}`;
-
-    console.log(`Using redirect URL: ${redirectUrl}`);
+    console.log(`Using local redirect URL: ${redirectUrl}`);
     return redirectUrl;
   };
 
@@ -192,8 +200,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the appropriate redirect URL for the current environment
       const redirectUrl = getRedirectUrl('/auth');
 
+      console.log(`Sending password reset email with redirect URL: ${redirectUrl}`);
+
+      // For Vercel deployments, ensure we're using the correct URL format
+      let finalRedirectUrl = redirectUrl;
+      if (window.location.hostname.includes('vercel.app')) {
+        // Ensure we're using the exact format that's allowed in Supabase
+        finalRedirectUrl = 'https://paperless-maverick.vercel.app/auth';
+        console.log(`Using production redirect URL for Vercel: ${finalRedirectUrl}`);
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
+        redirectTo: finalRedirectUrl,
       });
 
       if (error) throw error;
