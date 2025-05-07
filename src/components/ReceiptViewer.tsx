@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/select";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
 import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUtils";
+import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
+import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
+import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -122,12 +125,22 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   const [isProcessing, setIsProcessing] = useState(false);
   const [showFullTextData, setShowFullTextData] = useState(false);
   const [showProcessLogs, setShowProcessLogs] = useState(false);
+  const [showBoundingBoxes, setShowBoundingBoxes] = useState(false);
+  const [showPolygons, setShowPolygons] = useState(true);
+  const [debugMode, setDebugMode] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(30);
+  const [showDocumentStructure, setShowDocumentStructure] = useState(false);
+  const [showVisualizationSettings, setShowVisualizationSettings] = useState(false);
+  const [highlightedField, setHighlightedField] = useState<string | null>(null);
+  const [highlightedBlockId, setHighlightedBlockId] = useState<string | null>(null);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const [imageSource, setImageSource] = useState("/placeholder.svg");
+  const imageRef = useRef<HTMLImageElement>(null);
 
   // Define available expense categories
   const expenseCategories = [
@@ -211,29 +224,34 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     if (receipt.image_url) {
       // Track if component is still mounted
       let isMounted = true;
-      
+
       // Use a placeholder initially
       setImageSource("/placeholder.svg");
-      
+
       // Start loading with better error handling
       const loadImage = async () => {
         try {
           // Get properly formatted URL
           const formattedUrl = await getFormattedImageUrl(receipt.image_url);
-          
+
           if (!isMounted) return;
-          
+
           // Create a new image to test loading
           const img = new Image();
-          
+
           // Set up load/error handlers
           img.onload = () => {
             if (isMounted) {
               setImageSource(formattedUrl);
               setImageError(false);
+              // Update image dimensions for bounding box calculations
+              setImageDimensions({
+                width: img.width,
+                height: img.height
+              });
             }
           };
-          
+
           img.onerror = () => {
             if (isMounted) {
               console.error("Error loading receipt image despite async formatting:", receipt.image_url);
@@ -241,7 +259,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
               setImageSource("/placeholder.svg");
             }
           };
-          
+
           // Start loading
           img.src = formattedUrl;
         } catch (error) {
@@ -252,9 +270,9 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           }
         }
       };
-      
+
       loadImage();
-      
+
       // Cleanup function
       return () => {
         isMounted = false;
@@ -771,6 +789,55 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     // }));
   };
 
+  // Function to handle field hover for bounding box highlighting
+  const handleFieldHover = (field: string | null) => {
+    if (showBoundingBoxes) {
+      setHighlightedField(field);
+    }
+  };
+
+  // Toggle bounding box visualization
+  const toggleBoundingBoxes = () => {
+    const newValue = !showBoundingBoxes;
+    setShowBoundingBoxes(newValue);
+
+    if (newValue) {
+      // When enabling, update image dimensions if they're not set
+      if (imageDimensions.width === 0 && imageRef.current) {
+        setImageDimensions({
+          width: imageRef.current.naturalWidth,
+          height: imageRef.current.naturalHeight
+        });
+      }
+
+      // Show visualization settings when enabling bounding boxes
+      setShowVisualizationSettings(true);
+    } else {
+      // When disabling, clear highlighted field and hide settings
+      setHighlightedField(null);
+      setHighlightedBlockId(null);
+      setShowVisualizationSettings(false);
+      setShowDocumentStructure(false);
+    }
+  };
+
+  // Toggle document structure viewer
+  const toggleDocumentStructure = () => {
+    setShowDocumentStructure(!showDocumentStructure);
+  };
+
+  // Toggle visualization settings panel
+  const toggleVisualizationSettings = () => {
+    setShowVisualizationSettings(!showVisualizationSettings);
+  };
+
+  // Handle block selection from document structure viewer
+  const handleSelectBlock = (blockId: string) => {
+    setHighlightedBlockId(blockId);
+    // TODO: Implement highlighting the selected block in the image
+    toast.info(`Selected block: ${blockId}`);
+  };
+
   // Add helper to render processing status indicator
   const renderProcessingStatus = () => {
     // Use processingStatus state, not receipt.processing_status
@@ -914,125 +981,198 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                   wheel={{ smoothStep: 0.04 }}
                   pinch={{ step: 5 }}
                 >
-                  {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
-                    <>
-                      <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
-                        <div className="flex gap-1">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => zoomIn()}
-                            title="Zoom In"
-                          >
-                            <ZoomIn size={16} />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => zoomOut()}
-                            title="Zoom Out"
-                          >
-                            <ZoomOut size={16} />
-                          </Button>
-                        </div>
+                  {({ zoomIn, zoomOut, resetTransform, setTransform, instance }) => {
+                    // Create a compatible transform state object that our overlay can use
+                    const transformState = instance ? {
+                      scale: instance.transformState.scale,
+                      positionX: instance.transformState.positionX,
+                      positionY: instance.transformState.positionY
+                    } : undefined;
+                    
+                    return (
+                      <>
+                        <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => zoomIn()}
+                              title="Zoom In"
+                            >
+                              <ZoomIn size={16} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => zoomOut()}
+                              title="Zoom Out"
+                            >
+                              <ZoomOut size={16} />
+                            </Button>
+                          </div>
 
-                        <div className="flex gap-1">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => {
-                              const newRotation = (rotation - 90) % 360;
-                              setRotation(newRotation);
-                              setTransform(0, 0, 1);
-                            }}
-                            title="Rotate Left"
-                          >
-                            <RotateCcw size={16} />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => {
-                              const newRotation = (rotation + 90) % 360;
-                              setRotation(newRotation);
-                              setTransform(0, 0, 1);
-                            }}
-                            title="Rotate Right"
-                          >
-                            <RotateCw size={16} />
-                          </Button>
-                        </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => {
+                                const newRotation = (rotation - 90) % 360;
+                                setRotation(newRotation);
+                                setTransform(0, 0, 1);
+                              }}
+                              title="Rotate Left"
+                            >
+                              <RotateCcw size={16} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => {
+                                const newRotation = (rotation + 90) % 360;
+                                setRotation(newRotation);
+                                setTransform(0, 0, 1);
+                              }}
+                              title="Rotate Right"
+                            >
+                              <RotateCw size={16} />
+                            </Button>
+                          </div>
 
-                        <div className="flex gap-1">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => {
-                              resetTransform();
-                              setRotation(0);
-                            }}
-                            title="Reset View"
-                          >
-                            <RotateCw size={16} />
-                          </Button>
-                        </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => {
+                                resetTransform();
+                                setRotation(0);
+                              }}
+                              title="Reset View"
+                            >
+                              <RotateCw size={16} />
+                            </Button>
+                          </div>
 
-                        <div className="flex gap-1">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = imageSource; // Use the already processed image URL from state
-                              link.download = `receipt-${receipt.id}.jpg`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            title="Download Image"
-                          >
-                            <Download size={16} />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
-                                deleteMutation.mutate();
-                              }
-                            }}
-                            disabled={deleteMutation.isPending}
-                            title="Delete Receipt"
-                          >
-                            {deleteMutation.isPending ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={16} />
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showBoundingBoxes ? 'text-primary' : ''}`}
+                              onClick={toggleBoundingBoxes}
+                              title={showBoundingBoxes ? "Hide Bounding Boxes" : "Show Bounding Boxes"}
+                            >
+                              {showBoundingBoxes ? <Eye size={16} /> : <Layers size={16} />}
+                            </Button>
+
+                            {showBoundingBoxes && (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showVisualizationSettings ? 'text-primary' : ''}`}
+                                  onClick={toggleVisualizationSettings}
+                                  title="Visualization Settings"
+                                >
+                                  <Settings size={16} />
+                                </Button>
+
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showDocumentStructure ? 'text-primary' : ''}`}
+                                  onClick={toggleDocumentStructure}
+                                  title="Document Structure"
+                                  disabled={!receipt.document_structure || !receipt.document_structure.blocks || receipt.document_structure.blocks.length === 0}
+                                >
+                                  <Bug size={16} />
+                                </Button>
+                              </>
                             )}
-                          </Button>
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = imageSource; // Use the already processed image URL from state
+                                link.download = `receipt-${receipt.id}.jpg`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              title="Download Image"
+                            >
+                              <Download size={16} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+                                  deleteMutation.mutate();
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                              title="Delete Receipt"
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <TransformComponent
-                        wrapperClass="w-full h-full"
-                        contentClass="w-full h-full"
-                      >
-                        <img
-                          src={imageSource}
-                          alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                          className="receipt-image w-full h-full object-contain transition-transform"
-                          style={{ transform: `rotate(${rotation}deg)` }}
-                          onError={() => setImageError(true)}
-                        />
-                      </TransformComponent>
-                    </>
-                  )}
+                        <TransformComponent
+                          wrapperClass="w-full h-full"
+                          contentClass="w-full h-full"
+                        >
+                          <div className="relative w-full h-full">
+                            <img
+                              ref={imageRef}
+                              src={imageSource}
+                              alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
+                              className="receipt-image w-full h-full object-contain transition-transform"
+                              style={{ transform: `rotate(${rotation}deg)` }}
+                              onError={() => setImageError(true)}
+                              onLoad={(e) => {
+                                const img = e.currentTarget;
+                                setImageDimensions({
+                                  width: img.naturalWidth,
+                                  height: img.naturalHeight
+                                });
+                              }}
+                            />
+                            {/* Bounding Box Overlay */}
+                            {showBoundingBoxes && (
+                              <BoundingBoxOverlay
+                                fieldGeometry={receipt.field_geometry || {}}
+                                lineItems={editedReceipt.lineItems}
+                                imageWidth={imageDimensions.width}
+                                imageHeight={imageDimensions.height}
+                                visible={showBoundingBoxes}
+                                highlightedField={highlightedField}
+                                confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
+                                showPolygons={showPolygons}
+                                debugMode={debugMode}
+                                transformState={transformState}
+                                confidenceThreshold={confidenceThreshold}
+                                imageRef={imageRef}
+                              />
+                            )}
+                          </div>
+                        </TransformComponent>
+                      </>
+                    );
+                  }}
                 </TransformWrapper>
               </div>
             ) : (
@@ -1170,6 +1310,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                   value={editedReceipt.merchant || ""}
                   onChange={(e) => handleInputChange('merchant', e.target.value)}
                   className="bg-background/50"
+                  onMouseEnter={() => handleFieldHover('merchant')}
+                  onMouseLeave={() => handleFieldHover(null)}
                 />
                 {renderSuggestion('merchant', 'merchant name')}
               </div>
@@ -1209,6 +1351,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       value={typeof editedReceipt.date === 'string' ? editedReceipt.date.split('T')[0] : ''}
                       onChange={(e) => handleInputChange('date', e.target.value)}
                       className="bg-background/50 pl-9"
+                      onMouseEnter={() => handleFieldHover('date')}
+                      onMouseLeave={() => handleFieldHover(null)}
                     />
                     <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary dark:text-primary" />
                   </div>
@@ -1228,6 +1372,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       value={editedReceipt.total || 0}
                       onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
                       className="bg-background/50 pl-9"
+                      onMouseEnter={() => handleFieldHover('total')}
+                      onMouseLeave={() => handleFieldHover(null)}
                     />
                     <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
                   </div>
@@ -1260,6 +1406,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       value={editedReceipt.payment_method || ""}
                       onChange={(e) => handleInputChange('payment_method', e.target.value)}
                       className="bg-background/50 pl-9"
+                      onMouseEnter={() => handleFieldHover('payment_method')}
+                      onMouseLeave={() => handleFieldHover(null)}
                     />
                     <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
                   </div>
@@ -1273,15 +1421,28 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                     <Label>Line Items</Label>
                      <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 h-7"
-                    onClick={handleAddLineItem}
-                  >
-                    <Plus size={14} />
-                    Add Item
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 h-7"
+                      onClick={() => handleFieldHover('line_items')}
+                      onMouseLeave={() => handleFieldHover(null)}
+                      onBlur={() => handleFieldHover(null)}
+                    >
+                      <Layers size={14} />
+                      Highlight
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 h-7"
+                      onClick={handleAddLineItem}
+                    >
+                      <Plus size={14} />
+                      Add Item
+                    </Button>
+                  </div>
                 </div>
 
                 <Card className="bg-background/50 border border-border/50">
@@ -1348,6 +1509,8 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)}
                       className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
                       placeholder="Tax"
+                      onMouseEnter={() => handleFieldHover('tax')}
+                      onMouseLeave={() => handleFieldHover(null)}
                     />
                   </div>
                    {renderSuggestion('tax', 'tax amount')}
@@ -1384,6 +1547,32 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           </Button>
         </div>
       </motion.div>
+
+      {/* Visualization Settings Panel */}
+      {showVisualizationSettings && showBoundingBoxes && (
+        <div className="fixed right-4 top-20 z-50 w-64 shadow-lg">
+          <VisualizationSettings
+            showBoundingBoxes={showBoundingBoxes}
+            setShowBoundingBoxes={setShowBoundingBoxes}
+            showPolygons={showPolygons}
+            setShowPolygons={setShowPolygons}
+            debugMode={debugMode}
+            setDebugMode={setDebugMode}
+            confidenceThreshold={confidenceThreshold}
+            setConfidenceThreshold={setConfidenceThreshold}
+          />
+        </div>
+      )}
+
+      {/* Document Structure Viewer */}
+      {showDocumentStructure && showBoundingBoxes && (
+        <div className="fixed right-4 top-80 z-50 w-80 h-96 shadow-lg">
+          <DocumentStructureViewer
+            documentStructure={receipt.document_structure || { blocks: [], page_dimensions: { width: 0, height: 0 } }}
+            onSelectBlock={handleSelectBlock}
+          />
+        </div>
+      )}
 
       <ReceiptHistoryModal
         receiptId={receipt.id}

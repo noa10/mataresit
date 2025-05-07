@@ -1,14 +1,14 @@
 export type ReceiptStatus = "unreviewed" | "reviewed";
 
 // New processing status type for real-time updates
-export type ProcessingStatus = 
-  | 'uploading' 
-  | 'uploaded' 
-  | 'processing_ocr' 
-  | 'processing_ai' 
-  | 'failed_ocr' 
-  | 'failed_ai' 
-  | 'complete' 
+export type ProcessingStatus =
+  | 'uploading'
+  | 'uploaded'
+  | 'processing_ocr'
+  | 'processing_ai'
+  | 'failed_ocr'
+  | 'failed_ai'
+  | 'complete'
   | null;
 
 // Interface for managing the state during file upload and processing
@@ -79,6 +79,7 @@ export interface ReceiptLineItem {
   amount: number;
   created_at?: string;
   updated_at?: string;
+  geometry?: LineItemGeometry;
 }
 
 export interface LineItem {
@@ -104,6 +105,46 @@ export interface ConfidenceScore {
 }
 
 // ReceiptWithDetails now inherits confidence_scores from Receipt
+// Define geometry types for bounding boxes
+export interface BoundingBox {
+  Left: number;
+  Top: number;
+  Width: number;
+  Height: number;
+}
+
+export interface Polygon {
+  points: Array<{ X: number; Y: number }>;
+}
+
+export interface GeometryData {
+  boundingBox?: BoundingBox;
+  polygon?: Polygon;
+}
+
+export interface FieldGeometry {
+  merchant?: GeometryData;
+  date?: GeometryData;
+  total?: GeometryData;
+  tax?: GeometryData;
+  payment_method?: GeometryData;
+  [key: string]: GeometryData | undefined;
+}
+
+export interface LineItemGeometry {
+  item?: GeometryData;
+  price?: GeometryData;
+  combined?: BoundingBox;
+}
+
+export interface DocumentStructure {
+  blocks: Array<any>;
+  page_dimensions: {
+    width: number;
+    height: number;
+  };
+}
+
 export interface ReceiptWithDetails extends Receipt {
   lineItems?: ReceiptLineItem[];
   fullText?: string;
@@ -120,6 +161,9 @@ export interface ReceiptWithDetails extends Receipt {
     primaryValue: any;
     alternativeValue: any;
   }>;
+  // New fields for bounding box visualization
+  field_geometry?: FieldGeometry;
+  document_structure?: DocumentStructure;
 }
 
 export interface OCRResult {
