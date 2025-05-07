@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SettingsPage from "./pages/SettingsPage";
 import AdminRoute from "./components/admin/AdminRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminLayoutPage from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UsersManagement from "./pages/admin/UsersManagement";
@@ -50,28 +51,33 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/receipt/:id" element={
-              <Suspense fallback={<PageLoading />}>
-                <ViewReceipt />
-              </Suspense>
-            } />
-            <Route path="/profile" element={
-              <Suspense fallback={<PageLoading />}>
-                <Profile />
-              </Suspense>
-            } />
-            <Route path="/analysis" element={
-              <Suspense fallback={<PageLoading />}>
-                <AnalysisPage />
-              </Suspense>
-            } />
 
-            {/* Admin Routes */}
+            {/* Protected Routes - Require Authentication */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/receipt/:id" element={
+                <Suspense fallback={<PageLoading />}>
+                  <ViewReceipt />
+                </Suspense>
+              } />
+              <Route path="/profile" element={
+                <Suspense fallback={<PageLoading />}>
+                  <Profile />
+                </Suspense>
+              } />
+              <Route path="/analysis" element={
+                <Suspense fallback={<PageLoading />}>
+                  <AnalysisPage />
+                </Suspense>
+              } />
+            </Route>
+
+            {/* Admin Routes - Require Admin Role */}
             <Route element={<AdminRoute />}>
               <Route path="/admin" element={<AdminLayoutPage />}>
                 <Route index element={<AdminDashboard />} />

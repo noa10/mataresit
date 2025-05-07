@@ -12,6 +12,7 @@ type AuthContextType = {
   isAdmin: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...currentUser,
         roles
       };
-      
+
       setUser(userWithRole);
       setIsAdmin(roles.includes('admin'));
     } catch (error) {
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         setSession(newSession);
-        
+
         // Use setTimeout to avoid auth deadlock issues
         setTimeout(() => {
           updateUserWithRoles(newSession?.user ?? null, newSession);
@@ -126,6 +127,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      // No toast here as the user will be redirected to Google
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sign in with Google",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -153,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
       }}
     >
