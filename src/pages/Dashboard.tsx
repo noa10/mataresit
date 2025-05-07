@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Upload, Search, Filter, SlidersHorizontal,
-  PlusCircle, XCircle, Calendar, DollarSign, X,
+  PlusCircle, XCircle, Calendar as CalendarIcon, DollarSign, X,
   LayoutGrid, LayoutList, Table as TableIcon,
   Files, CheckSquare, Trash2, Loader2, Check
 } from "lucide-react";
@@ -25,6 +25,9 @@ import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { deleteReceipt } from "@/services/receiptService";
 import { toast } from "sonner";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
+import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
 
 import {
   Table,
@@ -86,6 +89,23 @@ export default function Dashboard() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
     (searchParams.get('sort') as any) || "newest"
   );
+
+  // Date range filter state
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+
+    if (fromParam && isValid(parseISO(fromParam))) {
+      if (toParam && isValid(parseISO(toParam))) {
+        return {
+          from: parseISO(fromParam),
+          to: parseISO(toParam)
+        };
+      }
+      return { from: parseISO(fromParam) };
+    }
+    return undefined;
+  });
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -188,7 +208,21 @@ export default function Dashboard() {
       const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTab = activeTab === "all" || receipt.status === activeTab;
       const matchesCurrency = !filterByCurrency || receipt.currency === filterByCurrency;
-      return matchesSearch && matchesTab && matchesCurrency;
+
+      // Date range filtering
+      let matchesDateRange = true;
+      if (dateRange?.from) {
+        const receiptDate = new Date(receipt.date);
+        // Check if receipt date is after or equal to the start date
+        matchesDateRange = isValid(receiptDate) && !isBefore(receiptDate, dateRange.from);
+
+        // If end date is specified, check if receipt date is before or equal to the end date
+        if (matchesDateRange && dateRange.to) {
+          matchesDateRange = !isAfter(receiptDate, dateRange.to);
+        }
+      }
+
+      return matchesSearch && matchesTab && matchesCurrency && matchesDateRange;
     })
     .sort((a, b) => {
       if (sortOrder === "newest") {
@@ -213,10 +247,35 @@ export default function Dashboard() {
     }).format(date);
   };
 
+  // Format date range for display
+  const formatDateRange = () => {
+    if (!dateRange?.from) return "All dates";
+
+    if (!dateRange.to) {
+      return `From ${format(dateRange.from, "MMM d, yyyy")}`;
+    }
+
+    return `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
+  };
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setSearchQuery(newQuery);
     updateSearchParams({ q: newQuery || null });
+  };
+
+  // Handle date range selection
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+
+    // Update URL parameters
+    if (!range || !range.from) {
+      updateSearchParams({ from: null, to: null });
+    } else {
+      const fromParam = format(range.from, "yyyy-MM-dd");
+      const toParam = range.to ? format(range.to, "yyyy-MM-dd") : null;
+      updateSearchParams({ from: fromParam, to: toParam });
+    }
   };
 
   const clearFilters = () => {
@@ -224,6 +283,7 @@ export default function Dashboard() {
     setActiveTab("all");
     setFilterByCurrency(null);
     setSortOrder("newest");
+    setDateRange(undefined);
     // Don't reset view mode when clearing filters, just keep current value if any
     const currentViewMode = viewMode !== 'grid' ? viewMode : null;
     // Clear all search params except view if it's not the default
@@ -729,6 +789,41 @@ export default function Dashboard() {
                 </Button>
               )}
 
+              {/* Date Filter Button */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={dateRange ? "default" : "outline"}
+                    className="gap-2 whitespace-nowrap"
+                  >
+                    <CalendarIcon size={16} />
+                    {dateRange ? formatDateRange() : "Date Filter"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="p-3">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={handleDateRangeChange}
+                      numberOfMonths={2}
+                    />
+                    {dateRange?.from && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 w-full"
+                        onClick={() => handleDateRangeChange(undefined)}
+                      >
+                        Clear Date Filter
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2 whitespace-nowrap">
@@ -753,10 +848,10 @@ export default function Dashboard() {
                       className="flex flex-wrap justify-start gap-2"
                     >
                       <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
-                        <Calendar className="h-4 w-4 mr-2" /> Newest
+                        <CalendarIcon className="h-4 w-4 mr-2" /> Newest
                       </ToggleGroupItem>
                       <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
-                        <Calendar className="h-4 w-4 mr-2" /> Oldest
+                        <CalendarIcon className="h-4 w-4 mr-2" /> Oldest
                       </ToggleGroupItem>
                       <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
                         <DollarSign className="h-4 w-4 mr-2" /> Highest
