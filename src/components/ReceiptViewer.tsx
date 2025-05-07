@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,10 +108,40 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
   );
 }
 
+// Debounce function to delay state updates
+const useDebounce = <T,>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps) {
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
+  // Add a separate state for input values that will be debounced
+  const [inputValues, setInputValues] = useState({
+    merchant: receipt.merchant || "",
+    date: receipt.date || "",
+    total: receipt.total || 0,
+    tax: receipt.tax || 0,
+    currency: receipt.currency || "MYR",
+    payment_method: receipt.payment_method || "",
+    predicted_category: receipt.predicted_category || ""
+  });
+  // Debounce the input values to avoid excessive state updates
+  const debouncedInputValues = useDebounce(inputValues, 500); // 500ms delay
+
   // State for confidence scores using ReceiptConfidence type
   const [editedConfidence, setEditedConfidence] = useState<ReceiptConfidence>(
     // Check if confidence_scores exists and is not null
@@ -151,6 +181,16 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
 
   useEffect(() => {
     setEditedReceipt(receipt);
+    // Initialize input values when receipt changes
+    setInputValues({
+      merchant: receipt.merchant || "",
+      date: receipt.date || "",
+      total: receipt.total || 0,
+      tax: receipt.tax || 0,
+      currency: receipt.currency || "MYR",
+      payment_method: receipt.payment_method || "",
+      predicted_category: receipt.predicted_category || ""
+    });
     // Initialize/Update editedConfidence when receipt changes
     // Handle different formats of confidence_scores
     if (receipt.confidence_scores) {
@@ -168,6 +208,66 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
     }
     setProcessingStatus(receipt.processing_status || null);
   }, [receipt]);
+
+  // Effect to update editedReceipt when debounced input values change
+  useEffect(() => {
+    // Validate currency before updating editedReceipt
+    let validatedCurrency = debouncedInputValues.currency;
+
+    // Ensure currency is a valid 3-letter code
+    if (!validatedCurrency || !/^[A-Z]{3}$/i.test(validatedCurrency)) {
+      validatedCurrency = 'MYR'; // Default to MYR if invalid
+    } else {
+      validatedCurrency = validatedCurrency.toUpperCase();
+    }
+
+    setEditedReceipt(prev => ({
+      ...prev,
+      merchant: debouncedInputValues.merchant,
+      date: debouncedInputValues.date,
+      total: debouncedInputValues.total,
+      tax: debouncedInputValues.tax,
+      currency: validatedCurrency,
+      payment_method: debouncedInputValues.payment_method,
+      predicted_category: debouncedInputValues.predicted_category
+    }));
+
+    // Update confidence scores for fields that have been edited
+    // Only update confidence when the value has actually changed from the original receipt
+    Object.entries(debouncedInputValues).forEach(([field, value]) => {
+      // Special handling for currency field
+      if (field === 'currency') {
+        // Only update if the validated currency is different from the original
+        if (validatedCurrency !== receipt.currency) {
+          setEditedConfidence(prev => ({
+            ...prev,
+            [field]: 100 // Set confidence to 100% for edited fields
+          }));
+
+          // Only show the verification toast when the value has been debounced
+          toast.success(`Currency verified`, {
+            duration: 1500,
+            position: 'bottom-right',
+            icon: '✓'
+          });
+        }
+      }
+      // Handle other fields normally
+      else if (field in defaultConfidence && value !== receipt[field as keyof typeof receipt]) {
+        setEditedConfidence(prev => ({
+          ...prev,
+          [field]: 100 // Set confidence to 100% for edited fields
+        }));
+
+        // Only show the verification toast when the value has been debounced
+        toast.success(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} verified`, {
+          duration: 1500,
+          position: 'bottom-right',
+          icon: '✓'
+        });
+      }
+    });
+  }, [debouncedInputValues, receipt]);
 
   // Subscribe to real-time updates for the receipt processing status
   useEffect(() => {
@@ -435,34 +535,35 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   });
 
   const formatCurrency = (amount?: number | null) => {
-    // Use editedReceipt for currency preference if available
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: editedReceipt.currency || 'MYR',
-    }).format(amount || 0); // Handle potential null/undefined amount
+    // Use a try-catch block to handle potential invalid currency codes
+    try {
+      // Validate currency code - must be 3 letters according to ISO 4217
+      const currencyCode = /^[A-Z]{3}$/i.test(inputValues.currency) ?
+        inputValues.currency.toUpperCase() : 'MYR';
+
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currencyCode,
+      }).format(amount || 0); // Handle potential null/undefined amount
+    } catch (error) {
+      // Fallback to MYR if there's any error
+      console.error("Error formatting currency:", error);
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'MYR',
+      }).format(amount || 0);
+    }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setEditedReceipt(prev => ({
+    // Only update the inputValues state, which will be debounced
+    setInputValues(prev => ({
       ...prev,
       [field]: value
     }));
 
-    // Update confidence scores in state when user edits a field
-    // Check if the field is a valid field on our ReceiptConfidence type
-    if (field in defaultConfidence) {
-      setEditedConfidence(prev => ({
-        ...prev,
-        [field]: 100 // Set confidence to 100%
-      }));
-
-      // Show visual feedback that the field has been verified
-      toast.success(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} verified`, {
-        duration: 1500,
-        position: 'bottom-right',
-        icon: '✓'
-      });
-    }
+    // The actual editedReceipt update and confidence score update
+    // will happen in the useEffect that watches debouncedInputValues
   };
 
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
@@ -695,20 +796,30 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
 
   // Function to accept an AI suggestion
   const handleAcceptSuggestion = (field: string, value: string | number) => {
-    setEditedReceipt(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Special handling for currency field
+    if (field === 'currency' && typeof value === 'string') {
+      // Validate currency code
+      const validatedCurrency = /^[A-Z]{3}$/i.test(value) ?
+        value.toUpperCase() : 'MYR';
 
-    // Also update confidence to 100% when accepting AI suggestion
-    if (field in defaultConfidence) {
-      setEditedConfidence(prev => ({
+      // Update with validated currency
+      setInputValues(prev => ({
         ...prev,
-        [field]: 100
+        [field]: validatedCurrency
+      }));
+    } else {
+      // Update the inputValues state for other fields, which will be debounced
+      setInputValues(prev => ({
+        ...prev,
+        [field]: value
       }));
     }
 
+    // Show a toast immediately for better UX
     toast.success(`Applied AI suggestion for ${field}`);
+
+    // The actual editedReceipt update and confidence score update
+    // will happen in the useEffect that watches debouncedInputValues
   };
 
   // Check if we have AI suggestions for a field
@@ -778,15 +889,12 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
 
   // Add category change handler
   const handleCategoryChange = (value: string) => {
-    setEditedReceipt(prev => ({
+    // Only update the inputValues state, which will be debounced
+    setInputValues(prev => ({
       ...prev,
       predicted_category: value
     }));
-     // Category confidence is not directly part of ConfidenceScore, handle separately if needed
-    // setEditedConfidence(prev => ({
-    //   ...prev,
-    //   predicted_category: 100 // This field might not exist on ConfidenceScore type
-    // }));
+    // The actual editedReceipt update will happen in the useEffect that watches debouncedInputValues
   };
 
   // Function to handle field hover for bounding box highlighting
@@ -988,7 +1096,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       positionX: instance.transformState.positionX,
                       positionY: instance.transformState.positionY
                     } : undefined;
-                    
+
                     return (
                       <>
                         <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
@@ -1307,7 +1415,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                 </div>
                 <Input
                   id="merchant"
-                  value={editedReceipt.merchant || ""}
+                  value={inputValues.merchant}
                   onChange={(e) => handleInputChange('merchant', e.target.value)}
                   className="bg-background/50"
                   onMouseEnter={() => handleFieldHover('merchant')}
@@ -1321,7 +1429,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                    <Label htmlFor="category">Category</Label>
                  </div>
                 <Select
-                  value={editedReceipt.predicted_category || ""}
+                  value={inputValues.predicted_category}
                   onValueChange={handleCategoryChange}
                 >
                   <SelectTrigger id="category" className="bg-background/50">
@@ -1348,7 +1456,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                     <Input
                       id="date"
                       type="date"
-                      value={typeof editedReceipt.date === 'string' ? editedReceipt.date.split('T')[0] : ''}
+                      value={typeof inputValues.date === 'string' ? inputValues.date.split('T')[0] : ''}
                       onChange={(e) => handleInputChange('date', e.target.value)}
                       className="bg-background/50 pl-9"
                       onMouseEnter={() => handleFieldHover('date')}
@@ -1369,7 +1477,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                       id="total"
                       type="number"
                       step="0.01"
-                      value={editedReceipt.total || 0}
+                      value={inputValues.total || 0}
                       onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
                       className="bg-background/50 pl-9"
                       onMouseEnter={() => handleFieldHover('total')}
@@ -1388,9 +1496,15 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                   </div>
                   <Input
                     id="currency"
-                    value={editedReceipt.currency || "MYR"}
-                    onChange={(e) => handleInputChange('currency', e.target.value)}
+                    value={inputValues.currency}
+                    onChange={(e) => {
+                      // Only allow letters and limit to 3 characters
+                      const value = e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 3);
+                      handleInputChange('currency', value.toUpperCase());
+                    }}
                     className="bg-background/50"
+                    maxLength={3}
+                    placeholder="MYR"
                   />
                    {renderSuggestion('currency', 'currency')}
                 </div>
@@ -1403,7 +1517,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                   <div className="relative">
                     <Input
                       id="paymentMethod"
-                      value={editedReceipt.payment_method || ""}
+                      value={inputValues.payment_method}
                       onChange={(e) => handleInputChange('payment_method', e.target.value)}
                       className="bg-background/50 pl-9"
                       onMouseEnter={() => handleFieldHover('payment_method')}
@@ -1505,7 +1619,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
                     <Input
                       type="number"
                       step="0.01"
-                      value={editedReceipt.tax || 0}
+                      value={inputValues.tax || 0}
                       onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)}
                       className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
                       placeholder="Tax"
