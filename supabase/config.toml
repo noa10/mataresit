@@ -24,6 +24,7 @@ jwt_expiry = 3600
 # Allow/disallow new user signups to your project.
 enable_signup = true
 
-# If enabled, a user will be automatically signed up for your project when they visit your site
-# and their email is verified by an OAuth provider.
-autoconfirm = true
+# If enabled, users need to confirm their email address before signing in.
+# Set to false to disable email confirmations (users can sign in without confirming email)
+[auth.email]
+enable_confirmations = false
