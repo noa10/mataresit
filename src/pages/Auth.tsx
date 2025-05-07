@@ -1,11 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -19,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
@@ -33,15 +36,34 @@ const signupSchema = loginSchema.extend({
   path: ["confirmPassword"],
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { user, signIn, signUp, signInWithGoogle } = useAuth();
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
+  const [isRecoverySession, setIsRecoverySession] = useState(false);
+  const { user, signIn, signUp, signInWithGoogle, resetPassword, updatePassword } = useAuth();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const location = useLocation();
+  const { toast } = useToast();
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -59,6 +81,139 @@ export default function Auth() {
       confirmPassword: "",
     },
   });
+
+  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Function to check for recovery mode
+  const checkForRecoveryMode = async () => {
+    try {
+      console.log("Checking for recovery mode...");
+
+      // Check URL parameters for recovery indicators
+      const url = new URL(window.location.href);
+      const type = url.searchParams.get('type');
+      const token = url.searchParams.get('token');
+      const code = url.searchParams.get('code');
+
+      console.log("URL params:", { type, token: token?.substring(0, 5), code: code?.substring(0, 5) });
+
+      // If recovery indicators are present, set recovery mode
+      if (type === 'recovery' || (token && type === 'recovery')) {
+        console.log("Recovery indicators found in URL");
+        setIsRecoverySession(true);
+        setIsResetPasswordOpen(true);
+
+        // Show a toast to guide the user
+        toast({
+          title: "Password Reset",
+          description: "Please set a new password for your account.",
+        });
+
+        // Clean up URL - keep the base path
+        const basePath = window.location.pathname.split('?')[0];
+        window.history.replaceState({}, document.title, basePath);
+        return true;
+      }
+
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Check if we have a session
+      if (session) {
+        console.log("Session found, checking for recovery context");
+
+        // If we have a session but no recovery indicators in the URL,
+        // check if the session was created for recovery
+        const accessToken = session.access_token;
+        if (accessToken && !type) {
+          // This is a heuristic - if we have a session but no clear indication
+          // of why, and the user just arrived, it might be from a recovery link
+          const justArrived = document.referrer !== window.location.href;
+          if (justArrived) {
+            console.log("User just arrived with a session, might be from recovery link");
+            setIsRecoverySession(true);
+            setIsResetPasswordOpen(true);
+
+            toast({
+              title: "Password Reset",
+              description: "It looks like you clicked a password reset link. Please set a new password for your account.",
+            });
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error checking for recovery mode:", error);
+      return false;
+    }
+  };
+
+  // Listen for auth state changes
+  useEffect(() => {
+    // Run the check immediately
+    checkForRecoveryMode();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state change event:", event, "Session:", session ? "exists" : "null");
+
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("PASSWORD_RECOVERY event detected");
+        setIsRecoverySession(true);
+        setIsResetPasswordOpen(true);
+
+        // Show a toast to guide the user
+        toast({
+          title: "Password Reset",
+          description: "Please set a new password for your account.",
+        });
+      }
+
+      // For SIGNED_IN events, check if it's from a recovery flow
+      if (event === 'SIGNED_IN') {
+        // Check URL parameters for recovery indicators
+        const url = new URL(window.location.href);
+        const type = url.searchParams.get('type');
+
+        if (type === 'recovery') {
+          console.log("Recovery sign-in detected");
+          setIsRecoverySession(true);
+          setIsResetPasswordOpen(true);
+
+          // Clean up URL - keep the base path
+          const basePath = window.location.pathname.split('?')[0];
+          window.history.replaceState({}, document.title, basePath);
+
+          // Show a toast to guide the user
+          toast({
+            title: "Password Reset",
+            description: "Please set a new password for your account.",
+          });
+        } else {
+          // If we just signed in but it's not clearly from recovery,
+          // check if we should be in recovery mode
+          checkForRecoveryMode();
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [toast]);
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
@@ -90,8 +245,84 @@ export default function Auth() {
     }
   };
 
-  // Redirect if user is already logged in
-  if (user) {
+  const onForgotPasswordSubmit = async (data: ForgotPasswordFormValues) => {
+    setIsLoading(true);
+    try {
+      await resetPassword(data.email);
+      setIsPasswordResetSent(true);
+      // Keep the dialog open to show success message
+    } catch (error) {
+      console.error("Password reset error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // This method is only used during the password recovery flow
+  const onResetPasswordSubmit = async (data: ResetPasswordFormValues) => {
+    setIsLoading(true);
+    try {
+      console.log("Updating password during recovery flow...");
+
+      // First, make sure we have a valid session
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        console.log("No active session found, attempting to update password anyway");
+      } else {
+        console.log("Active session found, proceeding with password update");
+      }
+
+      // Update the password
+      const { data: updateData, error } = await supabase.auth.updateUser({
+        password: data.password
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log("Password update successful:", updateData ? "User updated" : "No update");
+
+      // Reset the recovery session state
+      setIsRecoverySession(false);
+      setIsResetPasswordOpen(false);
+      resetPasswordForm.reset();
+
+      // Show success message
+      toast({
+        title: "Password updated",
+        description: "Your password has been updated successfully. You can now use your new password to log in.",
+      });
+
+      // Sign out the user to make them log in with the new password
+      await supabase.auth.signOut();
+
+      // Redirect to login page
+      window.location.href = '/auth';
+
+    } catch (error: any) {
+      console.error("Password update error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Additional check on mount for recovery parameters
+  useEffect(() => {
+    // This is a backup check in case the first one didn't catch it
+    if (!isRecoverySession && !isResetPasswordOpen) {
+      checkForRecoveryMode();
+    }
+  }, [isRecoverySession, isResetPasswordOpen]);
+
+  // Redirect if user is already logged in (but not in recovery mode)
+  if (user && !isRecoverySession && !isResetPasswordOpen) {
     // Redirect to the page they were trying to access, or dashboard as fallback
     const from = location.state?.from?.pathname || "/dashboard";
     return <Navigate to={from} replace />;
@@ -155,6 +386,21 @@ export default function Auth() {
                       "Log in"
                     )}
                   </Button>
+
+                  <div className="flex justify-end items-center mt-2 text-xs text-muted-foreground">
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-xs text-muted-foreground"
+                      type="button"
+                      onClick={() => {
+                        setIsForgotPasswordOpen(true);
+                        setIsPasswordResetSent(false);
+                        forgotPasswordForm.reset();
+                      }}
+                    >
+                      Forgot password?
+                    </Button>
+                  </div>
                 </form>
               </Form>
 
@@ -312,6 +558,142 @@ export default function Auth() {
           </Tabs>
         </motion.div>
       </main>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isPasswordResetSent ? "Email Sent" : "Forgot Password"}</DialogTitle>
+            <DialogDescription>
+              {isPasswordResetSent
+                ? "Check your email for a password reset link."
+                : "Enter your email address and we'll send you a link to reset your password."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!isPasswordResetSent ? (
+            <Form {...forgotPasswordForm}>
+              <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
+                <FormField
+                  control={forgotPasswordForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="your@email.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsForgotPasswordOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Reset Link"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          ) : (
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => setIsForgotPasswordOpen(false)}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog - Only shown during recovery flow */}
+      <Dialog
+        open={isResetPasswordOpen}
+        onOpenChange={(open) => {
+          // Only allow closing if not in recovery mode
+          if (!isRecoverySession || !open) {
+            setIsResetPasswordOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Your Password</DialogTitle>
+            <DialogDescription>
+              You've clicked a password reset link. Please set a new password for your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...resetPasswordForm}>
+            <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={resetPasswordForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} autoFocus />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={resetPasswordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="text-sm text-muted-foreground mt-2">
+                <p>Password must be at least 6 characters long.</p>
+                <p className="mt-2">
+                  After setting a new password, you'll be signed out and can log in with your new password.
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button type="submit" disabled={isLoading} className="w-full">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update Password"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

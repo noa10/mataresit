@@ -13,6 +13,8 @@ type AuthContextType = {
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -74,6 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (event, newSession) => {
         setSession(newSession);
 
+        // Handle password recovery event
+        if (event === 'PASSWORD_RECOVERY') {
+          toast({
+            title: "Reset your password",
+            description: "You can now set a new password",
+          });
+        }
+
         // Use setTimeout to avoid auth deadlock issues
         setTimeout(() => {
           updateUserWithRoles(newSession?.user ?? null, newSession);
@@ -93,7 +103,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      // Get the appropriate redirect URL for the current environment
+      const redirectUrl = getRedirectUrl();
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
       if (error) throw error;
       toast({
         title: "Account created",
@@ -129,10 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      // Get the appropriate redirect URL for the current environment
+      const redirectUrl = getRedirectUrl();
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: redirectUrl,
         },
       });
       if (error) throw error;
@@ -141,6 +163,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         title: "Error",
         description: error.message || "Failed to sign in with Google",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  /**
+   * Get the appropriate redirect URL based on the current environment
+   * This ensures that auth redirects work correctly in both development and production
+   */
+  const getRedirectUrl = (path: string = '/auth'): string => {
+    // Make sure path starts with a slash
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+    // Get the base URL (origin) of the current environment
+    const baseUrl = window.location.origin;
+
+    // Construct the full redirect URL
+    const redirectUrl = `${baseUrl}${normalizedPath}`;
+
+    console.log(`Using redirect URL: ${redirectUrl}`);
+    return redirectUrl;
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      // Get the appropriate redirect URL for the current environment
+      const redirectUrl = getRedirectUrl('/auth');
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) throw error;
+      toast({
+        title: "Password reset email sent",
+        description: "Check your email for a password reset link. Make sure to check your spam folder if you don't see it.",
+      });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send password reset email",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+      if (error) throw error;
+      toast({
+        title: "Password updated",
+        description: "Your password has been updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
         variant: "destructive",
       });
       throw error;
@@ -175,6 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signIn,
         signInWithGoogle,
+        resetPassword,
+        updatePassword,
         signOut,
       }}
     >

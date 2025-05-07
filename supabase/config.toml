@@ -1,1 +1,29 @@
 project_id = "mpmkbtsufihzdelrlszs"
+
+# Auth configuration
+[auth]
+# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
+# in emails.
+site_url = "https://paperless-maverick.vercel.app"
+
+# A list of URLs that auth providers are permitted to redirect to post authentication.
+additional_redirect_urls = [
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://paperless-maverick.vercel.app",
+  "https://paperless-maverick.vercel.app/auth",
+  "http://localhost:8080/auth",
+  "http://localhost:5173/auth",
+  "http://localhost:3000/auth"
+]
+
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
+jwt_expiry = 3600
+
+# Allow/disallow new user signups to your project.
+enable_signup = true
+
+# If enabled, a user will be automatically signed up for your project when they visit your site
+# and their email is verified by an OAuth provider.
+autoconfirm = true
