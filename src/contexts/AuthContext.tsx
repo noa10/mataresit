@@ -209,9 +209,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log(`Sending password reset email with redirect URL: ${redirectUrl}`);
 
-      // Make the API call with the appropriate redirect URL
+      // For Vercel deployments, ensure we're using the correct URL format
+      let finalRedirectUrl = redirectUrl;
+      if (window.location.hostname.includes('vercel.app')) {
+        // Ensure we're using the exact format that's allowed in Supabase
+        finalRedirectUrl = 'https://paperless-maverick.vercel.app/auth';
+        console.log(`Using production redirect URL for Vercel: ${finalRedirectUrl}`);
+      }
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
+        redirectTo: finalRedirectUrl,
       });
 
       if (error) throw error;
