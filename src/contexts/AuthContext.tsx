@@ -232,7 +232,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Password updated",
         description: "Your password has been updated successfully",
       });
+
+      // Clear the recovery hash from the URL to prevent re-triggering recovery mode
+      if (window.location.hash.includes('type=recovery')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        console.log("AuthContext: Recovery hash cleared from URL after password update.");
+      }
+
+      // Consider navigating the user away (e.g., to login or dashboard)
+      // This is best handled by the calling UI component using a router.
+
     } catch (error: any) {
+      console.error("AuthContext - Update password error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update password",
