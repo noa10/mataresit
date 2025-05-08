@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,15 +30,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserRoles = async (userId: string) => {
     try {
       // Using raw SQL query to avoid type issues with the newly created table
+      // TODO: Regenerate Supabase types to correctly include 'has_role' RPC function
       const { data, error } = await supabase
-        .rpc('has_role', { _user_id: userId, _role: 'admin' });
+        .rpc('has_role' as any, { _user_id: userId, _role: 'admin' });
 
       if (error) {
         console.error('Error fetching user roles:', error);
         return [];
       }
 
-      return data ? ['admin'] : ['user'] as AppRole[];
+      // Explicitly type the array elements as AppRole
+      return data ? ['admin' as AppRole] : ['user' as AppRole];
     } catch (error) {
       console.error('Error in fetchUserRoles:', error);
       return [];
@@ -197,27 +198,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      // For Vercel deployments, use a hardcoded URL that matches exactly what's in the Supabase dashboard
-      let redirectUrl: string;
-      if (window.location.hostname.includes('vercel.app')) {
-        // Use the exact URL format that's in your Supabase dashboard
-        redirectUrl = 'https://paperless-maverick.vercel.app/auth';
-      } else {
-        // For local development
-        redirectUrl = `${window.location.origin}/auth`;
-      }
-
+      // Use the getRedirectUrl function to ensure consistency with other auth methods
+      const redirectUrl = getRedirectUrl('/auth'); // Or your specific password update page
       console.log(`Sending password reset email with redirect URL: ${redirectUrl}`);
 
-      // For Vercel deployments, ensure we're using the correct URL format
-      let finalRedirectUrl = redirectUrl;
-      if (window.location.hostname.includes('vercel.app')) {
-        // Ensure we're using the exact format that's allowed in Supabase
-        finalRedirectUrl = 'https://paperless-maverick.vercel.app/auth';
-        console.log(`Using production redirect URL for Vercel: ${finalRedirectUrl}`);
-      }
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: finalRedirectUrl,
+        redirectTo: redirectUrl,
       });
 
       if (error) throw error;
