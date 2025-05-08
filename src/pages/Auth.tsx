@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { z } from "zod";
@@ -60,7 +59,7 @@ export default function Auth() {
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
   const [isRecoverySession, setIsRecoverySession] = useState(false);
-  const { user, signIn, signUp, signInWithGoogle, resetPassword, updatePassword } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const location = useLocation();
   const { toast } = useToast();
@@ -97,216 +96,98 @@ export default function Auth() {
     },
   });
 
-  // Function to check for recovery mode
-  const checkForRecoveryMode = async () => {
-    try {
-      console.log("Checking for recovery mode...");
+  // Function to check for recovery mode based on URL hash
+  // This is primarily for the initial page load.
+  const checkForRecoveryModeOnMount = () => {
+    console.log("Auth.tsx: checkForRecoveryModeOnMount running...");
+    const hash = window.location.hash;
 
-      // Check URL parameters for recovery indicators
-      const url = new URL(window.location.href);
-      const type = url.searchParams.get('type');
-      const token = url.searchParams.get('token');
-      const code = url.searchParams.get('code');
-      const error = url.searchParams.get('error');
-      const error_description = url.searchParams.get('error_description');
-
-      // Check for hash fragments (access_token, etc.)
-      const hash = window.location.hash;
-      console.log("URL hash:", hash ? "Present" : "None");
-
-      // If we have a hash that contains access_token, this might be from a password reset
-      if (hash && hash.includes('access_token')) {
-        console.log("Found access_token in URL hash, likely from password reset flow");
-
-        // Check if we have both access_token and refresh_token
-        const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
-        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
-
-        if (accessToken && refreshToken) {
-          console.log("Found both access_token and refresh_token in hash");
-          setIsRecoverySession(true);
-          setIsResetPasswordOpen(true);
-
-          // Show a toast to guide the user
-          toast({
-            title: "Password Reset",
-            description: "Please set a new password for your account.",
-          });
-
-          // We don't clean up the URL here as it might break the auth flow
-          return true;
-        } else {
-          console.warn("Found access_token but missing refresh_token in hash");
-        }
-      }
-
-      console.log("URL params:", {
-        type,
-        token: token?.substring(0, 5) + "..." || "None",
-        code: code?.substring(0, 5) + "..." || "None",
-        error,
-        error_description
-      });
-
-      // If there's an error in the URL, show it to the user
-      if (error || error_description) {
-        console.error("Auth error from URL:", error, error_description);
-        toast({
-          title: "Authentication Error",
-          description: error_description || "There was an error processing your request. Please try again.",
-          variant: "destructive",
-        });
-
-        // Clean up URL - keep the base path
-        const basePath = window.location.pathname.split('?')[0];
-        window.history.replaceState({}, document.title, basePath);
-      }
-
-      // If recovery indicators are present, set recovery mode
-      if (type === 'recovery' || (token && type === 'recovery')) {
-        console.log("Recovery indicators found in URL");
+    // Supabase password recovery flow puts tokens and type=recovery in the hash.
+    // e.g., #access_token=...&refresh_token=...&expires_in=...&token_type=bearer&type=recovery
+    if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
+      console.log("Auth.tsx: checkForRecoveryModeOnMount - Found 'type=recovery' and 'access_token' in hash.");
+      // Check if already in recovery mode to avoid redundant toasts/state sets if called multiple times
+      if (!isRecoverySession && !isResetPasswordOpen) {
         setIsRecoverySession(true);
         setIsResetPasswordOpen(true);
-
-        // Show a toast to guide the user
         toast({
           title: "Password Reset",
           description: "Please set a new password for your account.",
         });
-
-        // Clean up URL params but keep the hash - it might contain tokens we need
-        const basePath = window.location.pathname;
-        window.history.replaceState({}, document.title, basePath + window.location.hash);
-        return true;
       }
-
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-
-      // Check if we have a session
-      if (session) {
-        console.log("Session found, checking for recovery context");
-
-        // If we have a session but no recovery indicators in the URL,
-        // check if the session was created for recovery
-        const accessToken = session.access_token;
-        if (accessToken && !type) {
-          // This is a heuristic - if we have a session but no clear indication
-          // of why, and the user just arrived, it might be from a recovery link
-          const justArrived = document.referrer !== window.location.href;
-          if (justArrived) {
-            console.log("User just arrived with a session, might be from recovery link");
-            setIsRecoverySession(true);
-            setIsResetPasswordOpen(true);
-
-            toast({
-              title: "Password Reset",
-              description: "It looks like you clicked a password reset link. Please set a new password for your account.",
-            });
-            return true;
-          }
-        }
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Error checking for recovery mode:", error);
-      return false;
+      // It's important NOT to clear the hash here; onResetPasswordSubmit needs it.
+      return true;
     }
+    console.log("Auth.tsx: checkForRecoveryModeOnMount - No clear recovery indicators in hash.");
+    return false;
   };
 
-  // Listen for auth state changes
   useEffect(() => {
-    // Check for hash fragment in URL first
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token')) {
-      console.log("Found access_token in URL hash on initial load");
+    // Initial check on mount for recovery hash.
+    checkForRecoveryModeOnMount();
 
-      // Extract both tokens from the hash
-      const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
-      const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
-
-      if (accessToken && refreshToken) {
-        console.log("Successfully extracted access_token and refresh_token from hash");
-
-        // This is likely a password reset flow
-        setIsRecoverySession(true);
-        setIsResetPasswordOpen(true);
-
-        toast({
-          title: "Password Reset",
-          description: "Please set a new password for your account.",
-        });
-      } else {
-        console.warn("Found access_token but missing refresh_token in hash on initial load");
-        // Still try the normal check as a fallback
-        checkForRecoveryMode();
-      }
-    } else {
-      // If no hash with access token, run the normal check
-      checkForRecoveryMode();
-    }
-
-    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state change event:", event, "Session:", session ? "exists" : "null");
+      console.log("Auth.tsx: onAuthStateChange event:", event, "Session:", session ? "exists" : "null");
 
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("PASSWORD_RECOVERY event detected");
+        console.log("Auth.tsx: PASSWORD_RECOVERY event detected by onAuthStateChange.");
+        // This event implies Supabase has processed the recovery link and established a recovery session.
         setIsRecoverySession(true);
         setIsResetPasswordOpen(true);
-
-        // Show a toast to guide the user
         toast({
-          title: "Password Reset",
-          description: "Please set a new password for your account.",
+          title: "Password Recovery Confirmed",
+          description: "Please set your new password.",
         });
-      }
+        // Don't clear URL hash here; onResetPasswordSubmit needs it.
+      } else if (event === 'SIGNED_IN') {
+        // This event occurs for any successful sign-in (manual, OAuth, magic link, or session restoration).
+        // We must ensure this isn't misinterpreted as needing password reset if it's a normal sign-in.
+        const currentHash = window.location.hash;
+        const isActualRecoveryHash = currentHash && currentHash.includes('type=recovery') && currentHash.includes('access_token');
 
-      // For SIGNED_IN events, check if it's from a recovery flow
-      if (event === 'SIGNED_IN') {
-        // Check URL parameters for recovery indicators
-        const url = new URL(window.location.href);
-        const type = url.searchParams.get('type');
-
-        // Also check for hash fragment which might indicate a password reset flow
-        const hash = window.location.hash;
-        const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
-        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
-        const isHashRecovery = hash && accessToken && refreshToken;
-
-        if (type === 'recovery' || isHashRecovery) {
-          console.log("Recovery sign-in detected");
-          setIsRecoverySession(true);
-          setIsResetPasswordOpen(true);
-
-          // We don't clean up the URL here as it might break the auth flow
-          // Only clean up query parameters, not hash
-          if (type === 'recovery' && !isHashRecovery) {
-            const basePath = window.location.pathname.split('?')[0];
-            window.history.replaceState({}, document.title, basePath + window.location.hash);
+        if (isActualRecoveryHash) {
+          // If SIGNED_IN occurs and it IS a recovery hash, ensure recovery UI is active.
+          // This might be redundant if PASSWORD_RECOVERY event or checkForRecoveryModeOnMount already handled it, but acts as a safeguard.
+          if (!isRecoverySession) {
+            console.log("Auth.tsx: SIGNED_IN event with recovery hash, but recovery state not set. Setting it now.");
+            setIsRecoverySession(true);
+            setIsResetPasswordOpen(true);
           }
-
-          // Show a toast to guide the user
-          toast({
-            title: "Password Reset",
-            description: "Please set a new password for your account.",
-          });
         } else {
-          // If we just signed in but it's not clearly from recovery,
-          // check if we should be in recovery mode
-          checkForRecoveryMode();
+          // If it's a SIGNED_IN event (e.g. Google login) and NOT a recovery hash scenario,
+          // ensure recovery mode is turned OFF. This prevents the loop.
+          if (isRecoverySession || isResetPasswordOpen) {
+            console.log("Auth.tsx: SIGNED_IN event, but no active recovery hash. Resetting recovery state.");
+            setIsRecoverySession(false);
+            setIsResetPasswordOpen(false);
+          }
+          // AuthContext should handle clearing non-recovery auth hashes (like from OAuth).
         }
+      } else if (event === 'SIGNED_OUT') {
+        // If user signs out for any reason, clear any recovery state.
+        setIsRecoverySession(false);
+        setIsResetPasswordOpen(false);
+        resetPasswordForm.reset(); // Clear the form fields
+        // The component/logic that triggered sign-out should handle navigation/URL cleanup.
+        // onResetPasswordSubmit specifically handles this after password update.
       }
+      // USER_UPDATED events are generally not directly tied to starting/stopping recovery UI flow.
+      // The specific action (like password update) handles its own state.
     });
 
-    return () => subscription.unsubscribe();
-  }, [toast]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [toast, resetPasswordForm]); // Added resetPasswordForm to deps for reset call
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
       await signIn(data.email, data.password);
+      // Successful signIn will trigger onAuthStateChange, which handles navigation via redirect logic below
+    } catch (error) {
+      // Error toast is handled by signIn in AuthContext
+      console.error("Login error in Auth.tsx:", error);
     } finally {
       setIsLoading(false);
     }
@@ -316,7 +197,12 @@ export default function Auth() {
     setIsLoading(true);
     try {
       await signUp(data.email, data.password);
+      // Successful signUp will show a toast (from AuthContext) and user needs to verify email.
+      // Optionally, switch to login tab or show a message.
       setActiveTab("login");
+    } catch (error) {
+      // Error toast is handled by signUp in AuthContext
+      console.error("Signup error in Auth.tsx:", error);
     } finally {
       setIsLoading(false);
     }
@@ -326,9 +212,12 @@ export default function Auth() {
     setIsGoogleLoading(true);
     try {
       await signInWithGoogle();
+      // Redirect happens, then onAuthStateChange SIGNED_IN will be triggered.
     } catch (error) {
-      console.error("Google sign-in error:", error);
+      // Error toast is handled by signInWithGoogle in AuthContext
+      console.error("Google sign-in error in Auth.tsx:", error);
     } finally {
+      // This might not be reached if redirect is very fast.
       setIsGoogleLoading(false);
     }
   };
@@ -336,134 +225,154 @@ export default function Auth() {
   const onForgotPasswordSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
     try {
-      await resetPassword(data.email);
+      await resetPassword(data.email); // This is resetPasswordForEmail from AuthContext
       setIsPasswordResetSent(true);
-      // Keep the dialog open to show success message
+      // Keep the dialog open to show success message.
     } catch (error) {
-      console.error("Password reset error:", error);
+      // Error toast handled by resetPassword in AuthContext
+      console.error("Forgot password error in Auth.tsx:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // This method is only used during the password recovery flow
+  // This method is ONLY used during the password recovery flow (new password submission)
   const onResetPasswordSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
     try {
-      console.log("Updating password during recovery flow...");
+      console.log("Auth.tsx: Updating password during recovery flow...");
 
-      let sessionToUse = null;
-      const { data: existingSessionData } = await supabase.auth.getSession();
-      sessionToUse = existingSessionData.session;
+      // Step 1: Ensure there's a session. Supabase's recovery link creates one.
+      // If getSession doesn't immediately return it (e.g. race condition on load),
+      // try to set it manually from the hash (which contains tokens for recovery).
+      let { data: { session } } = await supabase.auth.getSession();
 
-      if (!sessionToUse) {
-        console.warn("No active session found by getSession(). Attempting to set session manually from URL hash.");
+      if (!session) {
+        console.warn("Auth.tsx: No active session from getSession(). Attempting to set session from URL hash for recovery.");
         const hash = window.location.hash;
         const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
-        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1]; // Extract refresh_token
+        const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
 
         if (accessToken && refreshToken) {
-          console.log("Found access_token and refresh_token in hash. Attempting supabase.auth.setSession().");
+          console.log("Auth.tsx: Found access_token and refresh_token in hash. Attempting supabase.auth.setSession().");
           const { data: manualSessionData, error: setError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
           if (setError) {
-            console.error("Error manually setting session:", setError);
+            console.error("Auth.tsx: Error manually setting session:", setError);
             toast({
               title: "Session Error",
-              description: `Failed to establish session for password reset: ${setError.message}. Please try the recovery link again.`,
+              description: `Failed to establish recovery session: ${setError.message}. Please try the link again.`,
               variant: "destructive",
             });
             setIsLoading(false);
-            return; // Stop execution if session cannot be set
+            return;
           }
-          console.log("Manual session set successfully.");
-          sessionToUse = manualSessionData.session; // Use the newly set session
+          session = manualSessionData.session;
+          console.log("Auth.tsx: Manual session set successfully for recovery.");
 
-          if (!sessionToUse) {
-            console.error("Session still null after attempting manual setSession.");
+          if (!session) {
+            console.error("Auth.tsx: Session still null after attempting manual setSession for recovery.");
             toast({
               title: "Session Error",
-              description: "Could not verify session after manual setup. Please try again.",
+              description: "Could not verify recovery session. Please try the link again.",
               variant: "destructive",
             });
             setIsLoading(false);
             return;
           }
         } else {
-          console.error("Access token or refresh token missing in hash. Cannot manually set session.");
+          console.error("Auth.tsx: Access token or refresh token missing in hash. Cannot manually set recovery session.");
           toast({
             title: "Recovery Error",
-            description: "Incomplete recovery information in URL. Please use the link from your email again.",
+            description: "Incomplete recovery information. Please use the link from your email again.",
             variant: "destructive",
           });
           setIsLoading(false);
-          return; // Stop execution
+          return;
         }
       } else {
-        console.log("Active session found via getSession().");
+        console.log("Auth.tsx: Active session found via getSession() for recovery.");
       }
 
-      // At this point, sessionToUse should be valid either from getSession() or manual setSession()
-      console.log("Proceeding with password update...");
+      // Step 2: Update the user's password.
+      // We use supabase.auth.updateUser directly here because this is part of the recovery flow,
+      // which is more specialized than the generic updatePassword in AuthContext.
+      console.log("Auth.tsx: Proceeding with password update using the recovery session...");
       const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: data.password
       });
 
       if (updateError) {
-        console.error("Supabase updateUser error:", updateError);
-        throw updateError;
+        console.error("Auth.tsx: Supabase updateUser error during recovery:", updateError);
+        // Check for common errors like weak password, expired token, etc.
+        let message = updateError.message;
+        if (message.includes("session is not a recovery session")) {
+            message = "Invalid or expired recovery session. Please request a new password reset link.";
+        } else if (message.includes("Password should be at least 6 characters")) {
+            message = "Password is too short. It must be at least 6 characters.";
+        }
+        toast({ title: "Password Update Failed", description: message, variant: "destructive" });
+        setIsLoading(false); // Release loading state
+        // Do not clear recovery state here, user might want to try again with a different password.
+        return;
       }
 
-      console.log("Password update successful:", updateData ? "User updated" : "No update data returned");
+      console.log("Auth.tsx: Password update successful during recovery:", updateData ? "User updated" : "No update data returned");
 
-      // Reset the recovery session state
+      // Step 3: Clean up and sign out.
       setIsRecoverySession(false);
       setIsResetPasswordOpen(false);
       resetPasswordForm.reset();
 
-      // Show success message
       toast({
-        title: "Password updated",
-        description: "Your password has been updated successfully. You will be signed out and can now log in with your new password.",
+        title: "Password Updated",
+        description: "Your password has been successfully updated. You will be signed out and can now log in with your new password.",
       });
 
-      // Clean the hash from the URL as it's no longer needed and contains sensitive tokens
+      // Clean the recovery tokens from the URL hash as they are no longer needed and sensitive.
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
-      // Sign out the user to make them log in with the new password
+      // Sign out the user from the recovery session. This is crucial.
       await supabase.auth.signOut();
+      console.log("Auth.tsx: User signed out after password recovery.");
 
-      // Redirect to login page
-      window.location.href = '/auth';
+      // Redirect to the login page to force a fresh login with the new password.
+      // A full page reload ensures all state is fresh.
+      window.location.assign('/auth'); // Using assign for a full reload effect.
 
     } catch (error: any) {
-      console.error("Password update error:", error);
+      console.error("Auth.tsx: Unexpected error in onResetPasswordSubmit:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update password. Please try again.",
+        description: error.message || "An unexpected error occurred while updating password. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      // Ensure isLoading is always reset, unless an early return happened due to error.
+      // If an early return happened, setIsLoading(false) should have been called there.
+      // If the flow reaches here, it implies either success or a fall-through error.
+      // Given the redirects and potential early returns, this might not always execute as expected
+      // for the success path. It's more critical for error paths that don't navigate away.
+      // The early returns for errors already handle setIsLoading(false).
+      // For the success path, navigation occurs, so this might be redundant or not hit.
+      setIsLoading(false); // This will be hit if an error is thrown and caught by the outer catch.
     }
   };
 
-  // Additional check on mount for recovery parameters
-  useEffect(() => {
-    // This is a backup check in case the first one didn't catch it
-    if (!isRecoverySession && !isResetPasswordOpen) {
-      checkForRecoveryMode();
-    }
-  }, [isRecoverySession, isResetPasswordOpen]);
-
-  // Redirect if user is already logged in (but not in recovery mode)
+  // Redirect if user is logged in AND not in an active recovery flow
   if (user && !isRecoverySession && !isResetPasswordOpen) {
-    // Redirect to the page they were trying to access, or dashboard as fallback
     const from = location.state?.from?.pathname || "/dashboard";
+    console.log(`Auth.tsx: User is logged in and not in recovery. Redirecting to ${from}.`);
     return <Navigate to={from} replace />;
+  }
+
+  // If in recovery mode, ensure the reset password dialog is open.
+  // This handles cases where onAuthStateChange sets isRecoverySession but dialog state might lag.
+  if (isRecoverySession && !isResetPasswordOpen) {
+      setIsResetPasswordOpen(true);
   }
 
   return (
@@ -811,7 +720,9 @@ export default function Auth() {
 
               <div className="text-sm text-muted-foreground mt-2">
                 <p>Password must be at least 6 characters long.</p>
-                <p className="mt-2">
+                {/* Updated dialog text for clarity */}
+                <p className="mt-1">
+                  This is a one-time process for account recovery.
                   After setting a new password, you'll be signed out and can log in with your new password.
                 </p>
               </div>
