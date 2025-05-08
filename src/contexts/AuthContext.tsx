@@ -75,14 +75,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
+        console.log(`AuthContext: onAuthStateChange event: ${event}, session present: ${!!newSession}`);
         setSession(newSession);
 
         // Handle password recovery event
         if (event === 'PASSWORD_RECOVERY') {
+          console.log("AuthContext: PASSWORD_RECOVERY event detected.");
           toast({
-            title: "Reset your password",
-            description: "You can now set a new password",
+            title: "Password Recovery Initiated",
+            description: "You can now set a new password for this recovery session.",
           });
+          // Do not clear the hash here.
+          // Auth.tsx's onResetPasswordSubmit needs it to potentially call setSession and then updatePassword.
+          // It will be cleared by Auth.tsx after successful password update.
+        } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          console.log(`AuthContext: ${event} event detected.`);
+          if (newSession) { // Only clear if a session is truly established
+            const currentHash = window.location.hash;
+            // Only clear non-recovery auth-related hashes.
+            // Recovery hashes (containing type=recovery) are handled by Auth.tsx.
+            if ( (currentHash.includes('access_token=') || currentHash.includes('error=')) &&
+                 !currentHash.includes('type=recovery') ) {
+              console.log(`AuthContext: Non-recovery auth-related hash (${currentHash}) detected on ${event}. Clearing.`);
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+          }
         }
 
         // Use setTimeout to avoid auth deadlock issues
@@ -225,25 +242,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updatePassword = async (password: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
+        // This function is intended for an already authenticated user changing their password,
+        // NOT for the password recovery flow handled by Auth.tsx's onResetPasswordSubmit.
         password,
       });
-      if (error) throw error;
+      if (error) {
+        console.error("AuthContext - updateUser error before throw:", error);
+        throw error;
+      }
+      console.log("AuthContext: supabase.auth.updateUser Succeeded.");
       toast({
         title: "Password updated",
         description: "Your password has been updated successfully",
       });
 
       // Clear the recovery hash from the URL to prevent re-triggering recovery mode
+      // This is a safeguard; typically, for standard updates, no recovery hash would be present.
       if (window.location.hash.includes('type=recovery')) {
+        console.log("AuthContext: Recovery hash found in updatePassword. Clearing.");
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        console.log("AuthContext: Recovery hash cleared from URL after password update.");
       }
 
       // Consider navigating the user away (e.g., to login or dashboard)
       // This is best handled by the calling UI component using a router.
 
     } catch (error: any) {
-      console.error("AuthContext - Update password error:", error);
+      console.error("AuthContext - Update password catch block:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update password",
