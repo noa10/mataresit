@@ -48,10 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Update user state with roles
-  const updateUserWithRoles = async (currentUser: User | null, currentSession: Session | null) => {
+  const updateUserWithRoles = async (currentUser: User | null, currentSession: Session | null, shouldSetLoading: boolean = false) => {
     if (!currentUser) {
       setUser(null);
       setIsAdmin(false);
+      if (shouldSetLoading) setLoading(false);
       return;
     }
 
@@ -68,6 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error updating user with roles:', error);
       setUser(currentUser as UserWithRole);
       setIsAdmin(false);
+    } finally {
+      if (shouldSetLoading) setLoading(false);
     }
   };
 
@@ -111,9 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log(`AuthContext: Initial session check, session present: ${!!currentSession}`);
       setSession(currentSession);
-      updateUserWithRoles(currentSession?.user ?? null, currentSession);
-      setLoading(false);
+      // Pass true to indicate this should set loading=false when complete
+      updateUserWithRoles(currentSession?.user ?? null, currentSession, true);
     });
 
     return () => subscription.unsubscribe();
