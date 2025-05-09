@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   CheckCircle,
   XCircle,
-  ChevronRight,
   FileText,
   RotateCcw,
   ExternalLink,
@@ -29,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ReceiptUpload } from "@/types/receipt";
+import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 
 interface BatchUploadReviewProps {
   completedUploads: ReceiptUpload[];
@@ -55,41 +54,63 @@ export function BatchUploadReview({
   const [selectedTab, setSelectedTab] = useState<'completed' | 'failed'>(
     completedUploads.length > 0 ? 'completed' : 'failed'
   );
+  const [isReceiptBrowserOpen, setIsReceiptBrowserOpen] = useState(false);
 
   const totalUploads = completedUploads.length + failedUploads.length;
   const successRate = totalUploads > 0
     ? Math.round((completedUploads.length / totalUploads) * 100)
     : 0;
 
+  // Extract receipt IDs from completed uploads
+  const successfulReceiptIds = completedUploads
+    .map(upload => {
+      const receiptId = receiptIds[upload.id];
+      if (!receiptId) {
+        console.log(`No receipt ID found for upload ID: ${upload.id}`);
+      }
+      return receiptId;
+    })
+    .filter(Boolean) as string[];
+
+  console.log('Successful receipt IDs:', successfulReceiptIds);
+
   const viewReceipt = (receiptId: string) => {
     navigate(`/receipt/${receiptId}`);
   };
 
   const viewAllReceipts = () => {
+    console.log('View Uploaded Receipts clicked');
+
     if (onViewAllReceipts) {
+      console.log('Using provided onViewAllReceipts callback');
       onViewAllReceipts();
+    } else if (successfulReceiptIds.length > 0) {
+      console.log('Opening DailyReceiptBrowserModal with IDs:', successfulReceiptIds);
+      // Open the DailyReceiptBrowserModal with the uploaded receipts
+      setIsReceiptBrowserOpen(true);
     } else {
+      console.log('No successful receipt IDs, navigating to dashboard');
       navigate('/dashboard');
       onClose();
     }
-    console.log('View All Receipts button clicked');
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Batch Upload Results</span>
-          <div className="text-sm font-normal flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-full ${successRate >= 80 ? 'bg-green-100 text-green-800' : successRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
-              Success Rate: {successRate}%
-            </span>
-          </div>
-        </CardTitle>
-        <CardDescription>
-          {completedUploads.length} of {totalUploads} receipts were successfully processed
-        </CardDescription>
-      </CardHeader>
+    <>
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Batch Upload Results</span>
+            <div className="text-sm font-normal flex items-center gap-2">
+              <span className={`px-2 py-1 rounded-full ${successRate >= 80 ? 'bg-green-100 text-green-800' : successRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
+                Success Rate: {successRate}%
+              </span>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            {completedUploads.length} of {totalUploads} receipts were successfully processed
+          </CardDescription>
+        </CardHeader>
 
       <CardContent>
         <div className="flex border-b mb-4">
@@ -237,11 +258,20 @@ export function BatchUploadReview({
             Close
           </Button>
           <Button onClick={viewAllReceipts}>
-            View All Receipts
+            View Uploaded Receipts
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
       </CardFooter>
     </Card>
+
+    {/* Receipt Browser Modal */}
+    <DailyReceiptBrowserModal
+      date={new Date().toISOString().split('T')[0]}
+      receiptIds={successfulReceiptIds}
+      isOpen={isReceiptBrowserOpen}
+      onClose={() => setIsReceiptBrowserOpen(false)}
+    />
+    </>
   );
 }

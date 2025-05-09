@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -227,13 +226,12 @@ export default function BatchUploadZone({
     });
 
     // If there are no active uploads and no queued uploads, and we have at least one upload (completed or failed)
-    // AND we haven't already marked processing as complete
     if (
       !isProcessing &&
       activeUploads.length === 0 &&
       queuedUploads.length === 0 &&
       (completedUploads.length > 0 || failedUploads.length > 0) &&
-      !allProcessingComplete // Only run this block if we haven't already marked as complete
+      !allProcessingComplete // Only proceed if we haven't already marked as complete
     ) {
       console.log('All processing is complete, showing notification');
 
@@ -264,7 +262,9 @@ export default function BatchUploadZone({
       if (successfulReceiptIds.length > 0) {
         console.log('Opening receipt browser with IDs:', successfulReceiptIds);
         setCompletedReceiptIds(successfulReceiptIds);
-        setShowReceiptBrowser(true);
+        // We're not automatically showing the browser modal anymore
+        // Users will need to click the "Review Results" button first
+        // setShowReceiptBrowser(true);
       }
 
       // Call the onUploadComplete callback if provided
@@ -361,15 +361,12 @@ export default function BatchUploadZone({
         onReset={resetBatchUpload}
         onViewAllReceipts={() => {
           // Show the receipt browser modal with all completed receipt IDs
-          // Fix: Ensure we're using string IDs when accessing the receiptIds object
+          // Extract receipt IDs correctly from the completed uploads
           const successfulReceiptIds = completedUploads
-            .map(uploadId => {
-              const id = typeof uploadId === 'string' ? uploadId : null;
-              return id ? receiptIds[id] : null;
-            })
+            .map(upload => receiptIds[upload.id])
             .filter(Boolean) as string[];
 
-          console.log('View All Receipts clicked in BatchUploadReview, IDs:', successfulReceiptIds);
+          console.log('View Uploaded Receipts clicked, IDs:', successfulReceiptIds);
 
           if (successfulReceiptIds.length > 0) {
             setCompletedReceiptIds(successfulReceiptIds);
@@ -377,6 +374,11 @@ export default function BatchUploadZone({
             setShowReview(false); // Hide the review UI
           } else {
             console.error('No successful receipt IDs found');
+            toast({
+              title: "No Receipts Found",
+              description: "Could not find any successfully processed receipts to view.",
+              variant: "destructive",
+            });
           }
         }}
       />
@@ -390,7 +392,10 @@ export default function BatchUploadZone({
         date={currentDate}
         receiptIds={completedReceiptIds}
         isOpen={showReceiptBrowser}
-        onClose={() => setShowReceiptBrowser(false)}
+        onClose={() => {
+          console.log('Closing receipt browser modal');
+          setShowReceiptBrowser(false);
+        }}
       />
 
       <div

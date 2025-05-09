@@ -131,15 +131,17 @@ export function BatchProcessingControls({
           <div className="flex flex-wrap gap-2">
             {/* Show Review Results button when all processing is complete */}
             {allComplete && onShowReview ? (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onShowReview}
-                className="h-8"
-              >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Review Results
-              </Button>
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onShowReview}
+                  className="h-8"
+                >
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Review Results
+                </Button>
+              </>
             ) : (
               /* Start/Pause button */
               isProcessing ? (

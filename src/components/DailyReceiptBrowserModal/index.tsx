@@ -5,10 +5,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
-import ReceiptViewer, { ReceiptViewerProps } from '@/components/ReceiptViewer';
+import ReceiptViewer from '@/components/ReceiptViewer';
 
 import './receipt-calendar.css';
-import styles from './receipt-calendar.module.css';
 
 // Helper function for date formatting
 const formatFullDate = (dateString: string) => {
@@ -73,7 +72,12 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
       <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle>Receipts for {formatFullDate(date)}</DialogTitle>
+          <DialogTitle>
+            {receiptIds.length > 0
+              ? `${receiptIds.length} Receipt${receiptIds.length !== 1 ? 's' : ''} - ${formatFullDate(date)}`
+              : `Receipts for ${formatFullDate(date)}`
+            }
+          </DialogTitle>
         </DialogHeader>
 
         {/* Main content area: Sidebar (Thumbnails/List) + Viewer */}
@@ -101,7 +105,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
                       <div className="flex flex-col items-start">
                         <span className="font-medium">{receipt.merchant || `Receipt (${receipt.id.substring(0, 6)}...)`}</span>
                         <span className="text-xs text-muted-foreground/80">
-                          {receipt.date ? formatFullDate(receipt.date) : 'Unknown Date'} - 
+                          {receipt.date ? formatFullDate(receipt.date) : 'Unknown Date'} -
                           {receipt.total ? ` MYR ${receipt.total.toFixed(2)}` : ' N/A'}
                         </span>
                       </div>
@@ -132,4 +136,4 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
   );
 };
 
-export default DailyReceiptBrowserModal; 
+export default DailyReceiptBrowserModal;
