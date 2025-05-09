@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: receipt, isLoading, error } = useQuery({
     queryKey: ['receipt', id],
@@ -28,6 +29,8 @@ export default function ViewReceipt() {
     onSuccess: (success) => {
       if (success) {
         toast.success("Receipt deleted successfully");
+        // Invalidate the receipts query to refresh the dashboard data
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
         navigate("/dashboard");
       }
     },
@@ -137,6 +140,8 @@ export default function ViewReceipt() {
             receipt={receipt}
             onDelete={(_) => {
               toast.success("Receipt deleted successfully");
+              // Invalidate the receipts query to refresh the dashboard data
+              queryClient.invalidateQueries({ queryKey: ['receipts'] });
               navigate("/dashboard");
             }}
           />
