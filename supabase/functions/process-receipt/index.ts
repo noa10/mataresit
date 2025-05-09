@@ -8,6 +8,15 @@ import { encodeBase64 } from "jsr:@std/encoding/base64"
 // Import deno-image for resizing
 import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
+// Maximum image size for processing (in bytes)
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB - reduced from 5MB
+
+// Maximum image dimensions for OCR processing
+const MAX_IMAGE_DIMENSION = 1500; // 1500px - reduced from 2000px
+
+// Always optimize images regardless of size
+const ALWAYS_OPTIMIZE = true;
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -130,6 +139,79 @@ async function processReceiptImage(
       await logger.log(`Calling enhance-receipt-data at: ${enhanceFunctionUrl}`, "DEBUG");
 
       try {
+        // Ensure image is optimized for AI Vision to reduce resource usage
+        const encodedImage = encodeBase64(imageBytes);
+        const imageSize = encodedImage.length;
+
+        // Log image size for debugging
+        await logger.log(`Encoded image size for AI Vision: ${imageSize} bytes`, "DEBUG");
+
+        // Check if image is too large for AI Vision
+        if (imageSize > 1.5 * 1024 * 1024) { // 1.5MB limit for base64 encoded image
+          await logger.log(`Image too large for AI Vision (${imageSize} bytes), falling back to OCR+AI method`, "WARNING");
+
+          // Fall back to OCR+AI method
+          await logger.log("Falling back to OCR+AI method due to image size constraints", "METHOD");
+
+          // Step 1: Perform OCR with Amazon Textract
+          await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
+          console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
+
+          const command = new AnalyzeExpenseCommand({
+            Document: { Bytes: imageBytes },
+          });
+
+          const response = await textractClient.send(command);
+          console.log("Received response from Amazon Textract");
+          await logger.log("Amazon Textract analysis complete", "OCR");
+
+          // Step 2: Extract structured data from Textract response
+          const textractResult = extractTextractData(response, logger);
+
+          // Step 3: Enhance with selected AI model
+          await logger.log("Starting AI enhancement of OCR data (fallback)", "AI");
+          console.log("Calling AI to enhance OCR data...");
+
+          try {
+            const enhanceResponse = await fetch(
+              enhanceFunctionUrl,
+              {
+                method: 'POST',
+                headers: internalFetchHeaders,
+                body: JSON.stringify({
+                  textractData: textractResult,
+                  fullText: textractResult.fullText,
+                  receiptId: receiptId,
+                  modelId: modelId
+                }),
+              }
+            );
+
+            if (enhanceResponse.ok) {
+              const enhancedData = await enhanceResponse.json();
+              console.log("Received enhanced data from AI:", enhancedData);
+              await logger.log("AI enhancement complete (fallback)", "AI");
+
+              // Update results with AI enhanced data
+              primaryResult = mergeTextractAndAIData(textractResult, enhancedData.result);
+              modelUsed = enhancedData.model_used;
+            } else {
+              console.error("Error calling AI enhancement (fallback):", await enhanceResponse.text());
+              await logger.log("AI enhancement failed (fallback)", "AI");
+              // Continue with Textract data only
+              primaryResult = textractResult;
+            }
+          } catch (enhanceError) {
+            console.error("Error during AI enhancement (fallback):", enhanceError);
+            await logger.log(`AI error (fallback): ${enhanceError.message}`, "ERROR");
+            // Continue with Textract data only
+            primaryResult = textractResult;
+          }
+
+          return; // Exit this block, we've handled the fallback
+        }
+
+        // Proceed with AI Vision if image is not too large
         const visionResponse = await fetch(
           enhanceFunctionUrl,
           {
@@ -137,7 +219,7 @@ async function processReceiptImage(
             headers: internalFetchHeaders,
             body: JSON.stringify({
               imageData: {
-                data: encodeBase64(imageBytes),
+                data: encodedImage,
                 mimeType: 'image/jpeg',
                 isBase64: true
               },
@@ -155,17 +237,85 @@ async function processReceiptImage(
           primaryResult = formatAIVisionResult(visionData.result);
           modelUsed = visionData.model_used;
         } else {
-          // Log status and error text if fetch was not ok
+          // Check for resource limit errors
           const errorText = await visionResponse.text();
           console.error(`Error calling AI Vision: Status ${visionResponse.status} ${visionResponse.statusText}, Response: ${errorText}`);
           await logger.log(`AI Vision fetch failed: Status ${visionResponse.status}, Error: ${errorText}`, "ERROR");
-          throw new Error(`AI Vision processing failed with status ${visionResponse.status}`);
+
+          // Check if this is a resource limit error
+          if (errorText.includes("WORKER_LIMIT") || errorText.includes("compute resources")) {
+            await logger.log("Detected resource limit error, falling back to OCR+AI method", "ERROR");
+
+            // Fall back to OCR+AI method
+            await logger.log("Falling back to OCR+AI method due to resource constraints", "METHOD");
+
+            // Step 1: Perform OCR with Amazon Textract
+            await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
+            console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
+
+            const command = new AnalyzeExpenseCommand({
+              Document: { Bytes: imageBytes },
+            });
+
+            const response = await textractClient.send(command);
+            console.log("Received response from Amazon Textract");
+            await logger.log("Amazon Textract analysis complete", "OCR");
+
+            // Step 2: Extract structured data from Textract response
+            const textractResult = extractTextractData(response, logger);
+
+            // Use Textract data only since we already hit resource limits
+            primaryResult = textractResult;
+            modelUsed = "textract-only";
+
+            await logger.log("Using Textract data only due to resource constraints", "AI");
+          } else {
+            // For other errors, throw normally
+            throw new Error(`AI Vision processing failed with status ${visionResponse.status}: ${errorText}`);
+          }
         }
       } catch (visionError) {
         // Log the full error object
         console.error("Error during AI Vision processing fetch call:", visionError);
         await logger.log(`AI Vision fetch exception: ${visionError.message}, Stack: ${visionError.stack}`, "ERROR");
-        throw visionError; // Rethrow to propagate
+
+        // Check if this is a resource limit error
+        if (visionError.message && (visionError.message.includes("WORKER_LIMIT") || visionError.message.includes("compute resources"))) {
+          await logger.log("Detected resource limit error in exception, falling back to OCR+AI method", "ERROR");
+
+          try {
+            // Fall back to OCR+AI method
+            await logger.log("Falling back to OCR+AI method due to resource constraints", "METHOD");
+
+            // Step 1: Perform OCR with Amazon Textract
+            await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
+            console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
+
+            const command = new AnalyzeExpenseCommand({
+              Document: { Bytes: imageBytes },
+            });
+
+            const response = await textractClient.send(command);
+            console.log("Received response from Amazon Textract");
+            await logger.log("Amazon Textract analysis complete", "OCR");
+
+            // Step 2: Extract structured data from Textract response
+            const textractResult = extractTextractData(response, logger);
+
+            // Use Textract data only since we already hit resource limits
+            primaryResult = textractResult;
+            modelUsed = "textract-only";
+
+            await logger.log("Using Textract data only due to resource constraints", "AI");
+          } catch (fallbackError) {
+            console.error("Error during fallback processing:", fallbackError);
+            await logger.log(`Fallback processing error: ${fallbackError.message}`, "ERROR");
+            throw fallbackError; // If fallback also fails, propagate the error
+          }
+        } else {
+          // For other errors, rethrow
+          throw visionError;
+        }
       }
     }
 
@@ -820,6 +970,99 @@ function findDiscrepancies(primaryResult: any, alternativeResult: any) {
   return discrepancies;
 }
 
+// Helper function to optimize image for OCR processing
+async function optimizeImageForOCR(imageBytes: Uint8Array, logger: ProcessingLogger): Promise<Uint8Array> {
+  try {
+    // Always log the original image size
+    await logger.log(`Original image size: ${imageBytes.length} bytes`, "OPTIMIZE");
+
+    // Check if image is already small enough and we're not forcing optimization
+    if (imageBytes.length <= MAX_IMAGE_SIZE && !ALWAYS_OPTIMIZE) {
+      await logger.log(`Image size is within limits, no optimization needed`, "OPTIMIZE");
+      return imageBytes;
+    }
+
+    // Log whether we're optimizing due to size or because of the ALWAYS_OPTIMIZE flag
+    if (imageBytes.length > MAX_IMAGE_SIZE) {
+      await logger.log(`Image size (${imageBytes.length} bytes) exceeds limit, optimizing...`, "OPTIMIZE");
+    } else {
+      await logger.log(`Optimizing image despite being within size limits (forced optimization)`, "OPTIMIZE");
+    }
+
+    try {
+      // Decode the image
+      const image = await Image.decode(imageBytes);
+      const originalWidth = image.width;
+      const originalHeight = image.height;
+
+      await logger.log(`Original dimensions: ${originalWidth}x${originalHeight}`, "OPTIMIZE");
+
+      // Always resize if dimensions exceed MAX_IMAGE_DIMENSION
+      let resized = false;
+      if (originalWidth > MAX_IMAGE_DIMENSION || originalHeight > MAX_IMAGE_DIMENSION) {
+        // Calculate new dimensions while maintaining aspect ratio
+        let newWidth, newHeight;
+
+        if (originalWidth > originalHeight) {
+          newWidth = MAX_IMAGE_DIMENSION;
+          newHeight = Math.round((originalHeight / originalWidth) * MAX_IMAGE_DIMENSION);
+        } else {
+          newHeight = MAX_IMAGE_DIMENSION;
+          newWidth = Math.round((originalWidth / originalHeight) * MAX_IMAGE_DIMENSION);
+        }
+
+        // Resize the image
+        image.resize(newWidth, newHeight);
+        resized = true;
+        await logger.log(`Resized to ${newWidth}x${newHeight}`, "OPTIMIZE");
+      } else if (ALWAYS_OPTIMIZE) {
+        // If we're forcing optimization but dimensions are already small,
+        // still resize slightly to reduce file size
+        const scaleFactor = 0.9; // Reduce to 90% of original size
+        const newWidth = Math.round(originalWidth * scaleFactor);
+        const newHeight = Math.round(originalHeight * scaleFactor);
+
+        // Only resize if the dimensions are still reasonable
+        if (newWidth > 500 && newHeight > 500) {
+          image.resize(newWidth, newHeight);
+          resized = true;
+          await logger.log(`Slightly reduced dimensions to ${newWidth}x${newHeight} for optimization`, "OPTIMIZE");
+        }
+      }
+
+      // Determine JPEG quality based on original image size
+      let quality = 85; // Default quality
+
+      if (imageBytes.length > 3 * 1024 * 1024) { // > 3MB
+        quality = 70; // Lower quality for very large images
+      } else if (imageBytes.length > 1 * 1024 * 1024) { // > 1MB
+        quality = 75; // Medium-low quality for large images
+      }
+
+      // Encode as JPEG with appropriate quality
+      const optimizedBytes = await image.encodeJPEG(quality);
+
+      // Log the results
+      const sizeReduction = Math.round((1 - (optimizedBytes.length / imageBytes.length)) * 100);
+      await logger.log(`Optimized image size: ${optimizedBytes.length} bytes (${sizeReduction}% reduction)`, "OPTIMIZE");
+
+      return optimizedBytes;
+    } catch (decodeError) {
+      // If we can't decode the image, try a different approach
+      await logger.log(`Image decoding failed: ${decodeError.message}, trying fallback optimization`, "WARNING");
+
+      // For now, return the original image if decoding fails
+      // In a production environment, you might want to implement a fallback optimization method
+      return imageBytes;
+    }
+  } catch (error) {
+    await logger.log(`Image optimization failed: ${error.message}, using original image`, "ERROR");
+    console.error("Image optimization error:", error);
+    // Return original image if optimization fails
+    return imageBytes;
+  }
+}
+
 // Add this helper function below the processReceiptImage function
 // Helper function to calculate more meaningful confidence scores
 function calculateFieldConfidence(baseConfidence: number, value: string, fieldType: string): number {
@@ -998,73 +1241,140 @@ serve(async (req: Request) => {
       const imageBytes = new Uint8Array(imageArrayBuffer);
       await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
 
+      // Optimize image for OCR processing
+      await logger.log("Starting image optimization for OCR", "OPTIMIZE");
+      const optimizedImageBytes = await optimizeImageForOCR(imageBytes, logger);
+
       // --- START: THUMBNAIL GENERATION ---
       let thumbnailUrl: string | null = null;
-      try {
-        await logger.log("Starting thumbnail generation", "THUMBNAIL");
-        console.log("Decoding image for thumbnail...");
-        const image = await Image.decode(imageBytes);
-        console.log(`Original dimensions: ${image.width}x${image.height}`);
 
-        const targetWidth = 400; // Target width for thumbnail
-        image.resize(targetWidth, Image.RESIZE_AUTO); // Resize maintaining aspect ratio
-        console.log(`Resized dimensions: ${image.width}x${image.height}`);
+      // Create a separate function for thumbnail generation to better isolate errors
+      const generateAndUploadThumbnail = async (): Promise<string | null> => {
+        try {
+          await logger.log("Starting thumbnail generation", "THUMBNAIL");
+          console.log("Decoding image for thumbnail...");
 
-        // Encode as JPEG with quality 75
-        const thumbnailBytes = await image.encodeJPEG(75);
-        console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
+          // Use a smaller subset of the image data for thumbnail generation
+          // This reduces memory usage during thumbnail creation
+          const thumbnailImageBytes = optimizedImageBytes || imageBytes;
 
-        const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`; // Store in a 'thumbnails' folder
+          const image = await Image.decode(thumbnailImageBytes);
+          console.log(`Original dimensions: ${image.width}x${image.height}`);
 
-        await logger.log(`Uploading thumbnail to ${thumbnailPath}`, "THUMBNAIL_UPLOAD");
-        console.log(`Uploading thumbnail to storage path: ${thumbnailPath}`);
+          // Use a smaller target width for thumbnails
+          const targetWidth = 300; // Reduced from 400
+          image.resize(targetWidth, Image.RESIZE_AUTO); // Resize maintaining aspect ratio
+          console.log(`Resized dimensions: ${image.width}x${image.height}`);
 
-        const { error: thumbUploadError } = await supabase.storage
-          .from('receipt_images') // Assuming same bucket, different folder
-          .upload(thumbnailPath, thumbnailBytes, {
-            contentType: 'image/jpeg',
-            cacheControl: '3600', // Cache for 1 hour
-            upsert: true // Overwrite if exists
-          });
+          // Encode as JPEG with lower quality to save memory
+          const quality = 70; // Reduced from 75
+          const thumbnailBytes = await image.encodeJPEG(quality);
+          console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
 
-        if (thumbUploadError) {
-          console.error("Error uploading thumbnail:", thumbUploadError);
-          await logger.log(`Error uploading thumbnail: ${thumbUploadError.message}`, "ERROR");
-          // Don't fail the whole process, just log the error
-        } else {
-          // Get public URL for the thumbnail
-          const { data: publicUrlData } = supabase.storage
-            .from('receipt_images')
-            .getPublicUrl(thumbnailPath);
+          const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`; // Store in a 'thumbnails' folder
 
-          if (publicUrlData?.publicUrl) {
-            thumbnailUrl = publicUrlData.publicUrl;
-            console.log("Thumbnail uploaded successfully:", thumbnailUrl);
-            await logger.log(`Thumbnail uploaded: ${thumbnailUrl}`, "THUMBNAIL_UPLOAD");
-          } else {
-             console.warn("Could not get public URL for thumbnail:", thumbnailPath);
-             await logger.log("Could not get public URL for thumbnail", "WARNING");
+          await logger.log(`Uploading thumbnail to ${thumbnailPath}`, "THUMBNAIL_UPLOAD");
+          console.log(`Uploading thumbnail to storage path: ${thumbnailPath}`);
+
+          try {
+            const { error: thumbUploadError } = await supabase.storage
+              .from('receipt_images') // Assuming same bucket, different folder
+              .upload(thumbnailPath, thumbnailBytes, {
+                contentType: 'image/jpeg',
+                cacheControl: '3600', // Cache for 1 hour
+                upsert: true // Overwrite if exists
+              });
+
+            if (thumbUploadError) {
+              console.error("Error uploading thumbnail:", thumbUploadError);
+              await logger.log(`Error uploading thumbnail: ${thumbUploadError.message}`, "ERROR");
+              return null;
+            }
+
+            // Get public URL for the thumbnail
+            const { data: publicUrlData } = supabase.storage
+              .from('receipt_images')
+              .getPublicUrl(thumbnailPath);
+
+            if (publicUrlData?.publicUrl) {
+              console.log("Thumbnail uploaded successfully:", publicUrlData.publicUrl);
+              await logger.log(`Thumbnail uploaded: ${publicUrlData.publicUrl}`, "THUMBNAIL_UPLOAD");
+              return publicUrlData.publicUrl;
+            } else {
+              console.warn("Could not get public URL for thumbnail:", thumbnailPath);
+              await logger.log("Could not get public URL for thumbnail", "WARNING");
+              return null;
+            }
+          } catch (uploadError) {
+            console.error("Error during thumbnail upload:", uploadError);
+            await logger.log(`Thumbnail upload error: ${uploadError.message}`, "ERROR");
+            return null;
           }
+        } catch (thumbError) {
+          console.error("Error generating thumbnail:", thumbError);
+          await logger.log(`Thumbnail generation error: ${thumbError.message}`, "ERROR");
+          return null;
         }
+      };
+
+      // Try to generate thumbnail but don't let it block the main processing
+      try {
+        thumbnailUrl = await generateAndUploadThumbnail();
       } catch (thumbError) {
-        console.error("Error generating or uploading thumbnail:", thumbError);
-        await logger.log(`Thumbnail generation/upload error: ${thumbError.message}`, "ERROR");
+        console.error("Unhandled error in thumbnail generation:", thumbError);
+        await logger.log(`Unhandled thumbnail error: ${thumbError.message}`, "ERROR");
         // Continue processing even if thumbnail fails
+        thumbnailUrl = null;
       }
       // --- END: THUMBNAIL GENERATION ---
 
-      // Process the receipt image with OCR
-      const extractedData = await processReceiptImage(
-        imageBytes,
-        imageUrl,
-        receiptId,
-        primaryMethod,
-        modelId,
-        compareWithAlternative,
-        { Authorization: authorization, apikey: apikey }
-      );
+      // Process the receipt image with OCR using the optimized image
+      let extractedData;
+      try {
+        await logger.log("Starting OCR processing with optimized image", "PROCESS");
+        extractedData = await processReceiptImage(
+          optimizedImageBytes, // Use optimized image instead of original
+          imageUrl,
+          receiptId,
+          primaryMethod,
+          modelId,
+          compareWithAlternative,
+          { Authorization: authorization, apikey: apikey }
+        );
 
-      console.log("Data extraction complete");
+        console.log("Data extraction complete");
+        await logger.log("Data extraction completed successfully", "PROCESS");
+      } catch (processingError) {
+        console.error("Error during receipt processing:", processingError);
+        await logger.log(`Processing error: ${processingError.message}`, "ERROR");
+
+        // Create a basic result with minimal data to avoid complete failure
+        extractedData = {
+          merchant: "",
+          date: new Date().toISOString().split('T')[0], // Today's date as fallback
+          total: 0,
+          tax: 0,
+          currency: "MYR",
+          payment_method: "",
+          line_items: [],
+          fullText: "Processing failed: " + processingError.message,
+          predicted_category: "",
+          processing_time: 0,
+          confidence: {
+            merchant: 0,
+            date: 0,
+            total: 0,
+            tax: 0,
+            payment_method: 0,
+            line_items: 0
+          },
+          ai_suggestions: {
+            error: processingError.message
+          }
+        };
+
+        await logger.log("Created fallback data structure due to processing error", "RECOVERY");
+      }
 
       await logger.log("Saving processing results to database", "SAVE");
 

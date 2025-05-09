@@ -5,16 +5,17 @@ import { toast } from "sonner";
 import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  createReceipt, 
-  uploadReceiptImage, 
-  processReceiptWithOCR, 
+import {
+  createReceipt,
+  uploadReceiptImage,
+  processReceiptWithOCR,
   markReceiptUploaded,
-  fixProcessingStatus 
+  fixProcessingStatus
 } from "@/services/receiptService";
 import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
+import { optimizeImageForUpload } from "@/utils/imageUtils";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
@@ -43,7 +44,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
   // Use settings hook instead of local state
   const { settings } = useSettings();
-  
+
   const {
     isDragging,
     isInvalidFile,
@@ -60,11 +61,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     openFileDialog,
     resetUpload,
   } = useFileUpload();
-  
+
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   // Map processing status to UI stages
   const mapStatusToStage = (status: ProcessingStatus): string | null => {
     switch (status) {
@@ -154,16 +155,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           console.log('Receipt status update:', payload.new);
           const newStatus = payload.new.processing_status as ProcessingStatus;
           const newError = payload.new.processing_error;
-          
+
           setProcessingStatus(newStatus);
-          
+
           if (newError) {
             setError(newError);
             toast.error(`Processing error: ${newError}`);
           } else if (newStatus === 'complete') {
             toast.success("Receipt processed successfully!");
           } else if (newStatus === 'failed_ocr' || newStatus === 'failed_ai') {
-            const errorMsg = newStatus === 'failed_ocr' 
+            const errorMsg = newStatus === 'failed_ocr'
               ? "OCR processing failed. Please edit manually."
               : "AI analysis failed. Please edit manually.";
             setError(errorMsg);
@@ -203,23 +204,23 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!uploadZoneRef.current) return;
-      
+
       if (e.key === 'Tab' && document.activeElement === uploadZoneRef.current) {
         uploadZoneRef.current.setAttribute('aria-selected', 'true');
       }
-      
+
       if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === uploadZoneRef.current) {
         e.preventDefault();
         openFileDialog();
       }
     };
-    
+
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [openFileDialog]);
-  
+
   const processUploadedFiles = async (files: File[]) => {
     if (!user) {
       toast.error("Please login first");
@@ -233,36 +234,67 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setCurrentStage('QUEUED');
     setIsUploading(true);
     setUploadProgress(10);
-    
+
     try {
       const file = files[0];
-      
+
       const ariaLiveRegion = document.getElementById('upload-status');
       if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = `Uploading ${file.name}`;
+        ariaLiveRegion.textContent = `Preparing ${file.name} for upload`;
       }
-      
+
+      // Using the directly imported optimizeImageForUpload function
+      console.log('Using directly imported optimizeImageForUpload function');
+
+      // Optimize the image before uploading
+      let fileToUpload = file;
+
+      // Only optimize images, not PDFs
+      if (file.type.startsWith('image/')) {
+        setUploadProgress(15);
+        if (ariaLiveRegion) {
+          ariaLiveRegion.textContent = `Optimizing image for better processing`;
+        }
+
+        try {
+          // Use a lower quality for larger files
+          const quality = file.size > 3 * 1024 * 1024 ? 70 : 80;
+          fileToUpload = await optimizeImageForUpload(file, 1500, quality);
+          console.log(`Image optimized: ${file.size} bytes → ${fileToUpload.size} bytes (${Math.round(fileToUpload.size / file.size * 100)}% of original)`);
+
+          if (ariaLiveRegion) {
+            ariaLiveRegion.textContent = `Image optimized, uploading ${fileToUpload.name}`;
+          }
+        } catch (optimizeError) {
+          console.error("Image optimization failed, using original file:", optimizeError);
+          // Continue with original file if optimization fails
+          if (ariaLiveRegion) {
+            ariaLiveRegion.textContent = `Optimization skipped, uploading original file`;
+          }
+        }
+      }
+
       console.log("Starting upload process with bucket: receipt-images");
-      
+
       setUploadProgress(30);
       setProcessingStatus('uploading');
-      const imageUrl = await uploadReceiptImage(file, user.id, (progress) => {
+      const imageUrl = await uploadReceiptImage(fileToUpload, user.id, (progress) => {
         // Update progress percentage based on upload progress
         const scaledProgress = Math.floor(progress * 0.5); // Scale to 0-50%
         setUploadProgress(scaledProgress);
       });
-      
+
       if (!imageUrl) {
         throw new Error("Failed to upload image. Please try again later.");
       }
-      
+
       console.log("Image uploaded successfully:", imageUrl);
       setUploadProgress(50);
-      
+
       if (ariaLiveRegion) {
         ariaLiveRegion.textContent = 'Image uploaded successfully, creating receipt record';
       }
-      
+
       const today = new Date().toISOString().split('T')[0];
       // Fix line 274 - Remove user_id from the object as it's not in the Receipt type
       // The createReceipt function adds the user_id internally
@@ -284,17 +316,17 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         date: 0,
         total: 0
       });
-      
+
       if (!newReceiptId) {
         throw new Error("Failed to create receipt record");
       }
-      
+
       setReceiptId(newReceiptId);
       setUploadProgress(60);
-      
+
       // Mark receipt as uploaded
       await markReceiptUploaded(newReceiptId);
-      
+
       if (ariaLiveRegion) {
         ariaLiveRegion.textContent = `Processing receipt with ${settings.processingMethod === 'ocr-ai' ? 'OCR + AI' : 'AI Vision'}`;
       }
@@ -311,7 +343,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           (payload) => {
             const newLog = payload.new as ProcessingLog;
             console.log('New upload log received:', newLog);
-            
+
             setProcessLogs((prev) => {
               if (prev.some(log => log.id === newLog.id)) {
                 return prev;
@@ -320,24 +352,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
               );
             });
-            
+
             if (ariaLiveRegion && newLog.status_message) {
               ariaLiveRegion.textContent = newLog.status_message;
             }
           }
         )
         .subscribe();
-      
+
       const { data: initialLogs } = await supabase
         .from('processing_logs')
         .select('*')
         .eq('receipt_id', newReceiptId)
         .order('created_at', { ascending: true });
-      
+
       if (initialLogs && initialLogs.length > 0) {
         setProcessLogs(initialLogs);
       }
-      
+
       try {
         // Process with settings from the hook
         await processReceiptWithOCR(newReceiptId, {
@@ -346,7 +378,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           compareWithAlternative: settings.compareWithAlternative
         });
         setUploadProgress(100);
-        
+
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
         }
@@ -355,16 +387,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         toast.info("Receipt uploaded, but processing failed. Please edit manually.");
         setUploadProgress(100);
         setCurrentStage('ERROR');
-        
+
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Processing failed. Please edit the receipt manually.';
         }
       }
-      
+
       setTimeout(() => {
         channel.unsubscribe();
       }, 5000);
-      
+
       if (onUploadComplete) {
         setTimeout(() => {
           onUploadComplete();
@@ -382,7 +414,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentStage('ERROR');
-      
+
       if (document.getElementById('upload-status')) {
         document.getElementById('upload-status')!.textContent = 'Upload failed: ' + (error.message || "Unknown error");
       }
@@ -398,7 +430,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       openFileDialog();
     }
   };
-  
+
   const retryUpload = () => {
     setError(null);
     setIsUploading(false);
@@ -418,7 +450,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div 
+    <div
       className={`relative w-full h-full flex flex-col overflow-hidden rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -439,19 +471,19 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         accept="image/jpeg,image/png,application/pdf"
         aria-hidden="true"
       />
-      
-      <div 
-        id="upload-status" 
-        className="sr-only" 
-        aria-live="polite" 
+
+      <div
+        id="upload-status"
+        className="sr-only"
+        aria-live="polite"
         aria-atomic="true"
       >
         {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
       </div>
-      
+
       <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
         <div className="flex flex-col items-center gap-3">
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             whileHover={{ scale: 1.05 }}
@@ -470,22 +502,22 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               <Upload size={36} className="text-primary" />
             )}
           </motion.div>
-          
+
           <div className="space-y-2">
             <h3 className="text-xl font-medium">
-              {isUploading 
-                ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..." 
-                : error 
-                  ? "Upload Failed" 
+              {isUploading
+                ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..."
+                : error
+                  ? "Upload Failed"
                   : isDragging
                     ? "Drop Files Here"
                     : "Upload Receipt"}
             </h3>
-            <p 
+            <p
               id="upload-zone-description"
               className="text-base text-muted-foreground max-w-md mx-auto"
             >
-              {isUploading 
+              {isUploading
                 ? currentStage === 'ERROR'
                   ? "An error occurred during processing"
                   : currentStage
@@ -534,10 +566,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               exit={{ opacity: 0 }}
               className="my-4"
             >
-              {isInvalidFile 
-                ? DropZoneIllustrations.error 
-                : isDragging 
-                  ? DropZoneIllustrations.drag 
+              {isInvalidFile
+                ? DropZoneIllustrations.error
+                : isDragging
+                  ? DropZoneIllustrations.drag
                   : DropZoneIllustrations.default}
             </motion.div>
           )}
@@ -547,24 +579,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
         <div className="w-full flex justify-center items-center mt-4">
           {isUploading ? (
-            <ProcessingTimeline 
-              currentStage={currentStage} 
-              stageHistory={stageHistory} 
-              uploadProgress={uploadProgress} 
+            <ProcessingTimeline
+              currentStage={currentStage}
+              stageHistory={stageHistory}
+              uploadProgress={uploadProgress}
             />
           ) : error ? (
-            <Button 
+            <Button
               onClick={retryUpload}
-              variant="default" 
+              variant="default"
               className="mt-4 px-6 py-2 text-base"
               size="lg"
             >
               Try Again
             </Button>
           ) : (
-            <Button 
+            <Button
               onClick={handleStartUpload}
-              variant="default" 
+              variant="default"
               className="mt-4 px-6 py-2 text-base group"
               size="lg"
             >
@@ -582,7 +614,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           {isUploading && processLogs.length > 0 && (
             <ProcessingLogs processLogs={processLogs} currentStage={currentStage} />
           )}
-          
+
           {currentStage === 'ERROR' && <ErrorState error={error} />}
         </div>
       </div>

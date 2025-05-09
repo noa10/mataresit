@@ -72,6 +72,7 @@ export function BatchUploadReview({
       navigate('/dashboard');
       onClose();
     }
+    console.log('View All Receipts button clicked');
   };
 
   return (

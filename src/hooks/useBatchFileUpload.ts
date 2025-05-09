@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
+import { optimizeImageForUpload } from "@/utils/imageUtils";
 
 interface BatchUploadOptions {
   maxConcurrent?: number;
@@ -76,39 +77,80 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   // Add files to the batch queue
   const addToBatchQueue = useCallback((files: FileList | File[]) => {
     console.log('addToBatchQueue called with files:', files);
-    const validFiles = Array.from(files).filter(file => {
+    console.log('Files array type:', Object.prototype.toString.call(files));
+    console.log('Files length:', files.length);
+
+    // Ensure we have an array to work with
+    let filesArray: File[];
+    if (files instanceof FileList) {
+      filesArray = Array.from(files);
+    } else if (Array.isArray(files)) {
+      filesArray = files;
+    } else {
+      console.error("Invalid files parameter type:", typeof files);
+      toast.error("Invalid files format. Please try again.");
+      return [];
+    }
+
+    console.log('Converted files to array with length:', filesArray.length);
+
+    // Filter for valid file types
+    const validFiles = filesArray.filter(file => {
+      if (!file) {
+        console.error("Null or undefined file found in array");
+        return false;
+      }
+
       const fileType = file.type;
-      return fileType === 'image/jpeg' ||
-             fileType === 'image/png' ||
-             fileType === 'application/pdf';
+      console.log(`Checking file: ${file.name}, type: ${fileType}`);
+
+      const isValid = fileType === 'image/jpeg' ||
+                      fileType === 'image/png' ||
+                      fileType === 'application/pdf';
+
+      if (!isValid) {
+        console.warn(`Invalid file type: ${fileType} for file: ${file.name}`);
+      }
+
+      return isValid;
     });
 
     if (validFiles.length === 0) {
       console.error("No valid files found in selection");
       toast.error("No valid files selected. Please upload JPEG, PNG, or PDF files.");
-      return;
+      return [];
     }
 
-    console.log('Valid files for batch upload:', validFiles);
+    console.log('Valid files for batch upload:', validFiles.length);
+    validFiles.forEach((file, index) => {
+      console.log(`Valid file ${index + 1}: ${file.name}, type: ${file.type}, size: ${file.size}`);
+    });
 
     // Create ReceiptUpload objects for all valid files
-    const newUploads: ReceiptUpload[] = validFiles.map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      status: 'pending',
-      uploadProgress: 0,
-    }));
+    const newUploads: ReceiptUpload[] = validFiles.map(file => {
+      const id = crypto.randomUUID();
+      console.log(`Creating upload object for file: ${file.name} with ID: ${id}`);
 
-    console.log('Adding new uploads to batch queue:', newUploads);
+      return {
+        id,
+        file,
+        status: 'pending',
+        uploadProgress: 0,
+      };
+    });
 
+    console.log('Created new uploads:', newUploads.length);
+
+    // Update state with new uploads
     setBatchUploads(prevUploads => {
       const updatedUploads = [...prevUploads, ...newUploads];
-      console.log('Updated batch uploads:', updatedUploads);
+      console.log('Updated batch uploads array length:', updatedUploads.length);
       return updatedUploads;
     });
 
     // If autoStart is enabled, start processing
     if (autoStart && !processingRef.current) {
+      console.log('Auto-start enabled, scheduling batch processing');
       setTimeout(() => {
         startBatchProcessing();
       }, 100);
@@ -205,15 +247,51 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
     try {
       // Update status to uploading
-      updateUploadStatus(upload.id, 'uploading', 10);
+      updateUploadStatus(upload.id, 'uploading', 5);
 
-      // Upload the image
+      // Optimize the image before uploading (if it's an image)
+      let fileToUpload = upload.file;
+
+      if (upload.file.type.startsWith('image/')) {
+        try {
+          // Using the directly imported optimizeImageForUpload function
+          updateUploadStatus(upload.id, 'uploading', 10);
+          console.log(`Optimizing image: ${upload.file.name}, size: ${upload.file.size}`);
+
+          // Use a lower quality for larger files
+          const quality = upload.file.size > 3 * 1024 * 1024 ? 70 : 80;
+
+          // Check if the function exists
+          if (typeof optimizeImageForUpload !== 'function') {
+            console.error('optimizeImageForUpload is not a function in useBatchFileUpload');
+            throw new Error('optimizeImageForUpload is not a function');
+          }
+
+          fileToUpload = await optimizeImageForUpload(upload.file, 1500, quality);
+
+          if (!fileToUpload) {
+            console.error('Optimization returned null or undefined file');
+            throw new Error('Optimization returned null file');
+          }
+
+          console.log(`Optimized image: ${upload.file.name}, new size: ${fileToUpload.size} (${Math.round(fileToUpload.size / upload.file.size * 100)}% of original)`);
+        } catch (optimizeError) {
+          console.error(`Error optimizing file ${upload.file.name}:`, optimizeError);
+          // Continue with original file if optimization fails
+          console.log(`Using original file for ${upload.file.name} due to optimization error`);
+        }
+      }
+
+      updateUploadStatus(upload.id, 'uploading', 15);
+
+      // Upload the image (optimized or original)
       const imageUrl = await uploadReceiptImage(
-        upload.file,
+        fileToUpload,
         user.id,
         (progress) => {
-          // Scale progress to 0-50%
-          updateUploadStatus(upload.id, 'uploading', Math.floor(progress * 0.5));
+          // Scale progress to 15-50%
+          const scaledProgress = 15 + Math.floor(progress * 0.35);
+          updateUploadStatus(upload.id, 'uploading', scaledProgress);
         }
       );
 
@@ -536,6 +614,12 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   // Log when batchUploads changes
   useEffect(() => {
     console.log('batchUploads state changed:', batchUploads);
+    console.log('batchUploads length:', batchUploads.length);
+    console.log('activeUploads:', activeUploads);
+    console.log('completedUploads:', completedUploads);
+    console.log('failedUploads:', failedUploads);
+    console.log('isProcessing:', isProcessing);
+    console.log('isPaused:', isPaused);
 
     // Log detailed progress information
     if (batchUploads.length > 0) {
@@ -547,8 +631,21 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         pending: batchUploads.filter(u => u.status === 'pending').length,
         uploadStatuses: batchUploads.map(u => ({ id: u.id, status: u.status, progress: u.uploadProgress }))
       });
+
+      // Log each upload in detail
+      batchUploads.forEach((upload, index) => {
+        console.log(`Upload ${index + 1}:`, {
+          id: upload.id,
+          fileName: upload.file?.name,
+          fileType: upload.file?.type,
+          fileSize: upload.file?.size,
+          status: upload.status,
+          progress: upload.uploadProgress,
+          error: upload.error
+        });
+      });
     }
-  }, [batchUploads, calculateTotalProgress, completedUploads.length, failedUploads.length, activeUploads.length]);
+  }, [batchUploads, calculateTotalProgress, completedUploads, failedUploads, activeUploads, isProcessing, isPaused]);
 
   // Effect to process next batch when active uploads change
   useEffect(() => {
@@ -565,20 +662,53 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   // Handle file drop and selection using the base hook
   const handleFiles = useCallback((files: FileList | File[]) => {
     console.log('handleFiles called in useBatchFileUpload with:', files);
+    console.log('Files type:', Object.prototype.toString.call(files));
+    console.log('Files length:', files.length);
+
+    // Ensure we have an array to work with
+    let filesArray: File[];
+    if (files instanceof FileList) {
+      filesArray = Array.from(files);
+    } else if (Array.isArray(files)) {
+      filesArray = files;
+    } else {
+      console.error("Invalid files parameter type:", typeof files);
+      toast.error("Invalid files format. Please try again.");
+      return;
+    }
+
+    console.log('Converted files to array with length:', filesArray.length);
 
     // Instead of using baseUpload.handleFiles, directly validate and add files
-    const validFiles = Array.from(files).filter(file => {
+    const validFiles = filesArray.filter(file => {
+      if (!file) {
+        console.error("Null or undefined file found in array");
+        return false;
+      }
+
       const fileType = file.type;
-      return fileType === 'image/jpeg' ||
-             fileType === 'image/png' ||
-             fileType === 'application/pdf';
+      console.log(`Checking file: ${file.name}, type: ${fileType}`);
+
+      const isValid = fileType === 'image/jpeg' ||
+                      fileType === 'image/png' ||
+                      fileType === 'application/pdf';
+
+      if (!isValid) {
+        console.warn(`Invalid file type: ${fileType} for file: ${file.name}`);
+      }
+
+      return isValid;
     });
 
-    console.log('Valid files in useBatchFileUpload handleFiles:', validFiles);
+    console.log('Valid files in useBatchFileUpload handleFiles:', validFiles.length);
+    validFiles.forEach((file, index) => {
+      console.log(`Valid file ${index + 1}: ${file.name}, type: ${file.type}, size: ${file.size}`);
+    });
 
     if (validFiles && validFiles.length > 0) {
       // Add to our batch queue
-      addToBatchQueue(validFiles);
+      const result = addToBatchQueue(validFiles);
+      console.log('Result from addToBatchQueue in handleFiles:', result);
 
       // Reset the base hook's uploads to avoid duplication
       baseUpload.resetUpload();

@@ -567,7 +567,23 @@ export const processReceiptWithOCR = async (
 
     if (!processingResponse.ok) {
       const errorText = await processingResponse.text();
-      const errorMsg = `Processing failed: ${processingResponse.status} ${processingResponse.statusText}`;
+      let errorMsg = `Processing failed: ${processingResponse.status} ${processingResponse.statusText}`;
+
+      // Check for resource limit errors
+      const isResourceLimitError = errorText.includes("WORKER_LIMIT") ||
+                                  errorText.includes("compute resources");
+
+      if (isResourceLimitError) {
+        console.error("Resource limit error during processing:", errorText);
+        errorMsg = "The receipt is too complex to process with the current resource limits. Try using a smaller image or the OCR+AI method instead of AI Vision.";
+
+        // Update status with more user-friendly message
+        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+
+        // Throw a more user-friendly error
+        throw new Error(errorMsg);
+      }
+
       console.error("Processing error:", errorText);
       await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
       throw new Error(errorMsg);

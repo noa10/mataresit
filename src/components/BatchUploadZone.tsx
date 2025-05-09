@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 import imageCompression from "browser-image-compression";
+import { optimizeImageForUpload } from "@/utils/imageUtils";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -77,17 +78,14 @@ export default function BatchUploadZone({
     if (!files) return;
 
     setIsCompressing(true);
-    console.log('Starting compression for', files.length, 'files');
+    console.log('Starting optimization for', files.length, 'files');
 
     const processedFiles: File[] = [];
     const invalidFiles: File[] = [];
     const compressionErrors: { name: string; error: unknown }[] = [];
 
-    const compressionOptions = {
-      maxSizeMB: 1, // Max size in MB
-      maxWidthOrHeight: 1920, // Max width or height
-      useWebWorker: true, // Use web worker for performance
-    };
+    // We're now using the direct import from the top of the file
+    console.log('Using directly imported optimizeImageForUpload function');
 
     for (const file of Array.from(files)) {
       const isImage = ['image/jpeg', 'image/png'].includes(file.type);
@@ -95,28 +93,72 @@ export default function BatchUploadZone({
 
       if (isImage) {
         try {
-          console.log(`Compressing image: ${file.name}, size: ${file.size}`);
-          const compressedFile = await imageCompression(file, compressionOptions);
-          console.log(`Compressed image: ${compressedFile.name}, new size: ${compressedFile.size}`);
-          // Create a new File object with the original name but compressed data
-          processedFiles.push(new File([compressedFile], file.name, { type: file.type, lastModified: file.lastModified }));
+          console.log(`Optimizing image: ${file.name}, size: ${file.size}, type: ${file.type}`);
+
+          // Use our new optimization function with quality based on file size
+          const quality = file.size > 3 * 1024 * 1024 ? 70 : 80;
+
+          // Check if the function exists
+          if (typeof optimizeImageForUpload !== 'function') {
+            console.error('optimizeImageForUpload is not a function:', optimizeImageForUpload);
+            throw new Error('optimizeImageForUpload is not a function');
+          }
+
+          const optimizedFile = await optimizeImageForUpload(file, 1500, quality);
+
+          if (!optimizedFile) {
+            console.error('Optimization returned null or undefined file');
+            throw new Error('Optimization returned null file');
+          }
+
+          console.log(`Optimized image: ${file.name}, new size: ${optimizedFile.size} (${Math.round(optimizedFile.size / file.size * 100)}% of original)`);
+
+          // Add to processed files array
+          processedFiles.push(optimizedFile);
+          console.log(`Added optimized file to processedFiles array, new length: ${processedFiles.length}`);
         } catch (error) {
-          console.error(`Error compressing file ${file.name}:`, error);
+          console.error(`Error optimizing file ${file.name}:`, error);
           compressionErrors.push({ name: file.name, error });
-          // Add original file if compression fails? Or mark as failed?
-          // For now, let's add the original file but log the error
-          processedFiles.push(file);
+
+          // Fall back to browser-image-compression if our optimization fails
+          try {
+            console.log(`Falling back to browser-image-compression for ${file.name}`);
+            const compressionOptions = {
+              maxSizeMB: 1, // Max size in MB
+              maxWidthOrHeight: 1500, // Max width or height
+              useWebWorker: true, // Use web worker for performance
+            };
+
+            const compressedFile = await imageCompression(file, compressionOptions);
+            console.log(`Fallback compression: ${file.name}, new size: ${compressedFile.size}`);
+
+            // Create a new File object with the original name but compressed data
+            const newFile = new File([compressedFile], file.name, {
+              type: file.type,
+              lastModified: file.lastModified
+            });
+
+            processedFiles.push(newFile);
+            console.log(`Added fallback compressed file to processedFiles array, new length: ${processedFiles.length}`);
+          } catch (fallbackError) {
+            console.error(`Fallback compression also failed for ${file.name}:`, fallbackError);
+            // Add original file if both optimization methods fail
+            processedFiles.push(file);
+            console.log(`Added original file to processedFiles array, new length: ${processedFiles.length}`);
+          }
         }
       } else if (isPdf) {
         // Keep PDFs as they are
         processedFiles.push(file);
+        console.log(`Added PDF file to processedFiles array, new length: ${processedFiles.length}`);
       } else {
         // Track invalid files
         invalidFiles.push(file);
+        console.log(`Added invalid file to invalidFiles array, new length: ${invalidFiles.length}`);
       }
     }
 
-    console.log('Compression finished. Processed:', processedFiles.length, 'Invalid:', invalidFiles.length, 'Errors:', compressionErrors.length);
+    console.log('Optimization finished. Processed:', processedFiles.length, 'Invalid:', invalidFiles.length, 'Errors:', compressionErrors.length);
     setIsCompressing(false);
 
     // Show toast for invalid files
@@ -131,15 +173,19 @@ export default function BatchUploadZone({
     // Show toast for compression errors (optional)
     if (compressionErrors.length > 0) {
       toast({
-        title: "Compression Issues",
-        description: `${compressionErrors.length} ${compressionErrors.length === 1 ? 'image' : 'images'} could not be compressed due to errors (original files were added). Check console for details.`,
+        title: "Optimization Issues",
+        description: `${compressionErrors.length} ${compressionErrors.length === 1 ? 'image' : 'images'} had optimization issues (fallback methods were used). Check console for details.`,
         variant: "default",
       });
     }
 
-    // Add the processed (compressed or original) files to the batch queue
+    // Add the processed (optimized or original) files to the batch queue
+    console.log(`Ready to add ${processedFiles.length} files to batch queue:`, processedFiles);
     if (processedFiles.length > 0) {
-      addToBatchQueue(processedFiles);
+      const result = addToBatchQueue(processedFiles);
+      console.log('Result from addToBatchQueue:', result);
+    } else {
+      console.error('No processed files to add to batch queue');
     }
 
   }, [addToBatchQueue]);
@@ -181,11 +227,13 @@ export default function BatchUploadZone({
     });
 
     // If there are no active uploads and no queued uploads, and we have at least one upload (completed or failed)
+    // AND we haven't already marked processing as complete
     if (
       !isProcessing &&
       activeUploads.length === 0 &&
       queuedUploads.length === 0 &&
-      (completedUploads.length > 0 || failedUploads.length > 0)
+      (completedUploads.length > 0 || failedUploads.length > 0) &&
+      !allProcessingComplete // Only run this block if we haven't already marked as complete
     ) {
       console.log('All processing is complete, showing notification');
 
@@ -241,7 +289,8 @@ export default function BatchUploadZone({
     completedUploads.length,
     failedUploads.length,
     allProcessingComplete,
-    onUploadComplete
+    onUploadComplete,
+    receiptIds
   ]);
 
   const getBorderStyle = () => {
@@ -281,7 +330,21 @@ export default function BatchUploadZone({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       console.log('Files dropped:', e.dataTransfer.files);
+      console.log('Files length:', e.dataTransfer.files.length);
+
+      // Log each file
+      Array.from(e.dataTransfer.files).forEach((file, index) => {
+        console.log(`Dropped file ${index + 1}:`, {
+          name: file.name,
+          type: file.type,
+          size: file.size
+        });
+      });
+
+      // Process the files
       compressAndAddFiles(e.dataTransfer.files);
+    } else {
+      console.log('No files in drop event');
     }
   }, [compressAndAddFiles]);
 
@@ -306,10 +369,14 @@ export default function BatchUploadZone({
             })
             .filter(Boolean) as string[];
 
+          console.log('View All Receipts clicked in BatchUploadReview, IDs:', successfulReceiptIds);
+
           if (successfulReceiptIds.length > 0) {
             setCompletedReceiptIds(successfulReceiptIds);
             setShowReceiptBrowser(true);
             setShowReview(false); // Hide the review UI
+          } else {
+            console.error('No successful receipt IDs found');
           }
         }}
       />

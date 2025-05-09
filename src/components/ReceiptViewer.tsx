@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -987,22 +987,63 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         break;
     }
 
+    // Check if there's a processing error message
+    const hasErrorDetails = receipt.processing_error && receipt.processing_error.length > 0;
+    const isResourceLimitError = hasErrorDetails &&
+      (receipt.processing_error.includes("WORKER_LIMIT") ||
+       receipt.processing_error.includes("compute resources") ||
+       receipt.processing_error.includes("too complex to process"));
+
     return (
-      <div className="mb-4 flex items-center gap-2">
-        <Badge variant="outline" className={`text-white ${colorClass} flex items-center`}>
-          {icon}
-          {statusText}
-        </Badge>
-        {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7"
-            onClick={() => fixProcessingStatus(receipt.id)}
-          >
-            <Check className="h-3.5 w-3.5 mr-1" />
-            Mark as fixed
-          </Button>
+      <div className="mb-4 flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`text-white ${colorClass} flex items-center`}>
+            {icon}
+            {statusText}
+          </Badge>
+          {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() => fixProcessingStatus(receipt.id)}
+            >
+              <Check className="h-3.5 w-3.5 mr-1" />
+              Mark as fixed
+            </Button>
+          )}
+
+          {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() => reprocessMutation.mutate()}
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Try Again
+            </Button>
+          )}
+        </div>
+
+        {/* Show error details if available */}
+        {hasErrorDetails && (
+          <div className={`text-sm px-3 py-2 rounded-md ${isResourceLimitError ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
+            {isResourceLimitError ? (
+              <>
+                <p className="font-medium">Resource Limit Exceeded</p>
+                <p>The receipt image is too complex or large to process with the current resources.</p>
+                <p className="mt-1">Try one of these solutions:</p>
+                <ul className="list-disc list-inside mt-1">
+                  <li>Use a smaller or clearer image</li>
+                  <li>Try the OCR+AI method instead of AI Vision</li>
+                  <li>Manually enter the receipt details</li>
+                </ul>
+              </>
+            ) : (
+              <p>{receipt.processing_error}</p>
+            )}
+          </div>
         )}
       </div>
     );
