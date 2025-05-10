@@ -188,28 +188,34 @@ export default function Index() {
               </div>
             </motion.div>
             
-            {/* Interactive Hero Visual - Keep existing for now */}
+            {/* Receipt Scanning Hero Image */}
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="hidden lg:block"
+              className="hidden lg:flex justify-center items-center"
             >
-              <div className="relative rounded-lg overflow-hidden shadow-xl border border-border/60 bg-card">
+              <div className="relative max-w-lg rounded-xl overflow-hidden border border-border shadow-2xl">
                 <img 
-                  src="/receipt-processing-preview.png" 
-                  alt="Receipt Processing Demo" 
-                  className="w-full rounded-lg"
-                  onError={(e) => {
-                    // Basic fallback: hide the image if not found
-                    e.currentTarget.style.display = 'none';
-                    // Consider adding a placeholder element here
-                  }}
+                  src="/receipt-scanner.png" 
+                  alt="Receipt Scanning on Mobile Phone" 
+                  width="500"
+                  height="600"
+                  className="block w-full h-auto object-cover"
                 />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-4">
+                
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
                   <div className="flex items-center">
-                    <span className="bg-primary/20 text-primary text-xs px-2 py-1 rounded-full">AI Enhanced</span>
-                    <span className="ml-2 text-sm text-muted-foreground">Side-by-side verification</span>
+                    <div>
+                      <p className="text-white font-medium">Transform your receipts</p>
+                      <p className="text-white/80 text-sm">Quick, accurate, and effortless</p>
+                    </div>
+                    <Button size="sm" variant="secondary" className="ml-auto" asChild>
+                      <Link to="/upload">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </div>
