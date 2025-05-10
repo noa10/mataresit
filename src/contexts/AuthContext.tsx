@@ -1,8 +1,9 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { AppRole, UserWithRole } from "@/types/auth";
+import { AppRole, UserWithRole, AuthState } from "@/types/auth";
 
 type AuthContextType = {
   user: UserWithRole | null;
@@ -29,21 +30,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user roles
   const fetchUserRoles = async (userId: string) => {
     try {
-      // Using raw SQL query to avoid type issues with the newly created table
-      // TODO: Regenerate Supabase types to correctly include 'has_role' RPC function
-      const { data, error } = await supabase
-        .rpc('has_role' as any, { _user_id: userId, _role: 'admin' });
+      // Using RPC function to check if user has admin role
+      const { data, error } = await supabase.rpc('has_role', { 
+        _user_id: userId, 
+        _role: 'admin' 
+      });
 
       if (error) {
         console.error('Error fetching user roles:', error);
         return [];
       }
 
-      // Explicitly type the array elements as AppRole
-      return data ? ['admin' as AppRole] : ['user' as AppRole];
+      // If has_role returns true, user is admin, otherwise regular user
+      const roles: AppRole[] = data ? ['admin'] : ['user'];
+      return roles;
     } catch (error) {
       console.error('Error in fetchUserRoles:', error);
-      return [];
+      return ['user'] as AppRole[];
     }
   };
 
@@ -67,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(roles.includes('admin'));
     } catch (error) {
       console.error('Error updating user with roles:', error);
-      setUser(currentUser as UserWithRole);
+      setUser({...currentUser, roles: ['user']} as UserWithRole);
       setIsAdmin(false);
     } finally {
       if (shouldSetLoading) setLoading(false);

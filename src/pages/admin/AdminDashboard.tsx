@@ -1,144 +1,135 @@
-
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminService } from "@/services/adminService";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart3, FileText, Users } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ShoppingBag, Users, AlertCircle } from "lucide-react";
+
+interface SystemStats {
+  userCount: number;
+  receiptCount: number;
+  recentActivity: any[];
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<{
-    userCount: number;
-    receiptCount: number;
-    recentActivity: any[];
-  } | null>(null);
-  
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const stats = await adminService.getSystemStats();
-        setStats(stats);
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to load dashboard statistics",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchSystemStats();
+  }, []);
 
-    fetchStats();
-  }, [toast]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
+  const fetchSystemStats = async () => {
+    try {
+      setLoading(true);
+      const stats = await adminService.getSystemStats();
+      setSystemStats(stats);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load system statistics",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          Overview of your application's performance and statistics
+          A overview of the platform&apos;s key metrics and recent activity.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.userCount || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Registered accounts
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Receipts</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.receiptCount || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Processed receipts
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Analytics</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Coming Soon</div>
-            <p className="text-xs text-muted-foreground">
-              Advanced analytics
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Spinner size="lg" />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="h-4 w-4" />
+                  <span>Total Users</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{systemStats?.userCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Registered users on the platform
+                </p>
+              </CardContent>
+            </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest 10 receipts processed in the system</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-8">
-            {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">Date</th>
-                      <th className="text-left p-2">Merchant</th>
-                      <th className="text-left p-2">Amount</th>
-                      <th className="text-left p-2">User</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recentActivity.map((activity) => (
-                      <tr key={activity.id} className="hover:bg-muted/50">
-                        <td className="p-2">
-                          {new Date(activity.date).toLocaleDateString()}
-                        </td>
-                        <td className="p-2">{activity.merchant}</td>
-                        <td className="p-2">
-                          {typeof activity.total === 'number'
-                            ? `$${activity.total.toFixed(2)}`
-                            : '$0.00'}
-                        </td>
-                        <td className="p-2">
-                          {activity.profiles?.first_name
-                            ? `${activity.profiles.first_name} ${activity.profiles.last_name || ''}`
-                            : 'Unknown User'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                No recent activity found
-              </div>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  <span>Total Receipts</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{systemStats?.receiptCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Total number of receipts processed
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Recent Activity</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{systemStats?.recentActivity.length}</div>
+                <p className="text-sm text-muted-foreground">
+                  Last 10 receipts
+                </p>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Receipt ID</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Merchant</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {systemStats?.recentActivity.map((activity) => (
+                    <TableRow key={activity.id}>
+                      <TableCell>{activity.id}</TableCell>
+                      <TableCell>{activity.profile?.first_name} {activity.profile?.last_name}</TableCell>
+                      <TableCell>{activity.merchant}</TableCell>
+                      <TableCell>{activity.total}</TableCell>
+                      <TableCell>{new Date(activity.date).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

@@ -1,26 +1,42 @@
-import { supabase } from "@/integrations/supabase/client";
-// We'll remove the dependency on potentially incorrect generated types for now
-// import { Database } from "@/types/supabase";
+
+import { supabase } from "@/lib/supabase";
+import { AppRole } from "@/types/auth";
+
+// Define admin user type
+export interface AdminUser {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  confirmed_at: string | null;
+  last_sign_in_at: string | null;
+  created_at: string;
+  roles: AppRole[];
+}
 
 // Admin service methods
 export const adminService = {
   // Get all users
-  async getAllUsers() {
-    // Using raw SQL query instead of accessing the view directly
-    const { data, error } = await supabase.rpc('get_admin_users' as any);
+  async getAllUsers(): Promise<AdminUser[]> {
+    // Using RPC function to get admin users
+    const { data, error } = await supabase.rpc('get_admin_users');
     
     if (error) {
       console.error("Error fetching users:", error);
       throw error;
     }
     
-    return data;
+    // Transform the data to ensure roles is of type AppRole[]
+    return (data || []).map(user => ({
+      ...user,
+      roles: (user.roles || []) as AppRole[]
+    }));
   },
   
   // Update user role
-  async updateUserRole(userId: string, role: 'admin' | 'user') {
-    // Use RPC call to avoid direct table access type issues
-    const { data, error } = await supabase.rpc('set_user_role' as any, { 
+  async updateUserRole(userId: string, role: AppRole): Promise<boolean> {
+    // Use RPC call to set user role
+    const { data, error } = await supabase.rpc('set_user_role', { 
       _user_id: userId, 
       _role: role 
     });
@@ -57,7 +73,7 @@ export const adminService = {
       if (profilesError) throw profilesError;
       
       // Step 4: Create a map of user_id to profile data for quick lookup
-      const profileMap = (profiles || []).reduce((map, profile) => {
+      const profileMap = (profiles || []).reduce((map: Record<string, any>, profile) => {
         map[profile.id] = profile;
         return map;
       }, {});
@@ -114,7 +130,7 @@ export const adminService = {
         if (profilesError) throw profilesError;
         
         // Create a map of user_id to profile data
-        const profileMap = (profiles || []).reduce((map, profile) => {
+        const profileMap = (profiles || []).reduce((map: Record<string, any>, profile) => {
           map[profile.id] = profile;
           return map;
         }, {});
