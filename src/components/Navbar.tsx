@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
 export default function Navbar() {
   const { user, signOut, isAdmin } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -34,7 +35,7 @@ export default function Navbar() {
   const initial = user?.email?.charAt(0).toUpperCase() ?? "";
 
   return (
-    <header className="w-full bg-background border-b">
+    <header className="w-full bg-background border-b relative">
       <div className="container mx-auto flex items-center justify-between py-4 px-4 md:px-8">
         {/* Brand */}
         <NavLink to="/" className="flex items-center gap-2 text-xl font-semibold text-foreground">
@@ -42,7 +43,7 @@ export default function Navbar() {
           ReceiptScan
         </NavLink>
 
-        {/* Main nav links */}
+        {/* Main nav links - Desktop */}
         <nav className="hidden md:flex items-center space-x-6">
           <NavLink
             to="/"
@@ -97,8 +98,13 @@ export default function Navbar() {
           </NavLink>
         </nav>
 
-        {/* Actions: theme toggle + user menu */}
-        <div className="flex items-center space-x-4">
+        {/* Actions: mobile menu toggle, theme toggle + user menu */}
+        <div className="flex items-center space-x-2 md:space-x-4">
+          {/* Mobile menu toggle button */}
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+          
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
@@ -133,6 +139,70 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-background border-b shadow-md z-50">
+          <nav className="flex flex-col px-4 py-2">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Home
+            </NavLink>
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Dashboard
+            </NavLink>
+            <NavLink
+              to="/analysis"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Analysis
+            </NavLink>
+            <NavLink
+              to="/search"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border flex items-center gap-1"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border flex items-center gap-1"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <BrainCircuit className="h-4 w-4" />
+              AI Search
+            </NavLink>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3"
+                  : "text-foreground hover:text-primary transition-colors py-3"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Settings
+            </NavLink>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
