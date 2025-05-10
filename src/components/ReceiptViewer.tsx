@@ -27,6 +27,7 @@ import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUti
 import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
 import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
+import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -1679,6 +1680,14 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
             </div>
         </div>
 
+        <div className="mt-4">
+          <SimilarReceipts
+            receiptId={receipt.id}
+            limit={3}
+            className="mb-4"
+          />
+        </div>
+        
         <div className="pt-4 mt-auto flex justify-between flex-shrink-0">
           <Button
             variant="outline"

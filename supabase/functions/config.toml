@@ -22,3 +22,16 @@ verify_jwt = true
 
 [generate-pdf-report]
 verify_jwt = true
+
+[test-gemini]
+verify_jwt = false
+
+[public-test-gemini]
+verify_jwt = false
+# This is a public test function that doesn't require authentication
+# It's used to test the Gemini API connection
+
+[simple-test]
+verify_jwt = false
+# This is a simple test function that doesn't require authentication
+# It's used to test if edge functions are working at all

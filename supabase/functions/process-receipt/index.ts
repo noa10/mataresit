@@ -1560,6 +1560,43 @@ serve(async (req: Request) => {
 
       await logger.log("Processing results saved successfully", "SAVE");
 
+      // Generate embeddings for the receipt data
+      try {
+        await logger.log("Triggering embedding generation", "EMBEDDING");
+        console.log("Calling generate-embeddings function...");
+        
+        // Call the generate-embeddings function
+        const embeddingsResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': requestHeaders.Authorization || '',
+              'apikey': requestHeaders.apikey || ''
+            },
+            body: JSON.stringify({
+              receiptId,
+              processAllFields: true
+            })
+          }
+        );
+        
+        if (!embeddingsResponse.ok) {
+          const errorData = await embeddingsResponse.json();
+          console.error("Error generating embeddings:", errorData);
+          await logger.log(`Embedding generation error: ${JSON.stringify(errorData)}`, "WARNING");
+          // Continue despite embedding errors
+        } else {
+          const embeddingResult = await embeddingsResponse.json();
+          await logger.log(`Successfully generated ${embeddingResult.results?.length || 0} embeddings`, "EMBEDDING");
+        }
+      } catch (embeddingError) {
+        console.error("Error calling generate-embeddings function:", embeddingError);
+        await logger.log(`Embedding function error: ${embeddingError.message}`, "WARNING");
+        // Continue despite embedding errors
+      }
+      
       // Return the extracted data (including processing time)
       await logger.log("Receipt processing completed successfully", "COMPLETE");
       return new Response(

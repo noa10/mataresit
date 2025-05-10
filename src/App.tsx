@@ -25,6 +25,7 @@ import AdminSettingsPage from "./pages/admin/SettingsPage";
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
+const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -76,6 +77,11 @@ const App = () => (
               <Route path="/analysis" element={
                 <Suspense fallback={<PageLoading />}>
                   <AnalysisPage />
+                </Suspense>
+              } />
+              <Route path="/search" element={
+                <Suspense fallback={<PageLoading />}>
+                  <SemanticSearch />
                 </Suspense>
               } />
             </Route>

@@ -5,8 +5,25 @@ import { Image } from 'https://deno.land/x/imagescript@1.2.15/mod.ts';
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control, pragma, expires, x-requested-with, user-agent, accept',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json'
 };
+
+// Helper function to add CORS headers to any response
+function addCorsHeaders(response: Response): Response {
+  const newHeaders = new Headers(response.headers);
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    newHeaders.set(key, value);
+  });
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+}
 
 // Initialize Supabase client (will use service_role key from environment)
 const supabaseUrl = Deno.env.get('PROJECT_URL')!;
@@ -196,14 +213,16 @@ serve(async (req: Request): Promise<Response> => {
   try {
     // 1) CORS preflight
     if (req.method === 'OPTIONS') {
-      return new Response('ok', { headers: corsHeaders });
+      return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     // 2) Only POST allowed
     if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return addCorsHeaders(
+        new Response(
+          JSON.stringify({ error: 'Method not allowed' }),
+          { status: 405, headers: { 'Content-Type': 'application/json' } }
+        )
       );
     }
 
@@ -213,38 +232,46 @@ serve(async (req: Request): Promise<Response> => {
     // 4) Dispatch to single vs batch
     if (batchProcess) {
       const result = await generateAllThumbnails(limit || 50);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: `Processed ${result.processed} receipts with ${result.errors} errors`,
-          ...result
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return addCorsHeaders(
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: `Processed ${result.processed} receipts with ${result.errors} errors`,
+            ...result
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       );
     }
     else if (receiptId) {
       const thumbnailUrl = await retry(() => generateThumbnail(receiptId));
-      return new Response(
-        JSON.stringify({ success: true, receiptId, thumbnailUrl }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return addCorsHeaders(
+        new Response(
+          JSON.stringify({ success: true, receiptId, thumbnailUrl }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       );
     }
     else {
-      return new Response(
-        JSON.stringify({ error: 'Missing receiptId or batchProcess flag' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return addCorsHeaders(
+        new Response(
+          JSON.stringify({ error: 'Missing receiptId or batchProcess flag' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
       );
     }
 
   } catch (err) {
     // THIS catches *everything*, even a bare `throw null`
     console.error('Function error (caught at top level):', err);
-    return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : String(err),
-        success: false
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({
+          error: err instanceof Error ? err.message : String(err),
+          success: false
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
     );
   }
 }); 

@@ -45,6 +45,13 @@ export type Database = {
             referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "corrections_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
+            referencedColumns: ["id"]
+          },
         ]
       }
       errors: {
@@ -99,10 +106,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "line_items_receipt_id_fkey"
             columns: ["receipt_id"]
             isOneToOne: false
             referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "line_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
             referencedColumns: ["id"]
           },
         ]
@@ -141,10 +162,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "processing_logs_receipt_id_fkey"
             columns: ["receipt_id"]
             isOneToOne: false
             referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "processing_logs_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
             referencedColumns: ["id"]
           },
         ]
@@ -176,6 +211,62 @@ export type Database = {
         }
         Relationships: []
       }
+      receipt_embeddings: {
+        Row: {
+          content_type: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          receipt_id: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          receipt_id: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          receipt_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_receipt"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_embeddings_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipt_embeddings_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts_debug"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       receipts: {
         Row: {
           ai_suggestions: Json | null
@@ -186,6 +277,8 @@ export type Database = {
           currency_converted: boolean | null
           date: string
           discrepancies: Json | null
+          document_structure: Json | null
+          field_geometry: Json | null
           fullText: string | null
           has_alternative_data: boolean | null
           id: string
@@ -215,6 +308,8 @@ export type Database = {
           currency_converted?: boolean | null
           date: string
           discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
           id?: string
@@ -244,6 +339,8 @@ export type Database = {
           currency_converted?: boolean | null
           date?: string
           discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
           id?: string
@@ -266,18 +363,172 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      receipts_debug: {
+        Row: {
+          ai_suggestions: Json | null
+          batch_id: string | null
+          confidence_scores: Json | null
+          created_at: string | null
+          currency: string | null
+          currency_converted: boolean | null
+          date: string | null
+          discrepancies: Json | null
+          document_structure: Json | null
+          field_geometry: Json | null
+          fullText: string | null
+          has_alternative_data: boolean | null
+          id: string | null
+          image_url: string | null
+          merchant: string | null
+          model_used: string | null
+          normalized_merchant: string | null
+          payment_method: string | null
+          predicted_category: string | null
+          primary_method: string | null
+          processing_error: string | null
+          processing_status: string | null
+          processing_time: number | null
+          status: string | null
+          tax: number | null
+          thumbnail_url: string | null
+          total: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_suggestions?: Json | null
+          batch_id?: string | null
+          confidence_scores?: Json | null
+          created_at?: string | null
+          currency?: string | null
+          currency_converted?: boolean | null
+          date?: string | null
+          discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
+          fullText?: string | null
+          has_alternative_data?: boolean | null
+          id?: string | null
+          image_url?: string | null
+          merchant?: string | null
+          model_used?: string | null
+          normalized_merchant?: string | null
+          payment_method?: string | null
+          predicted_category?: string | null
+          primary_method?: string | null
+          processing_error?: string | null
+          processing_status?: string | null
+          processing_time?: number | null
+          status?: string | null
+          tax?: number | null
+          thumbnail_url?: string | null
+          total?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_suggestions?: Json | null
+          batch_id?: string | null
+          confidence_scores?: Json | null
+          created_at?: string | null
+          currency?: string | null
+          currency_converted?: boolean | null
+          date?: string | null
+          discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
+          fullText?: string | null
+          has_alternative_data?: boolean | null
+          id?: string | null
+          image_url?: string | null
+          merchant?: string | null
+          model_used?: string | null
+          normalized_merchant?: string | null
+          payment_method?: string | null
+          predicted_category?: string | null
+          primary_method?: string | null
+          processing_error?: string | null
+          processing_status?: string | null
+          processing_time?: number | null
+          status?: string | null
+          tax?: number | null
+          thumbnail_url?: string | null
+          total?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      am_i_authenticated: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
       bytea_to_text: {
         Args: { data: string }
         Returns: string
       }
+      check_pgvector_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       column_exists: {
         Args: { p_table: string; p_column: string; p_schema?: string }
         Returns: boolean
+      }
+      create_first_admin: {
+        Args: { _email: string }
+        Returns: boolean
+      }
+      debug_auth_state: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_admin_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          first_name: string
+          last_name: string
+          confirmed_at: string
+          last_sign_in_at: string
+          created_at: string
+          roles: Json
+        }[]
+      }
+      get_direct_receipt_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_receipts_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_user_receipt_usage_stats: {
         Args: Record<PropertyKey, never>
@@ -285,6 +536,45 @@ export type Database = {
           primary_method: string
           receipt_count: number
         }[]
+      }
+      halfvec_avg: {
+        Args: { "": number[] }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id?: string
+        }
+        Returns: boolean
+      }
+      hnsw_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: { "": unknown }
+        Returns: unknown
       }
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
@@ -337,9 +627,75 @@ export type Database = {
         Args: { curlopt: string; value: string }
         Returns: boolean
       }
+      hybrid_search_receipts: {
+        Args: {
+          search_text: string
+          query_embedding: string
+          content_type?: string
+          similarity_weight?: number
+          text_weight?: number
+          match_count?: number
+        }
+        Returns: {
+          receipt_id: string
+          score: number
+        }[]
+      }
       increment_batch_counter: {
         Args: { batch_uuid: string; field_name: string }
         Returns: undefined
+      }
+      ivfflat_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: string
+      }
+      search_receipts: {
+        Args: {
+          query_embedding: string
+          similarity_threshold?: number
+          match_count?: number
+          content_type?: string
+        }
+        Returns: {
+          id: string
+          receipt_id: string
+          similarity: number
+        }[]
+      }
+      set_user_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      sparsevec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
       }
       text_to_bytea: {
         Args: { data: string }
@@ -353,9 +709,33 @@ export type Database = {
         Args: { data: Json } | { string: string } | { string: string }
         Returns: string
       }
+      vector_avg: {
+        Args: { "": number[] }
+        Returns: string
+      }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
+      vector_norm: {
+        Args: { "": string }
+        Returns: number
+      }
+      vector_out: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: { "": string }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       http_header: {
@@ -486,6 +866,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

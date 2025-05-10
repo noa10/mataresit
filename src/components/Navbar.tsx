@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Sun, Moon, ChevronDown } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -73,6 +73,17 @@ export default function Navbar() {
             }
           >
             Analysis
+          </NavLink>
+          <NavLink
+            to="/search"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold flex items-center gap-1"
+                : "text-foreground hover:text-primary transition-colors flex items-center gap-1"
+            }
+          >
+            <BrainCircuit className="h-4 w-4" />
+            AI Search
           </NavLink>
           <NavLink
             to="/settings"

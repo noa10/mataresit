@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -162,6 +162,11 @@ export default function Auth() {
             setIsResetPasswordOpen(false);
           }
           // AuthContext should handle clearing non-recovery auth hashes (like from OAuth).
+        }
+
+        // The 'session' object is available directly from the onAuthStateChange callback parameters.
+        if (session?.user) {
+          console.log('Current frontend user ID (auth.uid()):', session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
         // If user signs out for any reason, clear any recovery state.

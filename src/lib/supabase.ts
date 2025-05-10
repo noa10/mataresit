@@ -1,10 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+// Re-export the Supabase client from the integrations path
+export { supabase } from "@/integrations/supabase/client";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey); 
+// Add a warning comment to help future developers
+// WARNING: Do not create a new Supabase client instance here!
+// The application MUST use only ONE Supabase client instance across all components
+// to ensure authentication state is properly maintained. 
