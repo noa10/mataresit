@@ -8,12 +8,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { adminService } from "@/services/adminService";
+import { adminService, AdminUser } from "@/services/adminService";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Mail, Shield, ShieldOff } from "lucide-react";
+import { AppRole } from "@/types/auth";
 import {
   Dialog,
   DialogContent,
@@ -24,14 +25,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function UsersManagement() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
@@ -42,8 +42,8 @@ export default function UsersManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getAllUsers();
-      setUsers(data || []);
+      const userData = await adminService.getAllUsers();
+      setUsers(userData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -55,7 +55,7 @@ export default function UsersManagement() {
     }
   };
 
-  const handleRoleUpdate = async (userId: string, newRole: 'admin' | 'user') => {
+  const handleRoleUpdate = async (userId: string, newRole: AppRole) => {
     try {
       await adminService.updateUserRole(userId, newRole);
       toast({
@@ -76,8 +76,8 @@ export default function UsersManagement() {
 
   const filteredUsers = users.filter(user => 
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.last_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    user.first_name?.toLowerCase().includes(searchTerm.toLowerCase() || '') ||
+    user.last_name?.toLowerCase().includes(searchTerm.toLowerCase() || '')
   );
 
   return (
@@ -135,7 +135,7 @@ export default function UsersManagement() {
                         </TableCell>
                         <TableCell>
                           {user.roles && user.roles.length > 0 ? (
-                            user.roles.map((role: string) => (
+                            user.roles.map((role) => (
                               <Badge 
                                 key={role}
                                 variant={role === 'admin' ? 'default' : 'outline'}

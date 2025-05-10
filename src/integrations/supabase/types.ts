@@ -186,6 +186,8 @@ export type Database = {
           currency_converted: boolean | null
           date: string
           discrepancies: Json | null
+          document_structure: Json | null
+          field_geometry: Json | null
           fullText: string | null
           has_alternative_data: boolean | null
           id: string
@@ -215,6 +217,8 @@ export type Database = {
           currency_converted?: boolean | null
           date: string
           discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
           id?: string
@@ -244,6 +248,8 @@ export type Database = {
           currency_converted?: boolean | null
           date?: string
           discrepancies?: Json | null
+          document_structure?: Json | null
+          field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
           id?: string
@@ -266,6 +272,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -279,12 +303,36 @@ export type Database = {
         Args: { p_table: string; p_column: string; p_schema?: string }
         Returns: boolean
       }
+      create_first_admin: {
+        Args: { _email: string }
+        Returns: boolean
+      }
+      get_admin_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          first_name: string
+          last_name: string
+          confirmed_at: string
+          last_sign_in_at: string
+          created_at: string
+          roles: Json
+        }[]
+      }
       get_user_receipt_usage_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
           primary_method: string
           receipt_count: number
         }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id?: string
+        }
+        Returns: boolean
       }
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
@@ -341,6 +389,13 @@ export type Database = {
         Args: { batch_uuid: string; field_name: string }
         Returns: undefined
       }
+      set_user_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
       text_to_bytea: {
         Args: { data: string }
         Returns: string
@@ -355,7 +410,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       http_header: {
@@ -486,6 +541,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
