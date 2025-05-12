@@ -19,8 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import UploadZone from "@/components/UploadZone";
+
 import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { deleteReceipt } from "@/services/receiptService";
@@ -179,7 +178,6 @@ export default function Dashboard() {
     return (searchParams.get('view') as ViewMode) || (localStorage.getItem('dashboardViewMode') as ViewMode) || "grid";
   });
 
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
 
   // Helper function to update search parameters
@@ -336,20 +334,16 @@ export default function Dashboard() {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <PlusCircle size={24} className="text-primary" />
           </div>
-          <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
-          <p className="text-muted-foreground mb-6">
-            Upload your first receipt to get started
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button onClick={() => setIsUploadDialogOpen(true)} className="gap-2">
-              <PlusCircle size={16} />
-              Upload Receipt
-            </Button>
-            <Button onClick={() => setIsBatchUploadModalOpen(true)} variant="outline" className="gap-2">
-              <Files size={16} />
-              Batch Upload
-            </Button>
-          </div>
+                        <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Upload your first receipt to get started
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button onClick={() => setIsBatchUploadModalOpen(true)} className="gap-2">
+                  <PlusCircle size={16} />
+                  Upload Receipt
+                </Button>
+              </div>
         </motion.div>
       );
     }
@@ -576,7 +570,7 @@ export default function Dashboard() {
     // Table view
     else {
       return (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -677,7 +671,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="flex gap-3"
+            className="flex gap-3 flex-wrap"
           >
             <ToggleGroup
               type="single"
@@ -703,24 +697,13 @@ export default function Dashboard() {
               </ToggleGroupItem>
             </ToggleGroup>
 
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => setIsBatchUploadModalOpen(true)}
-                title="Upload multiple receipts at once"
-              >
-                <Files size={16} />
-                Batch Upload
-              </Button>
-              <Button
-                className="gap-2"
-                onClick={() => setIsUploadDialogOpen(true)}
-              >
-                <Upload size={16} />
-                Upload New
-              </Button>
-            </div>
+            <Button
+              className="gap-2"
+              onClick={() => setIsBatchUploadModalOpen(true)}
+            >
+              <Upload size={16} />
+              Upload
+            </Button>
           </motion.div>
         </div>
 
@@ -743,7 +726,7 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {/* Selection Mode Toggle */}
               <Button
                 variant={selectionMode ? "default" : "outline"}
@@ -923,20 +906,7 @@ export default function Dashboard() {
         {renderReceiptContent()}
       </main>
 
-      {/* Upload Dialog */}
-      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Upload Receipt</DialogTitle>
-          </DialogHeader>
-          <UploadZone onUploadComplete={() => {
-            setIsUploadDialogOpen(false);
-            refetch();
-          }} />
-        </DialogContent>
-      </Dialog>
-
-      {/* Batch Upload Modal */}
+      {/* Batch Upload Modal - Now handles both single and batch uploads */}
       <BatchUploadModal
         isOpen={isBatchUploadModalOpen}
         onClose={() => setIsBatchUploadModalOpen(false)}

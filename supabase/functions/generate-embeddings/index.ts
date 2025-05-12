@@ -37,6 +37,15 @@ interface ReceiptEmbeddingRequest {
   model?: string;
 }
 
+// Create a type for line item embedding request
+interface LineItemEmbeddingRequest {
+  lineItemId: string;
+  receiptId: string;
+  content: string;
+  metadata?: Record<string, any>;
+  model?: string;
+}
+
 // Default embedding model configuration
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMENSIONS = 1536; // OpenAI's standard dimension
@@ -73,17 +82,32 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Store embeddings in the database
+ * Store embeddings in the database using the new unified model
  */
-async function storeEmbedding(client: any, receiptId: string, contentType: string, embedding: number[], metadata: Record<string, any> = {}) {
-  const { data, error } = await client
-    .from('receipt_embeddings')
-    .insert({
-      receipt_id: receiptId,
-      content_type: contentType,
-      embedding,
-      metadata
-    });
+async function storeEmbedding(
+  client: any, 
+  receiptId: string, 
+  contentType: string, 
+  embedding: number[], 
+  metadata: Record<string, any> = {},
+  sourceType: string = 'receipt',
+  sourceId?: string
+) {
+  // For receipt embeddings, the source_id is the receipt_id
+  const actualSourceId = sourceId || receiptId;
+  
+  // Use the new add_embedding function that handles both receipt and line item embeddings
+  const { data, error } = await client.rpc(
+    'add_embedding',
+    {
+      p_source_type: sourceType,
+      p_source_id: actualSourceId,
+      p_receipt_id: receiptId,
+      p_content_type: contentType,
+      p_embedding: embedding,
+      p_metadata: metadata
+    }
+  );
   
   if (error) {
     throw new Error(`Error storing embedding: ${error.message}`);
@@ -117,6 +141,43 @@ async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabas
     success: true,
     receiptId,
     contentType,
+    dimensions: embedding.length
+  };
+}
+
+/**
+ * Process line item data and generate embeddings
+ */
+async function processLineItemEmbedding(request: LineItemEmbeddingRequest, supabaseClient: any) {
+  const { lineItemId, receiptId, content, metadata = {}, model } = request;
+  
+  // Validate inputs
+  if (!lineItemId || !receiptId || !content) {
+    throw new Error('Missing required parameters: lineItemId, receiptId, or content');
+  }
+  
+  console.log(`Generating embedding for line item ${lineItemId} in receipt ${receiptId}`);
+  
+  // Generate the embedding
+  const embedding = await generateEmbedding(content);
+  
+  console.log(`Successfully generated line item embedding with ${embedding.length} dimensions`);
+  
+  // Store the embedding using the unified model
+  await storeEmbedding(
+    supabaseClient, 
+    receiptId, 
+    'line_item', // content_type for line items
+    embedding, 
+    metadata,
+    'line_item', // source_type
+    lineItemId // source_id
+  );
+  
+  return {
+    success: true,
+    lineItemId,
+    receiptId,
     dimensions: embedding.length
   };
 }
@@ -236,6 +297,68 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
   };
 }
 
+/**
+ * Generate embeddings for all line items in a receipt
+ */
+async function generateLineItemEmbeddings(supabaseClient: any, receiptId: string, model?: string) {
+  // Fetch all line items for the receipt
+  const { data: lineItems, error } = await supabaseClient
+    .from('line_items')
+    .select('id, description, amount')
+    .eq('receipt_id', receiptId);
+  
+  if (error) {
+    throw new Error(`Error fetching line items: ${error.message}`);
+  }
+  
+  if (!lineItems || lineItems.length === 0) {
+    console.log(`No line items found for receipt ${receiptId}`);
+    return {
+      success: true,
+      receiptId,
+      lineItems: [],
+      count: 0
+    };
+  }
+  
+  console.log(`Processing ${lineItems.length} line items for receipt ${receiptId}`);
+  
+  const results = [];
+  
+  // Process each line item
+  for (const lineItem of lineItems) {
+    // Skip line items without descriptions
+    if (!lineItem.description) {
+      console.log(`Skipping line item ${lineItem.id} with no description`);
+      continue;
+    }
+    
+    try {
+      const result = await processLineItemEmbedding({
+        lineItemId: lineItem.id,
+        receiptId,
+        content: lineItem.description,
+        metadata: {
+          amount: lineItem.amount
+        },
+        model
+      }, supabaseClient);
+      
+      results.push(result);
+    } catch (error) {
+      console.error(`Error processing line item ${lineItem.id}:`, error);
+      // Continue with other line items even if one fails
+    }
+  }
+  
+  return {
+    success: true,
+    receiptId,
+    lineItems: results,
+    count: results.length
+  };
+}
+
 serve(async (req) => {
   // Log request details for debugging
   console.log('Request received:', {
@@ -281,19 +404,78 @@ serve(async (req) => {
         );
       }
 
-      const { receiptId, contentType, content, metadata, model, processAllFields } = requestBody;
+      const { 
+        receiptId, 
+        contentType, 
+        content, 
+        metadata, 
+        model, 
+        processAllFields,
+        lineItemId,
+        processLineItems 
+      } = requestBody;
       
       // Log the incoming request parameters (excluding any sensitive data)
       console.log('Received embedding request:', { 
         receiptId, 
         contentType, 
         processAllFields,
+        lineItemId,
+        processLineItems,
         hasContent: !!content,
         hasMetadata: !!metadata
       });
       
+      // Process line items for a receipt
+      if (processLineItems && receiptId) {
+        try {
+          const result = await generateLineItemEmbeddings(supabaseClient, receiptId, model);
+          return new Response(
+            JSON.stringify(result),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error(`Error generating line item embeddings for receipt ${receiptId}:`, error);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: error instanceof Error ? error.message : String(error),
+              receiptId
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      // Process a single line item
+      else if (lineItemId && receiptId && content) {
+        try {
+          const result = await processLineItemEmbedding({
+            lineItemId,
+            receiptId,
+            content,
+            metadata,
+            model
+          }, supabaseClient);
+          
+          return new Response(
+            JSON.stringify(result),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error(`Error processing single line item embedding for ${lineItemId}:`, error);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: error instanceof Error ? error.message : String(error),
+              lineItemId,
+              receiptId
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
       // If processAllFields is true, generate embeddings for all fields
-      if (processAllFields && receiptId) {
+      else if (processAllFields && receiptId) {
         try {
           const result = await generateReceiptEmbeddings(supabaseClient, receiptId, model);
           return new Response(

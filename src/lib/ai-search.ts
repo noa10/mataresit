@@ -398,19 +398,23 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 }
 
 /**
- * Check if embeddings exist for a receipt
+ * Check if embeddings exist for a specific receipt
  */
 export async function checkEmbeddings(receiptId: string): Promise<{exists: boolean, count: number}> {
   try {
-    console.log('Checking embeddings using utility function...');
-
-    // Use the utility function to call the generate-embeddings edge function
-    const data = await callEdgeFunction('generate-embeddings', 'GET', null, { receiptId });
-
-    return {
-      exists: (data?.count || 0) > 0,
-      count: data?.count || 0,
-    };
+    // Call the edge function to check embeddings
+    const response = await callEdgeFunction('generate-embeddings', 'GET', { receiptId });
+    
+    console.log('Embedding check result:', response);
+    
+    if (response && response.success) {
+      return { 
+        exists: response.count > 0, 
+        count: response.count || 0
+      };
+    }
+    
+    return { exists: false, count: 0 };
   } catch (error) {
     console.error('Error checking embeddings:', error);
     return { exists: false, count: 0 };
@@ -418,55 +422,27 @@ export async function checkEmbeddings(receiptId: string): Promise<{exists: boole
 }
 
 /**
- * Generate embeddings for a receipt
+ * Generate embeddings for a specific receipt
  */
 export async function generateEmbeddings(receiptId: string): Promise<boolean> {
   try {
-    console.log('Generating embeddings using utility function...');
-
-    // Try the direct edge function call first
-    try {
-      const data = await callEdgeFunction('generate-embeddings', 'POST', {
-        receiptId,
-        processAllFields: true,
-      });
-      
-      return data?.success || false;
-    } catch (edgeFunctionError) {
-      console.warn('Edge function approach failed, trying alternative API method:', edgeFunctionError);
-      
-      // Fallback: Use the Supabase REST API directly to call our database function
-      // @ts-ignore - The function exists in the database but might not be reflected in the types
-      const { data, error } = await supabase.rpc('generate_receipt_embeddings', {
-        p_receipt_id: receiptId,
-        p_process_all_fields: true,
-      });
-      
-      if (error) throw new Error(`Database procedure error: ${error.message}`);
-      
-      // Type assertion since we know the expected response structure
-      const result = data as unknown as { success: boolean };
-      return result?.success || false;
-    }
-  } catch (error) {
-    // Provide more detailed error information
-    let errorMessage = 'Unknown error';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error && typeof error === 'object') {
-      errorMessage = JSON.stringify(error);
-    }
+    // Call the edge function to generate embeddings
+    const response = await callEdgeFunction('generate-embeddings', 'POST', {
+      receiptId,
+      processAllFields: true // Process all available fields
+    });
     
+    console.log('Embedding generation result:', response);
+    
+    return response && response.success;
+  } catch (error) {
     console.error('Error generating embeddings:', error);
-    throw new Error(`Failed to generate embeddings: ${errorMessage}`);
+    return false;
   }
 }
 
 /**
  * Generate embeddings for multiple receipts
- * @param limit Maximum number of receipts to process
  */
 export async function generateAllEmbeddings(limit: number = 10): Promise<{
   success: boolean;
@@ -475,46 +451,100 @@ export async function generateAllEmbeddings(limit: number = 10): Promise<{
   successful: number;
 }> {
   try {
-    console.log(`Generating embeddings for up to ${limit} receipts...`);
-
-    // Use the utility function to call the generate-all-embeddings edge function
-    const data = await callEdgeFunction('generate-all-embeddings', 'GET', null, {
-      limit: limit.toString()
-    });
-
+    // Get receipts that don't have embeddings yet
+    const { data: receipts, error } = await supabase
+      .from('receipts')
+      .select('id, date, merchant, fullText')
+      .not('fullText', 'is', null)  // Correct syntax for 'is not null'
+      .order('date', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    console.log(`Found ${receipts?.length || 0} receipts to process for embeddings`);
+    
+    if (!receipts || receipts.length === 0) {
+      return {
+        success: true,
+        message: 'No receipts need embeddings',
+        processed: 0,
+        successful: 0
+      };
+    }
+    
+    let successful = 0;
+    
+    // Process each receipt
+    for (const receipt of receipts) {
+      try {
+        const generated = await generateEmbeddings(receipt.id);
+        if (generated) successful++;
+      } catch (err) {
+        console.error(`Error generating embeddings for receipt ${receipt.id}:`, err);
+      }
+    }
+    
     return {
-      success: data?.success || false,
-      message: data?.message || 'Unknown result',
-      processed: data?.processed || 0,
-      successful: data?.successful || 0
+      success: true,
+      message: `Generated embeddings for ${successful} out of ${receipts.length} receipts`,
+      processed: receipts.length,
+      successful
     };
   } catch (error) {
-    console.error('Error generating embeddings for multiple receipts:', error);
-    throw error;
+    console.error('Error generating all embeddings:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      processed: 0,
+      successful: 0
+    };
   }
 }
 
 /**
- * Check if embeddings exist for line items
+ * Check if line item embeddings exist in the receipt_embeddings table
  */
-export async function checkLineItemEmbeddings(): Promise<{exists: boolean, count: number, total: number, withEmbeddings: number, withoutEmbeddings: number}> {
+export async function checkLineItemEmbeddings(): Promise<{
+  exists: boolean,
+  count: number,
+  total: number,
+  withEmbeddings: number,
+  withoutEmbeddings: number
+}> {
   try {
-    console.log('Checking line item embeddings...');
-
-    // Use the utility function to call the semantic-search edge function with a test parameter
-    const data = await callEdgeFunction('semantic-search', 'POST', {
-      testLineItemEmbeddingStatus: true
-    });
-
-    return data;
+    // Query the new unified embedding model to count line item embeddings
+    const { count: embeddingsCount, error: embeddingsError } = await supabase
+      .from('receipt_embeddings')
+      .select('id', { count: 'exact' })
+      .eq('source_type', 'line_item');
+    
+    if (embeddingsError) throw embeddingsError;
+    
+    // Count total line items
+    const { count: totalLineItems, error: countError } = await supabase
+      .from('line_items')
+      .select('id', { count: 'exact' });
+    
+    if (countError) throw countError;
+    
+    // Get counts with and without embeddings
+    const withoutEmbeddings = (totalLineItems || 0) - (embeddingsCount || 0);
+    
+    return {
+      exists: (embeddingsCount || 0) > 0,
+      count: embeddingsCount || 0,
+      total: totalLineItems || 0,
+      withEmbeddings: embeddingsCount || 0,
+      withoutEmbeddings: withoutEmbeddings > 0 ? withoutEmbeddings : 0
+    };
   } catch (error) {
     console.error('Error checking line item embeddings:', error);
-    throw new Error(`Failed to check line item embeddings: ${error instanceof Error ? error.message : String(error)}`);
+    return { exists: false, count: 0, total: 0, withEmbeddings: 0, withoutEmbeddings: 0 };
   }
 }
 
 /**
- * Generate embeddings for line items
+ * Generate line item embeddings for multiple line items
  */
 export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
   success: boolean;
@@ -524,20 +554,132 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
   withoutEmbeddings: number;
 }> {
   try {
-    console.log(`Generating embeddings for up to ${limit} line items...`);
-
-    // Use the utility function to call the semantic-search edge function
-    const data = await callEdgeFunction('semantic-search', 'POST', {
-      generateLineItemEmbeddings: true,
-      limit
-    });
-
-    console.log('Line item embedding generation result:', data);
-    return data;
+    // Get the status of line item embeddings
+    const status = await checkLineItemEmbeddings();
+    
+    if (status.withoutEmbeddings === 0) {
+      return {
+        success: true,
+        processed: 0,
+        total: status.total,
+        withEmbeddings: status.withEmbeddings,
+        withoutEmbeddings: 0
+      };
+    }
+    
+    // Get receipts that need line item embeddings
+    const { data: receipts, error } = await supabase
+      .from('receipts')
+      .select('id')
+      .order('date', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    console.log(`Found ${receipts?.length || 0} receipts to process for line item embeddings`);
+    
+    if (!receipts || receipts.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        total: status.total,
+        withEmbeddings: status.withEmbeddings,
+        withoutEmbeddings: status.withoutEmbeddings
+      };
+    }
+    
+    let processedCount = 0;
+    
+    // Process line items for each receipt
+    for (const receipt of receipts) {
+      try {
+        // Call the edge function to generate line item embeddings
+        const response = await callEdgeFunction('generate-embeddings', 'POST', {
+          receiptId: receipt.id,
+          processLineItems: true // Process line items
+        });
+        
+        if (response && response.success) {
+          processedCount += response.count || 0;
+        }
+      } catch (err) {
+        console.error(`Error generating line item embeddings for receipt ${receipt.id}:`, err);
+      }
+    }
+    
+    // Get updated status after processing
+    const newStatus = await checkLineItemEmbeddings();
+    
+    return {
+      success: true,
+      processed: processedCount,
+      total: newStatus.total,
+      withEmbeddings: newStatus.withEmbeddings,
+      withoutEmbeddings: newStatus.withoutEmbeddings
+    };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error generating line item embeddings:', error);
-    throw new Error(`Failed to generate line item embeddings: ${errorMessage}`);
+    return {
+      success: false,
+      processed: 0,
+      total: 0,
+      withEmbeddings: 0,
+      withoutEmbeddings: 0
+    };
+  }
+}
+
+/**
+ * Generate all embeddings (receipts and line items)
+ */
+export async function generateAllTypeEmbeddings(limit: number = 10): Promise<{
+  success: boolean;
+  message: string;
+  receiptResults: {
+    processed: number;
+    successful: number;
+  };
+  lineItemResults: {
+    processed: number;
+    withEmbeddings: number;
+    withoutEmbeddings: number;
+  };
+}> {
+  try {
+    // Generate receipt embeddings
+    const receiptResults = await generateAllEmbeddings(limit);
+    
+    // Generate line item embeddings
+    const lineItemResults = await generateLineItemEmbeddings(limit);
+    
+    return {
+      success: receiptResults.success && lineItemResults.success,
+      message: `Generated embeddings for ${receiptResults.successful} receipts and ${lineItemResults.processed} line items`,
+      receiptResults: {
+        processed: receiptResults.processed,
+        successful: receiptResults.successful
+      },
+      lineItemResults: {
+        processed: lineItemResults.processed,
+        withEmbeddings: lineItemResults.withEmbeddings,
+        withoutEmbeddings: lineItemResults.withoutEmbeddings
+      }
+    };
+  } catch (error) {
+    console.error('Error generating all types of embeddings:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      receiptResults: {
+        processed: 0,
+        successful: 0
+      },
+      lineItemResults: {
+        processed: 0,
+        withEmbeddings: 0,
+        withoutEmbeddings: 0
+      }
+    };
   }
 }
 

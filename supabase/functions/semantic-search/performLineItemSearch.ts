@@ -21,60 +21,15 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     query: searchQuery // Log the actual search query
   });
 
-  // First verify if line_items table has the expected structure
-  try {
-    const { data: columnCheck, error: columnError } = await client
-      .from('line_items')
-      .select('embedding, description, amount')
-      .limit(1);
-    
-    if (columnError) {
-      console.error('Error checking line_items structure:', columnError);
-      if (columnError.message && columnError.message.includes('does not exist')) {
-        throw new Error('Line items embedding column not found - please ensure embeddings are generated');
-      }
-    }
-    
-    console.log('Line items table check result:', columnCheck);
-    
-    // Check if there are any items with the search term in description
-    const searchTerm = searchQuery.toLowerCase();
-    const { data: matchingItems, error: matchingError } = await client
-      .from('line_items')
-      .select('id, description, amount')
-      .ilike('description', `%${searchTerm}%`)
-      .limit(5);
-      
-    if (matchingError) {
-      console.error('Error checking for matching items:', matchingError);
-    } else {
-      console.log(`Found ${matchingItems?.length || 0} items with "${searchTerm}" in description:`, 
-        matchingItems?.map(i => `"${i.description}" (${i.amount})`) || 'none');
-    }
-    
-    // Verify there are items with embeddings
-    const { data: embeddingStats, error: statsError } = await client
-      .from('line_items')
-      .select('id')
-      .not('embedding', 'is', null)
-      .limit(5);
-      
-    if (statsError) {
-      console.error('Error checking embeddings:', statsError);
-    } else {
-      console.log(`Found ${embeddingStats?.length || 0} items with embeddings`);
-    }
-  } catch (checkError) {
-    console.error('Exception checking line items structure:', checkError);
-  }
-
-  // Determine which search function to use
-  const searchFunction = useHybridSearch ? 'hybrid_search_line_items' : 'search_line_items';
-  console.log(`Using database function: ${searchFunction}`);
+  // Use the unified search functions for line item embeddings
+  const searchFunction = useHybridSearch ? 'hybrid_search_embeddings' : 'search_embeddings';
+  console.log(`Using unified search function: ${searchFunction} for line items`);
 
   // Prepare parameters for the database function
   const functionParams = {
     query_embedding: queryEmbedding,
+    search_type: 'line_item', // Specify we're searching only line item embeddings
+    content_type: 'line_item', // Content type for line items
     similarity_threshold: similarityThreshold,
     match_count: limit + offset,
   };
@@ -82,7 +37,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   // Add hybrid search parameters if needed
   if (useHybridSearch) {
     Object.assign(functionParams, {
-      query_text: searchQuery,
+      search_text: searchQuery,
       min_amount: minAmount,
       max_amount: maxAmount,
       start_date: startDate,
@@ -100,8 +55,8 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   
   console.log(`Detailed functionParams for ${searchFunction}:`, JSON.stringify(loggableParams, null, 2));
 
-  // Call the database function for line item vector search
-  const { data: lineItemsData, error } = await client.rpc(
+  // Call the database function for unified vector search
+  const { data: searchResults, error } = await client.rpc(
     searchFunction,
     functionParams
   );
@@ -111,7 +66,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     throw new Error(`Error in line item semantic search: ${error.message}`);
   }
 
-  if (!lineItemsData || lineItemsData.length === 0) {
+  if (!searchResults || searchResults.length === 0) {
     console.log('No line item matches found for query');
     
     // Try a fallback direct query approach
@@ -160,38 +115,56 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     return { lineItems: [], count: 0, total: 0 };
   }
 
-  console.log(`Retrieved ${lineItemsData.length} line items before pagination`);
-  
-  // Log a sample of the actual data returned for debugging
-  if (lineItemsData.length > 0) {
-    console.log('Sample of line item results:', JSON.stringify(lineItemsData[0], null, 2));
-  }
+  console.log(`Retrieved ${searchResults.length} search results before pagination`);
   
   // Apply offset and limit for pagination
-  const paginatedLineItems = lineItemsData.slice(offset, offset + limit);
+  const paginatedResults = searchResults.slice(offset, offset + limit);
   
-  // Map the DB field names to the expected frontend property names
-  const formattedLineItems = paginatedLineItems.map(item => ({
-    line_item_id: item.line_item_id || item.id,
+  // Extract line item IDs from the search results
+  const lineItemIds = paginatedResults.map(r => r.source_id);
+  
+  // Create a map of similarity scores
+  const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
+    acc[r.source_id] = r.similarity || r.score || 0;
+    return acc;
+  }, {});
+  
+  // Fetch the actual line item data
+  const { data: lineItems, error: lineItemsError } = await client
+    .from('line_items')
+    .select(`
+      id,
+      receipt_id,
+      description,
+      amount,
+      quantity,
+      receipts(merchant, date)
+    `)
+    .in('id', lineItemIds);
+  
+  if (lineItemsError) {
+    console.error('Error fetching line item details:', lineItemsError);
+    throw new Error(`Error fetching line item details: ${lineItemsError.message}`);
+  }
+  
+  // Format the line items with the structure expected by the frontend
+  const formattedLineItems = lineItems.map(item => ({
+    line_item_id: item.id,
     receipt_id: item.receipt_id,
-    line_item_description: item.line_item_description || item.description,
-    line_item_price: item.line_item_amount || item.amount, // Map amount to price for frontend compatibility
-    line_item_quantity: 1, // Default quantity to 1 since we don't have that field
-    parent_receipt_merchant: item.parent_receipt_merchant,
-    parent_receipt_date: item.parent_receipt_date,
-    similarity: item.similarity || item.score || 0
+    line_item_description: item.description,
+    line_item_price: item.amount,
+    line_item_quantity: item.quantity || 1,
+    parent_receipt_merchant: item.receipts?.merchant,
+    parent_receipt_date: item.receipts?.date,
+    similarity: similarityScores[item.id] || 0
   }));
   
-  // Log the structure of line item results for debugging
-  console.log('Line item search results structure:', {
-    sample: formattedLineItems.length > 0 ? formattedLineItems[0] : null,
-    count: formattedLineItems.length,
-    total: lineItemsData.length
-  });
-
+  // Sort by similarity score (highest first)
+  formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
+  
   return {
     lineItems: formattedLineItems,
     count: formattedLineItems.length,
-    total: lineItemsData.length // Total potential matches before pagination
+    total: searchResults.length // Total potential matches before pagination
   };
 }

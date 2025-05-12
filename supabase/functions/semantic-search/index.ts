@@ -115,28 +115,31 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
     minAmount, maxAmount, useHybridSearch, searchTarget
   });
 
-  // Determine which search function to use based on searchTarget
-  let searchFunction = '';
-  if (searchTarget === 'receipts') {
-    searchFunction = useHybridSearch ? 'hybrid_search_receipts' : 'search_receipts';
-  } else {
-    searchFunction = useHybridSearch ? 'hybrid_search_line_items' : 'search_line_items';
-  }
+  // Map searchTarget to source_type parameter for the unified search function
+  const sourceType = searchTarget === 'receipts' ? 'receipt' : 'line_item';
+  
+  // Determine which unified search function to use
+  const searchFunction = useHybridSearch ? 'hybrid_search_embeddings' : 'search_embeddings';
+  
+  console.log(`Using unified search function: ${searchFunction} with source_type=${sourceType}`);
 
-  console.log(`Using database function: ${searchFunction}`);
-
-  // Call the database function for vector search
+  // Call the database function for unified vector search
   const { data: searchResults, error } = await client.rpc(
     searchFunction,
     {
       query_embedding: queryEmbedding,
+      search_type: sourceType,
+      content_type: contentType,
       similarity_threshold: similarityThreshold,
       match_count: limit + offset,
-      ...(searchTarget === 'receipts' ? { content_type_filter: contentType } : {}), // Use renamed parameter
       ...(useHybridSearch ? {
         search_text: searchQuery,
         similarity_weight: 0.7,
         text_weight: 0.3,
+        min_amount: minAmount,
+        max_amount: maxAmount,
+        start_date: startDate,
+        end_date: endDate
       } : {})
     }
   );
@@ -155,6 +158,13 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
 
   // Apply offset and limit for pagination
   const paginatedResults = searchResults.slice(offset, offset + limit);
+  
+  // If we're searching for line items, call the specialized line item search handler
+  if (searchTarget === 'line_items') {
+    return await processLineItemSearchResults(client, paginatedResults, params);
+  }
+  
+  // For receipt searches, continue with the existing flow
   const extractedIds = paginatedResults.map((r: any) => r.receipt_id);
   const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
     acc[r.receipt_id] = r.similarity || r.score || 0;
@@ -217,6 +227,63 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
     receipts: receiptsWithSimilarity,
     count: receiptsWithSimilarity.length,
     total: extractedIds.length
+  };
+}
+
+/**
+ * Process line item search results from the unified embeddings model
+ */
+async function processLineItemSearchResults(client: any, results: any[], params: SearchParams) {
+  if (!results || results.length === 0) {
+    return { lineItems: [], count: 0, total: 0 };
+  }
+  
+  // Extract line item IDs from the search results
+  const lineItemIds = results.map(r => r.source_id);
+  
+  // Create a map of similarity scores
+  const similarityScores = results.reduce((acc: Record<string, number>, r: any) => {
+    acc[r.source_id] = r.similarity || r.score || 0;
+    return acc;
+  }, {});
+  
+  // Fetch the actual line item data
+  const { data: lineItems, error } = await client
+    .from('line_items')
+    .select(`
+      id,
+      receipt_id,
+      description,
+      amount,
+      quantity,
+      receipts(merchant, date)
+    `)
+    .in('id', lineItemIds);
+  
+  if (error) {
+    console.error('Error fetching line item details:', error);
+    throw new Error(`Error fetching line item details: ${error.message}`);
+  }
+  
+  // Format the line items with the structure expected by the frontend
+  const formattedLineItems = lineItems.map(item => ({
+    line_item_id: item.id,
+    receipt_id: item.receipt_id,
+    line_item_description: item.description,
+    line_item_price: item.amount,
+    line_item_quantity: item.quantity || 1,
+    parent_receipt_merchant: item.receipts?.merchant,
+    parent_receipt_date: item.receipts?.date,
+    similarity: similarityScores[item.id] || 0
+  }));
+  
+  // Sort by similarity score (highest first)
+  formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
+  
+  return {
+    lineItems: formattedLineItems,
+    count: formattedLineItems.length,
+    total: results.length
   };
 }
 
