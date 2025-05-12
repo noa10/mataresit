@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { testGeminiConnection, checkGeminiApiKey, testEdgeFunctionCORS, testAllEdgeFunctionsCORS, SUPABASE_URL } from '@/lib/edge-function-utils';
 import { Separator } from '../ui/separator';
 import { Progress } from '../ui/progress';
-import { generateEmbeddings, generateAllEmbeddings } from '@/lib/ai-search';
+import { generateEmbeddings, generateAllEmbeddings, checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
 import { useAuth } from '@/contexts/AuthContext';  // Import the auth context hook
 import { Session } from '@supabase/supabase-js';
 
@@ -31,6 +31,21 @@ export function CombinedVectorStatus() {
   const [totalReceipts, setTotalReceipts] = useState(0);
   const [processedReceipts, setProcessedReceipts] = useState(0);
   const [embeddingStats, setEmbeddingStats] = useState<{
+    total: number;
+    withEmbeddings: number;
+    withoutEmbeddings: number;
+  } | null>({
+    total: 0,
+    withEmbeddings: 0,
+    withoutEmbeddings: 0
+  });
+
+  // Line item embedding state
+  const [isGeneratingLineItemEmbeddings, setIsGeneratingLineItemEmbeddings] = useState(false);
+  const [lineItemEmbeddingProgress, setLineItemEmbeddingProgress] = useState(0);
+  const [totalLineItems, setTotalLineItems] = useState(0);
+  const [processedLineItems, setProcessedLineItems] = useState(0);
+  const [lineItemEmbeddingStats, setLineItemEmbeddingStats] = useState<{
     total: number;
     withEmbeddings: number;
     withoutEmbeddings: number;
@@ -493,42 +508,163 @@ export function CombinedVectorStatus() {
           batchProcess: true,
           limit: 5
         })
-      });
       
-      const result = await response.json();
-      
-      if (response.ok) {
-        alert(`Generate Thumbnails Test Success!\nProcessed: ${result.processed}, Errors: ${result.errors}`);
+      // Use the auth data if found
+      if (authData && (authData.access_token || (authData.session && authData.session.access_token))) {
+        const accessToken = authData.access_token || authData.session.access_token;
+        const refreshToken = authData.refresh_token || (authData.session && authData.session.refresh_token);
+        
+        if (accessToken && refreshToken) {
+          console.log('CVS: Attempting to manually set session with tokens from localStorage');
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          
+          if (error) {
+            console.error('CVS: Error manually setting session:', error);
+          } else if (data.session) {
+            console.log('CVS: Successfully set session manually!', 'User ID:', data.session.user.id);
+            return data.session;
+          }
+        }
       } else {
-        alert(`Generate Thumbnails Test Failed: ${result.error || 'Unknown error'}`);
+        console.log('CVS: No suitable auth data found in localStorage');
       }
-    } catch (error) {
-      console.error('Generate Thumbnails Test Error:', error);
-      alert(`Generate Thumbnails Test Error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsTestingCORS(false);
+    } catch (localStorageError) {
+      console.error('CVS: Error accessing localStorage:', localStorageError);
     }
-  };
-
-  useEffect(() => {
-    // Refresh session before initial checks
-    const initComponent = async () => {
-      if (user) {
-        await refreshSession();
-      }
-      checkPgvectorStatus();
-      checkEmbeddingStats();
-    };
     
-    initComponent();
-  }, [user]); // Re-run when user changes
+    console.error('CVS: Unable to establish a valid session. RLS queries will return empty results.');
+    return null;
+  } catch (error) {
+    console.error('CVS: Unexpected error refreshing session:', error);
+    return null;
+  }
+};
 
-  return (
-    <div className="space-y-6 text-white">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Vector Database Status Card */}
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-4">
+// Function to test CORS for all edge functions
+const handleTestCORS = async () => {
+  setIsTestingCORS(true);
+  setCorsResults(null);
+
+  try {
+    // Use the utility function to test CORS
+    const results = await testAllEdgeFunctionsCORS();
+    setCorsResults(results);
+  } catch (error) {
+    console.error('CORS test error:', error);
+    setCorsResults({
+      error: false,
+      message: `Error: ${error instanceof Error ? error.message : String(error)}`
+    } as any);
+  } finally {
+    setIsTestingCORS(false);
+  }
+};
+
+// Function to specifically test the generate-thumbnails function
+const testGenerateThumbnails = async () => {
+  setIsTestingCORS(true);
+  
+  try {
+    // First, test CORS with OPTIONS
+    const corsResponse = await fetch(`${SUPABASE_URL}/functions/v1/generate-thumbnails`, {
+      method: 'OPTIONS',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('CORS Test Response:', corsResponse);
+    
+    if (!corsResponse.ok) {
+      alert(`CORS Test Failed! Status: ${corsResponse.status}`);
+      setIsTestingCORS(false);
+      return;
+    }
+    
+    // Then test a batch process call
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-thumbnails`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+      },
+      body: JSON.stringify({
+        batchProcess: true,
+        limit: 5
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      alert(`Generate Thumbnails Test Success!
+Processed: ${result.processed}, Errors: ${result.errors}`);
+    } else {
+      alert(`Generate Thumbnails Test Failed: ${result.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Generate Thumbnails Test Error:', error);
+    alert(`Generate Thumbnails Test Error: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    setIsTestingCORS(false);
+  }
+};
+
+// Function to check line item embedding statistics
+const checkLineItemEmbeddingStats = async () => {
+  try {
+    console.log('CVS: checkLineItemEmbeddingStats CALLED');
+
+    // Validate session first
+    const session = await refreshSession();
+    if (!session) {
+      console.error('Failed to refresh session for line item embedding check');
+      return;
+    }
+
+    const result = await checkLineItemEmbeddings();
+    console.log('Line item embedding check result:', result);
+
+    setLineItemEmbeddingStats({
+      total: result.total || 0,
+      withEmbeddings: result.withEmbeddings || 0,
+      withoutEmbeddings: result.withoutEmbeddings || 0
+    });
+  } catch (error) {
+    console.error('Error checking line item embedding stats:', error);
+  }
+};
+
+// Refresh session before initial checks
+const initComponent = async () => {
+  if (user) {
+    await refreshSession();
+  }
+  checkPgvectorStatus();
+  checkEmbeddingStats();
+  checkLineItemEmbeddingStats();
+};
+
+useEffect(() => {
+  initComponent();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+return (
+  <div className="space-y-6 text-white">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Vector Database Status Card */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Database className="h-5 w-5 mr-2" />
+            <h3 className="font-medium">Vector Database</h3>
+        <div className="flex items-center">
+          <Database className="h-5 w-5 mr-2" />
+          <h3 className="font-medium">Vector Database</h3>
             <div className="flex items-center">
               <Database className="h-5 w-5 mr-2" />
               <h3 className="font-medium">Vector Database</h3>

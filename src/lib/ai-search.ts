@@ -6,7 +6,7 @@ import { callEdgeFunction } from './edge-function-utils';
  */
 export interface SearchParams {
   query: string;
-  contentType?: 'full_text' | 'merchant' | 'notes';
+  contentType?: 'fullText' | 'merchant' | 'notes';
   limit?: number;
   offset?: number;
   startDate?: string;
@@ -17,10 +17,36 @@ export interface SearchParams {
   merchants?: string[];
   isNaturalLanguage?: boolean;
   isVectorSearch?: boolean; // Indicates whether vector search was used
+  searchTarget?: 'receipts' | 'line_items'; // Target for search (receipts or line items)
+}
+
+export interface ReceiptWithSimilarity {
+  id: string;
+  merchant: string;
+  date: string;
+  total: number;
+  notes?: string;
+  raw_text?: string;
+  predicted_category?: string;
+  similarity_score: number;
+  // Other receipt properties
+}
+
+export interface LineItemSearchResult {
+  line_item_id: string;
+  receipt_id: string;
+  line_item_description: string;
+  line_item_quantity?: number;
+  line_item_price?: number;
+  line_item_amount?: number;
+  parent_receipt_merchant: string;
+  parent_receipt_date: string;
+  similarity: number;
 }
 
 export interface SearchResult {
-  receipts: any[];
+  receipts?: ReceiptWithSimilarity[]; // Optional: results for receipts
+  lineItems?: LineItemSearchResult[]; // Optional: results for line items
   count: number;
   total: number;
   searchParams: SearchParams;
@@ -36,6 +62,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       console.error('Empty search query');
       return {
         receipts: [],
+        lineItems: [],
         count: 0,
         total: 0,
         searchParams: params,
@@ -48,10 +75,65 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       console.error('User is not authenticated');
       return {
         receipts: [],
+        lineItems: [],
         count: 0,
         total: 0,
         searchParams: params,
       };
+    }
+
+    // Helper function to process search results from the edge function
+    function handleSearchResults(data: any, searchTarget: string): SearchResult {
+      console.log('Processing search results from API:', {
+        target: searchTarget,
+        hasLineItems: !!data.results.lineItems,
+        hasReceipts: !!data.results.receipts,
+        raw: data.results
+      });
+      
+      let results: SearchResult = {
+        receipts: [],
+        lineItems: [],
+        count: data.results?.count || 0,
+        total: data.results?.total || 0,
+        searchParams: data.searchParams,
+      };
+      
+      // Handle line item search results
+      if (searchTarget === 'line_items') {
+        // Try various possible response formats
+        if (data.results.lineItems && Array.isArray(data.results.lineItems)) {
+          console.log('Using lineItems array directly from results');
+          results.lineItems = data.results.lineItems;
+        } 
+        else if (data.results.receipts && Array.isArray(data.results.receipts) && searchTarget === 'line_items') {
+          console.log('Converting receipts format to lineItems format');
+          
+          results.lineItems = data.results.receipts.map((item: any) => ({
+            line_item_id: item.id || item.line_item_id,
+            receipt_id: item.receipt_id,
+            line_item_description: item.description || item.line_item_description,
+            line_item_price: item.amount || item.line_item_price,
+            line_item_quantity: 1,
+            parent_receipt_merchant: item.parent_receipt_merchant,
+            parent_receipt_date: item.parent_receipt_date,
+            similarity: item.similarity_score || item.similarity || 0
+          }));
+        }
+      } 
+      // Handle receipt search results
+      else if (data.results.receipts) {
+        results.receipts = data.results.receipts;
+      }
+
+      console.log('Processed results:', {
+        type: searchTarget,
+        lineItemsCount: results.lineItems?.length || 0,
+        receiptsCount: results.receipts?.length || 0,
+        total: results.total
+      });
+
+      return results;
     }
 
     try {
@@ -67,19 +149,17 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
           throw new Error(data?.error || 'Unknown error in semantic search');
         }
 
-        const results = {
-          receipts: data.results.receipts || [],
-          count: data.results.count || 0,
-          total: data.results.total || 0,
-          searchParams: data.searchParams,
-        };
+        // Process results using our helper function
+        const results = handleSearchResults(data, params.searchTarget || 'receipts');
 
-        console.log('Semantic search results:', results);
-
-        // If no results found, try fallback search
-        if (results.receipts.length === 0) {
+        // If no results found, try fallback search (only for receipts)
+        if ((params.searchTarget !== 'line_items' && (!results.receipts || results.receipts.length === 0)) || 
+            (params.searchTarget === 'line_items' && (!results.lineItems || results.lineItems.length === 0))) {
           console.log('No results from vector search, trying fallback search');
-          return await fallbackBasicSearch(params);
+          // Only use fallback for receipts search, not line items
+          if (params.searchTarget !== 'line_items') {
+            return await fallbackBasicSearch(params);
+          }
         }
 
         return results;
@@ -155,68 +235,166 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
 async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> {
   const { query, limit = 10, offset = 0 } = params;
 
+  // Line item fallback search is not supported yet
+  if (params.searchTarget === 'line_items') {
+    console.log('Fallback search not supported for line items');
+    return {
+      receipts: [],
+      lineItems: [],
+      count: 0,
+      total: 0,
+      searchParams: params,
+    };
+  }
+  
   // Check if user is authenticated
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     console.error('User is not authenticated for fallback search');
     return {
       receipts: [],
+      lineItems: [],
       count: 0,
       total: 0,
       searchParams: params,
     };
   }
 
-  // Build a basic text search query
-  // First, try to get at least some results by using a very simple query
-  let textQuery = supabase
-    .from('receipts')
-    .select('*')
-    .limit(limit)
-    .order('date', { ascending: false });
+  console.log('Starting fallback search with query:', query);
 
-  // If we have a specific query, use it to filter
-  if (query && query.trim() !== '') {
-    textQuery = supabase
+  try {
+    // Build a basic text search query
+    // First, try to get at least some results by using a very simple query
+    let textQuery = supabase
       .from('receipts')
       .select('*')
-      .or(`merchant.ilike.%${query}%,fullText.ilike.%${query}%,predicted_category.ilike.%${query}%`)
-      .order('date', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .limit(limit)
+      .order('date', { ascending: false });
+
+    // If we have a specific query, use it to filter
+    if (query && query.trim() !== '') {
+      console.log('Performing text search with query:', query);
+      
+      try {
+        // Try individual filter approach (more reliable but potentially slower)
+        const { data: merchantData, error: merchantError } = await supabase
+          .from('receipts')
+          .select('*')
+          .ilike('merchant', `%${query}%`)
+          .order('date', { ascending: false })
+          .limit(limit);
+          
+        const { data: categoryData, error: categoryError } = await supabase
+          .from('receipts')
+          .select('*')
+          .ilike('predicted_category', `%${query}%`)
+          .order('date', { ascending: false })
+          .limit(limit);
+
+        // Note: fullText column is case-sensitive, so need to use a different approach
+        const { data: fullTextData, error: fullTextError } = await supabase
+          .from('receipts')
+          .select('*')
+          .filter('LOWER("fullText")', 'ilike', `%${query.toLowerCase()}%`)
+          .order('date', { ascending: false })
+          .limit(limit);
+          
+        // Combine results and remove duplicates
+        const combinedResults = [...(merchantData || []), ...(categoryData || []), ...(fullTextData || [])];
+        const uniqueResults = Array.from(new Map(combinedResults.map(item => [item.id, item])).values());
+        
+        console.log(`Found results: merchant(${merchantData?.length || 0}), category(${categoryData?.length || 0}), fullText(${fullTextData?.length || 0})`);
+        
+        // If we found results with individual queries, return them
+        if (uniqueResults.length > 0) {
+          // Sort by date
+          uniqueResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          // Apply pagination
+          const paginatedResults = uniqueResults.slice(offset, offset + limit);
+          
+          // Add similarity score
+          const receiptsWithScores = paginatedResults.map(receipt => ({
+            ...receipt,
+            similarity_score: 0 // No meaningful similarity score in fallback search
+          }));
+          
+          const results: SearchResult = {
+            receipts: receiptsWithScores,
+            lineItems: [], 
+            count: receiptsWithScores.length,
+            total: uniqueResults.length,
+            searchParams: {
+              ...params,
+              isVectorSearch: false,
+            },
+          };
+          
+          console.log('Returning combined fallback results:', results.count);
+          return results;
+        }
+      } catch (individualQueryError) {
+        console.error('Error with individual query approach:', individualQueryError);
+      }
+      
+      // If individual queries didn't work or didn't find results, try simpler approach
+      textQuery = supabase
+        .from('receipts')
+        .select('*')
+        .ilike('merchant', `%${query}%`)
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
+    }
+
+    console.log('Fallback to simple merchant search query:', query);
+
+    // Apply date filters if present
+    if (params.startDate) {
+      textQuery = textQuery.gte('date', params.startDate);
+    }
+
+    if (params.endDate) {
+      textQuery = textQuery.lte('date', params.endDate);
+    }
+
+    // Execute the query
+    const { data, error, count } = await textQuery;
+    console.log('Simple fallback search results:', { count: data?.length || 0, error: error?.message || 'none' });
+
+    if (error) {
+      console.error('Fallback search error:', error);
+      throw error;
+    }
+
+    // Add similarity_score to make receipts compatible with ReceiptWithSimilarity type
+    const receiptsWithScores = (data || []).map(receipt => ({
+      ...receipt,
+      similarity_score: 0 // No meaningful similarity score in fallback search
+    }));
+
+    const results: SearchResult = {
+      receipts: receiptsWithScores,
+      lineItems: [], // Always empty for fallback search
+      count: data?.length || 0,
+      total: count || data?.length || 0,
+      searchParams: {
+        ...params,
+        isVectorSearch: false,
+      },
+    };
+
+    console.log('Formatted simple fallback results:', results.count);
+    return results;
+  } catch (error) {
+    console.error('Error in fallback search:', error);
+    return {
+      receipts: [],
+      lineItems: [],
+      count: 0, 
+      total: 0,
+      searchParams: params,
+    };
   }
-
-  console.log('Fallback search query:', query);
-
-  // Apply date filters if present
-  if (params.startDate) {
-    textQuery = textQuery.gte('date', params.startDate);
-  }
-
-  if (params.endDate) {
-    textQuery = textQuery.lte('date', params.endDate);
-  }
-
-  // Execute the query
-  const { data, error, count } = await textQuery;
-  console.log('Fallback search results:', { data, error, count });
-
-  if (error) {
-    console.error('Fallback search error:', error);
-    throw error;
-  }
-
-  const results = {
-    receipts: data || [],
-    count: data?.length || 0,
-    total: count || 0,
-    searchParams: {
-      ...params,
-      isVectorSearch: false,
-    },
-  };
-
-  console.log('Formatted fallback results:', results);
-  return results;
 }
 
 /**
@@ -313,6 +491,53 @@ export async function generateAllEmbeddings(limit: number = 10): Promise<{
   } catch (error) {
     console.error('Error generating embeddings for multiple receipts:', error);
     throw error;
+  }
+}
+
+/**
+ * Check if embeddings exist for line items
+ */
+export async function checkLineItemEmbeddings(): Promise<{exists: boolean, count: number, total: number, withEmbeddings: number, withoutEmbeddings: number}> {
+  try {
+    console.log('Checking line item embeddings...');
+
+    // Use the utility function to call the semantic-search edge function with a test parameter
+    const data = await callEdgeFunction('semantic-search', 'POST', {
+      testLineItemEmbeddingStatus: true
+    });
+
+    return data;
+  } catch (error) {
+    console.error('Error checking line item embeddings:', error);
+    throw new Error(`Failed to check line item embeddings: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Generate embeddings for line items
+ */
+export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
+  success: boolean;
+  processed: number;
+  total: number;
+  withEmbeddings: number;
+  withoutEmbeddings: number;
+}> {
+  try {
+    console.log(`Generating embeddings for up to ${limit} line items...`);
+
+    // Use the utility function to call the semantic-search edge function
+    const data = await callEdgeFunction('semantic-search', 'POST', {
+      generateLineItemEmbeddings: true,
+      limit
+    });
+
+    console.log('Line item embedding generation result:', data);
+    return data;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error generating line item embeddings:', error);
+    throw new Error(`Failed to generate line item embeddings: ${errorMessage}`);
   }
 }
 

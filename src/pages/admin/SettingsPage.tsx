@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
+import { LineItemEmbeddingsCard } from '@/components/admin/LineItemEmbeddingsCard';
 
 export default function AdminSettingsPage() {
   return (
@@ -61,6 +62,9 @@ export default function AdminSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Line Item Embeddings Card */}
+      <LineItemEmbeddingsCard />
 
     </div>
   );
