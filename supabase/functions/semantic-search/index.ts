@@ -118,8 +118,8 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
   // Map searchTarget to source_type parameter for the unified search function
   const sourceType = searchTarget === 'receipts' ? 'receipt' : 'line_item';
   
-  // Determine which unified search function to use
-  const searchFunction = useHybridSearch ? 'hybrid_search_embeddings' : 'search_embeddings';
+  // Use only search_embeddings as hybrid_search_embeddings doesn't exist
+  const searchFunction = 'search_embeddings';
   
   console.log(`Using unified search function: ${searchFunction} with source_type=${sourceType}`);
 
@@ -131,16 +131,7 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
       search_type: sourceType,
       content_type: contentType,
       similarity_threshold: similarityThreshold,
-      match_count: limit + offset,
-      ...(useHybridSearch ? {
-        search_text: searchQuery,
-        similarity_weight: 0.7,
-        text_weight: 0.3,
-        min_amount: minAmount,
-        max_amount: maxAmount,
-        start_date: startDate,
-        end_date: endDate
-      } : {})
+      match_count: limit + offset
     }
   );
 

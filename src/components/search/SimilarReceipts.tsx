@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Spinner } from '../ui/spinner';
 import { Skeleton } from '../ui/skeleton';
 import { getSimilarReceipts } from '../../lib/ai-search';
+import { toast } from 'sonner';
 
 interface SimilarReceiptsProps {
   receiptId: string;
@@ -24,6 +25,29 @@ export function SimilarReceipts({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Enhanced navigation function with validation and error handling
+  const handleNavigateToReceipt = (e: React.MouseEvent, id: string | undefined) => {
+    // Stop event propagation to prevent any parent handlers from interfering
+    e.stopPropagation();
+    
+    // Validate the ID
+    if (!id) {
+      console.error('Cannot navigate to receipt: ID is undefined');
+      toast.error('Error: Receipt ID is missing');
+      return;
+    }
+    
+    console.log('Navigating to receipt with ID:', id);
+    
+    try {
+      // Use navigate function with explicit pathname and state
+      navigate(`/receipt/${id}`, { state: { from: 'similar-receipts' } });
+    } catch (error) {
+      console.error('Navigation error:', error);
+      toast.error('Failed to navigate to receipt details');
+    }
+  };
+
   useEffect(() => {
     if (!receiptId) return;
 
@@ -33,6 +57,13 @@ export function SimilarReceipts({
         setError(null);
         
         const receipts = await getSimilarReceipts(receiptId, limit);
+        
+        // Debug log the received receipt IDs
+        console.log('SimilarReceipts received:', receipts.map(r => ({
+          id: r.id || 'undefined',
+          merchant: r.merchant || 'Unknown'
+        })));
+        
         setSimilarReceipts(receipts);
       } catch (err) {
         console.error('Error fetching similar receipts:', err);
@@ -108,6 +139,9 @@ export function SimilarReceipts({
           {similarReceipts.map((receipt) => {
             const date = receipt.date ? new Date(receipt.date) : null;
             
+            // Debug log each receipt's ID as it's rendered
+            console.log(`Rendering similar receipt: ID=${receipt.id || 'undefined'}, Merchant=${receipt.merchant || 'Unknown'}`);
+            
             return (
               <div 
                 key={receipt.id}
@@ -140,7 +174,7 @@ export function SimilarReceipts({
                     variant="ghost"
                     size="sm"
                     className="mt-1 h-7 px-2 text-xs"
-                    onClick={() => navigate(`/receipts/${receipt.id}`)}
+                    onClick={(e) => handleNavigateToReceipt(e, receipt.id)}
                   >
                     View Receipt
                   </Button>

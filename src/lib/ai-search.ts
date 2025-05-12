@@ -41,6 +41,12 @@ export interface LineItemSearchResult {
   line_item_amount?: number;
   parent_receipt_merchant: string;
   parent_receipt_date: string;
+  parent_receipt_id?: string; // Ensure this field is specified and documented
+  receipt?: {  // Add optional receipt object that might be returned from the API
+    id: string;
+    merchant?: string;
+    date?: string;
+  };
   similarity: number;
 }
 
@@ -104,26 +110,95 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         // Try various possible response formats
         if (data.results.lineItems && Array.isArray(data.results.lineItems)) {
           console.log('Using lineItems array directly from results');
-          results.lineItems = data.results.lineItems;
+          
+          // Add validation for receipt_id before assigning
+          results.lineItems = data.results.lineItems.map((item: any) => {
+            // Check for receipt_id from various sources
+            let effectiveReceiptId = item.receipt_id;
+            
+            // Try to find the receipt_id from various possible locations
+            if (!effectiveReceiptId && item.parent_receipt_id) {
+              effectiveReceiptId = item.parent_receipt_id;
+              console.log(`Using parent_receipt_id for line item:`, item.line_item_id);
+            }
+            
+            // Check if receipt_id is missing and log it
+            if (!effectiveReceiptId) {
+              console.warn('Line item missing receipt_id:', item);
+            }
+            
+            return {
+              line_item_id: item.line_item_id || item.id || `item-${Math.random().toString(36).substring(2, 10)}`,
+              receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
+              line_item_description: item.line_item_description || item.description || 'Unknown item',
+              line_item_quantity: item.line_item_quantity || item.quantity || 1,
+              line_item_price: item.line_item_price || item.price || item.amount || 0,
+              line_item_amount: item.line_item_amount || item.amount || item.price || 0,
+              parent_receipt_merchant: item.parent_receipt_merchant || item.merchant || 'Unknown merchant',
+              parent_receipt_date: item.parent_receipt_date || item.date || '',
+              parent_receipt_id: item.parent_receipt_id || effectiveReceiptId || '', // Ensure parent_receipt_id is set
+              similarity: item.similarity || item.similarity_score || 0
+            };
+          });
         } 
         else if (data.results.receipts && Array.isArray(data.results.receipts) && searchTarget === 'line_items') {
           console.log('Converting receipts format to lineItems format');
           
-          results.lineItems = data.results.receipts.map((item: any) => ({
-            line_item_id: item.id || item.line_item_id,
-            receipt_id: item.receipt_id,
-            line_item_description: item.description || item.line_item_description,
-            line_item_price: item.amount || item.line_item_price,
-            line_item_quantity: 1,
-            parent_receipt_merchant: item.parent_receipt_merchant,
-            parent_receipt_date: item.parent_receipt_date,
-            similarity: item.similarity_score || item.similarity || 0
-          }));
+          results.lineItems = data.results.receipts.map((item: any) => {
+            // Check for receipt_id from various sources
+            let effectiveReceiptId = item.receipt_id || item.id;
+            
+            // Check if receipt_id is missing and log it
+            if (!effectiveReceiptId) {
+              console.warn('Line item (from receipts format) missing receipt_id:', item);
+            }
+            
+            return {
+              line_item_id: item.id || item.line_item_id || `item-${Math.random().toString(36).substring(2, 10)}`,
+              receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
+              line_item_description: item.description || item.line_item_description || 'Unknown item',
+              line_item_price: item.amount || item.line_item_price || item.price || 0,
+              line_item_quantity: item.quantity || 1,
+              parent_receipt_merchant: item.parent_receipt_merchant || item.merchant || 'Unknown merchant',
+              parent_receipt_date: item.parent_receipt_date || item.date || '',
+              parent_receipt_id: effectiveReceiptId || '', // Ensure parent_receipt_id is set
+              similarity: item.similarity_score || item.similarity || 0
+            };
+          });
         }
       } 
       // Handle receipt search results
       else if (data.results.receipts) {
         results.receipts = data.results.receipts;
+      }
+
+      // Add validation check for lineItems with missing receipt_id
+      if (results.lineItems && results.lineItems.length > 0) {
+        // Direct count of missing ids instead of complex filtering
+        let missingCount = 0;
+        
+        // Attempt to repair missing receipt_ids based on other data
+        for (let i = 0; i < results.lineItems.length; i++) {
+          const item = results.lineItems[i];
+          
+          // If receipt_id is missing, try to extract it from line_item_id if possible
+          if (!item.receipt_id) {
+            missingCount++;
+            
+            // Some line item IDs might be formatted as "receipt_id:line_number"
+            if (item.line_item_id && item.line_item_id.includes(':')) {
+              const parts = item.line_item_id.split(':');
+              if (parts.length > 1) {
+                console.log(`Repairing missing receipt_id for item ${item.line_item_id} -> ${parts[0]}`);
+                results.lineItems[i].receipt_id = parts[0];
+              }
+            }
+          }
+        }
+        
+        if (missingCount > 0) {
+          console.error(`Warning: ${missingCount} out of ${results.lineItems.length} line items are missing receipt_id`);
+        }
       }
 
       console.log('Processed results:', {
@@ -164,58 +239,10 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
 
         return results;
       } catch (edgeFunctionError) {
-        console.warn('Edge function approach failed, trying database function:', edgeFunctionError);
+        console.warn('Edge function approach failed, trying fallback search:', edgeFunctionError);
         
-        // Try the database function fallback
-        try {
-          console.log('Using database function fallback for semantic search after edge function failure');
-          
-          // @ts-ignore - The function exists in the database but might not be reflected in the types
-          const { data, error } = await supabase.rpc('basic_search_receipts', {
-            p_query: params.query,
-            p_limit: params.limit || 10,
-            p_offset: params.offset || 0,
-            p_start_date: params.startDate,
-            p_end_date: params.endDate,
-            p_min_amount: params.minAmount,
-            p_max_amount: params.maxAmount,
-            p_merchants: params.merchants
-          });
-          
-          if (error) {
-            console.error('Database function error:', error);
-            throw new Error(`Database search error: ${error.message}`);
-          }
-          
-          console.log('Database search function succeeded:', data && (data as any).success === true);
-          
-          // Type assertion for the database response
-          type DbSearchResponse = {
-            success: boolean;
-            results: {
-              receipts: any[];
-              count: number;
-              total: number;
-            };
-            searchParams: SearchParams;
-          };
-          
-          // If no results or database function fails, try the JavaScript fallback
-          const typedData = data as unknown as DbSearchResponse;
-          if (!typedData || !typedData.success) {
-            return await fallbackBasicSearch(params);
-          }
-          
-          return {
-            receipts: typedData.results.receipts || [],
-            count: typedData.results.count || 0,
-            total: typedData.results.total || 0,
-            searchParams: typedData.searchParams || params,
-          };
-        } catch (dbFunctionError) {
-          console.warn('Database function failed, using JavaScript fallback:', dbFunctionError);
-          return await fallbackBasicSearch(params);
-        }
+        // Skip the database function altogether and go straight to the JavaScript fallback
+        return await fallbackBasicSearch(params);
       }
     } catch (vectorError) {
       console.warn('All vector search methods failed, falling back to basic search:', vectorError);

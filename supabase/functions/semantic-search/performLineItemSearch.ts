@@ -22,7 +22,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   });
 
   // Use the unified search functions for line item embeddings
-  const searchFunction = useHybridSearch ? 'hybrid_search_embeddings' : 'search_embeddings';
+  const searchFunction = 'search_embeddings'; // Always use search_embeddings as hybrid_search_embeddings doesn't exist
   console.log(`Using unified search function: ${searchFunction} for line items`);
 
   // Prepare parameters for the database function
@@ -98,6 +98,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
           line_item_quantity: 1,
           parent_receipt_merchant: item.receipts?.parent_receipt_merchant,
           parent_receipt_date: item.receipts?.parent_receipt_date,
+          parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
           similarity: 0.5 // Default similarity for fallback results
         }));
         
@@ -156,6 +157,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     line_item_quantity: item.quantity || 1,
     parent_receipt_merchant: item.receipts?.merchant,
     parent_receipt_date: item.receipts?.date,
+    parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
     similarity: similarityScores[item.id] || 0
   }));
   

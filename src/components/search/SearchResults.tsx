@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Receipt, ArrowRight, Tag, AlertCircle } from 'lucide-react';
+import { Receipt, ArrowRight, Tag, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
+import { toast } from 'sonner';
 
 import { ReceiptWithSimilarity, LineItemSearchResult } from '@/lib/ai-search';
 
@@ -42,6 +43,30 @@ export function SearchResults({
     totalResults,
     resultsCount: results.length
   });
+
+  // Enhanced navigation function with validation and error handling
+  const handleNavigateToReceipt = (e: React.MouseEvent, id?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!id) {
+      console.error('Cannot navigate to receipt: ID is undefined');
+      toast.error('Unable to view receipt: Receipt ID is missing', {
+        description: 'The system could not find the parent receipt information for this item.'
+      });
+      return;
+    }
+
+    try {
+      console.log(`Navigating to receipt: ${id}`);
+      navigate(`/receipt/${id}`);
+    } catch (error) {
+      console.error('Error navigating to receipt:', error);
+      toast.error('Navigation failed', {
+        description: 'Could not navigate to the receipt page. Please try again.'
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -117,6 +142,9 @@ export function SearchResults({
           const similarityScore = receipt.similarity_score || 0;
           const formattedScore = (similarityScore * 100).toFixed(0);
 
+          // Log receipt ID for debugging
+          console.log(`Receipt card ID: ${receipt.id || 'undefined'}, Merchant: ${receipt.merchant || 'Unknown'}`);
+
           return (
             <Card
               key={receipt.id}
@@ -174,7 +202,7 @@ export function SearchResults({
                   variant="outline"
                   size="sm"
                   className="mt-2"
-                  onClick={() => navigate(`/receipt/${receipt.id}`)}
+                  onClick={(e) => handleNavigateToReceipt(e, receipt.id)}
                 >
                   <Receipt className="h-4 w-4 mr-2" />
                   View Receipt
@@ -189,6 +217,35 @@ export function SearchResults({
           const receiptDate = item.parent_receipt_date ? new Date(item.parent_receipt_date) : null;
           const similarityScore = item.similarity || 0;
           const formattedScore = (similarityScore * 100).toFixed(0);
+          
+          // Extract receipt ID from different possible sources in case it's missing
+          let receiptId = item.receipt_id;
+          
+          // If receipt_id is missing, try parent_receipt_id first
+          if (!receiptId && item.parent_receipt_id) {
+            receiptId = item.parent_receipt_id;
+            console.log(`Using parent_receipt_id ${receiptId}`);
+          }
+          
+          // If still missing, try to extract from line_item_id
+          if (!receiptId && item.line_item_id) {
+            // Line item IDs might be formatted like "receipt_id:line_item_number"
+            const parts = item.line_item_id.split(':');
+            if (parts.length > 1) {
+              receiptId = parts[0];
+              console.log(`Extracted receipt ID ${receiptId} from line item ID ${item.line_item_id}`);
+            }
+          }
+          
+          // Finally check if there's a nested receipt object
+          if (!receiptId && item.receipt && item.receipt.id) {
+            receiptId = item.receipt.id;
+            console.log(`Using nested receipt.id ${receiptId}`);
+          }
+          
+          // Log whether we have a valid receipt ID
+          const hasReceiptId = !!receiptId;
+          console.log(`Line item card: ${item.line_item_id || 'undefined'}, Has valid receipt ID: ${hasReceiptId}, Receipt ID: ${receiptId || 'undefined'}`);
 
           return (
             <Card
@@ -231,18 +288,38 @@ export function SearchResults({
                     )}
                   </p>
                 )}
+                
+                {!hasReceiptId && (
+                  <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    <span>Parent receipt information is missing</span>
+                  </div>
+                )}
               </CardContent>
               <CardFooter>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => navigate(`/receipt/${item.receipt_id}`)}
-                >
-                  <Receipt className="h-4 w-4 mr-2" />
-                  View Parent Receipt
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                {hasReceiptId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={(e) => handleNavigateToReceipt(e, receiptId)}
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    View Parent Receipt
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    disabled
+                    title="Parent receipt information is missing"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Receipt Unavailable
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           );
