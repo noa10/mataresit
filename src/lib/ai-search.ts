@@ -17,7 +17,7 @@ export interface SearchParams {
   merchants?: string[];
   isNaturalLanguage?: boolean;
   isVectorSearch?: boolean; // Indicates whether vector search was used
-  searchTarget?: 'receipts' | 'line_items'; // Target for search (receipts or line items)
+  searchTarget?: 'receipts' | 'line_items' | 'all'; // Target for search (receipts, line_items, or all)
 }
 
 export interface ReceiptWithSimilarity {
@@ -51,8 +51,9 @@ export interface LineItemSearchResult {
 }
 
 export interface SearchResult {
-  receipts?: ReceiptWithSimilarity[]; // Optional: results for receipts
-  lineItems?: LineItemSearchResult[]; // Optional: results for line items
+  receipts?: ReceiptWithSimilarity[]; // Optional: results for receipts (legacy support)
+  lineItems?: LineItemSearchResult[]; // Optional: results for line items (legacy support)
+  results?: (ReceiptWithSimilarity | LineItemSearchResult)[]; // Combined results for unified search
   count: number;
   total: number;
   searchParams: SearchParams;
@@ -69,6 +70,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       return {
         receipts: [],
         lineItems: [],
+        results: [],
         count: 0,
         total: 0,
         searchParams: params,
@@ -82,6 +84,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       return {
         receipts: [],
         lineItems: [],
+        results: [],
         count: 0,
         total: 0,
         searchParams: params,
@@ -96,37 +99,38 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         hasReceipts: !!data.results.receipts,
         raw: data.results
       });
-      
+
       let results: SearchResult = {
         receipts: [],
         lineItems: [],
+        results: [],
         count: data.results?.count || 0,
         total: data.results?.total || 0,
         searchParams: data.searchParams,
       };
-      
+
       // Handle line item search results
       if (searchTarget === 'line_items') {
         // Try various possible response formats
         if (data.results.lineItems && Array.isArray(data.results.lineItems)) {
           console.log('Using lineItems array directly from results');
-          
+
           // Add validation for receipt_id before assigning
           results.lineItems = data.results.lineItems.map((item: any) => {
             // Check for receipt_id from various sources
             let effectiveReceiptId = item.receipt_id;
-            
+
             // Try to find the receipt_id from various possible locations
             if (!effectiveReceiptId && item.parent_receipt_id) {
               effectiveReceiptId = item.parent_receipt_id;
               console.log(`Using parent_receipt_id for line item:`, item.line_item_id);
             }
-            
+
             // Check if receipt_id is missing and log it
             if (!effectiveReceiptId) {
               console.warn('Line item missing receipt_id:', item);
             }
-            
+
             return {
               line_item_id: item.line_item_id || item.id || `item-${Math.random().toString(36).substring(2, 10)}`,
               receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
@@ -140,19 +144,19 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
               similarity: item.similarity || item.similarity_score || 0
             };
           });
-        } 
+        }
         else if (data.results.receipts && Array.isArray(data.results.receipts) && searchTarget === 'line_items') {
           console.log('Converting receipts format to lineItems format');
-          
+
           results.lineItems = data.results.receipts.map((item: any) => {
             // Check for receipt_id from various sources
             let effectiveReceiptId = item.receipt_id || item.id;
-            
+
             // Check if receipt_id is missing and log it
             if (!effectiveReceiptId) {
               console.warn('Line item (from receipts format) missing receipt_id:', item);
             }
-            
+
             return {
               line_item_id: item.id || item.line_item_id || `item-${Math.random().toString(36).substring(2, 10)}`,
               receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
@@ -166,7 +170,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
             };
           });
         }
-      } 
+      }
       // Handle receipt search results
       else if (data.results.receipts) {
         results.receipts = data.results.receipts;
@@ -176,15 +180,15 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       if (results.lineItems && results.lineItems.length > 0) {
         // Direct count of missing ids instead of complex filtering
         let missingCount = 0;
-        
+
         // Attempt to repair missing receipt_ids based on other data
         for (let i = 0; i < results.lineItems.length; i++) {
           const item = results.lineItems[i];
-          
+
           // If receipt_id is missing, try to extract it from line_item_id if possible
           if (!item.receipt_id) {
             missingCount++;
-            
+
             // Some line item IDs might be formatted as "receipt_id:line_number"
             if (item.line_item_id && item.line_item_id.includes(':')) {
               const parts = item.line_item_id.split(':');
@@ -195,16 +199,39 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
             }
           }
         }
-        
+
         if (missingCount > 0) {
           console.error(`Warning: ${missingCount} out of ${results.lineItems.length} line items are missing receipt_id`);
         }
+      }
+
+      // Populate the unified results array for all search types
+      if (searchTarget === 'all') {
+        // Combine receipts and line items into a single array
+        results.results = [
+          ...(results.receipts || []),
+          ...(results.lineItems || [])
+        ];
+
+        // Sort by similarity score (highest first)
+        results.results.sort((a, b) => {
+          const scoreA = 'similarity_score' in a ? a.similarity_score : ('similarity' in a ? a.similarity : 0);
+          const scoreB = 'similarity_score' in b ? b.similarity_score : ('similarity' in b ? b.similarity : 0);
+          return scoreB - scoreA;
+        });
+      } else if (searchTarget === 'receipts') {
+        // For backward compatibility, populate results with receipts
+        results.results = [...(results.receipts || [])];
+      } else if (searchTarget === 'line_items') {
+        // For backward compatibility, populate results with line items
+        results.results = [...(results.lineItems || [])];
       }
 
       console.log('Processed results:', {
         type: searchTarget,
         lineItemsCount: results.lineItems?.length || 0,
         receiptsCount: results.receipts?.length || 0,
+        unifiedResultsCount: results.results?.length || 0,
         total: results.total
       });
 
@@ -228,8 +255,15 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         const results = handleSearchResults(data, params.searchTarget || 'receipts');
 
         // If no results found, try fallback search (only for receipts)
-        if ((params.searchTarget !== 'line_items' && (!results.receipts || results.receipts.length === 0)) || 
-            (params.searchTarget === 'line_items' && (!results.lineItems || results.lineItems.length === 0))) {
+        if (params.searchTarget === 'all') {
+          // For 'all' search, check if both receipts and line items are empty
+          if ((!results.receipts || results.receipts.length === 0) &&
+              (!results.lineItems || results.lineItems.length === 0)) {
+            console.log('No results from unified search, trying fallback search');
+            return await fallbackBasicSearch(params);
+          }
+        } else if ((params.searchTarget !== 'line_items' && (!results.receipts || results.receipts.length === 0)) ||
+                  (params.searchTarget === 'line_items' && (!results.lineItems || results.lineItems.length === 0))) {
           console.log('No results from vector search, trying fallback search');
           // Only use fallback for receipts search, not line items
           if (params.searchTarget !== 'line_items') {
@@ -240,7 +274,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         return results;
       } catch (edgeFunctionError) {
         console.warn('Edge function approach failed, trying fallback search:', edgeFunctionError);
-        
+
         // Skip the database function altogether and go straight to the JavaScript fallback
         return await fallbackBasicSearch(params);
       }
@@ -268,12 +302,13 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     return {
       receipts: [],
       lineItems: [],
+      results: [],
       count: 0,
       total: 0,
       searchParams: params,
     };
   }
-  
+
   // Check if user is authenticated
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
@@ -281,6 +316,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     return {
       receipts: [],
       lineItems: [],
+      results: [],
       count: 0,
       total: 0,
       searchParams: params,
@@ -301,7 +337,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     // If we have a specific query, use it to filter
     if (query && query.trim() !== '') {
       console.log('Performing text search with query:', query);
-      
+
       try {
         // Try individual filter approach (more reliable but potentially slower)
         const { data: merchantData, error: merchantError } = await supabase
@@ -310,7 +346,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
           .ilike('merchant', `%${query}%`)
           .order('date', { ascending: false })
           .limit(limit);
-          
+
         const { data: categoryData, error: categoryError } = await supabase
           .from('receipts')
           .select('*')
@@ -325,30 +361,31 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
           .filter('LOWER("fullText")', 'ilike', `%${query.toLowerCase()}%`)
           .order('date', { ascending: false })
           .limit(limit);
-          
+
         // Combine results and remove duplicates
         const combinedResults = [...(merchantData || []), ...(categoryData || []), ...(fullTextData || [])];
         const uniqueResults = Array.from(new Map(combinedResults.map(item => [item.id, item])).values());
-        
+
         console.log(`Found results: merchant(${merchantData?.length || 0}), category(${categoryData?.length || 0}), fullText(${fullTextData?.length || 0})`);
-        
+
         // If we found results with individual queries, return them
         if (uniqueResults.length > 0) {
           // Sort by date
           uniqueResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          
+
           // Apply pagination
           const paginatedResults = uniqueResults.slice(offset, offset + limit);
-          
+
           // Add similarity score
           const receiptsWithScores = paginatedResults.map(receipt => ({
             ...receipt,
             similarity_score: 0 // No meaningful similarity score in fallback search
           }));
-          
+
           const results: SearchResult = {
             receipts: receiptsWithScores,
-            lineItems: [], 
+            lineItems: [],
+            results: receiptsWithScores, // Add to unified results array
             count: receiptsWithScores.length,
             total: uniqueResults.length,
             searchParams: {
@@ -356,14 +393,14 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
               isVectorSearch: false,
             },
           };
-          
+
           console.log('Returning combined fallback results:', results.count);
           return results;
         }
       } catch (individualQueryError) {
         console.error('Error with individual query approach:', individualQueryError);
       }
-      
+
       // If individual queries didn't work or didn't find results, try simpler approach
       textQuery = supabase
         .from('receipts')
@@ -402,6 +439,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     const results: SearchResult = {
       receipts: receiptsWithScores,
       lineItems: [], // Always empty for fallback search
+      results: receiptsWithScores, // Add to unified results array
       count: data?.length || 0,
       total: count || data?.length || 0,
       searchParams: {
@@ -417,7 +455,8 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     return {
       receipts: [],
       lineItems: [],
-      count: 0, 
+      results: [],
+      count: 0,
       total: 0,
       searchParams: params,
     };
@@ -431,16 +470,16 @@ export async function checkEmbeddings(receiptId: string): Promise<{exists: boole
   try {
     // Call the edge function to check embeddings
     const response = await callEdgeFunction('generate-embeddings', 'GET', { receiptId });
-    
+
     console.log('Embedding check result:', response);
-    
+
     if (response && response.success) {
-      return { 
-        exists: response.count > 0, 
+      return {
+        exists: response.count > 0,
         count: response.count || 0
       };
     }
-    
+
     return { exists: false, count: 0 };
   } catch (error) {
     console.error('Error checking embeddings:', error);
@@ -458,9 +497,9 @@ export async function generateEmbeddings(receiptId: string): Promise<boolean> {
       receiptId,
       processAllFields: true // Process all available fields
     });
-    
+
     console.log('Embedding generation result:', response);
-    
+
     return response && response.success;
   } catch (error) {
     console.error('Error generating embeddings:', error);
@@ -485,11 +524,11 @@ export async function generateAllEmbeddings(limit: number = 10): Promise<{
       .not('fullText', 'is', null)  // Correct syntax for 'is not null'
       .order('date', { ascending: false })
       .limit(limit);
-    
+
     if (error) throw error;
-    
+
     console.log(`Found ${receipts?.length || 0} receipts to process for embeddings`);
-    
+
     if (!receipts || receipts.length === 0) {
       return {
         success: true,
@@ -498,9 +537,9 @@ export async function generateAllEmbeddings(limit: number = 10): Promise<{
         successful: 0
       };
     }
-    
+
     let successful = 0;
-    
+
     // Process each receipt
     for (const receipt of receipts) {
       try {
@@ -510,7 +549,7 @@ export async function generateAllEmbeddings(limit: number = 10): Promise<{
         console.error(`Error generating embeddings for receipt ${receipt.id}:`, err);
       }
     }
-    
+
     return {
       success: true,
       message: `Generated embeddings for ${successful} out of ${receipts.length} receipts`,
@@ -544,19 +583,19 @@ export async function checkLineItemEmbeddings(): Promise<{
       .from('receipt_embeddings')
       .select('id', { count: 'exact' })
       .eq('source_type', 'line_item');
-    
+
     if (embeddingsError) throw embeddingsError;
-    
+
     // Count total line items
     const { count: totalLineItems, error: countError } = await supabase
       .from('line_items')
       .select('id', { count: 'exact' });
-    
+
     if (countError) throw countError;
-    
+
     // Get counts with and without embeddings
     const withoutEmbeddings = (totalLineItems || 0) - (embeddingsCount || 0);
-    
+
     return {
       exists: (embeddingsCount || 0) > 0,
       count: embeddingsCount || 0,
@@ -583,7 +622,7 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
   try {
     // Get the status of line item embeddings
     const status = await checkLineItemEmbeddings();
-    
+
     if (status.withoutEmbeddings === 0) {
       return {
         success: true,
@@ -593,18 +632,18 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
         withoutEmbeddings: 0
       };
     }
-    
+
     // Get receipts that need line item embeddings
     const { data: receipts, error } = await supabase
       .from('receipts')
       .select('id')
       .order('date', { ascending: false })
       .limit(limit);
-    
+
     if (error) throw error;
-    
+
     console.log(`Found ${receipts?.length || 0} receipts to process for line item embeddings`);
-    
+
     if (!receipts || receipts.length === 0) {
       return {
         success: true,
@@ -614,9 +653,9 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
         withoutEmbeddings: status.withoutEmbeddings
       };
     }
-    
+
     let processedCount = 0;
-    
+
     // Process line items for each receipt
     for (const receipt of receipts) {
       try {
@@ -625,7 +664,7 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
           receiptId: receipt.id,
           processLineItems: true // Process line items
         });
-        
+
         if (response && response.success) {
           processedCount += response.count || 0;
         }
@@ -633,10 +672,10 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
         console.error(`Error generating line item embeddings for receipt ${receipt.id}:`, err);
       }
     }
-    
+
     // Get updated status after processing
     const newStatus = await checkLineItemEmbeddings();
-    
+
     return {
       success: true,
       processed: processedCount,
@@ -675,10 +714,10 @@ export async function generateAllTypeEmbeddings(limit: number = 10): Promise<{
   try {
     // Generate receipt embeddings
     const receiptResults = await generateAllEmbeddings(limit);
-    
+
     // Generate line item embeddings
     const lineItemResults = await generateLineItemEmbeddings(limit);
-    
+
     return {
       success: receiptResults.success && lineItemResults.success,
       message: `Generated embeddings for ${receiptResults.successful} receipts and ${lineItemResults.processed} line items`,

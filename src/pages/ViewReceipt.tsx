@@ -1,10 +1,10 @@
 
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, Search } from "lucide-react";
 import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,8 +13,13 @@ import { toast } from "sonner";
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Check if we came from the search page
+  const isFromSearch = location.state?.from === 'search' || searchParams.has('q');
 
   const { data: receipt, isLoading, error } = useQuery({
     queryKey: ['receipt', id],
@@ -90,13 +95,25 @@ export default function ViewReceipt() {
             transition={{ duration: 0.3 }}
             className="flex items-center gap-2"
           >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-            >
-              <ArrowLeft size={20} />
-            </Button>
+            {isFromSearch ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(`/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}
+                title="Back to search results"
+              >
+                <ArrowLeft size={20} />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/dashboard")}
+                title="Back to dashboard"
+              >
+                <ArrowLeft size={20} />
+              </Button>
+            )}
             <div>
               <h1 className="text-2xl font-bold">{receipt.merchant || "Unnamed Receipt"}</h1>
               <p className="text-muted-foreground">
@@ -114,6 +131,16 @@ export default function ViewReceipt() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex gap-2"
           >
+            {isFromSearch && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate(`/search${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}
+              >
+                <Search size={16} />
+                Back to Search
+              </Button>
+            )}
             <Button
               variant="outline"
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"

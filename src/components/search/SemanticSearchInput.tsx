@@ -10,6 +10,8 @@ interface SemanticSearchInputProps {
   placeholder?: string;
   isLoading?: boolean;
   className?: string;
+  initialQuery?: string;
+  initialIsNaturalLanguage?: boolean;
 }
 
 export function SemanticSearchInput({
@@ -17,9 +19,11 @@ export function SemanticSearchInput({
   placeholder = 'Search your receipts using natural language...',
   isLoading = false,
   className = '',
+  initialQuery = '',
+  initialIsNaturalLanguage = true,
 }: SemanticSearchInputProps) {
-  const [query, setQuery] = useState('');
-  const [isNaturalLanguage, setIsNaturalLanguage] = useState(true);
+  const [query, setQuery] = useState(initialQuery);
+  const [isNaturalLanguage, setIsNaturalLanguage] = useState(initialIsNaturalLanguage);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +39,13 @@ export function SemanticSearchInput({
       await onSearch(query, isNaturalLanguage);
     } catch (error) {
       console.error('Search error:', error);
-      
+
       // Provide more specific error messages based on error type
       let errorMessage = 'Failed to search receipts';
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
-        
+
         // Check for common error patterns
         if (errorMessage.includes('Failed to send a request to the Edge Function')) {
           errorMessage = 'Unable to connect to the search service. Please check if the function is deployed and configured correctly.';
@@ -51,7 +55,7 @@ export function SemanticSearchInput({
           errorMessage = 'Error in the search function. Check function logs for details.';
         }
       }
-      
+
       toast({
         title: 'Search error',
         description: errorMessage,
@@ -85,8 +89,8 @@ export function SemanticSearchInput({
       </div>
 
       <div className="ml-2 flex items-center space-x-2">
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           disabled={isLoading || !query.trim()}
           className="whitespace-nowrap"
         >

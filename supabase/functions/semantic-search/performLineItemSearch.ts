@@ -21,15 +21,13 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     query: searchQuery // Log the actual search query
   });
 
-  // Use the unified search functions for line item embeddings
-  const searchFunction = 'search_embeddings'; // Always use search_embeddings as hybrid_search_embeddings doesn't exist
-  console.log(`Using unified search function: ${searchFunction} for line items`);
+  // Use the appropriate search function for line items
+  const searchFunction = 'search_line_items'; // Use the dedicated line items search function
+  console.log(`Using search function: ${searchFunction} for line items`);
 
   // Prepare parameters for the database function
   const functionParams = {
     query_embedding: queryEmbedding,
-    search_type: 'line_item', // Specify we're searching only line item embeddings
-    content_type: 'line_item', // Content type for line items
     similarity_threshold: similarityThreshold,
     match_count: limit + offset,
   };
@@ -46,13 +44,13 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   }
 
   console.log(`Query Embedding (first 5 elements): [${queryEmbedding.slice(0,5).join(', ')}, ...] (length: ${queryEmbedding.length})`);
-  
+
   // Create a separate object for logging to avoid type issues
   const loggableParams = {
     ...functionParams,
     query_embedding: `[Vector of length ${queryEmbedding.length}] (first 5: ${queryEmbedding.slice(0,5).join(', ')})`
   };
-  
+
   console.log(`Detailed functionParams for ${searchFunction}:`, JSON.stringify(loggableParams, null, 2));
 
   // Call the database function for unified vector search
@@ -68,7 +66,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
 
   if (!searchResults || searchResults.length === 0) {
     console.log('No line item matches found for query');
-    
+
     // Try a fallback direct query approach
     try {
       console.log('Attempting fallback direct query approach...');
@@ -83,12 +81,12 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
         `)
         .ilike('description', `%${searchQuery.toLowerCase()}%`)
         .limit(limit);
-        
+
       if (fallbackError) {
         console.error('Fallback query error:', fallbackError);
       } else if (fallbackResults && fallbackResults.length > 0) {
         console.log(`Fallback found ${fallbackResults.length} results`);
-        
+
         // Format the fallback results to match expected structure
         const formattedFallback = fallbackResults.map(item => ({
           line_item_id: item.line_item_id,
@@ -101,7 +99,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
           parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
           similarity: 0.5 // Default similarity for fallback results
         }));
-        
+
         return {
           lineItems: formattedFallback,
           count: formattedFallback.length,
@@ -112,24 +110,24 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     } catch (fallbackEx) {
       console.error('Exception in fallback query:', fallbackEx);
     }
-    
+
     return { lineItems: [], count: 0, total: 0 };
   }
 
   console.log(`Retrieved ${searchResults.length} search results before pagination`);
-  
+
   // Apply offset and limit for pagination
   const paginatedResults = searchResults.slice(offset, offset + limit);
-  
+
   // Extract line item IDs from the search results
   const lineItemIds = paginatedResults.map(r => r.source_id);
-  
+
   // Create a map of similarity scores
   const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
     acc[r.source_id] = r.similarity || r.score || 0;
     return acc;
   }, {});
-  
+
   // Fetch the actual line item data
   const { data: lineItems, error: lineItemsError } = await client
     .from('line_items')
@@ -142,12 +140,12 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
       receipts(merchant, date)
     `)
     .in('id', lineItemIds);
-  
+
   if (lineItemsError) {
     console.error('Error fetching line item details:', lineItemsError);
     throw new Error(`Error fetching line item details: ${lineItemsError.message}`);
   }
-  
+
   // Format the line items with the structure expected by the frontend
   const formattedLineItems = lineItems.map(item => ({
     line_item_id: item.id,
@@ -160,10 +158,10 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
     similarity: similarityScores[item.id] || 0
   }));
-  
+
   // Sort by similarity score (highest first)
   formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
-  
+
   return {
     lineItems: formattedLineItems,
     count: formattedLineItems.length,

@@ -10,6 +10,7 @@ import Navbar from "@/components/Navbar";
 import { CombinedVectorStatus } from '../components/search/CombinedVectorStatus';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSearchParams, useLocation } from 'react-router-dom';
 
 export default function SemanticSearchPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,37 +18,74 @@ export default function SemanticSearchPage() {
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTarget, setSearchTarget] = useState<'receipts' | 'line_items'>('receipts');
+  const [isNaturalLanguage, setIsNaturalLanguage] = useState(true);
   const resultsPerPage = 10;
 
-  // This effect resets pagination and results when a new search is performed or target changes
+  // Use URL search params to persist search state
+  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Initialize state from URL parameters on component mount
+  useEffect(() => {
+    const query = urlSearchParams.get('q');
+    const natural = urlSearchParams.get('natural') !== 'false'; // Default to true
+    const page = parseInt(urlSearchParams.get('page') || '1', 10);
+
+    if (query) {
+      setSearchQuery(query);
+      setIsNaturalLanguage(natural);
+      setCurrentPage(page);
+
+      // If we have a query in the URL, perform the search
+      performSearch(query, natural, page);
+    }
+  }, []);
+
+  // This effect resets pagination and results when a new search is performed
   useEffect(() => {
     setCurrentPage(1);
-    setSearchResults(null);
-  }, [searchQuery, searchTarget]);
+    if (!searchQuery) {
+      setSearchResults(null);
+    }
+  }, [searchQuery]);
 
-  const handleSearch = async (query: string, isNaturalLanguage: boolean) => {
+  // Helper function to perform search and update state
+  const performSearch = async (query: string, isNaturalLang: boolean, page: number = 1) => {
     try {
       setIsLoading(true);
-      setSearchQuery(query);
+
+      const offset = (page - 1) * resultsPerPage;
 
       const params: SearchParams = {
         query,
-        isNaturalLanguage,
+        isNaturalLanguage: isNaturalLang,
         limit: resultsPerPage,
-        offset: 0,
-        searchTarget // Include the current search target (receipts or line_items)
+        offset: offset,
+        searchTarget: 'all' // Use 'all' to search both receipts and line items
       };
       setSearchParams(params);
 
       const results = await semanticSearch(params);
       setSearchResults(results);
+
+      // Update URL parameters to reflect the search state
+      setUrlSearchParams({
+        q: query,
+        natural: isNaturalLang.toString(),
+        page: page.toString()
+      });
     } catch (error) {
       console.error('Search error:', error);
       throw error;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSearch = async (query: string, isNaturalLang: boolean) => {
+    setSearchQuery(query);
+    setIsNaturalLanguage(isNaturalLang);
+    await performSearch(query, isNaturalLang);
   };
 
   const handleLoadMore = async () => {
@@ -64,24 +102,22 @@ export default function SemanticSearchPage() {
 
       const moreResults = await semanticSearch(moreParams);
 
-      // Determine if we are loading more receipts or line items
-      if (searchTarget === 'receipts' && moreResults.receipts && searchResults.receipts) {
-        setSearchResults({
-          ...searchResults,
-          receipts: [...searchResults.receipts, ...moreResults.receipts],
-          count: searchResults.receipts.length + moreResults.receipts.length,
-          total: moreResults.total // Use total from the latest call as it might be more accurate
-        });
-      } else if (searchTarget === 'line_items' && moreResults.lineItems && searchResults.lineItems) {
-        setSearchResults({
-          ...searchResults,
-          lineItems: [...searchResults.lineItems, ...moreResults.lineItems],
-          count: searchResults.lineItems.length + moreResults.lineItems.length,
-          total: moreResults.total
-        });
-      }
+      // Combine all results (both receipts and line items)
+      setSearchResults({
+        ...searchResults,
+        results: [...(searchResults.results || []), ...(moreResults.results || [])],
+        count: (searchResults.results?.length || 0) + (moreResults.results?.length || 0),
+        total: moreResults.total // Use total from the latest call as it might be more accurate
+      });
 
       setCurrentPage(nextPage);
+
+      // Update URL parameters with the new page number
+      setUrlSearchParams({
+        q: searchQuery,
+        natural: (searchParams.isNaturalLanguage ?? true).toString(),
+        page: nextPage.toString()
+      });
     } catch (error) {
       console.error('Load more error:', error);
     } finally {
@@ -91,9 +127,7 @@ export default function SemanticSearchPage() {
 
   // Check if there are more results to load
   const hasMoreResults = searchResults
-    ? searchTarget === 'receipts'
-      ? searchResults.receipts.length < searchResults.total
-      : searchResults.lineItems.length < searchResults.total
+    ? (searchResults.results?.length || 0) < (searchResults.total || 0)
     : false;
 
   return (
@@ -129,24 +163,9 @@ export default function SemanticSearchPage() {
             <SemanticSearchInput
               onSearch={handleSearch}
               isLoading={isLoading}
+              initialQuery={searchQuery}
+              initialIsNaturalLanguage={isNaturalLanguage}
             />
-            <div className="flex items-center gap-2">
-              <label htmlFor="searchTarget" className="text-sm font-medium text-muted-foreground">
-                Search In:
-              </label>
-              <Select 
-                value={searchTarget} 
-                onValueChange={(value: 'receipts' | 'line_items') => setSearchTarget(value)}
-              >
-                <SelectTrigger id="searchTarget" className="w-[180px]">
-                  <SelectValue placeholder="Select target" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="receipts">Receipts</SelectItem>
-                  <SelectItem value="line_items">Line Items</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -156,9 +175,7 @@ export default function SemanticSearchPage() {
           <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
             <Info className="h-12 w-12 text-muted-foreground mb-3" />
             <h3 className="text-lg font-semibold">
-              {searchTarget === 'receipts' 
-                ? 'Discover insights in your receipts' 
-                : 'Search within individual line items'}
+              Discover insights in your receipts and line items
             </h3>
             <p className="text-muted-foreground mt-1 max-w-lg">
               Our AI-powered semantic search understands natural language queries to help you find exactly what you're looking for.
@@ -166,19 +183,14 @@ export default function SemanticSearchPage() {
             <div className="mt-6 space-y-2">
               <p className="text-sm font-medium">Try asking questions like:</p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {(searchTarget === 'receipts' ? [
+                {[
                   "coffee shops from last month",
                   "grocery receipts over $50",
-                  "receipts from Target in 2024",
-                  "restaurants in New York",
-                  "gas station receipts from summer"
-                ] : [
                   "coffee items",
                   "bread or pastries",
                   "items over $10",
-                  "milk products",
-                  "fruits and vegetables"
-                ]).map((suggestion) => (
+                  "restaurants in New York"
+                ].map((suggestion) => (
                   <Button
                     key={suggestion}
                     variant="outline"
@@ -197,12 +209,10 @@ export default function SemanticSearchPage() {
       {(searchResults || isLoading) && (
         <div className="mt-6">
           <SearchResults
-            receiptResults={searchTarget === 'receipts' ? searchResults?.receipts || [] : []}
-            lineItemResults={searchTarget === 'line_items' ? searchResults?.lineItems || [] : []}
+            results={searchResults?.results || []}
             isLoading={isLoading}
             totalResults={searchResults?.total || 0}
             searchQuery={searchQuery}
-            searchTarget={searchTarget}
             onLoadMore={handleLoadMore}
             hasMoreResults={hasMoreResults}
           />

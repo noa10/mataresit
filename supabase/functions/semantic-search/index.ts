@@ -72,7 +72,7 @@ async function generateEmbedding(input: { text: string; model?: string }): Promi
     // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536
     if (embedding.length !== EMBEDDING_DIMENSIONS) {
       console.log(`Adjusting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
-      
+
       if (embedding.length < EMBEDDING_DIMENSIONS) {
         // Pad the embedding with zeros if it's too short
         const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
@@ -111,29 +111,49 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
   } = params;
 
   console.log('Starting semantic search with params:', {
-    contentType, limit, offset, startDate, endDate, 
+    contentType, limit, offset, startDate, endDate,
     minAmount, maxAmount, useHybridSearch, searchTarget
   });
 
-  // Map searchTarget to source_type parameter for the unified search function
-  const sourceType = searchTarget === 'receipts' ? 'receipt' : 'line_item';
-  
-  // Use only search_embeddings as hybrid_search_embeddings doesn't exist
-  const searchFunction = 'search_embeddings';
-  
-  console.log(`Using unified search function: ${searchFunction} with source_type=${sourceType}`);
+  // Use the appropriate search function based on what's available in the database
+  let searchFunction = 'search_receipts'; // Default to the legacy function
+  let searchResults;
+  let error;
 
-  // Call the database function for unified vector search
-  const { data: searchResults, error } = await client.rpc(
-    searchFunction,
-    {
-      query_embedding: queryEmbedding,
-      search_type: sourceType,
-      content_type: contentType,
-      similarity_threshold: similarityThreshold,
-      match_count: limit + offset
-    }
-  );
+  // For receipts, use search_receipts function
+  if (searchTarget === 'receipts') {
+    console.log(`Using search_receipts function`);
+
+    const { data, error: searchError } = await client.rpc(
+      'search_receipts',
+      {
+        query_embedding: queryEmbedding,
+        similarity_threshold: similarityThreshold,
+        match_count: limit + offset,
+        content_type_filter: contentType || 'all'
+      }
+    );
+
+    searchResults = data;
+    error = searchError;
+  }
+  // For line items, use search_line_items function
+  else if (searchTarget === 'line_items') {
+    console.log(`Using search_line_items function`);
+
+    const { data, error: searchError } = await client.rpc(
+      'search_line_items',
+      {
+        query_embedding: queryEmbedding,
+        similarity_threshold: similarityThreshold,
+        match_count: limit + offset
+      }
+    );
+
+    searchResults = data;
+    error = searchError;
+  }
+  // For 'all', we'll handle this differently in the main search handler
 
   if (error) {
     console.error('Error in semantic search:', error);
@@ -149,12 +169,12 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
 
   // Apply offset and limit for pagination
   const paginatedResults = searchResults.slice(offset, offset + limit);
-  
+
   // If we're searching for line items, call the specialized line item search handler
   if (searchTarget === 'line_items') {
     return await processLineItemSearchResults(client, paginatedResults, params);
   }
-  
+
   // For receipt searches, continue with the existing flow
   const extractedIds = paginatedResults.map((r: any) => r.receipt_id);
   const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
@@ -228,16 +248,16 @@ async function processLineItemSearchResults(client: any, results: any[], params:
   if (!results || results.length === 0) {
     return { lineItems: [], count: 0, total: 0 };
   }
-  
+
   // Extract line item IDs from the search results
   const lineItemIds = results.map(r => r.source_id);
-  
+
   // Create a map of similarity scores
   const similarityScores = results.reduce((acc: Record<string, number>, r: any) => {
     acc[r.source_id] = r.similarity || r.score || 0;
     return acc;
   }, {});
-  
+
   // Fetch the actual line item data
   const { data: lineItems, error } = await client
     .from('line_items')
@@ -250,12 +270,12 @@ async function processLineItemSearchResults(client: any, results: any[], params:
       receipts(merchant, date)
     `)
     .in('id', lineItemIds);
-  
+
   if (error) {
     console.error('Error fetching line item details:', error);
     throw new Error(`Error fetching line item details: ${error.message}`);
   }
-  
+
   // Format the line items with the structure expected by the frontend
   const formattedLineItems = lineItems.map(item => ({
     line_item_id: item.id,
@@ -267,10 +287,10 @@ async function processLineItemSearchResults(client: any, results: any[], params:
     parent_receipt_date: item.receipts?.date,
     similarity: similarityScores[item.id] || 0
   }));
-  
+
   // Sort by similarity score (highest first)
   formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
-  
+
   return {
     lineItems: formattedLineItems,
     count: formattedLineItems.length,
@@ -290,7 +310,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
     // Use Gemini to extract structured parameters from the query
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    
+
     const prompt = `Extract search parameters from natural language queries about receipts.
       Return a JSON object with these fields if they can be inferred:
       - startDate and endDate (ISO format YYYY-MM-DD)
@@ -300,21 +320,21 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       - contentType ('full_text', 'merchant', 'notes')
       - query (the core search query with filters removed)
       If something cannot be inferred, omit the field entirely.
-      
+
       User query: ${query}
-      
+
       JSON response:`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Try to parse the response text as JSON
     try {
       // Extract JSON from the response text in case it's wrapped in markdown code blocks
       const jsonText = text.replace(/```json\n|\n```|```/g, '').trim();
       const extractedParams = JSON.parse(jsonText);
-      
+
       return {
         query: extractedParams.query || query,
         contentType: extractedParams.contentType || 'full_text',
@@ -361,9 +381,9 @@ serve(async (req) => {
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase environment variables');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Server configuration error: Missing Supabase credentials' 
+        JSON.stringify({
+          success: false,
+          error: 'Server configuration error: Missing Supabase credentials'
         }),
         { status: 500, headers: corsHeaders }
       );
@@ -400,9 +420,9 @@ serve(async (req) => {
         'checkEmbeddingStats',
         'checkLineItemEmbeddingStats'
       ];
-      
+
       const isSpecialOperation = operationsNotRequiringQuery.some(op => requestBody[op] === true);
-      
+
       if (!query && !isSpecialOperation) {
         console.error('Missing required parameter: query');
         return new Response(
@@ -448,7 +468,7 @@ serve(async (req) => {
           );
         }
       }
-      
+
       // Check line item embedding status
       if (requestBody.testLineItemEmbeddingStatus) {
         console.log('Checking line item embedding status...');
@@ -489,25 +509,25 @@ serve(async (req) => {
           );
         }
       }
-      
+
       // Generate embeddings for line items
       if (requestBody.generateLineItemEmbeddings) {
         console.log('Generating line item embeddings...');
         try {
           // Reduced batch size to avoid timeouts
           const limit = requestBody.limit || 10; // Reduced from 50 to 10
-          
+
           // Get line items without embeddings
           const { data: lineItems, error: lineItemsError } = await supabaseClient
             .from('line_items')
             .select('id, description')
             .is('embedding', null)
             .limit(limit);
-            
+
           if (lineItemsError) {
             throw new Error(`Error fetching line items: ${lineItemsError.message}`);
           }
-          
+
           if (!lineItems || lineItems.length === 0) {
             console.log('No line items without embeddings found.');
             return new Response(
@@ -522,49 +542,49 @@ serve(async (req) => {
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
-          
+
           console.log(`Found ${lineItems.length} line items without embeddings.`);
-          
+
           // Get total counts for stats - but limit to first 100 to avoid performance issues
           const { data: statsData, error: statsError } = await supabaseClient
             .from('line_items')
             .select('id, embedding')
             .limit(100);
-            
+
           if (statsError) {
             throw new Error(`Error fetching line item stats: ${statsError.message}`);
           }
-          
+
           // Process line items one by one, but with a smaller batch size
           let processed = 0;
           let errors = 0;
           const maxItems = Math.min(5, lineItems.length); // Process at most 5 items per request
-          
+
           for (let i = 0; i < maxItems; i++) {
             const lineItem = lineItems[i];
             console.log(`Processing line item ${i+1}/${maxItems}: ${lineItem.id}`);
-            
+
             try {
               // Skip if no description available
               if (!lineItem.description || lineItem.description.trim() === '') {
                 console.log(`Skipping line item ${lineItem.id} - no description`);
                 continue;
               }
-              
+
               // Generate embedding for the line item description
               const embedding = await generateEmbedding({ text: lineItem.description });
               if (i === 0) { // Log only for the first item in the batch
                 console.log(`First line item to process: ID=${lineItem.id}, Description="${lineItem.description.substring(0,30)}..."`);
                 console.log(`Generated embedding for SQL (first item): [${embedding.slice(0,5).join(', ')}, ...] (length: ${embedding.length})`);
               }
-              
+
               // Store the embedding
               const { data: rpcData, error: rpcError } = await supabaseClient.rpc('generate_line_item_embeddings', {
                 p_line_item_id: lineItem.id,
                 p_embedding: embedding
               });
               console.log(`RPC call to generate_line_item_embeddings for ${lineItem.id}: Data=${JSON.stringify(rpcData)}, Error=${JSON.stringify(rpcError)}`);
-              
+
               if (rpcError) {
                 console.error(`Error storing embedding for line item ${lineItem.id}:`, rpcError);
                 errors++;
@@ -577,17 +597,17 @@ serve(async (req) => {
               errors++;
             }
           }
-          
+
           // Get new counts after processing
           const { data: newStatsData } = await supabaseClient
             .from('line_items')
             .select('id, embedding')
             .limit(100);
-            
+
           const total = newStatsData?.length || 0;
           const withEmbeddings = newStatsData?.filter(item => item.embedding !== null).length || 0;
           const withoutEmbeddings = total - withEmbeddings;
-          
+
           return new Response(
             JSON.stringify({
               success: true,
@@ -657,28 +677,34 @@ serve(async (req) => {
 
       // Determine which search function to use based on searchTarget
       let results;
-      if (searchParams.searchTarget === 'line_items') {
+      if (searchParams.searchTarget === 'all') {
+        console.log('Performing unified search (both receipts and line items)...');
+
+        // Search receipts
+        const receiptParams = { ...searchParams, searchTarget: 'receipts' };
+        const receiptResults = await performSemanticSearch(supabaseClient, queryEmbedding, receiptParams);
+
+        // Search line items
+        const lineItemParams = { ...searchParams, searchTarget: 'line_items' };
+        const lineItemResults = await performLineItemSearch(supabaseClient, queryEmbedding, lineItemParams);
+
+        // Combine results
+        results = {
+          receipts: receiptResults.receipts || [],
+          lineItems: lineItemResults.lineItems || [],
+          count: (receiptResults.receipts?.length || 0) + (lineItemResults.lineItems?.length || 0),
+          total: (receiptResults.total || 0) + (lineItemResults.total || 0)
+        };
+
+        console.log('Unified search completed with results:', {
+          receiptCount: results.receipts?.length || 0,
+          lineItemCount: results.lineItems?.length || 0,
+          totalCount: results.count,
+          total: results.total
+        });
+      } else if (searchParams.searchTarget === 'line_items') {
         console.log('Performing line item search...');
-        
-        // Test direct SQL query to debug
-        try {
-          console.log('Testing direct SQL query for line items with "sayur"');
-          const { data: directTestResults, error: directTestError } = await supabaseClient
-            .from('line_items')
-            .select('id, description, amount')
-            .ilike('description', '%sayur%')
-            .limit(5);
-            
-          if (directTestError) {
-            console.error('Direct test query error:', directTestError);
-          } else {
-            console.log(`Direct SQL test found ${directTestResults?.length || 0} results for "sayur"`, 
-              directTestResults?.map(i => `"${i.description}" (${i.amount})`) || []);
-          }
-        } catch (testError) {
-          console.error('Error in direct test query:', testError);
-        }
-        
+
         results = await performLineItemSearch(supabaseClient, queryEmbedding, searchParams);
         console.log('Line item search completed with results:', {
           count: results.lineItems?.length || 0,
