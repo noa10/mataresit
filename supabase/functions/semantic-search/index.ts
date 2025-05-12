@@ -48,7 +48,7 @@ interface SearchParams {
   merchants?: string[];
   useHybridSearch?: boolean;
   similarityThreshold?: number;
-  searchTarget?: 'receipts' | 'line_items';
+  searchTarget?: 'receipts' | 'line_items' | 'all';
 }
 
 // Model configuration for embeddings
@@ -57,6 +57,7 @@ const EMBEDDING_DIMENSIONS = 1536; // Gemini's standard dimension
 
 /**
  * Generate embeddings using Google's Gemini embedding model
+ * Improved to handle dimension conversion more effectively
  */
 async function generateEmbedding(input: { text: string; model?: string }): Promise<number[]> {
   if (!geminiApiKey) {
@@ -69,17 +70,40 @@ async function generateEmbedding(input: { text: string; model?: string }): Promi
     const result = await model.embedContent(input.text);
     let embedding = result.embedding.values;
 
-    // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536
+    // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536 for pgvector
     if (embedding.length !== EMBEDDING_DIMENSIONS) {
-      console.log(`Adjusting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
+      console.log(`Converting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
 
       if (embedding.length < EMBEDDING_DIMENSIONS) {
-        // Pad the embedding with zeros if it's too short
-        const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
-        embedding = [...embedding, ...padding];
+        if (embedding.length * 2 === EMBEDDING_DIMENSIONS) {
+          // If exactly half the size, duplicate each value instead of zero-padding
+          // This preserves more semantic information than zero padding
+          embedding = embedding.flatMap(val => [val, val]);
+        } else {
+          // Pad with zeros, but normalize the remaining values to maintain vector magnitude
+          const normalizationFactor = Math.sqrt(EMBEDDING_DIMENSIONS / embedding.length);
+          const normalizedEmbedding = embedding.map(val => val * normalizationFactor);
+          const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
+          embedding = [...normalizedEmbedding, ...padding];
+        }
       } else if (embedding.length > EMBEDDING_DIMENSIONS) {
-        // Truncate the embedding if it's too long
-        embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
+        // If too long, use a dimensionality reduction approach
+        // For simplicity, we're averaging adjacent pairs if it's exactly double
+        if (embedding.length === EMBEDDING_DIMENSIONS * 2) {
+          const reducedEmbedding = [];
+          for (let i = 0; i < embedding.length; i += 2) {
+            reducedEmbedding.push((embedding[i] + embedding[i+1]) / 2);
+          }
+          embedding = reducedEmbedding;
+        } else {
+          // Otherwise just truncate but normalize the remaining values
+          embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
+          // Normalize to maintain vector magnitude
+          const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+          if (magnitude > 0) {
+            embedding = embedding.map(val => val / magnitude * Math.sqrt(EMBEDDING_DIMENSIONS));
+          }
+        }
       }
     }
     console.log(`Generated embedding for text "${input.text.substring(0,30)}...": [${embedding.slice(0,5).join(', ')}, ...] (length: ${embedding.length})`);
@@ -299,64 +323,193 @@ async function processLineItemSearchResults(client: any, results: any[], params:
 }
 
 /**
- * Parse natural language query to extract search parameters
+ * Parse natural language query to extract search parameters with improved prompt and error handling
  */
 async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
+  console.log(`Parsing natural language query: ${query}`);
+  
   if (!geminiApiKey) {
     throw new Error('GEMINI_API_KEY not found in environment variables');
   }
 
   try {
-    // Use Gemini to extract structured parameters from the query
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-    const prompt = `Extract search parameters from natural language queries about receipts.
-      Return a JSON object with these fields if they can be inferred:
-      - startDate and endDate (ISO format YYYY-MM-DD)
-      - minAmount and maxAmount (numbers)
-      - categories (array of strings)
-      - merchants (array of strings)
-      - contentType ('full_text', 'merchant', 'notes')
-      - query (the core search query with filters removed)
-      If something cannot be inferred, omit the field entirely.
-
-      User query: ${query}
-
-      JSON response:`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    // Try to parse the response text as JSON
+    
+    // Get current date for better relative date handling
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
+    
+    // Construct an improved prompt to help the model understand how to parse the query
+    const prompt = `
+      Parse the following search query for a receipt tracking app and extract structured parameters.
+      You can extract dates, amounts, categories, merchants, and other relevant filters.
+      
+      Today's date is ${now.toISOString().split('T')[0]}.
+      
+      Guidelines for parsing:
+      1. For dates, convert to ISO format (YYYY-MM-DD).
+      2. For relative dates like 'last month', 'last week', etc., calculate the actual date range.
+      3. For amounts, extract numeric values only.
+      4. For merchants, extract exact store or business names.
+      5. For categories, map to common shopping categories (groceries, dining, entertainment, etc.)
+      6. If a field is not mentioned, return null for that field.
+      7. For search target, determine if the user is looking for receipts or line items (individual items on receipts).
+      
+      Examples:
+      Query: "Show me all receipts from last month over $50"
+      {
+        "startDate": "${currentYear}-${(currentMonth - 1).toString().padStart(2, '0')}-01",
+        "endDate": "${currentYear}-${(currentMonth - 1).toString().padStart(2, '0')}-${new Date(currentYear, currentMonth - 1, 0).getDate()}",
+        "minAmount": 50,
+        "maxAmount": null,
+        "categories": [],
+        "merchants": [],
+        "searchTarget": "receipts"
+      }
+      
+      Query: "receipts from Target between $10 and $50 in January"
+      {
+        "startDate": "${currentYear}-01-01",
+        "endDate": "${currentYear}-01-31",
+        "minAmount": 10,
+        "maxAmount": 50,
+        "categories": [],
+        "merchants": ["Target"],
+        "searchTarget": "receipts"
+      }
+      
+      Query: "milk purchases from last week"
+      {
+        "startDate": "${new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}",
+        "endDate": "${now.toISOString().split('T')[0]}",
+        "minAmount": null,
+        "maxAmount": null,
+        "categories": ["groceries"],
+        "merchants": [],
+        "searchTarget": "line_items"
+      }
+      
+      Now parse this search query:
+      Query: "${query}"
+      
+      Return a valid JSON object only, no explanation or additional text.
+    `;
+    
+    // Set temperature to 0 for more deterministic parsing
+    const generationConfig = {
+      temperature: 0,
+      topP: 0.8,
+      maxOutputTokens: 500,
+    };
+    
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig,
+    });
+    
+    const text = result.response.text();
+    console.log(`Raw NLU response: ${text}`);
+    
+    // Extract the JSON part from the text response with improved handling
+    let jsonStr = text.trim();
+    
+    // Try different approaches to extract JSON
+    let parsedParams = null;
+    let jsonError = null;
+    
+    // Try to parse directly first
     try {
-      // Extract JSON from the response text in case it's wrapped in markdown code blocks
-      const jsonText = text.replace(/```json\n|\n```|```/g, '').trim();
-      const extractedParams = JSON.parse(jsonText);
-
-      return {
-        query: extractedParams.query || query,
-        contentType: extractedParams.contentType || 'full_text',
-        startDate: extractedParams.startDate,
-        endDate: extractedParams.endDate,
-        minAmount: extractedParams.minAmount,
-        maxAmount: extractedParams.maxAmount,
-        categories: extractedParams.categories,
-        merchants: extractedParams.merchants,
-        useHybridSearch: true, // Default to hybrid search for natural language
+      parsedParams = JSON.parse(jsonStr);
+    } catch (e) {
+      jsonError = e;
+      console.log('Could not parse directly, trying to extract JSON block...');
+      
+      // Find JSON boundaries with improved detection
+      const jsonStart = jsonStr.indexOf('{');
+      const jsonEnd = jsonStr.lastIndexOf('}');
+      
+      if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart) {
+        try {
+          jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
+          parsedParams = JSON.parse(jsonStr);
+          jsonError = null;
+        } catch (e2) {
+          console.error(`Error extracting JSON from boundaries: ${e2}`);
+        }
+      }
+      
+      // If still not parsed, try regex for more complex cases
+      if (!parsedParams) {
+        try {
+          const regex = /{[\s\S]*?}/;
+          const match = jsonStr.match(regex);
+          if (match && match[0]) {
+            parsedParams = JSON.parse(match[0]);
+            jsonError = null;
+          }
+        } catch (e3) {
+          console.error(`Error parsing with regex: ${e3}`);
+        }
+      }
+    }
+    
+    if (parsedParams) {
+      // Validate and sanitize extracted parameters
+      // Type assertion to avoid 'never' type issues
+      const params = parsedParams as Record<string, any>;
+      
+      const validatedParams: SearchParams = {
+        query,  // Keep the original query text
+        // Convert date strings to ISO format if needed and verify they are valid dates
+        startDate: params.startDate && typeof params.startDate === 'string' && isValidDateString(params.startDate) ? 
+                  params.startDate : undefined,
+        endDate: params.endDate && typeof params.endDate === 'string' && isValidDateString(params.endDate) ? 
+                params.endDate : undefined,
+        // Ensure numeric values are properly typed
+        minAmount: typeof params.minAmount === 'number' ? params.minAmount : undefined,
+        maxAmount: typeof params.maxAmount === 'number' ? params.maxAmount : undefined,
+        // Validate arrays
+        categories: Array.isArray(params.categories) ? params.categories : undefined,
+        merchants: Array.isArray(params.merchants) ? params.merchants : undefined,
+        // Validate searchTarget is one of the expected values
+        searchTarget: ['receipts', 'line_items', 'all'].includes(params.searchTarget) ? 
+          params.searchTarget as 'receipts' | 'line_items' | 'all' : 'receipts',
+        // Set a sensible default for useHybridSearch based on parameter presence
+        useHybridSearch: Boolean(
+          params.minAmount !== null || 
+          params.maxAmount !== null || 
+          params.startDate !== null || 
+          params.endDate !== null || 
+          (Array.isArray(params.merchants) && params.merchants.length > 0)
+        )
       };
-    } catch (jsonError) {
-      console.warn('Error parsing Gemini response as JSON:', jsonError);
-      console.log('Raw Gemini response:', text);
-      // Fall back to using the raw query
+      
+      console.log('Validated search parameters:', validatedParams);
+      return validatedParams;
+    } else if (jsonError) {
+      console.error(`Error parsing JSON from NLU response: ${jsonError}`);
+      // Fallback to just the query if parsing fails
       return { query };
     }
+    
+    // Final fallback
+    return { query };
   } catch (error) {
-    console.warn('Error parsing natural language query with Gemini:', error);
-    // Fall back to using the raw query
+    console.error(`Error in natural language parsing: ${error}`);
+    // Return basic params with just the query on error
     return { query };
   }
+}
+
+// Helper function to validate date strings
+function isValidDateString(dateStr: string): boolean {
+  if (!dateStr) return false;
+  
+  // Try to parse as ISO date string
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime());
 }
 
 /**
@@ -655,6 +808,11 @@ serve(async (req) => {
           searchTarget = 'receipts' // Default to receipts search if not specified
         } = requestBody;
 
+        // Validate searchTarget to ensure it's one of the allowed values
+        const validatedSearchTarget = ['receipts', 'line_items', 'all'].includes(searchTarget) 
+          ? searchTarget as 'receipts' | 'line_items' | 'all'
+          : 'receipts';
+
         searchParams = {
           query,
           contentType,
@@ -666,7 +824,7 @@ serve(async (req) => {
           maxAmount,
           categories,
           merchants,
-          searchTarget
+          searchTarget: validatedSearchTarget
         };
       }
 
@@ -676,7 +834,14 @@ serve(async (req) => {
       console.log('Embedding generated with dimensions:', queryEmbedding.length);
 
       // Determine which search function to use based on searchTarget
-      let results;
+      let results: { 
+        receipts?: any[]; 
+        lineItems?: any[]; 
+        count: number; 
+        total: number;
+        fallback?: boolean;
+      };
+
       if (searchParams.searchTarget === 'all') {
         console.log('Performing unified search (both receipts and line items)...');
 
@@ -688,36 +853,65 @@ serve(async (req) => {
         const lineItemParams = { ...searchParams, searchTarget: 'line_items' };
         const lineItemResults = await performLineItemSearch(supabaseClient, queryEmbedding, lineItemParams);
 
+        // Proper type handling for receipt and line item results
+        const receiptItems = 'receipts' in receiptResults ? receiptResults.receipts : [];
+        const lineItems = 'lineItems' in lineItemResults ? lineItemResults.lineItems : [];
+        const receiptCount = receiptItems?.length || 0;
+        const lineItemCount = lineItems?.length || 0;
+        const receiptTotal = receiptResults.total || 0;
+        const lineItemTotal = lineItemResults.total || 0;
+
         // Combine results
         results = {
-          receipts: receiptResults.receipts || [],
-          lineItems: lineItemResults.lineItems || [],
-          count: (receiptResults.receipts?.length || 0) + (lineItemResults.lineItems?.length || 0),
-          total: (receiptResults.total || 0) + (lineItemResults.total || 0)
+          receipts: receiptItems,
+          lineItems: lineItems,
+          count: receiptCount + lineItemCount,
+          total: receiptTotal + lineItemTotal,
+          fallback: Boolean(receiptResults.fallback || lineItemResults.fallback)
         };
 
         console.log('Unified search completed with results:', {
-          receiptCount: results.receipts?.length || 0,
-          lineItemCount: results.lineItems?.length || 0,
-          totalCount: results.count,
-          total: results.total
+          receiptCount,
+          lineItemCount,
+          totalCount: receiptCount + lineItemCount,
+          total: receiptTotal + lineItemTotal,
+          usingFallback: results.fallback
         });
       } else if (searchParams.searchTarget === 'line_items') {
         console.log('Performing line item search...');
 
-        results = await performLineItemSearch(supabaseClient, queryEmbedding, searchParams);
+        const lineItemResults = await performLineItemSearch(supabaseClient, queryEmbedding, searchParams);
+        
+        // Ensure type safety
+        results = {
+          lineItems: lineItemResults.lineItems || [],
+          count: lineItemResults.lineItems?.length || 0,
+          total: lineItemResults.total || 0,
+          fallback: Boolean(lineItemResults.fallback)
+        };
+        
         console.log('Line item search completed with results:', {
           count: results.lineItems?.length || 0,
           total: results.total || 0,
-          resultsStructure: results
+          usingFallback: results.fallback
         });
       } else {
         console.log('Performing receipt search...');
         // Default to receipt search
-        results = await performSemanticSearch(supabaseClient, queryEmbedding, searchParams);
+        const receiptResults = await performSemanticSearch(supabaseClient, queryEmbedding, searchParams);
+        
+        // Ensure type safety
+        results = {
+          receipts: receiptResults.receipts || [],
+          count: receiptResults.receipts?.length || 0,
+          total: receiptResults.total || 0,
+          fallback: Boolean(receiptResults.fallback)
+        };
+        
         console.log('Receipt search completed with results:', {
           count: results.receipts?.length || 0,
-          total: results.total || 0
+          total: results.total || 0,
+          usingFallback: results.fallback
         });
       }
 

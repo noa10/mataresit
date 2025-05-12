@@ -1,5 +1,8 @@
 -- Update the line item search functions to match the actual database schema
 
+-- Drop the old function before redefining it
+DROP FUNCTION IF EXISTS search_line_items(vector, double precision, integer);
+
 -- Function to search line items using vector similarity
 CREATE OR REPLACE FUNCTION search_line_items(
   query_embedding vector(1536),
@@ -38,6 +41,9 @@ END;
 $$;
 
 -- Hybrid search function for line items (combines vector similarity with text search)
+-- Drop the old function before redefining it
+DROP FUNCTION IF EXISTS hybrid_search_line_items(vector, text, double precision, double precision, double precision, integer, numeric, numeric, date, date);
+
 CREATE OR REPLACE FUNCTION hybrid_search_line_items(
   query_embedding vector(1536),
   query_text text,

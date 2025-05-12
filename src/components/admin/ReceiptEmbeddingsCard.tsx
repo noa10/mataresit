@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
+import { checkReceiptEmbeddings, generateReceiptEmbeddings } from '@/lib/ai-search';
 
-export function LineItemEmbeddingsCard() {
-  // Line item embedding state
+export function ReceiptEmbeddingsCard() {
+  // Receipt embedding state
   const [isGeneratingEmbeddings, setIsGeneratingEmbeddings] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [embeddingProgress, setEmbeddingProgress] = useState(0);
-  const [totalLineItems, setTotalLineItems] = useState(0);
-  const [processedLineItems, setProcessedLineItems] = useState(0);
+  const [totalReceipts, setTotalReceipts] = useState(0);
+  const [processedReceipts, setProcessedReceipts] = useState(0);
   const [embeddingStats, setEmbeddingStats] = useState<{
     total: number;
     withEmbeddings: number;
@@ -21,13 +21,13 @@ export function LineItemEmbeddingsCard() {
     withoutEmbeddings: 0
   });
 
-  // Function to check line item embedding statistics
+  // Function to check receipt embedding statistics
   const checkEmbeddingStats = async () => {
     try {
-      console.log('Checking line item embeddings stats...');
+      console.log('Checking receipt embeddings stats...');
 
-      const result = await checkLineItemEmbeddings();
-      console.log('Line item embedding check result:', result);
+      const result = await checkReceiptEmbeddings();
+      console.log('Receipt embedding check result:', result);
 
       setEmbeddingStats({
         total: result.total || 0,
@@ -35,66 +35,50 @@ export function LineItemEmbeddingsCard() {
         withoutEmbeddings: result.withoutEmbeddings || 0
       });
     } catch (error) {
-      console.error('Error checking line item embedding stats:', error);
+      console.error('Error checking receipt embedding stats:', error);
     }
   };
 
-  // Function to generate embeddings for line items
+  // Function to generate embeddings for receipts
   const handleGenerateEmbeddings = async (regenerate: boolean = false) => {
     try {
       setIsGeneratingEmbeddings(true);
       setIsRegenerating(regenerate);
       setEmbeddingProgress(0);
-      setProcessedLineItems(0);
+      setProcessedReceipts(0);
 
       // Get current stats to know how many items need processing
       await checkEmbeddingStats();
 
       // Generate embeddings in batches until all are done
       let totalProcessed = 0;
-      const batchSize = 50; // Process in batches of 50
+      const batchSize = 10; // Process in batches of 10 (receipts need more resources per item)
 
       // Set the target based on whether we're regenerating all or just missing
       const targetCount = regenerate ? 
         embeddingStats?.total || 0 : 
         embeddingStats?.withoutEmbeddings || 0;
       
-      setTotalLineItems(targetCount);
+      setTotalReceipts(targetCount);
 
       if (targetCount > 0) {
-        while (totalProcessed < targetCount) {
-          try {
-            const result = await generateLineItemEmbeddings(batchSize, regenerate);
-            console.log('Generation batch result:', result);
+        const result = await generateReceiptEmbeddings(batchSize, regenerate);
+        console.log('Receipt embedding generation result:', result);
 
-            if (result.processed > 0) {
-              totalProcessed += result.processed;
-              setProcessedLineItems(totalProcessed);
+        if (result.processed > 0) {
+          totalProcessed += result.processed;
+          setProcessedReceipts(totalProcessed);
 
-              // Update progress percentage
-              const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
-              setEmbeddingProgress(progress);
-
-              // If no more items need processing, we're done
-              if ((regenerate && result.total === result.withEmbeddings) || 
-                  (!regenerate && result.withoutEmbeddings === 0)) {
-                break;
-              }
-            } else {
-              // If nothing was processed in this batch, likely all items are done
-              console.log('No more line items to process');
-              break;
-            }
-          } catch (batchError) {
-            console.error('Error in embedding generation batch:', batchError);
-          }
+          // Update progress percentage
+          const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
+          setEmbeddingProgress(progress);
         }
       }
 
       // Final check to update stats
       await checkEmbeddingStats();
     } catch (error) {
-      console.error('Error generating line item embeddings:', error);
+      console.error('Error generating receipt embeddings:', error);
     } finally {
       setIsGeneratingEmbeddings(false);
       setIsRegenerating(false);
@@ -109,16 +93,16 @@ export function LineItemEmbeddingsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Line Item Embeddings</CardTitle>
+        <CardTitle>Receipt Embeddings</CardTitle>
         <CardDescription>
-          Generate vector embeddings for line items to enable semantic search
+          Generate vector embeddings for receipts to enable semantic search
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="flex flex-col xs:flex-row gap-2 xs:justify-between text-sm">
             <div className="whitespace-nowrap">
-              <span className="font-medium">Total Line Items:</span> {embeddingStats?.total || 0}
+              <span className="font-medium">Total Receipts:</span> {embeddingStats?.total || 0}
             </div>
             <div className="whitespace-nowrap">
               <span className="font-medium">With Embeddings:</span> {embeddingStats?.withEmbeddings || 0}
@@ -141,7 +125,7 @@ export function LineItemEmbeddingsCard() {
                 <span>
                   {isRegenerating ? 'Regenerating embeddings...' : 'Generating embeddings...'}
                 </span>
-                <span>{processedLineItems} of {totalLineItems}</span>
+                <span>{processedReceipts} of {totalReceipts}</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
                 <div
@@ -156,7 +140,7 @@ export function LineItemEmbeddingsCard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => checkEmbeddingStats()}
+              onClick={checkEmbeddingStats}
               disabled={isGeneratingEmbeddings}
             >
               <RefreshCw className="h-3.5 w-3.5 mr-2" />

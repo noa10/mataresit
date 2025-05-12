@@ -1,7 +1,11 @@
 -- Fix line item search functions to correctly handle column mappings and improve search accuracy
 
+-- Drop existing functions first to avoid errors when changing return types
+DROP FUNCTION IF EXISTS search_line_items(vector, double precision, int);
+DROP FUNCTION IF EXISTS hybrid_search_line_items(vector, text, double precision, double precision, double precision, int, numeric, numeric, date, date);
+
 -- Updated function to search line items using vector similarity with corrected column mapping
-CREATE OR REPLACE FUNCTION search_line_items(
+CREATE FUNCTION search_line_items(
   query_embedding vector(1536),
   similarity_threshold double precision DEFAULT 0.3, -- Lower threshold for better recall
   match_count int DEFAULT 10
@@ -38,7 +42,7 @@ END;
 $$;
 
 -- Updated hybrid search function for line items with corrected column mapping
-CREATE OR REPLACE FUNCTION hybrid_search_line_items(
+CREATE FUNCTION hybrid_search_line_items(
   query_embedding vector(1536),
   query_text text,
   similarity_threshold double precision DEFAULT 0.3, -- Lower threshold for better recall

@@ -9,7 +9,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     endDate,
     minAmount,
     maxAmount,
-    similarityThreshold = 0.3, // Lower threshold to catch more matches
+    similarityThreshold = 0.35, // Adjusted threshold for better precision-recall balance
     useHybridSearch = false,
     query: searchQuery
   } = params;
@@ -87,18 +87,38 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
       } else if (fallbackResults && fallbackResults.length > 0) {
         console.log(`Fallback found ${fallbackResults.length} results`);
 
-        // Format the fallback results to match expected structure
-        const formattedFallback = fallbackResults.map(item => ({
-          line_item_id: item.line_item_id,
-          receipt_id: item.receipt_id,
-          line_item_description: item.line_item_description,
-          line_item_price: item.line_item_amount,
-          line_item_quantity: 1,
-          parent_receipt_merchant: item.receipts?.parent_receipt_merchant,
-          parent_receipt_date: item.receipts?.parent_receipt_date,
-          parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
-          similarity: 0.5 // Default similarity for fallback results
-        }));
+        // Format the fallback results to match expected structure but with lower similarity scores
+        // to ensure they rank below proper vector matches
+        const formattedFallback = fallbackResults.map(item => {
+          // Calculate a text match score based on how much of the query appears in the description
+          // This ensures better fallback ranking while keeping them distinctly lower than vector matches
+          const description = (item.line_item_description || '').toLowerCase();
+          const queryTerms = searchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+          
+          let matchScore = 0;
+          // Calculate score based on number of query terms that appear in the description
+          if (queryTerms.length > 0) {
+            const matchedTerms = queryTerms.filter(term => description.includes(term));
+            matchScore = matchedTerms.length / queryTerms.length * 0.2; // Scale to max 0.2 (below vector threshold)
+          }
+          
+          // Ensure the fallback similarity is always lower than the similarity threshold
+          // This keeps fallbacks ranked below vector matches but still ordered by relevance
+          const fallbackSimilarity = Math.min(matchScore, similarityThreshold - 0.05);
+          
+          return {
+            line_item_id: item.line_item_id,
+            receipt_id: item.receipt_id,
+            line_item_description: item.line_item_description,
+            line_item_price: item.line_item_amount,
+            line_item_quantity: 1,
+            parent_receipt_merchant: item.receipts?.parent_receipt_merchant,
+            parent_receipt_date: item.receipts?.parent_receipt_date,
+            parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
+            similarity: fallbackSimilarity, // Lower similarity for fallback results
+            is_fallback: true // Mark as fallback for UI differentiation
+          };
+        });
 
         return {
           lineItems: formattedFallback,

@@ -490,16 +490,15 @@ export async function checkEmbeddings(receiptId: string): Promise<{exists: boole
 /**
  * Generate embeddings for a specific receipt
  */
-export async function generateEmbeddings(receiptId: string): Promise<boolean> {
+export async function generateEmbeddings(receiptId: string, model: string = 'gemini-1.5-flash-latest'): Promise<boolean> {
   try {
-    // Call the edge function to generate embeddings
+    console.log(`Generating embeddings for receipt ${receiptId} using model ${model}`);
     const response = await callEdgeFunction('generate-embeddings', 'POST', {
       receiptId,
-      processAllFields: true // Process all available fields
+      model,
+      contentTypes: ['full_text', 'merchant', 'notes', 'raw_text'],
     });
-
-    console.log('Embedding generation result:', response);
-
+    
     return response && response.success;
   } catch (error) {
     console.error('Error generating embeddings:', error);
@@ -510,59 +509,103 @@ export async function generateEmbeddings(receiptId: string): Promise<boolean> {
 /**
  * Generate embeddings for multiple receipts
  */
-export async function generateAllEmbeddings(limit: number = 10): Promise<{
+export async function generateAllEmbeddings(model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
   success: boolean;
-  message: string;
+  count: number;
+  total: number;
   processed: number;
-  successful: number;
+  message: string;
 }> {
   try {
-    // Get receipts that don't have embeddings yet
-    const { data: receipts, error } = await supabase
+    console.log(`Starting generateAllEmbeddings with model: ${model}, forceRegenerate: ${forceRegenerate}`);
+    
+    // First get all receipts
+    const { data: allReceipts, error: receiptError } = await supabase
       .from('receipts')
-      .select('id, date, merchant, fullText')
-      .not('fullText', 'is', null)  // Correct syntax for 'is not null'
-      .order('date', { ascending: false })
-      .limit(limit);
+      .select('id');
 
-    if (error) throw error;
+    if (receiptError) {
+      console.error('Error fetching all receipts:', receiptError);
+      throw receiptError;
+    }
 
-    console.log(`Found ${receipts?.length || 0} receipts to process for embeddings`);
+    if (!allReceipts || allReceipts.length === 0) {
+      console.log('No receipts found in the database');
+      return { success: true, count: 0, total: 0, processed: 0, message: 'No receipts found' };
+    }
 
-    if (!receipts || receipts.length === 0) {
-      return {
-        success: true,
-        message: 'No receipts need embeddings',
+    console.log(`Found ${allReceipts.length} total receipts in database`);
+
+    // If we're not forcing regeneration, identify receipts that already have embeddings
+    let receiptsToProcess = [...allReceipts]; // Create a copy to avoid mutation issues
+    
+    if (!forceRegenerate) {
+      console.log('Not forcing regeneration, identifying receipts without embeddings');
+      
+      // Query for existing embeddings in receipt_embeddings table
+      const { data: existingEmbeddings, error: embeddingsError } = await supabase
+        .from('receipt_embeddings')
+        .select('receipt_id')
+        .not('receipt_id', 'is', null);
+      
+      if (embeddingsError) {
+        console.error('Error checking for existing embeddings:', embeddingsError);
+        throw embeddingsError;
+      }
+      
+      if (existingEmbeddings && existingEmbeddings.length > 0) {
+        // Create a set of receipt IDs that already have embeddings
+        const existingIds = new Set(existingEmbeddings.map(e => e.receipt_id));
+        console.log(`Found ${existingIds.size} receipts with existing embeddings`);
+        
+        // Filter to only process receipts without embeddings
+        receiptsToProcess = allReceipts.filter(r => !existingIds.has(r.id));
+        console.log(`Will process ${receiptsToProcess.length} receipts without embeddings`);
+      } else {
+        console.log('No existing embeddings found, will process all receipts');
+      }
+    } else {
+      console.log(`Forcing regeneration of all ${allReceipts.length} receipts`);
+    }
+
+    if (receiptsToProcess.length === 0) {
+      return { 
+        success: true, 
+        count: 0, 
+        total: allReceipts.length,
         processed: 0,
-        successful: 0
+        message: 'All receipts already have embeddings' 
       };
     }
 
-    let successful = 0;
-
     // Process each receipt
-    for (const receipt of receipts) {
-      try {
-        const generated = await generateEmbeddings(receipt.id);
-        if (generated) successful++;
-      } catch (err) {
-        console.error(`Error generating embeddings for receipt ${receipt.id}:`, err);
-      }
-    }
+    console.log(`Starting batch processing of ${receiptsToProcess.length} receipts`);
+    const results = await Promise.all(
+      receiptsToProcess.map(receipt => 
+        generateEmbeddings(receipt.id, model)
+      )
+    );
 
-    return {
-      success: true,
-      message: `Generated embeddings for ${successful} out of ${receipts.length} receipts`,
-      processed: receipts.length,
-      successful
+    const successCount = results.filter(r => r === true).length;
+    const failedCount = results.filter(r => r === false).length;
+    
+    console.log(`Embedding generation complete: ${successCount} successful, ${failedCount} failed`);
+
+    return { 
+      success: true, 
+      count: successCount,
+      total: allReceipts.length,
+      processed: receiptsToProcess.length,
+      message: `Generated embeddings for ${successCount} receipts out of ${receiptsToProcess.length} attempted.` 
     };
   } catch (error) {
     console.error('Error generating all embeddings:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      count: 0,
+      total: 0,
       processed: 0,
-      successful: 0
+      message: `Error generating embeddings: ${error.message || 'Unknown error'}`
     };
   }
 }
@@ -578,23 +621,54 @@ export async function checkLineItemEmbeddings(): Promise<{
   withoutEmbeddings: number
 }> {
   try {
-    // Query the new unified embedding model to count line item embeddings
-    const { count: embeddingsCount, error: embeddingsError } = await supabase
-      .from('receipt_embeddings')
-      .select('id', { count: 'exact' })
-      .eq('source_type', 'line_item');
-
-    if (embeddingsError) throw embeddingsError;
-
-    // Count total line items
+    // First check if embeddings column exists by getting total count
     const { count: totalLineItems, error: countError } = await supabase
       .from('line_items')
       .select('id', { count: 'exact' });
 
     if (countError) throw countError;
 
-    // Get counts with and without embeddings
-    const withoutEmbeddings = (totalLineItems || 0) - (embeddingsCount || 0);
+    // For migration compatibility - check both old and new schemas
+    let embeddingsCount = 0;
+    
+    try {
+      // Try to count direct embeddings in line_items first (old schema)
+      const { data, error } = await supabase
+        .from('line_items')
+        .select('id')
+        .not('embedding', 'is', null)
+        .limit(1);
+        
+      if (!error) {
+        // If this succeeds, the embedding column exists in line_items
+        const { count, error: embedError } = await supabase
+          .from('line_items')
+          .select('id', { count: 'exact' })
+          .not('embedding', 'is', null);
+          
+        if (!embedError) {
+          embeddingsCount = count || 0;
+        }
+      }
+    } catch (e) {
+      console.log('Old schema check failed, trying new schema...');
+      // Try the new unified schema if the old one fails
+      try {
+        const { count, error } = await supabase
+          .from('receipt_embeddings')
+          .select('id', { count: 'exact' })
+          .eq('source_type', 'line_item');
+          
+        if (!error) {
+          embeddingsCount = count || 0;
+        }
+      } catch (unifiedError) {
+        console.log('Both schema checks failed:', unifiedError);
+      }
+    }
+    
+    // Calculate those without embeddings
+    const withoutEmbeddings = (totalLineItems || 0) - embeddingsCount;
 
     return {
       exists: (embeddingsCount || 0) > 0,
@@ -610,9 +684,14 @@ export async function checkLineItemEmbeddings(): Promise<{
 }
 
 /**
- * Generate line item embeddings for multiple line items
+ * Generate line item embeddings for multiple line items.
+ * 
+ * @param limit The maximum number of line items to process.
+ * @param forceRegenerate Whether to regenerate embeddings even if they already exist.
+ * 
+ * @returns A promise that resolves with an object containing the results of the operation.
  */
-export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
+export async function generateLineItemEmbeddings(limit: number = 50, forceRegenerate: boolean = false): Promise<{
   success: boolean;
   processed: number;
   total: number;
@@ -623,7 +702,7 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
     // Get the status of line item embeddings
     const status = await checkLineItemEmbeddings();
 
-    if (status.withoutEmbeddings === 0) {
+    if (!forceRegenerate && status.withoutEmbeddings === 0) {
       return {
         success: true,
         processed: 0,
@@ -662,7 +741,8 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
         // Call the edge function to generate line item embeddings
         const response = await callEdgeFunction('generate-embeddings', 'POST', {
           receiptId: receipt.id,
-          processLineItems: true // Process line items
+          processLineItems: true,
+          forceRegenerate: forceRegenerate // Pass along the regenerate flag
         });
 
         if (response && response.success) {
@@ -698,12 +778,13 @@ export async function generateLineItemEmbeddings(limit: number = 50): Promise<{
 /**
  * Generate all embeddings (receipts and line items)
  */
-export async function generateAllTypeEmbeddings(limit: number = 10): Promise<{
+export async function generateAllTypeEmbeddings(limit: number = 10, model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
   success: boolean;
   message: string;
   receiptResults: {
     processed: number;
-    successful: number;
+    count: number;
+    total: number;
   };
   lineItemResults: {
     processed: number;
@@ -712,18 +793,21 @@ export async function generateAllTypeEmbeddings(limit: number = 10): Promise<{
   };
 }> {
   try {
-    // Generate receipt embeddings
-    const receiptResults = await generateAllEmbeddings(limit);
-
-    // Generate line item embeddings
-    const lineItemResults = await generateLineItemEmbeddings(limit);
-
+    console.log(`Generating all embeddings for receipts and line items with model: ${model}, forceRegenerate: ${forceRegenerate}`);
+    
+    // First generate receipts
+    const receiptResults = await generateAllEmbeddings(model, forceRegenerate);
+    
+    // Then generate line items
+    const lineItemResults = await generateLineItemEmbeddings(limit, forceRegenerate);
+    
     return {
-      success: receiptResults.success && lineItemResults.success,
-      message: `Generated embeddings for ${receiptResults.successful} receipts and ${lineItemResults.processed} line items`,
+      success: true,
+      message: `Generated embeddings for ${receiptResults.count} receipts and ${lineItemResults.withEmbeddings} line items`,
       receiptResults: {
         processed: receiptResults.processed,
-        successful: receiptResults.successful
+        count: receiptResults.count,
+        total: receiptResults.total
       },
       lineItemResults: {
         processed: lineItemResults.processed,
@@ -732,13 +816,14 @@ export async function generateAllTypeEmbeddings(limit: number = 10): Promise<{
       }
     };
   } catch (error) {
-    console.error('Error generating all types of embeddings:', error);
+    console.error('Error generating all type embeddings:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Error generating all type embeddings',
       receiptResults: {
         processed: 0,
-        successful: 0
+        count: 0,
+        total: 0
       },
       lineItemResults: {
         processed: 0,
@@ -781,5 +866,144 @@ export async function getSimilarReceipts(receiptId: string, limit: number = 5): 
   } catch (error) {
     console.error('Error getting similar receipts:', error);
     return [];
+  }
+}
+
+/**
+ * Check if a database table/schema exists
+ */
+async function checkDbSchema(tableName: 'receipts' | 'receipt_embeddings' | 'line_items'): Promise<{ exists: boolean }> {
+  try {
+    // Try to query the table structure
+    const { error } = await supabase
+      .from(tableName)
+      .select('id')
+      .limit(1);
+      
+    // If no error, the table exists
+    return { exists: !error };
+  } catch (e) {
+    console.error(`Error checking if schema ${tableName} exists:`, e);
+    return { exists: false };
+  }
+}
+
+/**
+ * Check if receipt embeddings exist in the database
+ */
+export async function checkReceiptEmbeddings(): Promise<{
+  exists: boolean,
+  count: number,
+  total: number,
+  withEmbeddings: number,
+  withoutEmbeddings: number
+}> {
+  try {
+    // Get total receipt count
+    const { count: totalReceipts, error: countError } = await supabase
+      .from('receipts')
+      .select('id', { count: 'exact' });
+
+    if (countError) {
+      console.error("Error fetching total receipts count:", countError);
+      throw countError;
+    }
+
+    // Count distinct receipts that have embeddings
+    let distinctReceiptsWithEmbeddings = 0;
+    try {
+      // Get count of distinct receipt_ids in receipt_embeddings table
+      const { data, error: distinctError } = await supabase
+        .from('receipt_embeddings')
+        .select('receipt_id')
+        .not('receipt_id', 'is', null);
+      
+      if (distinctError) {
+        console.error('Error getting distinct receipt_ids:', distinctError);
+      } else if (data) {
+        // Count distinct receipt_ids from the returned data
+        const uniqueReceiptIds = new Set(data.map(item => item.receipt_id));
+        distinctReceiptsWithEmbeddings = uniqueReceiptIds.size;
+        console.log('Distinct receipts with embeddings count:', distinctReceiptsWithEmbeddings);
+      }
+    } catch (e) {
+      console.error('Exception checking distinct receipt embeddings:', e);
+      // Default to 0 for calculation
+    }
+
+    const withEmbeddings = distinctReceiptsWithEmbeddings;
+    // Ensure withoutEmbeddings is not negative
+    const withoutEmbeddings = Math.max(0, (totalReceipts || 0) - withEmbeddings);
+
+    console.log('Calculated Receipt Stats:', { total: totalReceipts, withEmbeddings, withoutEmbeddings });
+
+    return {
+      exists: withEmbeddings > 0,
+      count: withEmbeddings, // Report the count of distinct receipts with embeddings
+      total: totalReceipts || 0,
+      withEmbeddings: withEmbeddings,
+      withoutEmbeddings: withoutEmbeddings
+    };
+  } catch (error) {
+    console.error('Error in checkReceiptEmbeddings:', error);
+    return { exists: false, count: 0, total: 0, withEmbeddings: 0, withoutEmbeddings: 0 };
+  }
+}
+
+
+
+/**
+ * Generate receipt embeddings - can regenerate all if forceRegenerate is true
+ */
+export async function generateReceiptEmbeddings(limit: number = 50, model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
+  success: boolean;
+  processed: number;
+  total: number;
+  withEmbeddings: number;
+  withoutEmbeddings: number;
+}> {
+  try {
+    console.log(`Starting generateReceiptEmbeddings with limit: ${limit}, model: ${model}, forceRegenerate: ${forceRegenerate}`);
+    
+    // Get the status of receipt embeddings
+    const status = await checkReceiptEmbeddings();
+    console.log('Current embedding status:', status);
+
+    if (!forceRegenerate && status.withoutEmbeddings === 0) {
+      console.log('All receipts already have embeddings, skipping generation');
+      return {
+        success: true,
+        processed: 0,
+        total: status.total,
+        withEmbeddings: status.withEmbeddings,
+        withoutEmbeddings: 0
+      };
+    }
+
+    // Use the generateAllEmbeddings function
+    console.log(`Generating embeddings for up to ${limit} receipts`);
+    const result = await generateAllEmbeddings(model, forceRegenerate);
+    console.log('Generation result:', result);
+    
+    // Get updated status after processing
+    const newStatus = await checkReceiptEmbeddings();
+    console.log('Updated embedding status after processing:', newStatus);
+
+    return {
+      success: result.success,
+      processed: result.processed,
+      total: newStatus.total,
+      withEmbeddings: newStatus.withEmbeddings,
+      withoutEmbeddings: newStatus.withoutEmbeddings
+    };
+  } catch (error) {
+    console.error('Error generating receipt embeddings:', error);
+    return {
+      success: false,
+      processed: 0,
+      total: 0,
+      withEmbeddings: 0,
+      withoutEmbeddings: 0
+    };
   }
 }
