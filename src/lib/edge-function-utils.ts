@@ -25,7 +25,7 @@ export async function callEdgeFunction<T = any>(
   body?: any,
   queryParams?: Record<string, string>,
   retries: number = 2, // Add retries parameter with default of 2 retries
-  timeout: number = 15000 // Add timeout parameter with default of 15 seconds
+  timeout: number = 30000 // Increased timeout to 30 seconds
 ): Promise<T> {
   try {
     // Get the session for the current user to include the auth token
@@ -74,6 +74,7 @@ export async function callEdgeFunction<T = any>(
         },
         credentials: 'omit', // Don't send credentials with the request to avoid CORS issues
         signal: controller.signal,
+        mode: 'cors', // Explicitly set CORS mode
         ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {})
       });
 
@@ -111,13 +112,13 @@ export async function callEdgeFunction<T = any>(
     // Check if this was a timeout
     if (error.name === 'AbortError') {
       console.error(`Edge function ${functionName} call timed out after ${timeout}ms`);
-      
+
       // If we have retries left, try again
       if (retries > 0) {
         console.log(`Retrying edge function ${functionName} call (${retries} retries left)...`);
         return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout);
       }
-      
+
       throw new Error(`Edge function ${functionName} call timed out after ${timeout}ms and ${2 - retries} retries`);
     }
 
@@ -129,7 +130,7 @@ export async function callEdgeFunction<T = any>(
         'Edge function errors: The function might be failing to start or crashing',
         'Auth issues: Check that the auth token is valid'
       ];
-      
+
       console.error(`Likely CORS or network error when calling function ${functionName}:`, {
         errorType: error.name,
         errorMessage: error.message,
@@ -140,7 +141,7 @@ export async function callEdgeFunction<T = any>(
           hasBody: !!body
         }
       });
-      
+
       // If we have retries left, try again
       if (retries > 0) {
         console.log(`Retrying after network error for ${functionName} (${retries} retries left)...`);
@@ -148,7 +149,7 @@ export async function callEdgeFunction<T = any>(
         await new Promise(resolve => setTimeout(resolve, 1000));
         return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout);
       }
-      
+
       // Create a more informative error
       throw new Error(`Network error calling ${functionName}: ${error.message}. Possible causes: CORS restrictions, network connectivity, or function errors.`);
     }
@@ -185,7 +186,7 @@ export async function testGeminiConnection() {
         })
       }
     );
-    
+
     // Handle non-successful responses
     if (!response.ok) {
       const errorText = await response.text();
@@ -196,9 +197,9 @@ export async function testGeminiConnection() {
         errorData: errorText
       };
     }
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
       return {
         success: true,
@@ -229,7 +230,7 @@ export async function checkGeminiApiKey() {
     // This requires a server-side or Edge Function call
     // We'll use our semantic-search endpoint with a test parameter
     const result = await testGeminiConnection();
-    
+
     return {
       keyExists: result.success,
       message: result.message
@@ -257,7 +258,7 @@ export async function testEdgeFunctionCORS(functionName: string) {
         }
       }
     );
-    
+
     return response.ok;
   } catch (error) {
     console.error(`CORS test error for ${functionName}:`, error);
@@ -277,14 +278,14 @@ export async function testAllEdgeFunctionsCORS() {
     'enhance-receipt-data',
     'generate-pdf-report'
   ];
-  
+
   const results: Record<string, boolean> = {};
-  
+
   await Promise.all(
     functions.map(async (funcName) => {
       results[funcName] = await testEdgeFunctionCORS(funcName);
     })
   );
-  
+
   return results;
 }

@@ -28,22 +28,33 @@ interface EmbeddingInput {
   model?: string;
 }
 
-// Create a type for receipt embedding request
-interface ReceiptEmbeddingRequest {
-  receiptId: string;
-  contentType: string; // e.g., 'full_text', 'merchant', 'items', etc.
-  content: string;
-  metadata?: Record<string, any>;
+// Update the interface for the request body to include useImprovedDimensionHandling
+interface BaseEmbeddingRequest {
   model?: string;
+  useImprovedDimensionHandling?: boolean; // New flag to indicate using improved dimension handling
+  forceRegenerate?: boolean;
 }
 
-// Create a type for line item embedding request
-interface LineItemEmbeddingRequest {
+interface ReceiptEmbeddingRequest extends BaseEmbeddingRequest {
+  receiptId: string;
+  contentType: string;
+  content: string;
+  metadata?: Record<string, any>;
+}
+
+interface LineItemEmbeddingRequest extends BaseEmbeddingRequest {
   lineItemId: string;
   receiptId: string;
   content: string;
   metadata?: Record<string, any>;
-  model?: string;
+}
+
+interface BatchEmbeddingRequest extends BaseEmbeddingRequest {
+  receiptId: string;
+  processAllFields?: boolean;
+  processLineItems?: boolean;
+  contentTypes?: string[];
+  lineItemIds?: string[]; // Optional specific line item IDs to process
 }
 
 // Default embedding model configuration
@@ -52,6 +63,7 @@ const EMBEDDING_DIMENSIONS = 1536; // OpenAI's standard dimension
 
 /**
  * Generate embeddings for a text using Google's Gemini embedding model
+ * Improved to handle dimension conversion more effectively
  */
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
@@ -62,15 +74,38 @@ async function generateEmbedding(text: string): Promise<number[]> {
 
     // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536
     if (embedding.length !== EMBEDDING_DIMENSIONS) {
-      console.log(`Adjusting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
+      console.log(`Converting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
 
       if (embedding.length < EMBEDDING_DIMENSIONS) {
-        // Pad the embedding with zeros if it's too short
-        const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
-        embedding = [...embedding, ...padding];
+        if (embedding.length * 2 === EMBEDDING_DIMENSIONS) {
+          // If exactly half the size, duplicate each value instead of zero-padding
+          // This preserves more semantic information than zero padding
+          embedding = embedding.flatMap(val => [val, val]);
+        } else {
+          // Pad with zeros, but normalize the remaining values to maintain vector magnitude
+          const normalizationFactor = Math.sqrt(EMBEDDING_DIMENSIONS / embedding.length);
+          const normalizedEmbedding = embedding.map(val => val * normalizationFactor);
+          const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
+          embedding = [...normalizedEmbedding, ...padding];
+        }
       } else if (embedding.length > EMBEDDING_DIMENSIONS) {
-        // Truncate the embedding if it's too long
-        embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
+        // If too long, use a dimensionality reduction approach
+        // For simplicity, we're averaging adjacent pairs if it's exactly double
+        if (embedding.length === EMBEDDING_DIMENSIONS * 2) {
+          const reducedEmbedding = [];
+          for (let i = 0; i < embedding.length; i += 2) {
+            reducedEmbedding.push((embedding[i] + embedding[i+1]) / 2);
+          }
+          embedding = reducedEmbedding;
+        } else {
+          // Otherwise just truncate but normalize the remaining values
+          embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
+          // Normalize to maintain vector magnitude
+          const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+          if (magnitude > 0) {
+            embedding = embedding.map(val => val / magnitude * Math.sqrt(EMBEDDING_DIMENSIONS));
+          }
+        }
       }
     }
 
@@ -424,17 +459,23 @@ serve(async (req) => {
       );
     }
 
+    // Parse the request
     if (req.method === 'POST') {
       let requestBody;
       try {
         requestBody = await req.json();
         console.log('Received POST body for generate-embeddings:', JSON.stringify(requestBody));
       } catch (jsonError) {
+        console.error('Error parsing JSON body:', jsonError);
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid JSON body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Check for the new useImprovedDimensionHandling flag
+      const useImprovedDimensionHandling = Boolean(requestBody.useImprovedDimensionHandling);
+      console.log(`Using ${useImprovedDimensionHandling ? 'improved' : 'standard'} dimension handling`);
 
       const {
         receiptId,

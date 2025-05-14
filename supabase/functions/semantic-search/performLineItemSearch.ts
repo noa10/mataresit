@@ -9,10 +9,16 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     endDate,
     minAmount,
     maxAmount,
-    similarityThreshold = 0.35, // Adjusted threshold for better precision-recall balance
+    similarityThreshold = 0.15, // Lowered from 0.3 for better recall
     useHybridSearch = false,
     query: searchQuery
   } = params;
+
+  // Validate queryEmbedding
+  if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+    console.error('Invalid queryEmbedding:', queryEmbedding);
+    throw new Error('Invalid query embedding provided');
+  }
 
   console.log('Line item search parameters:', {
     limit, offset, startDate, endDate, minAmount, maxAmount,
@@ -21,170 +27,227 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     query: searchQuery // Log the actual search query
   });
 
-  // Use the appropriate search function for line items
-  const searchFunction = 'search_line_items'; // Use the dedicated line items search function
-  console.log(`Using search function: ${searchFunction} for line items`);
-
-  // Prepare parameters for the database function
-  const functionParams = {
-    query_embedding: queryEmbedding,
-    similarity_threshold: similarityThreshold,
-    match_count: limit + offset,
-  };
-
-  // Add hybrid search parameters if needed
-  if (useHybridSearch) {
-    Object.assign(functionParams, {
-      search_text: searchQuery,
-      min_amount: minAmount,
-      max_amount: maxAmount,
-      start_date: startDate,
-      end_date: endDate
-    });
-  }
-
   console.log(`Query Embedding (first 5 elements): [${queryEmbedding.slice(0,5).join(', ')}, ...] (length: ${queryEmbedding.length})`);
 
-  // Create a separate object for logging to avoid type issues
-  const loggableParams = {
-    ...functionParams,
-    query_embedding: `[Vector of length ${queryEmbedding.length}] (first 5: ${queryEmbedding.slice(0,5).join(', ')})`
-  };
+  try {
+    // Get all line items with their details first
+    // Use explicit join to avoid ambiguous relationship error
+    const { data: lineItems, error: lineItemsError } = await client
+      .from('line_items')
+      .select(`
+        id,
+        receipt_id,
+        description,
+        amount,
+        quantity,
+        receipts:receipt_id (
+          id,
+          merchant,
+          date
+        )
+      `)
+      .order('id', { ascending: false })
+      .limit(100); // Limit to a reasonable number to avoid processing too many
 
-  console.log(`Detailed functionParams for ${searchFunction}:`, JSON.stringify(loggableParams, null, 2));
-
-  // Call the database function for unified vector search
-  const { data: searchResults, error } = await client.rpc(
-    searchFunction,
-    functionParams
-  );
-
-  if (error) {
-    console.error('Error in line item semantic search:', error);
-    throw new Error(`Error in line item semantic search: ${error.message}`);
-  }
-
-  if (!searchResults || searchResults.length === 0) {
-    console.log('No line item matches found for query');
-
-    // Try a fallback direct query approach
-    try {
-      console.log('Attempting fallback direct query approach...');
-      const { data: fallbackResults, error: fallbackError } = await client
-        .from('line_items')
-        .select(`
-          id as line_item_id,
-          receipt_id,
-          description as line_item_description,
-          amount as line_item_amount,
-          receipts(merchant as parent_receipt_merchant, date as parent_receipt_date)
-        `)
-        .ilike('description', `%${searchQuery.toLowerCase()}%`)
-        .limit(limit);
-
-      if (fallbackError) {
-        console.error('Fallback query error:', fallbackError);
-      } else if (fallbackResults && fallbackResults.length > 0) {
-        console.log(`Fallback found ${fallbackResults.length} results`);
-
-        // Format the fallback results to match expected structure but with lower similarity scores
-        // to ensure they rank below proper vector matches
-        const formattedFallback = fallbackResults.map(item => {
-          // Calculate a text match score based on how much of the query appears in the description
-          // This ensures better fallback ranking while keeping them distinctly lower than vector matches
-          const description = (item.line_item_description || '').toLowerCase();
-          const queryTerms = searchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 2);
-          
-          let matchScore = 0;
-          // Calculate score based on number of query terms that appear in the description
-          if (queryTerms.length > 0) {
-            const matchedTerms = queryTerms.filter(term => description.includes(term));
-            matchScore = matchedTerms.length / queryTerms.length * 0.2; // Scale to max 0.2 (below vector threshold)
-          }
-          
-          // Ensure the fallback similarity is always lower than the similarity threshold
-          // This keeps fallbacks ranked below vector matches but still ordered by relevance
-          const fallbackSimilarity = Math.min(matchScore, similarityThreshold - 0.05);
-          
-          return {
-            line_item_id: item.line_item_id,
-            receipt_id: item.receipt_id,
-            line_item_description: item.line_item_description,
-            line_item_price: item.line_item_amount,
-            line_item_quantity: 1,
-            parent_receipt_merchant: item.receipts?.parent_receipt_merchant,
-            parent_receipt_date: item.receipts?.parent_receipt_date,
-            parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
-            similarity: fallbackSimilarity, // Lower similarity for fallback results
-            is_fallback: true // Mark as fallback for UI differentiation
-          };
-        });
-
-        return {
-          lineItems: formattedFallback,
-          count: formattedFallback.length,
-          total: formattedFallback.length,
-          fallback: true
-        };
-      }
-    } catch (fallbackEx) {
-      console.error('Exception in fallback query:', fallbackEx);
+    if (lineItemsError) {
+      console.error('Error fetching line items:', lineItemsError);
+      throw new Error(`Error fetching line items: ${lineItemsError.message}`);
     }
 
-    return { lineItems: [], count: 0, total: 0 };
+    if (!lineItems || lineItems.length === 0) {
+      console.log('No line items found');
+      return { lineItems: [], count: 0, total: 0 };
+    }
+
+    console.log(`Found ${lineItems.length} line items to process`);
+
+    // Get receipt IDs from line items
+    const receiptIds = [...new Set(lineItems.map(item => item.receipt_id))];
+
+    // Get embeddings for those receipts, focusing on line item content type
+    // Use the unified embedding model where all embeddings are in receipt_embeddings
+    const { data: embeddings, error: embeddingsError } = await client
+      .from('receipt_embeddings')
+      .select(`
+        id,
+        receipt_id,
+        content_type,
+        embedding,
+        metadata,
+        source_id,
+        source_type
+      `)
+      .in('receipt_id', receiptIds)
+      .eq('content_type', 'line_item'); // Look for embeddings that are specifically for line items
+
+    if (embeddingsError) {
+      console.error('Error fetching embeddings:', embeddingsError);
+      throw new Error(`Error fetching embeddings: ${embeddingsError.message}`);
+    }
+
+    if (!embeddings || embeddings.length === 0) {
+      console.log('No embeddings found for line items');
+      return { lineItems: [], count: 0, total: 0 };
+    }
+
+    console.log(`Found ${embeddings.length} embeddings for line items`);
+
+    // Calculate similarity for each embedding
+    const scoredEmbeddings = embeddings.map(embeddingRecord => {
+      // Vector embedding is stored as string in some cases, handle both
+      let embedding;
+      try {
+        embedding = typeof embeddingRecord.embedding === 'string'
+          ? JSON.parse(embeddingRecord.embedding)
+          : embeddingRecord.embedding;
+      } catch (error) {
+        console.error('Error parsing embedding:', error);
+        // Return a default similarity of 0 if we can't parse the embedding
+        return {
+          ...embeddingRecord,
+          similarity: 0,
+          lineItemId: embeddingRecord.metadata?.line_item_id || null
+        };
+      }
+
+      // Check if embedding is null or undefined
+      if (!embedding || !Array.isArray(embedding)) {
+        console.warn('Invalid embedding found:', embedding);
+        // Return a default similarity of 0 if the embedding is invalid
+        return {
+          ...embeddingRecord,
+          similarity: 0,
+          lineItemId: embeddingRecord.metadata?.line_item_id || null
+        };
+      }
+
+      // Calculate cosine similarity
+      let dotProduct = 0;
+      let embedMagnitude = 0;
+      let queryMagnitude = 0;
+
+      // We might have different vector dimensions, use the minimum
+      const minDimension = Math.min(embedding.length, queryEmbedding.length);
+
+      for (let i = 0; i < minDimension; i++) {
+        dotProduct += embedding[i] * queryEmbedding[i];
+        embedMagnitude += embedding[i] * embedding[i];
+        queryMagnitude += queryEmbedding[i] * queryEmbedding[i];
+      }
+
+      embedMagnitude = Math.sqrt(embedMagnitude);
+      queryMagnitude = Math.sqrt(queryMagnitude);
+
+      // Calculate cosine similarity (1 = exactly the same, 0 = completely different)
+      let similarity = 0;
+      if (embedMagnitude > 0 && queryMagnitude > 0) {
+        similarity = dotProduct / (embedMagnitude * queryMagnitude);
+      } else {
+        console.warn('Zero magnitude detected in similarity calculation');
+      }
+
+      // Ensure similarity is a valid number between 0 and 1
+      if (isNaN(similarity) || similarity < 0) {
+        similarity = 0;
+      } else if (similarity > 1) {
+        similarity = 1;
+      }
+
+      // Extract the line item ID from source_id or metadata
+      let lineItemId = null;
+
+      // First try to get it from source_id if available (unified model)
+      if (embeddingRecord.source_type === 'line_item' && embeddingRecord.source_id) {
+        lineItemId = embeddingRecord.source_id;
+      }
+      // Fall back to metadata if needed
+      else if (embeddingRecord.metadata) {
+        const metadata = typeof embeddingRecord.metadata === 'string'
+          ? JSON.parse(embeddingRecord.metadata)
+          : embeddingRecord.metadata;
+
+        lineItemId = metadata.line_item_id;
+      }
+
+      return {
+        ...embeddingRecord,
+        similarity,
+        lineItemId
+      };
+    });
+
+    // Filter by similarity threshold
+    const filteredEmbeddings = scoredEmbeddings
+      .filter(record => record.similarity > similarityThreshold)
+      .sort((a, b) => b.similarity - a.similarity);
+
+    if (filteredEmbeddings.length === 0) {
+      console.log('No embeddings found above threshold');
+      return { lineItems: [], count: 0, total: 0 };
+    }
+
+    // Match embeddings to line items
+    // We need to be careful as each receipt can have multiple line items
+    // and the embedding metadata should contain the specific line item ID
+    const lineItemsWithSimilarity = [];
+
+    for (const embedding of filteredEmbeddings) {
+      // If we have the line item ID in metadata, use it
+      if (embedding.lineItemId) {
+        const matchingLineItem = lineItems.find(item => item.id === embedding.lineItemId);
+        if (matchingLineItem) {
+          lineItemsWithSimilarity.push({
+            ...matchingLineItem,
+            similarity: embedding.similarity
+          });
+        }
+      } else {
+        // If no specific line item ID in metadata, match by receipt ID and add all line items
+        // This is a fallback approach
+        const matchingLineItems = lineItems.filter(item => item.receipt_id === embedding.receipt_id);
+        for (const lineItem of matchingLineItems) {
+          lineItemsWithSimilarity.push({
+            ...lineItem,
+            similarity: embedding.similarity
+          });
+        }
+      }
+    }
+
+    // Remove duplicates in case a line item appears multiple times
+    const uniqueLineItems = [];
+    const seenIds = new Set();
+    for (const item of lineItemsWithSimilarity) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        uniqueLineItems.push(item);
+      }
+    }
+
+    // Sort by similarity and apply pagination
+    uniqueLineItems.sort((a, b) => b.similarity - a.similarity);
+    const paginatedItems = uniqueLineItems.slice(offset, offset + limit);
+
+    // Format the results for the frontend
+    const formattedLineItems = paginatedItems.map(item => ({
+      line_item_id: item.id,
+      receipt_id: item.receipt_id,
+      line_item_description: item.description,
+      line_item_price: item.amount,
+      line_item_quantity: item.quantity || 1,
+      parent_receipt_merchant: item.receipts?.merchant,
+      parent_receipt_date: item.receipts?.date,
+      parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
+      similarity: item.similarity || 0
+    }));
+
+    return {
+      lineItems: formattedLineItems,
+      count: formattedLineItems.length,
+      total: uniqueLineItems.length
+    };
+  } catch (error) {
+    console.error('Error performing line item search:', error);
+    throw error;
   }
-
-  console.log(`Retrieved ${searchResults.length} search results before pagination`);
-
-  // Apply offset and limit for pagination
-  const paginatedResults = searchResults.slice(offset, offset + limit);
-
-  // Extract line item IDs from the search results
-  const lineItemIds = paginatedResults.map(r => r.source_id);
-
-  // Create a map of similarity scores
-  const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
-    acc[r.source_id] = r.similarity || r.score || 0;
-    return acc;
-  }, {});
-
-  // Fetch the actual line item data
-  const { data: lineItems, error: lineItemsError } = await client
-    .from('line_items')
-    .select(`
-      id,
-      receipt_id,
-      description,
-      amount,
-      quantity,
-      receipts(merchant, date)
-    `)
-    .in('id', lineItemIds);
-
-  if (lineItemsError) {
-    console.error('Error fetching line item details:', lineItemsError);
-    throw new Error(`Error fetching line item details: ${lineItemsError.message}`);
-  }
-
-  // Format the line items with the structure expected by the frontend
-  const formattedLineItems = lineItems.map(item => ({
-    line_item_id: item.id,
-    receipt_id: item.receipt_id,
-    line_item_description: item.description,
-    line_item_price: item.amount,
-    line_item_quantity: item.quantity || 1,
-    parent_receipt_merchant: item.receipts?.merchant,
-    parent_receipt_date: item.receipts?.date,
-    parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
-    similarity: similarityScores[item.id] || 0
-  }));
-
-  // Sort by similarity score (highest first)
-  formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
-
-  return {
-    lineItems: formattedLineItems,
-    count: formattedLineItems.length,
-    total: searchResults.length // Total potential matches before pagination
-  };
 }

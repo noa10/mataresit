@@ -128,7 +128,7 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
     maxAmount,
     categories,
     merchants,
-    similarityThreshold = 0.5,
+    similarityThreshold = 0.2, // Lowered from 0.4 for better recall
     useHybridSearch = false,
     query: searchQuery,
     searchTarget = 'receipts' // Default to receipts search
@@ -283,6 +283,7 @@ async function processLineItemSearchResults(client: any, results: any[], params:
   }, {});
 
   // Fetch the actual line item data
+  // Use explicit join to avoid ambiguous relationship error
   const { data: lineItems, error } = await client
     .from('line_items')
     .select(`
@@ -291,7 +292,11 @@ async function processLineItemSearchResults(client: any, results: any[], params:
       description,
       amount,
       quantity,
-      receipts(merchant, date)
+      receipts:receipt_id (
+        id,
+        merchant,
+        date
+      )
     `)
     .in('id', lineItemIds);
 
@@ -327,7 +332,7 @@ async function processLineItemSearchResults(client: any, results: any[], params:
  */
 async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
   console.log(`Parsing natural language query: ${query}`);
-  
+
   if (!geminiApiKey) {
     throw new Error('GEMINI_API_KEY not found in environment variables');
   }
@@ -335,19 +340,19 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
   try {
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    
+
     // Get current date for better relative date handling
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
-    
+
     // Construct an improved prompt to help the model understand how to parse the query
     const prompt = `
       Parse the following search query for a receipt tracking app and extract structured parameters.
       You can extract dates, amounts, categories, merchants, and other relevant filters.
-      
+
       Today's date is ${now.toISOString().split('T')[0]}.
-      
+
       Guidelines for parsing:
       1. For dates, convert to ISO format (YYYY-MM-DD).
       2. For relative dates like 'last month', 'last week', etc., calculate the actual date range.
@@ -356,7 +361,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       5. For categories, map to common shopping categories (groceries, dining, entertainment, etc.)
       6. If a field is not mentioned, return null for that field.
       7. For search target, determine if the user is looking for receipts or line items (individual items on receipts).
-      
+
       Examples:
       Query: "Show me all receipts from last month over $50"
       {
@@ -368,7 +373,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         "merchants": [],
         "searchTarget": "receipts"
       }
-      
+
       Query: "receipts from Target between $10 and $50 in January"
       {
         "startDate": "${currentYear}-01-01",
@@ -379,7 +384,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         "merchants": ["Target"],
         "searchTarget": "receipts"
       }
-      
+
       Query: "milk purchases from last week"
       {
         "startDate": "${new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}",
@@ -390,46 +395,46 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         "merchants": [],
         "searchTarget": "line_items"
       }
-      
+
       Now parse this search query:
       Query: "${query}"
-      
+
       Return a valid JSON object only, no explanation or additional text.
     `;
-    
+
     // Set temperature to 0 for more deterministic parsing
     const generationConfig = {
       temperature: 0,
       topP: 0.8,
       maxOutputTokens: 500,
     };
-    
+
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig,
     });
-    
+
     const text = result.response.text();
     console.log(`Raw NLU response: ${text}`);
-    
+
     // Extract the JSON part from the text response with improved handling
     let jsonStr = text.trim();
-    
+
     // Try different approaches to extract JSON
     let parsedParams = null;
     let jsonError = null;
-    
+
     // Try to parse directly first
     try {
       parsedParams = JSON.parse(jsonStr);
     } catch (e) {
       jsonError = e;
       console.log('Could not parse directly, trying to extract JSON block...');
-      
+
       // Find JSON boundaries with improved detection
       const jsonStart = jsonStr.indexOf('{');
       const jsonEnd = jsonStr.lastIndexOf('}');
-      
+
       if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart) {
         try {
           jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
@@ -439,7 +444,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
           console.error(`Error extracting JSON from boundaries: ${e2}`);
         }
       }
-      
+
       // If still not parsed, try regex for more complex cases
       if (!parsedParams) {
         try {
@@ -454,18 +459,18 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         }
       }
     }
-    
+
     if (parsedParams) {
       // Validate and sanitize extracted parameters
       // Type assertion to avoid 'never' type issues
       const params = parsedParams as Record<string, any>;
-      
+
       const validatedParams: SearchParams = {
         query,  // Keep the original query text
         // Convert date strings to ISO format if needed and verify they are valid dates
-        startDate: params.startDate && typeof params.startDate === 'string' && isValidDateString(params.startDate) ? 
+        startDate: params.startDate && typeof params.startDate === 'string' && isValidDateString(params.startDate) ?
                   params.startDate : undefined,
-        endDate: params.endDate && typeof params.endDate === 'string' && isValidDateString(params.endDate) ? 
+        endDate: params.endDate && typeof params.endDate === 'string' && isValidDateString(params.endDate) ?
                 params.endDate : undefined,
         // Ensure numeric values are properly typed
         minAmount: typeof params.minAmount === 'number' ? params.minAmount : undefined,
@@ -474,18 +479,18 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         categories: Array.isArray(params.categories) ? params.categories : undefined,
         merchants: Array.isArray(params.merchants) ? params.merchants : undefined,
         // Validate searchTarget is one of the expected values
-        searchTarget: ['receipts', 'line_items', 'all'].includes(params.searchTarget) ? 
+        searchTarget: ['receipts', 'line_items', 'all'].includes(params.searchTarget) ?
           params.searchTarget as 'receipts' | 'line_items' | 'all' : 'receipts',
         // Set a sensible default for useHybridSearch based on parameter presence
         useHybridSearch: Boolean(
-          params.minAmount !== null || 
-          params.maxAmount !== null || 
-          params.startDate !== null || 
-          params.endDate !== null || 
+          params.minAmount !== null ||
+          params.maxAmount !== null ||
+          params.startDate !== null ||
+          params.endDate !== null ||
           (Array.isArray(params.merchants) && params.merchants.length > 0)
         )
       };
-      
+
       console.log('Validated search parameters:', validatedParams);
       return validatedParams;
     } else if (jsonError) {
@@ -493,7 +498,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       // Fallback to just the query if parsing fails
       return { query };
     }
-    
+
     // Final fallback
     return { query };
   } catch (error) {
@@ -506,7 +511,7 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
 // Helper function to validate date strings
 function isValidDateString(dateStr: string): boolean {
   if (!dateStr) return false;
-  
+
   // Try to parse as ISO date string
   const date = new Date(dateStr);
   return !isNaN(date.getTime());
@@ -809,7 +814,7 @@ serve(async (req) => {
         } = requestBody;
 
         // Validate searchTarget to ensure it's one of the allowed values
-        const validatedSearchTarget = ['receipts', 'line_items', 'all'].includes(searchTarget) 
+        const validatedSearchTarget = ['receipts', 'line_items', 'all'].includes(searchTarget)
           ? searchTarget as 'receipts' | 'line_items' | 'all'
           : 'receipts';
 
@@ -834,10 +839,10 @@ serve(async (req) => {
       console.log('Embedding generated with dimensions:', queryEmbedding.length);
 
       // Determine which search function to use based on searchTarget
-      let results: { 
-        receipts?: any[]; 
-        lineItems?: any[]; 
-        count: number; 
+      let results: {
+        receipts?: any[];
+        lineItems?: any[];
+        count: number;
         total: number;
         fallback?: boolean;
       };
@@ -881,7 +886,7 @@ serve(async (req) => {
         console.log('Performing line item search...');
 
         const lineItemResults = await performLineItemSearch(supabaseClient, queryEmbedding, searchParams);
-        
+
         // Ensure type safety
         results = {
           lineItems: lineItemResults.lineItems || [],
@@ -889,7 +894,7 @@ serve(async (req) => {
           total: lineItemResults.total || 0,
           fallback: Boolean(lineItemResults.fallback)
         };
-        
+
         console.log('Line item search completed with results:', {
           count: results.lineItems?.length || 0,
           total: results.total || 0,
@@ -899,7 +904,7 @@ serve(async (req) => {
         console.log('Performing receipt search...');
         // Default to receipt search
         const receiptResults = await performSemanticSearch(supabaseClient, queryEmbedding, searchParams);
-        
+
         // Ensure type safety
         results = {
           receipts: receiptResults.receipts || [],
@@ -907,7 +912,7 @@ serve(async (req) => {
           total: receiptResults.total || 0,
           fallback: Boolean(receiptResults.fallback)
         };
-        
+
         console.log('Receipt search completed with results:', {
           count: results.receipts?.length || 0,
           total: results.total || 0,

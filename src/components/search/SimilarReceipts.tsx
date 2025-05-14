@@ -15,10 +15,10 @@ interface SimilarReceiptsProps {
   className?: string;
 }
 
-export function SimilarReceipts({ 
-  receiptId, 
+export function SimilarReceipts({
+  receiptId,
   limit = 3,
-  className = '' 
+  className = ''
 }: SimilarReceiptsProps) {
   const navigate = useNavigate();
   const [similarReceipts, setSimilarReceipts] = useState<any[]>([]);
@@ -29,16 +29,16 @@ export function SimilarReceipts({
   const handleNavigateToReceipt = (e: React.MouseEvent, id: string | undefined) => {
     // Stop event propagation to prevent any parent handlers from interfering
     e.stopPropagation();
-    
+
     // Validate the ID
     if (!id) {
       console.error('Cannot navigate to receipt: ID is undefined');
       toast.error('Error: Receipt ID is missing');
       return;
     }
-    
+
     console.log('Navigating to receipt with ID:', id);
-    
+
     try {
       // Use navigate function with explicit pathname and state
       navigate(`/receipt/${id}`, { state: { from: 'similar-receipts' } });
@@ -49,22 +49,31 @@ export function SimilarReceipts({
   };
 
   useEffect(() => {
-    if (!receiptId) return;
+    if (!receiptId) {
+      console.log('No receipt ID provided, skipping similar receipts fetch');
+      return;
+    }
 
     const fetchSimilarReceipts = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
+
+        console.log(`Fetching similar receipts for ID: ${receiptId} with limit: ${limit}`);
         const receipts = await getSimilarReceipts(receiptId, limit);
-        
+
         // Debug log the received receipt IDs
         console.log('SimilarReceipts received:', receipts.map(r => ({
           id: r.id || 'undefined',
-          merchant: r.merchant || 'Unknown'
+          merchant: r.merchant || 'Unknown',
+          similarity: r.similarity_score || 0
         })));
-        
-        setSimilarReceipts(receipts);
+
+        if (!receipts || receipts.length === 0) {
+          console.log('No similar receipts found');
+        }
+
+        setSimilarReceipts(receipts || []);
       } catch (err) {
         console.error('Error fetching similar receipts:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch similar receipts');
@@ -123,6 +132,10 @@ export function SimilarReceipts({
           <p className="text-sm text-muted-foreground">
             We couldn't find any receipts similar to this one.
           </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            This may be because vector embeddings haven't been generated for your receipts.
+            Visit the AI Search page to generate embeddings.
+          </p>
         </CardContent>
       </Card>
     );
@@ -138,12 +151,12 @@ export function SimilarReceipts({
         <div className="space-y-4">
           {similarReceipts.map((receipt) => {
             const date = receipt.date ? new Date(receipt.date) : null;
-            
+
             // Debug log each receipt's ID as it's rendered
             console.log(`Rendering similar receipt: ID=${receipt.id || 'undefined'}, Merchant=${receipt.merchant || 'Unknown'}`);
-            
+
             return (
-              <div 
+              <div
                 key={receipt.id}
                 className="flex items-start space-x-3 pb-3 border-b last:border-0 last:pb-0"
               >

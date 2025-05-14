@@ -32,8 +32,8 @@ export default function AdminSettingsPage() {
         <CardContent>
           <div className="flex flex-col gap-3 sm:gap-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={() => {
                   fetch('https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/generate-thumbnails', {
                     method: 'OPTIONS',
@@ -64,11 +64,32 @@ export default function AdminSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Global Embeddings Action */}
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader>
+          <CardTitle>Global Embedding Management</CardTitle>
+          <CardDescription>
+            Need to regenerate all embeddings at once? Use the global regeneration tool.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              For a single-click solution to regenerate all embeddings with the improved dimension handling algorithm,
+              visit the main settings page. This is recommended after algorithm updates or when search results are inconsistent.
+            </p>
+            <Button asChild variant="default">
+              <a href="/admin/settings">Go to Global Embedding Management</a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Embeddings Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Receipt Embeddings Card */}
         <ReceiptEmbeddingsCard />
-        
+
         {/* Line Item Embeddings Card */}
         <LineItemEmbeddingsCard />
       </div>

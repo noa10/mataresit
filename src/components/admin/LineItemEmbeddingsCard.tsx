@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, InfoIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
+import { formatDistanceToNow } from 'date-fns';
 
 export function LineItemEmbeddingsCard() {
   // Line item embedding state
@@ -11,6 +13,7 @@ export function LineItemEmbeddingsCard() {
   const [embeddingProgress, setEmbeddingProgress] = useState(0);
   const [totalLineItems, setTotalLineItems] = useState(0);
   const [processedLineItems, setProcessedLineItems] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [embeddingStats, setEmbeddingStats] = useState<{
     total: number;
     withEmbeddings: number;
@@ -34,6 +37,7 @@ export function LineItemEmbeddingsCard() {
         withEmbeddings: result.withEmbeddings || 0,
         withoutEmbeddings: result.withoutEmbeddings || 0
       });
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error checking line item embedding stats:', error);
     }
@@ -55,10 +59,10 @@ export function LineItemEmbeddingsCard() {
       const batchSize = 50; // Process in batches of 50
 
       // Set the target based on whether we're regenerating all or just missing
-      const targetCount = regenerate ? 
-        embeddingStats?.total || 0 : 
+      const targetCount = regenerate ?
+        embeddingStats?.total || 0 :
         embeddingStats?.withoutEmbeddings || 0;
-      
+
       setTotalLineItems(targetCount);
 
       if (targetCount > 0) {
@@ -76,7 +80,7 @@ export function LineItemEmbeddingsCard() {
               setEmbeddingProgress(progress);
 
               // If no more items need processing, we're done
-              if ((regenerate && result.total === result.withEmbeddings) || 
+              if ((regenerate && result.total === result.withEmbeddings) ||
                   (!regenerate && result.withoutEmbeddings === 0)) {
                 break;
               }
@@ -109,7 +113,19 @@ export function LineItemEmbeddingsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Line Item Embeddings</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Line Item Embeddings</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <InfoIcon className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">
+                <p>Vector embeddings enable semantic search for individual line items on receipts. This allows searching for specific products or services.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </CardTitle>
         <CardDescription>
           Generate vector embeddings for line items to enable semantic search
         </CardDescription>
@@ -134,6 +150,12 @@ export function LineItemEmbeddingsCard() {
               style={{ width: `${embeddingStats && embeddingStats.total > 0 ? (embeddingStats.withEmbeddings / embeddingStats.total) * 100 : 0}%` }}
             ></div>
           </div>
+
+          {lastUpdated && (
+            <div className="text-xs text-muted-foreground">
+              Stats last updated: {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+            </div>
+          )}
 
           {isGeneratingEmbeddings && (
             <div className="space-y-2">
@@ -164,39 +186,61 @@ export function LineItemEmbeddingsCard() {
             </Button>
 
             <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-              <Button
-                variant="secondary"
-                className="text-xs sm:text-sm text-center"
-                size="sm"
-                onClick={() => handleGenerateEmbeddings(true)}
-                disabled={isGeneratingEmbeddings || embeddingStats?.total === 0}
-              >
-                {isGeneratingEmbeddings && isRegenerating ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                    Regenerating...
-                  </>
-                ) : (
-                  <>Regenerate All</>
-                )}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Button
+                        variant="secondary"
+                        className="text-xs sm:text-sm text-center w-full"
+                        size="sm"
+                        onClick={() => handleGenerateEmbeddings(true)}
+                        disabled={isGeneratingEmbeddings || embeddingStats?.total === 0}
+                      >
+                        {isGeneratingEmbeddings && isRegenerating ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Regenerating...
+                          </>
+                        ) : (
+                          <>Regenerate All Line Items</>
+                        )}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Reprocess all line items with the latest embedding algorithm, even those that already have embeddings
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-              <Button
-                variant="default"
-                className="text-xs sm:text-sm text-center"
-                size="sm"
-                onClick={() => handleGenerateEmbeddings(false)}
-                disabled={isGeneratingEmbeddings || (embeddingStats && embeddingStats.withoutEmbeddings === 0)}
-              >
-                {isGeneratingEmbeddings && !isRegenerating ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>Generate Missing</>
-                )}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Button
+                        variant="default"
+                        className="text-xs sm:text-sm text-center w-full"
+                        size="sm"
+                        onClick={() => handleGenerateEmbeddings(false)}
+                        disabled={isGeneratingEmbeddings || (embeddingStats && embeddingStats.withoutEmbeddings === 0)}
+                      >
+                        {isGeneratingEmbeddings && !isRegenerating ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>Generate Missing Embeddings</>
+                        )}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Only generate embeddings for line items that don't have them yet
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </div>
