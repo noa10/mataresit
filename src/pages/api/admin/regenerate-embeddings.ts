@@ -1,60 +1,66 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
-import { regenerateAllEmbeddings } from '@/lib/ai-search';
+import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Initialize Supabase client with the request and response
     const supabase = createServerSupabaseClient({ req, res });
-    
-    // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized - you must be logged in to access this endpoint' 
-      });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    
-    // Check if user has admin role
-    const { data: userRoles } = await supabase
-      .from('user_roles')
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single();
 
-    if (!userRoles || userRoles.role !== 'admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Forbidden - you must have admin privileges to use this endpoint' 
+    if (profile?.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { receipt_id } = req.body;
+
+    if (receipt_id) {
+      // Regenerate embeddings for a single receipt
+      await generateEmbeddingsForReceipt(receipt_id);
+      return res.status(200).json({ message: 'Embeddings regenerated successfully' });
+    } else {
+      // Regenerate embeddings for all reviewed receipts
+      const { data: receipts, error: fetchError } = await supabase
+        .from('receipts')
+        .select('id')
+        .eq('status', 'reviewed');
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Process receipts in parallel with a concurrency limit
+      const concurrencyLimit = 5;
+      const receiptIds = receipts?.map(r => r.id) || [];
+      
+      for (let i = 0; i < receiptIds.length; i += concurrencyLimit) {
+        const batch = receiptIds.slice(i, i + concurrencyLimit);
+        await Promise.all(batch.map(id => generateEmbeddingsForReceipt(id).catch(error => {
+          console.error(`Failed to generate embeddings for receipt ${id}:`, error);
+        })));
+      }
+
+      return res.status(200).json({ 
+        message: 'Bulk embedding regeneration completed',
+        processed: receiptIds.length
       });
     }
-    
-    // Extract parameters from request body
-    const { batchSize = 20 } = req.body;
-    
-    // Call the regeneration function
-    console.log('Admin regenerating all embeddings with improved dimension handling');
-    const result = await regenerateAllEmbeddings(batchSize);
-    
-    // Return the result
-    return res.status(result.success ? 200 : 500).json({
-      ...result,
-      message: result.success 
-        ? `Successfully regenerated embeddings for ${result.receiptsProcessed} receipts and ${result.lineItemsProcessed} line items` 
-        : `Error regenerating embeddings: ${result.message}`
-    });
   } catch (error) {
-    console.error('Error in regenerate embeddings API route:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: `Server error: ${error.message}` 
-    });
+    console.error('Error in regenerate-embeddings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 } 

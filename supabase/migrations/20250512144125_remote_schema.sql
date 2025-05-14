@@ -83,7 +83,7 @@ BEGIN
     UPDATE line_items
     SET embedding = p_embedding
     WHERE id = p_line_item_id;
-    
+
     RETURN FOUND;
 END;
 $function$
@@ -112,9 +112,9 @@ AS $function$
 $function$
 ;
 
-create type "public"."http_request" as ("method" http_method, "uri" character varying, "headers" http_header[], "content_type" character varying, "content" character varying);
-
-create type "public"."http_response" as ("status" integer, "content_type" character varying, "headers" http_header[], "content" character varying);
+-- Skip HTTP types creation as they already exist
+-- create type "public"."http_request" as ("method" http_method, "uri" character varying, "headers" http_header[], "content_type" character varying, "content" character varying);
+-- create type "public"."http_response" as ("status" integer, "content_type" character varying, "headers" http_header[], "content" character varying);
 
 CREATE OR REPLACE FUNCTION public.hybrid_search_line_items(query_embedding vector, query_text text, similarity_threshold double precision DEFAULT 0.5, similarity_weight double precision DEFAULT 0.7, text_weight double precision DEFAULT 0.3, match_count integer DEFAULT 10, min_amount double precision DEFAULT NULL::double precision, max_amount double precision DEFAULT NULL::double precision, start_date date DEFAULT NULL::date, end_date date DEFAULT NULL::date)
  RETURNS TABLE(line_item_id uuid, receipt_id uuid, line_item_description text, line_item_amount numeric, parent_receipt_merchant text, parent_receipt_date date, similarity double precision, text_score double precision, score double precision)
@@ -324,10 +324,10 @@ BEGIN
 
   -- Check if receipt_embeddings table exists
   SELECT EXISTS(
-    SELECT 1 FROM information_schema.tables 
+    SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'receipt_embeddings'
   ) INTO vector_table_exists;
-  
+
   -- Always set api_key_exists to true since we're using environment variables
   -- and can't check them from SQL
   api_key_exists := true;
@@ -354,20 +354,20 @@ DECLARE
 BEGIN
   -- Get user ID from email
   SELECT id INTO _user_id FROM auth.users WHERE email = _email;
-  
+
   IF _user_id IS NULL THEN
     RETURN FALSE;
   END IF;
-  
+
   -- Check if the user already has admin role
   IF EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = 'admin') THEN
     RETURN TRUE;
   END IF;
-  
+
   -- Insert as admin
   INSERT INTO public.user_roles (user_id, role)
   VALUES (_user_id, 'admin');
-  
+
   RETURN TRUE;
 EXCEPTION
   WHEN OTHERS THEN
@@ -381,9 +381,9 @@ CREATE OR REPLACE FUNCTION public.get_admin_users()
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
-  SELECT 
-    au.id, 
-    au.email, 
+  SELECT
+    au.id,
+    au.email,
     p.first_name,
     p.last_name,
     au.confirmed_at,
@@ -392,7 +392,7 @@ AS $function$
     COALESCE(
       (SELECT json_agg(ur.role)
        FROM public.user_roles ur
-       WHERE ur.user_id = au.id), 
+       WHERE ur.user_id = au.id),
       '[]'::json
     ) as roles
   FROM auth.users au
@@ -470,19 +470,19 @@ BEGIN
   IF NOT public.has_role('admin'::public.app_role) THEN
     RETURN FALSE;
   END IF;
-  
+
   -- Check if the user already has this role
   IF EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role) THEN
     RETURN TRUE;
   END IF;
-  
+
   -- Remove other roles first (assuming a user can have only one role)
   DELETE FROM public.user_roles WHERE user_id = _user_id;
-  
+
   -- Add the new role
   INSERT INTO public.user_roles (user_id, role)
   VALUES (_user_id, _role);
-  
+
   RETURN TRUE;
 EXCEPTION
   WHEN OTHERS THEN

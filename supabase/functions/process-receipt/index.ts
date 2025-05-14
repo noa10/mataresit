@@ -45,7 +45,7 @@ async function processReceiptImage(
   primaryMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai',
   modelId: string = '',
   compareWithAlternative: boolean = false,
-  requestHeaders: { Authorization: string | null; apikey: string | null }
+  requestHeaders: { Authorization?: string | null; apikey?: string | null } = { Authorization: null, apikey: null }
 ) {
   const logger = new ProcessingLogger(receiptId);
   const startTime = performance.now(); // Record start time
@@ -1146,13 +1146,17 @@ serve(async (req: Request) => {
     console.log("Received request to process receipt");
 
     // Capture headers from the incoming request
-    const authorization = req.headers.get('Authorization');
-    const apikey = req.headers.get('apikey');
+    const authorization = req.headers.get('Authorization') ||
+                         `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+    const apikey = req.headers.get('apikey') || Deno.env.get('SUPABASE_ANON_KEY');
+
+    // Log header information (without sensitive values)
+    console.log("Authorization header present:", !!authorization);
+    console.log("API key header present:", !!apikey);
 
     // Check for required headers (optional but good practice)
     if (!authorization || !apikey) {
-      console.warn("Authorization or apikey header missing from incoming request.");
-      // Decide if this is an error or just a warning depending on your security model
+      console.warn("Authorization or apikey header missing from incoming request. Using fallback values.");
     }
 
     // Only accept POST requests
@@ -1560,43 +1564,149 @@ serve(async (req: Request) => {
 
       await logger.log("Processing results saved successfully", "SAVE");
 
-      // Generate embeddings for the receipt data
+      // Generate embeddings for the receipt data with improved error handling and retry logic
       try {
         await logger.log("Triggering embedding generation", "EMBEDDING");
         console.log("Calling generate-embeddings function...");
-        
-        // Call the generate-embeddings function
-        const embeddingsResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': requestHeaders.Authorization || '',
-              'apikey': requestHeaders.apikey || ''
-            },
-            body: JSON.stringify({
-              receiptId,
-              processAllFields: true
-            })
+
+        // Check if GEMINI_API_KEY is set in environment variables
+        const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+        if (!geminiApiKey) {
+          console.warn("GEMINI_API_KEY is not set in environment variables. Embeddings will not be generated.");
+          await logger.log("GEMINI_API_KEY is not set. Embeddings cannot be generated.", "WARNING");
+          return;
+        }
+
+        // Use service role key for authorization
+        const authorization = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        const apikey = Deno.env.get('SUPABASE_ANON_KEY');
+
+        // Function to call the generate-embeddings endpoint
+        const callEmbeddingsFunction = async (retryCount = 0) => {
+          try {
+            // Prepare headers for the request
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json'
+            };
+
+            // Add authorization headers if available
+            if (typeof authorization === 'string' && authorization) {
+              headers['Authorization'] = authorization;
+            }
+
+            if (typeof apikey === 'string' && apikey) {
+              headers['apikey'] = apikey;
+            }
+
+            // Call the generate-embeddings function
+            const embeddingsResponse = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  receiptId,
+                  processAllFields: true,
+                  processLineItems: true, // Also process line items automatically
+                  useImprovedDimensionHandling: true // Use improved dimension handling
+                })
+              }
+            );
+
+            if (!embeddingsResponse.ok) {
+              const errorText = await embeddingsResponse.text();
+              let errorData;
+              try {
+                errorData = JSON.parse(errorText);
+              } catch (e) {
+                errorData = { error: errorText };
+              }
+
+              console.error("Error generating embeddings:", errorData);
+              await logger.log(`Embedding generation error: ${JSON.stringify(errorData)}`, "WARNING");
+
+              // Check if this is a resource limit error that we should retry
+              if (retryCount < 2 && (
+                  errorText.includes("WORKER_LIMIT") ||
+                  errorText.includes("compute resources") ||
+                  errorText.includes("timeout")
+                )) {
+                await logger.log(`Retrying embedding generation (attempt ${retryCount + 1})`, "EMBEDDING");
+                // Wait before retrying (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+                return callEmbeddingsFunction(retryCount + 1);
+              }
+
+              return { success: false, error: errorData };
+            } else {
+              const embeddingResult = await embeddingsResponse.json();
+              await logger.log(`Successfully generated ${embeddingResult.results?.length || 0} embeddings`, "EMBEDDING");
+
+              // If line items were processed, log that too
+              if (embeddingResult.lineItems && embeddingResult.lineItems.length > 0) {
+                await logger.log(`Also generated embeddings for ${embeddingResult.lineItems.length} line items`, "EMBEDDING");
+              }
+
+              return embeddingResult;
+            }
+          } catch (error) {
+            console.error("Error in embedding function call:", error);
+            await logger.log(`Embedding function error: ${error.message}`, "WARNING");
+
+            // Retry on network errors
+            if (retryCount < 2) {
+              await logger.log(`Retrying embedding generation after error (attempt ${retryCount + 1})`, "EMBEDDING");
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+              return callEmbeddingsFunction(retryCount + 1);
+            }
+
+            return { success: false, error: error.message };
           }
-        );
-        
-        if (!embeddingsResponse.ok) {
-          const errorData = await embeddingsResponse.json();
-          console.error("Error generating embeddings:", errorData);
-          await logger.log(`Embedding generation error: ${JSON.stringify(errorData)}`, "WARNING");
-          // Continue despite embedding errors
+        };
+
+        // Call the function with retry logic
+        const embeddingResult = await callEmbeddingsFunction();
+
+        // Update the receipt with embedding status
+        if (embeddingResult.success) {
+          try {
+            await supabase
+              .from('receipts')
+              .update({
+                has_embeddings: true,
+                embedding_status: 'complete'
+              })
+              .eq('id', receiptId);
+
+            await logger.log("Receipt marked as having embeddings", "EMBEDDING");
+          } catch (updateError) {
+            console.error("Error updating receipt embedding status:", updateError);
+            await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
+          }
         } else {
-          const embeddingResult = await embeddingsResponse.json();
-          await logger.log(`Successfully generated ${embeddingResult.results?.length || 0} embeddings`, "EMBEDDING");
+          // Mark the receipt as needing embeddings regeneration
+          try {
+            await supabase
+              .from('receipts')
+              .update({
+                has_embeddings: false,
+                embedding_status: 'failed'
+              })
+              .eq('id', receiptId);
+
+            await logger.log("Receipt marked for embedding regeneration", "EMBEDDING");
+          } catch (updateError) {
+            console.error("Error updating receipt embedding status:", updateError);
+            await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
+          }
         }
       } catch (embeddingError) {
         console.error("Error calling generate-embeddings function:", embeddingError);
         await logger.log(`Embedding function error: ${embeddingError.message}`, "WARNING");
-        // Continue despite embedding errors
+        // Continue processing even if embedding generation fails
       }
-      
+
       // Return the extracted data (including processing time)
       await logger.log("Receipt processing completed successfully", "COMPLETE");
       return new Response(

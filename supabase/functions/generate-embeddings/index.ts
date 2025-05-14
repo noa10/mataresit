@@ -63,13 +63,23 @@ const EMBEDDING_DIMENSIONS = 1536; // OpenAI's standard dimension
 
 /**
  * Generate embeddings for a text using Google's Gemini embedding model
- * Improved to handle dimension conversion more effectively
+ * Improved to handle dimension conversion more effectively with retry logic
  */
-async function generateEmbedding(text: string): Promise<number[]> {
+async function generateEmbedding(text: string, retryCount = 0): Promise<number[]> {
   try {
+    // Handle empty or invalid text
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+      console.warn('Empty or invalid text provided for embedding generation');
+      // Return a zero vector instead of failing
+      return new Array(EMBEDDING_DIMENSIONS).fill(0);
+    }
+
+    // Trim very long text to avoid API limits
+    const trimmedText = text.length > 10000 ? text.substring(0, 10000) : text;
+
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'embedding-001' });
-    const result = await model.embedContent(text);
+    const result = await model.embedContent(trimmedText);
     let embedding = result.embedding.values;
 
     // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536
@@ -80,11 +90,11 @@ async function generateEmbedding(text: string): Promise<number[]> {
         if (embedding.length * 2 === EMBEDDING_DIMENSIONS) {
           // If exactly half the size, duplicate each value instead of zero-padding
           // This preserves more semantic information than zero padding
-          embedding = embedding.flatMap(val => [val, val]);
+          embedding = embedding.flatMap((val: number) => [val, val]);
         } else {
           // Pad with zeros, but normalize the remaining values to maintain vector magnitude
           const normalizationFactor = Math.sqrt(EMBEDDING_DIMENSIONS / embedding.length);
-          const normalizedEmbedding = embedding.map(val => val * normalizationFactor);
+          const normalizedEmbedding = embedding.map((val: number) => val * normalizationFactor);
           const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
           embedding = [...normalizedEmbedding, ...padding];
         }
@@ -92,7 +102,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
         // If too long, use a dimensionality reduction approach
         // For simplicity, we're averaging adjacent pairs if it's exactly double
         if (embedding.length === EMBEDDING_DIMENSIONS * 2) {
-          const reducedEmbedding = [];
+          const reducedEmbedding: number[] = [];
           for (let i = 0; i < embedding.length; i += 2) {
             reducedEmbedding.push((embedding[i] + embedding[i+1]) / 2);
           }
@@ -101,17 +111,33 @@ async function generateEmbedding(text: string): Promise<number[]> {
           // Otherwise just truncate but normalize the remaining values
           embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
           // Normalize to maintain vector magnitude
-          const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+          const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
           if (magnitude > 0) {
-            embedding = embedding.map(val => val / magnitude * Math.sqrt(EMBEDDING_DIMENSIONS));
+            embedding = embedding.map((val: number) => val / magnitude * Math.sqrt(EMBEDDING_DIMENSIONS));
           }
         }
       }
     }
 
+    // Normalize the final embedding vector to unit length
+    const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
+    if (magnitude > 0) {
+      embedding = embedding.map((val: number) => val / magnitude);
+    }
+
     return embedding;
   } catch (error) {
     console.error('Error calling Gemini API:', error);
+
+    // Implement retry logic for transient errors
+    if (retryCount < 3) {
+      console.log(`Retrying embedding generation (attempt ${retryCount + 1})`);
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+      return generateEmbedding(text, retryCount + 1);
+    }
+
+    // If we've exhausted retries, throw the error
     throw error;
   }
 }
@@ -159,7 +185,8 @@ async function storeEmbedding(
  * Process receipt data and generate embeddings
  */
 async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabaseClient: any) {
-  const { receiptId, contentType, content, metadata = {}, model } = request;
+  const { receiptId, contentType, content, metadata = {} } = request;
+  // Note: model parameter is not used directly but kept in the interface for future use
 
   // Validate inputs
   if (!receiptId || !contentType || !content) {
@@ -188,7 +215,8 @@ async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabas
  * Process line item data and generate embeddings
  */
 async function processLineItemEmbedding(request: LineItemEmbeddingRequest, supabaseClient: any) {
-  const { lineItemId, receiptId, content, metadata = {}, model } = request;
+  const { lineItemId, receiptId, content, metadata = {} } = request;
+  // Note: model parameter is not used directly but kept in the interface for future use
 
   // Validate inputs
   if (!lineItemId || !receiptId || !content) {
@@ -242,13 +270,26 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
 
   console.log(`Processing receipt: ${receiptId}, fields available:`, Object.keys(receipt));
 
-  const results = [];
+  // Define the type for embedding results
+  type EmbeddingResult = {
+    success: boolean;
+    receiptId: string;
+    contentType: string;
+    dimensions: number;
+  };
+
+  const results: EmbeddingResult[] = [];
   let contentProcessed = false;
 
   // Generate embedding for the full text (check both raw_text and fullText fields)
   const fullTextContent = receipt.raw_text || receipt.fullText;
+  console.log(`Receipt ${receiptId} fullText content available: ${!!fullTextContent}`);
+  console.log(`Receipt ${receiptId} raw_text: ${receipt.raw_text ? 'present' : 'missing'}`);
+  console.log(`Receipt ${receiptId} fullText: ${receipt.fullText ? 'present' : 'missing'}`);
+
   if (fullTextContent) {
     contentProcessed = true;
+    console.log(`Processing full text content for receipt ${receiptId}, length: ${fullTextContent.length}`);
     const fullTextResult = await processReceiptEmbedding({
       receiptId,
       contentType: 'full_text',
@@ -260,13 +301,16 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       model
     }, supabaseClient);
     results.push(fullTextResult);
+    console.log(`Successfully processed full text embedding for receipt ${receiptId}`);
   } else {
     console.log(`No full text content found for receipt ${receiptId}`);
   }
 
   // Generate embedding for the merchant name
+  console.log(`Receipt ${receiptId} merchant: ${receipt.merchant || 'missing'}`);
   if (receipt.merchant) {
     contentProcessed = true;
+    console.log(`Processing merchant name for receipt ${receiptId}: "${receipt.merchant}"`);
     const merchantResult = await processReceiptEmbedding({
       receiptId,
       contentType: 'merchant',
@@ -278,6 +322,7 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       model
     }, supabaseClient);
     results.push(merchantResult);
+    console.log(`Successfully processed merchant embedding for receipt ${receiptId}`);
   } else {
     console.log(`No merchant name found for receipt ${receiptId}`);
   }
@@ -311,7 +356,10 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       receipt.predicted_category ? `Category: ${receipt.predicted_category}` : '',
     ].filter(Boolean).join('\n');
 
+    console.log(`Fallback text for receipt ${receiptId}: "${fallbackText}"`);
+
     if (fallbackText.trim()) {
+      console.log(`Processing fallback text for receipt ${receiptId}, length: ${fallbackText.length}`);
       const fallbackResult = await processReceiptEmbedding({
         receiptId,
         contentType: 'fallback',
@@ -324,7 +372,9 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
         model
       }, supabaseClient);
       results.push(fallbackResult);
+      console.log(`Successfully processed fallback embedding for receipt ${receiptId}`);
     } else {
+      console.error(`Receipt ${receiptId} has no embeddable content`);
       throw new Error(`Receipt ${receiptId} has no embeddable content`);
     }
   }
@@ -382,32 +432,50 @@ async function generateLineItemEmbeddings(supabaseClient: any, receiptId: string
   // *** Start: Parallel Processing Logic ***
   console.log(`Edge fn: Starting parallel processing for ${lineItemsToProcess.length} line items.`);
 
-  const processingPromises = lineItemsToProcess.map(lineItem => {
-    return processLineItemEmbedding({
-      lineItemId: lineItem.id,
-      receiptId,
-      content: lineItem.description,
-      metadata: { amount: lineItem.amount },
-      model
-    }, supabaseClient)
-    .then(result => ({ status: 'fulfilled', value: result }))
-    .catch(error => {
+  // Define types for our promise results
+  type LineItemEmbeddingResult = {
+    success: boolean;
+    lineItemId: string;
+    receiptId: string;
+    dimensions: number;
+  };
+
+  type SettledResult =
+    | { status: 'fulfilled'; value: LineItemEmbeddingResult }
+    | { status: 'rejected'; reason: string; lineItemId: string };
+
+  const processingPromises = lineItemsToProcess.map(async (lineItem) => {
+    try {
+      const result = await processLineItemEmbedding({
+        lineItemId: lineItem.id,
+        receiptId,
+        content: lineItem.description,
+        metadata: { amount: lineItem.amount },
+        model
+      }, supabaseClient);
+
+      return {
+        status: 'fulfilled' as const,
+        value: result
+      };
+    } catch (error) {
       // Log error but allow others to continue
       console.error(`Edge fn: Error processing line item ${lineItem.id} in parallel:`, error.message || error);
       return {
-        status: 'rejected',
+        status: 'rejected' as const,
         reason: error.message || String(error),
         lineItemId: lineItem.id
       };
-    });
+    }
   });
 
   // Wait for all promises to complete (success or failure)
-  const settledResults = await Promise.all(processingPromises);
+  const settledResults = await Promise.all(processingPromises) as SettledResult[];
 
   // Collect successful results
   const successfulResults = settledResults
-    .filter(result => result.status === 'fulfilled')
+    .filter((result): result is { status: 'fulfilled'; value: LineItemEmbeddingResult } =>
+      result.status === 'fulfilled')
     .map(result => result.value);
 
   const failedCount = settledResults.length - successfulResults.length;
@@ -426,13 +494,17 @@ async function generateLineItemEmbeddings(supabaseClient: any, receiptId: string
   };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Log request details for debugging
   console.log('Request received:', {
     method: req.method,
     url: req.url,
     headers: Object.fromEntries(req.headers.entries()),
   });
+
+  // Log authorization header presence (without sensitive values)
+  console.log('Authorization header present:', !!req.headers.get('Authorization'));
+  console.log('API key header present:', !!req.headers.get('apikey'));
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -461,7 +533,7 @@ serve(async (req) => {
 
     // Parse the request
     if (req.method === 'POST') {
-      let requestBody;
+      let requestBody: any;
       try {
         requestBody = await req.json();
         console.log('Received POST body for generate-embeddings:', JSON.stringify(requestBody));

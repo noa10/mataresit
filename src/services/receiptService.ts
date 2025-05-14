@@ -3,6 +3,7 @@ import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails
 import { toast } from "sonner";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { normalizeMerchant } from '../lib/receipts/validation';
+import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
@@ -354,90 +355,43 @@ export const createReceipt = async (
 
 // Update an existing receipt
 export const updateReceipt = async (
-  id: string,
-  receipt: Partial<Omit<Receipt, "id" | "created_at" | "updated_at" | "user_id">>,
-  lineItems?: LineItem[]
-): Promise<boolean> => {
+  receiptId: string,
+  data: Partial<Receipt>,
+  options?: { skipEmbeddings?: boolean }
+): Promise<Receipt> => {
   try {
-    // Call logCorrections before updating the receipt
-    await logCorrections(id, receipt);
+    const { data: responseData, error } = await supabase
+      .from('receipts')
+      .update(data)
+      .eq('id', receiptId)
+      .select()
+      .single();
 
-    // Update the receipt
-    console.log("Updating receipt with ID:", id, "Data:", receipt);
-
-    // Create a clean update object with only the fields we need
-    const updateData = {
-      merchant: receipt.merchant,
-      date: receipt.date,
-      total: receipt.total,
-      tax: receipt.tax,
-      currency: receipt.currency,
-      payment_method: receipt.payment_method,
-      predicted_category: receipt.predicted_category,
-      status: receipt.status || 'reviewed',
-      updated_at: new Date().toISOString()
-    };
-
-    console.log("Updating with clean data:", updateData);
-
-    // Use the Supabase client directly to update the receipt
-    try {
-      console.log("Using Supabase client to update receipt");
-
-      // Use the Supabase client to update the receipt
-      const { error: updateError } = await supabase
-        .from("receipts")
-        .update(updateData)
-        .eq("id", id);
-
-      if (updateError) {
-        console.error("Error updating receipt with Supabase client:", updateError);
-        throw updateError;
-      }
-
-      console.log("Receipt updated successfully with Supabase client");
-    } catch (updateError) {
-      console.error("Error during receipt update:", updateError);
-      throw updateError;
+    if (error) {
+      throw error;
     }
 
-    // If line items are provided, update them
-    if (lineItems !== undefined) {
-      // First delete existing line items
-      const { error: deleteError } = await supabase
-        .from("line_items")
-        .delete()
-        .eq("receipt_id", id);
+    if (!responseData) {
+      throw new Error('Receipt not found after update');
+    }
 
-      if (deleteError) {
-        console.error("Error deleting line items:", deleteError);
-        throw deleteError;
-      }
+    // Cast the response data to Receipt type
+    const receipt = responseData as unknown as Receipt;
 
-      // Then insert new ones if there are any
-      if (lineItems.length > 0) {
-        const formattedLineItems = lineItems.map(item => ({
-          description: item.description,
-          amount: item.amount,
-          receipt_id: id
-        }));
-
-        const { error: insertError } = await supabase
-          .from("line_items")
-          .insert(formattedLineItems);
-
-        if (insertError) {
-          console.error("Error inserting line items:", insertError);
-          throw insertError;
-        }
+    // Generate embeddings if not explicitly skipped and receipt is reviewed
+    if (!options?.skipEmbeddings && receipt.status === 'reviewed') {
+      try {
+        await generateEmbeddingsForReceipt(receiptId);
+      } catch (embeddingError) {
+        console.error('Failed to generate embeddings:', embeddingError);
+        // Continue with the update even if embedding fails
       }
     }
 
-    return true;
+    return receipt;
   } catch (error) {
-    console.error("Error updating receipt:", error);
-    toast.error("Failed to update receipt");
-    return false;
+    console.error('Error updating receipt:', error);
+    throw error;
   }
 };
 
