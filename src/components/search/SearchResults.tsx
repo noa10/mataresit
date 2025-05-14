@@ -95,19 +95,19 @@ export function SearchResults({
   if (results.length === 0) {
     return (
       <Card className="border rounded-lg overflow-hidden bg-muted/30">
-        <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mb-3" />
-          <h3 className="text-lg font-semibold">No results found</h3>
-          <p className="text-muted-foreground mt-1">
+        <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 flex flex-col items-center justify-center text-center">
+          <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-2 sm:mb-3" />
+          <h3 className="text-base sm:text-lg font-semibold">No results found</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {searchQuery ? (
               <>No receipts or line items matching "{searchQuery}" were found.</>
             ) : (
               <>Try a different search query or check your filters.</>
             )}
           </p>
-          <div className="mt-4 text-sm text-muted-foreground">
+          <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-muted-foreground">
             <p>Possible reasons:</p>
-            <ul className="list-disc text-left pl-6 mt-2 space-y-1">
+            <ul className="list-disc text-left pl-4 sm:pl-6 mt-1 sm:mt-2 space-y-1">
               <li>No receipts have been uploaded yet</li>
               <li>Your search terms don't match any receipts or line items</li>
               <li>Vector embeddings haven't been generated for your data</li>
@@ -122,7 +122,7 @@ export function SearchResults({
   return (
     <div className="space-y-4">
       {results.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Found {totalResults} result{totalResults !== 1 ? 's' : ''}
           {searchQuery ? ` for "${searchQuery}"` : ''} in Receipts and Line Items
         </p>
@@ -145,21 +145,24 @@ export function SearchResults({
               <Card
                 key={receipt.id}
                 className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg line-clamp-1">
+                    <CardTitle className="text-base sm:text-lg line-clamp-1">
                       {receipt.merchant || 'Unknown Merchant'}
                     </CardTitle>
                     {similarityScore > 0 && (
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="ml-2 text-xs">
                         {formattedScore}% match
                       </Badge>
                     )}
                   </div>
-                  <CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
                     {date ? (
                       <span title={date.toLocaleDateString()}>
-                        {date.toLocaleDateString()} ({formatDistanceToNow(date, { addSuffix: true })})
+                        {date.toLocaleDateString()}
+                        <span className="hidden sm:inline">
+                          ({formatDistanceToNow(date, { addSuffix: true })})
+                        </span>
                       </span>
                     ) : (
                       'Unknown date'
@@ -173,36 +176,36 @@ export function SearchResults({
                     )}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pb-2">
+                <CardContent className="pb-2 px-3 sm:px-6">
                   {receipt.notes ? (
-                    <p className="text-sm line-clamp-2">{receipt.notes}</p>
+                    <p className="text-xs sm:text-sm line-clamp-2">{receipt.notes}</p>
                   ) : receipt.raw_text ? (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                       {receipt.raw_text.substring(0, 150)}...
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No additional details</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">No additional details</p>
                   )}
 
                   {receipt.predicted_category && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         <Tag className="h-3 w-3 mr-1" />
                         {receipt.predicted_category}
                       </Badge>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="px-3 sm:px-6 py-2 sm:py-4">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-2"
+                    className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                     onClick={(e) => handleNavigateToReceipt(e, receipt.id)}
                   >
-                    <Receipt className="h-4 w-4 mr-2" />
-                    View Receipt
-                    <ArrowRight className="h-4 w-4 ml-2" />
+                    <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span>View Receipt</span>
+                    <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                   </Button>
                 </CardFooter>
               </Card>
@@ -247,18 +250,18 @@ export function SearchResults({
               <Card
                 key={item.line_item_id}
                 className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg line-clamp-1">
+                    <CardTitle className="text-base sm:text-lg line-clamp-1">
                       {item.line_item_description || 'Unknown Item'}
                     </CardTitle>
                     {similarityScore > 0 && (
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="ml-2 text-xs">
                         {formattedScore}% match
                       </Badge>
                     )}
                   </div>
-                  <CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
                     From: {item.parent_receipt_merchant || 'Unknown Merchant'}
                     {receiptDate && (
                       <span className="ml-2" title={receiptDate.toLocaleDateString()}>
@@ -267,9 +270,9 @@ export function SearchResults({
                     )}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pb-2">
+                <CardContent className="pb-2 px-3 sm:px-6">
                   {(item.line_item_quantity !== undefined || item.line_item_price !== undefined) && (
-                    <p className="text-sm">
+                    <p className="text-xs sm:text-sm">
                       {item.line_item_quantity !== undefined && (
                         <span>Qty: {item.line_item_quantity}</span>
                       )}
@@ -292,28 +295,28 @@ export function SearchResults({
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="px-3 sm:px-6 py-2 sm:py-4">
                   {hasReceiptId ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-2"
+                      className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                       onClick={(e) => handleNavigateToReceipt(e, receiptId)}
                     >
-                      <Receipt className="h-4 w-4 mr-2" />
-                      View Parent Receipt
-                      <ArrowRight className="h-4 w-4 ml-2" />
+                      <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span>View Parent Receipt</span>
+                      <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                     </Button>
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-2"
+                      className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                       disabled
                       title="Parent receipt information is missing"
                     >
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      Receipt Unavailable
+                      <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span>Receipt Unavailable</span>
                     </Button>
                   )}
                 </CardFooter>
@@ -324,8 +327,12 @@ export function SearchResults({
       </div>
 
       {hasMoreResults && onLoadMore && (
-        <div className="flex justify-center mt-6">
-          <Button onClick={onLoadMore} variant="outline">
+        <div className="flex justify-center mt-4 sm:mt-6">
+          <Button
+            onClick={onLoadMore}
+            variant="outline"
+            className="text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+          >
             Load More Results
           </Button>
         </div>

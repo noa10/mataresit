@@ -139,16 +139,16 @@ export default function SemanticSearchPage() {
       <Navbar />
 
       <main className="flex-1">
-        <div className="container mx-auto py-6 max-w-7xl">
+        <div className="container mx-auto px-4 py-4 sm:py-6 max-w-7xl">
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AI Semantic Search</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">AI Semantic Search</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Search your receipts using natural language and AI-powered semantic understanding
           </p>
         </div>
-        <BrainCircuit className="h-10 w-10 text-primary" />
+        <BrainCircuit className="h-8 w-8 sm:h-10 sm:w-10 text-primary mt-1 sm:mt-0" />
       </div>
 
       <Card className="mb-8">
@@ -196,6 +196,7 @@ export default function SemanticSearchPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleSearch(suggestion, true)}
+                    className="text-xs sm:text-sm px-2 py-1 h-auto"
                   >
                     {suggestion}
                   </Button>
@@ -221,10 +222,10 @@ export default function SemanticSearchPage() {
         </div>
       </main>
 
-      <footer className="border-t border-border/40 mt-12">
-        <div className="container px-4 py-6">
+      <footer className="border-t border-border/40 mt-8 sm:mt-12">
+        <div className="container px-4 py-4 sm:py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Paperless Maverick. All rights reserved.
             </div>
           </div>

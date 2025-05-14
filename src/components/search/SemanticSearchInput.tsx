@@ -68,15 +68,15 @@ export function SemanticSearchInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className={`relative flex items-center ${className}`}
+      className={`relative flex flex-col md:flex-row gap-2 ${className}`}
     >
-      <div className="relative flex-1">
+      <div className="relative flex-1 w-full">
         <Input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="pr-10 py-6 text-base"
+          className="pr-10 py-4 md:py-6 text-base w-full"
           disabled={isLoading}
         />
         <div className="absolute right-3 top-2.5 flex space-x-1 items-center">
@@ -88,36 +88,38 @@ export function SemanticSearchInput({
         </div>
       </div>
 
-      <div className="ml-2 flex items-center space-x-2">
+      <div className="flex flex-wrap gap-2 w-full md:w-auto">
         <Button
           type="submit"
           disabled={isLoading || !query.trim()}
-          className="whitespace-nowrap"
+          className="whitespace-nowrap flex-1 md:flex-none"
         >
           {isLoading ? 'Searching...' : 'Search'}
         </Button>
 
-        <Button
-          type="button"
-          variant={isNaturalLanguage ? "default" : "outline"}
-          onClick={() => setIsNaturalLanguage(true)}
-          className="whitespace-nowrap"
-          size="sm"
-          disabled={isLoading}
-        >
-          Natural Language
-        </Button>
+        <div className="flex flex-1 md:flex-none gap-1">
+          <Button
+            type="button"
+            variant={isNaturalLanguage ? "default" : "outline"}
+            onClick={() => setIsNaturalLanguage(true)}
+            className="whitespace-nowrap flex-1"
+            size="sm"
+            disabled={isLoading}
+          >
+            Natural
+          </Button>
 
-        <Button
-          type="button"
-          variant={!isNaturalLanguage ? "default" : "outline"}
-          onClick={() => setIsNaturalLanguage(false)}
-          className="whitespace-nowrap"
-          size="sm"
-          disabled={isLoading}
-        >
-          Keyword
-        </Button>
+          <Button
+            type="button"
+            variant={!isNaturalLanguage ? "default" : "outline"}
+            onClick={() => setIsNaturalLanguage(false)}
+            className="whitespace-nowrap flex-1"
+            size="sm"
+            disabled={isLoading}
+          >
+            Keyword
+          </Button>
+        </div>
       </div>
     </form>
   );
