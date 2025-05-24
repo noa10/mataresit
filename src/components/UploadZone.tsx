@@ -23,9 +23,12 @@ import { ProcessingTimeline } from "./upload/ProcessingTimeline";
 import { EnhancedProcessingTimeline } from "./upload/EnhancedProcessingTimeline";
 import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
+import { FileAnalyzer } from "./upload/FileAnalyzer";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
+import { ProcessingRecommendation } from "@/utils/processingOptimizer";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
@@ -43,6 +46,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
+  const [useEnhancedFallback, setUseEnhancedFallback] = useState(true);
 
   // Use settings hook instead of local state
   const { settings } = useSettings();
@@ -374,12 +379,59 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       try {
-        // Process with settings from the hook
-        await processReceiptWithOCR(newReceiptId, {
-          primaryMethod: settings.processingMethod,
-          modelId: settings.selectedModel,
-          compareWithAlternative: settings.compareWithAlternative
-        });
+        // Use enhanced fallback processing if available and recommended
+        if (useEnhancedFallback && processingRecommendation) {
+          console.log('Using enhanced fallback processing with recommendation:', processingRecommendation);
+
+          const success = await processReceiptWithEnhancedFallback(
+            newReceiptId,
+            processingRecommendation,
+            {
+              onProgress: (stage, progress) => {
+                console.log(`Enhanced processing: ${stage} (${progress}%)`);
+                if (ariaLiveRegion) {
+                  ariaLiveRegion.textContent = stage;
+                }
+              },
+              onFallback: (reason, newMethod) => {
+                console.log(`Fallback triggered: ${reason} → ${newMethod}`);
+                toast.info(`Switching to ${newMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'} method...`);
+              },
+              onRetry: (attempt, maxAttempts) => {
+                console.log(`Processing attempt ${attempt}/${maxAttempts}`);
+                if (ariaLiveRegion) {
+                  ariaLiveRegion.textContent = `Processing attempt ${attempt}/${maxAttempts}...`;
+                }
+              },
+              onComplete: (success, stats) => {
+                console.log('Enhanced processing completed:', { success, stats });
+                if (success) {
+                  setUploadProgress(100);
+                  if (ariaLiveRegion) {
+                    ariaLiveRegion.textContent = 'Receipt processed successfully';
+                  }
+                } else {
+                  setCurrentStage('ERROR');
+                  if (ariaLiveRegion) {
+                    ariaLiveRegion.textContent = 'Processing failed after multiple attempts';
+                  }
+                }
+              }
+            }
+          );
+
+          if (!success) {
+            throw new Error('Enhanced processing failed after all fallback attempts');
+          }
+        } else {
+          // Fallback to original processing method
+          await processReceiptWithOCR(newReceiptId, {
+            primaryMethod: processingRecommendation?.recommendedMethod || settings.processingMethod,
+            modelId: processingRecommendation?.recommendedModel || settings.selectedModel,
+            compareWithAlternative: settings.compareWithAlternative
+          });
+        }
+
         setUploadProgress(100);
 
         if (ariaLiveRegion) {
@@ -387,7 +439,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
       } catch (ocrError: any) {
         console.error("Processing error:", ocrError);
-        toast.info("Receipt uploaded, but processing failed. Please edit manually.");
+        toast.error("Processing failed. Please edit manually or try again.");
         setUploadProgress(100);
         setCurrentStage('ERROR');
 
@@ -545,19 +597,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="w-full max-w-md mt-4 p-4 border rounded-lg bg-secondary/50 flex items-center space-x-4"
+              className="w-full max-w-2xl mt-4 space-y-4"
             >
-              {receiptUploads[0].file.type === 'application/pdf' ? (
-                <FileText className="w-10 h-10 text-muted-foreground flex-shrink-0" />
-              ) : previewUrl ? (
-                <img src={previewUrl} alt={`Preview of ${receiptUploads[0].file.name}`} className="w-16 h-16 object-cover rounded flex-shrink-0" />
-              ) : (
-                <FileImage className="w-10 h-10 text-muted-foreground flex-shrink-0" />
-              )}
-              <div className="flex-grow overflow-hidden">
-                <p className="text-sm font-medium truncate">{receiptUploads[0].file.name}</p>
-                <p className="text-xs text-muted-foreground">{(receiptUploads[0].file.size / 1024).toFixed(1)} KB</p>
+              {/* File Preview */}
+              <div className="p-4 border rounded-lg bg-secondary/50 flex items-center space-x-4">
+                {receiptUploads[0].file.type === 'application/pdf' ? (
+                  <FileText className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+                ) : previewUrl ? (
+                  <img src={previewUrl} alt={`Preview of ${receiptUploads[0].file.name}`} className="w-16 h-16 object-cover rounded flex-shrink-0" />
+                ) : (
+                  <FileImage className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+                )}
+                <div className="flex-grow overflow-hidden">
+                  <p className="text-sm font-medium truncate">{receiptUploads[0].file.name}</p>
+                  <p className="text-xs text-muted-foreground">{(receiptUploads[0].file.size / 1024).toFixed(1)} KB</p>
+                </div>
               </div>
+
+              {/* File Analysis */}
+              <FileAnalyzer
+                file={receiptUploads[0].file}
+                onRecommendationChange={setProcessingRecommendation}
+                showDetails={true}
+                compact={false}
+              />
             </motion.div>
           )}
         </AnimatePresence>

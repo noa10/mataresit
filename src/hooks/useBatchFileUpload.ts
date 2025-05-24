@@ -12,14 +12,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
+import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/utils/processingOptimizer";
+import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
 
 interface BatchUploadOptions {
   maxConcurrent?: number;
   autoStart?: boolean;
+  useEnhancedFallback?: boolean;
 }
 
 export function useBatchFileUpload(options: BatchUploadOptions = {}) {
-  const { maxConcurrent = 2, autoStart = false } = options;
+  const { maxConcurrent = 2, autoStart = false, useEnhancedFallback = true } = options;
 
   // Use the base file upload hook for file selection and validation
   const baseUpload = useFileUpload();
@@ -32,6 +35,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const [completedUploads, setCompletedUploads] = useState<string[]>([]);
   const [failedUploads, setFailedUploads] = useState<string[]>([]);
   const [receiptIds, setReceiptIds] = useState<Record<string, string>>({});
+  const [processingRecommendations, setProcessingRecommendations] = useState<Record<string, ProcessingRecommendation>>({});
   const processingRef = useRef<boolean>(false);
 
   const { user } = useAuth();
@@ -126,10 +130,26 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       console.log(`Valid file ${index + 1}: ${file.name}, type: ${file.type}, size: ${file.size}`);
     });
 
-    // Create ReceiptUpload objects for all valid files
-    const newUploads: ReceiptUpload[] = validFiles.map(file => {
+    // Get intelligent batch processing optimization
+    const batchOptimization = getBatchProcessingOptimization(validFiles);
+    console.log('Batch optimization:', batchOptimization);
+
+    // Create ReceiptUpload objects for all valid files with processing recommendations
+    const newUploads: ReceiptUpload[] = validFiles.map((file, index) => {
       const id = crypto.randomUUID();
-      console.log(`Creating upload object for file: ${file.name} with ID: ${id}`);
+      const recommendation = batchOptimization.recommendations[index];
+
+      console.log(`Creating upload object for file: ${file.name} with ID: ${id}`, {
+        recommendation: recommendation.recommendedMethod,
+        model: recommendation.recommendedModel,
+        riskLevel: recommendation.riskLevel
+      });
+
+      // Store the processing recommendation
+      setProcessingRecommendations(prev => ({
+        ...prev,
+        [id]: recommendation
+      }));
 
       return {
         id,
@@ -140,12 +160,29 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     });
 
     console.log('Created new uploads:', newUploads.length);
+    console.log('Batch strategy:', batchOptimization.batchStrategy);
 
-    // Update state with new uploads
+    // Update state with new uploads (sorted by priority)
     setBatchUploads(prevUploads => {
-      const updatedUploads = [...prevUploads, ...newUploads];
-      console.log('Updated batch uploads array length:', updatedUploads.length);
-      return updatedUploads;
+      const allUploads = [...prevUploads, ...newUploads];
+
+      // Sort by priority order from optimization
+      const sortedUploads = allUploads.sort((a, b) => {
+        const aRecommendation = processingRecommendations[a.id];
+        const bRecommendation = processingRecommendations[b.id];
+
+        if (!aRecommendation || !bRecommendation) return 0;
+
+        const aPriority = aRecommendation.riskLevel === 'low' ? 1 :
+                        aRecommendation.riskLevel === 'medium' ? 2 : 3;
+        const bPriority = bRecommendation.riskLevel === 'low' ? 1 :
+                        bRecommendation.riskLevel === 'medium' ? 2 : 3;
+
+        return aPriority - bPriority;
+      });
+
+      console.log('Updated batch uploads array length:', sortedUploads.length);
+      return sortedUploads;
     });
 
     // If autoStart is enabled, start processing
@@ -374,15 +411,45 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         )
         .subscribe();
 
-      // Process the receipt
+      // Process the receipt with enhanced fallback if available
       try {
-        console.log(`Processing receipt ${newReceiptId} with OCR...`);
-        const result = await processReceiptWithOCR(newReceiptId, {
-          primaryMethod: settings.processingMethod,
-          modelId: settings.selectedModel,
-          compareWithAlternative: settings.compareWithAlternative
-        });
-        console.log(`OCR processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
+        console.log(`Processing receipt ${newReceiptId}...`);
+
+        const recommendation = processingRecommendations[upload.id];
+        let result;
+
+        if (useEnhancedFallback && recommendation) {
+          console.log(`Using enhanced fallback processing for ${newReceiptId}:`, {
+            method: recommendation.recommendedMethod,
+            model: recommendation.recommendedModel,
+            riskLevel: recommendation.riskLevel
+          });
+
+          result = await processReceiptWithEnhancedFallback(
+            newReceiptId,
+            recommendation,
+            {
+              onProgress: (stage, progress) => {
+                console.log(`Enhanced processing ${newReceiptId}: ${stage} (${progress}%)`);
+              },
+              onFallback: (reason, newMethod) => {
+                console.log(`Fallback triggered for ${newReceiptId}: ${reason} → ${newMethod}`);
+              },
+              onRetry: (attempt, maxAttempts) => {
+                console.log(`Processing attempt ${attempt}/${maxAttempts} for ${newReceiptId}`);
+              }
+            }
+          );
+        } else {
+          // Fallback to original processing
+          result = await processReceiptWithOCR(newReceiptId, {
+            primaryMethod: recommendation?.recommendedMethod || settings.processingMethod,
+            modelId: recommendation?.recommendedModel || settings.selectedModel,
+            compareWithAlternative: settings.compareWithAlternative
+          });
+        }
+
+        console.log(`Processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
 
         // If we got a successful result, update the status to completed
         // This is a fallback in case the realtime subscription doesn't catch the update
