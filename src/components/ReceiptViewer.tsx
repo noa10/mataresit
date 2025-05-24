@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -22,6 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
 import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUtils";
 import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
@@ -32,6 +37,7 @@ import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
   onDelete?: (deletedId: string) => void; // Notify parent of deletion
+  onUpdate?: (updatedReceipt: ReceiptWithDetails) => void; // Notify parent of updates
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
@@ -126,7 +132,7 @@ const useDebounce = <T,>(value: T, delay: number): T => {
   return debouncedValue;
 };
 
-export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps) {
+export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
@@ -464,6 +470,11 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
 
       // Force update the UI with the new data
       setEditedReceipt(updatedReceipt);
+
+      // Notify parent component of the update
+      if (onUpdate) {
+        onUpdate(updatedReceipt);
+      }
 
       // Save confidence scores as part of the receipt update
       // This is now handled by the update_receipt_final function
@@ -1093,12 +1104,13 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full h-full min-h-0">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-full min-h-screen md:min-h-0">{/* Optimized for mobile scrolling */}
+      {/* Image and controls column */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4 }}
-        className="glass-card p-4 flex flex-col h-full min-h-0"
+        className="glass-card p-4 flex flex-col w-full md:w-1/2 h-auto md:h-full min-h-[400px] md:min-h-0 flex-shrink-0"
       >
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex justify-between items-start mb-3">
@@ -1432,11 +1444,12 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
         </div>
       </motion.div>
 
+      {/* Receipt details column */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="glass-card p-4 flex flex-col h-full min-h-0"
+        className="glass-card p-4 flex flex-col w-full md:w-1/2 h-auto md:h-full min-h-[600px] md:min-h-0 md:overflow-y-auto"
       >
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h3 className="font-medium">Receipt Details</h3>
@@ -1680,14 +1693,6 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
             </div>
         </div>
 
-        <div className="mt-4">
-          <SimilarReceipts
-            receiptId={receipt.id}
-            limit={3}
-            className="mb-4"
-          />
-        </div>
-        
         <div className="pt-4 mt-auto flex justify-between flex-shrink-0">
           <Button
             variant="outline"
@@ -1709,6 +1714,25 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
               </>
             ) : "Save Changes"}
           </Button>
+        </div>
+
+        {/* Move Similar Receipts to the bottom */}
+        <div className="mt-6 mb-4">
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full flex justify-between items-center p-2">
+                <span>Similar Receipts</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="p-2">
+                <SimilarReceipts
+                  receiptId={receipt.id}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </motion.div>
 
