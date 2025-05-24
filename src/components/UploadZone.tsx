@@ -20,6 +20,7 @@ import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
 import { ProcessingTimeline } from "./upload/ProcessingTimeline";
+import { EnhancedProcessingTimeline } from "./upload/EnhancedProcessingTimeline";
 import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
 import { useFileUpload } from "@/hooks/useFileUpload";
@@ -41,6 +42,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
 
   // Use settings hook instead of local state
   const { settings } = useSettings();
@@ -234,6 +236,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setCurrentStage('QUEUED');
     setIsUploading(true);
     setUploadProgress(10);
+    setStartTime(Date.now());
 
     try {
       const file = files[0];
@@ -440,6 +443,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setProcessLogs([]);
     setProcessingStatus(null);
     setReceiptId(null);
+    setStartTime(null);
     resetUpload();
   };
 
@@ -579,10 +583,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
         <div className="w-full flex justify-center items-center mt-4">
           {isUploading ? (
-            <ProcessingTimeline
+            <EnhancedProcessingTimeline
               currentStage={currentStage}
               stageHistory={stageHistory}
               uploadProgress={uploadProgress}
+              fileSize={receiptUploads[0]?.file?.size}
+              processingMethod={settings.processingMethod}
+              modelId={settings.selectedModel}
+              startTime={startTime}
             />
           ) : error ? (
             <Button
@@ -611,8 +619,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         </div>
 
         <div className="w-full max-w-2xl mt-auto">
-          {isUploading && processLogs.length > 0 && (
-            <ProcessingLogs processLogs={processLogs} currentStage={currentStage} />
+          {isUploading && (
+            <ProcessingLogs
+              processLogs={processLogs}
+              currentStage={currentStage}
+              showDetailedLogs={true}
+              startTime={startTime}
+            />
           )}
 
           {currentStage === 'ERROR' && <ErrorState error={error} />}

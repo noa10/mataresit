@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Play,
@@ -9,11 +10,16 @@ import {
   Loader2,
   Clock,
   ClipboardList,
-  ArrowRight
+  ArrowRight,
+  Zap,
+  Turtle,
+  Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDuration } from "@/utils/timeEstimation";
 
 interface BatchProcessingControlsProps {
   totalFiles: number;
@@ -31,6 +37,9 @@ interface BatchProcessingControlsProps {
   onRetryAllFailed?: () => void;
   onShowReview?: () => void;
   allComplete?: boolean;
+  startTime?: number;
+  averageFileSize?: number;
+  processingMethod?: 'ocr-ai' | 'ai-vision';
 }
 
 export function BatchProcessingControls({
@@ -48,8 +57,56 @@ export function BatchProcessingControls({
   onClearAll,
   onRetryAllFailed,
   onShowReview,
-  allComplete = false
+  allComplete = false,
+  startTime,
+  averageFileSize = 1024 * 1024, // Default 1MB
+  processingMethod = 'ai-vision'
 }: BatchProcessingControlsProps) {
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
+
+  // Update elapsed time and estimate remaining time
+  useEffect(() => {
+    if (!startTime || !isProcessing) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      setElapsedTime(elapsed);
+
+      // Calculate estimated time remaining
+      if (completedFiles > 0) {
+        const averageTimePerFile = elapsed / completedFiles;
+        const remaining = averageTimePerFile * pendingFiles;
+        setEstimatedTimeRemaining(remaining);
+      } else {
+        // Initial estimate based on file size and method
+        const baseTimePerFile = processingMethod === 'ai-vision' ? 25000 : 20000; // ms
+        const sizeMultiplier = averageFileSize > 2 * 1024 * 1024 ? 1.5 : 1.0;
+        const estimatedTimePerFile = baseTimePerFile * sizeMultiplier;
+        setEstimatedTimeRemaining(estimatedTimePerFile * pendingFiles);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime, isProcessing, completedFiles, pendingFiles, averageFileSize, processingMethod]);
+
+  // Calculate processing speed
+  const getProcessingSpeed = () => {
+    if (!startTime || completedFiles === 0) return { speed: 'normal', icon: Activity, color: 'text-blue-500' };
+
+    const averageTimePerFile = elapsedTime / completedFiles;
+
+    if (averageTimePerFile < 15000) { // Less than 15 seconds per file
+      return { speed: 'fast', icon: Zap, color: 'text-green-500' };
+    } else if (averageTimePerFile > 35000) { // More than 35 seconds per file
+      return { speed: 'slow', icon: Turtle, color: 'text-amber-500' };
+    } else {
+      return { speed: 'normal', icon: Activity, color: 'text-blue-500' };
+    }
+  };
+
+  const speedInfo = getProcessingSpeed();
+
   // No files to display
   if (totalFiles === 0) {
     return null;
@@ -103,25 +160,64 @@ export function BatchProcessingControls({
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="space-y-2">
+        {/* Enhanced Progress bar with time estimation */}
+        <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">
-              {isProcessing
-                ? isPaused
-                  ? "Paused"
-                  : "Processing..."
-                : pendingFiles > 0
-                  ? "Ready to process"
-                  : "Complete"}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {isProcessing
+                  ? isPaused
+                    ? "Paused"
+                    : "Processing..."
+                  : pendingFiles > 0
+                    ? "Ready to process"
+                    : "Complete"}
+              </span>
+              {isProcessing && !isPaused && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1">
+                        <speedInfo.icon className={`h-3 w-3 ${speedInfo.color}`} />
+                        <Badge variant="outline" className="text-xs">
+                          {speedInfo.speed}
+                        </Badge>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Processing speed: {speedInfo.speed}</p>
+                      {completedFiles > 0 && (
+                        <p>Average: {formatDuration(elapsedTime / completedFiles)} per file</p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <span className="text-xs font-medium">
               {completedFiles}/{totalFiles} ({Math.round(totalProgress)}%)
             </span>
           </div>
+
+          {/* Time information */}
+          {startTime && isProcessing && !isPaused && (
+            <div className="flex justify-between items-center text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>Elapsed: {formatDuration(elapsedTime)}</span>
+              </div>
+              {estimatedTimeRemaining > 0 && pendingFiles > 0 && (
+                <div className="flex items-center gap-1">
+                  <ArrowRight className="h-3 w-3" />
+                  <span>~{formatDuration(estimatedTimeRemaining)} remaining</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <Progress
             value={totalProgress}
-            className="h-2"
+            className="h-3"
             aria-label={`Batch progress: ${totalProgress}%`}
           />
         </div>
