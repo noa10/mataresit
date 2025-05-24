@@ -49,7 +49,7 @@ export class FallbackProcessingService {
 
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       this.currentAttempt = attempt;
-      
+
       const attemptRecord: ProcessingAttempt = {
         attempt,
         method: currentMethod,
@@ -87,7 +87,7 @@ export class FallbackProcessingService {
 
         const processingTime = (attemptRecord.endTime - attemptRecord.startTime) / 1000;
         console.log(`Processing successful on attempt ${attempt} after ${processingTime.toFixed(2)}s`);
-        
+
         toast.success(`Receipt processed successfully${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
         return true;
 
@@ -111,19 +111,19 @@ export class FallbackProcessingService {
 
           console.log(`Fallback triggered: ${previousMethod} → ${currentMethod}`);
           onFallback?.(error.message, currentMethod);
-          
+
           toast.info(`Switching to ${currentMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'} method...`);
-          
+
           // Add delay before retry to allow system recovery
           await this.waitWithBackoff(attempt);
-          
+
         } else if (attempt < this.maxAttempts) {
           // Same method retry with different model or settings
           currentModel = this.getAlternativeModel(currentModel, fallbackStrategy);
           console.log(`Retrying with alternative model: ${currentModel}`);
-          
+
           toast.info(`Retrying with different settings...`);
-          
+
           // Add delay before retry
           await this.waitWithBackoff(attempt);
         }
@@ -134,9 +134,9 @@ export class FallbackProcessingService {
 
     // All attempts failed
     console.error(`All ${this.maxAttempts} processing attempts failed. Last error:`, lastError);
-    
+
     // Update receipt status to failed
-    await updateReceiptProcessingStatus(receiptId, 'failed_ocr', 
+    await updateReceiptProcessingStatus(receiptId, 'failed_ocr',
       `Processing failed after ${this.maxAttempts} attempts. Last error: ${lastError}`
     );
 
@@ -148,12 +148,22 @@ export class FallbackProcessingService {
    * Get alternative model for retry attempts
    */
   private getAlternativeModel(currentModel: string, fallbackStrategy: FallbackStrategy): string {
-    // Model fallback hierarchy
+    // Model fallback hierarchy - includes all models
     const modelFallbacks: Record<string, string> = {
-      'gemini-1.5-pro': 'gemini-1.5-flash-latest',
-      'gemini-1.5-flash-latest': 'gemini-1.5-flash',
+      // Gemini models
+      'gemini-1.5-pro': 'gemini-1.5-flash',
       'gemini-1.5-flash': 'gemini-2.0-flash-lite',
-      'gemini-2.0-flash-lite': 'gemini-1.5-flash'
+      'gemini-2.0-flash-lite': 'gemini-2.5-flash-preview-05-20',
+      'gemini-2.5-flash-preview-05-20': 'openrouter/google/gemini-2.0-flash-exp:free',
+
+      // OpenRouter free models
+      'openrouter/google/gemma-3-27b-it:free': 'openrouter/google/gemini-2.0-flash-exp:free',
+      'openrouter/google/gemini-2.0-flash-exp:free': 'openrouter/meta-llama/llama-4-maverick:free',
+      'openrouter/meta-llama/llama-4-maverick:free': 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
+      'openrouter/google/gemma-3n-e4b-it:free': 'openrouter/mistralai/devstral-small:free',
+      'openrouter/mistralai/devstral-small:free': 'openrouter/google/gemma-3-27b-it:free',
+      'openrouter/nvidia/llama-3.3-nemotron-super-49b-v1:free': 'openrouter/google/gemini-2.0-flash-exp:free',
+      'openrouter/moonshotai/kimi-vl-a3b-thinking:free': 'gemini-2.0-flash-lite'
     };
 
     return modelFallbacks[currentModel] || 'gemini-2.0-flash-lite';
@@ -166,10 +176,10 @@ export class FallbackProcessingService {
     const baseDelay = 2000; // 2 seconds
     const delay = baseDelay * Math.pow(1.5, attempt - 1);
     const maxDelay = 10000; // 10 seconds max
-    
+
     const actualDelay = Math.min(delay, maxDelay);
     console.log(`Waiting ${actualDelay}ms before retry...`);
-    
+
     return new Promise(resolve => setTimeout(resolve, actualDelay));
   }
 
@@ -234,12 +244,12 @@ export async function processReceiptWithEnhancedFallback(
   try {
     const success = await service.processWithFallback();
     const stats = service.getProcessingStats();
-    
+
     callbacks?.onComplete?.(success, stats);
-    
+
     // Log final statistics
     console.log('Processing completed with stats:', stats);
-    
+
     return success;
   } catch (error) {
     console.error('Enhanced fallback processing failed:', error);
@@ -257,7 +267,7 @@ export class BatchFallbackProcessor {
     recommendation: ProcessingRecommendation;
     priority: number;
   }> = [];
-  
+
   private processing = false;
   private concurrentLimit = 2;
   private activeProcessors = new Set<string>();
@@ -270,11 +280,11 @@ export class BatchFallbackProcessor {
    * Add receipt to processing queue with priority
    */
   addToQueue(receiptId: string, recommendation: ProcessingRecommendation): void {
-    const priority = recommendation.riskLevel === 'low' ? 1 : 
+    const priority = recommendation.riskLevel === 'low' ? 1 :
                     recommendation.riskLevel === 'medium' ? 2 : 3;
-    
+
     this.queue.push({ receiptId, recommendation, priority });
-    
+
     // Sort queue by priority (low risk first)
     this.queue.sort((a, b) => a.priority - b.priority);
   }
@@ -296,14 +306,14 @@ export class BatchFallbackProcessor {
 
     this.processing = true;
     const results: Array<{ receiptId: string; success: boolean; stats: any }> = [];
-    
+
     console.log(`Starting batch processing of ${this.queue.length} items with concurrency ${this.concurrentLimit}`);
 
     try {
       while (this.queue.length > 0 && this.processing) {
         // Process items up to concurrent limit
         const batch = [];
-        
+
         while (batch.length < this.concurrentLimit && this.queue.length > 0) {
           const item = this.queue.shift()!;
           batch.push(item);
@@ -313,7 +323,7 @@ export class BatchFallbackProcessor {
         const batchPromises = batch.map(async (item, index) => {
           const position = results.length + index + 1;
           const total = results.length + this.queue.length + batch.length;
-          
+
           callbacks?.onItemStart?.(item.receiptId, position, total);
           this.activeProcessors.add(item.receiptId);
 
@@ -327,13 +337,13 @@ export class BatchFallbackProcessor {
               receiptId: item.receiptId,
               recommendation: item.recommendation
             });
-            
+
             const stats = service.getProcessingStats();
             const result = { receiptId: item.receiptId, success, stats };
-            
+
             callbacks?.onItemComplete?.(item.receiptId, success, stats);
             return result;
-            
+
           } finally {
             this.activeProcessors.delete(item.receiptId);
           }

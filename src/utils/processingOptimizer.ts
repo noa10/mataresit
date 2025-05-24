@@ -31,41 +31,8 @@ export interface FileAnalysis {
   estimatedProcessingDifficulty: number; // 1-10 scale
 }
 
-// Model performance characteristics
-const MODEL_CHARACTERISTICS = {
-  'gemini-2.0-flash-lite': {
-    speed: 'fast',
-    accuracy: 'good',
-    resourceUsage: 'low',
-    maxFileSize: 5 * 1024 * 1024, // 5MB
-    reliability: 0.95,
-    avgProcessingTime: 8000 // ms
-  },
-  'gemini-1.5-flash': {
-    speed: 'fast',
-    accuracy: 'good',
-    resourceUsage: 'low',
-    maxFileSize: 4 * 1024 * 1024, // 4MB
-    reliability: 0.93,
-    avgProcessingTime: 10000
-  },
-  'gemini-1.5-flash-latest': {
-    speed: 'fast',
-    accuracy: 'very-good',
-    resourceUsage: 'medium',
-    maxFileSize: 4 * 1024 * 1024, // 4MB
-    reliability: 0.94,
-    avgProcessingTime: 12000
-  },
-  'gemini-1.5-pro': {
-    speed: 'slow',
-    accuracy: 'excellent',
-    resourceUsage: 'high',
-    maxFileSize: 3 * 1024 * 1024, // 3MB
-    reliability: 0.85, // Lower due to resource constraints
-    avgProcessingTime: 25000
-  }
-};
+// Import model configurations from the centralized config
+import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
 
 // Processing method characteristics
 const METHOD_CHARACTERISTICS = {
@@ -93,11 +60,11 @@ const METHOD_CHARACTERISTICS = {
 export function analyzeFile(file: File, dimensions?: { width: number; height: number }): FileAnalysis {
   const size = file.size;
   const type = file.type;
-  
+
   // Determine complexity based on multiple factors
   let complexity: 'low' | 'medium' | 'high' = 'medium';
   let estimatedProcessingDifficulty = 5;
-  
+
   // Size-based complexity
   if (size < 500 * 1024) { // < 500KB
     complexity = 'low';
@@ -106,7 +73,7 @@ export function analyzeFile(file: File, dimensions?: { width: number; height: nu
     complexity = 'high';
     estimatedProcessingDifficulty += 2;
   }
-  
+
   // Dimension-based complexity (if available)
   if (dimensions) {
     const totalPixels = dimensions.width * dimensions.height;
@@ -117,15 +84,15 @@ export function analyzeFile(file: File, dimensions?: { width: number; height: nu
       estimatedProcessingDifficulty -= 1;
     }
   }
-  
+
   // File type considerations
   if (type === 'application/pdf') {
     estimatedProcessingDifficulty += 1; // PDFs can be more complex
   }
-  
+
   // Clamp difficulty to 1-10 range
   estimatedProcessingDifficulty = Math.max(1, Math.min(10, estimatedProcessingDifficulty));
-  
+
   return {
     size,
     type,
@@ -153,7 +120,7 @@ export function getProcessingRecommendation(
   let recommendedModel = 'gemini-2.0-flash-lite'; // Default
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
-  
+
   // Analyze file characteristics
   if (fileAnalysis.size > 4 * 1024 * 1024) {
     recommendedMethod = 'ocr-ai';
@@ -161,32 +128,32 @@ export function getProcessingRecommendation(
     reasoning.push('Large file size detected - OCR + AI method is more reliable for large files');
     riskLevel = 'medium';
   }
-  
+
   if (fileAnalysis.complexity === 'high') {
     if (fileAnalysis.size < 3 * 1024 * 1024) {
       recommendedMethod = 'ai-vision';
-      recommendedModel = 'gemini-1.5-flash-latest';
+      recommendedModel = 'gemini-1.5-pro';
       reasoning.push('High complexity receipt - AI Vision provides better accuracy for complex layouts');
     } else {
       recommendedMethod = 'ocr-ai';
-      recommendedModel = 'gemini-1.5-flash-latest';
+      recommendedModel = 'gemini-1.5-pro';
       reasoning.push('High complexity + large size - OCR + AI method is more stable');
       riskLevel = 'medium';
     }
   }
-  
+
   if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
     recommendedMethod = 'ai-vision';
     recommendedModel = 'gemini-2.0-flash-lite';
     reasoning.push('Simple receipt detected - fast AI Vision processing recommended');
     confidence = 'high';
   }
-  
+
   // Apply user preferences
   if (userPreferences?.preferredMethod) {
     const userMethod = userPreferences.preferredMethod;
     const methodChar = METHOD_CHARACTERISTICS[userMethod];
-    
+
     if (fileAnalysis.size <= methodChar.maxFileSize) {
       recommendedMethod = userMethod;
       reasoning.push(`Using user preference: ${userMethod}`);
@@ -195,35 +162,39 @@ export function getProcessingRecommendation(
       riskLevel = 'medium';
     }
   }
-  
+
   if (userPreferences?.prioritizeSpeed) {
     recommendedModel = 'gemini-2.0-flash-lite';
     reasoning.push('Speed prioritized - using fastest model');
   }
-  
+
   if (userPreferences?.prioritizeAccuracy && fileAnalysis.size < 3 * 1024 * 1024) {
     recommendedModel = 'gemini-1.5-flash-latest';
     reasoning.push('Accuracy prioritized - using more accurate model');
   }
-  
+
   // Determine confidence based on risk factors
   if (riskLevel === 'low' && fileAnalysis.complexity === 'low') {
     confidence = 'high';
   } else if (riskLevel === 'high' || fileAnalysis.estimatedProcessingDifficulty > 7) {
     confidence = 'low';
   }
-  
+
   // Create fallback strategy
   const fallbackStrategy = createFallbackStrategy(recommendedMethod, recommendedModel, fileAnalysis);
-  
-  // Estimate processing time
-  const modelChar = MODEL_CHARACTERISTICS[recommendedModel];
+
+  // Estimate processing time using the new model system
+  const modelConfig = getModelConfig(recommendedModel);
   const sizeMultiplier = fileAnalysis.size > 2 * 1024 * 1024 ? 1.5 : 1.0;
-  const complexityMultiplier = fileAnalysis.complexity === 'high' ? 1.3 : 
+  const complexityMultiplier = fileAnalysis.complexity === 'high' ? 1.3 :
                               fileAnalysis.complexity === 'low' ? 0.8 : 1.0;
-  
-  const estimatedProcessingTime = modelChar.avgProcessingTime * sizeMultiplier * complexityMultiplier;
-  
+
+  // Base processing time based on model performance
+  const baseTime = modelConfig?.performance.speed === 'fast' ? 8000 :
+                   modelConfig?.performance.speed === 'medium' ? 12000 : 20000;
+
+  const estimatedProcessingTime = baseTime * sizeMultiplier * complexityMultiplier;
+
   return {
     recommendedMethod,
     recommendedModel,
@@ -245,15 +216,15 @@ function createFallbackStrategy(
 ): FallbackStrategy {
   // Determine fallback method (opposite of primary)
   const fallbackMethod: 'ocr-ai' | 'ai-vision' = primaryMethod === 'ai-vision' ? 'ocr-ai' : 'ai-vision';
-  
+
   // Choose fallback model based on file characteristics
   let fallbackModel = 'gemini-1.5-flash';
   if (fileAnalysis.size > 3 * 1024 * 1024) {
     fallbackModel = 'gemini-2.0-flash-lite'; // Use fastest for large files
   } else if (fileAnalysis.complexity === 'high') {
-    fallbackModel = 'gemini-1.5-flash-latest'; // Use more accurate for complex files
+    fallbackModel = 'gemini-1.5-pro'; // Use more accurate for complex files
   }
-  
+
   // Define triggers for fallback
   const triggers = [
     'WORKER_LIMIT',
@@ -263,13 +234,13 @@ function createFallbackStrategy(
     'processing failed',
     'too complex to process'
   ];
-  
+
   // Determine max retries based on file characteristics
   let maxRetries = 2;
   if (fileAnalysis.size > 4 * 1024 * 1024 || fileAnalysis.complexity === 'high') {
     maxRetries = 1; // Fewer retries for problematic files
   }
-  
+
   return {
     primaryMethod,
     primaryModel,
@@ -285,7 +256,7 @@ function createFallbackStrategy(
  */
 export function shouldTriggerFallback(error: string, fallbackStrategy: FallbackStrategy): boolean {
   const errorLower = error.toLowerCase();
-  return fallbackStrategy.triggers.some(trigger => 
+  return fallbackStrategy.triggers.some(trigger =>
     errorLower.includes(trigger.toLowerCase())
   );
 }
@@ -305,26 +276,26 @@ export function getBatchProcessingOptimization(files: File[]): {
     const analysis = analyzeFile(file);
     return getProcessingRecommendation(analysis);
   });
-  
+
   // Optimize batch processing
   let concurrentLimit = 2; // Default
-  const totalComplexity = recommendations.reduce((sum, rec) => 
+  const totalComplexity = recommendations.reduce((sum, rec) =>
     sum + (rec.riskLevel === 'high' ? 3 : rec.riskLevel === 'medium' ? 2 : 1), 0
   );
-  
+
   // Reduce concurrency for complex batches
   if (totalComplexity > files.length * 2) {
     concurrentLimit = 1;
   }
-  
+
   // Create priority order (simple files first)
   const priorityOrder = recommendations
     .map((rec, index) => ({ index, priority: rec.riskLevel === 'low' ? 1 : rec.riskLevel === 'medium' ? 2 : 3 }))
     .sort((a, b) => a.priority - b.priority)
     .map(item => item.index);
-  
+
   const estimatedTotalTime = recommendations.reduce((sum, rec) => sum + rec.estimatedProcessingTime, 0);
-  
+
   return {
     recommendations,
     batchStrategy: {

@@ -50,7 +50,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [useEnhancedFallback, setUseEnhancedFallback] = useState(true);
 
   // Use settings hook instead of local state
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
 
   const {
     isDragging,
@@ -506,18 +506,19 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div
-      className={`relative w-full h-full flex flex-col overflow-hidden rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      ref={uploadZoneRef}
-      tabIndex={0}
-      role="button"
-      aria-label="Upload receipt files: JPEG, PNG, or PDF (up to 5MB)"
-      aria-describedby="upload-zone-description upload-status"
-    >
+    <div className="w-full h-full flex flex-col space-y-6 p-4">
+      <div
+        className={`relative w-full flex flex-col rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        ref={uploadZoneRef}
+        tabIndex={0}
+        role="button"
+        aria-label="Upload receipt files: JPEG, PNG, or PDF (up to 5MB)"
+        aria-describedby="upload-zone-description upload-status"
+      >
       <input
         type="file"
         className="hidden"
@@ -537,27 +538,27 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
       </div>
 
-      <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
-        <div className="flex flex-col items-center gap-3">
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className={`relative rounded-full p-6 ${
-              isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
-            }`}
-          >
-            {isUploading ? (
-              <Loader2 size={36} className="text-primary animate-spin" />
-            ) : error ? (
-              <XCircle size={36} className="text-destructive" />
-            ) : isDragging ? (
-              <Upload size={36} className="text-primary" />
-            ) : (
-              <Upload size={36} className="text-primary" />
-            )}
-          </motion.div>
+        <div className="flex flex-col items-center justify-center text-center gap-4 min-h-[300px]">
+          <div className="flex flex-col items-center gap-3">
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className={`relative rounded-full p-6 ${
+                isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
+              }`}
+            >
+              {isUploading ? (
+                <Loader2 size={36} className="text-primary animate-spin" />
+              ) : error ? (
+                <XCircle size={36} className="text-destructive" />
+              ) : isDragging ? (
+                <Upload size={36} className="text-primary" />
+              ) : (
+                <Upload size={36} className="text-primary" />
+              )}
+            </motion.div>
 
           <div className="space-y-2">
             <h3 className="text-xl font-medium">
@@ -642,58 +643,77 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           )}
         </AnimatePresence>
 
-        {/* Processing options removed - now managed in settings page */}
+          <div className="w-full flex justify-center items-center mt-4">
+            {isUploading ? (
+              <EnhancedProcessingTimeline
+                currentStage={currentStage}
+                stageHistory={stageHistory}
+                uploadProgress={uploadProgress}
+                fileSize={receiptUploads[0]?.file?.size}
+                processingMethod={settings.processingMethod}
+                modelId={settings.selectedModel}
+                startTime={startTime}
+              />
+            ) : error ? (
+              <Button
+                onClick={retryUpload}
+                variant="default"
+                className="mt-4 px-6 py-2 text-base"
+                size="lg"
+              >
+                Try Again
+              </Button>
+            ) : (
+              <Button
+                onClick={handleStartUpload}
+                variant="default"
+                className="mt-4 px-6 py-2 text-base group"
+                size="lg"
+              >
+                <span className="mr-2">
+                  {receiptUploads.length > 0 ? "Upload File" : "Select File"}
+                </span>
+                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
+                  JPG, PNG, PDF (up to 5MB)
+                </span>
+              </Button>
+            )}
+          </div>
 
-        <div className="w-full flex justify-center items-center mt-4">
-          {isUploading ? (
-            <EnhancedProcessingTimeline
-              currentStage={currentStage}
-              stageHistory={stageHistory}
-              uploadProgress={uploadProgress}
-              fileSize={receiptUploads[0]?.file?.size}
-              processingMethod={settings.processingMethod}
-              modelId={settings.selectedModel}
-              startTime={startTime}
-            />
-          ) : error ? (
-            <Button
-              onClick={retryUpload}
-              variant="default"
-              className="mt-4 px-6 py-2 text-base"
-              size="lg"
-            >
-              Try Again
-            </Button>
-          ) : (
-            <Button
-              onClick={handleStartUpload}
-              variant="default"
-              className="mt-4 px-6 py-2 text-base group"
-              size="lg"
-            >
-              <span className="mr-2">
-                {receiptUploads.length > 0 ? "Upload File" : "Select File"}
-              </span>
-              <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
-                JPG, PNG, PDF (up to 5MB)
-              </span>
-            </Button>
-          )}
-        </div>
+          <div className="w-full max-w-2xl mt-4">
+            {isUploading && (
+              <ProcessingLogs
+                processLogs={processLogs}
+                currentStage={currentStage}
+                showDetailedLogs={true}
+                startTime={startTime}
+              />
+            )}
 
-        <div className="w-full max-w-2xl mt-auto">
-          {isUploading && (
-            <ProcessingLogs
-              processLogs={processLogs}
-              currentStage={currentStage}
-              showDetailedLogs={true}
-              startTime={startTime}
-            />
-          )}
-
-          {currentStage === 'ERROR' && <ErrorState error={error} />}
+            {currentStage === 'ERROR' && <ErrorState error={error} />}
+          </div>
         </div>
       </div>
+
+      {/* Processing Options Section */}
+      {!isUploading && (
+        <div className="w-full">
+          <ReceiptProcessingOptions
+            defaultMethod={settings.processingMethod}
+            defaultModel={settings.selectedModel}
+            defaultCompare={settings.compareWithAlternative}
+            onMethodChange={(method) => {
+              updateSettings({ processingMethod: method });
+            }}
+            onModelChange={(model) => {
+              updateSettings({ selectedModel: model });
+            }}
+            onCompareChange={(compare) => {
+              updateSettings({ compareWithAlternative: compare });
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

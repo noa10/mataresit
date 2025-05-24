@@ -12,7 +12,7 @@ export interface ProcessingSettings {
 
 const defaultSettings: ProcessingSettings = {
   processingMethod: 'ai-vision',
-  selectedModel: 'gemini-1.5-flash-latest',
+  selectedModel: 'gemini-2.0-flash-lite',
   compareWithAlternative: false,
   batchUpload: {
     maxConcurrent: 2,

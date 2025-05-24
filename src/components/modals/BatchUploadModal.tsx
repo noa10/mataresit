@@ -29,21 +29,21 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[800px] h-[80vh] max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[900px] w-[95vw] h-[85vh] max-h-[95vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Upload Receipts</DialogTitle>
           <DialogDescription>
             Upload and process your receipts. You can upload a single receipt or process multiple receipts at once.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs 
-          defaultValue="single" 
+        <Tabs
+          defaultValue="single"
           value={activeTab}
           onValueChange={setActiveTab}
-          className="flex-grow flex flex-col overflow-hidden"
+          className="flex-grow flex flex-col min-h-0"
         >
-          <TabsList className="mb-4 self-center">
+          <TabsList className="mb-4 self-center flex-shrink-0">
             <TabsTrigger value="single" className="flex items-center gap-2">
               <Upload size={16} />
               Single Upload
@@ -53,17 +53,17 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
               Batch Upload
             </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="single" className="flex-grow data-[state=active]:flex flex-col overflow-hidden mt-0">
-            <div className="flex-grow overflow-auto">
+
+          <TabsContent value="single" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0">
+            <div className="flex-grow overflow-y-auto overflow-x-hidden">
               <UploadZone
                 onUploadComplete={handleUploadComplete}
               />
             </div>
           </TabsContent>
-          
-          <TabsContent value="batch" className="flex-grow data-[state=active]:flex flex-col overflow-hidden mt-0">
-            <div className="flex-grow overflow-auto">
+
+          <TabsContent value="batch" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0">
+            <div className="flex-grow overflow-y-auto overflow-x-hidden">
               <BatchUploadZone
                 onUploadComplete={handleUploadComplete}
               />

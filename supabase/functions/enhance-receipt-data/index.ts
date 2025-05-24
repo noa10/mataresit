@@ -18,6 +18,7 @@ const corsHeaders = {
 interface ModelConfig {
   id: string;
   name: string;
+  provider: 'gemini' | 'openrouter' | 'anthropic' | 'openai';
   endpoint: string;
   apiKeyEnvVar: string;
   temperature: number;
@@ -30,9 +31,11 @@ interface ModelConfig {
  * Registry of available AI models
  */
 const AVAILABLE_MODELS: Record<string, ModelConfig> = {
+  // Google Gemini Models
   'gemini-1.5-flash': {
     id: 'gemini-1.5-flash',
     name: 'Gemini 1.5 Flash',
+    provider: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.2,
@@ -43,6 +46,7 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   'gemini-1.5-pro': {
     id: 'gemini-1.5-pro',
     name: 'Gemini 1.5 Pro',
+    provider: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.1,
@@ -53,10 +57,101 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   'gemini-2.0-flash-lite': {
     id: 'gemini-2.0-flash-lite',
     name: 'Gemini 2.0 Flash Lite',
+    provider: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.3,
     maxTokens: 2048,
+    supportsText: true,
+    supportsVision: true
+  },
+  'gemini-2.5-flash-preview-05-20': {
+    id: 'gemini-2.5-flash-preview-05-20',
+    name: 'Gemini 2.5 Flash Preview',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-preview-05-20:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.2,
+    maxTokens: 2048,
+    supportsText: true,
+    supportsVision: true
+  },
+
+  // OpenRouter Free Models
+  'openrouter/google/gemma-3-27b-it:free': {
+    id: 'openrouter/google/gemma-3-27b-it:free',
+    name: 'Gemma 3 27B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false
+  },
+  'openrouter/google/gemini-2.0-flash-exp:free': {
+    id: 'openrouter/google/gemini-2.0-flash-exp:free',
+    name: 'Gemini 2.0 Flash Experimental',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true
+  },
+  'openrouter/meta-llama/llama-4-maverick:free': {
+    id: 'openrouter/meta-llama/llama-4-maverick:free',
+    name: 'Llama 4 Maverick',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true
+  },
+  'openrouter/google/gemma-3n-e4b-it:free': {
+    id: 'openrouter/google/gemma-3n-e4b-it:free',
+    name: 'Gemma 3N E4B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false
+  },
+  'openrouter/mistralai/devstral-small:free': {
+    id: 'openrouter/mistralai/devstral-small:free',
+    name: 'Devstral Small',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false
+  },
+  'openrouter/nvidia/llama-3.3-nemotron-super-49b-v1:free': {
+    id: 'openrouter/nvidia/llama-3.3-nemotron-super-49b-v1:free',
+    name: 'Llama 3.3 Nemotron Super 49B',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false
+  },
+  'openrouter/moonshotai/kimi-vl-a3b-thinking:free': {
+    id: 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
+    name: 'Kimi VL A3B Thinking',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
     supportsText: true,
     supportsVision: true
   }
@@ -93,32 +188,45 @@ async function callAIModel(
   receiptId: string,
   logger: ProcessingLogger
 ): Promise<any> {
+  // Log the requested model ID for debugging
+  await logger.log(`Requested model ID: ${modelId}`, "AI");
+
+  // Check if the requested model exists
+  if (modelId && !AVAILABLE_MODELS[modelId]) {
+    await logger.log(`Model ${modelId} not found in AVAILABLE_MODELS. Available models: ${Object.keys(AVAILABLE_MODELS).join(', ')}`, "ERROR");
+    throw new Error(`Model ${modelId} is not available in this edge function`);
+  }
+
   // Get the model config or use default if not found
-  const modelConfig = AVAILABLE_MODELS[modelId] || 
+  const modelConfig = AVAILABLE_MODELS[modelId] ||
     AVAILABLE_MODELS[input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL];
-  
-  await logger.log(`Using ${modelConfig.name} for analysis`, "AI");
-  
+
+  await logger.log(`Using ${modelConfig.name} (${modelConfig.id}) for analysis`, "AI");
+
   // Validate input type is supported by the model
   if (input.type === 'image' && !modelConfig.supportsVision) {
     await logger.log(`Model ${modelConfig.id} does not support vision input`, "ERROR");
     throw new Error(`Model ${modelConfig.id} does not support vision input`);
   }
-  
+
   // Get API key for the model
   const apiKey = Deno.env.get(modelConfig.apiKeyEnvVar);
   if (!apiKey) {
     await logger.log(`${modelConfig.apiKeyEnvVar} not found in environment variables. Please ensure this secret is set in the Supabase dashboard.`, "ERROR");
     return new Response(JSON.stringify({ error: `${modelConfig.apiKeyEnvVar} not found in environment variables` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  
-  // Handle model-specific API calls
-  if (modelConfig.id.startsWith('gemini')) {
-    return await callGeminiAPI(input, modelConfig, apiKey, logger);
-  } else if (modelConfig.id.startsWith('claude')) {
-    return await callClaudeAPI(input, modelConfig, apiKey, logger);
-  } else {
-    throw new Error(`Unsupported model: ${modelConfig.id}`);
+
+  // Handle model-specific API calls based on provider
+  switch (modelConfig.provider) {
+    case 'gemini':
+      return await callGeminiAPI(input, modelConfig, apiKey, logger);
+    case 'openrouter':
+      return await callOpenRouterAPI(input, modelConfig, apiKey, logger);
+    case 'anthropic':
+      return await callClaudeAPI(input, modelConfig, apiKey, logger);
+    default:
+      await logger.log(`Unsupported model provider: ${modelConfig.provider}`, "ERROR");
+      throw new Error(`Unsupported model provider: ${modelConfig.provider}`);
   }
 }
 
@@ -126,16 +234,16 @@ async function callAIModel(
  * Call Gemini API for text or vision processing
  */
 async function callGeminiAPI(
-  input: AIModelInput, 
-  modelConfig: ModelConfig, 
+  input: AIModelInput,
+  modelConfig: ModelConfig,
   apiKey: string,
   logger: ProcessingLogger
 ): Promise<any> {
   await logger.log("Constructing prompt for Gemini AI", "AI");
-  
+
   // Construct the payload based on input type
   let payload: any;
-  
+
   if (input.type === 'text') {
     // Text-based prompt for OCR data
     const prompt = `
@@ -178,7 +286,7 @@ Return your findings in the following JSON format:
     }
   }
 }`;
-    
+
     payload = {
       contents: [{
         parts: [{
@@ -239,7 +347,7 @@ Return your findings in the following JSON format:
       }]
     };
   }
-  
+
   // Add generation config
   payload.generationConfig = {
     temperature: modelConfig.temperature,
@@ -247,7 +355,7 @@ Return your findings in the following JSON format:
     topK: 40,
     maxOutputTokens: modelConfig.maxTokens,
   };
-  
+
   // Call Gemini API
   await logger.log("Calling Gemini API", "AI");
   const response = await fetch(
@@ -260,36 +368,36 @@ Return your findings in the following JSON format:
       body: JSON.stringify(payload),
     }
   );
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Gemini API error:', errorText);
     await logger.log(`Gemini API error: ${response.status} ${response.statusText}`, "ERROR");
     throw new Error(`Failed to process with Gemini API: ${response.status} ${response.statusText}`);
   }
-  
+
   const geminiResponse = await response.json();
   await logger.log("Received response from Gemini API", "AI");
-  
+
   // Parse the response
   try {
     // Extract the text content from Gemini response
     const responseText = geminiResponse.candidates[0].content.parts[0].text;
     await logger.log("Parsing Gemini response", "AI");
-    
+
     // Extract JSON from the response (handle case where other text might be included)
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : null;
-    
+
     if (!jsonStr) {
       console.error('No valid JSON found in Gemini response');
       await logger.log("No valid JSON found in Gemini response", "ERROR");
       return {};
     }
-    
+
     // Parse the JSON data
     const enhancedData = JSON.parse(jsonStr);
-    
+
     // Set default MYR currency if not found by Gemini
     if (!enhancedData.currency) {
       enhancedData.currency = 'MYR';
@@ -299,7 +407,7 @@ Return your findings in the following JSON format:
     } else {
       await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
     }
-    
+
     await logger.log("AI processing complete", "AI");
     return enhancedData;
   } catch (error) {
@@ -310,22 +418,217 @@ Return your findings in the following JSON format:
 }
 
 /**
+ * Call OpenRouter API for text or vision processing
+ */
+async function callOpenRouterAPI(
+  input: AIModelInput,
+  modelConfig: ModelConfig,
+  apiKey: string,
+  logger: ProcessingLogger
+): Promise<any> {
+  await logger.log("Constructing prompt for OpenRouter API", "AI");
+
+  // Extract model name from OpenRouter model ID
+  const modelName = modelConfig.id.replace(/^openrouter\//, '');
+
+  // Prepare messages based on input type
+  let messages: any[];
+
+  if (input.type === 'text') {
+    // Text-based processing
+    const prompt = `You are an AI assistant specialized in analyzing receipt data.
+
+RECEIPT TEXT:
+${input.fullText}
+
+TEXTRACT EXTRACTED DATA:
+${JSON.stringify(input.textractData, null, 2)}
+
+Based on the receipt text above, please:
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
+3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+4. Provide SUGGESTIONS for potential OCR errors.
+
+Return your findings in JSON format:
+{
+  "currency": "The currency code (e.g., MYR, USD)",
+  "payment_method": "The payment method used",
+  "predicted_category": "One of the categories from the list above",
+  "merchant": "The merchant name if you find a better match than Textract",
+  "total": "The total amount if you find a better match than Textract",
+  "suggestions": {
+    "merchant": "A suggested correction for merchant name if OCR made errors",
+    "date": "A suggested date correction in YYYY-MM-DD format if needed",
+    "total": "A suggested total amount correction if needed",
+    "tax": "A suggested tax amount correction if needed"
+  },
+  "confidence": {
+    "currency": "Confidence score 0-100 for currency",
+    "payment_method": "Confidence score 0-100 for payment method",
+    "predicted_category": "Confidence score 0-100 for category prediction"
+  }
+}`;
+
+    messages = [
+      { role: "user", content: prompt }
+    ];
+  } else {
+    // Vision-based processing
+    if (!modelConfig.supportsVision) {
+      await logger.log(`Model ${modelConfig.name} does not support vision input`, "ERROR");
+      throw new Error(`Model ${modelConfig.name} does not support vision input`);
+    }
+
+    const imageBase64 = encodeBase64(input.imageData.data);
+    const dataUrl = `data:${input.imageData.mimeType};base64,${imageBase64}`;
+
+    messages = [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `You are an AI assistant specialized in analyzing receipt images.
+
+Please examine this receipt image and extract the following information:
+1. MERCHANT name (store or business name)
+2. DATE of purchase (in YYYY-MM-DD format)
+3. TOTAL amount
+4. TAX amount (if present)
+5. LINE ITEMS (product/service name and price for each item)
+6. CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous.
+7. PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
+8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+
+Return your findings in JSON format:
+{
+  "merchant": "The merchant name",
+  "date": "The date in YYYY-MM-DD format",
+  "total": "The total amount as a number",
+  "tax": "The tax amount as a number",
+  "currency": "The currency code (e.g., MYR, USD)",
+  "payment_method": "The payment method used",
+  "predicted_category": "One of the categories from the list above",
+  "line_items": [
+    { "description": "Item 1 description", "amount": "Item 1 price as a number" }
+  ],
+  "confidence": {
+    "merchant": "Confidence score 0-100",
+    "date": "Confidence score 0-100",
+    "total": "Confidence score 0-100",
+    "tax": "Confidence score 0-100",
+    "currency": "Confidence score 0-100",
+    "payment_method": "Confidence score 0-100",
+    "predicted_category": "Confidence score 0-100",
+    "line_items": "Confidence score 0-100"
+  }
+}`
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: dataUrl,
+              detail: "high"
+            }
+          }
+        ]
+      }
+    ];
+  }
+
+  const payload = {
+    model: modelName,
+    messages: messages,
+    temperature: modelConfig.temperature,
+    max_tokens: modelConfig.maxTokens,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0
+  };
+
+  // Call OpenRouter API
+  await logger.log(`Calling OpenRouter API with model: ${modelName}`, "AI");
+  const response = await fetch(modelConfig.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://paperless-maverick.vercel.app',
+      'X-Title': 'Paperless Maverick Receipt Processing'
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('OpenRouter API error:', errorText);
+    await logger.log(`OpenRouter API error: ${response.status} ${response.statusText}`, "ERROR");
+    throw new Error(`Failed to process with OpenRouter API: ${response.status} ${response.statusText}`);
+  }
+
+  const openRouterResponse = await response.json();
+  await logger.log("Received response from OpenRouter API", "AI");
+
+  // Parse the response
+  try {
+    // Extract the text content from OpenRouter response
+    const responseText = openRouterResponse.choices[0]?.message?.content;
+    if (!responseText) {
+      throw new Error('No content in OpenRouter response');
+    }
+
+    await logger.log("Parsing OpenRouter response", "AI");
+
+    // Extract JSON from the response (handle case where other text might be included)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : null;
+
+    if (!jsonStr) {
+      console.error('No valid JSON found in OpenRouter response');
+      await logger.log("No valid JSON found in OpenRouter response", "ERROR");
+      return {};
+    }
+
+    // Parse the JSON data
+    const enhancedData = JSON.parse(jsonStr);
+
+    // Set default MYR currency if not found
+    if (!enhancedData.currency) {
+      enhancedData.currency = 'MYR';
+      if (!enhancedData.confidence) enhancedData.confidence = {};
+      enhancedData.confidence.currency = 50; // medium confidence for default
+      await logger.log("Using default currency: MYR", "AI");
+    } else {
+      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
+    }
+
+    await logger.log("OpenRouter AI processing complete", "AI");
+    return enhancedData;
+  } catch (error) {
+    console.error('Error parsing OpenRouter response:', error);
+    await logger.log(`Error parsing OpenRouter response: ${error.message}`, "ERROR");
+    return {};
+  }
+}
+
+/**
  * Call Claude API for text or vision processing
  */
 async function callClaudeAPI(
-  input: AIModelInput, 
-  modelConfig: ModelConfig, 
+  input: AIModelInput,
+  modelConfig: ModelConfig,
   apiKey: string,
   logger: ProcessingLogger
 ): Promise<any> {
   await logger.log("Constructing prompt for Claude AI", "AI");
-  
+
   // Validate input type (Claude currently only supports text)
   if (input.type === 'image') {
     await logger.log("Claude API does not support vision input yet", "ERROR");
     throw new Error("Claude API does not support vision input yet");
   }
-  
+
   // Construct the payload for Claude
   const prompt = `
 You are an AI assistant specialized in analyzing receipt data.
@@ -367,7 +670,7 @@ Return your findings in the following JSON format:
     }
   }
 }`;
-  
+
   const payload = {
     model: "claude-3-5-sonnet-20240620",
     messages: [
@@ -376,7 +679,7 @@ Return your findings in the following JSON format:
     temperature: modelConfig.temperature,
     max_tokens: modelConfig.maxTokens,
   };
-  
+
   // Call Claude API
   await logger.log("Calling Claude API", "AI");
   const response = await fetch(modelConfig.endpoint, {
@@ -388,36 +691,36 @@ Return your findings in the following JSON format:
     },
     body: JSON.stringify(payload),
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Claude API error:', errorText);
     await logger.log(`Claude API error: ${response.status} ${response.statusText}`, "ERROR");
     throw new Error(`Failed to process with Claude API: ${response.status} ${response.statusText}`);
   }
-  
+
   const claudeResponse = await response.json();
   await logger.log("Received response from Claude API", "AI");
-  
+
   // Parse the response
   try {
     // Extract the text content from Claude response
     const responseText = claudeResponse.content[0].text;
     await logger.log("Parsing Claude response", "AI");
-    
+
     // Extract JSON from the response (handle case where other text might be included)
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : null;
-    
+
     if (!jsonStr) {
       console.error('No valid JSON found in Claude response');
       await logger.log("No valid JSON found in Claude response", "ERROR");
       return {};
     }
-    
+
     // Parse the JSON data
     const enhancedData = JSON.parse(jsonStr);
-    
+
     // Set default MYR currency if not found by Claude
     if (!enhancedData.currency) {
       enhancedData.currency = 'MYR';
@@ -427,7 +730,7 @@ Return your findings in the following JSON format:
     } else {
       await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
     }
-    
+
     await logger.log("AI processing complete", "AI");
     return enhancedData;
   } catch (error) {
@@ -446,33 +749,33 @@ async function enhanceReceiptData(
   receiptId: string
 ) {
   const logger = new ProcessingLogger(receiptId);
-  
+
   try {
     await logger.log(`Starting ${modelId || 'AI'} processing`, "AI");
-    
+
     // Use the specified model or default based on input type
     const modelToUse = modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL);
     await logger.log(`Using model: ${modelToUse}`, "AI");
-    
+
     // Call the appropriate AI model
     const enhancedData = await callAIModel(input, modelToUse, receiptId, logger);
-    
+
     // Log results
     if (enhancedData.payment_method) {
       await logger.log(`Detected payment method: ${enhancedData.payment_method}`, "AI");
     }
-    
+
     if (enhancedData.predicted_category) {
       await logger.log(`Predicted category: ${enhancedData.predicted_category}`, "AI");
     }
-    
+
     if (enhancedData.suggestions) {
       const suggestionFields = Object.keys(enhancedData.suggestions);
       if (suggestionFields.length > 0) {
         await logger.log(`Found ${suggestionFields.length} suggestion(s) for: ${suggestionFields.join(', ')}`, "AI");
       }
     }
-    
+
     await logger.log("AI processing complete", "AI");
     return enhancedData;
   } catch (error) {
@@ -487,10 +790,10 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-  
+
   try {
     console.log("Received request to enhance receipt data");
-    
+
     // Only accept POST requests
     if (req.method !== 'POST') {
       return new Response(
@@ -498,23 +801,23 @@ serve(async (req) => {
         { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
+
     // Parse request body
     const requestData = await req.json();
-    
+
     // Extract and validate required parameters
     const { textractData, fullText, imageData, receiptId, modelId } = requestData;
-    
+
     if (!receiptId) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameter: receiptId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
+
     // Determine the input type (text or image)
     let input: AIModelInput;
-    
+
     if (textractData && fullText) {
       input = {
         type: 'text',
@@ -533,17 +836,17 @@ serve(async (req) => {
       console.log("Processing with image input (direct vision)");
     } else {
       return new Response(
-        JSON.stringify({ 
-          error: 'Missing required parameters: either (textractData + fullText) or imageData must be provided' 
+        JSON.stringify({
+          error: 'Missing required parameters: either (textractData + fullText) or imageData must be provided'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
+
     // Process the receipt data with AI
     const enhancedData = await enhanceReceiptData(input, modelId, receiptId);
     console.log("Data enhancement complete");
-    
+
     // Return the enhanced data
     return new Response(
       JSON.stringify({
@@ -555,7 +858,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in enhance-receipt-data function:', error);
-    
+
     // Try to log the error if possible
     try {
       const { receiptId } = await req.json();
@@ -566,11 +869,11 @@ serve(async (req) => {
     } catch (logError) {
       // Ignore errors during error logging
     }
-    
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message || 'Internal server error',
-        success: false 
+        success: false
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
