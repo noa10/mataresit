@@ -9,7 +9,7 @@ import { encodeBase64 } from "jsr:@std/encoding/base64"
 import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 // Maximum image size for processing (in bytes)
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB - reduced from 5MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB - increased for AI Vision processing
 
 // Maximum image dimensions for OCR processing
 const MAX_IMAGE_DIMENSION = 1500; // 1500px - reduced from 2000px
@@ -42,7 +42,7 @@ async function processReceiptImage(
   imageBytes: Uint8Array,
   imageUrl: string,
   receiptId: string,
-  primaryMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai',
+  primaryMethod: 'ocr-ai' | 'ai-vision' = 'ai-vision',
   modelId: string = '',
   compareWithAlternative: boolean = false,
   requestHeaders: { Authorization?: string | null; apikey?: string | null } = { Authorization: null, apikey: null }
@@ -1175,7 +1175,7 @@ serve(async (req: Request) => {
     const {
       imageUrl,
       receiptId,
-      primaryMethod = 'ocr-ai', // Default to OCR + AI
+      primaryMethod = 'ai-vision', // Default to AI Vision
       modelId = '', // Use default model based on method
       compareWithAlternative = false // Don't compare by default
     } = requestData;

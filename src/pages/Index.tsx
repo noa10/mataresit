@@ -31,8 +31,8 @@ const featuresList = [
   },
   {
     icon: <Sparkles className="h-8 w-8 text-primary" />,
-    title: "Dual-Method OCR",
-    description: "Choose between Amazon Textract and Google Gemini AI for the best extraction results."
+    title: "AI-Powered Processing",
+    description: "Advanced AI Vision processing (default) with OCR + AI fallback. Supports larger images up to 5MB for better accuracy."
   },
   {
     icon: <CheckCircle className="h-8 w-8 text-primary" />,

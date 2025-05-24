@@ -43,7 +43,7 @@ export function ReceiptProcessingOptions({
   onMethodChange,
   onModelChange,
   onCompareChange,
-  defaultMethod = 'ocr-ai',
+  defaultMethod = 'ai-vision',
   defaultModel = 'gemini-2.0-flash-lite',
   defaultCompare = false
 }: ReceiptProcessingOptionsProps) {
@@ -52,7 +52,7 @@ export function ReceiptProcessingOptions({
   const [compare, setCompare] = useState<boolean>(defaultCompare);
 
   // Filter models based on the selected method
-  const availableModels = Object.values(AVAILABLE_MODELS).filter(model => 
+  const availableModels = Object.values(AVAILABLE_MODELS).filter(model =>
     method === 'ocr-ai' ? model.supportsText : model.supportsVision
   );
 
@@ -69,24 +69,24 @@ export function ReceiptProcessingOptions({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    <strong>OCR + AI:</strong> Text is extracted from the image first, then enhanced with AI.
+                    <strong>AI Vision (Recommended):</strong> The image is processed directly by an AI model with vision capabilities. This is now the default method and works well with larger images (up to 5MB).
                     <br /><br />
-                    <strong>AI Vision:</strong> The image is processed directly by an AI model with vision capabilities.
+                    <strong>OCR + AI:</strong> Text is extracted from the image first, then enhanced with AI. Good for simpler receipts or when AI Vision encounters issues.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
-          <p className="text-sm text-muted-foreground">Choose how your receipt should be processed</p>
+          <p className="text-sm text-muted-foreground">Choose how your receipt should be processed (AI Vision is recommended and set as default)</p>
         </div>
       </div>
 
-      <Select 
+      <Select
         value={method}
         onValueChange={(value: 'ocr-ai' | 'ai-vision') => {
           setMethod(value);
           onMethodChange(value);
-          
+
           // Reset model to a default that supports the selected method
           // Default to the new flash model as it supports both text and vision
           const defaultForMethod = 'gemini-2.0-flash-lite';
@@ -98,8 +98,8 @@ export function ReceiptProcessingOptions({
           <SelectValue placeholder="Select a processing method" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="ai-vision">AI Vision (Recommended)</SelectItem>
           <SelectItem value="ocr-ai">OCR + AI</SelectItem>
-          <SelectItem value="ai-vision">AI Vision</SelectItem>
         </SelectContent>
       </Select>
 
@@ -115,6 +115,7 @@ export function ReceiptProcessingOptions({
                 <p className="max-w-xs">
                   Select the AI model that will process your receipt data.
                   Different models have different capabilities and accuracy.
+                  All models now support larger images (up to 5MB) for better processing.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -123,7 +124,7 @@ export function ReceiptProcessingOptions({
         <p className="text-sm text-muted-foreground">Select the AI model to use</p>
       </div>
 
-      <Select 
+      <Select
         value={selectedModel}
         onValueChange={(value) => {
           setSelectedModel(value);
@@ -162,19 +163,20 @@ export function ReceiptProcessingOptions({
                 <TooltipContent>
                   <p className="max-w-xs">
                     When enabled, we'll also process your receipt using the alternative method
+                    (OCR + AI if you selected AI Vision, or AI Vision if you selected OCR + AI)
                     and highlight any discrepancies between the two methods.
                     <br /><br />
-                    Note: This will increase processing time.
+                    Note: This will increase processing time but can improve accuracy.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           <p className="text-sm text-muted-foreground">
-            Process with both methods to improve accuracy
+            Process with both AI Vision and OCR + AI methods to improve accuracy
           </p>
         </div>
       </div>
     </div>
   );
-} 
+}

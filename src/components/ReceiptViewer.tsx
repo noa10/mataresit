@@ -1047,8 +1047,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 <p>The receipt image is too complex or large to process with the current resources.</p>
                 <p className="mt-1">Try one of these solutions:</p>
                 <ul className="list-disc list-inside mt-1">
-                  <li>Use a smaller or clearer image</li>
-                  <li>Try the OCR+AI method instead of AI Vision</li>
+                  <li>Use a smaller or clearer image (we now support up to 5MB)</li>
+                  <li>Try the OCR+AI method if AI Vision encounters issues</li>
                   <li>Manually enter the receipt details</li>
                 </ul>
               </>

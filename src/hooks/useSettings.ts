@@ -11,7 +11,7 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  processingMethod: 'ocr-ai',
+  processingMethod: 'ai-vision',
   selectedModel: 'gemini-1.5-flash-latest',
   compareWithAlternative: false,
   batchUpload: {

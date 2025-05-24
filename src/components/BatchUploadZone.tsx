@@ -407,7 +407,7 @@ export default function BatchUploadZone({
         ref={uploadZoneRef}
         tabIndex={0}
         role="button"
-        aria-label="Upload multiple receipt files: JPEG, PNG, or PDF"
+        aria-label="Upload multiple receipt files: JPEG, PNG, or PDF (up to 5MB each)"
         aria-describedby="batch-upload-zone-description batch-upload-status"
       >
       <input
@@ -482,7 +482,7 @@ export default function BatchUploadZone({
                   ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
                   : isDragging
                     ? "Release to add files to the queue"
-                    : "Drag & drop multiple receipt files here, or click to browse"}
+                    : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
             </p>
           </div>
         </div>

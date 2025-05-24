@@ -410,7 +410,7 @@ export const processReceiptWithOCR = async (
   try {
     // Use default options if not provided
     const processingOptions: ProcessingOptions = {
-      primaryMethod: options?.primaryMethod || 'ocr-ai',
+      primaryMethod: options?.primaryMethod || 'ai-vision',
       modelId: options?.modelId || '',
       compareWithAlternative: options?.compareWithAlternative || false
     };

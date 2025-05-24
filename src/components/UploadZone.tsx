@@ -459,7 +459,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       ref={uploadZoneRef}
       tabIndex={0}
       role="button"
-      aria-label="Upload receipt files: JPEG, PNG, or PDF"
+      aria-label="Upload receipt files: JPEG, PNG, or PDF (up to 5MB)"
       aria-describedby="upload-zone-description upload-status"
     >
       <input
@@ -604,7 +604,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 {receiptUploads.length > 0 ? "Upload File" : "Select File"}
               </span>
               <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
-                JPG, PNG, PDF
+                JPG, PNG, PDF (up to 5MB)
               </span>
             </Button>
           )}
