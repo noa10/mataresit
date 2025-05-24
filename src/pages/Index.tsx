@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
-import { 
+import {
   Upload,
   FileText,
   Sparkles,
@@ -128,9 +128,9 @@ export default function Index() {
 
   return (
     // Simplified background and increased spacing
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/80"> 
+    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
       <Navbar />
-      
+
       <div className="relative overflow-hidden"> {/* Added overflow-hidden */}
         {/* Background pattern - subtle */}
         <div className="absolute inset-0 overflow-hidden z-0">
@@ -138,7 +138,7 @@ export default function Index() {
         </div>
 
         {/* Increased spacing */}
-        <main className="relative z-10 container py-16 space-y-32"> 
+        <main className="relative z-10 container py-16 space-y-32">
           {/* Enhanced Hero Section */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center pt-8">
             <motion.div
@@ -173,7 +173,7 @@ export default function Index() {
                 ) : (
                   <>
                     <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                      <Link to="/upload" className="flex items-center justify-center sm:justify-start">
+                      <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
                         Upload Receipt
                         <Upload className="ml-2 h-5 w-5 transition-transform group-hover:translate-y-[-2px]" />
                       </Link>
@@ -187,23 +187,23 @@ export default function Index() {
                 )}
               </div>
             </motion.div>
-            
+
             {/* Receipt Scanning Hero Image */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               className="hidden lg:flex justify-center items-center"
             >
               <div className="relative max-w-lg rounded-xl overflow-hidden border border-border shadow-2xl">
-                <img 
-                  src="/receipt-scanner.png" 
-                  alt="Receipt Scanning on Mobile Phone" 
+                <img
+                  src="/receipt-scanner.png"
+                  alt="Receipt Scanning on Mobile Phone"
                   width="500"
                   height="600"
                   className="block w-full h-auto object-cover"
                 />
-                
+
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
                   <div className="flex items-center">
                     <div>
@@ -211,7 +211,7 @@ export default function Index() {
                       <p className="text-white/80 text-sm">Quick, accurate, and effortless</p>
                     </div>
                     <Button size="sm" variant="secondary" className="ml-auto" asChild>
-                      <Link to="/upload">
+                      <Link to="/dashboard">
                         <Upload className="h-4 w-4 mr-2" />
                         Upload
                       </Link>
@@ -244,8 +244,8 @@ export default function Index() {
             {/* Timeline-style layout */}
             <div className="flex flex-col md:flex-row gap-8 mt-12 items-start relative">
               {featureGroups.map((group, groupIndex) => (
-                <motion.div 
-                  key={groupIndex} 
+                <motion.div
+                  key={groupIndex}
                   className="flex-1 relative pb-8 md:pb-0" // Added padding bottom for mobile
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -258,9 +258,9 @@ export default function Index() {
                     </span>
                     <h3 className="ml-4 text-xl font-semibold text-primary">{group.title}</h3>
                   </div>
-                  
+
                   {/* Feature Cards */}
-                  <div className="space-y-4 pl-2 md:pl-0"> 
+                  <div className="space-y-4 pl-2 md:pl-0">
                     {group.features.map((feature, index) => (
                       <motion.div
                         key={index}
@@ -291,7 +291,7 @@ export default function Index() {
                       </motion.div>
                     ))}
                   </div>
-                  
+
                   {/* Connecting Line/Arrow (Visible on MD+) */}
                   {groupIndex < featureGroups.length - 1 && (
                     <div className="hidden md:block absolute top-1/2 right-[-2rem] transform -translate-y-1/2 z-0">
@@ -300,13 +300,13 @@ export default function Index() {
                   )}
                   {/* Vertical connector line for mobile */}
                   {groupIndex < featureGroups.length - 1 && (
-                    <div className="absolute left-[23px] top-16 bottom-0 w-px bg-border md:hidden" /> 
+                    <div className="absolute left-[23px] top-16 bottom-0 w-px bg-border md:hidden" />
                   )}
                 </motion.div>
               ))}
             </div>
           </section>
-          
+
           {/* Enhanced Stats Section */}
           <section className="py-16 px-4 bg-secondary/10 backdrop-blur-sm rounded-2xl">
             <motion.div
@@ -319,7 +319,7 @@ export default function Index() {
                 Trusted by <span className="text-primary">Finance Teams</span> Worldwide
               </h2>
             </motion.div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto"> {/* Increased max-width */}
               {stats.map((stat, index) => (
                 <motion.div
@@ -344,7 +344,7 @@ export default function Index() {
                 </motion.div>
               ))}
             </div>
-            
+
             {/* Keep Explore Dashboard button */}
             <div className="flex justify-center mt-16"> {/* Increased top margin */}
               <motion.div
@@ -362,7 +362,7 @@ export default function Index() {
               </motion.div>
             </div>
           </section>
-          
+
           {/* Refined Features Section */}
           <section id="features" className="scroll-mt-16">
             <motion.div
@@ -381,7 +381,7 @@ export default function Index() {
                 Leverage advanced OCR and AI technology to automate your receipt processing workflow efficiently.
               </p>
             </motion.div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {/* Using the featuresList defined at the top */}
               {featuresList.map((feature, index) => (
@@ -395,7 +395,7 @@ export default function Index() {
                 >
                   <Card className="h-full hover:bg-primary/5 transition-all duration-300 border-border/60 bg-card">
                     {/* Increased padding */}
-                    <CardContent className="pt-8"> 
+                    <CardContent className="pt-8">
                       <div className="mb-6 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10">
                         {feature.icon}
                       </div>
@@ -407,13 +407,13 @@ export default function Index() {
               ))}
             </div>
           </section>
-          
+
           {/* Strengthened CTA Section */}
           <section className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden"> {/* Increased padding, added gradient */}
              {/* Optional: Add a subtle background pattern or shapes */}
             <div className="absolute inset-0 z-0 opacity-5">
               {/* Example subtle pattern */}
-              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="scale(2) rotate(45)"><rect x="0" y="0" width="100%" height="100%" fill="hsla(0,0%,100%,0)"/><path d="M10-5C10 5 10 5 0 5A10 10 0 0110-5M10 15c0 10 0 10-10 10a10 10 0 0110-10" stroke-width="0.5" stroke="hsla(215, 28%, 17%, 0.2)" fill="none"/></pattern></defs><rect width="800%" height="800%" transform="translate(0,0)" fill="url(#a)"/></svg>
+              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="scale(2) rotate(45)"><rect x="0" y="0" width="100%" height="100%" fill="hsla(0,0%,100%,0)"/><path d="M10-5C10 5 10 5 0 5A10 10 0 0 1 10-5M10 15c0 10 0 10-10 10a10 10 0 0 1 10-10" strokeWidth="0.5" stroke="hsla(215, 28%, 17%, 0.2)" fill="none"/></pattern></defs><rect width="800%" height="800%" transform="translate(0,0)" fill="url(#a)"/></svg>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -428,7 +428,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 {/* Larger CTA button */}
                 <Button asChild size="lg" className="group w-full sm:w-auto">
-                  <Link to={user ? '/upload' : '/auth'} className="flex items-center justify-center sm:justify-start">
+                  <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
                     {user ? 'Upload Your First Receipt' : 'Sign Up Free'}
                     <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Link>
@@ -458,7 +458,7 @@ export default function Index() {
                 AI-powered receipt processing for modern businesses.
               </p>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-medium text-lg">Product</h4>
               <ul className="space-y-2">
@@ -467,10 +467,10 @@ export default function Index() {
                 <li><Link to="/dashboard" className="text-sm text-muted-foreground hover:text-primary transition-colors">Dashboard</Link></li>
                 {/* Placeholder links - update as needed */}
                 <li><Link to="/api" className="text-sm text-muted-foreground hover:text-primary transition-colors">API Reference</Link></li>
-                <li><Link to="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">Pricing</Link></li> 
+                <li><Link to="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">Pricing</Link></li>
               </ul>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-medium text-lg">Resources</h4>
               <ul className="space-y-2">
@@ -478,10 +478,10 @@ export default function Index() {
                 <li><Link to="/docs" className="text-sm text-muted-foreground hover:text-primary transition-colors">Documentation</Link></li>
                 <li><Link to="/help" className="text-sm text-muted-foreground hover:text-primary transition-colors">Help Center</Link></li>
                 <li><Link to="/status" className="text-sm text-muted-foreground hover:text-primary transition-colors">System Status</Link></li>
-                <li><Link to="/blog" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</Link></li> 
+                <li><Link to="/blog" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</Link></li>
               </ul>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-medium text-lg">Legal</h4>
               <ul className="space-y-2">
@@ -492,9 +492,9 @@ export default function Index() {
               </ul>
             </div>
           </div>
-          
+
           {/* Newsletter/Contact Placeholder - Adding this requires backend/form handling */}
-          {/* 
+          {/*
           <div className="mb-12 pt-8 border-t">
              <h4 className="font-medium text-lg mb-4 text-center md:text-left">Stay Updated</h4>
              <form className="flex flex-col md:flex-row gap-2 max-w-md mx-auto md:mx-0">
