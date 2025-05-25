@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, RefreshCcw, Loader2, Database, BrainCircuit, RefreshCw, Globe } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -9,7 +10,7 @@ import { testGeminiConnection, checkGeminiApiKey, testEdgeFunctionCORS, testAllE
 import { Separator } from '../ui/separator';
 import { Progress } from '../ui/progress';
 import { generateEmbeddings, generateAllEmbeddings, checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
-import { useAuth } from '@/contexts/AuthContext';  // Import the auth context hook
+import { useAuth } from '@/contexts/AuthContext';
 import { Session } from '@supabase/supabase-js';
 
 export function CombinedVectorStatus() {
@@ -80,7 +81,6 @@ export function CombinedVectorStatus() {
       const {
         extension_exists: pgvectorEnabled,
         vector_table_exists: tableExists,
-        // api_key_exists is checked separately below as it's a client-side/edge function concern
       } = rpcData as { extension_exists: boolean; vector_table_exists: boolean; api_key_exists: boolean };
 
       // Check if the Gemini API key is set (client-side/edge function check)
@@ -92,7 +92,6 @@ export function CombinedVectorStatus() {
       const geminiTest = await testGeminiConnection();
       console.log('Gemini API test result:', geminiTest);
       setGeminiResult(geminiTest);
-
 
       if (!apiKeyExists) {
         setStatus('disabled');
@@ -115,8 +114,6 @@ export function CombinedVectorStatus() {
       setIsChecking(false);
     }
   };
-
-
 
   const handleGeminiTest = async () => {
     setIsTestingGemini(true);
@@ -148,7 +145,7 @@ export function CombinedVectorStatus() {
   // Function to check embedding statistics
   const checkEmbeddingStats = async () => {
     try {
-      console.log('CVS: checkEmbeddingStats CALLED'); // CVS for CombinedVectorStatus
+      console.log('CVS: checkEmbeddingStats CALLED');
 
       // Log auth context user information
       console.log('CVS: Auth context user:', user ? `ID: ${user.id}, Email: ${user.email}` : 'Not authenticated');
@@ -190,13 +187,12 @@ export function CombinedVectorStatus() {
       console.log('CVS: Querying total receipts count...');
       const { count: totalCount, error: totalError, data: totalData, status: totalStatus } = await supabase
         .from('receipts')
-        .select('id', { count: 'exact', head: true }); // Select 'id' just to be minimal
+        .select('id', { count: 'exact', head: true });
 
       console.log('CVS: Total receipts query DONE. Error:', totalError, 'Count:', totalCount, 'Data:', totalData, 'Status:', totalStatus);
 
       if (totalError) {
         console.error('CVS: Error getting total receipt count:', totalError);
-        // Potentially throw or set error state, but for now, just log
       }
 
       console.log(`CVS: Raw totalCount from query: ${totalCount}`);
@@ -208,7 +204,6 @@ export function CombinedVectorStatus() {
         .select('receipt_id', { count: 'exact', head: true });
 
       console.log('CVS: Receipts_embeddings query DONE. Error:', embeddingsError, 'Count:', embeddingsCount, 'Data:', embeddingsData, 'Status:', embeddingsStatus);
-
 
       if (embeddingsError) {
         // If the table doesn't exist yet, just set count to 0
@@ -225,10 +220,8 @@ export function CombinedVectorStatus() {
         }
 
         console.error('CVS: Error getting embeddings count:', embeddingsError);
-        // Potentially throw or set error state
       }
       console.log(`CVS: Raw embeddingsCount from query: ${embeddingsCount}`);
-
 
       // Calculate stats
       const total = totalCount || 0;
@@ -508,163 +501,70 @@ export function CombinedVectorStatus() {
           batchProcess: true,
           limit: 5
         })
+      });
       
-      // Use the auth data if found
-      if (authData && (authData.access_token || (authData.session && authData.session.access_token))) {
-        const accessToken = authData.access_token || authData.session.access_token;
-        const refreshToken = authData.refresh_token || (authData.session && authData.session.refresh_token);
-        
-        if (accessToken && refreshToken) {
-          console.log('CVS: Attempting to manually set session with tokens from localStorage');
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-          
-          if (error) {
-            console.error('CVS: Error manually setting session:', error);
-          } else if (data.session) {
-            console.log('CVS: Successfully set session manually!', 'User ID:', data.session.user.id);
-            return data.session;
-          }
-        }
-      } else {
-        console.log('CVS: No suitable auth data found in localStorage');
-      }
-    } catch (localStorageError) {
-      console.error('CVS: Error accessing localStorage:', localStorageError);
-    }
-    
-    console.error('CVS: Unable to establish a valid session. RLS queries will return empty results.');
-    return null;
-  } catch (error) {
-    console.error('CVS: Unexpected error refreshing session:', error);
-    return null;
-  }
-};
-
-// Function to test CORS for all edge functions
-const handleTestCORS = async () => {
-  setIsTestingCORS(true);
-  setCorsResults(null);
-
-  try {
-    // Use the utility function to test CORS
-    const results = await testAllEdgeFunctionsCORS();
-    setCorsResults(results);
-  } catch (error) {
-    console.error('CORS test error:', error);
-    setCorsResults({
-      error: false,
-      message: `Error: ${error instanceof Error ? error.message : String(error)}`
-    } as any);
-  } finally {
-    setIsTestingCORS(false);
-  }
-};
-
-// Function to specifically test the generate-thumbnails function
-const testGenerateThumbnails = async () => {
-  setIsTestingCORS(true);
-  
-  try {
-    // First, test CORS with OPTIONS
-    const corsResponse = await fetch(`${SUPABASE_URL}/functions/v1/generate-thumbnails`, {
-      method: 'OPTIONS',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    console.log('CORS Test Response:', corsResponse);
-    
-    if (!corsResponse.ok) {
-      alert(`CORS Test Failed! Status: ${corsResponse.status}`);
-      setIsTestingCORS(false);
-      return;
-    }
-    
-    // Then test a batch process call
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-thumbnails`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
-      },
-      body: JSON.stringify({
-        batchProcess: true,
-        limit: 5
-      })
-    });
-    
-    const result = await response.json();
-    
-    if (response.ok) {
-      alert(`Generate Thumbnails Test Success!
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`Generate Thumbnails Test Success!
 Processed: ${result.processed}, Errors: ${result.errors}`);
-    } else {
-      alert(`Generate Thumbnails Test Failed: ${result.error || 'Unknown error'}`);
+      } else {
+        alert(`Generate Thumbnails Test Failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Generate Thumbnails Test Error:', error);
+      alert(`Generate Thumbnails Test Error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsTestingCORS(false);
     }
-  } catch (error) {
-    console.error('Generate Thumbnails Test Error:', error);
-    alert(`Generate Thumbnails Test Error: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    setIsTestingCORS(false);
-  }
-};
+  };
 
-// Function to check line item embedding statistics
-const checkLineItemEmbeddingStats = async () => {
-  try {
-    console.log('CVS: checkLineItemEmbeddingStats CALLED');
+  // Function to check line item embedding statistics
+  const checkLineItemEmbeddingStats = async () => {
+    try {
+      console.log('CVS: checkLineItemEmbeddingStats CALLED');
 
-    // Validate session first
-    const session = await refreshSession();
-    if (!session) {
-      console.error('Failed to refresh session for line item embedding check');
-      return;
+      // Validate session first
+      const session = await refreshSession();
+      if (!session) {
+        console.error('Failed to refresh session for line item embedding check');
+        return;
+      }
+
+      const result = await checkLineItemEmbeddings();
+      console.log('Line item embedding check result:', result);
+
+      setLineItemEmbeddingStats({
+        total: result.total || 0,
+        withEmbeddings: result.withEmbeddings || 0,
+        withoutEmbeddings: result.withoutEmbeddings || 0
+      });
+    } catch (error) {
+      console.error('Error checking line item embedding stats:', error);
     }
+  };
 
-    const result = await checkLineItemEmbeddings();
-    console.log('Line item embedding check result:', result);
+  // Refresh session before initial checks
+  const initComponent = async () => {
+    if (user) {
+      await refreshSession();
+    }
+    checkPgvectorStatus();
+    checkEmbeddingStats();
+    checkLineItemEmbeddingStats();
+  };
 
-    setLineItemEmbeddingStats({
-      total: result.total || 0,
-      withEmbeddings: result.withEmbeddings || 0,
-      withoutEmbeddings: result.withoutEmbeddings || 0
-    });
-  } catch (error) {
-    console.error('Error checking line item embedding stats:', error);
-  }
-};
+  useEffect(() => {
+    initComponent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-// Refresh session before initial checks
-const initComponent = async () => {
-  if (user) {
-    await refreshSession();
-  }
-  checkPgvectorStatus();
-  checkEmbeddingStats();
-  checkLineItemEmbeddingStats();
-};
-
-useEffect(() => {
-  initComponent();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-return (
-  <div className="space-y-6 text-white">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Vector Database Status Card */}
-      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Database className="h-5 w-5 mr-2" />
-            <h3 className="font-medium">Vector Database</h3>
-        <div className="flex items-center">
-          <Database className="h-5 w-5 mr-2" />
-          <h3 className="font-medium">Vector Database</h3>
+  return (
+    <div className="space-y-6 text-white">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Vector Database Status Card */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
               <Database className="h-5 w-5 mr-2" />
               <h3 className="font-medium">Vector Database</h3>
@@ -845,20 +745,20 @@ return (
         <div className="space-y-4">
           <div className="flex justify-between text-sm text-gray-300">
             <div>
-              <span className="font-medium">Total Receipts:</span> {embeddingStats.total}
+              <span className="font-medium">Total Receipts:</span> {embeddingStats?.total || 0}
             </div>
             <div>
-              <span className="font-medium">With Embeddings:</span> {embeddingStats.withEmbeddings}
+              <span className="font-medium">With Embeddings:</span> {embeddingStats?.withEmbeddings || 0}
             </div>
             <div>
-              <span className="font-medium">Without Embeddings:</span> {embeddingStats.withoutEmbeddings}
+              <span className="font-medium">Without Embeddings:</span> {embeddingStats?.withoutEmbeddings || 0}
             </div>
           </div>
 
           <div className="w-full bg-gray-800 rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full"
-              style={{ width: `${embeddingStats.total > 0 ? (embeddingStats.withEmbeddings / embeddingStats.total) * 100 : 0}%` }}
+              style={{ width: `${(embeddingStats?.total || 0) > 0 ? ((embeddingStats?.withEmbeddings || 0) / (embeddingStats?.total || 1)) * 100 : 0}%` }}
             ></div>
           </div>
 
