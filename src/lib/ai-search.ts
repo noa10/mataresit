@@ -49,10 +49,13 @@ export interface LineItemSearchResult {
   similarity: number;
 }
 
+/**
+ * Simplify the type to avoid excessive depth
+ */
 export interface SearchResult {
   receipts?: ReceiptWithSimilarity[];
   lineItems?: LineItemSearchResult[];
-  results?: Array<ReceiptWithSimilarity | LineItemSearchResult>;
+  results?: any[]; // Simplified to avoid type instantiation depth issues
   count: number;
   total: number;
   searchParams: SearchParams;

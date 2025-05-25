@@ -1407,3 +1407,61 @@ export const getNormalizedMerchant = (merchant: string): string => {
   }
   return merchantCache.get(key)!;
 };
+
+// Generate embeddings for a receipt
+export const generateEmbeddingsForReceipt = async (receiptId: string): Promise<void> => {
+  try {
+    // Get the receipt data
+    const { data: receipt, error: receiptError } = await supabase
+      .from('receipts')
+      .select('*')
+      .eq('id', receiptId)
+      .single();
+
+    if (receiptError || !receipt) {
+      throw new Error(`Failed to fetch receipt: ${receiptError?.message || 'Receipt not found'}`);
+    }
+
+    // Generate embeddings for receipt text
+    await generateEmbeddings(receiptId);
+
+    // Process line items
+    try {
+      // Call the edge function to generate line item embeddings
+      await callEdgeFunction('generate-embeddings', 'POST', {
+        receiptId,
+        processLineItems: true
+      });
+    } catch (lineItemError) {
+      console.error(`Error generating line item embeddings: ${lineItemError}`);
+      // Continue even if line item embedding fails
+    }
+
+    // Update receipt with embedding status using any to bypass type checking
+    // This is necessary because the database schema may have evolved ahead of the TypeScript types
+    try {
+      const { error: updateError } = await supabase
+        .from('receipts')
+        .update({ embedding_status: 'complete' } as any)
+        .eq('id', receiptId);
+
+      if (updateError) {
+        console.error(`Failed to update receipt embedding status: ${updateError.message}`);
+      }
+    } catch (updateError) {
+      console.error(`Error updating receipt status: ${updateError}`);
+    }
+  } catch (error) {
+    console.error('Error generating embeddings for receipt:', error);
+    // Update receipt to indicate embedding failure using any to bypass type checking
+    try {
+      await supabase
+        .from('receipts')
+        .update({ embedding_status: 'failed' } as any)
+        .eq('id', receiptId);
+    } catch (updateError) {
+      console.error(`Error updating receipt status after failure: ${updateError}`);
+    }
+    throw error;
+  }
+};
