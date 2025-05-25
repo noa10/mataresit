@@ -283,17 +283,22 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     }
 
     try {
+      // Update status to uploading
       updateUploadStatus(upload.id, 'uploading', 5);
 
+      // Optimize the image before uploading (if it's an image)
       let fileToUpload = upload.file;
 
       if (upload.file.type.startsWith('image/')) {
         try {
+          // Using the directly imported optimizeImageForUpload function
           updateUploadStatus(upload.id, 'uploading', 10);
           console.log(`Optimizing image: ${upload.file.name}, size: ${upload.file.size}`);
 
+          // Use a lower quality for larger files
           const quality = upload.file.size > 3 * 1024 * 1024 ? 70 : 80;
 
+          // Check if the function exists
           if (typeof optimizeImageForUpload !== 'function') {
             console.error('optimizeImageForUpload is not a function in useBatchFileUpload');
             throw new Error('optimizeImageForUpload is not a function');
@@ -309,16 +314,19 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           console.log(`Optimized image: ${upload.file.name}, new size: ${fileToUpload.size} (${Math.round(fileToUpload.size / upload.file.size * 100)}% of original)`);
         } catch (optimizeError) {
           console.error(`Error optimizing file ${upload.file.name}:`, optimizeError);
+          // Continue with original file if optimization fails
           console.log(`Using original file for ${upload.file.name} due to optimization error`);
         }
       }
 
       updateUploadStatus(upload.id, 'uploading', 15);
 
+      // Upload the image (optimized or original)
       const imageUrl = await uploadReceiptImage(
         fileToUpload,
         user.id,
         (progress) => {
+          // Scale progress to 15-50%
           const scaledProgress = 15 + Math.floor(progress * 0.35);
           updateUploadStatus(upload.id, 'uploading', scaledProgress);
         }
@@ -330,6 +338,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
       updateUploadStatus(upload.id, 'uploading', 50);
 
+      // Create receipt record
       const today = new Date().toISOString().split('T')[0];
       const newReceiptId = await createReceipt({
         merchant: "Processing...",
@@ -338,11 +347,16 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         currency: "MYR",
         status: "unreviewed",
         image_url: imageUrl,
+        // user_id is added by the createReceipt function
         processing_status: 'uploading',
         primary_method: settings.processingMethod,
         model_used: settings.selectedModel,
         has_alternative_data: settings.compareWithAlternative,
-        payment_method: ""
+        payment_method: "" // Add required field
+      }, [], {
+        merchant: 0,
+        date: 0,
+        total: 0
       });
 
       if (!newReceiptId) {
@@ -352,9 +366,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       // Store the receipt ID for this upload
       setReceiptIds(prev => ({ ...prev, [upload.id]: newReceiptId }));
 
+      // Mark as uploaded
       await markReceiptUploaded(newReceiptId);
       updateUploadStatus(upload.id, 'processing', 60);
 
+      // Subscribe to status updates for this receipt
       const statusChannel = supabase.channel(`receipt-status-${newReceiptId}`)
         .on(
           'postgres_changes',
@@ -367,6 +383,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           (payload) => {
             const newStatus = payload.new.processing_status as ProcessingStatus;
             const newError = payload.new.processing_error;
+
+            // Update progress based on processing status
+            console.log(`Receipt ${newReceiptId} status updated to ${newStatus}`);
 
             if (newStatus === 'processing_ocr') {
               updateUploadStatus(upload.id, 'processing', 70);
@@ -392,6 +411,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         )
         .subscribe();
 
+      // Process the receipt with enhanced fallback if available
       try {
         console.log(`Processing receipt ${newReceiptId}...`);
 
@@ -421,6 +441,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
             }
           );
         } else {
+          // Fallback to original processing
           result = await processReceiptWithOCR(newReceiptId, {
             primaryMethod: recommendation?.recommendedMethod || settings.processingMethod,
             modelId: recommendation?.recommendedModel || settings.selectedModel,
@@ -430,11 +451,16 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
         console.log(`Processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
 
+        // If we got a successful result, update the status to completed
+        // This is a fallback in case the realtime subscription doesn't catch the update
         if (result) {
+          // Force update to completed status immediately
           updateUploadStatus(upload.id, 'completed', 100);
           statusChannel.unsubscribe();
 
+          // Also check after a short delay in case the first update didn't take effect
           setTimeout(() => {
+            // Check if this upload is still in processing status
             const currentUpload = batchUploads.find(u => u.id === upload.id);
             if (currentUpload && currentUpload.status === 'processing') {
               console.log(`Manually completing upload ${upload.id} after successful processing`);
@@ -467,14 +493,17 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const processNextBatch = useCallback(async () => {
     if (!processingRef.current || isPaused) return;
 
+    // Get pending uploads that aren't already being processed
     const pendingUploads = batchUploads.filter(upload =>
       upload.status === 'pending' && !activeUploads.includes(upload.id)
     );
 
+    // If no more pending uploads, we're done
     if (pendingUploads.length === 0) {
       setIsProcessing(false);
       processingRef.current = false;
 
+      // Show completion toast
       const totalCount = batchUploads.length;
       const successCount = completedUploads.length;
       const failureCount = failedUploads.length;
@@ -490,16 +519,20 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // Calculate how many new uploads we can start
     const currentActive = activeUploads.length;
     const slotsAvailable = maxConcurrent - currentActive;
 
     if (slotsAvailable <= 0) return;
 
+    // Get the next batch of uploads to process
     const nextBatch = pendingUploads.slice(0, slotsAvailable);
 
+    // Mark these as active
     const newActiveIds = nextBatch.map(upload => upload.id);
     setActiveUploads(prev => [...prev, ...newActiveIds]);
 
+    // Process each file in parallel
     nextBatch.forEach(upload => {
       processFile(upload).catch(error => {
         console.error(`Error processing file ${upload.id}:`, error);
@@ -515,12 +548,14 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // If paused, just resume
     if (isPaused) {
       setIsPaused(false);
       toast.info("Resuming batch processing");
       return;
     }
 
+    // Check if there are any pending uploads
     const pendingUploads = batchUploads.filter(upload => upload.status === 'pending');
 
     console.log('Pending uploads:', pendingUploads.length);
@@ -531,12 +566,14 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // Start processing
     setIsProcessing(true);
     processingRef.current = true;
     setIsPaused(false);
 
     toast.info(`Starting batch processing of ${pendingUploads.length} files`);
 
+    // Kick off the first batch
     processNextBatch();
   }, [batchUploads, isPaused, processNextBatch]);
 
@@ -560,34 +597,43 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // If it's already completed or failed, we can't cancel it
     if (upload.status === 'completed' || upload.status === 'error') {
       toast.info(`Cannot cancel upload that is already ${upload.status}`);
       return;
     }
 
+    // If it's active, mark it as failed
     if (activeUploads.includes(uploadId)) {
       updateUploadStatus(uploadId, 'error', 0, {
         code: 'CANCELLED',
         message: 'Upload cancelled by user'
       });
 
+      // If we have a receipt ID, update its status
       const receiptId = receiptIds[uploadId];
       if (receiptId) {
-        const { error } = await supabase
-          .from('receipts')
-          .update({
-            processing_status: 'failed_ocr',
-            processing_error: 'Cancelled by user'
-          })
-          .eq('id', receiptId);
+        // Update the receipt status to failed
+        try {
+          const { error } = await supabase
+            .from('receipts')
+            .update({
+              processing_status: 'failed_ocr',
+              processing_error: 'Cancelled by user'
+            })
+            .eq('id', receiptId);
 
-        if (error) {
-          console.error(`Failed to update receipt ${receiptId} status:`, error);
-        } else {
-          console.log(`Updated receipt ${receiptId} status to failed_ocr`);
+          if (error) {
+            console.error(`Failed to update receipt ${receiptId} status:`, error);
+          } else {
+            console.log(`Updated receipt ${receiptId} status to failed_ocr`);
+          }
+        } catch (error) {
+          console.error(`Exception updating receipt ${receiptId} status:`, error);
         }
       }
     } else {
+      // If it's pending, just remove it from the queue
       removeFromBatchQueue(uploadId);
     }
   }, [batchUploads, activeUploads, receiptIds, removeFromBatchQueue, updateUploadStatus]);
@@ -601,11 +647,13 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // Only retry failed uploads
     if (upload.status !== 'error') {
       toast.info(`Can only retry failed uploads`);
       return;
     }
 
+    // Create a new upload with the same file
     const newUpload: ReceiptUpload = {
       id: crypto.randomUUID(),
       file: upload.file,
@@ -613,13 +661,16 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       uploadProgress: 0
     };
 
+    // Add the new upload to the queue
     setBatchUploads(prev => [...prev, newUpload]);
 
+    // Remove the failed upload
     removeFromBatchQueue(uploadId);
     setFailedUploads(prev => prev.filter(id => id !== uploadId));
 
     toast.info("Upload queued for retry");
 
+    // If processing is active, the new upload will be picked up automatically
     if (!isProcessing && autoStart) {
       setTimeout(() => {
         startBatchProcessing();
@@ -637,6 +688,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     console.log('isProcessing:', isProcessing);
     console.log('isPaused:', isPaused);
 
+    // Log detailed progress information
     if (batchUploads.length > 0) {
       console.log('Upload progress details:', {
         totalProgress: calculateTotalProgress(),
@@ -647,6 +699,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         uploadStatuses: batchUploads.map(u => ({ id: u.id, status: u.status, progress: u.uploadProgress }))
       });
 
+      // Log each upload in detail
       batchUploads.forEach((upload, index) => {
         console.log(`Upload ${index + 1}:`, {
           id: upload.id,
@@ -664,6 +717,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   // Effect to process next batch when active uploads change
   useEffect(() => {
     if (processingRef.current && !isPaused) {
+      // Use a small timeout to avoid potential race conditions
       const timer = setTimeout(() => {
         processNextBatch();
       }, 100);
@@ -678,6 +732,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     console.log('Files type:', Object.prototype.toString.call(files));
     console.log('Files length:', files.length);
 
+    // Ensure we have an array to work with
     let filesArray: File[];
     if (files instanceof FileList) {
       filesArray = Array.from(files);
@@ -691,6 +746,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
     console.log('Converted files to array with length:', filesArray.length);
 
+    // Instead of using baseUpload.handleFiles, directly validate and add files
     const validFiles = filesArray.filter(file => {
       if (!file) {
         console.error("Null or undefined file found in array");
@@ -717,9 +773,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     });
 
     if (validFiles && validFiles.length > 0) {
+      // Add to our batch queue
       const result = addToBatchQueue(validFiles);
       console.log('Result from addToBatchQueue in handleFiles:', result);
 
+      // Reset the base hook's uploads to avoid duplication
       baseUpload.resetUpload();
     } else {
       console.error('No valid files found in useBatchFileUpload handleFiles');
@@ -728,9 +786,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   }, [baseUpload, addToBatchQueue]);
 
   return {
+    // Base file upload properties and methods
     ...baseUpload,
     handleFiles,
 
+    // Batch-specific state
     batchUploads,
     isProcessing,
     isPaused,
@@ -740,6 +800,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     failedUploads: currentlyFailedUploads,
     totalProgress: calculateTotalProgress(),
 
+    // Batch-specific methods
     addToBatchQueue,
     removeFromBatchQueue,
     clearBatchQueue,
@@ -749,6 +810,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     cancelUpload,
     retryUpload,
 
+    // Receipt IDs for navigation
     receiptIds
   };
 }

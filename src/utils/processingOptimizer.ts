@@ -1,4 +1,3 @@
-
 /**
  * Intelligent processing optimization utilities
  * Provides automatic fallback mechanisms and processing method selection
@@ -30,25 +29,6 @@ export interface FileAnalysis {
   complexity: 'low' | 'medium' | 'high';
   isOptimized: boolean;
   estimatedProcessingDifficulty: number; // 1-10 scale
-}
-
-// Add missing type definitions
-export type SystemLoad = 'low' | 'medium' | 'high';
-
-export interface QueueItem {
-  id: string;
-  priority: 'low' | 'medium' | 'high';
-  estimatedProcessingTime: number;
-}
-
-export interface ProcessingPlan {
-  batches: {
-    items: QueueItem[];
-    estimatedTime: number;
-    priority: 'low' | 'medium' | 'high';
-  }[];
-  estimatedTime: number;
-  recommendedConcurrency: number;
 }
 
 // Import model configurations from the centralized config
@@ -162,7 +142,6 @@ export function getProcessingRecommendation(
     }
   }
 
-  // Fix the type comparison by using explicit checks
   if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
     recommendedMethod = 'ai-vision';
     recommendedModel = 'gemini-2.0-flash-lite';
@@ -325,69 +304,4 @@ export function getBatchProcessingOptimization(files: File[]): {
       estimatedTotalTime
     }
   };
-}
-
-/**
- * Optimize processing queue based on system load
- */
-export function optimizeProcessingQueue(
-  items: QueueItem[],
-  systemLoad: SystemLoad = 'medium'
-): ProcessingPlan {
-  const plan: ProcessingPlan = {
-    batches: [],
-    estimatedTime: 0,
-    recommendedConcurrency: getRecommendedConcurrency(systemLoad)
-  };
-
-  if (items.length === 0) {
-    return plan;
-  }
-
-  // Sort items by priority and size
-  const sortedItems = [...items].sort((a, b) => {
-    const priorityOrder = { high: 3, medium: 2, low: 1 };
-    const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
-    
-    if (priorityDiff !== 0) return priorityDiff;
-    
-    // For same priority, smaller files first for faster feedback
-    return a.estimatedProcessingTime - b.estimatedProcessingTime;
-  });
-
-  // Group into batches
-  const batchSize = getBatchSize(systemLoad);
-  for (let i = 0; i < sortedItems.length; i += batchSize) {
-    const batchItems = sortedItems.slice(i, i + batchSize);
-    const maxTime = Math.max(...batchItems.map(item => item.estimatedProcessingTime));
-    
-    plan.batches.push({
-      items: batchItems,
-      estimatedTime: maxTime,
-      priority: batchItems[0].priority
-    });
-  }
-
-  // Calculate total estimated time
-  plan.estimatedTime = plan.batches.reduce((total, batch) => total + batch.estimatedTime, 0);
-
-  return plan;
-}
-
-function getRecommendedConcurrency(systemLoad: SystemLoad): number {
-  switch (systemLoad) {
-    case 'low': return 2;
-    case 'medium': return 3;
-    case 'high': return 1;
-    default: return 2;
-  }
-}
-
-function getBatchSize(systemLoad: SystemLoad): number {
-  switch (systemLoad) {
-    case 'low': return 8;
-    case 'medium': return 5;
-    case 'high': return 2;
-    default: return 5;
-  }
 }

@@ -5,107 +5,77 @@ import type { AdminUser, AppRole } from '@/types/auth';
 export class AdminService {
   async getAllUsers(): Promise<AdminUser[]> {
     try {
-      // Use the existing get_admin_users function instead of get_all_users
-      const { data: adminUsers, error: adminError } = await supabase.rpc('get_admin_users');
+      // Get users from auth.users via RPC call
+      const { data: authUsers, error: authError } = await supabase.rpc('get_all_users');
       
-      if (adminError) {
-        console.error('Error fetching admin users:', adminError);
-        throw adminError;
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+        throw authError;
       }
 
-      if (!adminUsers || !Array.isArray(adminUsers) || adminUsers.length === 0) {
+      if (!authUsers || authUsers.length === 0) {
         return [];
       }
 
-      // Transform the data to match AdminUser interface
-      const transformedUsers: AdminUser[] = adminUsers.map((user: any) => ({
-        id: user.id,
-        email: user.email || '',
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        confirmed_at: user.confirmed_at || '',
-        last_sign_in_at: user.last_sign_in_at || '',
-        created_at: user.created_at || '',
-        roles: Array.isArray(user.roles) ? user.roles : []
-      }));
+      // Get user roles
+      const userIds = authUsers.map((user: any) => user.id);
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
 
-      return transformedUsers;
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        throw rolesError;
+      }
+
+      // Get profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        // Don't throw here, profiles might not exist for all users
+      }
+
+      // Create a map of user roles
+      const rolesMap = new Map<string, AppRole[]>();
+      userRoles?.forEach((ur: any) => {
+        const userId = ur.user_id;
+        if (!rolesMap.has(userId)) {
+          rolesMap.set(userId, []);
+        }
+        rolesMap.get(userId)!.push(ur.role as AppRole);
+      });
+
+      // Create a map of profiles
+      const profilesMap = new Map<string, any>();
+      profiles?.forEach((profile: any) => {
+        profilesMap.set(profile.id, profile);
+      });
+
+      // Combine auth users with roles and profiles
+      const adminUsers: AdminUser[] = authUsers.map((authUser: any) => {
+        const profile = profilesMap.get(authUser.id);
+        const roles = rolesMap.get(authUser.id) || [];
+
+        return {
+          id: authUser.id,
+          email: authUser.email || '',
+          first_name: profile?.first_name || authUser.user_metadata?.first_name || '',
+          last_name: profile?.last_name || authUser.user_metadata?.last_name || '',
+          confirmed_at: authUser.confirmed_at || '',
+          last_sign_in_at: authUser.last_sign_in_at || '',
+          created_at: authUser.created_at || '',
+          roles: roles
+        };
+      });
+
+      return adminUsers;
     } catch (error) {
       console.error('Error in getAllUsers:', error);
-      throw error;
-    }
-  }
-
-  async getAllReceipts(): Promise<any[]> {
-    try {
-      const { data: receipts, error } = await supabase
-        .from('receipts')
-        .select(`
-          *,
-          profiles!receipts_user_id_fkey(email)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching receipts:', error);
-        throw error;
-      }
-
-      return receipts || [];
-    } catch (error) {
-      console.error('Error in getAllReceipts:', error);
-      throw error;
-    }
-  }
-
-  async getSystemStats(): Promise<{
-    userCount: number;
-    receiptCount: number;
-    recentActivity: any[];
-  }> {
-    try {
-      // Get user count
-      const { count: userCount, error: userError } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true });
-
-      if (userError) {
-        console.error('Error getting user count:', userError);
-      }
-
-      // Get receipt count
-      const { count: receiptCount, error: receiptError } = await supabase
-        .from('receipts')
-        .select('id', { count: 'exact', head: true });
-
-      if (receiptError) {
-        console.error('Error getting receipt count:', receiptError);
-      }
-
-      // Get recent activity (last 10 receipts)
-      const { data: recentActivity, error: activityError } = await supabase
-        .from('receipts')
-        .select(`
-          id,
-          merchant,
-          total,
-          date,
-          profiles!receipts_user_id_fkey(first_name, last_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (activityError) {
-        console.error('Error getting recent activity:', activityError);
-      }
-
-      return {
-        userCount: userCount || 0,
-        receiptCount: receiptCount || 0,
-        recentActivity: recentActivity || []
-      };
-    } catch (error) {
-      console.error('Error in getSystemStats:', error);
       throw error;
     }
   }
@@ -140,30 +110,14 @@ export class AdminService {
 
   async getReceiptStats() {
     try {
-      // Query the receipt_embeddings table directly instead of using RPC
-      const { count: totalEmbeddings, error: embeddingError } = await supabase
-        .from('receipt_embeddings')
-        .select('receipt_id', { count: 'exact', head: true });
-
-      if (embeddingError) {
-        console.error('Error fetching receipt embeddings count:', embeddingError);
-        throw embeddingError;
+      const { data, error } = await supabase.rpc('get_receipt_stats');
+      
+      if (error) {
+        console.error('Error fetching receipt stats:', error);
+        throw error;
       }
 
-      const { count: totalReceipts, error: receiptError } = await supabase
-        .from('receipts')
-        .select('id', { count: 'exact', head: true });
-
-      if (receiptError) {
-        console.error('Error fetching total receipts count:', receiptError);
-        throw receiptError;
-      }
-
-      return {
-        total_receipts: totalReceipts || 0,
-        receipts_with_embeddings: totalEmbeddings || 0,
-        receipts_without_embeddings: Math.max(0, (totalReceipts || 0) - (totalEmbeddings || 0))
-      };
+      return data;
     } catch (error) {
       console.error('Error in getReceiptStats:', error);
       throw error;
@@ -172,4 +126,3 @@ export class AdminService {
 }
 
 export const adminService = new AdminService();
-export type { AdminUser };
