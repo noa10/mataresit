@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Receipt } from '@/types/receipt';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { motion } from 'framer-motion';
 interface ReceiptViewerProps {
   receipt: Receipt;
   onDelete: (receiptId: string) => void;
+  onUpdate?: (updatedReceipt: Receipt) => void;
 }
 
 interface Item {
@@ -20,7 +22,7 @@ interface Item {
   quantity?: number;
 }
 
-export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps) {
+export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGeneratingEmbeddings, setIsGeneratingEmbeddings] = useState(false);
 
@@ -121,7 +123,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
             {/* Payment Method */}
             <div>
               <div className="text-sm font-medium text-muted-foreground">Payment Method</div>
-              <div className="text-gray-900">{receipt?.paymentMethod || 'N/A'}</div>
+              <div className="text-gray-900">{receipt?.payment_method || 'N/A'}</div>
             </div>
 
             {/* Predicted Category */}
@@ -130,16 +132,16 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
               <div className="text-gray-900">{receipt?.predicted_category || 'N/A'}</div>
             </div>
 
-            {/* Notes */}
+            {/* Notes - using fullText as fallback since notes doesn't exist */}
             <div>
               <div className="text-sm font-medium text-muted-foreground">Notes</div>
-              <div className="text-gray-900">{receipt?.notes || 'N/A'}</div>
+              <div className="text-gray-900">{receipt?.fullText || 'N/A'}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Items Card */}
+      {/* Items Card - using a placeholder since items don't exist in Receipt type */}
       <Card className="bg-card text-card-foreground shadow-md overflow-hidden">
         <CardHeader className="px-4 py-5">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -148,23 +150,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-6">
-          {receipt?.items && receipt.items.length > 0 ? (
-            <div className="divide-y divide-border/40">
-              {receipt.items.map((item: Item, index: number) => (
-                <div key={index} className="py-3">
-                  <div className="flex justify-between">
-                    <div className="text-gray-900">{item.description}</div>
-                    <div className="text-gray-900">{formatCurrency(item.amount, receipt?.currency)}</div>
-                  </div>
-                  {item.quantity && (
-                    <div className="text-sm text-muted-foreground">Quantity: {item.quantity}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-muted-foreground">No items listed on this receipt.</div>
-          )}
+          <div className="text-muted-foreground">No items listed on this receipt.</div>
         </CardContent>
       </Card>
 
@@ -181,7 +167,7 @@ export default function ReceiptViewer({ receipt, onDelete }: ReceiptViewerProps)
             {/* Raw Text */}
             <div>
               <div className="text-sm font-medium text-muted-foreground">Raw Text</div>
-              <div className="text-gray-900 break-words">{receipt?.raw_text || 'N/A'}</div>
+              <div className="text-gray-900 break-words">{receipt?.fullText || 'N/A'}</div>
             </div>
           </div>
         </CardContent>

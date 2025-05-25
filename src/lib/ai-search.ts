@@ -1,1329 +1,230 @@
-import { supabase } from './supabase';
-import { callEdgeFunction } from './edge-function-utils';
+import { supabase } from "@/integrations/supabase/client";
 
-/**
- * Type definitions for semantic search
- */
-export interface SearchParams {
-  query: string;
-  contentType?: 'fullText' | 'merchant' | 'notes';
-  limit?: number;
-  offset?: number;
-  startDate?: string;
-  endDate?: string;
-  minAmount?: number;
-  maxAmount?: number;
-  categories?: string[];
-  merchants?: string[];
-  isNaturalLanguage?: boolean;
-  isVectorSearch?: boolean;
-  searchTarget?: 'receipts' | 'line_items' | 'all';
-}
-
-export interface ReceiptWithSimilarity {
+// Simplified SearchResult type to avoid deep recursion
+export interface SearchResult {
   id: string;
   merchant: string;
   date: string;
   total: number;
-  notes?: string;
-  raw_text?: string;
+  currency: string;
+  similarity: number;
+  created_at: string;
+  payment_method?: string;
   predicted_category?: string;
-  similarity_score: number;
+  thumbnail_url?: string;
+  image_url?: string;
 }
 
 export interface LineItemSearchResult {
   line_item_id: string;
   receipt_id: string;
-  line_item_description: string;
-  line_item_quantity?: number;
-  line_item_price?: number;
-  line_item_amount?: number;
-  parent_receipt_merchant: string;
-  parent_receipt_date: string;
-  parent_receipt_id?: string;
-  receipt?: {
-    id: string;
-    merchant?: string;
-    date?: string;
-  };
+  description: string;
+  amount: number;
+  merchant: string;
+  date: string;
+  total: number;
+  currency: string;
   similarity: number;
+  thumbnail_url?: string;
+  image_url?: string;
+}
+
+export interface SearchFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  merchant?: string;
+  category?: string;
+  paymentMethod?: string;
 }
 
 /**
- * Simplify the type to avoid excessive depth
- */
-export interface SearchResult {
-  receipts?: ReceiptWithSimilarity[];
-  lineItems?: LineItemSearchResult[];
-  results?: any[]; // Simplified to avoid type instantiation depth issues
-  count: number;
-  total: number;
-  searchParams: SearchParams;
-}
-
-/**
- * Perform semantic search on receipts
- */
-export async function semanticSearch(params: SearchParams): Promise<SearchResult> {
-  try {
-    // Check if query is empty
-    if (!params.query || params.query.trim() === '') {
-      console.error('Empty search query');
-      return {
-        receipts: [],
-        lineItems: [],
-        results: [],
-        count: 0,
-        total: 0,
-        searchParams: params,
-      };
-    }
-
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.error('User is not authenticated');
-      return {
-        receipts: [],
-        lineItems: [],
-        results: [],
-        count: 0,
-        total: 0,
-        searchParams: params,
-      };
-    }
-
-    // Helper function to process search results from the edge function
-    function handleSearchResults(data: any, searchTarget: string): SearchResult {
-      console.log('Processing search results from API:', {
-        target: searchTarget,
-        hasLineItems: !!data.results.lineItems,
-        hasReceipts: !!data.results.receipts,
-        raw: data.results
-      });
-
-      let results: SearchResult = {
-        receipts: [],
-        lineItems: [],
-        results: [],
-        count: data.results?.count || 0,
-        total: data.results?.total || 0,
-        searchParams: data.searchParams,
-      };
-
-      // Handle line item search results
-      if (searchTarget === 'line_items') {
-        // Try various possible response formats
-        if (data.results.lineItems && Array.isArray(data.results.lineItems)) {
-          console.log('Using lineItems array directly from results');
-
-          // Add validation for receipt_id before assigning
-          results.lineItems = data.results.lineItems.map((item: any) => {
-            // Check for receipt_id from various sources
-            let effectiveReceiptId = item.receipt_id;
-
-            // Try to find the receipt_id from various possible locations
-            if (!effectiveReceiptId && item.parent_receipt_id) {
-              effectiveReceiptId = item.parent_receipt_id;
-              console.log(`Using parent_receipt_id for line item:`, item.line_item_id);
-            }
-
-            // Check if receipt_id is missing and log it
-            if (!effectiveReceiptId) {
-              console.warn('Line item missing receipt_id:', item);
-            }
-
-            return {
-              line_item_id: item.line_item_id || item.id || `item-${Math.random().toString(36).substring(2, 10)}`,
-              receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
-              line_item_description: item.line_item_description || item.description || 'Unknown item',
-              line_item_quantity: item.line_item_quantity || item.quantity || 1,
-              line_item_price: item.line_item_price || item.price || item.amount || 0,
-              line_item_amount: item.line_item_amount || item.amount || item.price || 0,
-              parent_receipt_merchant: item.parent_receipt_merchant || item.merchant || 'Unknown merchant',
-              parent_receipt_date: item.parent_receipt_date || item.date || '',
-              parent_receipt_id: item.parent_receipt_id || effectiveReceiptId || '', // Ensure parent_receipt_id is set
-              similarity: item.similarity || item.similarity_score || 0
-            };
-          });
-        }
-        else if (data.results.receipts && Array.isArray(data.results.receipts) && searchTarget === 'line_items') {
-          console.log('Converting receipts format to lineItems format');
-
-          results.lineItems = data.results.receipts.map((item: any) => {
-            // Check for receipt_id from various sources
-            let effectiveReceiptId = item.receipt_id || item.id;
-
-            // Check if receipt_id is missing and log it
-            if (!effectiveReceiptId) {
-              console.warn('Line item (from receipts format) missing receipt_id:', item);
-            }
-
-            return {
-              line_item_id: item.id || item.line_item_id || `item-${Math.random().toString(36).substring(2, 10)}`,
-              receipt_id: effectiveReceiptId || '', // Use the effective receipt ID, ensuring at least empty string
-              line_item_description: item.description || item.line_item_description || 'Unknown item',
-              line_item_price: item.amount || item.line_item_price || item.price || 0,
-              line_item_quantity: item.quantity || 1,
-              parent_receipt_merchant: item.parent_receipt_merchant || item.merchant || 'Unknown merchant',
-              parent_receipt_date: item.parent_receipt_date || item.date || '',
-              parent_receipt_id: effectiveReceiptId || '', // Ensure parent_receipt_id is set
-              similarity: item.similarity_score || item.similarity || 0
-            };
-          });
-        }
-      }
-      // Handle receipt search results
-      else if (data.results.receipts) {
-        results.receipts = data.results.receipts;
-      }
-
-      // Add validation check for lineItems with missing receipt_id
-      if (results.lineItems && results.lineItems.length > 0) {
-        // Direct count of missing ids instead of complex filtering
-        let missingCount = 0;
-
-        // Attempt to repair missing receipt_ids based on other data
-        for (let i = 0; i < results.lineItems.length; i++) {
-          const item = results.lineItems[i];
-
-          // If receipt_id is missing, try to extract it from line_item_id if possible
-          if (!item.receipt_id) {
-            missingCount++;
-
-            // Some line item IDs might be formatted as "receipt_id:line_number"
-            if (item.line_item_id && item.line_item_id.includes(':')) {
-              const parts = item.line_item_id.split(':');
-              if (parts.length > 1) {
-                console.log(`Repairing missing receipt_id for item ${item.line_item_id} -> ${parts[0]}`);
-                results.lineItems[i].receipt_id = parts[0];
-              }
-            }
-          }
-        }
-
-        if (missingCount > 0) {
-          console.error(`Warning: ${missingCount} out of ${results.lineItems.length} line items are missing receipt_id`);
-        }
-      }
-
-      // Populate the unified results array for all search types
-      if (searchTarget === 'all') {
-        // Combine receipts and line items into a single array
-        results.results = [
-          ...(results.receipts || []),
-          ...(results.lineItems || [])
-        ];
-
-        // Sort by similarity score (highest first)
-        results.results.sort((a, b) => {
-          const scoreA = 'similarity_score' in a ? a.similarity_score : ('similarity' in a ? a.similarity : 0);
-          const scoreB = 'similarity_score' in b ? b.similarity_score : ('similarity' in b ? b.similarity : 0);
-          return scoreB - scoreA;
-        });
-
-        // Update the count and total to reflect the combined results
-        results.count = results.results.length;
-        results.total = (results.receipts?.length || 0) + (results.lineItems?.length || 0);
-      } else if (searchTarget === 'receipts') {
-        // For backward compatibility, populate results with receipts
-        results.results = [...(results.receipts || [])];
-      } else if (searchTarget === 'line_items') {
-        // For backward compatibility, populate results with line items
-        results.results = [...(results.lineItems || [])];
-      }
-
-      console.log('Processed results:', {
-        type: searchTarget,
-        lineItemsCount: results.lineItems?.length || 0,
-        receiptsCount: results.receipts?.length || 0,
-        unifiedResultsCount: results.results?.length || 0,
-        total: results.total
-      });
-
-      return results;
-    }
-
-    try {
-      console.log('Performing semantic search using utility function...', params);
-
-      // Try the edge function approach first
-      try {
-        // Use the utility function to call the semantic-search edge function
-        const data = await callEdgeFunction('semantic-search', 'POST', params);
-        console.log('Semantic search response:', data);
-
-        if (!data || !data.success) {
-          throw new Error(data?.error || 'Unknown error in semantic search');
-        }
-
-        // Process results using our helper function
-        const results = handleSearchResults(data, params.searchTarget || 'receipts');
-
-        // If no results found, try fallback search (only for receipts)
-        // Note: We previously skipped fallback for merchant similarity searches,
-        // but now we allow fallback to ensure similar receipts are found
-
-        if (params.searchTarget === 'all') {
-          // For 'all' search, check if both receipts and line items are empty
-          if ((!results.receipts || results.receipts.length === 0) &&
-              (!results.lineItems || results.lineItems.length === 0)) {
-            console.log('No results from unified search, trying fallback search');
-            return await fallbackBasicSearch(params);
-          }
-        } else if ((params.searchTarget === 'receipts' && (!results.receipts || results.receipts.length === 0)) ||
-                  (params.searchTarget === 'line_items' && (!results.lineItems || results.lineItems.length === 0))) {
-          console.log('No results from vector search, trying fallback search');
-          // Use fallback for all search types to improve recall
-          return await fallbackBasicSearch(params);
-        }
-
-        return results;
-      } catch (edgeFunctionError) {
-        console.warn('Edge function approach failed, trying fallback search:', edgeFunctionError);
-
-        // Skip the database function altogether and go straight to the JavaScript fallback
-        return await fallbackBasicSearch(params);
-      }
-    } catch (vectorError) {
-      console.warn('All vector search methods failed, falling back to basic search:', vectorError);
-
-      // Fallback to basic text search if vector search fails
-      return await fallbackBasicSearch(params);
-    }
-  } catch (error) {
-    console.error('Error in semanticSearch:', error);
-    throw error;
-  }
-}
-
-/**
- * Fallback to basic text search when vector search is unavailable
- */
-async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> {
-  const { query, limit = 10, offset = 0 } = params;
-
-  // Support fallback search for all search targets
-  const isLineItemSearch = params.searchTarget === 'line_items';
-  const isUnifiedSearch = params.searchTarget === 'all';
-
-  console.log(`Fallback search for target: ${params.searchTarget}`);
-
-  // We'll always search receipts, and optionally line items based on search target
-
-  // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    console.error('User is not authenticated for fallback search');
-    return {
-      receipts: [],
-      lineItems: [],
-      results: [],
-      count: 0,
-      total: 0,
-      searchParams: params,
-    };
-  }
-
-  console.log('Starting fallback search with query:', query);
-
-  try {
-    // Build a basic text search query
-    // First, try to get at least some results by using a very simple query
-    let textQuery = supabase
-      .from('receipts')
-      .select('*')
-      .limit(limit)
-      .order('date', { ascending: false });
-
-    // If we have a specific query, use it to filter
-    if (query && query.trim() !== '') {
-      console.log('Performing text search with query:', query);
-
-      try {
-        // Try individual filter approach (more reliable but potentially slower)
-        const { data: merchantData, error: merchantError } = await supabase
-          .from('receipts')
-          .select('*')
-          .ilike('merchant', `%${query}%`)
-          .order('date', { ascending: false })
-          .limit(limit);
-
-        const { data: categoryData, error: categoryError } = await supabase
-          .from('receipts')
-          .select('*')
-          .ilike('predicted_category', `%${query}%`)
-          .order('date', { ascending: false })
-          .limit(limit);
-
-        // Note: fullText column is case-sensitive, so need to use a different approach
-        const { data: fullTextData, error: fullTextError } = await supabase
-          .from('receipts')
-          .select('*')
-          .filter('LOWER("fullText")', 'ilike', `%${query.toLowerCase()}%`)
-          .order('date', { ascending: false })
-          .limit(limit);
-
-        // Combine results and remove duplicates
-        const combinedResults = [...(merchantData || []), ...(categoryData || []), ...(fullTextData || [])];
-        const uniqueResults = Array.from(new Map(combinedResults.map(item => [item.id, item])).values());
-
-        console.log(`Found results: merchant(${merchantData?.length || 0}), category(${categoryData?.length || 0}), fullText(${fullTextData?.length || 0})`);
-
-        // If we found results with individual queries, return them
-        if (uniqueResults.length > 0) {
-          // Sort by date
-          uniqueResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-          // Apply pagination
-          const paginatedResults = uniqueResults.slice(offset, offset + limit);
-
-          // Add similarity score
-          const receiptsWithScores = paginatedResults.map(receipt => ({
-            ...receipt,
-            similarity_score: 0 // No meaningful similarity score in fallback search
-          }));
-
-          const results: SearchResult = {
-            receipts: receiptsWithScores,
-            lineItems: [],
-            results: receiptsWithScores, // Add to unified results array
-            count: receiptsWithScores.length,
-            total: uniqueResults.length,
-            searchParams: {
-              ...params,
-              isVectorSearch: false,
-            },
-          };
-
-          console.log('Returning combined fallback results:', results.count);
-          return results;
-        }
-      } catch (individualQueryError) {
-        console.error('Error with individual query approach:', individualQueryError);
-      }
-
-      // If individual queries didn't work or didn't find results, try simpler approach
-      textQuery = supabase
-        .from('receipts')
-        .select('*')
-        .ilike('merchant', `%${query}%`)
-        .order('date', { ascending: false })
-        .range(offset, offset + limit - 1);
-    }
-
-    console.log('Fallback to simple merchant search query:', query);
-
-    // Apply date filters if present
-    if (params.startDate) {
-      textQuery = textQuery.gte('date', params.startDate);
-    }
-
-    if (params.endDate) {
-      textQuery = textQuery.lte('date', params.endDate);
-    }
-
-    // Execute the query
-    const { data, error, count } = await textQuery;
-    console.log('Simple fallback search results:', { count: data?.length || 0, error: error?.message || 'none' });
-
-    if (error) {
-      console.error('Fallback search error:', error);
-      throw error;
-    }
-
-    // Add similarity_score to make receipts compatible with ReceiptWithSimilarity type
-    const receiptsWithScores = (data || []).map(receipt => ({
-      ...receipt,
-      similarity_score: 0 // No meaningful similarity score in fallback search
-    }));
-
-    // If we're searching for line items or all, also search line items
-    let lineItems: any[] = [];
-
-    if (isLineItemSearch || isUnifiedSearch) {
-      try {
-        console.log('Performing fallback line item search with query:', query);
-
-        // Search line items by description
-        // Use a simpler query to avoid relationship issues
-        const { data: lineItemData, error: lineItemError } = await supabase
-          .from('line_items')
-          .select('id, receipt_id, description, amount, created_at')
-          .ilike('description', `%${query}%`)
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        // If we found line items, get the receipt data separately
-        let receiptData = {};
-        if (lineItemData && lineItemData.length > 0) {
-          const receiptIds = lineItemData.map(item => item.receipt_id);
-          const { data: receipts } = await supabase
-            .from('receipts')
-            .select('id, merchant, date')
-            .in('id', receiptIds);
-
-          // Create a lookup map for receipts
-          if (receipts) {
-            receiptData = receipts.reduce((acc, receipt) => {
-              acc[receipt.id] = receipt;
-              return acc;
-            }, {});
-          }
-        }
-
-        if (lineItemError) {
-          console.error('Line item fallback search error:', lineItemError);
-        } else if (lineItemData && lineItemData.length > 0) {
-          console.log(`Found ${lineItemData.length} line items in fallback search`);
-
-          // Format line items to match the expected structure
-          lineItems = lineItemData.map(item => {
-            const receipt = receiptData[item.receipt_id] || {};
-            return {
-              line_item_id: item.id,
-              receipt_id: item.receipt_id,
-              line_item_description: item.description || 'Unknown item',
-              line_item_amount: item.amount || 0,
-              parent_receipt_merchant: receipt.merchant || 'Unknown merchant',
-              parent_receipt_date: receipt.date || '',
-              similarity: 0 // No meaningful similarity score in fallback search
-            };
-          });
-        }
-      } catch (lineItemError) {
-        console.error('Error in line item fallback search:', lineItemError);
-      }
-    }
-
-    // Combine results based on search target
-    let combinedResults = isLineItemSearch ? lineItems :
-                         isUnifiedSearch ? [...receiptsWithScores, ...lineItems] :
-                         receiptsWithScores;
-
-    const results: SearchResult = {
-      receipts: isLineItemSearch ? [] : receiptsWithScores,
-      lineItems: isLineItemSearch || isUnifiedSearch ? lineItems : [],
-      results: combinedResults,
-      count: combinedResults.length,
-      total: (isLineItemSearch ? 0 : (count || data?.length || 0)) +
-             (isLineItemSearch || isUnifiedSearch ? lineItems.length : 0),
-      searchParams: {
-        ...params,
-        isVectorSearch: false,
-      },
-    };
-
-    console.log('Formatted simple fallback results:', results.count);
-    return results;
-  } catch (error) {
-    console.error('Error in fallback search:', error);
-    return {
-      receipts: [],
-      lineItems: [],
-      results: [],
-      count: 0,
-      total: 0,
-      searchParams: params,
-    };
-  }
-}
-
-/**
- * Check if embeddings exist for a specific receipt
- */
-export async function checkEmbeddings(receiptId: string): Promise<{exists: boolean, count: number}> {
-  try {
-    // Call the edge function to check embeddings
-    const response = await callEdgeFunction('generate-embeddings', 'GET', { receiptId });
-
-    console.log('Embedding check result:', response);
-
-    if (response && response.success) {
-      return {
-        exists: response.count > 0,
-        count: response.count || 0
-      };
-    }
-
-    return { exists: false, count: 0 };
-  } catch (error) {
-    console.error('Error checking embeddings:', error);
-    return { exists: false, count: 0 };
-  }
-}
-
-/**
- * Generate embeddings for a specific receipt
- */
-export async function generateEmbeddings(receiptId: string, model: string = 'gemini-1.5-flash-latest'): Promise<boolean> {
-  try {
-    console.log(`Generating embeddings for receipt ${receiptId} using model ${model}`);
-    const response = await callEdgeFunction('generate-embeddings', 'POST', {
-      receiptId,
-      model,
-      processAllFields: true, // This flag tells the edge function to process all fields
-      // Removed contentTypes as it's not recognized by the edge function
-    });
-
-    return response && response.success;
-  } catch (error) {
-    console.error('Error generating embeddings:', error);
-    return false;
-  }
-}
-
-/**
- * Generate embeddings for multiple receipts
- */
-export async function generateAllEmbeddings(model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
-  success: boolean;
-  count: number;
-  total: number;
-  processed: number;
-  message: string;
-}> {
-  try {
-    console.log(`Starting generateAllEmbeddings with model: ${model}, forceRegenerate: ${forceRegenerate}`);
-
-    // First get all receipts
-    const { data: allReceipts, error: receiptError } = await supabase
-      .from('receipts')
-      .select('id');
-
-    if (receiptError) {
-      console.error('Error fetching all receipts:', receiptError);
-      throw receiptError;
-    }
-
-    if (!allReceipts || allReceipts.length === 0) {
-      console.log('No receipts found in the database');
-      return { success: true, count: 0, total: 0, processed: 0, message: 'No receipts found' };
-    }
-
-    console.log(`Found ${allReceipts.length} total receipts in database`);
-
-    // If we're not forcing regeneration, identify receipts that already have embeddings
-    let receiptsToProcess = [...allReceipts]; // Create a copy to avoid mutation issues
-
-    if (!forceRegenerate) {
-      console.log('Not forcing regeneration, identifying receipts without embeddings');
-
-      // Query for existing embeddings in receipt_embeddings table
-      const { data: existingEmbeddings, error: embeddingsError } = await supabase
-        .from('receipt_embeddings')
-        .select('receipt_id')
-        .not('receipt_id', 'is', null);
-
-      if (embeddingsError) {
-        console.error('Error checking for existing embeddings:', embeddingsError);
-        throw embeddingsError;
-      }
-
-      if (existingEmbeddings && existingEmbeddings.length > 0) {
-        // Create a set of receipt IDs that already have embeddings
-        const existingIds = new Set(existingEmbeddings.map(e => e.receipt_id));
-        console.log(`Found ${existingIds.size} receipts with existing embeddings`);
-
-        // Filter to only process receipts without embeddings
-        receiptsToProcess = allReceipts.filter(r => !existingIds.has(r.id));
-        console.log(`Will process ${receiptsToProcess.length} receipts without embeddings`);
-      } else {
-        console.log('No existing embeddings found, will process all receipts');
-      }
-    } else {
-      console.log(`Forcing regeneration of all ${allReceipts.length} receipts`);
-    }
-
-    if (receiptsToProcess.length === 0) {
-      return {
-        success: true,
-        count: 0,
-        total: allReceipts.length,
-        processed: 0,
-        message: 'All receipts already have embeddings'
-      };
-    }
-
-    // Process each receipt
-    console.log(`Starting batch processing of ${receiptsToProcess.length} receipts`);
-    const results = await Promise.all(
-      receiptsToProcess.map(receipt =>
-        generateEmbeddings(receipt.id, model)
-      )
-    );
-
-    const successCount = results.filter(r => r === true).length;
-    const failedCount = results.filter(r => r === false).length;
-
-    console.log(`Embedding generation complete: ${successCount} successful, ${failedCount} failed`);
-
-    return {
-      success: true,
-      count: successCount,
-      total: allReceipts.length,
-      processed: receiptsToProcess.length,
-      message: `Generated embeddings for ${successCount} receipts out of ${receiptsToProcess.length} attempted.`
-    };
-  } catch (error) {
-    console.error('Error generating all embeddings:', error);
-    return {
-      success: false,
-      count: 0,
-      total: 0,
-      processed: 0,
-      message: `Error generating embeddings: ${error.message || 'Unknown error'}`
-    };
-  }
-}
-
-/**
- * Check if line item embeddings exist in the receipt_embeddings table
- */
-export async function checkLineItemEmbeddings(): Promise<{
-  exists: boolean,
-  count: number,
-  total: number,
-  withEmbeddings: number,
-  withoutEmbeddings: number
-}> {
-  try {
-    // First check if embeddings column exists by getting total count of line items with descriptions
-    // Only count line items with descriptions since those are the only ones we can generate embeddings for
-    const { count: totalLineItems, error: countError } = await supabase
-      .from('line_items')
-      .select('id', { count: 'exact' })
-      .not('description', 'is', null);
-
-    if (countError) throw countError;
-
-    // Count line item embeddings in the receipt_embeddings table
-    // This is the current schema where all embeddings are stored
-    const { count: embeddingsCount, error: embedError } = await supabase
-      .from('receipt_embeddings')
-      .select('id', { count: 'exact' })
-      .eq('content_type', 'line_item');
-
-    if (embedError) {
-      console.error('Error counting line item embeddings:', embedError);
-      throw embedError;
-    }
-
-    // Calculate those without embeddings
-    const withoutEmbeddings = Math.max(0, (totalLineItems || 0) - (embeddingsCount || 0));
-
-    console.log('Line item embedding stats:', {
-      total: totalLineItems || 0,
-      withEmbeddings: embeddingsCount || 0,
-      withoutEmbeddings
-    });
-
-    return {
-      exists: (embeddingsCount || 0) > 0,
-      count: embeddingsCount || 0,
-      total: totalLineItems || 0,
-      withEmbeddings: embeddingsCount || 0,
-      withoutEmbeddings
-    };
-  } catch (error) {
-    console.error('Error checking line item embeddings:', error);
-    return { exists: false, count: 0, total: 0, withEmbeddings: 0, withoutEmbeddings: 0 };
-  }
-}
-
-/**
- * Generate line item embeddings for multiple line items.
+ * Searches for receipts based on a text query and optional filters.
  *
- * @param limit The maximum number of line items to process.
- * @param forceRegenerate Whether to regenerate embeddings even if they already exist.
- *
- * @returns A promise that resolves with an object containing the results of the operation.
+ * @param {string} query - The text query to search for in receipt data.
+ * @param {string} userId - The ID of the user performing the search.
+ * @param {SearchFilters} [filters] - Optional filters to apply to the search.
+ * @param {number} [limit=10] - The maximum number of results to return.
+ * @returns {Promise<SearchResult[]>} - A promise that resolves to an array of search results.
  */
-export async function generateLineItemEmbeddings(limit: number = 50, forceRegenerate: boolean = false): Promise<{
-  success: boolean;
-  processed: number;
-  total: number;
-  withEmbeddings: number;
-  withoutEmbeddings: number;
-}> {
+export async function searchReceipts(
+  query: string,
+  userId: string,
+  filters?: SearchFilters,
+  limit: number = 10
+): Promise<SearchResult[]> {
   try {
-    // Get the status of line item embeddings
-    const status = await checkLineItemEmbeddings();
-
-    if (!forceRegenerate && status.withoutEmbeddings === 0) {
-      return {
-        success: true,
-        processed: 0,
-        total: status.total,
-        withEmbeddings: status.withEmbeddings,
-        withoutEmbeddings: 0
-      };
-    }
-
-    // Get receipts that need line item embeddings
-    const { data: receipts, error } = await supabase
-      .from('receipts')
-      .select('id')
-      .order('date', { ascending: false })
+    let supabaseQuery = supabase
+      .rpc('search_receipts', {
+        query_embedding: `[${await generateEmbedding(query)}]`,
+        similarity_threshold: 0.78,
+        match_count: limit,
+        user_id: userId
+      })
       .limit(limit);
 
-    if (error) throw error;
-
-    console.log(`Found ${receipts?.length || 0} receipts to process for line item embeddings`);
-
-    if (!receipts || receipts.length === 0) {
-      return {
-        success: true,
-        processed: 0,
-        total: status.total,
-        withEmbeddings: status.withEmbeddings,
-        withoutEmbeddings: status.withoutEmbeddings
-      };
-    }
-
-    let processedCount = 0;
-
-    // Process line items for each receipt
-    for (const receipt of receipts) {
-      try {
-        // Call the edge function to generate line item embeddings
-        const response = await callEdgeFunction('generate-embeddings', 'POST', {
-          receiptId: receipt.id,
-          processLineItems: true,
-          forceRegenerate: forceRegenerate // Pass along the regenerate flag
-        });
-
-        if (response && response.success) {
-          processedCount += response.count || 0;
-        }
-      } catch (err) {
-        console.error(`Error generating line item embeddings for receipt ${receipt.id}:`, err);
+    if (filters) {
+      if (filters.dateFrom) {
+        supabaseQuery = supabaseQuery.gte('date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        supabaseQuery = supabaseQuery.lte('date', filters.dateTo);
+      }
+      if (filters.minAmount) {
+        supabaseQuery = supabaseQuery.gte('total', filters.minAmount);
+      }
+      if (filters.maxAmount) {
+        supabaseQuery = supabaseQuery.lte('total', filters.maxAmount);
+      }
+      if (filters.merchant) {
+        supabaseQuery = supabaseQuery.ilike('merchant', `%${filters.merchant}%`);
+      }
+      if (filters.category) {
+        supabaseQuery = supabaseQuery.eq('predicted_category', filters.category);
+      }
+      if (filters.paymentMethod) {
+        supabaseQuery = supabaseQuery.eq('payment_method', filters.paymentMethod);
       }
     }
 
-    // Get updated status after processing
-    const newStatus = await checkLineItemEmbeddings();
+    const { data, error } = await supabaseQuery;
 
-    return {
-      success: true,
-      processed: processedCount,
-      total: newStatus.total,
-      withEmbeddings: newStatus.withEmbeddings,
-      withoutEmbeddings: newStatus.withoutEmbeddings
-    };
-  } catch (error) {
-    console.error('Error generating line item embeddings:', error);
-    return {
-      success: false,
-      processed: 0,
-      total: 0,
-      withEmbeddings: 0,
-      withoutEmbeddings: 0
-    };
-  }
-}
-
-/**
- * Generate all embeddings (receipts and line items)
- */
-export async function generateAllTypeEmbeddings(limit: number = 10, model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
-  success: boolean;
-  message: string;
-  receiptResults: {
-    processed: number;
-    count: number;
-    total: number;
-  };
-  lineItemResults: {
-    processed: number;
-    withEmbeddings: number;
-    withoutEmbeddings: number;
-  };
-}> {
-  try {
-    console.log(`Generating all embeddings for receipts and line items with model: ${model}, forceRegenerate: ${forceRegenerate}`);
-
-    // First generate receipts
-    const receiptResults = await generateAllEmbeddings(model, forceRegenerate);
-
-    // Then generate line items
-    const lineItemResults = await generateLineItemEmbeddings(limit, forceRegenerate);
-
-    return {
-      success: true,
-      message: `Generated embeddings for ${receiptResults.count} receipts and ${lineItemResults.withEmbeddings} line items`,
-      receiptResults: {
-        processed: receiptResults.processed,
-        count: receiptResults.count,
-        total: receiptResults.total
-      },
-      lineItemResults: {
-        processed: lineItemResults.processed,
-        withEmbeddings: lineItemResults.withEmbeddings,
-        withoutEmbeddings: lineItemResults.withoutEmbeddings
-      }
-    };
-  } catch (error) {
-    console.error('Error generating all type embeddings:', error);
-    return {
-      success: false,
-      message: 'Error generating all type embeddings',
-      receiptResults: {
-        processed: 0,
-        count: 0,
-        total: 0
-      },
-      lineItemResults: {
-        processed: 0,
-        withEmbeddings: 0,
-        withoutEmbeddings: 0
-      }
-    };
-  }
-}
-
-/**
- * Get similar receipts based on a receipt ID
- */
-export async function getSimilarReceipts(receiptId: string, limit: number = 5): Promise<any[]> {
-  try {
-    console.log(`Getting similar receipts for receipt ID: ${receiptId}, limit: ${limit}`);
-
-    // First, get the receipt to access its data
-    const { data: receipt, error: receiptError } = await supabase
-      .from('receipts')
-      .select('*')
-      .eq('id', receiptId)
-      .single();
-
-    if (receiptError) {
-      console.error('Error fetching receipt:', receiptError);
-      throw receiptError;
-    }
-
-    if (!receipt) {
-      console.error('Receipt not found');
-      throw new Error('Receipt not found');
-    }
-
-    // Use merchant name as query to find similar receipts
-    const searchQuery = receipt.merchant || '';
-    console.log(`Using merchant name as search query: "${searchQuery}"`);
-
-    if (!searchQuery) {
-      console.log('Empty merchant name, returning empty results');
+    if (error) {
+      console.error('Search error:', error);
       return [];
     }
 
-    // Increase the limit to account for filtering out the current receipt
-    const searchLimit = limit + 1;
-
-    // Use a more flexible search approach that allows fallback to text search
-    const result = await semanticSearch({
-      query: searchQuery,
-      contentType: 'merchant',
-      limit: searchLimit,
-      searchTarget: 'receipts', // Explicitly specify we want receipts
-      // Don't set isVectorSearch to true to allow fallback to text search if needed
-    });
-
-    console.log(`Semantic search returned ${result.receipts?.length || 0} results (using ${result.searchParams?.isVectorSearch ? 'vector' : 'text'} search)`);
-
-    // Filter out the current receipt and limit to requested number
-    const filteredResults = (result.receipts || [])
-      .filter(r => r.id !== receiptId)
-      .slice(0, limit);
-
-    // Add similarity scores if they're missing (for text search results)
-    const resultsWithScores = filteredResults.map(receipt => {
-      if (receipt.similarity_score === undefined) {
-        return {
-          ...receipt,
-          similarity_score: 0.5 // Default score for text search results
-        };
-      }
-      return receipt;
-    });
-
-    console.log(`Returning ${resultsWithScores.length} similar receipts after filtering`);
-
-    return resultsWithScores;
+    return (data as any[])?.map(result => ({
+      id: result.id,
+      merchant: result.merchant,
+      date: result.date,
+      total: result.total,
+      currency: result.currency,
+      similarity: result.similarity,
+      created_at: result.created_at,
+      payment_method: result.payment_method,
+      predicted_category: result.predicted_category,
+      thumbnail_url: result.thumbnail_url,
+      image_url: result.image_url,
+    })) || [];
   } catch (error) {
-    console.error('Error getting similar receipts:', error);
+    console.error('Search error:', error);
     return [];
   }
 }
 
 /**
- * Check if a database table/schema exists
+ * Searches for line items within receipts based on a text query and optional filters.
+ *
+ * @param {string} query - The text query to search for in line item descriptions.
+ * @param {string} userId - The ID of the user performing the search.
+ * @param {SearchFilters} [filters] - Optional filters to apply to the search.
+ * @param {number} [limit=10] - The maximum number of results to return.
+ * @returns {Promise<LineItemSearchResult[]>} - A promise that resolves to an array of line item search results.
  */
-async function checkDbSchema(tableName: 'receipts' | 'receipt_embeddings' | 'line_items'): Promise<{ exists: boolean }> {
+export async function searchLineItems(
+  query: string,
+  userId: string,
+  filters?: SearchFilters,
+  limit: number = 10
+): Promise<LineItemSearchResult[]> {
   try {
-    // Try to query the table structure
-    const { error } = await supabase
-      .from(tableName)
-      .select('id')
-      .limit(1);
+    let supabaseQuery = supabase
+      .rpc('search_line_items', {
+        query_embedding: `[${await generateEmbedding(query)}]`,
+        similarity_threshold: 0.78,
+        match_count: limit,
+        user_id: userId
+      })
+      .limit(limit)
 
-    // If no error, the table exists
-    return { exists: !error };
-  } catch (e) {
-    console.error(`Error checking if schema ${tableName} exists:`, e);
-    return { exists: false };
+    if (filters) {
+      if (filters.dateFrom) {
+        supabaseQuery = supabaseQuery.gte('date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        supabaseQuery = supabaseQuery.lte('date', filters.dateTo);
+      }
+      if (filters.minAmount) {
+        supabaseQuery = supabaseQuery.gte('total', filters.minAmount);
+      }
+      if (filters.maxAmount) {
+        supabaseQuery = supabaseQuery.lte('total', filters.maxAmount);
+      }
+      if (filters.merchant) {
+        supabaseQuery = supabaseQuery.ilike('merchant', `%${filters.merchant}%`);
+      }
+      if (filters.category) {
+        supabaseQuery = supabaseQuery.eq('predicted_category', filters.category);
+      }
+      if (filters.paymentMethod) {
+        supabaseQuery = supabaseQuery.eq('payment_method', filters.paymentMethod);
+      }
+    }
+
+    const { data, error } = await supabaseQuery;
+
+    if (error) {
+      console.error('Line item search error:', error);
+      return [];
+    }
+
+    return (data as any[])?.map(result => ({
+      line_item_id: result.line_item_id,
+      receipt_id: result.receipt_id,
+      description: result.description,
+      amount: result.amount,
+      merchant: result.merchant,
+      date: result.date,
+      total: result.total,
+      currency: result.currency,
+      similarity: result.similarity,
+      thumbnail_url: result.thumbnail_url,
+      image_url: result.image_url,
+    })) || [];
+  } catch (error) {
+    console.error('Line item search error:', error);
+    return [];
   }
 }
 
 /**
- * Check if receipt embeddings exist in the database
+ * Generates an embedding for a given text using the OpenAI API.
+ *
+ * @param {string} text - The text to generate an embedding for.
+ * @returns {Promise<number[]>} - A promise that resolves to an array of numbers representing the embedding.
  */
-export async function checkReceiptEmbeddings(): Promise<{
-  exists: boolean,
-  count: number,
-  total: number,
-  withEmbeddings: number,
-  withoutEmbeddings: number
-}> {
+async function generateEmbedding(text: string): Promise<number[]> {
+  const input = text.replace(/\n/g, " ");
+
   try {
-    // Get total receipt count
-    const { count: totalReceipts, error: countError } = await supabase
-      .from('receipts')
-      .select('id', { count: 'exact' });
-
-    if (countError) {
-      console.error("Error fetching total receipts count:", countError);
-      throw countError;
-    }
-
-    // Count distinct receipts that have embeddings
-    let distinctReceiptsWithEmbeddings = 0;
-    try {
-      // Get count of distinct receipt_ids in receipt_embeddings table
-      const { data, error: distinctError } = await supabase
-        .from('receipt_embeddings')
-        .select('receipt_id')
-        .not('receipt_id', 'is', null);
-
-      if (distinctError) {
-        console.error('Error getting distinct receipt_ids:', distinctError);
-      } else if (data) {
-        // Count distinct receipt_ids from the returned data
-        const uniqueReceiptIds = new Set(data.map(item => item.receipt_id));
-        distinctReceiptsWithEmbeddings = uniqueReceiptIds.size;
-        console.log('Distinct receipts with embeddings count:', distinctReceiptsWithEmbeddings);
+    const response = await fetch(
+      `https://api.openai.com/v1/embeddings`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input,
+          model: "text-embedding-ada-002",
+        }),
       }
-    } catch (e) {
-      console.error('Exception checking distinct receipt embeddings:', e);
-      // Default to 0 for calculation
+    );
+
+    if (!response.ok) {
+      console.error('OpenAI API error:', response.status, response.statusText);
+      throw new Error(
+        `OpenAI API error: ${response.status} ${response.statusText}`
+      );
     }
 
-    const withEmbeddings = distinctReceiptsWithEmbeddings;
-    // Ensure withoutEmbeddings is not negative
-    const withoutEmbeddings = Math.max(0, (totalReceipts || 0) - withEmbeddings);
-
-    console.log('Calculated Receipt Stats:', { total: totalReceipts, withEmbeddings, withoutEmbeddings });
-
-    return {
-      exists: withEmbeddings > 0,
-      count: withEmbeddings, // Report the count of distinct receipts with embeddings
-      total: totalReceipts || 0,
-      withEmbeddings: withEmbeddings,
-      withoutEmbeddings: withoutEmbeddings
-    };
+    const json = await response.json();
+    return json.data[0].embedding;
   } catch (error) {
-    console.error('Error in checkReceiptEmbeddings:', error);
-    return { exists: false, count: 0, total: 0, withEmbeddings: 0, withoutEmbeddings: 0 };
-  }
-}
-
-/**
- * Regenerate all embeddings with the improved dimension handling algorithm
- * This is needed after updating the generateEmbedding function in the edge function
- */
-export async function regenerateAllEmbeddings(batchSize: number = 20): Promise<{
-  success: boolean;
-  receiptsProcessed: number;
-  lineItemsProcessed: number;
-  errors: string[];
-  message: string;
-}> {
-  try {
-    console.log('Starting regeneration of all embeddings with improved dimension handling');
-    const errors: string[] = [];
-
-    // Check if user is authenticated as admin
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('You must be logged in to regenerate embeddings');
-    }
-
-    // Step 1: Get stats before regeneration
-    const beforeStats = await Promise.all([
-      checkReceiptEmbeddings(),
-      checkLineItemEmbeddings()
-    ]);
-
-    console.log('Current embedding stats before regeneration:', {
-      receipts: beforeStats[0],
-      lineItems: beforeStats[1]
-    });
-
-    // Step 2: Get all receipts with existing embeddings
-    let receiptsWithEmbeddings: any[] = [];
-    try {
-      const { data, error } = await supabase
-        .from('receipt_embeddings')
-        .select('receipt_id')
-        .eq('source_type', 'receipt')
-        .not('embedding', 'is', null);
-
-      if (error) {
-        console.error('Error fetching receipts with embeddings:', error);
-        errors.push(`Error fetching receipts: ${error.message}`);
-      } else if (data) {
-        receiptsWithEmbeddings = data;
-      }
-    } catch (e) {
-      console.error('Exception fetching receipts with embeddings:', e);
-      errors.push(`Exception fetching receipts: ${e.message}`);
-    }
-
-    // Process receipts in batches
-    let receiptsProcessed = 0;
-    if (receiptsWithEmbeddings && receiptsWithEmbeddings.length > 0) {
-      const uniqueReceiptIds = [...new Set(receiptsWithEmbeddings.map(r => r.receipt_id).filter(Boolean))];
-      console.log(`Found ${uniqueReceiptIds.length} receipts with existing embeddings to regenerate`);
-
-      // Process in batches to avoid overloading the system
-      for (let i = 0; i < uniqueReceiptIds.length; i += batchSize) {
-        const batch = uniqueReceiptIds.slice(i, i + batchSize);
-        console.log(`Processing receipt batch ${i/batchSize + 1} of ${Math.ceil(uniqueReceiptIds.length/batchSize)}`);
-
-        // Process each receipt in the batch concurrently
-        await Promise.all(
-          batch.map(async (receiptId) => {
-            try {
-              const response = await callEdgeFunction('generate-embeddings', 'POST', {
-                receiptId,
-                forceRegenerate: true, // Important: force regeneration of embeddings
-                processAllFields: true,
-                useImprovedDimensionHandling: true // Signal to use the improved algorithm
-              });
-
-              if (response && response.success) {
-                receiptsProcessed++;
-              } else {
-                console.error(`Failed to regenerate embeddings for receipt ${receiptId}:`, response?.error);
-                errors.push(`Receipt ${receiptId}: ${response?.error || 'Unknown error'}`);
-              }
-            } catch (err) {
-              console.error(`Error regenerating embeddings for receipt ${receiptId}:`, err);
-              errors.push(`Receipt ${receiptId}: ${err.message}`);
-            }
-          })
-        );
-      }
-    }
-
-    // Step 3: Regenerate line item embeddings
-    // Get all line item embeddings
-    let lineItemsWithEmbeddings: any[] = [];
-    try {
-      const { data, error } = await supabase
-        .from('receipt_embeddings')
-        .select('source_id, receipt_id')
-        .eq('source_type', 'line_item')
-        .not('embedding', 'is', null);
-
-      if (error) {
-        console.error('Error fetching line items with embeddings:', error);
-        errors.push(`Error fetching line items: ${error.message}`);
-      } else if (data) {
-        lineItemsWithEmbeddings = data;
-      }
-    } catch (e) {
-      console.error('Exception fetching line items with embeddings:', e);
-      errors.push(`Exception fetching line items: ${e.message}`);
-    }
-
-    // Process line items grouped by receipt_id to avoid overwhelming the system
-    let lineItemsProcessed = 0;
-    if (lineItemsWithEmbeddings && lineItemsWithEmbeddings.length > 0) {
-      console.log(`Found ${lineItemsWithEmbeddings.length} line items with existing embeddings to regenerate`);
-
-      // Group line items by receipt_id for more efficient processing
-      const lineItemsByReceipt: Record<string, string[]> = {};
-      
-      // Process each line item and build the groups
-      for (const item of lineItemsWithEmbeddings) {
-        if (item && item.receipt_id && item.source_id) {
-          if (!lineItemsByReceipt[item.receipt_id]) {
-            lineItemsByReceipt[item.receipt_id] = [];
-          }
-          lineItemsByReceipt[item.receipt_id].push(item.source_id);
-        }
-      }
-
-      const receiptIds = Object.keys(lineItemsByReceipt);
-      console.log(`Line items belong to ${receiptIds.length} different receipts`);
-
-      // Process receipts in batches
-      for (let i = 0; i < receiptIds.length; i += batchSize) {
-        const batchReceiptIds = receiptIds.slice(i, i + batchSize);
-        console.log(`Processing line item batch ${i/batchSize + 1} of ${Math.ceil(receiptIds.length/batchSize)}`);
-
-        // Process each receipt's line items
-        await Promise.all(
-          batchReceiptIds.map(async (receiptId) => {
-            try {
-              const response = await callEdgeFunction('generate-embeddings', 'POST', {
-                receiptId,
-                processLineItems: true,
-                forceRegenerate: true, // Important: force regeneration
-                useImprovedDimensionHandling: true, // Signal to use the improved algorithm
-                lineItemIds: lineItemsByReceipt[receiptId] // Only regenerate specific line items
-              });
-
-              if (response && response.success) {
-                lineItemsProcessed += lineItemsByReceipt[receiptId].length;
-              } else {
-                console.error(`Failed to regenerate line item embeddings for receipt ${receiptId}:`, response?.error);
-                errors.push(`Line items for receipt ${receiptId}: ${response?.error || 'Unknown error'}`);
-              }
-            } catch (err) {
-              console.error(`Error regenerating line item embeddings for receipt ${receiptId}:`, err);
-              errors.push(`Line items for receipt ${receiptId}: ${err.message}`);
-            }
-          })
-        );
-      }
-    }
-
-    // Step 4: Get stats after regeneration
-    const afterStats = await Promise.all([
-      checkReceiptEmbeddings(),
-      checkLineItemEmbeddings()
-    ]);
-
-    console.log('Embedding stats after regeneration:', {
-      receipts: afterStats[0],
-      lineItems: afterStats[1]
-    });
-
-    return {
-      success: true,
-      receiptsProcessed,
-      lineItemsProcessed,
-      errors,
-      message: `Successfully regenerated embeddings for ${receiptsProcessed} receipts and ${lineItemsProcessed} line items.${errors.length > 0 ? ' Some errors occurred.' : ''}`
-    };
-  } catch (error) {
-    console.error('Error in regenerateAllEmbeddings:', error);
-    return {
-      success: false,
-      receiptsProcessed: 0,
-      lineItemsProcessed: 0,
-      errors: [error.message],
-      message: `Failed to regenerate embeddings: ${error.message}`
-    };
-  }
-}
-
-/**
- * Generate embeddings for receipts with the specified batch size and regeneration flag
- * @param batchSize The number of receipts to process in each batch
- * @param forceRegenerate Whether to regenerate embeddings for receipts that already have them
- */
-export async function generateReceiptEmbeddings(batchSize: number = 10, forceRegenerate: boolean = false): Promise<{
-  success: boolean;
-  processed: number;
-  total: number;
-  withEmbeddings: number;
-  withoutEmbeddings: number;
-}> {
-  try {
-    // Use the existing generateAllEmbeddings function
-    const result = await generateAllEmbeddings('gemini-1.5-flash-latest', forceRegenerate);
-
-    // Get the current status of embeddings
-    const stats = await checkReceiptEmbeddings();
-
-    return {
-      success: result.success,
-      processed: result.processed,
-      total: stats.total,
-      withEmbeddings: stats.withEmbeddings,
-      withoutEmbeddings: stats.withoutEmbeddings
-    };
-  } catch (error) {
-    console.error('Error generating receipt embeddings:', error);
-    return {
-      success: false,
-      processed: 0,
-      total: 0,
-      withEmbeddings: 0,
-      withoutEmbeddings: 0
-    };
-  }
-}
-
-/**
- * Generates embeddings for a single receipt, including both receipt text and line items
- * @param receiptId The ID of the receipt to generate embeddings for
- * @returns Promise<void>
- */
-export async function generateEmbeddingsForReceipt(receiptId: string): Promise<void> {
-  try {
-    // Get the receipt data
-    const { data: receipt, error: receiptError } = await supabase
-      .from('receipts')
-      .select('*')
-      .eq('id', receiptId)
-      .single();
-
-    if (receiptError || !receipt) {
-      throw new Error(`Failed to fetch receipt: ${receiptError?.message || 'Receipt not found'}`);
-    }
-
-    // Generate embeddings for receipt text
-    await generateEmbeddings(receiptId);
-
-    // Process line items
-    try {
-      // Call the edge function to generate line item embeddings
-      await callEdgeFunction('generate-embeddings', 'POST', {
-        receiptId,
-        processLineItems: true
-      });
-    } catch (lineItemError) {
-      console.error(`Error generating line item embeddings: ${lineItemError}`);
-      // Continue even if line item embedding fails
-    }
-
-    // Update receipt with embedding status using any to bypass type checking
-    // This is necessary because the database schema may have evolved ahead of the TypeScript types
-    try {
-      const { error: updateError } = await supabase
-        .from('receipts')
-        .update({ embedding_status: 'complete' } as any)
-        .eq('id', receiptId);
-
-      if (updateError) {
-        console.error(`Failed to update receipt embedding status: ${updateError.message}`);
-      }
-    } catch (updateError) {
-      console.error(`Error updating receipt status: ${updateError}`);
-    }
-  } catch (error) {
-    console.error('Error generating embeddings for receipt:', error);
-    // Update receipt to indicate embedding failure using any to bypass type checking
-    try {
-      await supabase
-        .from('receipts')
-        .update({ embedding_status: 'failed' } as any)
-        .eq('id', receiptId);
-    } catch (updateError) {
-      console.error(`Error updating receipt status after failure: ${updateError}`);
-    }
+    console.error("Error generating embedding:", error);
     throw error;
   }
 }

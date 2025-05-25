@@ -1,3 +1,4 @@
+
 /**
  * Intelligent processing optimization utilities
  * Provides automatic fallback mechanisms and processing method selection
@@ -161,7 +162,7 @@ export function getProcessingRecommendation(
     }
   }
 
-  // Fix the type comparison error by properly checking complexity
+  // Fix the type comparison by using explicit checks
   if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
     recommendedMethod = 'ai-vision';
     recommendedModel = 'gemini-2.0-flash-lite';
