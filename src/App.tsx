@@ -26,6 +26,7 @@ const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -58,6 +59,11 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/reset-password" element={<AuthCallback />} />
+            <Route path="/pricing" element={
+              <Suspense fallback={<PageLoading />}>
+                <PricingPage />
+              </Suspense>
+            } />
             <Route path="*" element={<NotFound />} />
 
             {/* Protected Routes - Require Authentication */}

@@ -56,6 +56,16 @@ export default function Navbar() {
             Home
           </NavLink>
           <NavLink
+            to="/pricing"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
+          >
+            Pricing
+          </NavLink>
+          <NavLink
             to="/dashboard"
             className={({ isActive }) =>
               isActive
@@ -104,7 +114,7 @@ export default function Navbar() {
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          
+
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
@@ -154,6 +164,17 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Home
+            </NavLink>
+            <NavLink
+              to="/pricing"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Pricing
             </NavLink>
             <NavLink
               to="/dashboard"
