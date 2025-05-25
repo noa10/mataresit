@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
 import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
+import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
+import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
@@ -52,8 +54,9 @@ export default function SettingsPage() {
       <Navbar />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs defaultValue="processing" className="max-w-3xl mx-auto">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="processing">Processing</TabsTrigger>
+            <TabsTrigger value="providers">AI Providers</TabsTrigger>
             <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
           </TabsList>
 
@@ -137,6 +140,11 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="providers" className="space-y-6">
+            <ApiKeySettings />
+            <ModelProviderStatus />
           </TabsContent>
 
           <TabsContent value="usage">

@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  RefreshCw, 
+import {
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  RefreshCw,
   ExternalLink,
   Info,
   Zap,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { AVAILABLE_MODELS, getModelsByProvider, ModelProvider } from "@/config/modelProviders";
 import { OpenRouterService } from "@/services/openRouterService";
+import { useSettings } from "@/hooks/useSettings";
 
 interface ProviderStatus {
   provider: ModelProvider;
@@ -58,6 +59,7 @@ const PROVIDER_INFO = {
 };
 
 export function ModelProviderStatus() {
+  const { settings } = useSettings();
   const [providerStatuses, setProviderStatuses] = useState<ProviderStatus[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -70,7 +72,7 @@ export function ModelProviderStatus() {
       testing: false,
       models: getModelsByProvider(provider).length
     }));
-    
+
     setProviderStatuses(initialStatuses);
     checkProviderAvailability(initialStatuses);
   }, []);
@@ -78,11 +80,11 @@ export function ModelProviderStatus() {
   // Check provider availability
   const checkProviderAvailability = async (statuses: ProviderStatus[]) => {
     setIsRefreshing(true);
-    
+
     const updatedStatuses = await Promise.all(
       statuses.map(async (status) => {
         const updatedStatus = { ...status, testing: true };
-        setProviderStatuses(prev => 
+        setProviderStatuses(prev =>
           prev.map(s => s.provider === status.provider ? updatedStatus : s)
         );
 
@@ -95,20 +97,32 @@ export function ModelProviderStatus() {
               // Check if Gemini API key is available (this would need to be implemented)
               available = true; // Assume available for now
               break;
-              
+
             case 'openrouter':
-              // Test OpenRouter connection
-              const openRouterService = new OpenRouterService('test-key');
-              try {
-                // This would need a proper API key to test
-                available = false; // Set to false until proper testing is implemented
-                error = 'API key required';
-              } catch (e) {
+              // Test OpenRouter connection with user's API key
+              const openRouterApiKey = settings.userApiKeys?.openrouter;
+              if (openRouterApiKey) {
+                const openRouterService = new OpenRouterService(openRouterApiKey);
+                try {
+                  // Test with a free vision-capable model
+                  const testModelId = 'openrouter/google/gemini-2.0-flash-exp:free';
+                  const connectionOk = await openRouterService.testConnection(testModelId);
+                  if (connectionOk) {
+                    available = true;
+                  } else {
+                    available = false;
+                    error = 'API key test failed. Please verify your key.';
+                  }
+                } catch (e: any) {
+                  available = false;
+                  error = `Connection test error: ${e.message}`;
+                }
+              } else {
                 available = false;
-                error = 'Connection failed';
+                error = 'OpenRouter API key not configured in settings.';
               }
               break;
-              
+
             default:
               available = false;
               error = 'Not implemented';
@@ -198,7 +212,7 @@ export function ModelProviderStatus() {
         {providerStatuses.map((status) => {
           const info = PROVIDER_INFO[status.provider];
           const stats = getModelStats(status.provider);
-          
+
           return (
             <Card key={status.provider} className="relative">
               <CardHeader className="pb-3">
@@ -216,7 +230,7 @@ export function ModelProviderStatus() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="space-y-3">
                 {/* Model Count */}
                 <div className="flex items-center justify-between text-sm">
@@ -313,8 +327,8 @@ export function ModelProviderStatus() {
             <div className="text-sm text-blue-800">
               <p className="font-medium mb-1">About Model Providers</p>
               <p>
-                Different AI model providers offer various capabilities, pricing, and performance characteristics. 
-                Configure API keys for the providers you want to use. OpenRouter provides access to multiple 
+                Different AI model providers offer various capabilities, pricing, and performance characteristics.
+                Configure API keys for the providers you want to use. OpenRouter provides access to multiple
                 providers through a single API key.
               </p>
             </div>

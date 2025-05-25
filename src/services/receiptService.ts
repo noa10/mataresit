@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { normalizeMerchant } from '../lib/receipts/validation';
 import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
+import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
+import { OpenRouterService, ProcessingInput } from '@/services/openRouterService';
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
@@ -402,6 +404,106 @@ export interface ProcessingOptions {
   compareWithAlternative?: boolean;
 }
 
+// Helper function to check if a model is an OpenRouter model
+const isOpenRouterModel = (modelId: string): boolean => {
+  return modelId.startsWith('openrouter/');
+};
+
+// Helper function to get user's OpenRouter API key from settings
+const getOpenRouterApiKey = (): string | null => {
+  try {
+    const storedSettings = localStorage.getItem('receiptProcessingSettings');
+    if (storedSettings) {
+      const settings = JSON.parse(storedSettings);
+      return settings.userApiKeys?.openrouter || null;
+    }
+  } catch (error) {
+    console.error('Error reading OpenRouter API key from settings:', error);
+  }
+  return null;
+};
+
+// Process receipt using client-side OpenRouter service
+const processReceiptWithOpenRouter = async (
+  receiptId: string,
+  imageUrl: string,
+  options: ProcessingOptions
+): Promise<OCRResult> => {
+  const modelConfig = getModelConfig(options.modelId!);
+  if (!modelConfig) {
+    throw new Error(`Model configuration not found for ${options.modelId}`);
+  }
+
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) {
+    throw new Error('OpenRouter API key not configured. Please set it in the settings.');
+  }
+
+  const openRouterService = new OpenRouterService(apiKey);
+
+  // Fetch the image data
+  console.log('Fetching image for OpenRouter processing:', imageUrl);
+  const imageResponse = await fetch(imageUrl);
+  if (!imageResponse.ok) {
+    throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+  }
+
+  const imageArrayBuffer = await imageResponse.arrayBuffer();
+  const imageData = new Uint8Array(imageArrayBuffer);
+  const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+  // Prepare input for OpenRouter service
+  let input: ProcessingInput;
+
+  if (options.primaryMethod === 'ai-vision' && modelConfig.supportsVision) {
+    // Direct vision processing
+    input = {
+      type: 'image',
+      imageData: {
+        data: imageData,
+        mimeType: mimeType
+      }
+    };
+  } else {
+    // For OCR+AI method, we would need OCR data first
+    // For now, we'll use vision processing as fallback
+    if (!modelConfig.supportsVision) {
+      throw new Error(`Model ${modelConfig.name} does not support vision processing. OCR+AI method not yet implemented for OpenRouter.`);
+    }
+
+    input = {
+      type: 'image',
+      imageData: {
+        data: imageData,
+        mimeType: mimeType
+      }
+    };
+  }
+
+  // Call OpenRouter service
+  console.log(`Processing receipt ${receiptId} with OpenRouter model ${modelConfig.name}`);
+  const result = await openRouterService.callModel(modelConfig, input, receiptId);
+
+  // Transform the result to match OCRResult interface
+  const ocrResult: OCRResult = {
+    merchant: result.merchant || '',
+    date: result.date || '',
+    total: parseFloat(result.total) || 0,
+    tax: parseFloat(result.tax) || 0,
+    currency: result.currency || 'MYR',
+    payment_method: result.payment_method || '',
+    fullText: result.fullText || '',
+    line_items: result.line_items || [],
+    confidence_scores: result.confidence || {},
+    ai_suggestions: result.suggestions || {},
+    predicted_category: result.predicted_category || null,
+    modelUsed: modelConfig.id,
+    processingMethod: options.primaryMethod || 'ai-vision'
+  };
+
+  return ocrResult;
+};
+
 // Process a receipt with OCR
 export const processReceiptWithOCR = async (
   receiptId: string,
@@ -415,6 +517,96 @@ export const processReceiptWithOCR = async (
       compareWithAlternative: options?.compareWithAlternative || false
     };
 
+    // Check if this is an OpenRouter model and handle it client-side
+    if (processingOptions.modelId && isOpenRouterModel(processingOptions.modelId)) {
+      console.log(`Detected OpenRouter model: ${processingOptions.modelId}, processing client-side`);
+
+      // Update status to start processing
+      await updateReceiptProcessingStatus(receiptId, 'processing_ocr');
+
+      const { data: receipt, error: receiptError } = await supabase
+        .from("receipts")
+        .select("image_url")
+        .eq("id", receiptId)
+        .single();
+
+      if (receiptError || !receipt) {
+        const errorMsg = "Receipt not found";
+        console.error("Error fetching receipt to process:", receiptError);
+        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // Process with OpenRouter client-side
+      const result = await processReceiptWithOpenRouter(receiptId, receipt.image_url, processingOptions);
+
+      // Update status to complete
+      await updateReceiptProcessingStatus(receiptId, 'complete');
+
+      // Update the receipt with the processed data
+      const updateData: any = {
+        merchant: result.merchant || '',
+        date: result.date || '',
+        total: result.total || 0,
+        tax: result.tax || 0,
+        currency: result.currency || 'MYR',
+        payment_method: result.payment_method || '',
+        fullText: result.fullText || '',
+        ai_suggestions: result.ai_suggestions || {},
+        predicted_category: result.predicted_category || null,
+        status: 'unreviewed',
+        processing_status: 'complete',
+        model_used: result.modelUsed || processingOptions.modelId,
+        primary_method: processingOptions.primaryMethod
+      };
+
+      // Update the receipt with the data
+      const { error: updateError } = await supabase
+        .from('receipts')
+        .update(updateData)
+        .eq('id', receiptId);
+
+      if (updateError) {
+        const errorMsg = `Failed to update receipt with processed data: ${updateError.message}`;
+        console.error("Error updating receipt with processed data:", updateError);
+        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+        throw updateError;
+      }
+
+      // Update line items if available
+      if (result.line_items && result.line_items.length > 0) {
+        // Delete existing line items first
+        const { error: deleteError } = await supabase
+          .from("line_items")
+          .delete()
+          .eq("receipt_id", receiptId);
+
+        if (deleteError) {
+          console.error("Error deleting old line items:", deleteError);
+          // Log but continue trying to insert
+        }
+
+        // Insert new line items
+        const formattedLineItems = result.line_items.map(item => ({
+          description: item.description,
+          amount: item.amount,
+          receipt_id: receiptId
+        }));
+
+        const { error: insertError } = await supabase
+          .from("line_items")
+          .insert(formattedLineItems);
+
+        if (insertError) {
+          console.error("Error inserting line items:", insertError);
+          // Non-critical error, don't throw
+        }
+      }
+
+      return result;
+    }
+
+    // Continue with server-side processing for non-OpenRouter models
     // Update status to start processing
     await updateReceiptProcessingStatus(receiptId, 'processing_ocr');
 

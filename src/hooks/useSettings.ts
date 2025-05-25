@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 
+export interface UserApiKeys {
+  openrouter?: string;
+  // Future API keys can be added here
+}
+
 export interface ProcessingSettings {
   processingMethod: 'ocr-ai' | 'ai-vision';
   selectedModel: string;
@@ -8,6 +13,7 @@ export interface ProcessingSettings {
     maxConcurrent: number;
     autoStart: boolean;
   };
+  userApiKeys: UserApiKeys;
 }
 
 const defaultSettings: ProcessingSettings = {
@@ -18,6 +24,7 @@ const defaultSettings: ProcessingSettings = {
     maxConcurrent: 2,
     autoStart: false,
   },
+  userApiKeys: {},
 };
 
 const SETTINGS_STORAGE_KEY = 'receiptProcessingSettings';
@@ -38,7 +45,9 @@ export function useSettings() {
             ...defaultSettings,
             ...parsed,
             // If batchUpload exists in parsed, use it, otherwise use default
-            batchUpload: parsed.batchUpload || defaultSettings.batchUpload
+            batchUpload: parsed.batchUpload || defaultSettings.batchUpload,
+            // If userApiKeys exists in parsed, use it, otherwise use default
+            userApiKeys: parsed.userApiKeys || defaultSettings.userApiKeys
           };
         }
       }
