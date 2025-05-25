@@ -17,42 +17,46 @@ import {
   Users,
   LineChart,
   Layers,
-  TrendingUp
+  TrendingUp,
+  Brain,
+  Search,
+  Zap,
+  Shield
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from "@/components/ui/separator";
 
-// Define features array separately for clarity in the Features section
+// Enhanced features array with latest AI capabilities
 const featuresList = [
   {
-    icon: <Layers className="h-8 w-8 text-primary" />,
-    title: "Multi-Format Support",
-    description: "Upload receipt images or PDFs with our drag-and-drop interface. Supports single and batch uploads."
+    icon: <Brain className="h-8 w-8 text-primary" />,
+    title: "Multi-Provider AI Processing",
+    description: "Advanced AI Vision with Google Gemini and OpenRouter integration. Support for multiple AI providers including GPT-4, Claude, and more through unified API."
   },
   {
     icon: <Sparkles className="h-8 w-8 text-primary" />,
-    title: "AI-Powered Processing",
-    description: "Advanced AI Vision processing (default) with OCR + AI fallback. Supports larger images up to 5MB for better accuracy."
+    title: "Smart Confidence Scoring",
+    description: "Real-time confidence indicators for every extracted field. AI-powered validation with visual feedback and automatic error detection."
+  },
+  {
+    icon: <Search className="h-8 w-8 text-primary" />,
+    title: "Semantic Search & Analytics",
+    description: "Vector-powered search across receipts and line items. Find receipts by natural language queries with pgvector integration."
+  },
+  {
+    icon: <Layers className="h-8 w-8 text-primary" />,
+    title: "Dual Processing Methods",
+    description: "Choose between AI Vision (direct image processing) and OCR + AI Enhancement. Compare results with alternative processing methods."
   },
   {
     icon: <CheckCircle className="h-8 w-8 text-primary" />,
-    title: "Confidence Indicators",
-    description: "Visual feedback on extraction accuracy with AI-powered suggestions for corrections."
+    title: "Real-time Processing Status",
+    description: "Live processing updates with detailed logs. Track every step from upload through AI enhancement to final verification."
   },
   {
-    icon: <Users className="h-8 w-8 text-primary" />,
-    title: "Team Collaboration",
-    description: "Share receipt data and processing results with your team members securely."
-  },
-  {
-    icon: <LineChart className="h-8 w-8 text-primary" />,
-    title: "Expense Analytics",
-    description: "Track spending patterns and generate reports for financial planning and analysis."
-  },
-  {
-    icon: <FileText className="h-8 w-8 text-primary" />,
-    title: "PDF Reporting",
-    description: "Generate comprehensive PDF reports of your receipt data for compliance and record-keeping."
+    icon: <Zap className="h-8 w-8 text-primary" />,
+    title: "Batch Processing & Optimization",
+    description: "Intelligent batch upload with concurrent processing. Auto-optimization based on image quality and content complexity."
   }
 ];
 
@@ -60,107 +64,117 @@ export default function Index() {
   const { user } = useAuth();
 
   useEffect(() => {
-    document.title = "Smart Receipt Processing - ReceiptScan";
-    // Consider adding favicon link handling here if not done globally
+    document.title = "AI-Powered Receipt Processing - ReceiptScan";
   }, []);
 
-  // Workflow-organized features
+  // Enhanced workflow with AI-first approach
   const featureGroups = [
     {
-      title: "Upload & Process",
+      title: "AI-Powered Upload",
       features: [
         {
           icon: <Upload className="h-8 w-8 text-primary" />,
-          title: "Upload Receipts",
-          description: "Drag-and-drop interface supporting multiple formats including images and PDFs.",
+          title: "Smart Upload & Detection",
+          description: "AI-powered file validation with automatic format detection. Supports images, PDFs, and batch uploads up to 5MB.",
           link: "/upload"
         },
       ]
     },
     {
-      title: "OCR & AI Enhancement",
+      title: "Advanced AI Processing",
       features: [
         {
-          icon: <Sparkles className="h-8 w-8 text-primary" />,
-          title: "AI-Powered OCR",
-          description: "Advanced OCR with Amazon Textract and Google Gemini enhancement for high-accuracy data extraction.",
-          link: "/dashboard"
+          icon: <Brain className="h-8 w-8 text-primary" />,
+          title: "Multi-Model AI Processing",
+          description: "Choose from Google Gemini, OpenRouter models, or custom AI providers. Real-time model switching and performance optimization.",
+          link: "/settings"
         },
         {
           icon: <BarChart4 className="h-8 w-8 text-primary" />,
-          title: "Confidence Scoring",
-          description: "Field-level confidence indicators help identify potential OCR issues. Real-time feedback on data quality.",
+          title: "Confidence-Driven Validation",
+          description: "Field-level confidence scoring with visual indicators. AI suggests corrections and flags potential issues automatically.",
           link: "/dashboard"
         },
       ]
     },
     {
-      title: "Verify & Manage",
+      title: "Intelligent Management",
       features: [
         {
-          icon: <FileText className="h-8 w-8 text-primary" />,
-          title: "Smart Verification",
-          description: "Interactive review interface with side-by-side image and data comparison. AI suggestions for quick corrections.",
-          link: "/dashboard"
+          icon: <Search className="h-8 w-8 text-primary" />,
+          title: "Semantic Search & Discovery",
+          description: "Natural language search powered by vector embeddings. Find receipts by description, merchant, or transaction details.",
+          link: "/semantic-search"
         },
         {
           icon: <History className="h-8 w-8 text-primary" />,
-          title: "Processing History",
-          description: "Track every step of receipt processing, from upload through OCR and AI enhancement to final verification.",
+          title: "Processing Intelligence",
+          description: "Complete audit trail with AI decision logging. Track confidence improvements and processing method effectiveness.",
           link: "/dashboard"
         },
         {
           icon: <Settings2 className="h-8 w-8 text-primary" />,
-          title: "Custom Settings",
-          description: "Choose between OCR-AI and AI Vision methods. Configure processing options for your specific needs.",
+          title: "AI Model Configuration",
+          description: "Configure multiple AI providers and API keys. Compare processing methods and optimize for accuracy or speed.",
           link: "/settings"
         }
       ]
     },
   ];
 
-  // Stats for social proof section
+  // Updated stats reflecting AI capabilities
   const stats = [
-    { value: "500+", label: "Finance Teams", icon: <Users className="h-6 w-6 text-primary mb-2" /> },
+    { value: "500+", label: "AI Models Available", icon: <Brain className="h-6 w-6 text-primary mb-2" /> },
+    { value: "95%+", label: "Average Confidence", icon: <TrendingUp className="h-6 w-6 text-primary mb-2" /> },
     { value: "10,000+", label: "Receipts Processed", icon: <FileText className="h-6 w-6 text-primary mb-2" /> },
-    { value: "99%", label: "Average Accuracy", icon: <TrendingUp className="h-6 w-6 text-primary mb-2" /> }, // Using TrendingUp for accuracy
   ];
 
   return (
-    // Simplified background and increased spacing
     <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
       <Navbar />
 
-      <div className="relative overflow-hidden"> {/* Added overflow-hidden */}
-        {/* Background pattern - subtle */}
+      <div className="relative overflow-hidden">
+        {/* Enhanced background pattern */}
         <div className="absolute inset-0 overflow-hidden z-0">
           <div className="w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background"></div>
         </div>
 
-        {/* Increased spacing */}
         <main className="relative z-10 container py-16 space-y-32">
-          {/* Enhanced Hero Section */}
+          {/* Enhanced Hero Section with AI focus */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center pt-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              {/* Larger headline */}
               <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight">
-                Intelligent <span className="text-primary">Receipt Processing</span>
+                <span className="text-primary">AI-Powered</span> Receipt Processing
               </h1>
-              {/* Added subheading */}
               <p className="mt-4 text-xl text-muted-foreground lg:text-2xl">
-                Transform receipts into actionable data in seconds.
+                Advanced multi-model AI with confidence scoring and semantic search.
               </p>
-              {/* Enhanced CTAs */}
+              {/* AI Features highlight */}
+              <div className="mt-6 flex flex-wrap gap-3">
+                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
+                  <Brain className="h-4 w-4 text-primary" />
+                  <span>Multi-Provider AI</span>
+                </div>
+                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
+                  <BarChart4 className="h-4 w-4 text-primary" />
+                  <span>Confidence Scoring</span>
+                </div>
+                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
+                  <Search className="h-4 w-4 text-primary" />
+                  <span>Semantic Search</span>
+                </div>
+              </div>
+              
               <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4">
                 {!user ? (
                   <>
                     <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
                       <Link to="/auth" className="flex items-center justify-center sm:justify-start">
-                        Sign Up Free
+                        Try AI Processing Free
                         <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                       </Link>
                     </Button>
@@ -174,13 +188,13 @@ export default function Index() {
                   <>
                     <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
                       <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
-                        Upload Receipt
+                        Upload with AI
                         <Upload className="ml-2 h-5 w-5 transition-transform group-hover:translate-y-[-2px]" />
                       </Link>
                     </Button>
                     <Button variant="ghost" size="lg" asChild className="w-full sm:w-auto">
-                      <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
-                        View Dashboard
+                      <Link to="/semantic-search" className="flex items-center justify-center sm:justify-start">
+                        Try Semantic Search
                       </Link>
                     </Button>
                   </>
@@ -188,7 +202,7 @@ export default function Index() {
               </div>
             </motion.div>
 
-            {/* Receipt Scanning Hero Image */}
+            {/* Keep existing hero image */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -198,7 +212,7 @@ export default function Index() {
               <div className="relative max-w-lg rounded-xl overflow-hidden border border-border shadow-2xl">
                 <img
                   src="/receipt-scanner.png"
-                  alt="Receipt Scanning on Mobile Phone"
+                  alt="AI Receipt Processing"
                   width="500"
                   height="600"
                   className="block w-full h-auto object-cover"
@@ -207,13 +221,13 @@ export default function Index() {
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
                   <div className="flex items-center">
                     <div>
-                      <p className="text-white font-medium">Transform your receipts</p>
-                      <p className="text-white/80 text-sm">Quick, accurate, and effortless</p>
+                      <p className="text-white font-medium">AI-Enhanced Processing</p>
+                      <p className="text-white/80 text-sm">Smart, confident, and accurate</p>
                     </div>
                     <Button size="sm" variant="secondary" className="ml-auto" asChild>
                       <Link to="/dashboard">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
+                        <Brain className="h-4 w-4 mr-2" />
+                        Try AI
                       </Link>
                     </Button>
                   </div>
@@ -222,7 +236,7 @@ export default function Index() {
             </motion.div>
           </section>
 
-          {/* Improved Workflow Section */}
+          {/* Enhanced Workflow Section */}
           <section id="how-it-works" className="scroll-mt-16">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -232,26 +246,25 @@ export default function Index() {
             >
               <div className="inline-flex items-center justify-center">
                 <Separator className="w-8 bg-primary h-1" />
-                <h2 className="text-lg font-medium px-4">How It Works</h2>
+                <h2 className="text-lg font-medium px-4">AI-First Workflow</h2>
                 <Separator className="w-8 bg-primary h-1" />
               </div>
-              <h3 className="text-3xl font-bold mt-4">Simple 3-Step Process</h3>
+              <h3 className="text-3xl font-bold mt-4">Intelligent 3-Step Process</h3>
               <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-                Our application offers a streamlined workflow from upload to verification.
+                Powered by advanced AI models with real-time confidence scoring and semantic understanding.
               </p>
             </motion.div>
 
-            {/* Timeline-style layout */}
+            {/* Keep existing workflow structure but with updated content */}
             <div className="flex flex-col md:flex-row gap-8 mt-12 items-start relative">
               {featureGroups.map((group, groupIndex) => (
                 <motion.div
                   key={groupIndex}
-                  className="flex-1 relative pb-8 md:pb-0" // Added padding bottom for mobile
+                  className="flex-1 relative pb-8 md:pb-0"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
                 >
-                  {/* Step Number and Title */}
                   <div className="flex items-center mb-6">
                     <span className="bg-primary/10 text-primary rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shrink-0">
                       {groupIndex + 1}
@@ -259,7 +272,6 @@ export default function Index() {
                     <h3 className="ml-4 text-xl font-semibold text-primary">{group.title}</h3>
                   </div>
 
-                  {/* Feature Cards */}
                   <div className="space-y-4 pl-2 md:pl-0">
                     {group.features.map((feature, index) => (
                       <motion.div
@@ -267,24 +279,19 @@ export default function Index() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: (groupIndex * 0.2) + (index * 0.1) + 0.2 }}
-                        whileHover={{ scale: 1.02, z: 10 }} // Added z-index on hover
-                        className="relative" // Added relative for z-index
+                        whileHover={{ scale: 1.02, z: 10 }}
+                        className="relative"
                       >
                         <Link to={feature.link} className="block h-full">
                           <Card className="h-full hover:bg-primary/5 hover:shadow-lg transition-all duration-300 cursor-pointer border-border/60 bg-card">
                             <CardContent className="pt-6">
-                              <div className="mb-4 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10 scale-110"> {/* Increased icon background size */}
-                                {React.cloneElement(feature.icon, { className: "h-10 w-10 text-primary" })} {/* Larger icon */}
+                              <div className="mb-4 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10 scale-110">
+                                {React.cloneElement(feature.icon, { className: "h-10 w-10 text-primary" })}
                               </div>
                               <h4 className="text-lg font-medium mb-2">{feature.title}</h4>
-                              {/* Simplified description - using first sentence as example */}
                               <p className="text-muted-foreground text-sm">
-                                {feature.description.split('.')[0]}.
+                                {feature.description}
                               </p>
-                              {/* Example using bullet points if description allows */}
-                              {/* <ul className="text-muted-foreground list-disc pl-5 text-sm space-y-1 mt-2">
-                                {feature.description.split('. ').map((point, i) => point && <li key={i}>{point}</li>)}
-                              </ul> */}
                             </CardContent>
                           </Card>
                         </Link>
@@ -292,13 +299,11 @@ export default function Index() {
                     ))}
                   </div>
 
-                  {/* Connecting Line/Arrow (Visible on MD+) */}
                   {groupIndex < featureGroups.length - 1 && (
                     <div className="hidden md:block absolute top-1/2 right-[-2rem] transform -translate-y-1/2 z-0">
                       <ArrowRight className="h-8 w-8 text-muted-foreground/30" />
                     </div>
                   )}
-                  {/* Vertical connector line for mobile */}
                   {groupIndex < featureGroups.length - 1 && (
                     <div className="absolute left-[23px] top-16 bottom-0 w-px bg-border md:hidden" />
                   )}
@@ -313,14 +318,14 @@ export default function Index() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12" // Increased bottom margin
+              className="text-center mb-12"
             >
               <h2 className="text-3xl font-bold">
-                Trusted by <span className="text-primary">Finance Teams</span> Worldwide
+                Powered by <span className="text-primary">Advanced AI</span>
               </h2>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto"> {/* Increased max-width */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               {stats.map((stat, index) => (
                 <motion.div
                   key={index}
@@ -329,14 +334,12 @@ export default function Index() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                   className="text-center flex flex-col items-center"
                 >
-                  {/* Added Icon */}
                   {stat.icon}
-                  {/* Increased value font size & added simple count-up via transition */}
                   <motion.h3
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.8, delay: index * 0.1 + 0.2 }} // Slight delay for effect
-                    className="text-5xl font-bold text-primary" // Increased size
+                    transition={{ duration: 0.8, delay: index * 0.1 + 0.2 }}
+                    className="text-5xl font-bold text-primary"
                   >
                     {stat.value}
                   </motion.h3>
@@ -345,8 +348,29 @@ export default function Index() {
               ))}
             </div>
 
-            {/* Keep Explore Dashboard button */}
-            <div className="flex justify-center mt-16"> {/* Increased top margin */}
+            {/* AI Features showcase */}
+            <div className="flex justify-center mt-12">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div className="flex flex-col items-center">
+                  <Brain className="h-8 w-8 text-primary mb-2" />
+                  <span className="text-sm font-medium">Multi-Model AI</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <Shield className="h-8 w-8 text-primary mb-2" />
+                  <span className="text-sm font-medium">Confidence Scoring</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <Search className="h-8 w-8 text-primary mb-2" />
+                  <span className="text-sm font-medium">Vector Search</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <Zap className="h-8 w-8 text-primary mb-2" />
+                  <span className="text-sm font-medium">Real-time Processing</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center mt-16">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -355,7 +379,7 @@ export default function Index() {
               >
                 <Button asChild size="lg">
                   <Link to="/dashboard" className="flex items-center">
-                    Explore the Dashboard
+                    Explore AI Features
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -363,7 +387,7 @@ export default function Index() {
             </div>
           </section>
 
-          {/* Refined Features Section */}
+          {/* Enhanced Features Section */}
           <section id="features" className="scroll-mt-16">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -373,28 +397,26 @@ export default function Index() {
             >
               <div className="inline-flex items-center justify-center">
                 <Separator className="w-8 bg-primary h-1" />
-                <h2 className="text-lg font-medium px-4">Features</h2>
+                <h2 className="text-lg font-medium px-4">AI Features</h2>
                 <Separator className="w-8 bg-primary h-1" />
               </div>
-              <h3 className="text-3xl font-bold mt-4">Smart Processing Powerhouse</h3> {/* Changed title slightly */}
+              <h3 className="text-3xl font-bold mt-4">Next-Generation Intelligence</h3>
               <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-                Leverage advanced OCR and AI technology to automate your receipt processing workflow efficiently.
+                Harness the power of multiple AI providers with confidence-driven processing and semantic understanding.
               </p>
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {/* Using the featuresList defined at the top */}
               {featuresList.map((feature, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.03, y: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }} // Enhanced hover
-                  className="h-full" // Ensure motion div takes full height for consistent card height
+                  whileHover={{ scale: 1.03, y: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
+                  className="h-full"
                 >
                   <Card className="h-full hover:bg-primary/5 transition-all duration-300 border-border/60 bg-card">
-                    {/* Increased padding */}
                     <CardContent className="pt-8">
                       <div className="mb-6 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10">
                         {feature.icon}
@@ -408,28 +430,25 @@ export default function Index() {
             </div>
           </section>
 
-          {/* Strengthened CTA Section */}
-          <section className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden"> {/* Increased padding, added gradient */}
-             {/* Optional: Add a subtle background pattern or shapes */}
+          {/* Enhanced CTA Section */}
+          <section className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-5">
-              {/* Example subtle pattern */}
               <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="scale(2) rotate(45)"><rect x="0" y="0" width="100%" height="100%" fill="hsla(0,0%,100%,0)"/><path d="M10-5C10 5 10 5 0 5A10 10 0 0 1 10-5M10 15c0 10 0 10-10 10a10 10 0 0 1 10-10" strokeWidth="0.5" stroke="hsla(215, 28%, 17%, 0.2)" fill="none"/></pattern></defs><rect width="800%" height="800%" transform="translate(0,0)" fill="url(#a)"/></svg>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="max-w-2xl mx-auto relative z-10" // Ensure content is above pattern
+              className="max-w-2xl mx-auto relative z-10"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to streamline your receipt processing?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to experience AI-powered processing?</h2>
               <p className="text-lg md:text-xl text-muted-foreground mb-8">
-                Join hundreds of companies saving time with our AI-powered receipt processing solution.
+                Join hundreds of companies using our multi-model AI platform with confidence scoring and semantic search.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                {/* Larger CTA button */}
                 <Button asChild size="lg" className="group w-full sm:w-auto">
                   <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
-                    {user ? 'Upload Your First Receipt' : 'Sign Up Free'}
+                    {user ? 'Start AI Processing' : 'Try AI Features Free'}
                     <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>
@@ -446,14 +465,14 @@ export default function Index() {
         </main>
       </div>
 
-      {/* Enhanced Footer */}
+      {/* Keep existing footer */}
       <footer className="border-t py-12 bg-background/80 backdrop-blur-sm">
         <div className="container">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12"> {/* Added mb */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div className="space-y-4">
               {/* Placeholder for Logo */}
               {/* <img src="/logo.svg" alt="ReceiptScan Logo" className="h-8 mb-2" /> */}
-              <h4 className="font-semibold text-lg">ReceiptScan</h4> {/* Increased weight */}
+              <h4 className="font-semibold text-lg">ReceiptScan</h4>
               <p className="text-sm text-muted-foreground">
                 AI-powered receipt processing for modern businesses.
               </p>

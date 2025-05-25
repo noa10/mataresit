@@ -77,6 +77,7 @@ export type Database = {
           amount: number
           created_at: string
           description: string
+          embedding: string | null
           id: string
           receipt_id: string
           updated_at: string
@@ -85,6 +86,7 @@ export type Database = {
           amount: number
           created_at?: string
           description: string
+          embedding?: string | null
           id?: string
           receipt_id: string
           updated_at?: string
@@ -93,6 +95,7 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
+          embedding?: string | null
           id?: string
           receipt_id?: string
           updated_at?: string
@@ -219,6 +222,7 @@ export type Database = {
           id: string
           metadata: Json | null
           receipt_id: string
+          source_type: string
         }
         Insert: {
           content_type: string
@@ -227,6 +231,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           receipt_id: string
+          source_type?: string
         }
         Update: {
           content_type?: string
@@ -235,6 +240,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           receipt_id?: string
+          source_type?: string
         }
         Relationships: [
           {
@@ -278,9 +284,11 @@ export type Database = {
           date: string
           discrepancies: Json | null
           document_structure: Json | null
+          embedding_status: string | null
           field_geometry: Json | null
           fullText: string | null
           has_alternative_data: boolean | null
+          has_embeddings: boolean | null
           id: string
           image_url: string | null
           merchant: string
@@ -309,9 +317,11 @@ export type Database = {
           date: string
           discrepancies?: Json | null
           document_structure?: Json | null
+          embedding_status?: string | null
           field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
+          has_embeddings?: boolean | null
           id?: string
           image_url?: string | null
           merchant: string
@@ -340,9 +350,11 @@ export type Database = {
           date?: string
           discrepancies?: Json | null
           document_structure?: Json | null
+          embedding_status?: string | null
           field_geometry?: Json | null
           fullText?: string | null
           has_alternative_data?: boolean | null
+          has_embeddings?: boolean | null
           id?: string
           image_url?: string | null
           merchant?: string
@@ -485,6 +497,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      basic_search_receipts: {
+        Args: {
+          p_query: string
+          p_limit?: number
+          p_offset?: number
+          p_start_date?: string
+          p_end_date?: string
+          p_min_amount?: number
+          p_max_amount?: number
+          p_merchants?: string[]
+        }
+        Returns: Json
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -501,12 +526,28 @@ export type Database = {
         Args: { p_table: string; p_column: string; p_schema?: string }
         Returns: boolean
       }
+      count_receipt_embeddings: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_receipts: number
+          receipts_with_embeddings: number
+          receipts_without_embeddings: number
+        }[]
+      }
       create_first_admin: {
         Args: { _email: string }
         Returns: boolean
       }
       debug_auth_state: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      generate_line_item_embeddings: {
+        Args: { p_line_item_id: string; p_embedding: string }
+        Returns: boolean
+      }
+      generate_receipt_embeddings: {
+        Args: { p_receipt_id: string; p_process_all_fields?: boolean }
         Returns: Json
       }
       get_admin_users: {
@@ -526,9 +567,27 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      get_line_items_without_embeddings_for_receipt: {
+        Args: { p_receipt_id: string }
+        Returns: {
+          id: string
+          description: string
+          amount: number
+        }[]
+      }
       get_receipts_count: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      get_receipts_needing_embeddings: {
+        Args: { limit_count?: number }
+        Returns: {
+          id: string
+          merchant: string
+          date: string
+          total: number
+          processing_status: string
+        }[]
       }
       get_user_receipt_usage_stats: {
         Args: Record<PropertyKey, never>
@@ -627,15 +686,63 @@ export type Database = {
         Args: { curlopt: string; value: string }
         Returns: boolean
       }
+      hybrid_search_line_items: {
+        Args:
+          | {
+              query_embedding: string
+              query_text: string
+              similarity_threshold?: number
+              similarity_weight?: number
+              text_weight?: number
+              match_count?: number
+              min_amount?: number
+              max_amount?: number
+              start_date?: string
+              end_date?: string
+            }
+          | {
+              query_embedding: string
+              query_text: string
+              similarity_threshold?: number
+              similarity_weight?: number
+              text_weight?: number
+              match_count?: number
+              min_amount?: number
+              max_amount?: number
+              start_date?: string
+              end_date?: string
+            }
+        Returns: {
+          line_item_id: string
+          receipt_id: string
+          line_item_description: string
+          line_item_amount: number
+          parent_receipt_merchant: string
+          parent_receipt_date: string
+          similarity: number
+          text_score: number
+          score: number
+        }[]
+      }
       hybrid_search_receipts: {
-        Args: {
-          search_text: string
-          query_embedding: string
-          content_type?: string
-          similarity_weight?: number
-          text_weight?: number
-          match_count?: number
-        }
+        Args:
+          | {
+              query_embedding: string
+              search_text: string
+              similarity_threshold?: number
+              similarity_weight?: number
+              text_weight?: number
+              match_count?: number
+              content_type_filter?: string
+            }
+          | {
+              search_text: string
+              query_embedding: string
+              content_type?: string
+              similarity_weight?: number
+              text_weight?: number
+              match_count?: number
+            }
         Returns: {
           receipt_id: string
           score: number
@@ -665,15 +772,30 @@ export type Database = {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
       }
+      search_line_items: {
+        Args: {
+          query_embedding: string
+          similarity_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          line_item_id: string
+          receipt_id: string
+          line_item_description: string
+          line_item_amount: number
+          parent_receipt_merchant: string
+          parent_receipt_date: string
+          similarity: number
+        }[]
+      }
       search_receipts: {
         Args: {
           query_embedding: string
           similarity_threshold?: number
           match_count?: number
-          content_type?: string
+          content_type_filter?: string
         }
         Returns: {
-          id: string
           receipt_id: string
           similarity: number
         }[]
