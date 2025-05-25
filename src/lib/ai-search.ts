@@ -16,8 +16,8 @@ export interface SearchParams {
   categories?: string[];
   merchants?: string[];
   isNaturalLanguage?: boolean;
-  isVectorSearch?: boolean; // Indicates whether vector search was used
-  searchTarget?: 'receipts' | 'line_items' | 'all'; // Target for search (receipts, line_items, or all)
+  isVectorSearch?: boolean;
+  searchTarget?: 'receipts' | 'line_items' | 'all';
 }
 
 export interface ReceiptWithSimilarity {
@@ -29,7 +29,6 @@ export interface ReceiptWithSimilarity {
   raw_text?: string;
   predicted_category?: string;
   similarity_score: number;
-  // Other receipt properties
 }
 
 export interface LineItemSearchResult {
@@ -41,8 +40,8 @@ export interface LineItemSearchResult {
   line_item_amount?: number;
   parent_receipt_merchant: string;
   parent_receipt_date: string;
-  parent_receipt_id?: string; // Ensure this field is specified and documented
-  receipt?: {  // Add optional receipt object that might be returned from the API
+  parent_receipt_id?: string;
+  receipt?: {
     id: string;
     merchant?: string;
     date?: string;
@@ -51,9 +50,9 @@ export interface LineItemSearchResult {
 }
 
 export interface SearchResult {
-  receipts?: ReceiptWithSimilarity[]; // Optional: results for receipts (legacy support)
-  lineItems?: LineItemSearchResult[]; // Optional: results for line items (legacy support)
-  results?: (ReceiptWithSimilarity | LineItemSearchResult)[]; // Combined results for unified search
+  receipts?: ReceiptWithSimilarity[];
+  lineItems?: LineItemSearchResult[];
+  results?: Array<ReceiptWithSimilarity | LineItemSearchResult>;
   count: number;
   total: number;
   searchParams: SearchParams;

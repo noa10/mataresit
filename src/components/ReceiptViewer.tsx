@@ -8,7 +8,7 @@ import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw,
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
-import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus } from "@/services/receiptService";
+import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus, generateEmbeddingsForReceipt } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
@@ -545,6 +545,21 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       toast.error("Failed to process receipt with OCR");
     }
   });
+
+  const handleGenerateEmbeddings = async () => {
+    if (!receipt?.id) return;
+    
+    setIsGeneratingEmbeddings(true);
+    try {
+      await generateEmbeddingsForReceipt(receipt.id);
+      toast.success("Embeddings generated successfully");
+    } catch (error) {
+      console.error("Error generating embeddings:", error);
+      toast.error("Failed to generate embeddings");
+    } finally {
+      setIsGeneratingEmbeddings(false);
+    }
+  };
 
   const formatCurrency = (amount?: number | null) => {
     // Use a try-catch block to handle potential invalid currency codes

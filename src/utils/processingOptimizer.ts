@@ -1,3 +1,4 @@
+
 /**
  * Intelligent processing optimization utilities
  * Provides automatic fallback mechanisms and processing method selection
@@ -29,6 +30,25 @@ export interface FileAnalysis {
   complexity: 'low' | 'medium' | 'high';
   isOptimized: boolean;
   estimatedProcessingDifficulty: number; // 1-10 scale
+}
+
+// Add missing type definitions
+export type SystemLoad = 'low' | 'medium' | 'high';
+
+export interface QueueItem {
+  id: string;
+  priority: 'low' | 'medium' | 'high';
+  estimatedProcessingTime: number;
+}
+
+export interface ProcessingPlan {
+  batches: {
+    items: QueueItem[];
+    estimatedTime: number;
+    priority: 'low' | 'medium' | 'high';
+  }[];
+  estimatedTime: number;
+  recommendedConcurrency: number;
 }
 
 // Import model configurations from the centralized config
@@ -142,6 +162,7 @@ export function getProcessingRecommendation(
     }
   }
 
+  // Fix the type comparison error here
   if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
     recommendedMethod = 'ai-vision';
     recommendedModel = 'gemini-2.0-flash-lite';

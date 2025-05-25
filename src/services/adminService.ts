@@ -140,15 +140,30 @@ export class AdminService {
 
   async getReceiptStats() {
     try {
-      // Use the existing count_receipt_embeddings function
-      const { data, error } = await supabase.rpc('count_receipt_embeddings');
-      
-      if (error) {
-        console.error('Error fetching receipt stats:', error);
-        throw error;
+      // Query the receipt_embeddings table directly instead of using RPC
+      const { count: totalEmbeddings, error: embeddingError } = await supabase
+        .from('receipt_embeddings')
+        .select('receipt_id', { count: 'exact', head: true });
+
+      if (embeddingError) {
+        console.error('Error fetching receipt embeddings count:', embeddingError);
+        throw embeddingError;
       }
 
-      return data;
+      const { count: totalReceipts, error: receiptError } = await supabase
+        .from('receipts')
+        .select('id', { count: 'exact', head: true });
+
+      if (receiptError) {
+        console.error('Error fetching total receipts count:', receiptError);
+        throw receiptError;
+      }
+
+      return {
+        total_receipts: totalReceipts || 0,
+        receipts_with_embeddings: totalEmbeddings || 0,
+        receipts_without_embeddings: Math.max(0, (totalReceipts || 0) - (totalEmbeddings || 0))
+      };
     } catch (error) {
       console.error('Error in getReceiptStats:', error);
       throw error;
