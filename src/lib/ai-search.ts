@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 // Simplified SearchResult type to avoid deep recursion
@@ -39,14 +40,19 @@ export interface SearchFilters {
   paymentMethod?: string;
 }
 
+// Add missing type exports
+export interface ReceiptWithSimilarity extends SearchResult {
+  similarity: number;
+}
+
+export interface SearchParams {
+  query: string;
+  filters?: SearchFilters;
+  limit?: number;
+}
+
 /**
  * Searches for receipts based on a text query and optional filters.
- *
- * @param {string} query - The text query to search for in receipt data.
- * @param {string} userId - The ID of the user performing the search.
- * @param {SearchFilters} [filters] - Optional filters to apply to the search.
- * @param {number} [limit=10] - The maximum number of results to return.
- * @returns {Promise<SearchResult[]>} - A promise that resolves to an array of search results.
  */
 export async function searchReceipts(
   query: string,
@@ -55,40 +61,15 @@ export async function searchReceipts(
   limit: number = 10
 ): Promise<SearchResult[]> {
   try {
-    let supabaseQuery = supabase
+    const embedding = await generateEmbedding(query);
+    
+    const { data, error } = await supabase
       .rpc('search_receipts', {
-        query_embedding: `[${await generateEmbedding(query)}]`,
+        query_embedding: `[${embedding.join(',')}]`,
         similarity_threshold: 0.78,
-        match_count: limit,
-        user_id: userId
+        match_count: limit
       })
       .limit(limit);
-
-    if (filters) {
-      if (filters.dateFrom) {
-        supabaseQuery = supabaseQuery.gte('date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        supabaseQuery = supabaseQuery.lte('date', filters.dateTo);
-      }
-      if (filters.minAmount) {
-        supabaseQuery = supabaseQuery.gte('total', filters.minAmount);
-      }
-      if (filters.maxAmount) {
-        supabaseQuery = supabaseQuery.lte('total', filters.maxAmount);
-      }
-      if (filters.merchant) {
-        supabaseQuery = supabaseQuery.ilike('merchant', `%${filters.merchant}%`);
-      }
-      if (filters.category) {
-        supabaseQuery = supabaseQuery.eq('predicted_category', filters.category);
-      }
-      if (filters.paymentMethod) {
-        supabaseQuery = supabaseQuery.eq('payment_method', filters.paymentMethod);
-      }
-    }
-
-    const { data, error } = await supabaseQuery;
 
     if (error) {
       console.error('Search error:', error);
@@ -116,54 +97,23 @@ export async function searchReceipts(
 
 /**
  * Searches for line items within receipts based on a text query and optional filters.
- *
- * @param {string} query - The text query to search for in line item descriptions.
- * @param {string} userId - The ID of the user performing the search.
- * @param {SearchFilters} [filters] - Optional filters to apply to the search.
- * @param {number} [limit=10] - The maximum number of results to return.
- * @returns {Promise<LineItemSearchResult[]>} - A promise that resolves to an array of line item search results.
  */
 export async function searchLineItems(
   query: string,
   userId: string,
   filters?: SearchFilters,
   limit: number = 10
-): Promise<LineItemSearchResult[]> {
+): Promise<LineItemSearchResult[]> => {
   try {
-    let supabaseQuery = supabase
+    const embedding = await generateEmbedding(query);
+    
+    const { data, error } = await supabase
       .rpc('search_line_items', {
-        query_embedding: `[${await generateEmbedding(query)}]`,
+        query_embedding: `[${embedding.join(',')}]`,
         similarity_threshold: 0.78,
-        match_count: limit,
-        user_id: userId
+        match_count: limit
       })
-      .limit(limit)
-
-    if (filters) {
-      if (filters.dateFrom) {
-        supabaseQuery = supabaseQuery.gte('date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        supabaseQuery = supabaseQuery.lte('date', filters.dateTo);
-      }
-      if (filters.minAmount) {
-        supabaseQuery = supabaseQuery.gte('total', filters.minAmount);
-      }
-      if (filters.maxAmount) {
-        supabaseQuery = supabaseQuery.lte('total', filters.maxAmount);
-      }
-      if (filters.merchant) {
-        supabaseQuery = supabaseQuery.ilike('merchant', `%${filters.merchant}%`);
-      }
-      if (filters.category) {
-        supabaseQuery = supabaseQuery.eq('predicted_category', filters.category);
-      }
-      if (filters.paymentMethod) {
-        supabaseQuery = supabaseQuery.eq('payment_method', filters.paymentMethod);
-      }
-    }
-
-    const { data, error } = await supabaseQuery;
+      .limit(limit);
 
     if (error) {
       console.error('Line item search error:', error);
@@ -189,11 +139,143 @@ export async function searchLineItems(
   }
 }
 
+// Add missing function exports
+export async function semanticSearch(params: SearchParams): Promise<SearchResult[]> {
+  return await searchReceipts(params.query, '', params.filters, params.limit);
+}
+
+export async function getSimilarReceipts(receiptId: string, limit: number = 5): Promise<ReceiptWithSimilarity[]> {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_similar_receipts', {
+        receipt_id: receiptId,
+        similarity_threshold: 0.5,
+        match_count: limit
+      })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error getting similar receipts:', error);
+      return [];
+    }
+
+    return (data as any[])?.map(result => ({
+      id: result.id,
+      merchant: result.merchant,
+      date: result.date,
+      total: result.total,
+      currency: result.currency,
+      similarity: result.similarity,
+      created_at: result.created_at,
+      payment_method: result.payment_method,
+      predicted_category: result.predicted_category,
+      thumbnail_url: result.thumbnail_url,
+      image_url: result.image_url,
+    })) || [];
+  } catch (error) {
+    console.error('Error getting similar receipts:', error);
+    return [];
+  }
+}
+
+export async function generateEmbeddings(text: string): Promise<number[]> {
+  return await generateEmbedding(text);
+}
+
+export async function generateAllEmbeddings(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-all-embeddings');
+    
+    if (error) {
+      console.error('Error generating all embeddings:', error);
+      return false;
+    }
+    
+    return data?.success || false;
+  } catch (error) {
+    console.error('Error calling generate-all-embeddings function:', error);
+    return false;
+  }
+}
+
+export async function checkLineItemEmbeddings(): Promise<{ total: number; withEmbeddings: number }> {
+  try {
+    const { data, error } = await supabase
+      .from('line_items')
+      .select('id, embedding')
+      .limit(1000);
+
+    if (error) {
+      console.error('Error checking line item embeddings:', error);
+      return { total: 0, withEmbeddings: 0 };
+    }
+
+    const total = data?.length || 0;
+    const withEmbeddings = data?.filter(item => item.embedding).length || 0;
+
+    return { total, withEmbeddings };
+  } catch (error) {
+    console.error('Error checking line item embeddings:', error);
+    return { total: 0, withEmbeddings: 0 };
+  }
+}
+
+export async function generateLineItemEmbeddings(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-line-item-embeddings');
+    
+    if (error) {
+      console.error('Error generating line item embeddings:', error);
+      return false;
+    }
+    
+    return data?.success || false;
+  } catch (error) {
+    console.error('Error calling generate-line-item-embeddings function:', error);
+    return false;
+  }
+}
+
+export async function checkReceiptEmbeddings(): Promise<{ total: number; withEmbeddings: number }> {
+  try {
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('id, has_embeddings')
+      .limit(1000);
+
+    if (error) {
+      console.error('Error checking receipt embeddings:', error);
+      return { total: 0, withEmbeddings: 0 };
+    }
+
+    const total = data?.length || 0;
+    const withEmbeddings = data?.filter(item => item.has_embeddings).length || 0;
+
+    return { total, withEmbeddings };
+  } catch (error) {
+    console.error('Error checking receipt embeddings:', error);
+    return { total: 0, withEmbeddings: 0 };
+  }
+}
+
+export async function generateReceiptEmbeddings(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-receipt-embeddings');
+    
+    if (error) {
+      console.error('Error generating receipt embeddings:', error);
+      return false;
+    }
+    
+    return data?.success || false;
+  } catch (error) {
+    console.error('Error calling generate-receipt-embeddings function:', error);
+    return false;
+  }
+}
+
 /**
  * Generates an embedding for a given text using the OpenAI API.
- *
- * @param {string} text - The text to generate an embedding for.
- * @returns {Promise<number[]>} - A promise that resolves to an array of numbers representing the embedding.
  */
 async function generateEmbedding(text: string): Promise<number[]> {
   const input = text.replace(/\n/g, " ");

@@ -16,7 +16,10 @@ export const fetchAllReceipts = async (userId: string): Promise<Receipt[]> => {
       throw new Error(error.message);
     }
 
-    return data || [];
+    return (data || []).map(receipt => ({
+      ...receipt,
+      status: receipt.status as Receipt['status']
+    }));
   } catch (error: any) {
     console.error('Unexpected error fetching receipts:', error);
     throw new Error(error.message);
@@ -45,7 +48,10 @@ export const fetchReceiptsWithPagination = async (
       throw new Error(error.message);
     }
 
-    return data || [];
+    return (data || []).map(receipt => ({
+      ...receipt,
+      status: receipt.status as Receipt['status']
+    }));
   } catch (error: any) {
     console.error('Unexpected error fetching paginated receipts:', error);
     throw new Error(error.message);
@@ -87,42 +93,20 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     }
 
     const { data: lineItems, error: lineItemsError } = await supabase
-      .from('receipt_line_items')
+      .from('line_items')
       .select('*')
       .eq('receipt_id', id);
 
     if (lineItemsError) {
       console.error('Error fetching line items:', lineItemsError);
-      // Consider whether to return the receipt without line items or throw an error
-    }
-
-    // Fetch field geometry
-    const { data: fieldGeometry, error: fieldGeometryError } = await supabase
-      .from('field_geometry')
-      .select('*')
-      .eq('receipt_id', id)
-      .single();
-
-    if (fieldGeometryError && fieldGeometryError.code !== '404') {
-      console.error('Error fetching field geometry:', fieldGeometryError);
-    }
-
-    // Fetch document structure
-    const { data: documentStructure, error: documentStructureError } = await supabase
-      .from('document_structure')
-      .select('*')
-      .eq('receipt_id', id)
-      .single();
-
-    if (documentStructureError && documentStructureError.code !== '404') {
-      console.error('Error fetching document structure:', documentStructureError);
     }
 
     return {
       ...receipt,
+      status: receipt.status as Receipt['status'],
       lineItems: lineItems || [],
-      field_geometry: fieldGeometry || undefined,
-      document_structure: documentStructure || undefined,
+      field_geometry: undefined,
+      document_structure: undefined,
     } as ReceiptWithDetails;
 
   } catch (error: any) {
@@ -215,11 +199,18 @@ export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDeta
 };
 
 // Function to create a new receipt
-export const createReceipt = async (receipt: Omit<Receipt, 'id' | 'created_at' | 'updated_at'>): Promise<Receipt | null> => {
+export const createReceipt = async (
+  receipt: Omit<Receipt, 'id' | 'created_at' | 'updated_at'>, 
+  lineItems: any[] = [], 
+  confidenceScores: any = {}
+): Promise<string | null> => {
   try {
     const { data, error } = await supabase
       .from('receipts')
-      .insert([receipt])
+      .insert([{
+        ...receipt,
+        confidence_scores: confidenceScores
+      }])
       .select('*')
       .single();
 
@@ -228,7 +219,7 @@ export const createReceipt = async (receipt: Omit<Receipt, 'id' | 'created_at' |
       throw new Error(error.message);
     }
 
-    return data as Receipt;
+    return data.id;
   } catch (error: any) {
     console.error('Unexpected error creating receipt:', error);
     throw new Error(error.message);
@@ -312,6 +303,144 @@ export const uploadImage = async (file: File, userId: string): Promise<{ imageUr
     return { imageUrl, thumbnailUrl };
   } catch (error: any) {
     console.error('Unexpected error uploading image:', error);
+    throw new Error(error.message);
+  }
+};
+
+// Add missing exports that are being imported by other files
+export const uploadReceiptImage = async (
+  file: File, 
+  userId: string, 
+  onProgress?: (progress: number) => void
+): Promise<string | null> => {
+  try {
+    if (onProgress) onProgress(0);
+    
+    const result = await uploadImage(file, userId);
+    
+    if (onProgress) onProgress(100);
+    
+    return result?.imageUrl || null;
+  } catch (error: any) {
+    console.error('Error uploading receipt image:', error);
+    throw new Error(error.message);
+  }
+};
+
+export const processReceiptWithOCR = async (
+  receiptId: string, 
+  options: {
+    primaryMethod?: string;
+    modelId?: string;
+    compareWithAlternative?: boolean;
+  } = {}
+): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('process-receipt', {
+      body: { 
+        receiptId,
+        ...options
+      }
+    });
+
+    if (error) {
+      console.error('Error processing receipt:', error);
+      throw error;
+    }
+
+    return data?.success || false;
+  } catch (error) {
+    console.error('Error calling process-receipt function:', error);
+    throw error;
+  }
+};
+
+export const markReceiptUploaded = async (receiptId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('receipts')
+      .update({ 
+        processing_status: 'uploaded',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', receiptId);
+
+    if (error) {
+      console.error('Error marking receipt as uploaded:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Unexpected error marking receipt as uploaded:', error);
+    throw new Error(error.message);
+  }
+};
+
+export const fixProcessingStatus = async (receiptId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('receipts')
+      .update({ 
+        processing_status: 'complete',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', receiptId);
+
+    if (error) {
+      console.error('Error fixing processing status:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Unexpected error fixing processing status:', error);
+    throw new Error(error.message);
+  }
+};
+
+export const fetchCorrections = async (receiptId: string): Promise<Correction[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('corrections')
+      .select('*')
+      .eq('receipt_id', receiptId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching corrections:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('Unexpected error fetching corrections:', error);
+    throw new Error(error.message);
+  }
+};
+
+export const updateReceiptProcessingStatus = async (
+  receiptId: string, 
+  status: string, 
+  error?: string
+): Promise<void> => {
+  try {
+    const updateData: any = {
+      processing_status: status,
+      updated_at: new Date().toISOString()
+    };
+    
+    if (error) {
+      updateData.processing_error = error;
+    }
+
+    const { error: updateError } = await supabase
+      .from('receipts')
+      .update(updateData)
+      .eq('id', receiptId);
+
+    if (updateError) {
+      console.error('Error updating receipt processing status:', updateError);
+      throw new Error(updateError.message);
+    }
+  } catch (error: any) {
+    console.error('Unexpected error updating receipt processing status:', error);
     throw new Error(error.message);
   }
 };

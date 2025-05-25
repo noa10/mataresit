@@ -251,13 +251,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         ariaLiveRegion.textContent = `Preparing ${file.name} for upload`;
       }
 
-      // Using the directly imported optimizeImageForUpload function
       console.log('Using directly imported optimizeImageForUpload function');
 
-      // Optimize the image before uploading
       let fileToUpload = file;
 
-      // Only optimize images, not PDFs
       if (file.type.startsWith('image/')) {
         setUploadProgress(15);
         if (ariaLiveRegion) {
@@ -265,7 +262,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
 
         try {
-          // Use a lower quality for larger files
           const quality = file.size > 3 * 1024 * 1024 ? 70 : 80;
           fileToUpload = await optimizeImageForUpload(file, 1500, quality);
           console.log(`Image optimized: ${file.size} bytes → ${fileToUpload.size} bytes (${Math.round(fileToUpload.size / file.size * 100)}% of original)`);
@@ -275,7 +271,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           }
         } catch (optimizeError) {
           console.error("Image optimization failed, using original file:", optimizeError);
-          // Continue with original file if optimization fails
           if (ariaLiveRegion) {
             ariaLiveRegion.textContent = `Optimization skipped, uploading original file`;
           }
@@ -287,8 +282,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setUploadProgress(30);
       setProcessingStatus('uploading');
       const imageUrl = await uploadReceiptImage(fileToUpload, user.id, (progress) => {
-        // Update progress percentage based on upload progress
-        const scaledProgress = Math.floor(progress * 0.5); // Scale to 0-50%
+        const scaledProgress = Math.floor(progress * 0.5);
         setUploadProgress(scaledProgress);
       });
 
@@ -304,8 +298,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       const today = new Date().toISOString().split('T')[0];
-      // Fix line 274 - Remove user_id from the object as it's not in the Receipt type
-      // The createReceipt function adds the user_id internally
       const newReceiptId = await createReceipt({
         merchant: "Processing...",
         date: today,
@@ -313,16 +305,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         currency: "MYR",
         status: "unreviewed",
         image_url: imageUrl,
-        // user_id is added by the createReceipt function automatically, remove it here
-        processing_status: 'uploading', // Initialize with uploading status
-        primary_method: settings.processingMethod, // Use settings from the hook
-        model_used: settings.selectedModel, // Use settings from the hook
-        has_alternative_data: settings.compareWithAlternative, // Use settings from the hook
-        payment_method: "" // Add required field
-      }, [], {
-        merchant: 0,
-        date: 0,
-        total: 0
+        processing_status: 'uploading',
+        primary_method: settings.processingMethod,
+        model_used: settings.selectedModel,
+        has_alternative_data: settings.compareWithAlternative,
+        payment_method: ""
       });
 
       if (!newReceiptId) {
@@ -332,7 +319,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setReceiptId(newReceiptId);
       setUploadProgress(60);
 
-      // Mark receipt as uploaded
       await markReceiptUploaded(newReceiptId);
 
       if (ariaLiveRegion) {
@@ -379,7 +365,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       try {
-        // Use enhanced fallback processing if available and recommended
         if (useEnhancedFallback && processingRecommendation) {
           console.log('Using enhanced fallback processing with recommendation:', processingRecommendation);
 
@@ -424,7 +409,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             throw new Error('Enhanced processing failed after all fallback attempts');
           }
         } else {
-          // Fallback to original processing method
           await processReceiptWithOCR(newReceiptId, {
             primaryMethod: processingRecommendation?.recommendedMethod || settings.processingMethod,
             modelId: processingRecommendation?.recommendedModel || settings.selectedModel,
