@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStripe } from "@/contexts/StripeContext";
+import { PRICE_IDS } from "@/config/stripe";
+import { toast } from "sonner";
 import {
   Check,
   X,
@@ -18,7 +22,8 @@ import {
   Shield,
   Clock,
   Database,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
 
 interface PricingTier {
@@ -141,6 +146,8 @@ const pricingTiers: PricingTier[] = [
 
 export default function PricingPage() {
   const { user } = useAuth();
+  const { createCheckoutSession, isLoading, subscriptionData } = useStripe();
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
   useEffect(() => {
     document.title = "Pricing - ReceiptScan";
@@ -155,6 +162,27 @@ export default function PricingPage() {
     const monthlyCost = monthly * 12;
     const savings = ((monthlyCost - annual) / monthlyCost) * 100;
     return Math.round(savings);
+  };
+
+  const handleSubscribe = async (tierId: string) => {
+    if (!user) {
+      toast.error("Please sign in to subscribe");
+      return;
+    }
+
+    if (tierId === 'free') {
+      toast.success("You're already on the Free plan!");
+      return;
+    }
+
+    try {
+      // Get the appropriate price ID based on tier and billing interval
+      const priceId = PRICE_IDS[tierId as 'pro' | 'max'][billingInterval];
+      await createCheckoutSession(priceId, billingInterval);
+    } catch (error) {
+      console.error('Error subscribing:', error);
+      toast.error("Failed to process subscription. Please try again.");
+    }
   };
 
   return (
@@ -191,6 +219,25 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
+        {/* Billing Interval Toggle */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-muted p-1 rounded-lg">
+            <ToggleGroup
+              type="single"
+              value={billingInterval}
+              onValueChange={(value) => value && setBillingInterval(value as 'monthly' | 'annual')}
+              className="flex items-center"
+            >
+              <ToggleGroupItem value="monthly" className="px-4">
+                Monthly
+              </ToggleGroupItem>
+              <ToggleGroupItem value="annual" className="px-4">
+                Yearly <Badge variant="outline" className="ml-2 text-green-600 border-green-200">Save up to 20%</Badge>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </div>
+
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
           {pricingTiers.map((tier, index) => (
@@ -199,18 +246,18 @@ export default function PricingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className={`relative ${tier.popular ? 'md:scale-105' : ''}`}
+              className={`relative ${tier.popular ? 'md:scale-105 pt-6' : ''}`}
             >
               {tier.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-4 py-1">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
+                  <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-4 py-1 shadow-lg">
                     <Star className="h-3 w-3 mr-1" />
                     Most Popular
                   </Badge>
                 </div>
               )}
 
-              <Card className={`h-full glass-card ${tier.popular ? 'border-primary/50 shadow-lg' : ''}`}>
+              <Card className={`h-full glass-card ${tier.popular ? 'border-primary/50 shadow-lg pt-4' : ''}`}>
                 <CardHeader className="text-center pb-8">
                   <div className="flex items-center justify-center mb-4">
                     <div className={`p-3 rounded-full ${
@@ -226,14 +273,20 @@ export default function PricingPage() {
 
                   <div className="mt-6">
                     <div className="text-4xl font-bold">
-                      {formatPrice(tier.price.monthly)}
-                      {tier.price.monthly > 0 && <span className="text-lg font-normal text-muted-foreground">/month</span>}
+                      {billingInterval === 'monthly'
+                        ? formatPrice(tier.price.monthly)
+                        : formatPrice(tier.price.annual)
+                      }
+                      {(billingInterval === 'monthly' ? tier.price.monthly : tier.price.annual) > 0 && (
+                        <span className="text-lg font-normal text-muted-foreground">
+                          /{billingInterval === 'monthly' ? 'month' : 'year'}
+                        </span>
+                      )}
                     </div>
-                    {tier.price.annual > 0 && (
+                    {billingInterval === 'annual' && tier.price.annual > 0 && (
                       <div className="text-sm text-muted-foreground mt-2">
-                        or {formatPrice(tier.price.annual)}/year
-                        <Badge variant="outline" className="ml-2 text-green-600 border-green-200">
-                          Save {getAnnualSavings(tier.price.monthly, tier.price.annual)}%
+                        <Badge variant="outline" className="text-green-600 border-green-200">
+                          Save {getAnnualSavings(tier.price.monthly, tier.price.annual)}% vs monthly
                         </Badge>
                       </div>
                     )}
@@ -344,13 +397,20 @@ export default function PricingPage() {
                   <div className="pt-6">
                     {user ? (
                       <Button
-                        asChild
+                        onClick={() => handleSubscribe(tier.id)}
+                        disabled={isLoading || (subscriptionData?.status === 'active' && tier.id === subscriptionData?.tier)}
                         className={`w-full ${tier.popular ? 'bg-primary hover:bg-primary/90' : ''}`}
                         variant={tier.popular ? 'default' : 'outline'}
                       >
-                        <Link to="/dashboard">
-                          {tier.id === 'free' ? 'Current Plan' : 'Upgrade Now'}
-                        </Link>
+                        {isLoading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : subscriptionData?.status === 'active' && tier.id === subscriptionData?.tier ? (
+                          'Current Plan'
+                        ) : tier.id === 'free' ? (
+                          'Downgrade to Free'
+                        ) : (
+                          `Upgrade to ${tier.name}`
+                        )}
                       </Button>
                     ) : (
                       <Button

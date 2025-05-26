@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { StripeProvider } from "@/contexts/StripeContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -27,6 +28,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
+const TestStripePage = lazy(() => import("./pages/TestStripePage"));
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -49,7 +52,8 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
+      <StripeProvider>
+        <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -62,6 +66,11 @@ const App = () => (
             <Route path="/pricing" element={
               <Suspense fallback={<PageLoading />}>
                 <PricingPage />
+              </Suspense>
+            } />
+            <Route path="/payment-success" element={
+              <Suspense fallback={<PageLoading />}>
+                <PaymentSuccessPage />
               </Suspense>
             } />
             <Route path="*" element={<NotFound />} />
@@ -91,6 +100,11 @@ const App = () => (
                   <SemanticSearch />
                 </Suspense>
               } />
+              <Route path="/test-stripe" element={
+                <Suspense fallback={<PageLoading />}>
+                  <TestStripePage />
+                </Suspense>
+              } />
             </Route>
 
             {/* Admin Routes - Require Admin Role */}
@@ -105,7 +119,8 @@ const App = () => (
             </Route>
           </Routes>
         </BrowserRouter>
-      </TooltipProvider>
+        </TooltipProvider>
+      </StripeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

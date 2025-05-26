@@ -10,10 +10,12 @@ import {
   Upload, Search, Filter, SlidersHorizontal,
   PlusCircle, XCircle, Calendar as CalendarIcon, DollarSign, X,
   LayoutGrid, LayoutList, Table as TableIcon,
-  Files, CheckSquare, Trash2, Loader2, Check
+  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStripe } from "@/contexts/StripeContext";
 import { fetchReceipts } from "@/services/receiptService";
+import { Badge } from "@/components/ui/badge";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +75,7 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { subscriptionData } = useStripe();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -661,7 +664,28 @@ export default function Dashboard() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <h1 className="text-3xl font-bold">Receipts Dashboard</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">Receipts Dashboard</h1>
+              {subscriptionData?.tier && subscriptionData.tier !== 'free' && (
+                <Badge className={`${
+                  subscriptionData.tier === 'pro'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-purple-500 text-white'
+                } text-sm px-2 py-1`}>
+                  {subscriptionData.tier === 'pro' ? (
+                    <>
+                      <Zap className="h-3 w-3 mr-1" />
+                      Pro
+                    </>
+                  ) : (
+                    <>
+                      <Crown className="h-3 w-3 mr-1" />
+                      Max
+                    </>
+                  )}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
               Manage and track all your receipts in one place
             </p>

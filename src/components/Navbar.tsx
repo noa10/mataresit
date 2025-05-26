@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X } from "lucide-react";
+import { useStripe } from "@/contexts/StripeContext";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, Gift } from "lucide-react";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,6 +16,7 @@ import {
 
 export default function Navbar() {
   const { user, signOut, isAdmin } = useAuth();
+  const { subscriptionData } = useStripe();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -34,14 +37,44 @@ export default function Navbar() {
 
   const initial = user?.email?.charAt(0).toUpperCase() ?? "";
 
+  const getTierIcon = () => {
+    switch (subscriptionData?.tier) {
+      case 'pro':
+        return <Zap className="h-3 w-3" />;
+      case 'max':
+        return <Crown className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
+  const getTierBadge = () => {
+    if (!subscriptionData?.tier || subscriptionData.tier === 'free') return null;
+
+    const colors = {
+      pro: 'bg-blue-500 text-white',
+      max: 'bg-purple-500 text-white'
+    };
+
+    return (
+      <Badge className={`${colors[subscriptionData.tier as keyof typeof colors]} text-xs px-1.5 py-0.5 ml-2`}>
+        {getTierIcon()}
+        <span className="ml-1 capitalize">{subscriptionData.tier}</span>
+      </Badge>
+    );
+  };
+
   return (
     <header className="w-full bg-background border-b relative">
       <div className="container mx-auto flex items-center justify-between py-4 px-4 md:px-8">
         {/* Brand */}
-        <NavLink to="/" className="flex items-center gap-2 text-xl font-semibold text-foreground">
-          <FileText className="h-6 w-6 text-primary" />
-          ReceiptScan
-        </NavLink>
+        <div className="flex items-center">
+          <NavLink to="/" className="flex items-center gap-2 text-xl font-semibold text-foreground">
+            <FileText className="h-6 w-6 text-primary" />
+            ReceiptScan
+          </NavLink>
+          {getTierBadge()}
+        </div>
 
         {/* Main nav links - Desktop */}
         <nav className="hidden md:flex items-center space-x-6">
