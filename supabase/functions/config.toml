@@ -35,3 +35,11 @@ verify_jwt = false
 verify_jwt = false
 # This is a simple test function that doesn't require authentication
 # It's used to test if edge functions are working at all
+
+[create-checkout-session]
+verify_jwt = true
+# Stripe checkout session creation requires authentication
+
+[stripe-webhook]
+verify_jwt = false
+# Stripe webhook doesn't use JWT auth, it uses webhook signatures

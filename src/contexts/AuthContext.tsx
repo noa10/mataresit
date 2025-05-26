@@ -16,6 +16,7 @@ type AuthContextType = {
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,9 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserRoles = async (userId: string) => {
     try {
       // Using RPC function to check if user has admin role
-      const { data, error } = await supabase.rpc('has_role', { 
-        _user_id: userId, 
-        _role: 'admin' 
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin'
       });
 
       if (error) {
@@ -61,16 +62,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const roles = await fetchUserRoles(currentUser.id);
+
+      // Fetch subscription data from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select(`
+          subscription_tier,
+          subscription_status,
+          stripe_customer_id,
+          stripe_subscription_id,
+          receipts_used_this_month
+        `)
+        .eq('id', currentUser.id)
+        .single();
+
       const userWithRole: UserWithRole = {
         ...currentUser,
-        roles
+        roles,
+        subscription_tier: profile?.subscription_tier || 'free',
+        subscription_status: profile?.subscription_status || 'active',
+        stripe_customer_id: profile?.stripe_customer_id,
+        stripe_subscription_id: profile?.stripe_subscription_id,
+        receipts_used_this_month: profile?.receipts_used_this_month || 0,
       };
 
       setUser(userWithRole);
       setIsAdmin(roles.includes('admin'));
     } catch (error) {
       console.error('Error updating user with roles:', error);
-      setUser({...currentUser, roles: ['user']} as UserWithRole);
+      setUser({...currentUser, roles: ['user'], subscription_tier: 'free'} as UserWithRole);
       setIsAdmin(false);
     } finally {
       if (shouldSetLoading) setLoading(false);
@@ -302,6 +322,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (currentSession?.user) {
+      await updateUserWithRoles(currentSession.user, currentSession);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -315,6 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetPassword,
         updatePassword,
         signOut,
+        refreshUser,
       }}
     >
       {children}

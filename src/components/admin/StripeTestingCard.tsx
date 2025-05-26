@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { PRICE_IDS } from '@/config/stripe';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 
-const TestStripePage: React.FC = () => {
+export function StripeTestingCard() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -15,8 +17,8 @@ const TestStripePage: React.FC = () => {
 
     try {
       console.log('Testing create-checkout-session function...');
-      console.log('Supabase URL:', supabase.supabaseUrl);
-      console.log('Supabase Key:', supabase.supabaseKey?.substring(0, 20) + '...');
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...');
 
       // Check current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -73,11 +75,11 @@ const TestStripePage: React.FC = () => {
       console.log('Testing stripe-webhook function...');
 
       // This is just to test if the function is accessible
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/stripe-webhook`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ test: true }),
       });
@@ -113,7 +115,7 @@ const TestStripePage: React.FC = () => {
       console.log('=== Testing with real price ID ===');
       console.log('Available price IDs:', PRICE_IDS);
       console.log('Using price ID:', PRICE_IDS.pro.monthly);
-      console.log('Supabase URL:', supabase.supabaseUrl);
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
 
       // Check current session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -161,81 +163,112 @@ const TestStripePage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Stripe Integration Test</h1>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-primary" />
+          Stripe Integration Testing
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="text-sm text-muted-foreground">
+          Test Stripe integration functionality including checkout sessions and webhook endpoints.
+        </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Test Create Checkout Session</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm">Checkout Session</h4>
+            <p className="text-xs text-muted-foreground">
               Test the create-checkout-session Edge Function with valid price ID
             </p>
             <Button
               onClick={testCreateCheckoutSession}
               disabled={isLoading}
+              size="sm"
               className="w-full"
             >
-              {isLoading ? 'Testing...' : 'Test Checkout Session'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                'Test Checkout'
+              )}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Test with Real Price ID</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm">Real Price ID</h4>
+            <p className="text-xs text-muted-foreground">
               Test with actual price ID from environment variables
             </p>
             <Button
               onClick={testWithRealPriceId}
               disabled={isLoading}
               variant="secondary"
+              size="sm"
               className="w-full"
             >
-              {isLoading ? 'Testing...' : 'Test Real Price ID'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                'Test Real Price'
+              )}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Test Stripe Webhook</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm">Webhook</h4>
+            <p className="text-xs text-muted-foreground">
               Test the stripe-webhook Edge Function accessibility
             </p>
             <Button
               onClick={testStripeWebhook}
               disabled={isLoading}
               variant="outline"
+              size="sm"
               className="w-full"
             >
-              {isLoading ? 'Testing...' : 'Test Webhook'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                'Test Webhook'
+              )}
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
 
-      {result && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Test Result</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-muted p-4 rounded-md overflow-auto text-sm">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {result && (
+          <div className="space-y-2">
+            <h4 className="font-medium text-sm">Test Result</h4>
+            {result.error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Error: {result.error}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Test completed successfully!
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="bg-muted p-3 rounded-md overflow-auto text-xs">
+              <pre>{JSON.stringify(result, null, 2)}</pre>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
-};
-
-export default TestStripePage;
+}

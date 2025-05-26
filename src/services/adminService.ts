@@ -6,8 +6,8 @@ export class AdminService {
   async getAllUsers(): Promise<AdminUser[]> {
     try {
       // Get users from auth.users via RPC call
-      const { data: authUsers, error: authError } = await supabase.rpc('get_all_users');
-      
+      const { data: authUsers, error: authError } = await supabase.rpc('get_admin_users');
+
       if (authError) {
         console.error('Error fetching auth users:', authError);
         throw authError;
@@ -17,61 +17,17 @@ export class AdminService {
         return [];
       }
 
-      // Get user roles
-      const userIds = authUsers.map((user: any) => user.id);
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
-
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-        throw rolesError;
-      }
-
-      // Get profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        // Don't throw here, profiles might not exist for all users
-      }
-
-      // Create a map of user roles
-      const rolesMap = new Map<string, AppRole[]>();
-      userRoles?.forEach((ur: any) => {
-        const userId = ur.user_id;
-        if (!rolesMap.has(userId)) {
-          rolesMap.set(userId, []);
-        }
-        rolesMap.get(userId)!.push(ur.role as AppRole);
-      });
-
-      // Create a map of profiles
-      const profilesMap = new Map<string, any>();
-      profiles?.forEach((profile: any) => {
-        profilesMap.set(profile.id, profile);
-      });
-
-      // Combine auth users with roles and profiles
-      const adminUsers: AdminUser[] = authUsers.map((authUser: any) => {
-        const profile = profilesMap.get(authUser.id);
-        const roles = rolesMap.get(authUser.id) || [];
-
-        return {
-          id: authUser.id,
-          email: authUser.email || '',
-          first_name: profile?.first_name || authUser.user_metadata?.first_name || '',
-          last_name: profile?.last_name || authUser.user_metadata?.last_name || '',
-          confirmed_at: authUser.confirmed_at || '',
-          last_sign_in_at: authUser.last_sign_in_at || '',
-          created_at: authUser.created_at || '',
-          roles: roles
-        };
-      });
+      // Transform the data to match AdminUser interface
+      const adminUsers: AdminUser[] = authUsers.map((user: any) => ({
+        id: user.id,
+        email: user.email || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        confirmed_at: user.confirmed_at || '',
+        last_sign_in_at: user.last_sign_in_at || '',
+        created_at: user.created_at || '',
+        roles: user.roles || []
+      }));
 
       return adminUsers;
     } catch (error) {
@@ -108,18 +64,120 @@ export class AdminService {
     }
   }
 
-  async getReceiptStats() {
+  async getAllReceipts() {
     try {
-      const { data, error } = await supabase.rpc('get_receipt_stats');
-      
+      // Get all receipts with user profile information
+      const { data: receipts, error } = await supabase
+        .from('receipts')
+        .select(`
+          id,
+          merchant,
+          total,
+          date,
+          status,
+          created_at,
+          user_id
+        `)
+        .order('created_at', { ascending: false });
+
       if (error) {
-        console.error('Error fetching receipt stats:', error);
+        console.error('Error fetching all receipts:', error);
         throw error;
       }
 
-      return data;
+      // Get user profiles for all receipts
+      if (receipts && receipts.length > 0) {
+        const userIds = [...new Set(receipts.map((receipt: any) => receipt.user_id))];
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles for receipts:', profilesError);
+          // Continue without profile data rather than failing completely
+        }
+
+        // Get auth users for email information
+        const { data: authUsers, error: authError } = await supabase.rpc('get_admin_users');
+
+        if (authError) {
+          console.error('Error fetching auth users:', authError);
+        }
+
+        // Combine receipt data with profile and auth data
+        return receipts.map((receipt: any) => {
+          const profile = profiles?.find((p: any) => p.id === receipt.user_id);
+          const authUser = authUsers?.find((u: any) => u.id === receipt.user_id);
+
+          return {
+            ...receipt,
+            profiles: {
+              first_name: profile?.first_name || '',
+              last_name: profile?.last_name || '',
+              email: authUser?.email || 'Unknown'
+            }
+          };
+        });
+      }
+
+      return receipts || [];
     } catch (error) {
-      console.error('Error in getReceiptStats:', error);
+      console.error('Error in getAllReceipts:', error);
+      throw error;
+    }
+  }
+
+  async getSystemStats() {
+    try {
+      // Get user count
+      const { count: userCount, error: userCountError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (userCountError) {
+        console.error('Error fetching user count:', userCountError);
+        throw userCountError;
+      }
+
+      // Get receipt count
+      const { count: receiptCount, error: receiptCountError } = await supabase
+        .from('receipts')
+        .select('*', { count: 'exact', head: true });
+
+      if (receiptCountError) {
+        console.error('Error fetching receipt count:', receiptCountError);
+        throw receiptCountError;
+      }
+
+      // Get recent activity (last 10 receipts) - simplified approach
+      const { data: recentReceipts, error: recentActivityError } = await supabase
+        .from('receipts')
+        .select('id, merchant, total, date, created_at, user_id')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (recentActivityError) {
+        console.error('Error fetching recent activity:', recentActivityError);
+        throw recentActivityError;
+      }
+
+      // Transform the data without profile info for now (to avoid FK issues)
+      const transformedActivity = (recentReceipts || []).map((receipt: any) => ({
+        id: receipt.id,
+        merchant: receipt.merchant,
+        total: receipt.total,
+        date: receipt.date,
+        profile: null // We'll add profile info later if needed
+      }));
+
+      return {
+        userCount: userCount || 0,
+        receiptCount: receiptCount || 0,
+        recentActivity: transformedActivity
+      };
+    } catch (error) {
+      console.error('Error in getSystemStats:', error);
       throw error;
     }
   }

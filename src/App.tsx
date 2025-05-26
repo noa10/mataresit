@@ -29,7 +29,7 @@ const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
-const TestStripePage = lazy(() => import("./pages/TestStripePage"));
+
 
 // Create a loading component for suspense
 const PageLoading = () => (
@@ -100,11 +100,7 @@ const App = () => (
                   <SemanticSearch />
                 </Suspense>
               } />
-              <Route path="/test-stripe" element={
-                <Suspense fallback={<PageLoading />}>
-                  <TestStripePage />
-                </Suspense>
-              } />
+
             </Route>
 
             {/* Admin Routes - Require Admin Role */}

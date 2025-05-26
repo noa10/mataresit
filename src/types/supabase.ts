@@ -149,6 +149,59 @@ export type Database = {
           },
         ]
       }
+      payment_history: {
+        Row: {
+          amount: number
+          billing_period_end: string | null
+          billing_period_start: string | null
+          created_at: string
+          currency: string
+          id: string
+          status: string
+          stripe_payment_intent_id: string
+          stripe_subscription_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          status: string
+          stripe_payment_intent_id: string
+          stripe_subscription_id?: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -156,6 +209,15 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          monthly_reset_date: string | null
+          receipts_used_this_month: number | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_end_date: string | null
+          subscription_start_date: string | null
+          subscription_status: Database["public"]["Enums"]["subscription_status"] | null
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"] | null
+          trial_end_date: string | null
           updated_at: string
         }
         Insert: {
@@ -164,6 +226,15 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          monthly_reset_date?: string | null
+          receipts_used_this_month?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"] | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          trial_end_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -172,6 +243,45 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          monthly_reset_date?: string | null
+          receipts_used_this_month?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"] | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          trial_end_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscription_limits: {
+        Row: {
+          batch_upload_limit: number
+          created_at: string
+          monthly_receipts: number
+          retention_days: number
+          storage_limit_mb: number
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+        }
+        Insert: {
+          batch_upload_limit: number
+          created_at?: string
+          monthly_receipts: number
+          retention_days: number
+          storage_limit_mb: number
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+        }
+        Update: {
+          batch_upload_limit?: number
+          created_at?: string
+          monthly_receipts?: number
+          retention_days?: number
+          storage_limit_mb?: number
+          tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
         }
         Relationships: []
@@ -576,6 +686,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      subscription_status: "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "incomplete_expired" | "unpaid"
+      subscription_tier: "free" | "pro" | "max"
     }
     CompositeTypes: {
       http_header: {

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { RefreshCw, Loader2, InfoIcon } from 'lucide-react';
+import { RefreshCw, Loader2, InfoIcon, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Alert, AlertDescription } from '../ui/alert';
 import { checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 export function LineItemEmbeddingsCard() {
   // Line item embedding state
@@ -14,6 +16,8 @@ export function LineItemEmbeddingsCard() {
   const [totalLineItems, setTotalLineItems] = useState(0);
   const [processedLineItems, setProcessedLineItems] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [embeddingStats, setEmbeddingStats] = useState<{
     total: number;
     withEmbeddings: number;
@@ -27,6 +31,8 @@ export function LineItemEmbeddingsCard() {
   // Function to check line item embedding statistics
   const checkEmbeddingStats = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
       console.log('Checking line item embeddings stats...');
 
       const result = await checkLineItemEmbeddings();
@@ -38,8 +44,14 @@ export function LineItemEmbeddingsCard() {
         withoutEmbeddings: result.withoutEmbeddings || 0
       });
       setLastUpdated(new Date());
+      toast.success('Line item embedding stats refreshed');
     } catch (error) {
       console.error('Error checking line item embedding stats:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to check embedding stats';
+      setError(errorMessage);
+      toast.error(`Failed to refresh stats: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -50,6 +62,10 @@ export function LineItemEmbeddingsCard() {
       setIsRegenerating(regenerate);
       setEmbeddingProgress(0);
       setProcessedLineItems(0);
+      setError(null);
+
+      const actionType = regenerate ? 'Regenerating' : 'Generating';
+      toast.info(`${actionType} line item embeddings...`);
 
       // Get current stats to know how many items need processing
       await checkEmbeddingStats();
@@ -66,39 +82,32 @@ export function LineItemEmbeddingsCard() {
       setTotalLineItems(targetCount);
 
       if (targetCount > 0) {
-        while (totalProcessed < targetCount) {
-          try {
-            const result = await generateLineItemEmbeddings(batchSize, regenerate);
-            console.log('Generation batch result:', result);
+        const result = await generateLineItemEmbeddings(batchSize, regenerate);
+        console.log('Generation result:', result);
 
-            if (result.processed > 0) {
-              totalProcessed += result.processed;
-              setProcessedLineItems(totalProcessed);
+        if (result.processed > 0) {
+          totalProcessed += result.processed;
+          setProcessedLineItems(totalProcessed);
 
-              // Update progress percentage
-              const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
-              setEmbeddingProgress(progress);
+          // Update progress percentage
+          const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
+          setEmbeddingProgress(progress);
 
-              // If no more items need processing, we're done
-              if ((regenerate && result.total === result.withEmbeddings) ||
-                  (!regenerate && result.withoutEmbeddings === 0)) {
-                break;
-              }
-            } else {
-              // If nothing was processed in this batch, likely all items are done
-              console.log('No more line items to process');
-              break;
-            }
-          } catch (batchError) {
-            console.error('Error in embedding generation batch:', batchError);
-          }
+          toast.success(`Successfully processed ${result.processed} line items`);
+        } else {
+          toast.info('No line items needed processing');
         }
+      } else {
+        toast.info('No line items available for processing');
       }
 
       // Final check to update stats
       await checkEmbeddingStats();
     } catch (error) {
       console.error('Error generating line item embeddings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate embeddings';
+      setError(errorMessage);
+      toast.error(`Failed to generate embeddings: ${errorMessage}`);
     } finally {
       setIsGeneratingEmbeddings(false);
       setIsRegenerating(false);
@@ -132,6 +141,13 @@ export function LineItemEmbeddingsCard() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex flex-col xs:flex-row gap-2 xs:justify-between text-sm">
             <div className="whitespace-nowrap">
               <span className="font-medium">Total Line Items:</span> {embeddingStats?.total || 0}
@@ -174,41 +190,44 @@ export function LineItemEmbeddingsCard() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-between">
+          <div className="flex flex-col gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => checkEmbeddingStats()}
-              disabled={isGeneratingEmbeddings}
+              disabled={isGeneratingEmbeddings || isLoading}
+              className="w-full sm:w-auto"
             >
-              <RefreshCw className="h-3.5 w-3.5 mr-2" />
+              {isLoading ? (
+                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+              )}
               Refresh Stats
             </Button>
 
-            <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div>
-                      <Button
-                        variant="secondary"
-                        className="text-xs sm:text-sm text-center w-full"
-                        size="sm"
-                        onClick={() => handleGenerateEmbeddings(true)}
-                        disabled={isGeneratingEmbeddings || embeddingStats?.total === 0}
-                      >
-                        {isGeneratingEmbeddings && isRegenerating ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                            Regenerating...
-                          </>
-                        ) : (
-                          <>Regenerate All Line Items</>
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="secondary"
+                      className="text-xs sm:text-sm w-full"
+                      size="sm"
+                      onClick={() => handleGenerateEmbeddings(true)}
+                      disabled={isGeneratingEmbeddings || embeddingStats?.total === 0}
+                    >
+                      {isGeneratingEmbeddings && isRegenerating ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        <>Regenerate All</>
+                      )}
+                    </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">
+                  <TooltipContent side="bottom" className="max-w-xs">
                     Reprocess all line items with the latest embedding algorithm, even those that already have embeddings
                   </TooltipContent>
                 </Tooltip>
@@ -217,26 +236,24 @@ export function LineItemEmbeddingsCard() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div>
-                      <Button
-                        variant="default"
-                        className="text-xs sm:text-sm text-center w-full"
-                        size="sm"
-                        onClick={() => handleGenerateEmbeddings(false)}
-                        disabled={isGeneratingEmbeddings || (embeddingStats && embeddingStats.withoutEmbeddings === 0)}
-                      >
-                        {isGeneratingEmbeddings && !isRegenerating ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>Generate Missing Embeddings</>
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="default"
+                      className="text-xs sm:text-sm w-full"
+                      size="sm"
+                      onClick={() => handleGenerateEmbeddings(false)}
+                      disabled={isGeneratingEmbeddings || (embeddingStats && embeddingStats.withoutEmbeddings === 0)}
+                    >
+                      {isGeneratingEmbeddings && !isRegenerating ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>Generate Missing</>
+                      )}
+                    </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">
+                  <TooltipContent side="bottom" className="max-w-xs">
                     Only generate embeddings for line items that don't have them yet
                   </TooltipContent>
                 </Tooltip>

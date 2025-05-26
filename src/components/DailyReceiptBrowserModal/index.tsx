@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -99,6 +99,9 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
               : `Receipts for ${formatFullDate(date)}`
             }
           </DialogTitle>
+          <DialogDescription>
+            View and manage receipts from this date. Select a receipt from the list to view details.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Main content area: Sidebar (Thumbnails/List) + Viewer */}

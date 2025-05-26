@@ -21,7 +21,6 @@ import {
   BarChart3,
   Shield,
   Clock,
-  Database,
   Sparkles,
   Loader2
 } from "lucide-react";
