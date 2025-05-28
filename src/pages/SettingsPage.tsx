@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
 import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
-import { ApiKeySettings } from "@/components/settings/ApiKeySettings";
+
 import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
@@ -53,12 +53,20 @@ export default function SettingsPage() {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <Tabs defaultValue="processing" className="max-w-3xl mx-auto">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="processing">Processing</TabsTrigger>
-            <TabsTrigger value="providers">AI Providers</TabsTrigger>
-            <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
-          </TabsList>
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-muted-foreground mt-2">
+              Configure your receipt processing preferences and AI model providers
+            </p>
+          </div>
+
+          <Tabs defaultValue="processing" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-8 max-w-md">
+              <TabsTrigger value="processing">Processing</TabsTrigger>
+              <TabsTrigger value="providers">AI Providers</TabsTrigger>
+              <TabsTrigger value="usage">Usage Stats</TabsTrigger>
+            </TabsList>
 
           <TabsContent value="processing">
             <Card>
@@ -143,14 +151,14 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="providers" className="space-y-6">
-            <ApiKeySettings />
             <ModelProviderStatus />
           </TabsContent>
 
           <TabsContent value="usage">
             <UsageStatsPanelPlaceholder />
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
       </main>
     </div>
   );
