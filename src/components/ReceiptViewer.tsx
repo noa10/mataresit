@@ -33,6 +33,7 @@ import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
 import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 import { SimilarReceipts } from "@/components/search/SimilarReceipts";
+import { useSettings } from "@/hooks/useSettings";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -133,6 +134,9 @@ const useDebounce = <T,>(value: T, delay: number): T => {
 };
 
 export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
+  // Get user settings for processing method
+  const { settings } = useSettings();
+
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
@@ -146,6 +150,22 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     payment_method: receipt.payment_method || "",
     predicted_category: receipt.predicted_category || ""
   });
+
+  // State for tracking manual total override
+  const [isManualTotal, setIsManualTotal] = useState(false);
+
+  // Calculate total from line items
+  const calculateLineItemsTotal = () => {
+    if (!editedReceipt.lineItems || editedReceipt.lineItems.length === 0) {
+      return 0;
+    }
+    return editedReceipt.lineItems.reduce((sum, item) => {
+      const amount = typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+  };
+
+  const lineItemsTotal = calculateLineItemsTotal();
   // Debounce the input values to avoid excessive state updates
   const debouncedInputValues = useDebounce(inputValues, 500); // 500ms delay
 
@@ -168,8 +188,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [confidenceThreshold, setConfidenceThreshold] = useState(30);
   const [showDocumentStructure, setShowDocumentStructure] = useState(false);
   const [showVisualizationSettings, setShowVisualizationSettings] = useState(false);
-  const [highlightedField, setHighlightedField] = useState<string | null>(null);
-  const [highlightedBlockId, setHighlightedBlockId] = useState<string | null>(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
@@ -434,7 +452,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             predicted_category: editedReceipt.predicted_category,
             status: "reviewed",
           },
-          formattedLineItems
+          { skipEmbeddings: false }
         );
       } catch (error) {
         console.error("Error preparing data for update:", error);
@@ -532,17 +550,23 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   });
 
   const reprocessMutation = useMutation({
-    mutationFn: () => processReceiptWithOCR(receipt.id),
+    mutationFn: () => processReceiptWithOCR(receipt.id, {
+      primaryMethod: settings.processingMethod,
+      modelId: settings.selectedModel,
+      compareWithAlternative: settings.compareWithAlternative
+    }),
     onSuccess: (data) => {
       if (data) {
         // Invalidate query, the useEffect hook will handle state update
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-        toast.success("Receipt processed successfully!");
+        const methodName = settings.processingMethod === 'ai-vision' ? 'AI Vision' : 'OCR-AI';
+        toast.success(`Receipt processed successfully with ${methodName}!`);
       }
     },
     onError: (error) => {
       console.error("Failed to process receipt:", error);
-      toast.error("Failed to process receipt with OCR");
+      const methodName = settings.processingMethod === 'ai-vision' ? 'AI Vision' : 'OCR-AI';
+      toast.error(`Failed to process receipt with ${methodName}`);
     }
   });
 
@@ -568,6 +592,19 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   };
 
   const handleInputChange = (field: string, value: string | number) => {
+    // Check if this is a manual total override
+    if (field === 'total') {
+      const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+      const calculatedTotal = calculateLineItemsTotal();
+
+      // Mark as manual override if the value differs from calculated total
+      if (Math.abs(numericValue - calculatedTotal) > 0.01) { // Allow for small floating point differences
+        setIsManualTotal(true);
+      } else {
+        setIsManualTotal(false);
+      }
+    }
+
     // Only update the inputValues state, which will be debounced
     setInputValues(prev => ({
       ...prev,
@@ -587,11 +624,32 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         [field]: value
       };
 
-      setEditedReceipt(prev => ({
-        ...prev,
-        lineItems: updatedLineItems
-      }));
-      // Optionally set line_items confidence to 100 if any item is edited
+      setEditedReceipt(prev => {
+        const newReceipt = {
+          ...prev,
+          lineItems: updatedLineItems
+        };
+
+        // Auto-sync total if not manually overridden and we're changing amounts
+        if (!isManualTotal && field === 'amount') {
+          const newTotal = updatedLineItems.reduce((sum, item) => {
+            const amount = typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0;
+            return sum + amount;
+          }, 0);
+
+          // Update both the receipt state and input values
+          setInputValues(prevInput => ({
+            ...prevInput,
+            total: newTotal
+          }));
+
+          newReceipt.total = newTotal;
+        }
+
+        return newReceipt;
+      });
+
+      // Set line_items confidence to 100 if any item is edited
       setEditedConfidence(prev => ({
         ...prev,
         line_items: 100
@@ -682,8 +740,13 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
     setIsProcessing(true); // Show loading state in confidence indicators
 
-    // First set processing status to indicate starting OCR
-    setProcessingStatus('processing_ocr');
+    // Set processing status based on the user's preferred method
+    const processingMethod = settings.processingMethod;
+    if (processingMethod === 'ai-vision') {
+      setProcessingStatus('processing_ai');
+    } else {
+      setProcessingStatus('processing_ocr');
+    }
 
     // Reset confidence scores temporarily to show loading state
     setEditedConfidence(prev => ({
@@ -696,7 +759,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       line_items: 50
     }));
 
-    // Call the reprocess mutation
+    // Call the reprocess mutation with user's settings
     reprocessMutation.mutate(undefined, {
       onSettled: () => {
         // Whether success or error, we're no longer processing
@@ -909,11 +972,20 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     // The actual editedReceipt update will happen in the useEffect that watches debouncedInputValues
   };
 
-  // Function to handle field hover for bounding box highlighting
-  const handleFieldHover = (field: string | null) => {
-    if (showBoundingBoxes) {
-      setHighlightedField(field);
-    }
+  // Function to handle field hover for bounding box highlighting (removed highlight functionality)
+  const handleFieldHover = (_field: string | null) => {
+    // Highlight functionality removed as requested
+  };
+
+  // Function to sync total with line items
+  const handleSyncTotalWithLineItems = () => {
+    const calculatedTotal = calculateLineItemsTotal();
+    setInputValues(prev => ({
+      ...prev,
+      total: calculatedTotal
+    }));
+    setIsManualTotal(false);
+    toast.success("Total synced with line items");
   };
 
   // Toggle bounding box visualization
@@ -933,9 +1005,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       // Show visualization settings when enabling bounding boxes
       setShowVisualizationSettings(true);
     } else {
-      // When disabling, clear highlighted field and hide settings
-      setHighlightedField(null);
-      setHighlightedBlockId(null);
+      // When disabling, hide settings
       setShowVisualizationSettings(false);
       setShowDocumentStructure(false);
     }
@@ -951,10 +1021,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     setShowVisualizationSettings(!showVisualizationSettings);
   };
 
-  // Handle block selection from document structure viewer
+  // Handle block selection from document structure viewer (highlight functionality removed)
   const handleSelectBlock = (blockId: string) => {
-    setHighlightedBlockId(blockId);
-    // TODO: Implement highlighting the selected block in the image
+    // Highlight functionality removed as requested
     toast.info(`Selected block: ${blockId}`);
   };
 
@@ -1321,7 +1390,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                                 imageWidth={imageDimensions.width}
                                 imageHeight={imageDimensions.height}
                                 visible={showBoundingBoxes}
-                                highlightedField={highlightedField}
+                                highlightedField={null}
                                 confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
                                 showPolygons={showPolygons}
                                 debugMode={debugMode}
@@ -1374,7 +1443,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               ) : (
                 <>
                   <RotateCw size={16} />
-                  Reprocess with OCR
+                  {settings.processingMethod === 'ai-vision' ? 'Reprocess with AI Vision' : 'Reprocess with OCR-AI'}
                 </>
               )}
             </Button>
@@ -1523,8 +1592,20 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="total">Total Amount</Label>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="total">Total Amount</Label>
+                      {isManualTotal && (
+                        <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                          Manual Override
+                        </Badge>
+                      )}
+                      {!isManualTotal && lineItemsTotal > 0 && (
+                        <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
+                          Auto-calculated
+                        </Badge>
+                      )}
+                    </div>
                      <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
                   </div>
                   <div className="relative">
@@ -1534,12 +1615,25 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                       step="0.01"
                       value={inputValues.total || 0}
                       onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
-                      className="bg-background/50 pl-9"
+                      className={`bg-background/50 pl-9 ${isManualTotal ? 'border-amber-300 focus:border-amber-500' : ''}`}
                       onMouseEnter={() => handleFieldHover('total')}
                       onMouseLeave={() => handleFieldHover(null)}
                     />
                     <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
                   </div>
+                  {isManualTotal && lineItemsTotal > 0 && (
+                    <div className="flex items-center justify-between text-xs text-amber-600">
+                      <span>Total manually overridden. Line items sum: {formatCurrency(lineItemsTotal)}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={handleSyncTotalWithLineItems}
+                      >
+                        Sync with Line Items
+                      </Button>
+                    </div>
+                  )}
                   {renderSuggestion('total', 'total amount')}
                 </div>
               </div>
@@ -1591,17 +1685,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                      <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 h-7"
-                      onClick={() => handleFieldHover('line_items')}
-                      onMouseLeave={() => handleFieldHover(null)}
-                      onBlur={() => handleFieldHover(null)}
-                    >
-                      <Layers size={14} />
-                      Highlight
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
