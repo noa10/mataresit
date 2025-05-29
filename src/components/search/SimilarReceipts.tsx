@@ -30,18 +30,30 @@ export function SimilarReceipts({
     // Stop event propagation to prevent any parent handlers from interfering
     e.stopPropagation();
 
-    // Validate the ID
-    if (!id) {
-      console.error('Cannot navigate to receipt: ID is undefined');
+    // Enhanced validation with better error messages
+    if (!id || id.trim() === '') {
+      console.error('Cannot navigate to receipt: ID is undefined or empty', { id });
       toast.error('Error: Receipt ID is missing');
       return;
     }
 
-    console.log('Navigating to receipt with ID:', id);
+    // Validate that the ID looks like a valid UUID or receipt ID
+    if (id.length < 10) {
+      console.error('Cannot navigate to receipt: ID appears invalid', { id });
+      toast.error('Error: Invalid receipt ID');
+      return;
+    }
+
+    console.log('Navigating to similar receipt with ID:', id);
 
     try {
       // Use navigate function with explicit pathname and state
-      navigate(`/receipt/${id}`, { state: { from: 'similar-receipts' } });
+      navigate(`/receipt/${id}`, {
+        state: {
+          from: 'similar-receipts',
+          itemType: 'receipt'
+        }
+      });
     } catch (error) {
       console.error('Navigation error:', error);
       toast.error('Failed to navigate to receipt details');

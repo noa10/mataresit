@@ -354,11 +354,11 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
           .order('date', { ascending: false })
           .limit(limit);
 
-        // Note: fullText column is case-sensitive, so need to use a different approach
+        // Note: fullText column is case-sensitive, so use ilike directly
         const { data: fullTextData, error: fullTextError } = await supabase
           .from('receipts')
           .select('*')
-          .filter('LOWER("fullText")', 'ilike', `%${query.toLowerCase()}%`)
+          .ilike('fullText', `%${query}%`)
           .order('date', { ascending: false })
           .limit(limit);
 

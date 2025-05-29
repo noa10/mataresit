@@ -37,20 +37,30 @@ export function SearchResults({
   });
 
   // Enhanced navigation function with validation and error handling
-  const handleNavigateToReceipt = (e: React.MouseEvent, id?: string) => {
+  const handleNavigateToReceipt = (e: React.MouseEvent, id?: string, itemType?: string) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!id) {
-      console.error('Cannot navigate to receipt: ID is undefined');
+    // Enhanced validation with better error messages
+    if (!id || id.trim() === '') {
+      console.error('Cannot navigate to receipt: ID is undefined or empty', { id, itemType });
       toast.error('Unable to view receipt: Receipt ID is missing', {
-        description: 'The system could not find the parent receipt information for this item.'
+        description: 'The system could not find the receipt information for this item.'
+      });
+      return;
+    }
+
+    // Validate that the ID looks like a valid UUID or receipt ID
+    if (id.length < 10) {
+      console.error('Cannot navigate to receipt: ID appears invalid', { id, itemType });
+      toast.error('Unable to view receipt: Invalid receipt ID', {
+        description: 'The receipt ID appears to be malformed.'
       });
       return;
     }
 
     try {
-      console.log(`Navigating to receipt: ${id}`);
+      console.log(`Navigating to receipt: ${id} (from ${itemType || 'unknown'})`);
 
       // Get the current URL search params to preserve search state
       const urlParams = new URLSearchParams(window.location.search);
@@ -59,7 +69,8 @@ export function SearchResults({
       navigate(`/receipt/${id}?${urlParams.toString()}`, {
         state: {
           from: 'search',
-          searchQuery: searchQuery
+          searchQuery: searchQuery,
+          itemType: itemType
         }
       });
     } catch (error) {
@@ -138,8 +149,8 @@ export function SearchResults({
             const similarityScore = receipt.similarity_score || 0;
             const formattedScore = (similarityScore * 100).toFixed(0);
 
-            // Log receipt ID for debugging
-            console.log(`Receipt card ID: ${receipt.id || 'undefined'}, Merchant: ${receipt.merchant || 'Unknown'}`);
+            // Enhanced logging for debugging
+            console.log(`Receipt card - ID: ${receipt.id || 'undefined'}, Merchant: ${receipt.merchant || 'Unknown'}, Type: receipt`);
 
             return (
               <Card
@@ -201,7 +212,7 @@ export function SearchResults({
                     variant="outline"
                     size="sm"
                     className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-                    onClick={(e) => handleNavigateToReceipt(e, receipt.id)}
+                    onClick={(e) => handleNavigateToReceipt(e, receipt.id, 'receipt')}
                   >
                     <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     <span>View Receipt</span>
@@ -244,7 +255,7 @@ export function SearchResults({
 
             // Log whether we have a valid receipt ID
             const hasReceiptId = !!receiptId;
-            console.log(`Line item card: ${item.line_item_id || 'undefined'}, Has valid receipt ID: ${hasReceiptId}, Receipt ID: ${receiptId || 'undefined'}`);
+            console.log(`Line item card - ID: ${item.line_item_id || 'undefined'}, Has valid receipt ID: ${hasReceiptId}, Receipt ID: ${receiptId || 'undefined'}, Type: line_item`);
 
             return (
               <Card
@@ -301,7 +312,7 @@ export function SearchResults({
                       variant="outline"
                       size="sm"
                       className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-                      onClick={(e) => handleNavigateToReceipt(e, receiptId)}
+                      onClick={(e) => handleNavigateToReceipt(e, receiptId, 'line_item')}
                     >
                       <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       <span>View Parent Receipt</span>
