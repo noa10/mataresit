@@ -273,31 +273,35 @@ async function processLineItemSearchResults(client: any, results: any[], params:
     return { lineItems: [], count: 0, total: 0 };
   }
 
-  // Extract line item IDs from the search results
-  const lineItemIds = results.map(r => r.source_id);
+  // Extract line item IDs from the search results metadata
+  const lineItemIds = results.map(r => {
+    // Try to get line item ID from metadata
+    if (r.metadata) {
+      const metadata = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata;
+      return metadata.line_item_id;
+    }
+    return null;
+  }).filter(id => id !== null);
 
   // Create a map of similarity scores
   const similarityScores = results.reduce((acc: Record<string, number>, r: any) => {
-    acc[r.source_id] = r.similarity || r.score || 0;
+    // Get line item ID from metadata
+    let lineItemId = null;
+    if (r.metadata) {
+      const metadata = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata;
+      lineItemId = metadata.line_item_id;
+    }
+    if (lineItemId) {
+      acc[lineItemId] = r.similarity || r.score || 0;
+    }
     return acc;
   }, {});
 
   // Fetch the actual line item data
-  // Use explicit join to avoid ambiguous relationship error
+  // Use separate queries to avoid relationship conflicts
   const { data: lineItems, error } = await client
     .from('line_items')
-    .select(`
-      id,
-      receipt_id,
-      description,
-      amount,
-      quantity,
-      receipts:receipt_id (
-        id,
-        merchant,
-        date
-      )
-    `)
+    .select('id, receipt_id, description, amount')
     .in('id', lineItemIds);
 
   if (error) {
@@ -305,17 +309,40 @@ async function processLineItemSearchResults(client: any, results: any[], params:
     throw new Error(`Error fetching line item details: ${error.message}`);
   }
 
+  // Fetch receipt data separately to avoid relationship conflicts
+  let receiptData = {};
+  if (lineItems && lineItems.length > 0) {
+    const receiptIds = [...new Set(lineItems.map(item => item.receipt_id))];
+    const { data: receipts, error: receiptError } = await client
+      .from('receipts')
+      .select('id, merchant, date')
+      .in('id', receiptIds);
+
+    if (receiptError) {
+      console.error('Error fetching receipt details:', receiptError);
+      // Continue without receipt data rather than failing completely
+    } else if (receipts) {
+      receiptData = receipts.reduce((acc, receipt) => {
+        acc[receipt.id] = receipt;
+        return acc;
+      }, {});
+    }
+  }
+
   // Format the line items with the structure expected by the frontend
-  const formattedLineItems = lineItems.map(item => ({
-    line_item_id: item.id,
-    receipt_id: item.receipt_id,
-    line_item_description: item.description,
-    line_item_price: item.amount,
-    line_item_quantity: item.quantity || 1,
-    parent_receipt_merchant: item.receipts?.merchant,
-    parent_receipt_date: item.receipts?.date,
-    similarity: similarityScores[item.id] || 0
-  }));
+  const formattedLineItems = lineItems.map(item => {
+    const receipt = receiptData[item.receipt_id] || {};
+    return {
+      line_item_id: item.id,
+      receipt_id: item.receipt_id,
+      line_item_description: item.description,
+      line_item_price: item.amount,
+      line_item_quantity: 1, // Default quantity since column doesn't exist
+      parent_receipt_merchant: receipt.merchant || 'Unknown merchant',
+      parent_receipt_date: receipt.date || '',
+      similarity: similarityScores[item.id] || 0
+    };
+  });
 
   // Sort by similarity score (highest first)
   formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);

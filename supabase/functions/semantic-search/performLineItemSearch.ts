@@ -31,21 +31,10 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
 
   try {
     // Get all line items with their details first
-    // Use explicit join to avoid ambiguous relationship error
+    // Use separate queries to avoid relationship conflicts
     const { data: lineItems, error: lineItemsError } = await client
       .from('line_items')
-      .select(`
-        id,
-        receipt_id,
-        description,
-        amount,
-        quantity,
-        receipts:receipt_id (
-          id,
-          merchant,
-          date
-        )
-      `)
+      .select('id, receipt_id, description, amount')
       .order('id', { ascending: false })
       .limit(100); // Limit to a reasonable number to avoid processing too many
 
@@ -64,6 +53,25 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     // Get receipt IDs from line items
     const receiptIds = [...new Set(lineItems.map(item => item.receipt_id))];
 
+    // Fetch receipt data separately to avoid relationship conflicts
+    const { data: receipts, error: receiptsError } = await client
+      .from('receipts')
+      .select('id, merchant, date')
+      .in('id', receiptIds);
+
+    if (receiptsError) {
+      console.error('Error fetching receipts:', receiptsError);
+      // Continue without receipt data rather than failing completely
+    }
+
+    // Create a lookup map for receipts
+    const receiptLookup = {};
+    if (receipts) {
+      receipts.forEach(receipt => {
+        receiptLookup[receipt.id] = receipt;
+      });
+    }
+
     // Get embeddings for those receipts, focusing on line item content type
     // Use the unified embedding model where all embeddings are in receipt_embeddings
     const { data: embeddings, error: embeddingsError } = await client
@@ -73,9 +81,7 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
         receipt_id,
         content_type,
         embedding,
-        metadata,
-        source_id,
-        source_type
+        metadata
       `)
       .in('receipt_id', receiptIds)
       .eq('content_type', 'line_item'); // Look for embeddings that are specifically for line items
@@ -153,15 +159,11 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
         similarity = 1;
       }
 
-      // Extract the line item ID from source_id or metadata
+      // Extract the line item ID from metadata
       let lineItemId = null;
 
-      // First try to get it from source_id if available (unified model)
-      if (embeddingRecord.source_type === 'line_item' && embeddingRecord.source_id) {
-        lineItemId = embeddingRecord.source_id;
-      }
-      // Fall back to metadata if needed
-      else if (embeddingRecord.metadata) {
+      // Get line item ID from metadata
+      if (embeddingRecord.metadata) {
         const metadata = typeof embeddingRecord.metadata === 'string'
           ? JSON.parse(embeddingRecord.metadata)
           : embeddingRecord.metadata;
@@ -229,17 +231,20 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     const paginatedItems = uniqueLineItems.slice(offset, offset + limit);
 
     // Format the results for the frontend
-    const formattedLineItems = paginatedItems.map(item => ({
-      line_item_id: item.id,
-      receipt_id: item.receipt_id,
-      line_item_description: item.description,
-      line_item_price: item.amount,
-      line_item_quantity: item.quantity || 1,
-      parent_receipt_merchant: item.receipts?.merchant,
-      parent_receipt_date: item.receipts?.date,
-      parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
-      similarity: item.similarity || 0
-    }));
+    const formattedLineItems = paginatedItems.map(item => {
+      const receipt = receiptLookup[item.receipt_id] || {};
+      return {
+        line_item_id: item.id,
+        receipt_id: item.receipt_id,
+        line_item_description: item.description,
+        line_item_price: item.amount,
+        line_item_quantity: 1, // Default quantity since column doesn't exist
+        parent_receipt_merchant: receipt.merchant || 'Unknown merchant',
+        parent_receipt_date: receipt.date || '',
+        parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
+        similarity: item.similarity || 0
+      };
+    });
 
     return {
       lineItems: formattedLineItems,
