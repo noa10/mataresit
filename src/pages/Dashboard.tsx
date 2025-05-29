@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
+import { ExportDropdown } from "@/components/export/ExportDropdown";
+import { ExportFilters } from "@/lib/export";
 import { fetchReceipts } from "@/services/receiptService";
 import { Badge } from "@/components/ui/badge";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
@@ -289,6 +291,15 @@ export default function Dashboard() {
     const currentViewMode = viewMode !== 'grid' ? viewMode : null;
     // Clear all search params except view if it's not the default
     setSearchParams(currentViewMode ? { view: currentViewMode } : {}, { replace: true });
+  };
+
+  // Prepare export filters
+  const exportFilters: ExportFilters = {
+    searchQuery: searchQuery || undefined,
+    activeTab: activeTab !== 'all' ? activeTab : undefined,
+    filterByCurrency: filterByCurrency || undefined,
+    sortOrder: sortOrder !== 'newest' ? sortOrder : undefined,
+    dateRange: dateRange || undefined
   };
 
   // Render different view modes
@@ -908,6 +919,13 @@ export default function Dashboard() {
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {/* Export Dropdown */}
+              <ExportDropdown
+                receipts={processedReceipts}
+                filters={exportFilters}
+                disabled={isLoading}
+              />
             </div>
           </div>
           {/* Status Tabs */}
