@@ -18,7 +18,7 @@ export class ProcessingLogger {
   constructor(receiptId: string, supabaseUrl?: string, supabaseAnonKey?: string) {
     this.receiptId = receiptId;
     
-    const url = supabaseUrl || Deno.env.get('SUPABASE_URL') || 'http://localhost:54321';
+    const url = supabaseUrl || Deno.env.get('SUPABASE_URL') || 'http://localhost:54331';
     const key = supabaseAnonKey || Deno.env.get('SUPABASE_ANON_KEY') || '';
     
     // Create Supabase client
