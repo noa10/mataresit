@@ -121,46 +121,30 @@ export function getProcessingRecommendation(
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
 
-  // Analyze file characteristics
+  // Always recommend AI Vision as the primary method
+  recommendedMethod = 'ai-vision';
+
+  // Analyze file characteristics for model selection
   if (fileAnalysis.size > 4 * 1024 * 1024) {
-    recommendedMethod = 'ocr-ai';
-    recommendedModel = 'gemini-1.5-flash';
-    reasoning.push('Large file size detected - OCR + AI method is more reliable for large files');
+    recommendedModel = 'gemini-1.5-pro';
+    reasoning.push('Large file size detected - using high-capacity AI Vision model');
     riskLevel = 'medium';
-  }
-
-  if (fileAnalysis.complexity === 'high') {
-    if (fileAnalysis.size < 3 * 1024 * 1024) {
-      recommendedMethod = 'ai-vision';
-      recommendedModel = 'gemini-1.5-pro';
-      reasoning.push('High complexity receipt - AI Vision provides better accuracy for complex layouts');
-    } else {
-      recommendedMethod = 'ocr-ai';
-      recommendedModel = 'gemini-1.5-pro';
-      reasoning.push('High complexity + large size - OCR + AI method is more stable');
-      riskLevel = 'medium';
-    }
-  }
-
-  if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
-    recommendedMethod = 'ai-vision';
+  } else if (fileAnalysis.complexity === 'high') {
+    recommendedModel = 'gemini-1.5-pro';
+    reasoning.push('High complexity receipt - AI Vision with advanced model provides better accuracy');
+  } else if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
     recommendedModel = 'gemini-2.0-flash-lite';
     reasoning.push('Simple receipt detected - fast AI Vision processing recommended');
     confidence = 'high';
+  } else {
+    recommendedModel = 'gemini-2.0-flash-lite';
+    reasoning.push('Standard receipt - AI Vision with balanced model recommended');
   }
 
-  // Apply user preferences
+  // Apply user preferences (always AI Vision, but respect model preferences)
   if (userPreferences?.preferredMethod) {
-    const userMethod = userPreferences.preferredMethod;
-    const methodChar = METHOD_CHARACTERISTICS[userMethod];
-
-    if (fileAnalysis.size <= methodChar.maxFileSize) {
-      recommendedMethod = userMethod;
-      reasoning.push(`Using user preference: ${userMethod}`);
-    } else {
-      reasoning.push(`User preference ${userMethod} not suitable for file size, using optimized method`);
-      riskLevel = 'medium';
-    }
+    // We always use AI Vision, but acknowledge user preference in reasoning
+    reasoning.push(`AI Vision processing (user preference noted)`);
   }
 
   if (userPreferences?.prioritizeSpeed) {
@@ -214,8 +198,8 @@ function createFallbackStrategy(
   primaryModel: string,
   fileAnalysis: FileAnalysis
 ): FallbackStrategy {
-  // Determine fallback method (opposite of primary)
-  const fallbackMethod: 'ocr-ai' | 'ai-vision' = primaryMethod === 'ai-vision' ? 'ocr-ai' : 'ai-vision';
+  // Always use OCR-AI as fallback since primary is always AI Vision
+  const fallbackMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai';
 
   // Choose fallback model based on file characteristics
   let fallbackModel = 'gemini-1.5-flash';

@@ -79,12 +79,10 @@ export default function SettingsPage() {
               <CardContent className="space-y-6">
                 <div className="prose prose-sm max-w-none text-muted-foreground">
                   <p>
-                    Choose your preferred method for extracting data from receipts.
-                    <strong>'AI Vision' is now the recommended default method</strong> and uses advanced AI models directly for interpretation with support for larger images (up to 5MB).
-                    'OCR + AI Enhancement' uses traditional OCR followed by AI for refinement and works well for simpler receipts.
+                    We now exclusively use <strong>AI Vision</strong> for receipt processing, which provides superior accuracy with support for larger images (up to 5MB). This advanced method processes your receipts directly using AI models with vision capabilities.
                   </p>
                   <p>
-                    Enabling 'Compare with Alternative' runs both methods for comparison but increases processing time.
+                    You can still enable 'Compare with Alternative' to also process receipts using OCR + AI for comparison, which can help improve accuracy but increases processing time.
                   </p>
                 </div>
 

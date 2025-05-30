@@ -551,7 +551,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   const reprocessMutation = useMutation({
     mutationFn: () => processReceiptWithOCR(receipt.id, {
-      primaryMethod: settings.processingMethod,
+      primaryMethod: 'ai-vision', // Force AI Vision
       modelId: settings.selectedModel,
       compareWithAlternative: settings.compareWithAlternative
     }),
@@ -559,8 +559,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       if (data) {
         // Invalidate query, the useEffect hook will handle state update
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-        const methodName = settings.processingMethod === 'ai-vision' ? 'AI Vision' : 'OCR-AI';
-        toast.success(`Receipt processed successfully with ${methodName}!`);
+        toast.success(`Receipt processed successfully with AI Vision!`);
       }
     },
     onError: (error) => {
@@ -740,13 +739,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
     setIsProcessing(true); // Show loading state in confidence indicators
 
-    // Set processing status based on the user's preferred method
-    const processingMethod = settings.processingMethod;
-    if (processingMethod === 'ai-vision') {
-      setProcessingStatus('processing_ai');
-    } else {
-      setProcessingStatus('processing_ocr');
-    }
+    // Always use AI Vision processing status
+    setProcessingStatus('processing_ai');
 
     // Reset confidence scores temporarily to show loading state
     setEditedConfidence(prev => ({
@@ -1443,7 +1437,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               ) : (
                 <>
                   <RotateCw size={16} />
-                  {settings.processingMethod === 'ai-vision' ? 'Reprocess with AI Vision' : 'Reprocess with OCR-AI'}
+                  Reprocess with AI Vision
                 </>
               )}
             </Button>

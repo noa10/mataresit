@@ -441,9 +441,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
             }
           );
         } else {
-          // Fallback to original processing
+          // Fallback to original processing with AI Vision
           result = await processReceiptWithOCR(newReceiptId, {
-            primaryMethod: recommendation?.recommendedMethod || settings.processingMethod,
+            primaryMethod: 'ai-vision', // Force AI Vision
             modelId: recommendation?.recommendedModel || settings.selectedModel,
             compareWithAlternative: settings.compareWithAlternative
           });
