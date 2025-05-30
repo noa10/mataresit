@@ -3,7 +3,7 @@
  * Supports Google Gemini, OpenRouter, and other AI model providers
  */
 
-export type ModelProvider = 'gemini' | 'openrouter' | 'anthropic' | 'openai';
+export type ModelProvider = 'gemini' | 'openrouter';
 
 export interface ModelConfig {
   id: string;

@@ -18,7 +18,7 @@ const corsHeaders = {
 interface ModelConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter' | 'anthropic' | 'openai';
+  provider: 'gemini' | 'openrouter';
   endpoint: string;
   apiKeyEnvVar: string;
   temperature: number;
@@ -222,8 +222,6 @@ async function callAIModel(
       return await callGeminiAPI(input, modelConfig, apiKey, logger);
     case 'openrouter':
       return await callOpenRouterAPI(input, modelConfig, apiKey, logger);
-    case 'anthropic':
-      return await callClaudeAPI(input, modelConfig, apiKey, logger);
     default:
       await logger.log(`Unsupported model provider: ${modelConfig.provider}`, "ERROR");
       throw new Error(`Unsupported model provider: ${modelConfig.provider}`);
@@ -608,134 +606,6 @@ Return your findings in JSON format:
   } catch (error) {
     console.error('Error parsing OpenRouter response:', error);
     await logger.log(`Error parsing OpenRouter response: ${error.message}`, "ERROR");
-    return {};
-  }
-}
-
-/**
- * Call Claude API for text or vision processing
- */
-async function callClaudeAPI(
-  input: AIModelInput,
-  modelConfig: ModelConfig,
-  apiKey: string,
-  logger: ProcessingLogger
-): Promise<any> {
-  await logger.log("Constructing prompt for Claude AI", "AI");
-
-  // Validate input type (Claude currently only supports text)
-  if (input.type === 'image') {
-    await logger.log("Claude API does not support vision input yet", "ERROR");
-    throw new Error("Claude API does not support vision input yet");
-  }
-
-  // Construct the payload for Claude
-  const prompt = `
-You are an AI assistant specialized in analyzing receipt data.
-
-RECEIPT TEXT:
-${input.fullText}
-
-TEXTRACT EXTRACTED DATA:
-${JSON.stringify(input.textractData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Provide SUGGESTIONS for potential OCR errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
-
-Return your findings in the following JSON format:
-{
-  "currency": "The currency code (e.g., MYR, USD)",
-  "payment_method": "The payment method used",
-  "predicted_category": "One of the categories from the list above",
-  "merchant": "The merchant name if you find a better match than Textract",
-  "total": "The total amount if you find a better match than Textract",
-  "suggestions": {
-    "merchant": "A suggested correction for merchant name if OCR made errors",
-    "date": "A suggested date correction in YYYY-MM-DD format if needed",
-    "total": "A suggested total amount correction if needed",
-    "tax": "A suggested tax amount correction if needed"
-  },
-  "confidence": {
-    "currency": "Confidence score 0-100 for currency",
-    "payment_method": "Confidence score 0-100 for payment method",
-    "predicted_category": "Confidence score 0-100 for category prediction",
-    "suggestions": {
-      "merchant": "Confidence score 0-100 for merchant suggestion",
-      "date": "Confidence score 0-100 for date suggestion",
-      "total": "Confidence score 0-100 for total suggestion",
-      "tax": "Confidence score 0-100 for tax suggestion"
-    }
-  }
-}`;
-
-  const payload = {
-    model: "claude-3-5-sonnet-20240620",
-    messages: [
-      { role: "user", content: prompt }
-    ],
-    temperature: modelConfig.temperature,
-    max_tokens: modelConfig.maxTokens,
-  };
-
-  // Call Claude API
-  await logger.log("Calling Claude API", "AI");
-  const response = await fetch(modelConfig.endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Claude API error:', errorText);
-    await logger.log(`Claude API error: ${response.status} ${response.statusText}`, "ERROR");
-    throw new Error(`Failed to process with Claude API: ${response.status} ${response.statusText}`);
-  }
-
-  const claudeResponse = await response.json();
-  await logger.log("Received response from Claude API", "AI");
-
-  // Parse the response
-  try {
-    // Extract the text content from Claude response
-    const responseText = claudeResponse.content[0].text;
-    await logger.log("Parsing Claude response", "AI");
-
-    // Extract JSON from the response (handle case where other text might be included)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
-
-    if (!jsonStr) {
-      console.error('No valid JSON found in Claude response');
-      await logger.log("No valid JSON found in Claude response", "ERROR");
-      return {};
-    }
-
-    // Parse the JSON data
-    const enhancedData = JSON.parse(jsonStr);
-
-    // Set default MYR currency if not found by Claude
-    if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      if (!enhancedData.confidence) enhancedData.confidence = {};
-      enhancedData.confidence.currency = 50; // medium confidence for default
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
-    }
-
-    await logger.log("AI processing complete", "AI");
-    return enhancedData;
-  } catch (error) {
-    console.error('Error parsing Claude response:', error);
-    await logger.log(`Error parsing Claude response: ${error.message}`, "ERROR");
     return {};
   }
 }

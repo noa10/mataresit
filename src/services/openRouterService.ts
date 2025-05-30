@@ -271,6 +271,13 @@ Return the extracted information as JSON with the required fields.`;
         temperature: 0
       };
 
+      console.log('OpenRouter test request:', {
+        model: testRequest.model,
+        url: `${this.baseUrl}/chat/completions`,
+        hasApiKey: !!this.apiKey,
+        apiKeyLength: this.apiKey?.length || 0
+      });
+
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -282,9 +289,32 @@ Return the extracted information as JSON with the required fields.`;
         body: JSON.stringify(testRequest)
       });
 
+      console.log('OpenRouter test response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OpenRouter API error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+
+        // Try to parse error details
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error('OpenRouter error details:', errorData);
+        } catch (parseError) {
+          console.error('Could not parse error response as JSON');
+        }
+      }
+
       return response.ok;
     } catch (error) {
-      console.error('OpenRouter connection test failed:', error);
+      console.error('OpenRouter connection test failed with exception:', error);
       return false;
     }
   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,18 +20,6 @@ const PROVIDER_INFO = {
     description: 'Access to multiple AI providers',
     icon: '🌐',
     color: 'bg-purple-100 text-purple-800'
-  },
-  anthropic: {
-    name: 'Anthropic',
-    description: 'Claude AI models',
-    icon: '🧠',
-    color: 'bg-orange-100 text-orange-800'
-  },
-  openai: {
-    name: 'OpenAI',
-    description: 'GPT models',
-    icon: '⚡',
-    color: 'bg-green-100 text-green-800'
   }
 };
 
@@ -52,12 +40,13 @@ export function ReceiptProcessingOptions({
   defaultModel = 'gemini-2.0-flash-lite',
   defaultCompare = false
 }: ReceiptProcessingOptionsProps) {
-  const [method, setMethod] = useState<'ocr-ai' | 'ai-vision'>(defaultMethod);
+  // Always use AI Vision - no longer allow method selection
+  const method = 'ai-vision';
   const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
   const [compare, setCompare] = useState<boolean>(defaultCompare);
 
-  // Filter models based on the selected method
-  const availableModels = getModelsByCapability(method === 'ocr-ai' ? 'text' : 'vision');
+  // Always use vision models since we're exclusively using AI Vision
+  const availableModels = getModelsByCapability('vision');
 
   // Group models by provider
   const modelsByProvider = availableModels.reduce((acc, model) => {
@@ -86,12 +75,19 @@ export function ReceiptProcessingOptions({
     return <Badge variant="outline" className="text-xs bg-red-100 text-red-700">$$$</Badge>;
   };
 
+  // Always notify parent that we're using AI Vision
+  useEffect(() => {
+    onMethodChange('ai-vision');
+    onModelChange(selectedModel);
+    onCompareChange(compare);
+  }, [selectedModel, compare, onMethodChange, onModelChange, onCompareChange]);
+
   return (
     <div className="space-y-4 p-4 border rounded-md bg-background/50">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <Label htmlFor="processing-method">Processing Method</Label>
+            <Label htmlFor="ai-model">AI Vision Processing</Label>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -99,60 +95,17 @@ export function ReceiptProcessingOptions({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    <strong>AI Vision (Recommended):</strong> The image is processed directly by an AI model with vision capabilities. This is now the default method and works well with larger images (up to 5MB).
-                    <br /><br />
-                    <strong>OCR + AI:</strong> Text is extracted from the image first, then enhanced with AI. Good for simpler receipts or when AI Vision encounters issues.
+                    <strong>AI Vision:</strong> Your receipts are processed directly by advanced AI models with vision capabilities. This method provides superior accuracy and supports larger images (up to 5MB).
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
-          <p className="text-sm text-muted-foreground">Choose how your receipt should be processed (AI Vision is recommended and set as default)</p>
+          <p className="text-sm text-muted-foreground">Select which AI model to use for processing your receipts</p>
         </div>
       </div>
 
-      <Select
-        value={method}
-        onValueChange={(value: 'ocr-ai' | 'ai-vision') => {
-          setMethod(value);
-          onMethodChange(value);
 
-          // Reset model to a default that supports the selected method
-          // Default to Gemini 2.0 Flash Lite as it supports both text and vision
-          const defaultForMethod = 'gemini-2.0-flash-lite';
-          setSelectedModel(defaultForMethod);
-          onModelChange(defaultForMethod);
-        }}
-      >
-        <SelectTrigger id="processing-method">
-          <SelectValue placeholder="Select a processing method" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="ai-vision">AI Vision (Recommended)</SelectItem>
-          <SelectItem value="ocr-ai">OCR + AI</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2">
-          <Label htmlFor="ai-model">AI Model</Label>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">
-                  Select the AI model that will process your receipt data.
-                  Different models have different capabilities and accuracy.
-                  All models now support larger images (up to 5MB) for better processing.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        <p className="text-sm text-muted-foreground">Select the AI model to use</p>
-      </div>
 
       <Select
         value={selectedModel}
@@ -269,9 +222,8 @@ export function ReceiptProcessingOptions({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    When enabled, we'll also process your receipt using the alternative method
-                    (OCR + AI if you selected AI Vision, or AI Vision if you selected OCR + AI)
-                    and highlight any discrepancies between the two methods.
+                    When enabled, we'll also process your receipt using OCR + AI as an alternative method
+                    and highlight any discrepancies between AI Vision and OCR + AI results.
                     <br /><br />
                     Note: This will increase processing time but can improve accuracy.
                   </p>
@@ -280,7 +232,7 @@ export function ReceiptProcessingOptions({
             </TooltipProvider>
           </div>
           <p className="text-sm text-muted-foreground">
-            Process with both AI Vision and OCR + AI methods to improve accuracy
+            Also process with OCR + AI method to compare results and improve accuracy
           </p>
         </div>
       </div>

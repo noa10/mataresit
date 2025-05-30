@@ -27,6 +27,7 @@ import { AVAILABLE_MODELS, getModelsByProvider, ModelProvider } from "@/config/m
 import { OpenRouterService } from "@/services/openRouterService";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
+import { testGeminiConnection } from "@/lib/edge-function-utils";
 
 interface ProviderStatus {
   provider: ModelProvider;
@@ -57,26 +58,6 @@ const PROVIDER_INFO = {
     keyRequired: true,
     serverSide: false,
     features: ['Multiple Providers', 'Free Models', 'Pay-per-use']
-  },
-  anthropic: {
-    name: 'Anthropic',
-    description: 'Claude AI models with strong reasoning capabilities',
-    icon: '🧠',
-    color: 'bg-orange-100 text-orange-800',
-    setupUrl: 'https://console.anthropic.com/',
-    keyRequired: true,
-    serverSide: true,
-    features: ['Advanced Reasoning', 'Large Context', 'Safety Focused']
-  },
-  openai: {
-    name: 'OpenAI',
-    description: 'GPT models with multimodal capabilities',
-    icon: '⚡',
-    color: 'bg-green-100 text-green-800',
-    setupUrl: 'https://platform.openai.com/api-keys',
-    keyRequired: true,
-    serverSide: true,
-    features: ['Multimodal', 'Industry Standard', 'Reliable']
   }
 };
 
@@ -126,38 +107,69 @@ export function ModelProviderStatus() {
 
           switch (status.provider) {
             case 'gemini':
-              // Check if Gemini API key is available (this would need to be implemented)
-              available = true; // Assume available for now
+              // Test Gemini connection via edge function
+              try {
+                console.log('Testing Gemini connection...');
+                const geminiResult = await testGeminiConnection();
+                if (geminiResult.success) {
+                  available = true;
+                  console.log('Gemini connection successful:', geminiResult.message);
+                } else {
+                  available = false;
+                  error = `Gemini connection failed: ${geminiResult.message}`;
+                  console.error('Gemini connection failed:', geminiResult.message);
+                }
+              } catch (e: any) {
+                available = false;
+                error = `Gemini test error: ${e.message}`;
+                console.error('Gemini connection test error:', e);
+              }
               break;
 
             case 'openrouter':
               // Test OpenRouter connection with user's API key
-              const openRouterApiKey = settings.userApiKeys?.openrouter;
-              if (openRouterApiKey) {
-                const openRouterService = new OpenRouterService(openRouterApiKey);
+              // Check both saved settings and local state for the API key
+              const savedApiKey = settings.userApiKeys?.openrouter;
+              const localApiKey = apiKeys[status.provider];
+              const openRouterApiKey = localApiKey || savedApiKey;
+
+              console.log('Testing OpenRouter connection...', {
+                hasSavedKey: !!savedApiKey,
+                hasLocalKey: !!localApiKey,
+                usingKey: openRouterApiKey ? 'Yes' : 'No'
+              });
+
+              if (openRouterApiKey && openRouterApiKey.trim()) {
+                const openRouterService = new OpenRouterService(openRouterApiKey.trim());
                 try {
                   // Test with a free vision-capable model
                   const testModelId = 'openrouter/google/gemini-2.0-flash-exp:free';
+                  console.log('Testing OpenRouter with model:', testModelId);
                   const connectionOk = await openRouterService.testConnection(testModelId);
                   if (connectionOk) {
                     available = true;
+                    console.log('OpenRouter connection successful');
                   } else {
                     available = false;
-                    error = 'API key test failed. Please verify your key.';
+                    error = 'API key test failed. Please verify your key is valid and has sufficient credits.';
+                    console.error('OpenRouter connection test returned false');
                   }
                 } catch (e: any) {
                   available = false;
                   error = `Connection test error: ${e.message}`;
+                  console.error('OpenRouter connection test error:', e);
                 }
               } else {
                 available = false;
-                error = 'OpenRouter API key not configured in settings.';
+                error = 'OpenRouter API key not provided. Please enter your API key and save it.';
+                console.log('No OpenRouter API key found');
               }
               break;
 
             default:
               available = false;
-              error = 'Not implemented';
+              error = `Provider ${status.provider} is not supported`;
+              console.warn(`Unsupported provider: ${status.provider}`);
           }
 
           return {
@@ -168,6 +180,7 @@ export function ModelProviderStatus() {
             lastChecked: new Date()
           };
         } catch (e) {
+          console.error(`Error testing provider ${status.provider}:`, e);
           return {
             ...status,
             available: false,
@@ -404,14 +417,14 @@ export function ModelProviderStatus() {
 
                 {/* API Key Configuration */}
                 {info.keyRequired && (
-                  <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor={`${status.provider}-key`} className="text-sm font-medium flex items-center gap-2">
+                      <Label htmlFor={`${status.provider}-key`} className="text-sm font-medium flex items-center gap-2 text-gray-900 dark:text-gray-100">
                         <Key className="h-3 w-3" />
                         API Key
                       </Label>
                       {configured && (
-                        <Badge variant="outline" className="text-green-600 bg-green-50 text-xs">
+                        <Badge variant="outline" className="text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-xs">
                           Configured
                         </Badge>
                       )}
@@ -430,7 +443,7 @@ export function ModelProviderStatus() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                         onClick={() => toggleApiKeyVisibility(status.provider)}
                       >
                         {showApiKeys[status.provider] ? (
@@ -457,7 +470,7 @@ export function ModelProviderStatus() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleClearApiKey(status.provider)}
-                          className="text-red-600 hover:text-red-700 text-xs"
+                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
                           Clear
                         </Button>
@@ -467,7 +480,7 @@ export function ModelProviderStatus() {
                         variant="ghost"
                         size="sm"
                         onClick={() => window.open(info.setupUrl, '_blank')}
-                        className="flex items-center gap-1 text-xs ml-auto"
+                        className="flex items-center gap-1 text-xs ml-auto text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
                       >
                         Get Key
                         <ExternalLink className="h-3 w-3" />
@@ -478,17 +491,17 @@ export function ModelProviderStatus() {
 
                 {/* Error Message */}
                 {status.error && (
-                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-md">
-                    <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-red-700">
+                  <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-red-700 dark:text-red-300">
                       <p className="font-medium">Connection Error</p>
-                      <p className="text-xs mt-1">{status.error}</p>
+                      <p className="text-xs mt-1 text-red-600 dark:text-red-400">{status.error}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Status Footer */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {status.lastChecked ? (
@@ -498,7 +511,7 @@ export function ModelProviderStatus() {
                     )}
                   </div>
                   {!info.keyRequired && (
-                    <span className="text-blue-600">Server-managed</span>
+                    <span className="text-blue-600 dark:text-blue-400">Server-managed</span>
                   )}
                 </div>
               </CardContent>
@@ -508,42 +521,42 @@ export function ModelProviderStatus() {
       </div>
 
       {/* Enhanced Information Card */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border-blue-200 dark:border-blue-800">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Info className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-blue-900 mb-2">AI Provider Configuration Guide</h4>
-              <div className="text-sm text-blue-800 space-y-2">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">AI Provider Configuration Guide</h4>
+              <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                 <p>
-                  <strong>Google Gemini:</strong> Configured server-side with environment variables.
+                  <strong className="text-blue-900 dark:text-blue-100">Google Gemini:</strong> Configured server-side with environment variables.
                   No API key needed from you - ready to use immediately.
                 </p>
                 <p>
-                  <strong>OpenRouter:</strong> Requires your API key for client-side access.
+                  <strong className="text-blue-900 dark:text-blue-100">OpenRouter:</strong> Requires your API key for client-side access.
                   Provides access to multiple AI providers through a single unified API.
                 </p>
                 <p>
-                  <strong>Status Indicators:</strong> Green border = connected and working,
+                  <strong className="text-blue-900 dark:text-blue-100">Status Indicators:</strong> Green border = connected and working,
                   Yellow border = configured but not tested, Gray border = needs configuration.
                 </p>
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300">
                   <Zap className="h-3 w-3 mr-1" />
                   Fast
                 </Badge>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300">
                   <Brain className="h-3 w-3 mr-1" />
                   Accurate
                 </Badge>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300">
                   <DollarSign className="h-3 w-3 mr-1" />
                   Economical
                 </Badge>
-                <span className="text-xs text-blue-600 ml-2">Model capability indicators</span>
+                <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">Model capability indicators</span>
               </div>
             </div>
           </div>
