@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
 import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUtils";
+import { formatCurrencySafe, normalizeCurrencyCode } from "@/utils/currency";
 import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
 import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
@@ -146,7 +147,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     date: receipt.date || "",
     total: receipt.total || 0,
     tax: receipt.tax || 0,
-    currency: receipt.currency || "MYR",
+    currency: normalizeCurrencyCode(receipt.currency, "MYR"),
     payment_method: receipt.payment_method || "",
     predicted_category: receipt.predicted_category || ""
   });
@@ -237,14 +238,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Effect to update editedReceipt when debounced input values change
   useEffect(() => {
     // Validate currency before updating editedReceipt
-    let validatedCurrency = debouncedInputValues.currency;
-
-    // Ensure currency is a valid 3-letter code
-    if (!validatedCurrency || !/^[A-Z]{3}$/i.test(validatedCurrency)) {
-      validatedCurrency = 'MYR'; // Default to MYR if invalid
-    } else {
-      validatedCurrency = validatedCurrency.toUpperCase();
-    }
+    const validatedCurrency = normalizeCurrencyCode(debouncedInputValues.currency, 'MYR');
 
     setEditedReceipt(prev => ({
       ...prev,
@@ -570,24 +564,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   });
 
   const formatCurrency = (amount?: number | null) => {
-    // Use a try-catch block to handle potential invalid currency codes
-    try {
-      // Validate currency code - must be 3 letters according to ISO 4217
-      const currencyCode = /^[A-Z]{3}$/i.test(inputValues.currency) ?
-        inputValues.currency.toUpperCase() : 'MYR';
-
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currencyCode,
-      }).format(amount || 0); // Handle potential null/undefined amount
-    } catch (error) {
-      // Fallback to MYR if there's any error
-      console.error("Error formatting currency:", error);
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'MYR',
-      }).format(amount || 0);
-    }
+    return formatCurrencySafe(amount, inputValues.currency, 'en-US', 'MYR');
   };
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -867,9 +844,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const handleAcceptSuggestion = (field: string, value: string | number) => {
     // Special handling for currency field
     if (field === 'currency' && typeof value === 'string') {
-      // Validate currency code
-      const validatedCurrency = /^[A-Z]{3}$/i.test(value) ?
-        value.toUpperCase() : 'MYR';
+      // Normalize currency code using our utility
+      const validatedCurrency = normalizeCurrencyCode(value, 'MYR');
 
       // Update with validated currency
       setInputValues(prev => ({
@@ -1641,13 +1617,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     id="currency"
                     value={inputValues.currency}
                     onChange={(e) => {
-                      // Only allow letters and limit to 3 characters
-                      const value = e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 3);
-                      handleInputChange('currency', value.toUpperCase());
+                      // Allow common currency symbols and letters, limit to 3 characters for final code
+                      const value = e.target.value.replace(/[^A-Za-z$€£¥₱₫฿]/g, '').slice(0, 5);
+                      // Normalize the currency code as the user types
+                      const normalizedValue = normalizeCurrencyCode(value, inputValues.currency);
+                      handleInputChange('currency', normalizedValue);
                     }}
                     className="bg-background/50"
-                    maxLength={3}
-                    placeholder="MYR"
+                    maxLength={5}
+                    placeholder="MYR, RM, USD, $"
                   />
                    {renderSuggestion('currency', 'currency')}
                 </div>

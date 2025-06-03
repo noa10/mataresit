@@ -41,9 +41,12 @@ import { supabase } from '@/integrations/supabase/client'; // Corrected supabase
 // Import the new DailyReceiptBrowserModal
 import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
 
+// Import currency utility
+import { formatCurrencySafe } from '@/utils/currency';
+
 // Currency formatting function
 const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
+  return formatCurrencySafe(amount, currencyCode, 'en-US', 'MYR');
 };
 
 // Date formatting function for charts (short format)

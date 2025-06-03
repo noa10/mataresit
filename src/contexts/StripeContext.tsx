@@ -6,7 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { SubscriptionData, SubscriptionTier, SubscriptionStatus } from '@/config/stripe';
 
-const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
+// Only load Stripe if we have a valid public key
+const stripePromise = STRIPE_PUBLIC_KEY && STRIPE_PUBLIC_KEY.trim() !== ''
+  ? loadStripe(STRIPE_PUBLIC_KEY)
+  : Promise.resolve(null);
 
 interface StripeContextType {
   createCheckoutSession: (priceId: string, billingInterval?: 'monthly' | 'annual') => Promise<void>;
@@ -109,6 +112,13 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createCheckoutSession = async (priceId: string, billingInterval: 'monthly' | 'annual' = 'monthly') => {
     if (!user) {
       toast.error('Please sign in to subscribe');
+      return;
+    }
+
+    // Check if Stripe is properly configured
+    if (!STRIPE_PUBLIC_KEY || STRIPE_PUBLIC_KEY.trim() === '') {
+      console.error('Stripe public key is not configured');
+      toast.error('Payment system is not configured. Please contact support.');
       return;
     }
 

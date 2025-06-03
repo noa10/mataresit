@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
 import ReceiptViewer from '@/components/ReceiptViewer';
+import { formatCurrencySafe } from '@/utils/currency';
 
 import './receipt-calendar.css';
 
@@ -150,7 +151,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
                           <span className="font-medium">{receipt.merchant || `Receipt (${receipt.id.substring(0, 6)}...)`}</span>
                           <span className="text-xs text-muted-foreground/80">
                             {receipt.date ? formatFullDate(receipt.date) : 'Unknown Date'} -
-                            {receipt.total ? ` ${receipt.currency || 'MYR'} ${receipt.total.toFixed(2)}` : ' N/A'}
+                            {receipt.total ? ` ${formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}` : ' N/A'}
                           </span>
                         </div>
                       </Button>

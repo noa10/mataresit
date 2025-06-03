@@ -9,6 +9,7 @@ import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { formatCurrencySafe } from "@/utils/currency";
 
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
@@ -117,10 +118,7 @@ export default function ViewReceipt() {
             <div>
               <h1 className="text-2xl font-bold">{receipt.merchant || "Unnamed Receipt"}</h1>
               <p className="text-muted-foreground">
-                {receipt.date ? new Date(receipt.date).toLocaleDateString() : "No date"} • {receipt.total ? new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: receipt.currency || 'USD',
-                }).format(receipt.total) : "$0.00"}
+                {receipt.date ? new Date(receipt.date).toLocaleDateString() : "No date"} • {receipt.total ? formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR') : formatCurrencySafe(0, 'MYR')}
               </p>
             </div>
           </motion.div>

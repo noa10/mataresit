@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReceiptStatus, ProcessingStatus } from "@/types/receipt";
 import { getFormattedImageUrlSync } from "@/utils/imageUtils";
+import { formatCurrencySafe } from "@/utils/currency";
 
 interface ReceiptCardProps {
   id: string;
@@ -52,10 +53,7 @@ export default function ReceiptCard({
   }, [imageUrl]);
   
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'MYR',
-    }).format(amount);
+    return formatCurrencySafe(amount, currency, 'en-US', 'MYR');
   };
   
   const getStatusColor = () => {
