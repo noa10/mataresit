@@ -8,9 +8,18 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+build
 dist
 dist-ssr
 *.local
+
+# Temporary files
+tmp/
+temp/
+
+# Test artifacts
+tests/coverage/
+tests/reports/
 
 # Editor directories and files
 .vscode/*
