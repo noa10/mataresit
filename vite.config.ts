@@ -9,9 +9,6 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 5000,
   },
-  build: {
-    outDir: "../build",
-  },
   plugins: [
     react(),
     mode === 'development' &&
@@ -19,7 +16,7 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "../src"),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 }));
