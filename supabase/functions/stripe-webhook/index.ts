@@ -47,8 +47,19 @@ serve(async (req) => {
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
 
+      // Handle subscription item updates (for plan changes)
+      case 'subscription_schedule.updated':
+      case 'subscription_schedule.completed':
+        console.log(`Subscription schedule event: ${event.type}`, event.data.object);
+        // These events might contain subscription changes, but we'll rely on subscription.updated
+        break;
+
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`Unhandled event type: ${event.type}`, {
+          eventId: event.id,
+          created: event.created,
+          livemode: event.livemode
+        });
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -66,14 +77,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
 
+  console.log(`Processing checkout session completed for customer ${customerId}:`, {
+    sessionId: session.id,
+    subscriptionId: subscriptionId,
+    paymentStatus: session.payment_status,
+    mode: session.mode
+  });
+
   if (subscriptionId) {
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    await handleSubscriptionChange(subscription);
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      console.log(`Retrieved subscription ${subscriptionId} for checkout session ${session.id}`);
+      await handleSubscriptionChange(subscription);
+    } catch (error) {
+      console.error(`Error processing subscription ${subscriptionId} from checkout session ${session.id}:`, error);
+      throw error;
+    }
+  } else {
+    console.warn(`No subscription ID found in checkout session ${session.id} for customer ${customerId}`);
   }
 }
 
 async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
+
+  console.log(`Processing subscription change for customer ${customerId}:`, {
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    items: subscription.items.data.map(item => ({
+      priceId: item.price.id,
+      productId: item.price.product
+    }))
+  });
 
   // Get the price ID to determine tier
   const priceId = subscription.items.data[0]?.price.id;
@@ -81,17 +116,47 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 
   const status = mapStripeStatusToOurStatus(subscription.status);
 
-  await supabaseClient.rpc('update_subscription_from_stripe', {
-    _stripe_customer_id: customerId,
-    _stripe_subscription_id: subscription.id,
-    _tier: tier,
-    _status: status,
-    _current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-    _current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-    _trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-  });
+  console.log(`Mapping for customer ${customerId}: priceId=${priceId} -> tier=${tier}, status=${status}`);
 
-  console.log(`Updated subscription for customer ${customerId} to tier ${tier} with status ${status}`);
+  try {
+    const { data, error } = await supabaseClient.rpc('update_subscription_from_stripe', {
+      _stripe_customer_id: customerId,
+      _stripe_subscription_id: subscription.id,
+      _tier: tier,
+      _status: status,
+      _current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      _current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      _trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+    });
+
+    if (error) {
+      console.error(`Error updating subscription for customer ${customerId}:`, error);
+      throw error;
+    }
+
+    console.log(`Successfully updated subscription for customer ${customerId} to tier ${tier} with status ${status}`);
+
+    // Verify the update by checking the database
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('id, subscription_tier, subscription_status, stripe_customer_id')
+      .eq('stripe_customer_id', customerId)
+      .single();
+
+    if (profileError) {
+      console.error(`Error verifying subscription update for customer ${customerId}:`, profileError);
+    } else {
+      console.log(`Verification: Customer ${customerId} profile updated:`, {
+        userId: profile.id,
+        tier: profile.subscription_tier,
+        status: profile.subscription_status
+      });
+    }
+
+  } catch (error) {
+    console.error(`Failed to update subscription for customer ${customerId}:`, error);
+    throw error;
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -288,8 +353,22 @@ function mapPriceIdToTier(priceId: string): 'free' | 'pro' | 'max' {
     'price_1RSik1PHa6JfBjtMbYhspNSR': 'max',  // Max Annual
   };
 
-  console.log(`Mapping price ID ${priceId} to tier:`, priceToTierMap[priceId] || 'free');
-  return priceToTierMap[priceId] || 'free';
+  const mappedTier = priceToTierMap[priceId] || 'free';
+
+  console.log(`Price ID mapping:`, {
+    priceId,
+    mappedTier,
+    availablePriceIds: Object.keys(priceToTierMap),
+    isKnownPrice: priceId in priceToTierMap
+  });
+
+  if (!priceId) {
+    console.warn('mapPriceIdToTier called with empty/null priceId');
+  } else if (!(priceId in priceToTierMap)) {
+    console.warn(`Unknown price ID: ${priceId}. Available price IDs:`, Object.keys(priceToTierMap));
+  }
+
+  return mappedTier;
 }
 
 function mapStripeStatusToOurStatus(stripeStatus: string): 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid' {

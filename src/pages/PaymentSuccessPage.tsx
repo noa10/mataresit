@@ -13,7 +13,7 @@ export default function PaymentSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
-  const { refreshSubscription } = useStripe();
+  const { refreshSubscription, createPortalSession, isLoading: stripeLoading } = useStripe();
   const [isLoading, setIsLoading] = useState(true);
   const [paymentDetails, setPaymentDetails] = useState<{
     tier: string;
@@ -257,8 +257,19 @@ export default function PaymentSuccessPage() {
               <Button asChild size="lg">
                 <Link to="/dashboard">Go to Dashboard</Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link to="/settings">Manage Subscription</Link>
+              <Button
+                variant="outline"
+                onClick={createPortalSession}
+                disabled={stripeLoading}
+              >
+                {stripeLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Opening Portal...
+                  </>
+                ) : (
+                  'Manage Subscription'
+                )}
               </Button>
             </div>
           </CardContent>

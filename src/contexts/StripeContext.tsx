@@ -61,6 +61,16 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (error) {
         console.error('StripeContext: Error fetching subscription data:', error);
+
+        // If profile doesn't exist, create one with default values
+        if (error.code === 'PGRST116') {
+          console.log('StripeContext: Profile not found, this might be a new user');
+          return {
+            tier: 'free',
+            status: 'active',
+            receiptsUsedThisMonth: 0,
+          };
+        }
         return null;
       }
 
