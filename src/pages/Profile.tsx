@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { 
-  User, Moon, Sun, LogOut, ChevronRight, 
-  Mail, Edit, Camera
+import {
+  User, Moon, Sun, LogOut, ChevronRight,
+  Mail, Edit, Camera, Key
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { ChangePasswordDialog } from "@/components/modals/ChangePasswordDialog";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -25,6 +26,7 @@ export default function Profile() {
   const [isDarkMode, setIsDarkMode] = useState(
     document.documentElement.classList.contains('dark')
   );
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   
   // Handle dark mode toggle
   const toggleDarkMode = () => {
@@ -203,7 +205,12 @@ export default function Profile() {
                   <CardContent>
                     <p className="text-muted-foreground">Manage your security settings here.</p>
                     <div className="mt-6 space-y-4">
-                      <Button variant="outline" className="w-full justify-start">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start gap-2"
+                        onClick={() => setIsChangePasswordOpen(true)}
+                      >
+                        <Key size={16} />
                         Change Password
                       </Button>
                       <Button variant="outline" className="w-full justify-start">
@@ -245,6 +252,12 @@ export default function Profile() {
           </motion.div>
         </div>
       </main>
+
+      {/* Change Password Dialog */}
+      <ChangePasswordDialog
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </div>
   );
 }
