@@ -14,6 +14,7 @@ const stripePromise = STRIPE_PUBLIC_KEY && STRIPE_PUBLIC_KEY.trim() !== ''
 interface StripeContextType {
   createCheckoutSession: (priceId: string, billingInterval?: 'monthly' | 'annual') => Promise<void>;
   cancelSubscription: () => Promise<void>;
+  downgradeSubscription: (targetTier: 'free' | 'pro' | 'max', immediate?: boolean) => Promise<void>;
   createPortalSession: () => Promise<void>;
   getSubscriptionStatus: () => Promise<SubscriptionData | null>;
   isLoading: boolean;
@@ -75,6 +76,47 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (profile) {
+        // Check if user needs subscription initialization
+        const needsInitialization = !profile.stripe_customer_id || !profile.stripe_subscription_id;
+
+        if (needsInitialization) {
+          console.log('StripeContext: User needs subscription initialization, setting up...');
+          try {
+            const { data: initData, error: initError } = await supabase.functions.invoke('initialize-user-subscription');
+
+            if (initError) {
+              console.error('StripeContext: Failed to initialize subscription:', initError);
+            } else {
+              console.log('StripeContext: Subscription initialized successfully:', initData);
+              // Refresh the profile data after initialization
+              const { data: updatedProfile, error: refreshError } = await supabase
+                .from('profiles')
+                .select(`
+                  subscription_tier,
+                  subscription_status,
+                  stripe_customer_id,
+                  stripe_subscription_id,
+                  subscription_start_date,
+                  subscription_end_date,
+                  trial_end_date,
+                  receipts_used_this_month,
+                  monthly_reset_date
+                `)
+                .eq('id', user.id)
+                .single();
+
+              if (!refreshError && updatedProfile) {
+                profile.stripe_customer_id = updatedProfile.stripe_customer_id;
+                profile.stripe_subscription_id = updatedProfile.stripe_subscription_id;
+                profile.subscription_start_date = updatedProfile.subscription_start_date;
+                profile.subscription_end_date = updatedProfile.subscription_end_date;
+              }
+            }
+          } catch (error) {
+            console.error('StripeContext: Error during subscription initialization:', error);
+          }
+        }
+
         const newSubscriptionData = {
           tier: (profile.subscription_tier as SubscriptionTier) || 'free',
           status: (profile.subscription_status as SubscriptionStatus) || 'active',
@@ -174,6 +216,91 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const downgradeSubscription = async (targetTier: 'free' | 'pro' | 'max', immediate: boolean = true) => {
+    if (!user) {
+      toast.error('Please sign in to manage your subscription');
+      return;
+    }
+
+    if (!subscriptionData) {
+      toast.error('No active subscription found');
+      return;
+    }
+
+    // Validate downgrade direction
+    const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
+    const currentTierLevel = tierHierarchy[subscriptionData.tier];
+    const targetTierLevel = tierHierarchy[targetTier];
+
+    if (targetTierLevel >= currentTierLevel) {
+      toast.error('You can only downgrade to a lower tier');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log(`Downgrading from ${subscriptionData.tier} to ${targetTier}, immediate: ${immediate}`);
+
+      // Debug: Check current session
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session ? 'exists' : 'null');
+      console.log('User ID:', user.id);
+      console.log('Access token exists:', !!session?.access_token);
+
+      if (!session?.access_token) {
+        console.error('No valid session found, attempting to refresh...');
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedSession) {
+          toast.error('Authentication session expired. Please sign in again.');
+          return;
+        }
+        console.log('Session refreshed successfully');
+      }
+
+      // Test authentication first with get_status action
+      console.log('Testing authentication with get_status...');
+      const { data: statusData, error: statusError } = await supabase.functions.invoke('manage-subscription', {
+        body: { action: 'get_status' },
+      });
+
+      if (statusError) {
+        console.error('Authentication test failed:', statusError);
+        toast.error('Authentication failed. Please try signing out and back in.');
+        return;
+      }
+
+      console.log('Authentication test successful, proceeding with downgrade...');
+
+      const { data, error } = await supabase.functions.invoke('manage-subscription', {
+        body: {
+          action: 'downgrade',
+          targetTier,
+          immediate
+        },
+      });
+
+      if (error) throw error;
+
+      // Show success message based on the response
+      if (data.scheduledChange) {
+        toast.success(`Your subscription will be downgraded to ${targetTier} at the end of your current billing period`);
+      } else if (data.cancelAtPeriodEnd) {
+        toast.success('Your subscription will be canceled at the end of your current billing period');
+      } else {
+        toast.success(data.message || `Successfully downgraded to ${targetTier}`);
+      }
+
+      // Refresh subscription data to reflect changes
+      await refreshSubscription();
+    } catch (error) {
+      console.error('Error downgrading subscription:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to downgrade subscription';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const createPortalSession = async () => {
     if (!user) return;
 
@@ -202,6 +329,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <StripeContext.Provider value={{
       createCheckoutSession,
       cancelSubscription,
+      downgradeSubscription,
       createPortalSession,
       getSubscriptionStatus,
       isLoading,

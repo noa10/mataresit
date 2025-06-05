@@ -87,7 +87,17 @@ END $$;
 -- 5. Add comments to document the fix
 COMMENT ON TABLE public.line_items IS 'Line items table with single foreign key constraint to receipts table (duplicate fk_receipt constraint removed)';
 COMMENT ON TABLE public.processing_logs IS 'Processing logs table with single foreign key constraint to receipts table (duplicate fk_receipt constraint removed)';
-COMMENT ON TABLE public.receipt_embeddings IS 'Receipt embeddings table with single foreign key constraint to receipts table (duplicate fk_receipt constraint removed)';
+
+-- Only add comment if receipt_embeddings table exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'receipt_embeddings'
+    ) THEN
+        COMMENT ON TABLE public.receipt_embeddings IS 'Receipt embeddings table with single foreign key constraint to receipts table (duplicate fk_receipt constraint removed)';
+    END IF;
+END $$;
 
 -- 6. Refresh the schema cache to ensure Supabase recognizes the changes
 -- This is important for the ORM to pick up the corrected relationships

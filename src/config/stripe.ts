@@ -17,23 +17,52 @@ export const SUBSCRIPTION_TIERS = {
   free: {
     name: 'Free',
     monthlyReceipts: 25,
-    storageLimitMB: 100,
+    storageLimitMB: 1024, // 1GB
     retentionDays: 7,
     batchUploadLimit: 1,
+    features: {
+      versionControl: false,
+      integrations: false,
+      customBranding: false,
+      prioritySupport: false,
+      advancedAnalytics: false,
+      apiAccess: false,
+      unlimitedUsers: false,
+    }
   },
   pro: {
     name: 'Pro',
     monthlyReceipts: 200,
-    storageLimitMB: 2048,
+    storageLimitMB: 10240, // 10GB
     retentionDays: 90,
     batchUploadLimit: 5,
+    features: {
+      versionControl: true,
+      integrations: 'basic',
+      customBranding: true,
+      prioritySupport: 'standard',
+      advancedAnalytics: true,
+      apiAccess: false,
+      unlimitedUsers: false,
+      maxUsers: 5,
+    }
   },
   max: {
     name: 'Max',
     monthlyReceipts: -1, // unlimited
-    storageLimitMB: 10240,
+    storageLimitMB: -1, // unlimited
     retentionDays: 365,
     batchUploadLimit: 20,
+    features: {
+      versionControl: true,
+      integrations: 'advanced',
+      customBranding: true,
+      prioritySupport: 'priority',
+      advancedAnalytics: true,
+      apiAccess: true,
+      unlimitedUsers: true,
+      maxUsers: -1, // unlimited
+    }
   }
 } as const;
 

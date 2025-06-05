@@ -6,18 +6,25 @@ import { Progress } from '@/components/ui/progress';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useStripe } from '@/contexts/StripeContext';
 import { Link } from 'react-router-dom';
-import { 
-  Crown, 
-  Zap, 
-  Upload, 
-  Database, 
+import {
+  Crown,
+  Zap,
+  Upload,
+  Database,
   Calendar,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Users,
+  GitBranch,
+  Puzzle,
+  Palette,
+  Headphones,
+  CheckCircle,
+  X
 } from 'lucide-react';
 
 export const SubscriptionStatus: React.FC = () => {
-  const { limits, usage, isLoading, getCurrentTier, getUpgradeMessage } = useSubscription();
+  const { limits, usage, isLoading, getCurrentTier, getUpgradeMessage, isFeatureAvailable, getFeatureLimit } = useSubscription();
   const { subscriptionData, createPortalSession, isLoading: stripeLoading } = useStripe();
 
   if (isLoading) {
@@ -138,6 +145,68 @@ export const SubscriptionStatus: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Plan Features */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Plan Features</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* Users */}
+              <div className="flex items-center gap-2">
+                {isFeatureAvailable('unlimited_users') ? (
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span className={isFeatureAvailable('unlimited_users') ? 'text-foreground' : 'text-muted-foreground'}>
+                  {isFeatureAvailable('unlimited_users') ? 'Unlimited users' : `${getFeatureLimit('max_users')} user${getFeatureLimit('max_users') === 1 ? '' : 's'}`}
+                </span>
+              </div>
+
+              {/* Version Control */}
+              <div className="flex items-center gap-2">
+                {isFeatureAvailable('version_control') ? (
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                ) : (
+                  <X className="h-3 w-3 text-red-500" />
+                )}
+                <span className={isFeatureAvailable('version_control') ? 'text-foreground' : 'text-muted-foreground'}>
+                  Version control
+                </span>
+              </div>
+
+              {/* Integrations */}
+              <div className="flex items-center gap-2">
+                {isFeatureAvailable('integrations') ? (
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                ) : (
+                  <X className="h-3 w-3 text-red-500" />
+                )}
+                <span className={isFeatureAvailable('integrations') ? 'text-foreground' : 'text-muted-foreground'}>
+                  {isFeatureAvailable('integrations') ? `${getFeatureLimit('integrations_level')} integrations` : 'No integrations'}
+                </span>
+              </div>
+
+              {/* Custom Branding */}
+              <div className="flex items-center gap-2">
+                {isFeatureAvailable('custom_branding') ? (
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                ) : (
+                  <X className="h-3 w-3 text-red-500" />
+                )}
+                <span className={isFeatureAvailable('custom_branding') ? 'text-foreground' : 'text-muted-foreground'}>
+                  Custom branding
+                </span>
+              </div>
+
+              {/* Support Level */}
+              <div className="flex items-center gap-2 col-span-2">
+                <Headphones className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">
+                  {getFeatureLimit('support_level')} support
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Upgrade Message */}
           {upgradeMessage && (

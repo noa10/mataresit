@@ -149,7 +149,8 @@ export const useSubscription = () => {
 
   const isFeatureAvailable = (feature: string): boolean => {
     const tier = getCurrentTier();
-    
+    const tierConfig = SUBSCRIPTION_TIERS[tier];
+
     switch (feature) {
       case 'batch_upload':
         return tier !== 'free';
@@ -161,8 +162,32 @@ export const useSubscription = () => {
         return tier === 'pro' || tier === 'max';
       case 'unlimited_receipts':
         return tier === 'max';
+      case 'version_control':
+        return tierConfig.features.versionControl;
+      case 'integrations':
+        return tierConfig.features.integrations !== false;
+      case 'custom_branding':
+        return tierConfig.features.customBranding;
+      case 'unlimited_users':
+        return tierConfig.features.unlimitedUsers;
       default:
         return true;
+    }
+  };
+
+  const getFeatureLimit = (feature: string): number | string => {
+    const tier = getCurrentTier();
+    const tierConfig = SUBSCRIPTION_TIERS[tier];
+
+    switch (feature) {
+      case 'max_users':
+        return tierConfig.features.maxUsers || 1;
+      case 'integrations_level':
+        return tierConfig.features.integrations || 'none';
+      case 'support_level':
+        return tierConfig.features.prioritySupport || 'basic';
+      default:
+        return 'unlimited';
     }
   };
 
@@ -174,6 +199,7 @@ export const useSubscription = () => {
     getUpgradeMessage,
     getCurrentTier,
     isFeatureAvailable,
+    getFeatureLimit,
     refreshUsage: fetchUsageData,
   };
 };

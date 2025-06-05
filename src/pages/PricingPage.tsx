@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { PRICE_IDS } from "@/config/stripe";
@@ -53,36 +54,37 @@ const pricingTiers: PricingTier[] = [
     id: "free",
     name: "Free",
     price: { monthly: 0, annual: 0 },
-    description: "Perfect for getting started with AI-powered receipt processing",
+    description: "Perfect for individuals getting started",
     icon: <Upload className="h-6 w-6" />,
     features: {
       uploads: "25 receipts per month",
       processing: "Basic OCR with AI enhancement",
       retention: "7-day data retention",
-      storage: "100MB storage limit",
+      storage: "1GB storage",
       models: ["Free OpenRouter models", "Gemma 3n", "Devstral Small"],
       capabilities: [
         "Basic merchant normalization",
         "Simple currency detection",
         "Basic confidence scoring",
-        "Single processing method"
+        "Single processing method",
+        "Single user access"
       ],
       analytics: ["Basic receipt summary", "Simple monthly overview"]
     },
-    limitations: ["No batch processing", "Limited field validation", "No currency conversion"]
+    limitations: ["No batch processing", "No version control", "No integrations", "Basic support only"]
   },
   {
     id: "pro",
     name: "Pro",
-    price: { monthly: 9.99, annual: 99.99 },
-    description: "Advanced features for regular users and small businesses",
+    price: { monthly: 10, annual: 108 },
+    description: "Advanced features for small teams",
     icon: <Zap className="h-6 w-6" />,
     popular: true,
     features: {
       uploads: "200 receipts per month",
       processing: "Advanced OCR + AI processing",
       retention: "90-day data retention",
-      storage: "2GB storage limit",
+      storage: "10GB storage",
       models: [
         "All Free tier models",
         "Gemini 1.5 Flash",
@@ -94,28 +96,33 @@ const pricingTiers: PricingTier[] = [
         "Currency detection with conversion",
         "Advanced confidence scoring",
         "Dual processing methods",
-        "Batch processing (up to 5)"
+        "Batch processing (up to 5)",
+        "Up to 5 users",
+        "Version control",
+        "Basic integrations",
+        "Custom branding"
       ],
       analytics: [
+        "Advanced search with filters and tags",
         "Detailed spending reports",
         "Merchant analysis",
         "Monthly/quarterly trends",
         "Basic data export (CSV)"
       ],
-      support: "Priority support"
+      support: "Standard support"
     }
   },
   {
     id: "max",
     name: "Max",
-    price: { monthly: 19.99, annual: 199.99 },
-    description: "Ultimate solution for power users and businesses",
+    price: { monthly: 20, annual: 216 },
+    description: "Complete solution for growing businesses",
     icon: <Crown className="h-6 w-6" />,
     features: {
       uploads: "Unlimited receipts",
       processing: "Priority processing queue",
       retention: "1-year retention + archiving",
-      storage: "10GB storage limit",
+      storage: "Unlimited storage",
       models: [
         "All Pro tier models",
         "Unlimited premium models",
@@ -128,9 +135,14 @@ const pricingTiers: PricingTier[] = [
         "Premium confidence scoring",
         "Automatic dual processing",
         "Advanced batch processing (up to 20)",
-        "Line item extraction"
+        "Line item extraction",
+        "Unlimited users",
+        "Advanced version control",
+        "Advanced integrations",
+        "Custom branding"
       ],
       analytics: [
+        "Advanced search with all features",
         "Advanced reporting dashboard",
         "Custom category creation",
         "Year-over-year comparisons",
@@ -138,15 +150,26 @@ const pricingTiers: PricingTier[] = [
         "Full data export (CSV, JSON, PDF)",
         "API access"
       ],
-      support: "Dedicated support"
+      support: "Priority support"
     }
   }
 ];
 
 export default function PricingPage() {
   const { user } = useAuth();
-  const { createCheckoutSession, isLoading, subscriptionData } = useStripe();
+  const { createCheckoutSession, downgradeSubscription, isLoading, subscriptionData } = useStripe();
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [downgradeDialog, setDowngradeDialog] = useState<{
+    isOpen: boolean;
+    targetTier: 'free' | 'pro' | 'max' | null;
+    tierName: string;
+    isProcessing: boolean;
+  }>({
+    isOpen: false,
+    targetTier: null,
+    tierName: '',
+    isProcessing: false
+  });
 
   useEffect(() => {
     document.title = "Pricing - ReceiptScan";
@@ -169,11 +192,35 @@ export default function PricingPage() {
       return;
     }
 
-    if (tierId === 'free') {
+    const currentTier = subscriptionData?.tier || 'free';
+    const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
+
+    // Check if this is a downgrade
+    if (tierHierarchy[tierId as keyof typeof tierHierarchy] < tierHierarchy[currentTier]) {
+      // This is a downgrade - show confirmation dialog
+      const tierNames = { 'free': 'Free', 'pro': 'Pro', 'max': 'Max' };
+      setDowngradeDialog({
+        isOpen: true,
+        targetTier: tierId as 'free' | 'pro' | 'max',
+        tierName: tierNames[tierId as keyof typeof tierNames],
+        isProcessing: false
+      });
+      return;
+    }
+
+    // Handle same tier
+    if (tierId === currentTier) {
+      toast.success(`You're already on the ${tierId.charAt(0).toUpperCase() + tierId.slice(1)} plan!`);
+      return;
+    }
+
+    // Handle free tier for new users
+    if (tierId === 'free' && currentTier === 'free') {
       toast.success("You're already on the Free plan!");
       return;
     }
 
+    // Handle upgrades
     try {
       // Get the appropriate price ID based on tier and billing interval
       const priceId = PRICE_IDS[tierId as 'pro' | 'max'][billingInterval];
@@ -182,6 +229,25 @@ export default function PricingPage() {
       console.error('Error subscribing:', error);
       toast.error("Failed to process subscription. Please try again.");
     }
+  };
+
+  const handleDowngradeConfirm = async (immediate: boolean = true) => {
+    if (!downgradeDialog.targetTier) return;
+
+    setDowngradeDialog(prev => ({ ...prev, isProcessing: true }));
+
+    try {
+      await downgradeSubscription(downgradeDialog.targetTier, immediate);
+      setDowngradeDialog({ isOpen: false, targetTier: null, tierName: '', isProcessing: false });
+    } catch (error) {
+      console.error('Error downgrading:', error);
+      setDowngradeDialog(prev => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handleDowngradeCancel = () => {
+    if (downgradeDialog.isProcessing) return; // Prevent closing during processing
+    setDowngradeDialog({ isOpen: false, targetTier: null, tierName: '', isProcessing: false });
   };
 
   return (
@@ -403,13 +469,23 @@ export default function PricingPage() {
                       >
                         {isLoading ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : subscriptionData?.status === 'active' && tier.id === subscriptionData?.tier ? (
-                          'Current Plan'
-                        ) : tier.id === 'free' ? (
-                          'Downgrade to Free'
-                        ) : (
-                          `Upgrade to ${tier.name}`
-                        )}
+                        ) : (() => {
+                          const currentTier = subscriptionData?.tier || 'free';
+                          const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
+                          const isCurrentPlan = subscriptionData?.status === 'active' && tier.id === currentTier;
+                          const isDowngrade = tierHierarchy[tier.id as keyof typeof tierHierarchy] < tierHierarchy[currentTier];
+                          const isUpgrade = tierHierarchy[tier.id as keyof typeof tierHierarchy] > tierHierarchy[currentTier];
+
+                          if (isCurrentPlan) {
+                            return 'Current Plan';
+                          } else if (isDowngrade) {
+                            return `Downgrade to ${tier.name}`;
+                          } else if (isUpgrade) {
+                            return `Upgrade to ${tier.name}`;
+                          } else {
+                            return tier.id === 'free' ? 'Get Started Free' : `Get ${tier.name}`;
+                          }
+                        })()}
                       </Button>
                     ) : (
                       <Button
@@ -488,6 +564,8 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
+
+
         {/* Contact Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -503,6 +581,88 @@ export default function PricingPage() {
           </Button>
         </motion.div>
       </div>
+
+      {/* Downgrade Confirmation Dialog */}
+      <Dialog open={downgradeDialog.isOpen} onOpenChange={(open) => !open && !downgradeDialog.isProcessing && handleDowngradeCancel()}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Downgrade</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to downgrade to the {downgradeDialog.tierName} plan?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="space-y-4">
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">What happens when you downgrade:</h4>
+                <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                  {downgradeDialog.targetTier === 'free' ? (
+                    <>
+                      <li>• Your subscription will be canceled</li>
+                      <li>• You'll lose access to premium features</li>
+                      <li>• Data retention will be limited to 7 days</li>
+                      <li>• Monthly receipt limit will be reduced to 25</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>• You'll lose access to higher-tier features</li>
+                      <li>• Your monthly limits will be reduced</li>
+                      <li>• You'll receive a prorated credit for unused time</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Choose when you'd like the downgrade to take effect:
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDowngradeCancel}
+              disabled={downgradeDialog.isProcessing}
+              className="w-full sm:w-auto order-3 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => handleDowngradeConfirm(false)}
+              disabled={downgradeDialog.isProcessing}
+              className="w-full sm:w-auto order-2 sm:order-2"
+            >
+              {downgradeDialog.isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Downgrade at Period End'
+              )}
+            </Button>
+            <Button
+              onClick={() => handleDowngradeConfirm(true)}
+              disabled={downgradeDialog.isProcessing}
+              className="w-full sm:w-auto order-1 sm:order-3"
+            >
+              {downgradeDialog.isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Downgrade Now'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
