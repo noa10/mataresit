@@ -29,6 +29,8 @@ export default function SemanticSearchPage() {
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
 
   // URL state management for preserving chat state (optional)
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
@@ -36,10 +38,20 @@ export default function SemanticSearchPage() {
   // Conversation updater for real-time updates
   const { saveConversation: saveConversationWithEvents } = useConversationUpdater();
 
-  // Initialize sidebar state based on screen size
+  // Initialize sidebar state based on screen size and localStorage preference
   useEffect(() => {
     const handleResize = () => {
-      setSidebarOpen(window.innerWidth >= 1024);
+      const isLargeScreen = window.innerWidth >= 1024;
+      setIsDesktop(isLargeScreen);
+
+      if (isLargeScreen) {
+        // On large screens, check localStorage preference or default to open
+        const savedState = localStorage.getItem('chat-sidebar-open');
+        setSidebarOpen(savedState !== null ? savedState === 'true' : true);
+      } else {
+        // On mobile/tablet, always start closed
+        setSidebarOpen(false);
+      }
     };
 
     handleResize();
@@ -47,18 +59,43 @@ export default function SemanticSearchPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Keyboard shortcuts
+  // Save sidebar state to localStorage when it changes (only on large screens)
+  useEffect(() => {
+    if (isDesktop) {
+      localStorage.setItem('chat-sidebar-open', sidebarOpen.toString());
+    }
+  }, [sidebarOpen, isDesktop]);
+
+  // Enhanced keyboard shortcuts with visual feedback
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === 'H') {
+      // Ctrl+B or Cmd+B to toggle sidebar (standard shortcut)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
         event.preventDefault();
         setSidebarOpen(prev => !prev);
+
+        // Show visual feedback
+        const feedback = document.createElement('div');
+        feedback.className = 'fixed top-4 right-4 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium z-50 animate-in fade-in slide-in-from-top-2 duration-200';
+        feedback.textContent = `Sidebar ${!sidebarOpen ? 'opened' : 'closed'}`;
+        document.body.appendChild(feedback);
+
+        setTimeout(() => {
+          feedback.classList.add('animate-out', 'fade-out', 'slide-out-to-top-2');
+          setTimeout(() => document.body.removeChild(feedback), 200);
+        }, 1500);
+      }
+
+      // Escape key to close sidebar on mobile
+      if (event.key === 'Escape' && sidebarOpen && !isDesktop) {
+        event.preventDefault();
+        setSidebarOpen(false);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [sidebarOpen, isDesktop]);
 
   // Initialize from URL if there's a query parameter
   useEffect(() => {
@@ -307,10 +344,35 @@ export default function SemanticSearchPage() {
     setUrlSearchParams({});
   }, [messages, saveCurrentConversation, setUrlSearchParams]);
 
-  // Sidebar handlers
-  const handleToggleSidebar = () => {
-    setSidebarOpen(prev => !prev);
-  };
+  // Enhanced sidebar handlers with focus management
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => {
+      const newState = !prev;
+
+      // Focus management for accessibility
+      if (newState && isDesktop) {
+        // When opening sidebar on desktop, focus the first interactive element
+        setTimeout(() => {
+          const sidebar = document.querySelector('[role="complementary"]');
+          const firstFocusable = sidebar?.querySelector('button, input, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+          firstFocusable?.focus();
+        }, 300);
+      } else if (!newState && !isDesktop) {
+        // When closing sidebar on mobile, return focus to toggle button
+        setTimeout(() => {
+          const toggleButton = document.querySelector('[aria-label*="sidebar"]') as HTMLElement;
+          toggleButton?.focus();
+        }, 100);
+      }
+
+      return newState;
+    });
+  }, [isDesktop]);
+
+  // Handle sidebar width changes
+  const handleSidebarWidthChange = useCallback((width: number) => {
+    setSidebarWidth(width);
+  }, []);
 
   const handleSelectConversation = (conversationId: string) => {
     // Save current conversation before switching
@@ -335,60 +397,75 @@ export default function SemanticSearchPage() {
         onSelectConversation={handleSelectConversation}
         currentConversationId={currentConversationId}
         className={sidebarOpen ? "lg:relative" : ""}
+        onWidthChange={handleSidebarWidthChange}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar />
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <Navbar
+          chatControls={{
+            sidebarToggle: (
+              <SidebarToggle
+                isOpen={sidebarOpen}
+                onToggle={handleToggleSidebar}
+                showKeyboardHint={true}
+              />
+            ),
+            onNewChat: handleNewChat,
+            showChatTitle: true
+          }}
+        />
 
-        {/* Chat Header */}
-        <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-3 max-w-4xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <SidebarToggle
-                  isOpen={sidebarOpen}
-                  onToggle={handleToggleSidebar}
-                />
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold">AI Receipt Assistant</h1>
-                  <p className="text-xs text-muted-foreground">
-                    Ask me anything about your receipts
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNewChat}
-                className="flex items-center space-x-1"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">New Chat</span>
-              </Button>
+        {/* Chat Content Area - Optimized for fixed input */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Chat Container with dynamic centering and bottom padding for fixed input */}
+          <div className={`flex-1 overflow-hidden transition-all duration-300 ease-in-out ${
+            sidebarOpen
+              ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
+              : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed for better centering
+          }`}>
+            <div className={`h-full mx-auto transition-all duration-300 ease-in-out ${
+              sidebarOpen
+                ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
+                : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
+            }`}>
+              <ChatContainer
+                messages={messages}
+                isLoading={isLoading}
+                onExampleClick={handleExampleClick}
+                onCopy={handleCopy}
+                onFeedback={handleFeedback}
+                sidebarOpen={sidebarOpen}
+              />
             </div>
           </div>
         </div>
 
-        {/* Chat Container */}
-        <ChatContainer
-          messages={messages}
-          isLoading={isLoading}
-          onExampleClick={handleExampleClick}
-          onCopy={handleCopy}
-          onFeedback={handleFeedback}
-        />
-
-        {/* Chat Input */}
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-          placeholder="Ask about your receipts..."
-        />
+        {/* Fixed Chat Input at bottom of viewport */}
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg"
+          style={{
+            left: sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0'
+          }}
+        >
+          <div className={`transition-all duration-300 ease-in-out ${
+            sidebarOpen
+              ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
+              : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed
+          }`}>
+            <div className={`mx-auto py-4 transition-all duration-300 ease-in-out ${
+              sidebarOpen
+                ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
+                : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
+            }`}>
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+                placeholder="Ask about your receipts..."
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

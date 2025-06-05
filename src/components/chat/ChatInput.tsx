@@ -31,7 +31,7 @@ export function ChatInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
       toast.error('Please enter a message');
@@ -45,10 +45,14 @@ export function ChatInput({
     try {
       await onSendMessage(trimmedMessage);
       setMessage('');
-      
-      // Reset textarea height
+
+      // Reset textarea height and maintain focus
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
+        // Keep focus on the input for better UX
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 100);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -69,55 +73,51 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-4 max-w-4xl">
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="relative flex items-end space-x-2">
-            <div className="flex-1 relative">
-              <Textarea
-                ref={textareaRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={placeholder}
-                disabled={disabled || isLoading}
-                className="min-h-[44px] max-h-[120px] resize-none pr-12 py-3 text-sm leading-relaxed"
-                rows={1}
-              />
-              
-              {/* Send/Stop button inside textarea */}
-              <div className="absolute right-2 bottom-2">
-                {isLoading ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleStop}
-                    className="h-8 w-8 p-0 hover:bg-destructive/10"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={!message.trim() || disabled}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
+    <form onSubmit={handleSubmit} className="relative w-full">
+      <div className="relative flex items-end space-x-2">
+        <div className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled || isLoading}
+            className="min-h-[44px] max-h-[120px] resize-none pr-12 py-3 text-sm leading-relaxed"
+            rows={1}
+          />
+
+          {/* Send/Stop button inside textarea */}
+          <div className="absolute right-2 bottom-2">
+            {isLoading ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleStop}
+                className="h-8 w-8 p-0 hover:bg-destructive/10"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!message.trim() || disabled}
+                className="h-8 w-8 p-0"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          
-          {/* Helper text */}
-          <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
-            <span>Press Enter to send, Shift+Enter for new line</span>
-            <span>{message.length}/2000</span>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+
+      {/* Helper text */}
+      <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
+        <span>Press Enter to send, Shift+Enter for new line</span>
+        <span>{message.length}/2000</span>
+      </div>
+    </form>
   );
 }
