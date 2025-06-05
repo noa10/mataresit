@@ -20,6 +20,10 @@ temp/
 # Test artifacts
 tests/coverage/
 tests/reports/
+tests/screenshots/
+tests/videos/
+tests/fixtures/temp/
+tests/manual/temp/
 
 # Editor directories and files
 .vscode/*
