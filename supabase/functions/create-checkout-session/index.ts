@@ -115,11 +115,65 @@ serve(async (req) => {
     console.log('Looking up profile for user:', user.id);
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('stripe_customer_id, email')
+      .select('stripe_customer_id, stripe_subscription_id, subscription_tier, email')
       .eq('id', user.id)
       .single();
 
     console.log('Profile lookup result:', { profile, profileError });
+
+    // Check if this is a simulated/test subscription user trying to upgrade
+    const isSimulatedSubscription = profile?.stripe_subscription_id?.startsWith('sub_simulated_') ||
+                                   profile?.stripe_subscription_id?.startsWith('test_sub_') ||
+                                   profile?.stripe_customer_id?.startsWith('cus_simulated_');
+
+    if (isSimulatedSubscription) {
+      console.log('Detected simulated subscription user attempting upgrade');
+
+      // For simulated subscriptions, simulate the upgrade by updating the database directly
+      const targetTier = mapPriceIdToTier(priceId);
+      console.log('Simulating upgrade to tier:', targetTier);
+
+      // Update database to reflect the tier change
+      const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('update_subscription_from_stripe', {
+        _stripe_customer_id: profile.stripe_customer_id,
+        _stripe_subscription_id: profile.stripe_subscription_id,
+        _tier: targetTier,
+        _status: 'active',
+        _current_period_start: new Date().toISOString(),
+        _current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        _trial_end: null,
+      });
+
+      if (rpcError) {
+        console.error('RPC call failed for simulated upgrade:', rpcError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update subscription in database', details: rpcError.message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      console.log('Database update successful for simulated upgrade:', rpcData);
+
+      // Return a simulated success URL that redirects to a success page
+      const baseUrl = req.headers.get('origin') || 'http://localhost:8080';
+      const simulatedSuccessUrl = `${baseUrl}/payment-success?simulated=true&tier=${targetTier}`;
+
+      return new Response(
+        JSON.stringify({
+          sessionId: 'sim_' + Date.now(),
+          url: simulatedSuccessUrl,
+          simulated: true,
+          message: `Simulated upgrade to ${targetTier} tier`
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     if (profile?.stripe_customer_id) {
       customerId = profile.stripe_customer_id;
@@ -202,3 +256,15 @@ serve(async (req) => {
     );
   }
 });
+
+function mapPriceIdToTier(priceId: string): 'free' | 'pro' | 'max' {
+  const priceToTierMap: Record<string, 'free' | 'pro' | 'max'> = {
+    // Your actual Stripe price IDs
+    'price_1RSiggPHa6JfBjtMFGNcoKnZ': 'pro',  // Pro Monthly
+    'price_1RSiiHPHa6JfBjtMOIItG7RA': 'pro',  // Pro Annual
+    'price_1RSiixPHa6JfBjtMXI9INFRf': 'max',  // Max Monthly
+    'price_1RSik1PHa6JfBjtMbYhspNSR': 'max',  // Max Annual
+  };
+
+  return priceToTierMap[priceId] || 'free';
+}

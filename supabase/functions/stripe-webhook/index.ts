@@ -7,16 +7,35 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 });
 
 const supabaseClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  Deno.env.get('VITE_SUPABASE_URL') ?? '',
+  Deno.env.get('SERVICE_ROLE_KEY') ?? ''
 );
 
 serve(async (req) => {
+  console.log('Webhook received:', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries()),
+    hasStripeSignature: !!req.headers.get('stripe-signature'),
+    hasWebhookSecret: !!Deno.env.get('STRIPE_WEBHOOK_SECRET'),
+    supabaseUrl: !!Deno.env.get('VITE_SUPABASE_URL'),
+    serviceRoleKey: !!Deno.env.get('SERVICE_ROLE_KEY')
+  });
+
   const signature = req.headers.get('stripe-signature');
   const body = await req.text();
   const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
 
+  console.log('Webhook debug info:', {
+    signaturePresent: !!signature,
+    signatureValue: signature ? signature.substring(0, 20) + '...' : 'null',
+    webhookSecretPresent: !!webhookSecret,
+    webhookSecretValue: webhookSecret ? webhookSecret.substring(0, 20) + '...' : 'null',
+    bodyLength: body.length
+  });
+
   if (!signature || !webhookSecret) {
+    console.error('Missing signature or webhook secret:', { signature: !!signature, webhookSecret: !!webhookSecret });
     return new Response('Missing signature or webhook secret', { status: 400 });
   }
 
@@ -68,8 +87,17 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Webhook error:', error);
-    return new Response(`Webhook error: ${error.message}`, { status: 400 });
+    console.error('Webhook error:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      signatureLength: signature?.length,
+      webhookSecretLength: webhookSecret?.length
+    });
+
+    // Return 401 for signature verification errors, 400 for other errors
+    const status = error.message?.includes('signature') || error.message?.includes('timestamp') ? 401 : 400;
+    return new Response(`Webhook error: ${error.message}`, { status });
   }
 });
 
@@ -104,6 +132,8 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   console.log(`Processing subscription change for customer ${customerId}:`, {
     subscriptionId: subscription.id,
     status: subscription.status,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
     items: subscription.items.data.map(item => ({
       priceId: item.price.id,
       productId: item.price.product
@@ -112,17 +142,56 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 
   // Get the price ID to determine tier
   const priceId = subscription.items.data[0]?.price.id;
-  const tier = mapPriceIdToTier(priceId);
-
+  const newTier = mapPriceIdToTier(priceId);
   const status = mapStripeStatusToOurStatus(subscription.status);
 
-  console.log(`Mapping for customer ${customerId}: priceId=${priceId} -> tier=${tier}, status=${status}`);
+  // Check if this is a tier change by comparing with current database tier
+  let isDowngrade = false;
+  let isUpgrade = false;
+  let previousTier = null;
+
+  try {
+    const { data: currentProfile } = await supabaseClient
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('stripe_customer_id', customerId)
+      .single();
+
+    if (currentProfile?.subscription_tier) {
+      previousTier = currentProfile.subscription_tier;
+      const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
+      const previousLevel = tierHierarchy[previousTier as keyof typeof tierHierarchy] || 0;
+      const newLevel = tierHierarchy[newTier] || 0;
+
+      isDowngrade = newLevel < previousLevel;
+      isUpgrade = newLevel > previousLevel;
+    }
+  } catch (error) {
+    console.warn(`Could not fetch current tier for customer ${customerId}:`, error);
+  }
+
+  const changeType = isDowngrade ? 'DOWNGRADE' : isUpgrade ? 'UPGRADE' : 'UPDATE';
+
+  console.log(`${changeType} detected for customer ${customerId}:`, {
+    previousTier,
+    newTier,
+    priceId,
+    status,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    isScheduledChange: subscription.cancel_at_period_end && status === 'active'
+  });
+
+  if (isDowngrade) {
+    console.log(`🔽 DOWNGRADE: Customer ${customerId} downgraded from ${previousTier} to ${newTier}`);
+  } else if (isUpgrade) {
+    console.log(`🔼 UPGRADE: Customer ${customerId} upgraded from ${previousTier} to ${newTier}`);
+  }
 
   try {
     const { data, error } = await supabaseClient.rpc('update_subscription_from_stripe', {
       _stripe_customer_id: customerId,
       _stripe_subscription_id: subscription.id,
-      _tier: tier,
+      _tier: newTier,
       _status: status,
       _current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
       _current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -134,7 +203,13 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
       throw error;
     }
 
-    console.log(`Successfully updated subscription for customer ${customerId} to tier ${tier} with status ${status}`);
+    console.log(`Successfully updated subscription for customer ${customerId} to tier ${newTier} with status ${status}`);
+
+    if (isDowngrade) {
+      console.log(`✅ DOWNGRADE COMPLETED: Customer ${customerId} successfully downgraded from ${previousTier} to ${newTier}`);
+    } else if (isUpgrade) {
+      console.log(`✅ UPGRADE COMPLETED: Customer ${customerId} successfully upgraded from ${previousTier} to ${newTier}`);
+    }
 
     // Verify the update by checking the database
     const { data: profile, error: profileError } = await supabaseClient
@@ -149,8 +224,18 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
       console.log(`Verification: Customer ${customerId} profile updated:`, {
         userId: profile.id,
         tier: profile.subscription_tier,
-        status: profile.subscription_status
+        status: profile.subscription_status,
+        changeType: changeType,
+        previousTier: previousTier,
+        newTier: newTier
       });
+
+      // Additional verification for downgrades
+      if (isDowngrade && profile.subscription_tier === newTier) {
+        console.log(`🎉 DOWNGRADE VERIFICATION SUCCESSFUL: Database tier matches expected downgrade tier (${newTier})`);
+      } else if (isUpgrade && profile.subscription_tier === newTier) {
+        console.log(`🎉 UPGRADE VERIFICATION SUCCESSFUL: Database tier matches expected upgrade tier (${newTier})`);
+      }
     }
 
   } catch (error) {
