@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Downgrade</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test Subscription Functionality</h1>
+    <button id="testDowngrade">Test Downgrade Max→Pro</button>
+    <button id="testDowngradeToFree">Test Downgrade Max→Free</button>
+    <button id="testUpgradeToPro">Test Upgrade Free→Pro</button>
+    <button id="testUpgradeToMax">Test Upgrade Free→Max</button>
+    <div id="result"></div>
+
+    <script>
+        const { createClient } = supabase;
+        
+        const supabaseClient = createClient(
+            'https://mpmkbtsufihzdelrlszs.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMDI1MjEsImV4cCI6MjA0ODg3ODUyMX0.WX8A74UAggXnu0RE6JMp0s0cNt-DVUvgtKOTo10cYY0'
+        );
+
+        async function testSubscriptionAction(action, targetTier, priceId = null) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `Testing ${action}...`;
+
+            try {
+                // Get current session
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                console.log('Session:', session ? 'exists' : 'null');
+
+                if (!session) {
+                    resultDiv.innerHTML = 'Error: No session found. Please sign in first.';
+                    return;
+                }
+
+                console.log('User ID:', session.user.id);
+                console.log('Access token exists:', !!session.access_token);
+
+                if (action === 'upgrade') {
+                    // Test upgrade via checkout session
+                    console.log('Testing upgrade via checkout session...');
+                    const { data: checkoutData, error: checkoutError } = await supabaseClient.functions.invoke('create-checkout-session', {
+                        body: { priceId, billingInterval: 'monthly' },
+                    });
+
+                    if (checkoutError) {
+                        console.error('Upgrade failed:', checkoutError);
+                        resultDiv.innerHTML += `<br>Upgrade failed: ${checkoutError.message}`;
+                        return;
+                    }
+
+                    console.log('Upgrade successful:', checkoutData);
+                    resultDiv.innerHTML += `<br>Upgrade successful: ${JSON.stringify(checkoutData)}`;
+                } else {
+                    // Test authentication first
+                    console.log('Testing authentication...');
+                    const { data: statusData, error: statusError } = await supabaseClient.functions.invoke('manage-subscription', {
+                        body: { action: 'get_status' },
+                    });
+
+                    if (statusError) {
+                        console.error('Auth test failed:', statusError);
+                        resultDiv.innerHTML = `Auth test failed: ${statusError.message}`;
+                        return;
+                    }
+
+                    console.log('Auth test successful:', statusData);
+                    resultDiv.innerHTML += '<br>Auth test successful!';
+
+                    // Now test downgrade
+                    console.log('Testing downgrade...');
+                    const { data: downgradeData, error: downgradeError } = await supabaseClient.functions.invoke('manage-subscription', {
+                        body: {
+                            action: 'downgrade',
+                            targetTier,
+                            immediate: true
+                        },
+                    });
+
+                    if (downgradeError) {
+                        console.error('Downgrade failed:', downgradeError);
+                        resultDiv.innerHTML += `<br>Downgrade failed: ${downgradeError.message}`;
+                        return;
+                    }
+
+                    console.log('Downgrade successful:', downgradeData);
+                    resultDiv.innerHTML += `<br>Downgrade successful: ${JSON.stringify(downgradeData)}`;
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        document.getElementById('testDowngrade').addEventListener('click', () => testSubscriptionAction('downgrade', 'pro'));
+        document.getElementById('testDowngradeToFree').addEventListener('click', () => testSubscriptionAction('downgrade', 'free'));
+        document.getElementById('testUpgradeToPro').addEventListener('click', () => testSubscriptionAction('upgrade', 'pro', 'price_1RSiggPHa6JfBjtMFGNcoKnZ'));
+        document.getElementById('testUpgradeToMax').addEventListener('click', () => testSubscriptionAction('upgrade', 'max', 'price_1RSiixPHa6JfBjtMXI9INFRf'));
+    </script>
+</body>
+</html>

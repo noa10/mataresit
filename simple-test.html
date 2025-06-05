@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Auth Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Simple Authentication Test</h1>
+    <button onclick="testAuth()">Test Authentication</button>
+    <div id="output"></div>
+
+    <script>
+        const supabase = window.supabase.createClient(
+            'https://mpmkbtsufihzdelrlszs.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY'
+        );
+
+        function log(message) {
+            console.log(message);
+            document.getElementById('output').innerHTML += '<p>' + message + '</p>';
+        }
+
+        async function testAuth() {
+            try {
+                log('Testing authentication...');
+                
+                const { data: { session } } = await supabase.auth.getSession();
+                log('Session exists: ' + !!session);
+                
+                if (!session) {
+                    log('No session found. Please sign in first.');
+                    return;
+                }
+                
+                log('User: ' + session.user.email);
+                log('Token preview: ' + session.access_token.substring(0, 20) + '...');
+                
+                // Test function call
+                log('Calling manage-subscription function...');
+                const { data, error } = await supabase.functions.invoke('manage-subscription', {
+                    body: { action: 'get_status' },
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`
+                    }
+                });
+                
+                if (error) {
+                    log('ERROR: ' + JSON.stringify(error));
+                } else {
+                    log('SUCCESS: ' + JSON.stringify(data));
+                }
+                
+            } catch (error) {
+                log('CAUGHT ERROR: ' + error.message);
+            }
+        }
+
+        // Check session on load
+        window.addEventListener('load', async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                log('User is signed in: ' + session.user.email);
+            } else {
+                log('User is not signed in');
+            }
+        });
+    </script>
+</body>
+</html>
