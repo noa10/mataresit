@@ -183,13 +183,105 @@ export function formatRelativeTime(date: Date): string {
 }
 
 /**
- * Group conversations by time periods
+ * Search conversations by title or content
+ */
+export function searchConversations(conversations: ConversationMetadata[], query: string): ConversationMetadata[] {
+  if (!query.trim()) return conversations;
+
+  const searchTerm = query.toLowerCase().trim();
+
+  return conversations.filter(conv => {
+    return (
+      conv.title.toLowerCase().includes(searchTerm) ||
+      conv.lastMessage?.toLowerCase().includes(searchTerm) ||
+      conv.firstUserMessage?.toLowerCase().includes(searchTerm)
+    );
+  });
+}
+
+/**
+ * Filter conversations by time period
+ */
+export function filterConversationsByTime(conversations: ConversationMetadata[], timeFilter: string): ConversationMetadata[] {
+  if (timeFilter === 'all') return conversations;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+  const startOfWeek = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const startOfMonth = new Date(startOfToday.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  return conversations.filter(conv => {
+    const convTime = conv.timestamp.getTime();
+
+    switch (timeFilter) {
+      case 'today':
+        return convTime >= startOfToday.getTime();
+      case 'yesterday':
+        return convTime >= startOfYesterday.getTime() && convTime < startOfToday.getTime();
+      case 'week':
+        return convTime >= startOfWeek.getTime();
+      case 'month':
+        return convTime >= startOfMonth.getTime();
+      default:
+        return true;
+    }
+  });
+}
+
+/**
+ * Sort conversations by different criteria
+ */
+export function sortConversations(conversations: ConversationMetadata[], sortBy: 'recent' | 'oldest' | 'title' | 'messageCount'): ConversationMetadata[] {
+  return [...conversations].sort((a, b) => {
+    switch (sortBy) {
+      case 'recent':
+        return b.timestamp.getTime() - a.timestamp.getTime();
+      case 'oldest':
+        return a.timestamp.getTime() - b.timestamp.getTime();
+      case 'title':
+        return a.title.localeCompare(b.title);
+      case 'messageCount':
+        return b.messageCount - a.messageCount;
+      default:
+        return b.timestamp.getTime() - a.timestamp.getTime();
+    }
+  });
+}
+
+/**
+ * Get conversation statistics
+ */
+export function getConversationStats(conversations: ConversationMetadata[]): {
+  total: number;
+  today: number;
+  thisWeek: number;
+  totalMessages: number;
+} {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const today = conversations.filter(conv => conv.timestamp.getTime() >= startOfToday.getTime()).length;
+  const thisWeek = conversations.filter(conv => conv.timestamp.getTime() >= startOfWeek.getTime()).length;
+  const totalMessages = conversations.reduce((sum, conv) => sum + conv.messageCount, 0);
+
+  return {
+    total: conversations.length,
+    today,
+    thisWeek,
+    totalMessages
+  };
+}
+
+/**
+ * Group conversations by time periods with enhanced grouping
  */
 export function groupConversationsByTime(conversations: ConversationMetadata[]): {
   [key: string]: ConversationMetadata[];
 } {
   const groups: { [key: string]: ConversationMetadata[] } = {};
-  
+
   conversations.forEach(conv => {
     const timeGroup = formatRelativeTime(conv.timestamp);
     const groupKey = timeGroup === 'Just now' || timeGroup === 'Today' ? 'Today' :
@@ -197,12 +289,55 @@ export function groupConversationsByTime(conversations: ConversationMetadata[]):
                     timeGroup.includes('days ago') ? 'This week' :
                     timeGroup.includes('week') ? 'Earlier' :
                     'Older';
-    
+
     if (!groups[groupKey]) {
       groups[groupKey] = [];
     }
     groups[groupKey].push(conv);
   });
-  
+
   return groups;
+}
+
+/**
+ * Export conversations to JSON for backup
+ */
+export function exportConversations(): string {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return JSON.stringify([]);
+
+    const conversations: StoredConversation[] = JSON.parse(stored);
+    return JSON.stringify(conversations, null, 2);
+  } catch (error) {
+    console.error('Error exporting conversations:', error);
+    return JSON.stringify([]);
+  }
+}
+
+/**
+ * Import conversations from JSON backup
+ */
+export function importConversations(jsonData: string): boolean {
+  try {
+    const conversations: StoredConversation[] = JSON.parse(jsonData);
+
+    // Validate the data structure
+    if (!Array.isArray(conversations)) {
+      throw new Error('Invalid data format');
+    }
+
+    // Validate each conversation
+    conversations.forEach(conv => {
+      if (!conv.metadata || !conv.messages || !conv.metadata.id) {
+        throw new Error('Invalid conversation structure');
+      }
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    return true;
+  } catch (error) {
+    console.error('Error importing conversations:', error);
+    return false;
+  }
 }
