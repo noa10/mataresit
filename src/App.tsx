@@ -27,6 +27,7 @@ const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
 
@@ -98,6 +99,11 @@ const App = () => (
               <Route path="/search" element={
                 <Suspense fallback={<PageLoading />}>
                   <SemanticSearch />
+                </Suspense>
+              } />
+              <Route path="/features" element={
+                <Suspense fallback={<PageLoading />}>
+                  <FeaturesPage />
                 </Suspense>
               } />
 

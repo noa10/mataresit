@@ -130,6 +130,16 @@ export default function Navbar() {
             AI Search
           </NavLink>
           <NavLink
+            to="/features"
+            className={({ isActive }) =>
+              isActive
+                ? "text-primary font-semibold"
+                : "text-foreground hover:text-primary transition-colors"
+            }
+          >
+            Features
+          </NavLink>
+          <NavLink
             to="/settings"
             className={({ isActive }) =>
               isActive
@@ -242,6 +252,17 @@ export default function Navbar() {
             >
               <BrainCircuit className="h-4 w-4" />
               AI Search
+            </NavLink>
+            <NavLink
+              to="/features"
+              className={({ isActive }) =>
+                isActive
+                  ? "text-primary font-semibold py-3 border-b border-border"
+                  : "text-foreground hover:text-primary transition-colors py-3 border-b border-border"
+              }
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Features
             </NavLink>
             <NavLink
               to="/settings"
