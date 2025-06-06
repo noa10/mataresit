@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Interface for log entries
 export interface ProcessingLog {
@@ -7,78 +7,74 @@ export interface ProcessingLog {
   step_name?: string;
 }
 
-export type LogStep = 'START' | 'FETCH' | 'OCR' | 'EXTRACT' | 'GEMINI' | 'SAVE' | 'COMPLETE' | 'ERROR';
+export type LogStep = 'START' | 'FETCH' | 'OPTIMIZE' | 'OCR' | 'AI' | 'THUMBNAIL' | 'SAVE' | 'EMBEDDING' | 'COMPLETE' | 'ERROR' | 'WARNING' | 'DEBUG' | 'METHOD';
 
 /**
- * Logger class for tracking receipt processing steps in the database
+ * Unified, robust logger class for tracking receipt processing steps in the database.
+ * This logger is designed to never crash the parent function and gracefully handles
+ * database errors, RLS issues, and network problems.
  */
 export class ProcessingLogger {
+  private supabase: SupabaseClient;
   private receiptId: string;
-  private supabase: any;
-  private initialized: boolean = false;
+  private loggingEnabled = true;
+  private initialized = false;
 
-  constructor(receiptId: string, supabaseUrl: string, supabaseKey: string) {
+  constructor(receiptId: string) {
     this.receiptId = receiptId;
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service role key for all logging operations to avoid RLS issues
+    this.supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
   }
 
   /**
-   * Initialize the logger by ensuring the table exists
+   * Initialize the logger by checking if logging is enabled and accessible
    */
-  async initialize(): Promise<boolean> {
-    if (this.initialized) return true;
-    
+  private async initialize(): Promise<boolean> {
+    if (this.initialized) return this.loggingEnabled;
+
     try {
-      // Check if the processing_logs table exists
+      // Check if the processing_logs table exists and is accessible
       const { error: checkError } = await this.supabase
         .from('processing_logs')
         .select('id', { count: 'exact', head: true });
-      
-      // If table doesn't exist, create it
-      if (checkError && checkError.code === 'PGRST109') {
-        console.log('Creating processing_logs table...');
-        
-        const createTableSQL = `
-          CREATE TABLE IF NOT EXISTS public.processing_logs (
-            id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
-            receipt_id uuid NOT NULL,
-            created_at timestamp with time zone DEFAULT now() NOT NULL,
-            status_message text NOT NULL,
-            step_name text NULL
-          );
-          CREATE INDEX IF NOT EXISTS idx_processing_logs_receipt_id 
-            ON public.processing_logs USING btree (receipt_id);
-        `;
-        
-        const { error: createError } = await this.supabase.rpc('exec_sql', { sql: createTableSQL });
-        
-        if (createError) {
-          console.error('Error creating table:', createError);
-          return false;
-        }
-      } else if (checkError) {
-        console.error('Error checking table:', checkError);
-        return false;
+
+      if (checkError) {
+        // If there's an error, disable logging but don't fail
+        console.warn('Processing logs disabled due to error:', checkError.message);
+        this.loggingEnabled = false;
+      } else {
+        this.loggingEnabled = true;
       }
-      
+
       this.initialized = true;
-      return true;
+      return this.loggingEnabled;
     } catch (error) {
-      console.error('Error initializing logger:', error);
+      console.warn('Error initializing logger, disabling logging:', error);
+      this.initialized = true;
+      this.loggingEnabled = false;
       return false;
     }
   }
 
   /**
-   * Log a processing step
+   * Log a processing step with resilient error handling
    */
-  async log(message: string, step?: LogStep): Promise<void> {
+  async log(message: string, step?: LogStep | string): Promise<void> {
+    const logMessage = `[${step || 'LOG'}] (Receipt: ${this.receiptId}) ${message}`;
+    console.log(logMessage);
+
+    if (!this.loggingEnabled) return;
+
     try {
-      if (!this.initialized && !(await this.initialize())) {
-        console.warn('Unable to log due to initialization failure');
-        return;
+      // Initialize if not already done
+      if (!this.initialized) {
+        await this.initialize();
+        if (!this.loggingEnabled) return;
       }
-      
+
       const { error } = await this.supabase
         .from('processing_logs')
         .insert({
@@ -86,15 +82,20 @@ export class ProcessingLogger {
           status_message: message,
           step_name: step || null
         });
-      
+
       if (error) {
-        console.error("Error logging to database:", error);
+        console.warn('DB logging failed (will disable for this instance):', error.message);
+        this.loggingEnabled = false; // Disable DB logging for subsequent calls on this instance
       }
-    } catch (err) {
-      console.error("Failed to log message:", err);
+    } catch (e) {
+      console.error('Critical DB logging error:', e);
+      this.loggingEnabled = false;
     }
   }
 
+  /**
+   * Convenience methods for common logging scenarios
+   */
   async start(): Promise<void> {
     await this.log("Starting receipt processing", "START");
   }
@@ -106,4 +107,12 @@ export class ProcessingLogger {
   async error(message: string): Promise<void> {
     await this.log(`Error: ${message}`, "ERROR");
   }
-} 
+
+  async warning(message: string): Promise<void> {
+    await this.log(`Warning: ${message}`, "WARNING");
+  }
+
+  async debug(message: string): Promise<void> {
+    await this.log(`Debug: ${message}`, "DEBUG");
+  }
+}
