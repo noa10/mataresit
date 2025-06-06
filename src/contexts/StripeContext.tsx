@@ -20,6 +20,8 @@ interface StripeContextType {
   isLoading: boolean;
   subscriptionData: SubscriptionData | null;
   refreshSubscription: () => Promise<SubscriptionData | null>;
+  forceRefreshSubscription: () => Promise<SubscriptionData | null>;
+  lastRefreshTime: Date | null;
 }
 
 const StripeContext = createContext<StripeContextType | undefined>(undefined);
@@ -28,6 +30,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -136,10 +139,68 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         setSubscriptionData(newSubscriptionData);
+        setLastRefreshTime(new Date());
         return newSubscriptionData;
       }
     } catch (error) {
       console.error('StripeContext: Error refreshing subscription:', error);
+    }
+
+    return null;
+  };
+
+  // Force refresh with cache bypass for webhook failure scenarios
+  const forceRefreshSubscription = async (): Promise<SubscriptionData | null> => {
+    if (!user) return null;
+
+    console.log('StripeContext: Force refreshing subscription data (bypassing cache)');
+
+    try {
+      // Add cache-busting timestamp to ensure fresh data
+      const timestamp = Date.now();
+
+      // Get subscription data from Supabase profiles table with cache bypass
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select(`
+          subscription_tier,
+          subscription_status,
+          stripe_customer_id,
+          stripe_subscription_id,
+          subscription_start_date,
+          subscription_end_date,
+          trial_end_date,
+          receipts_used_this_month,
+          monthly_reset_date
+        `)
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('StripeContext: Error force refreshing subscription data:', error);
+        return null;
+      }
+
+      if (profile) {
+        const newSubscriptionData: SubscriptionData = {
+          tier: profile.subscription_tier || 'free',
+          status: profile.subscription_status || 'active',
+          stripeCustomerId: profile.stripe_customer_id,
+          stripeSubscriptionId: profile.stripe_subscription_id,
+          subscriptionStartDate: profile.subscription_start_date,
+          subscriptionEndDate: profile.subscription_end_date,
+          trialEndDate: profile.trial_end_date,
+          receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
+          monthlyResetDate: profile.monthly_reset_date,
+        };
+
+        console.log('StripeContext: Force refresh successful:', newSubscriptionData);
+        setSubscriptionData(newSubscriptionData);
+        setLastRefreshTime(new Date());
+        return newSubscriptionData;
+      }
+    } catch (error) {
+      console.error('StripeContext: Error force refreshing subscription:', error);
     }
 
     return null;
@@ -335,6 +396,8 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       isLoading,
       subscriptionData,
       refreshSubscription,
+      forceRefreshSubscription,
+      lastRefreshTime,
     }}>
       {children}
     </StripeContext.Provider>

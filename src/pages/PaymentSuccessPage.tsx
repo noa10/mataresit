@@ -3,11 +3,12 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Loader2, Crown, Zap, Gift, Calendar, CreditCard, Mail } from "lucide-react";
+import { CheckCircle, Loader2, Crown, Zap, Gift, Calendar, CreditCard, Mail, RefreshCw, AlertTriangle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 export default function PaymentSuccessPage() {
   const [searchParams] = useSearchParams();
@@ -15,6 +16,9 @@ export default function PaymentSuccessPage() {
   const { user, refreshUser } = useAuth();
   const { refreshSubscription, createPortalSession, isLoading: stripeLoading } = useStripe();
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<'pending' | 'success' | 'delayed' | 'failed'>('pending');
+  const [retryCount, setRetryCount] = useState(0);
   const [paymentDetails, setPaymentDetails] = useState<{
     tier: string;
     status: string;
@@ -38,40 +42,68 @@ export default function PaymentSuccessPage() {
       return;
     }
 
-    // Verify the payment and get subscription details
+    // Enhanced payment verification with comprehensive webhook failure handling
     const verifyPayment = async () => {
       try {
-        console.log('PaymentSuccessPage: Starting payment verification for session:', sessionId);
+        console.log('PaymentSuccessPage: Starting enhanced payment verification for session:', sessionId);
+        setWebhookStatus('pending');
 
-        // Wait longer for Stripe webhook to process
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Initial wait for webhook processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Refresh user data and subscription info with retry logic
+        // Enhanced polling with exponential backoff
         let subscriptionData = null;
-        let retryCount = 0;
-        const maxRetries = 5;
+        let currentRetry = 0;
+        const maxRetries = 8; // Increased from 5
+        const baseDelay = 1500; // Base delay in ms
+        const maxDelay = 10000; // Maximum delay in ms
 
-        while (!subscriptionData && retryCount < maxRetries) {
-          console.log(`PaymentSuccessPage: Attempt ${retryCount + 1} to refresh subscription data`);
+        while (!subscriptionData && currentRetry < maxRetries) {
+          setRetryCount(currentRetry + 1);
+          console.log(`PaymentSuccessPage: Polling attempt ${currentRetry + 1}/${maxRetries}`);
 
-          await Promise.all([
-            refreshUser(),
-            refreshSubscription()
-          ]);
-
-          // Get updated subscription status
-          subscriptionData = await refreshSubscription();
-
-          // If still showing free tier, wait and retry
-          if (!subscriptionData || subscriptionData.tier === 'free') {
-            retryCount++;
-            if (retryCount < maxRetries) {
-              console.log('PaymentSuccessPage: Still showing free tier, retrying in 2 seconds...');
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
+          // Update webhook status based on retry count
+          if (currentRetry === 0) {
+            setWebhookStatus('pending');
+          } else if (currentRetry < 4) {
+            setWebhookStatus('pending');
+          } else if (currentRetry < 7) {
+            setWebhookStatus('delayed');
           } else {
-            console.log('PaymentSuccessPage: Successfully retrieved subscription data:', subscriptionData);
-            break;
+            setWebhookStatus('failed');
+          }
+
+          try {
+            // Parallel refresh of user and subscription data
+            await Promise.all([
+              refreshUser(),
+              refreshSubscription()
+            ]);
+
+            // Get updated subscription status
+            subscriptionData = await refreshSubscription();
+
+            // Check if subscription has been updated from free tier
+            if (subscriptionData && subscriptionData.tier !== 'free') {
+              console.log('PaymentSuccessPage: Subscription successfully updated:', subscriptionData);
+              setWebhookStatus('success');
+              break;
+            }
+
+            // If still showing free tier, implement exponential backoff
+            currentRetry++;
+            if (currentRetry < maxRetries) {
+              const delay = Math.min(baseDelay * Math.pow(1.5, currentRetry), maxDelay);
+              console.log(`PaymentSuccessPage: Still showing free tier, retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          } catch (refreshError) {
+            console.error(`PaymentSuccessPage: Error during refresh attempt ${currentRetry + 1}:`, refreshError);
+            currentRetry++;
+            if (currentRetry < maxRetries) {
+              const delay = Math.min(baseDelay * Math.pow(2, currentRetry), maxDelay);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
           }
         }
 
@@ -117,17 +149,28 @@ export default function PaymentSuccessPage() {
             amount: paymentHistory?.amount ? paymentHistory.amount / 100 : undefined
           });
         } else {
-          console.warn('PaymentSuccessPage: Could not retrieve subscription data after retries');
-          // Set basic payment details even if subscription data is not available
+          console.warn('PaymentSuccessPage: Could not retrieve subscription data after all retries');
+          setWebhookStatus('failed');
+
+          // Set basic payment details with warning
           setPaymentDetails({
             tier: 'pro', // Default assumption for successful payment
             status: 'active',
             planName: 'Pro Plan',
             billingInterval: 'monthly'
           });
+
+          // Show user-friendly message about the delay
+          toast.warning(
+            "Your payment was successful, but we're still updating your account. " +
+            "Please wait a moment and use the refresh button below if needed.",
+            { duration: 8000 }
+          );
         }
       } catch (error) {
         console.error('PaymentSuccessPage: Error verifying payment:', error);
+        setWebhookStatus('failed');
+
         // Set basic payment details even on error
         setPaymentDetails({
           tier: 'pro',
@@ -135,8 +178,62 @@ export default function PaymentSuccessPage() {
           planName: 'Pro Plan',
           billingInterval: 'monthly'
         });
+
+        toast.error(
+          "Your payment was successful, but there was an issue updating your account. " +
+          "Please use the refresh button below or contact support if the issue persists."
+        );
       } finally {
         setIsLoading(false);
+      }
+    };
+
+    // Manual refresh function for webhook failures
+    const manualRefresh = async () => {
+      if (isRefreshing) return;
+
+      setIsRefreshing(true);
+      setWebhookStatus('pending');
+
+      try {
+        console.log('PaymentSuccessPage: Manual refresh triggered');
+
+        // Refresh subscription data
+        await Promise.all([
+          refreshUser(),
+          refreshSubscription()
+        ]);
+
+        const subscriptionData = await refreshSubscription();
+
+        if (subscriptionData && subscriptionData.tier !== 'free') {
+          setWebhookStatus('success');
+
+          // Update payment details with fresh data
+          const planNames = {
+            'pro': 'Pro Plan',
+            'max': 'Max Plan',
+            'free': 'Free Plan'
+          };
+
+          setPaymentDetails(prev => ({
+            ...prev,
+            tier: subscriptionData.tier,
+            status: subscriptionData.status,
+            planName: planNames[subscriptionData.tier as keyof typeof planNames] || subscriptionData.tier,
+          }));
+
+          toast.success("Subscription status updated successfully!");
+        } else {
+          setWebhookStatus('delayed');
+          toast.warning("Still updating your subscription. Please try again in a moment.");
+        }
+      } catch (error) {
+        console.error('PaymentSuccessPage: Manual refresh failed:', error);
+        setWebhookStatus('failed');
+        toast.error("Failed to refresh subscription status. Please try again.");
+      } finally {
+        setIsRefreshing(false);
       }
     };
 
@@ -149,7 +246,22 @@ export default function PaymentSuccessPage() {
         <Navbar />
         <div className="container mx-auto px-4 py-16 flex flex-col items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin mb-4" />
-          <p className="text-lg text-muted-foreground">Verifying your payment...</p>
+          <p className="text-lg text-muted-foreground mb-2">Verifying your payment...</p>
+          {retryCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Checking subscription status... (Attempt {retryCount}/8)
+            </p>
+          )}
+          {webhookStatus === 'delayed' && (
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Taking longer than usual to update your subscription...
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -252,6 +364,71 @@ export default function PaymentSuccessPage() {
                 </div>
               </>
             )}
+
+            {/* Webhook Status Indicator */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Subscription Status:
+                  </div>
+                  {webhookStatus === 'success' && (
+                    <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Updated
+                    </Badge>
+                  )}
+                  {webhookStatus === 'pending' && (
+                    <Badge variant="secondary">
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Updating...
+                    </Badge>
+                  )}
+                  {webhookStatus === 'delayed' && (
+                    <Badge variant="outline" className="border-yellow-300 text-yellow-700 dark:border-yellow-600 dark:text-yellow-400">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Delayed
+                    </Badge>
+                  )}
+                  {webhookStatus === 'failed' && (
+                    <Badge variant="destructive">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Needs Refresh
+                    </Badge>
+                  )}
+                </div>
+
+                {(webhookStatus === 'delayed' || webhookStatus === 'failed') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={manualRefresh}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        Refreshing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Refresh Status
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              {webhookStatus === 'failed' && (
+                <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    Your payment was successful, but we're still updating your account.
+                    Please click "Refresh Status" or wait a moment and try again.
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-col space-y-3 pt-4">
               <Button asChild size="lg">

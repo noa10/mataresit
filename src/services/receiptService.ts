@@ -6,6 +6,7 @@ import { normalizeMerchant } from '../lib/receipts/validation';
 import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
 import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
 import { OpenRouterService, ProcessingInput } from '@/services/openRouterService';
+import { SubscriptionEnforcementService, handleActionResult } from '@/services/subscriptionEnforcementService';
 
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
@@ -302,6 +303,18 @@ export const createReceipt = async (
       toast.error("You must be logged in to create a receipt.");
       return null;
     }
+
+    // ENHANCED SECURITY: Check subscription limits before creating receipt
+    console.log("Checking subscription limits before creating receipt...");
+    const enforcementResult = await SubscriptionEnforcementService.canUploadReceipt();
+
+    if (!enforcementResult.allowed) {
+      console.warn("Receipt creation blocked by subscription limits:", enforcementResult.reason);
+      handleActionResult(enforcementResult, "create this receipt");
+      return null;
+    }
+
+    console.log("Subscription check passed, proceeding with receipt creation");
 
     // Ensure the processing status is set, defaulting to 'uploading' if not provided
     const receiptWithStatus = {

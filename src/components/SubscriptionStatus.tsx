@@ -22,6 +22,7 @@ import {
   CheckCircle,
   X
 } from 'lucide-react';
+import SubscriptionStatusRefresh from '@/components/SubscriptionStatusRefresh';
 
 export const SubscriptionStatus: React.FC = () => {
   const { limits, usage, isLoading, getCurrentTier, getUpgradeMessage, isFeatureAvailable, getFeatureLimit } = useSubscription();
@@ -83,9 +84,16 @@ export const SubscriptionStatus: React.FC = () => {
               {getTierIcon()}
               <CardTitle>Current Plan</CardTitle>
             </div>
-            <Badge className={getTierColor()}>
-              {tier.charAt(0).toUpperCase() + tier.slice(1)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={getTierColor()}>
+                {tier.charAt(0).toUpperCase() + tier.slice(1)}
+              </Badge>
+              <SubscriptionStatusRefresh
+                showStatusBadge={false}
+                size="sm"
+                variant="outline"
+              />
+            </div>
           </div>
           <CardDescription>
             {subscriptionData?.status === 'active' ? 'Active subscription' : 'Free plan'}
