@@ -2,7 +2,7 @@
 /// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textract'
-import { ProcessingLogger } from './shared/db-logger.ts'
+import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encodeBase64 } from "jsr:@std/encoding/base64"
 // Import deno-image for resizing
@@ -1136,6 +1136,417 @@ function calculateFieldConfidence(baseConfidence: number, value: string, fieldTy
   return Math.min(Math.max(adjustedConfidence, 30), 100);
 }
 
+// ============================================================================
+// HELPER FUNCTIONS FOR MODULAR PIPELINE
+// ============================================================================
+
+/**
+ * Validates and extracts request parameters
+ */
+async function validateAndExtractParams(req: Request) {
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    throw new Error('Method not allowed');
+  }
+
+  // Parse request body
+  const requestData = await req.json();
+  console.log("Request data received:", JSON.stringify(requestData).substring(0, 200) + "...");
+
+  // Extract and validate required parameters
+  const {
+    imageUrl,
+    receiptId,
+    primaryMethod = 'ai-vision', // Default to AI Vision
+    modelId = '', // Use default model based on method
+    compareWithAlternative = false // Don't compare by default
+  } = requestData;
+
+  if (!imageUrl) {
+    throw new Error('Missing required parameter: imageUrl');
+  }
+
+  if (!receiptId) {
+    throw new Error('Missing required parameter: receiptId');
+  }
+
+  // Validate primaryMethod
+  if (primaryMethod !== 'ocr-ai' && primaryMethod !== 'ai-vision') {
+    throw new Error('Invalid primaryMethod. Use "ocr-ai" or "ai-vision"');
+  }
+
+  return { imageUrl, receiptId, primaryMethod, modelId, compareWithAlternative };
+}
+
+/**
+ * Fetches and optimizes image for processing
+ */
+async function fetchAndOptimizeImage(imageUrl: string, logger: ProcessingLogger): Promise<Uint8Array> {
+  await logger.log("Fetching receipt image", "FETCH");
+  console.log("Fetching image from URL:", imageUrl);
+
+  const imageResponse = await fetch(imageUrl);
+
+  if (!imageResponse.ok) {
+    const errorMsg = `Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`;
+    console.error(errorMsg);
+    await logger.log(errorMsg, "ERROR");
+    throw new Error(`Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`);
+  }
+
+  // Convert image to binary data
+  const imageArrayBuffer = await imageResponse.arrayBuffer();
+  const imageBytes = new Uint8Array(imageArrayBuffer);
+  await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
+
+  // Optimize image for OCR processing
+  await logger.log("Starting image optimization for OCR", "OPTIMIZE");
+  const optimizedImageBytes = await optimizeImageForOCR(imageBytes, logger);
+
+  return optimizedImageBytes;
+}
+
+/**
+ * Generates and uploads thumbnail for the receipt
+ */
+async function generateThumbnail(
+  imageBytes: Uint8Array,
+  receiptId: string,
+  supabase: any,
+  logger: ProcessingLogger
+): Promise<string | null> {
+  try {
+    await logger.log("Starting thumbnail generation", "THUMBNAIL");
+    console.log("Decoding image for thumbnail...");
+
+    const image = await Image.decode(imageBytes);
+    console.log(`Original dimensions: ${image.width}x${image.height}`);
+
+    // Use a smaller target width for thumbnails
+    const targetWidth = 300;
+    image.resize(targetWidth, Image.RESIZE_AUTO);
+    console.log(`Resized dimensions: ${image.width}x${image.height}`);
+
+    // Encode as JPEG with lower quality to save memory
+    const quality = 70;
+    const thumbnailBytes = await image.encodeJPEG(quality);
+    console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
+
+    const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`;
+
+    await logger.log(`Uploading thumbnail to ${thumbnailPath}`, "THUMBNAIL");
+    console.log(`Uploading thumbnail to storage path: ${thumbnailPath}`);
+
+    const { error: thumbUploadError } = await supabase.storage
+      .from('receipt_images')
+      .upload(thumbnailPath, thumbnailBytes, {
+        contentType: 'image/jpeg',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (thumbUploadError) {
+      console.error("Error uploading thumbnail:", thumbUploadError);
+      await logger.log(`Error uploading thumbnail: ${thumbUploadError.message}`, "ERROR");
+      return null;
+    }
+
+    // Get public URL for the thumbnail
+    const { data: publicUrlData } = supabase.storage
+      .from('receipt_images')
+      .getPublicUrl(thumbnailPath);
+
+    if (publicUrlData?.publicUrl) {
+      console.log("Thumbnail uploaded successfully:", publicUrlData.publicUrl);
+      await logger.log(`Thumbnail uploaded: ${publicUrlData.publicUrl}`, "THUMBNAIL");
+      return publicUrlData.publicUrl;
+    } else {
+      console.warn("Could not get public URL for thumbnail:", thumbnailPath);
+      await logger.log("Could not get public URL for thumbnail", "WARNING");
+      return null;
+    }
+  } catch (thumbError) {
+    console.error("Error generating thumbnail:", thumbError);
+    await logger.log(`Thumbnail generation error: ${thumbError.message}`, "ERROR");
+    return null;
+  }
+}
+
+/**
+ * Normalizes and validates date format
+ */
+function normalizeDate(dateValue: string, logger: ProcessingLogger): string {
+  console.log(`Date before validation: ${dateValue}`);
+
+  // Check if the date is already in YYYY-MM-DD format
+  const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoRegex.test(dateValue)) {
+    console.log(`Date is already in correct format: ${dateValue}`);
+    return dateValue;
+  }
+
+  // Try to extract components from the date string (DD-MM-YYYY format)
+  const ddmmyyyyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
+  const ddmmyyyyMatch = dateValue.match(ddmmyyyyRegex);
+
+  if (ddmmyyyyMatch) {
+    // Convert DD-MM-YYYY to YYYY-MM-DD
+    const day = ddmmyyyyMatch[1].padStart(2, '0');
+    const month = ddmmyyyyMatch[2].padStart(2, '0');
+    const year = ddmmyyyyMatch[3];
+    const normalizedDate = `${year}-${month}-${day}`;
+    console.log(`Fixed date format from ${dateValue} to ${normalizedDate}`);
+    return normalizedDate;
+  }
+
+  // As a last resort, try standard Date parsing
+  try {
+    const dateObj = new Date(dateValue);
+    if (!isNaN(dateObj.getTime())) {
+      const normalizedDate = dateObj.toISOString().split('T')[0];
+      console.log(`Date object parsing: ${dateValue} -> ${normalizedDate}`);
+      return normalizedDate;
+    }
+  } catch (e) {
+    // Fall through to default
+  }
+
+  // If everything fails, use current date as fallback
+  const fallbackDate = new Date().toISOString().split('T')[0];
+  console.log(`Using current date as fallback: ${fallbackDate}`);
+  return fallbackDate;
+}
+
+/**
+ * Saves processing results to the database
+ */
+async function saveResultsToDatabase(
+  receiptId: string,
+  extractedData: any,
+  thumbnailUrl: string | null,
+  supabase: any,
+  logger: ProcessingLogger
+): Promise<void> {
+  await logger.log("Saving processing results to database", "SAVE");
+
+  // Prepare data for saving to Supabase `receipts` table
+  const updateData: Record<string, any> = {
+    merchant: extractedData.merchant,
+    date: extractedData.date ? normalizeDate(extractedData.date, logger) : new Date().toISOString().split('T')[0],
+    total: extractedData.total,
+    tax: extractedData.tax,
+    currency: extractedData.currency,
+    payment_method: extractedData.payment_method,
+    fullText: extractedData.fullText,
+    ai_suggestions: extractedData.ai_suggestions,
+    predicted_category: extractedData.predicted_category,
+    processing_status: 'complete',
+    processing_time: extractedData.processing_time,
+    updated_at: new Date().toISOString(),
+    // Add new fields for AI enhancement features
+    model_used: extractedData.modelUsed,
+    primary_method: extractedData.primaryMethod,
+    has_alternative_data: !!extractedData.alternativeResult,
+    discrepancies: extractedData.discrepancies || [],
+    // Save confidence scores directly to receipts table
+    confidence_scores: extractedData.confidence,
+    thumbnail_url: thumbnailUrl
+  };
+
+  // Feature flag to control whether to use the new columns
+  const ENABLE_GEOMETRY_COLUMNS = true;
+
+  if (ENABLE_GEOMETRY_COLUMNS) {
+    try {
+      // Add geometry information if available and feature flag is enabled
+      if (extractedData.geometry) {
+        updateData.field_geometry = extractedData.geometry;
+      }
+
+      // Add document structure if available and feature flag is enabled
+      if (extractedData.document_structure) {
+        updateData.document_structure = extractedData.document_structure;
+      }
+    } catch (error) {
+      // If there's an error, it might be because the columns don't exist yet
+      console.log("Note: Skipping geometry and document structure fields - they may not exist in the database yet");
+    }
+  }
+
+  // Remove null/undefined fields before updating
+  Object.keys(updateData).forEach(key => {
+    if (updateData[key] === null || updateData[key] === undefined) {
+      delete updateData[key];
+    }
+  });
+
+  // Save to Supabase `receipts` table
+  const { error: updateError } = await supabase
+    .from('receipts')
+    .update(updateData)
+    .eq('id', receiptId);
+
+  if (updateError) {
+    console.error("Error updating receipt in database:", updateError);
+    await logger.log(`Error saving results: ${updateError.message}`, "ERROR");
+    throw new Error(`Failed to update receipt record: ${updateError.message}`);
+  }
+
+  // Handle line items logging
+  if (extractedData.line_items && extractedData.line_items.length > 0) {
+    await logger.log(`Extracted ${extractedData.line_items.length} line items (saving not implemented in this function)`, "SAVE");
+  }
+
+  await logger.log("Processing results saved successfully", "SAVE");
+}
+
+/**
+ * Triggers post-processing tasks (embeddings) asynchronously
+ */
+async function triggerPostProcessing(receiptId: string, supabase: any, logger: ProcessingLogger): Promise<void> {
+  try {
+    await logger.log("Triggering embedding generation", "EMBEDDING");
+    console.log("Calling generate-embeddings function...");
+
+    // Check if GEMINI_API_KEY is set in environment variables
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      console.warn("GEMINI_API_KEY is not set in environment variables. Embeddings will not be generated.");
+      await logger.log("GEMINI_API_KEY is not set. Embeddings cannot be generated.", "WARNING");
+      return;
+    }
+
+    // Use service role key for authorization
+    const authorization = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+    const apikey = Deno.env.get('SUPABASE_ANON_KEY');
+
+    // Function to call the generate-embeddings endpoint with retry logic
+    const callEmbeddingsFunction = async (retryCount = 0): Promise<any> => {
+      try {
+        // Prepare headers for the request
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+
+        // Add authorization headers if available
+        if (typeof authorization === 'string' && authorization) {
+          headers['Authorization'] = authorization;
+        }
+
+        if (typeof apikey === 'string' && apikey) {
+          headers['apikey'] = apikey;
+        }
+
+        // Call the generate-embeddings function
+        const embeddingsResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              receiptId,
+              processAllFields: true,
+              processLineItems: true,
+              useImprovedDimensionHandling: true
+            })
+          }
+        );
+
+        if (!embeddingsResponse.ok) {
+          const errorText = await embeddingsResponse.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch (e) {
+            errorData = { error: errorText };
+          }
+
+          console.error("Error generating embeddings:", errorData);
+          await logger.log(`Embedding generation error: ${JSON.stringify(errorData)}`, "WARNING");
+
+          // Check if this is a resource limit error that we should retry
+          if (retryCount < 2 && (
+              errorText.includes("WORKER_LIMIT") ||
+              errorText.includes("compute resources") ||
+              errorText.includes("timeout")
+            )) {
+            await logger.log(`Retrying embedding generation (attempt ${retryCount + 1})`, "EMBEDDING");
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+            return callEmbeddingsFunction(retryCount + 1);
+          }
+
+          return { success: false, error: errorData };
+        } else {
+          const embeddingResult = await embeddingsResponse.json();
+          await logger.log(`Successfully generated ${embeddingResult.results?.length || 0} embeddings`, "EMBEDDING");
+
+          // If line items were processed, log that too
+          if (embeddingResult.lineItems && embeddingResult.lineItems.length > 0) {
+            await logger.log(`Also generated embeddings for ${embeddingResult.lineItems.length} line items`, "EMBEDDING");
+          }
+
+          return embeddingResult;
+        }
+      } catch (error) {
+        console.error("Error in embedding function call:", error);
+        await logger.log(`Embedding function error: ${error.message}`, "WARNING");
+
+        // Retry on network errors
+        if (retryCount < 2) {
+          await logger.log(`Retrying embedding generation after error (attempt ${retryCount + 1})`, "EMBEDDING");
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          return callEmbeddingsFunction(retryCount + 1);
+        }
+
+        return { success: false, error: error.message };
+      }
+    };
+
+    // Call the function with retry logic
+    const embeddingResult = await callEmbeddingsFunction();
+
+    // Update the receipt with embedding status
+    if (embeddingResult.success) {
+      try {
+        await supabase
+          .from('receipts')
+          .update({
+            has_embeddings: true,
+            embedding_status: 'complete'
+          })
+          .eq('id', receiptId);
+
+        await logger.log("Receipt marked as having embeddings", "EMBEDDING");
+      } catch (updateError) {
+        console.error("Error updating receipt embedding status:", updateError);
+        await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
+      }
+    } else {
+      // Mark the receipt as needing embeddings regeneration
+      try {
+        await supabase
+          .from('receipts')
+          .update({
+            has_embeddings: false,
+            embedding_status: 'failed'
+          })
+          .eq('id', receiptId);
+
+        await logger.log("Receipt marked for embedding regeneration", "EMBEDDING");
+      } catch (updateError) {
+        console.error("Error updating receipt embedding status:", updateError);
+        await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
+      }
+    }
+  } catch (embeddingError) {
+    console.error("Error calling generate-embeddings function:", embeddingError);
+    await logger.log(`Embedding function error: ${embeddingError.message}`, "WARNING");
+    // Continue processing even if embedding generation fails
+  }
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -1159,589 +1570,120 @@ serve(async (req: Request) => {
       console.warn("Authorization or apikey header missing from incoming request. Using fallback values.");
     }
 
-    // Only accept POST requests
-    if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // 1. Validate and extract parameters
+    const { imageUrl, receiptId, primaryMethod, modelId, compareWithAlternative } =
+      await validateAndExtractParams(req);
 
-    // Parse request body
-    const requestData = await req.json();
-    console.log("Request data received:", JSON.stringify(requestData).substring(0, 200) + "...");
-
-    // Extract and validate required parameters
-    const {
-      imageUrl,
-      receiptId,
-      primaryMethod = 'ai-vision', // Default to AI Vision
-      modelId = '', // Use default model based on method
-      compareWithAlternative = false // Don't compare by default
-    } = requestData;
-
-    if (!imageUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameter: imageUrl' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!receiptId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameter: receiptId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate primaryMethod
-    if (primaryMethod !== 'ocr-ai' && primaryMethod !== 'ai-vision') {
-      return new Response(
-        JSON.stringify({ error: 'Invalid primaryMethod. Use "ocr-ai" or "ai-vision"' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create a logger for this process
-    const logger = new ProcessingLogger(
-      receiptId,
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    );
-
-    await logger.initialize();
-
-    // Initialize Supabase client (ensure service role key is used for storage/db updates)
+    // 2. Initialize logger and Supabase client
+    const logger = new ProcessingLogger(receiptId);
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "" // Use Service Role Key
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     await logger.log("Starting receipt processing", "START");
 
-    await logger.log("Fetching receipt data", "FETCH");
-    console.log("Fetching image from URL:", imageUrl);
-    await logger.log("Fetching receipt image", "FETCH");
+    // 3. Fetch and optimize image
+    const optimizedImageBytes = await fetchAndOptimizeImage(imageUrl, logger);
 
-    // Fetch the image from the provided URL
+    // 4. Generate thumbnail (fire-and-forget, don't block main processing)
+    let thumbnailUrl: string | null = null;
     try {
-      const imageResponse = await fetch(imageUrl);
+      thumbnailUrl = await generateThumbnail(optimizedImageBytes, receiptId, supabase, logger);
+    } catch (thumbError) {
+      console.error("Unhandled error in thumbnail generation:", thumbError);
+      await logger.log(`Unhandled thumbnail error: ${thumbError.message}`, "ERROR");
+      // Continue processing even if thumbnail fails
+      thumbnailUrl = null;
+    }
 
-      if (!imageResponse.ok) {
-        console.error("Failed to fetch image:", imageResponse.status, imageResponse.statusText);
-        await logger.log(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`, "ERROR");
+    // 5. Process the receipt data
+    let extractedData;
+    try {
+      await logger.log("Starting data processing with optimized image", "AI");
+      extractedData = await processReceiptImage(
+        optimizedImageBytes,
+        imageUrl,
+        receiptId,
+        primaryMethod,
+        modelId,
+        compareWithAlternative,
+        { Authorization: authorization, apikey: apikey }
+      );
 
-        return new Response(
-          JSON.stringify({
-            error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`,
-            success: false
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      console.log("Data extraction complete");
+      await logger.log("Data extraction completed successfully", "AI");
+    } catch (processingError) {
+      console.error("Error during receipt processing:", processingError);
+      await logger.log(`Processing error: ${processingError.message}`, "ERROR");
 
-      // Convert image to binary data
-      const imageArrayBuffer = await imageResponse.arrayBuffer();
-      const imageBytes = new Uint8Array(imageArrayBuffer);
-      await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
-
-      // Optimize image for OCR processing
-      await logger.log("Starting image optimization for OCR", "OPTIMIZE");
-      const optimizedImageBytes = await optimizeImageForOCR(imageBytes, logger);
-
-      // --- START: THUMBNAIL GENERATION ---
-      let thumbnailUrl: string | null = null;
-
-      // Create a separate function for thumbnail generation to better isolate errors
-      const generateAndUploadThumbnail = async (): Promise<string | null> => {
-        try {
-          await logger.log("Starting thumbnail generation", "THUMBNAIL");
-          console.log("Decoding image for thumbnail...");
-
-          // Use a smaller subset of the image data for thumbnail generation
-          // This reduces memory usage during thumbnail creation
-          const thumbnailImageBytes = optimizedImageBytes || imageBytes;
-
-          const image = await Image.decode(thumbnailImageBytes);
-          console.log(`Original dimensions: ${image.width}x${image.height}`);
-
-          // Use a smaller target width for thumbnails
-          const targetWidth = 300; // Reduced from 400
-          image.resize(targetWidth, Image.RESIZE_AUTO); // Resize maintaining aspect ratio
-          console.log(`Resized dimensions: ${image.width}x${image.height}`);
-
-          // Encode as JPEG with lower quality to save memory
-          const quality = 70; // Reduced from 75
-          const thumbnailBytes = await image.encodeJPEG(quality);
-          console.log(`Thumbnail encoded as JPEG, size: ${thumbnailBytes.length} bytes`);
-
-          const thumbnailPath = `thumbnails/${receiptId}_thumb.jpg`; // Store in a 'thumbnails' folder
-
-          await logger.log(`Uploading thumbnail to ${thumbnailPath}`, "THUMBNAIL_UPLOAD");
-          console.log(`Uploading thumbnail to storage path: ${thumbnailPath}`);
-
-          try {
-            const { error: thumbUploadError } = await supabase.storage
-              .from('receipt_images') // Assuming same bucket, different folder
-              .upload(thumbnailPath, thumbnailBytes, {
-                contentType: 'image/jpeg',
-                cacheControl: '3600', // Cache for 1 hour
-                upsert: true // Overwrite if exists
-              });
-
-            if (thumbUploadError) {
-              console.error("Error uploading thumbnail:", thumbUploadError);
-              await logger.log(`Error uploading thumbnail: ${thumbUploadError.message}`, "ERROR");
-              return null;
-            }
-
-            // Get public URL for the thumbnail
-            const { data: publicUrlData } = supabase.storage
-              .from('receipt_images')
-              .getPublicUrl(thumbnailPath);
-
-            if (publicUrlData?.publicUrl) {
-              console.log("Thumbnail uploaded successfully:", publicUrlData.publicUrl);
-              await logger.log(`Thumbnail uploaded: ${publicUrlData.publicUrl}`, "THUMBNAIL_UPLOAD");
-              return publicUrlData.publicUrl;
-            } else {
-              console.warn("Could not get public URL for thumbnail:", thumbnailPath);
-              await logger.log("Could not get public URL for thumbnail", "WARNING");
-              return null;
-            }
-          } catch (uploadError) {
-            console.error("Error during thumbnail upload:", uploadError);
-            await logger.log(`Thumbnail upload error: ${uploadError.message}`, "ERROR");
-            return null;
-          }
-        } catch (thumbError) {
-          console.error("Error generating thumbnail:", thumbError);
-          await logger.log(`Thumbnail generation error: ${thumbError.message}`, "ERROR");
-          return null;
+      // Create a basic result with minimal data to avoid complete failure
+      extractedData = {
+        merchant: "",
+        date: new Date().toISOString().split('T')[0], // Today's date as fallback
+        total: 0,
+        tax: 0,
+        currency: "MYR",
+        payment_method: "",
+        line_items: [],
+        fullText: "Processing failed: " + processingError.message,
+        predicted_category: "",
+        processing_time: 0,
+        confidence: {
+          merchant: 0,
+          date: 0,
+          total: 0,
+          tax: 0,
+          payment_method: 0,
+          line_items: 0
+        },
+        ai_suggestions: {
+          error: processingError.message
         }
       };
 
-      // Try to generate thumbnail but don't let it block the main processing
-      try {
-        thumbnailUrl = await generateAndUploadThumbnail();
-      } catch (thumbError) {
-        console.error("Unhandled error in thumbnail generation:", thumbError);
-        await logger.log(`Unhandled thumbnail error: ${thumbError.message}`, "ERROR");
-        // Continue processing even if thumbnail fails
-        thumbnailUrl = null;
-      }
-      // --- END: THUMBNAIL GENERATION ---
+      await logger.log("Created fallback data structure due to processing error", "RECOVERY");
+    }
 
-      // Process the receipt image with OCR using the optimized image
-      let extractedData;
-      try {
-        await logger.log("Starting OCR processing with optimized image", "PROCESS");
-        extractedData = await processReceiptImage(
-          optimizedImageBytes, // Use optimized image instead of original
-          imageUrl,
-          receiptId,
-          primaryMethod,
-          modelId,
-          compareWithAlternative,
-          { Authorization: authorization, apikey: apikey }
-        );
+    // 6. Save results to database
+    await saveResultsToDatabase(receiptId, extractedData, thumbnailUrl, supabase, logger);
 
-        console.log("Data extraction complete");
-        await logger.log("Data extraction completed successfully", "PROCESS");
-      } catch (processingError) {
-        console.error("Error during receipt processing:", processingError);
-        await logger.log(`Processing error: ${processingError.message}`, "ERROR");
+    // 7. Trigger post-processing (embeddings) asynchronously
+    await triggerPostProcessing(receiptId, supabase, logger);
 
-        // Create a basic result with minimal data to avoid complete failure
-        extractedData = {
-          merchant: "",
-          date: new Date().toISOString().split('T')[0], // Today's date as fallback
-          total: 0,
-          tax: 0,
-          currency: "MYR",
-          payment_method: "",
-          line_items: [],
-          fullText: "Processing failed: " + processingError.message,
-          predicted_category: "",
-          processing_time: 0,
-          confidence: {
-            merchant: 0,
-            date: 0,
-            total: 0,
-            tax: 0,
-            payment_method: 0,
-            line_items: 0
-          },
-          ai_suggestions: {
-            error: processingError.message
-          }
-        };
-
-        await logger.log("Created fallback data structure due to processing error", "RECOVERY");
-      }
-
-      await logger.log("Saving processing results to database", "SAVE");
-
-      // Prepare data for saving to Supabase `receipts` table
-      const updateData: Record<string, any> = {
-        merchant: extractedData.merchant,
-        date: extractedData.date,
-        total: extractedData.total,
-        tax: extractedData.tax,
-        currency: extractedData.currency,
-        payment_method: extractedData.payment_method,
-        fullText: extractedData.fullText,
-        ai_suggestions: extractedData.ai_suggestions,
-        predicted_category: extractedData.predicted_category,
-        processing_status: 'complete',
-        processing_time: extractedData.processing_time,
-        updated_at: new Date().toISOString(),
-        // Add new fields for AI enhancement features
+    // 8. Return success response
+    await logger.log("Receipt processing completed successfully", "COMPLETE");
+    return new Response(
+      JSON.stringify({
+        success: true,
+        receiptId,
+        result: extractedData,
+        // Include additional information for the client
         model_used: extractedData.modelUsed,
         primary_method: extractedData.primaryMethod,
         has_alternative_data: !!extractedData.alternativeResult,
-        discrepancies: extractedData.discrepancies || [],
-        // ADDED: Save confidence scores directly to receipts table
-        confidence_scores: extractedData.confidence,
-        thumbnail_url: thumbnailUrl // Add the thumbnail URL here
-      };
+        discrepancies: extractedData.discrepancies || []
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
-      // IMPORTANT: Temporarily disable the new columns until schema cache is updated
-      // We'll store this data in a separate table or re-enable it later
-
-      // Feature flag to control whether to use the new columns
-      const ENABLE_GEOMETRY_COLUMNS = true; // Re-enabled now that columns exist in the database
-
-      if (ENABLE_GEOMETRY_COLUMNS) {
-        try {
-          // Add geometry information if available and feature flag is enabled
-          if (extractedData.geometry) {
-            updateData.field_geometry = extractedData.geometry;
-          }
-
-          // Add document structure if available and feature flag is enabled
-          if (extractedData.document_structure) {
-            updateData.document_structure = extractedData.document_structure;
-          }
-        } catch (error) {
-          // If there's an error, it might be because the columns don't exist yet
-          // Just log it and continue without these fields
-          console.log("Note: Skipping geometry and document structure fields - they may not exist in the database yet");
-        }
-      } else {
-        console.log("Note: Geometry and document structure fields are disabled by feature flag to avoid schema cache errors");
-      }
-
-      // CRITICAL: Double-check and fix date format before saving to database
-      // This ensures dates like "19-03-2025" are converted to "2025-03-19"
-      if (updateData.date && typeof updateData.date === 'string') {
-        const dateValue = updateData.date;
-        console.log(`Date before validation: ${dateValue}`);
-
-        // Check if the date is already in YYYY-MM-DD format
-        const isoRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!isoRegex.test(dateValue)) {
-          // Try to extract components from the date string (DD-MM-YYYY format)
-          const ddmmyyyyRegex = /^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/;
-          const ddmmyyyyMatch = dateValue.match(ddmmyyyyRegex);
-
-          if (ddmmyyyyMatch) {
-            // Convert DD-MM-YYYY to YYYY-MM-DD
-            const day = ddmmyyyyMatch[1].padStart(2, '0');
-            const month = ddmmyyyyMatch[2].padStart(2, '0');
-            const year = ddmmyyyyMatch[3];
-            updateData.date = `${year}-${month}-${day}`;
-            console.log(`Fixed date format from ${dateValue} to ${updateData.date}`);
-            await logger.log(`Fixed date format from ${dateValue} to ${updateData.date}`, "DATE_FIX");
-          } else {
-            // As a last resort, try standard Date parsing
-            try {
-              const dateObj = new Date(dateValue);
-              if (!isNaN(dateObj.getTime())) {
-                updateData.date = dateObj.toISOString().split('T')[0];
-                console.log(`Date object parsing: ${dateValue} -> ${updateData.date}`);
-                await logger.log(`Date object parsing: ${dateValue} -> ${updateData.date}`, "DATE_FIX");
-              } else {
-                // If everything fails, use current date as fallback
-                updateData.date = new Date().toISOString().split('T')[0];
-                console.log(`Using current date as fallback: ${updateData.date}`);
-                await logger.log(`Failed to parse date '${dateValue}', using current date`, "WARNING");
-              }
-            } catch (e) {
-              // If date parsing fails entirely, use current date
-              updateData.date = new Date().toISOString().split('T')[0];
-              console.log(`Date parsing exception, using current date: ${updateData.date}`);
-              await logger.log(`Exception parsing date '${dateValue}', using current date`, "WARNING");
-            }
-          }
-        } else {
-          console.log(`Date is already in correct format: ${dateValue}`);
-        }
-      } else if (!updateData.date) {
-        // If date is missing, use current date
-        updateData.date = new Date().toISOString().split('T')[0];
-        console.log(`No date found, using current date: ${updateData.date}`);
-        await logger.log("No date found, using current date", "WARNING");
-      }
-
-      // Remove null/undefined fields before updating (including thumbnail_url if it's null)
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === null || updateData[key] === undefined) {
-          delete updateData[key];
-        }
-      });
-
-      // --- Save to Supabase `receipts` table ---
-      const { error: updateError } = await supabase
-        .from('receipts')
-        .update(updateData)
-        .eq('id', receiptId);
-
-      if (updateError) {
-        console.error("Error updating receipt in database:", updateError);
-        await logger.log(`Error saving results: ${updateError.message}`, "ERROR");
-        throw new Error(`Failed to update receipt record: ${updateError.message}`);
-      }
-
-      // --- COMMENTED OUT: Saving confidence scores to separate table is no longer needed ---
-      // const confidenceData = {
-      //   receipt_id: receiptId,
-      //   merchant: extractedData.confidence.merchant || 0,
-      //   date: extractedData.confidence.date || 0,
-      //   total: extractedData.confidence.total || 0,
-      //   tax: extractedData.confidence.tax || 0,
-      //   line_items: extractedData.confidence.line_items || 0,
-      //   payment_method: extractedData.confidence.payment_method || 0
-      // };
-      //
-      // // Check if confidence record already exists
-      // const { data: existingConfidence, error: fetchError } = await supabase
-      //   .from('confidence_scores')
-      //   .select('id')
-      //   .eq('receipt_id', receiptId)
-      //   .single();
-      //
-      // if (fetchError && fetchError.code !== 'PGRST116') { // Not Found error code
-      //   console.error("Error checking for existing confidence scores:", fetchError);
-      //   await logger.log(`Error checking confidence scores: ${fetchError.message}`, "ERROR");
-      //   // Continue processing - non-critical error
-      // }
-      //
-      // let confidenceError;
-      //
-      // if (existingConfidence?.id) {
-      //   // Update existing confidence scores
-      //   const { error } = await supabase
-      //     .from('confidence_scores')
-      //     .update(confidenceData)
-      //     .eq('id', existingConfidence.id);
-      //
-      //   confidenceError = error;
-      // } else {
-      //   // Insert new confidence scores
-      //   const { error } = await supabase
-      //     .from('confidence_scores')
-      //     .insert(confidenceData);
-      //
-      //   confidenceError = error;
-      // }
-      //
-      // if (confidenceError) {
-      //   console.error("Error saving confidence scores:", confidenceError);
-      //   await logger.log(`Error saving confidence scores: ${confidenceError.message}`, "WARNING");
-      //   // Don't fail the process for confidence score errors
-      // } else {
-      //   await logger.log("Confidence scores saved successfully", "SAVE");
-      // }
-      // --- END COMMENTED OUT BLOCK ---
-
-      // --- Handle line items (Optional: Assuming separate handling or basic logging for now) ---
-      if (extractedData.line_items && extractedData.line_items.length > 0) {
-        await logger.log(`Extracted ${extractedData.line_items.length} line items (saving not implemented in this function)`, "SAVE_LINE_ITEMS");
-        // TODO: Implement line item saving if necessary within this function
-        // This might involve deleting existing items and inserting new ones
-      }
-
-      await logger.log("Processing results saved successfully", "SAVE");
-
-      // Generate embeddings for the receipt data with improved error handling and retry logic
-      try {
-        await logger.log("Triggering embedding generation", "EMBEDDING");
-        console.log("Calling generate-embeddings function...");
-
-        // Check if GEMINI_API_KEY is set in environment variables
-        const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-        if (!geminiApiKey) {
-          console.warn("GEMINI_API_KEY is not set in environment variables. Embeddings will not be generated.");
-          await logger.log("GEMINI_API_KEY is not set. Embeddings cannot be generated.", "WARNING");
-          return;
-        }
-
-        // Use service role key for authorization
-        const authorization = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
-        const apikey = Deno.env.get('SUPABASE_ANON_KEY');
-
-        // Function to call the generate-embeddings endpoint
-        const callEmbeddingsFunction = async (retryCount = 0) => {
-          try {
-            // Prepare headers for the request
-            const headers: Record<string, string> = {
-              'Content-Type': 'application/json'
-            };
-
-            // Add authorization headers if available
-            if (typeof authorization === 'string' && authorization) {
-              headers['Authorization'] = authorization;
-            }
-
-            if (typeof apikey === 'string' && apikey) {
-              headers['apikey'] = apikey;
-            }
-
-            // Call the generate-embeddings function
-            const embeddingsResponse = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`,
-              {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  receiptId,
-                  processAllFields: true,
-                  processLineItems: true, // Also process line items automatically
-                  useImprovedDimensionHandling: true // Use improved dimension handling
-                })
-              }
-            );
-
-            if (!embeddingsResponse.ok) {
-              const errorText = await embeddingsResponse.text();
-              let errorData;
-              try {
-                errorData = JSON.parse(errorText);
-              } catch (e) {
-                errorData = { error: errorText };
-              }
-
-              console.error("Error generating embeddings:", errorData);
-              await logger.log(`Embedding generation error: ${JSON.stringify(errorData)}`, "WARNING");
-
-              // Check if this is a resource limit error that we should retry
-              if (retryCount < 2 && (
-                  errorText.includes("WORKER_LIMIT") ||
-                  errorText.includes("compute resources") ||
-                  errorText.includes("timeout")
-                )) {
-                await logger.log(`Retrying embedding generation (attempt ${retryCount + 1})`, "EMBEDDING");
-                // Wait before retrying (exponential backoff)
-                await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-                return callEmbeddingsFunction(retryCount + 1);
-              }
-
-              return { success: false, error: errorData };
-            } else {
-              const embeddingResult = await embeddingsResponse.json();
-              await logger.log(`Successfully generated ${embeddingResult.results?.length || 0} embeddings`, "EMBEDDING");
-
-              // If line items were processed, log that too
-              if (embeddingResult.lineItems && embeddingResult.lineItems.length > 0) {
-                await logger.log(`Also generated embeddings for ${embeddingResult.lineItems.length} line items`, "EMBEDDING");
-              }
-
-              return embeddingResult;
-            }
-          } catch (error) {
-            console.error("Error in embedding function call:", error);
-            await logger.log(`Embedding function error: ${error.message}`, "WARNING");
-
-            // Retry on network errors
-            if (retryCount < 2) {
-              await logger.log(`Retrying embedding generation after error (attempt ${retryCount + 1})`, "EMBEDDING");
-              // Wait before retrying (exponential backoff)
-              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-              return callEmbeddingsFunction(retryCount + 1);
-            }
-
-            return { success: false, error: error.message };
-          }
-        };
-
-        // Call the function with retry logic
-        const embeddingResult = await callEmbeddingsFunction();
-
-        // Update the receipt with embedding status
-        if (embeddingResult.success) {
-          try {
-            await supabase
-              .from('receipts')
-              .update({
-                has_embeddings: true,
-                embedding_status: 'complete'
-              })
-              .eq('id', receiptId);
-
-            await logger.log("Receipt marked as having embeddings", "EMBEDDING");
-          } catch (updateError) {
-            console.error("Error updating receipt embedding status:", updateError);
-            await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
-          }
-        } else {
-          // Mark the receipt as needing embeddings regeneration
-          try {
-            await supabase
-              .from('receipts')
-              .update({
-                has_embeddings: false,
-                embedding_status: 'failed'
-              })
-              .eq('id', receiptId);
-
-            await logger.log("Receipt marked for embedding regeneration", "EMBEDDING");
-          } catch (updateError) {
-            console.error("Error updating receipt embedding status:", updateError);
-            await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
-          }
-        }
-      } catch (embeddingError) {
-        console.error("Error calling generate-embeddings function:", embeddingError);
-        await logger.log(`Embedding function error: ${embeddingError.message}`, "WARNING");
-        // Continue processing even if embedding generation fails
-      }
-
-      // Return the extracted data (including processing time)
-      await logger.log("Receipt processing completed successfully", "COMPLETE");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          receiptId,
-          result: extractedData, // Return the full result including processing time
-          // Include additional information for the client
-          model_used: extractedData.modelUsed,
-          primary_method: extractedData.primaryMethod,
-          has_alternative_data: !!extractedData.alternativeResult,
-          discrepancies: extractedData.discrepancies || []
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (fetchError) {
-      console.error("Error fetching image:", fetchError);
-      await logger.log(`Error fetching image: ${fetchError.message}`, "ERROR");
-
-      return new Response(
-        JSON.stringify({
-          error: `Failed to fetch image: ${fetchError.message}`,
-          success: false
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
   } catch (error) {
     console.error('Error in process-receipt function:', error);
 
     // Try to log the error if possible
     try {
-      const { receiptId } = await req.json();
-      if (receiptId) {
-        const logger = new ProcessingLogger(receiptId);
+      if (error.message && error.message.includes('Missing required parameter')) {
+        // For validation errors, return 400
+        return new Response(
+          JSON.stringify({ error: error.message, success: false }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // For other errors, try to log and return 500
+      const params = await req.json().catch(() => ({}));
+      if (params.receiptId) {
+        const logger = new ProcessingLogger(params.receiptId);
         await logger.log(`Server error: ${error.message}`, "ERROR");
       }
     } catch (logError) {

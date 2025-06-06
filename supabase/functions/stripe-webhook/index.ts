@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
+import {
+  mapPriceIdToTier,
+  mapStripeStatusToOurStatus,
+  getDebugInfo,
+  validateStripeEnvironment
+} from '../_shared/stripe-config.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -428,44 +434,4 @@ async function sendPaymentConfirmationEmail(userId: string, paymentDetails: {
   }
 }
 
-function mapPriceIdToTier(priceId: string): 'free' | 'pro' | 'max' {
-  // Map your actual Stripe price IDs to tiers
-  const priceToTierMap: Record<string, 'free' | 'pro' | 'max'> = {
-    // Your actual Stripe price IDs from .env.local
-    'price_1RSiggPHa6JfBjtMFGNcoKnZ': 'pro',  // Pro Monthly
-    'price_1RSiiHPHa6JfBjtMOIItG7RA': 'pro',  // Pro Annual
-    'price_1RSiixPHa6JfBjtMXI9INFRf': 'max',  // Max Monthly
-    'price_1RSik1PHa6JfBjtMbYhspNSR': 'max',  // Max Annual
-  };
-
-  const mappedTier = priceToTierMap[priceId] || 'free';
-
-  console.log(`Price ID mapping:`, {
-    priceId,
-    mappedTier,
-    availablePriceIds: Object.keys(priceToTierMap),
-    isKnownPrice: priceId in priceToTierMap
-  });
-
-  if (!priceId) {
-    console.warn('mapPriceIdToTier called with empty/null priceId');
-  } else if (!(priceId in priceToTierMap)) {
-    console.warn(`Unknown price ID: ${priceId}. Available price IDs:`, Object.keys(priceToTierMap));
-  }
-
-  return mappedTier;
-}
-
-function mapStripeStatusToOurStatus(stripeStatus: string): 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid' {
-  const statusMap: Record<string, 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid'> = {
-    'active': 'active',
-    'trialing': 'trialing',
-    'past_due': 'past_due',
-    'canceled': 'canceled',
-    'incomplete': 'incomplete',
-    'incomplete_expired': 'incomplete_expired',
-    'unpaid': 'unpaid',
-  };
-
-  return statusMap[stripeStatus] || 'canceled';
-}
+// Functions now imported from _shared/stripe-config.ts

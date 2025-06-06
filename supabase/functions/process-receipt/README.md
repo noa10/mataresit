@@ -2,29 +2,27 @@
 
 This Edge Function processes receipt images using OCR and AI enhancement.
 
-## Fixing Row-Level Security (RLS) Issues
+## Logging
 
-The current implementation has an issue with the `processing_logs` table's row-level security policy, which prevents the function from logging processing steps to the database.
+This function uses the unified ProcessingLogger from `supabase/functions/_shared/db-logger.ts` which provides:
 
-### How to Fix
+- Resilient error handling that never crashes the parent function
+- Automatic fallback to console logging if database logging fails
+- Service role key authentication to avoid RLS issues
+- Consistent logging format across all edge functions
 
-1. Replace the current `db-logger.ts` file with the fixed version:
+## Deployment
 
-```bash
-# From the project root directory
-cp supabase/functions/process-receipt/shared/db-logger-fixed.ts supabase/functions/process-receipt/shared/db-logger.ts
-```
-
-2. Deploy the updated function:
+Deploy the function using:
 
 ```bash
 # From the project root directory
 supabase functions deploy process-receipt
 ```
 
-### What Changed
+## Architecture
 
-The fixed version of the logger:
+The function follows a modular pipeline approach:
 
 1. Gracefully handles RLS policy violations
 2. Continues to log to the console even when database logging fails

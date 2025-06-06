@@ -412,7 +412,8 @@ export default function SemanticSearchPage() {
               />
             ),
             onNewChat: handleNewChat,
-            showChatTitle: true
+            showChatTitle: true,
+            useChatLayout: true
           }}
         />
 

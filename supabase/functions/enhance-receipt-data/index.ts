@@ -1,7 +1,7 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { ProcessingLogger } from './shared/db-logger.ts'
+import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { encodeBase64, decodeBase64 } from "jsr:@std/encoding/base64";
 
 // CORS headers for browser requests

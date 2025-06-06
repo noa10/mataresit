@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
+import {
+  mapPriceIdToTier,
+  getTierPriceId,
+  validateStripeEnvironment
+} from '../_shared/stripe-config.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -716,29 +721,4 @@ async function downgradeSubscription(
   }
 }
 
-function getTierPriceId(tier: 'pro' | 'max', billingInterval: 'monthly' | 'annual'): string | null {
-  const priceIds = {
-    'pro': {
-      'monthly': 'price_1RSiggPHa6JfBjtMFGNcoKnZ',
-      'annual': 'price_1RSiiHPHa6JfBjtMOIItG7RA'
-    },
-    'max': {
-      'monthly': 'price_1RSiixPHa6JfBjtMXI9INFRf',
-      'annual': 'price_1RSik1PHa6JfBjtMbYhspNSR'
-    }
-  };
-
-  return priceIds[tier]?.[billingInterval] || null;
-}
-
-function mapPriceIdToTier(priceId: string): 'free' | 'pro' | 'max' {
-  const priceToTierMap: Record<string, 'free' | 'pro' | 'max'> = {
-    // Your actual Stripe price IDs from .env.local
-    'price_1RSiggPHa6JfBjtMFGNcoKnZ': 'pro',  // Pro Monthly
-    'price_1RSiiHPHa6JfBjtMOIItG7RA': 'pro',  // Pro Annual
-    'price_1RSiixPHa6JfBjtMXI9INFRf': 'max',  // Max Monthly
-    'price_1RSik1PHa6JfBjtMbYhspNSR': 'max',  // Max Annual
-  };
-
-  return priceToTierMap[priceId] || 'free';
-}
+// Functions now imported from _shared/stripe-config.ts
