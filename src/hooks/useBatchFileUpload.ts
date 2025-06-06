@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useReducer, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { ReceiptUpload, ProcessingStatus } from "@/types/receipt";
 import { useFileUpload } from "./useFileUpload";
@@ -14,11 +14,260 @@ import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/utils/processingOptimizer";
 import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
+import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
 
 interface BatchUploadOptions {
   maxConcurrent?: number;
   autoStart?: boolean;
   useEnhancedFallback?: boolean;
+}
+
+// ============================================================================
+// STATE MANAGEMENT WITH REDUCER
+// ============================================================================
+
+/**
+ * Actions for the batch upload state reducer
+ */
+type BatchUploadAction =
+  | { type: 'ADD_FILES'; files: File[]; recommendations: Record<string, ProcessingRecommendation> }
+  | { type: 'REMOVE_UPLOAD'; uploadId: string }
+  | { type: 'CLEAR_PENDING' }
+  | { type: 'CLEAR_ALL' }
+  | { type: 'START_PROCESSING' }
+  | { type: 'PAUSE_PROCESSING' }
+  | { type: 'STOP_PROCESSING' }
+  | { type: 'UPLOAD_STARTED'; uploadId: string }
+  | { type: 'UPLOAD_PROGRESS'; uploadId: string; progress: number; status?: ReceiptUpload['status'] }
+  | { type: 'UPLOAD_COMPLETED'; uploadId: string }
+  | { type: 'UPLOAD_FAILED'; uploadId: string; error: { code: string; message: string } }
+  | { type: 'SET_RECEIPT_ID'; uploadId: string; receiptId: string }
+  | { type: 'RETRY_UPLOAD'; uploadId: string };
+
+/**
+ * State shape for batch upload management
+ */
+interface BatchUploadState {
+  uploads: ReceiptUpload[];
+  isProcessing: boolean;
+  isPaused: boolean;
+  activeUploads: string[];
+  completedUploads: string[];
+  failedUploads: string[];
+  receiptIds: Record<string, string>;
+  processingRecommendations: Record<string, ProcessingRecommendation>;
+}
+
+/**
+ * Initial state for the batch upload reducer
+ */
+const initialBatchState: BatchUploadState = {
+  uploads: [],
+  isProcessing: false,
+  isPaused: false,
+  activeUploads: [],
+  completedUploads: [],
+  failedUploads: [],
+  receiptIds: {},
+  processingRecommendations: {}
+};
+
+/**
+ * Reducer function for managing batch upload state transitions
+ */
+function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction): BatchUploadState {
+  switch (action.type) {
+    case 'ADD_FILES': {
+      // Create new upload objects using the IDs from recommendations
+      const recommendationIds = Object.keys(action.recommendations);
+      const newUploads: ReceiptUpload[] = action.files.map((file, index) => ({
+        id: recommendationIds[index],
+        file,
+        status: 'pending',
+        uploadProgress: 0,
+      }));
+
+      // Sort uploads by priority based on recommendations
+      const allUploads = [...state.uploads, ...newUploads];
+      const sortedUploads = allUploads.sort((a, b) => {
+        const aRecommendation = action.recommendations[a.id] || state.processingRecommendations[a.id];
+        const bRecommendation = action.recommendations[b.id] || state.processingRecommendations[b.id];
+
+        if (!aRecommendation || !bRecommendation) return 0;
+
+        const aPriority = aRecommendation.riskLevel === 'low' ? 1 :
+                        aRecommendation.riskLevel === 'medium' ? 2 : 3;
+        const bPriority = bRecommendation.riskLevel === 'low' ? 1 :
+                        bRecommendation.riskLevel === 'medium' ? 2 : 3;
+
+        return aPriority - bPriority;
+      });
+
+      return {
+        ...state,
+        uploads: sortedUploads,
+        processingRecommendations: {
+          ...state.processingRecommendations,
+          ...action.recommendations
+        }
+      };
+    }
+
+    case 'REMOVE_UPLOAD': {
+      return {
+        ...state,
+        uploads: state.uploads.filter(upload => upload.id !== action.uploadId),
+        activeUploads: state.activeUploads.filter(id => id !== action.uploadId),
+        completedUploads: state.completedUploads.filter(id => id !== action.uploadId),
+        failedUploads: state.failedUploads.filter(id => id !== action.uploadId),
+        receiptIds: Object.fromEntries(
+          Object.entries(state.receiptIds).filter(([uploadId]) => uploadId !== action.uploadId)
+        ),
+        processingRecommendations: Object.fromEntries(
+          Object.entries(state.processingRecommendations).filter(([uploadId]) => uploadId !== action.uploadId)
+        )
+      };
+    }
+
+    case 'CLEAR_PENDING': {
+      // Only remove pending uploads, keep active/completed/failed
+      const uploadsToKeep = state.uploads.filter(upload =>
+        upload.status !== 'pending' || state.activeUploads.includes(upload.id)
+      );
+
+      return {
+        ...state,
+        uploads: uploadsToKeep
+      };
+    }
+
+    case 'CLEAR_ALL': {
+      return {
+        ...initialBatchState
+      };
+    }
+
+    case 'START_PROCESSING': {
+      return {
+        ...state,
+        isProcessing: true,
+        isPaused: false
+      };
+    }
+
+    case 'PAUSE_PROCESSING': {
+      return {
+        ...state,
+        isPaused: true
+      };
+    }
+
+    case 'STOP_PROCESSING': {
+      return {
+        ...state,
+        isProcessing: false,
+        isPaused: false
+      };
+    }
+
+    case 'UPLOAD_STARTED': {
+      return {
+        ...state,
+        activeUploads: state.activeUploads.includes(action.uploadId)
+          ? state.activeUploads
+          : [...state.activeUploads, action.uploadId],
+        uploads: state.uploads.map(upload =>
+          upload.id === action.uploadId
+            ? { ...upload, status: 'uploading' as const }
+            : upload
+        )
+      };
+    }
+
+    case 'UPLOAD_PROGRESS': {
+      return {
+        ...state,
+        uploads: state.uploads.map(upload =>
+          upload.id === action.uploadId
+            ? {
+                ...upload,
+                uploadProgress: action.progress,
+                status: action.status || upload.status
+              }
+            : upload
+        )
+      };
+    }
+
+    case 'UPLOAD_COMPLETED': {
+      return {
+        ...state,
+        uploads: state.uploads.map(upload =>
+          upload.id === action.uploadId
+            ? { ...upload, status: 'completed' as const, uploadProgress: 100 }
+            : upload
+        ),
+        activeUploads: state.activeUploads.filter(id => id !== action.uploadId),
+        completedUploads: state.completedUploads.includes(action.uploadId)
+          ? state.completedUploads
+          : [...state.completedUploads, action.uploadId]
+      };
+    }
+
+    case 'UPLOAD_FAILED': {
+      return {
+        ...state,
+        uploads: state.uploads.map(upload =>
+          upload.id === action.uploadId
+            ? { ...upload, status: 'error' as const, uploadProgress: 0, error: action.error }
+            : upload
+        ),
+        activeUploads: state.activeUploads.filter(id => id !== action.uploadId),
+        failedUploads: state.failedUploads.includes(action.uploadId)
+          ? state.failedUploads
+          : [...state.failedUploads, action.uploadId]
+      };
+    }
+
+    case 'SET_RECEIPT_ID': {
+      return {
+        ...state,
+        receiptIds: {
+          ...state.receiptIds,
+          [action.uploadId]: action.receiptId
+        }
+      };
+    }
+
+    case 'RETRY_UPLOAD': {
+      const uploadToRetry = state.uploads.find(u => u.id === action.uploadId);
+      if (!uploadToRetry || uploadToRetry.status !== 'error') {
+        return state;
+      }
+
+      // Create a new upload with the same file
+      const newUpload: ReceiptUpload = {
+        id: crypto.randomUUID(),
+        file: uploadToRetry.file,
+        status: 'pending',
+        uploadProgress: 0
+      };
+
+      return {
+        ...state,
+        uploads: [...state.uploads.filter(u => u.id !== action.uploadId), newUpload],
+        failedUploads: state.failedUploads.filter(id => id !== action.uploadId),
+        // Copy the processing recommendation to the new upload
+        processingRecommendations: {
+          ...state.processingRecommendations,
+          [newUpload.id]: state.processingRecommendations[action.uploadId]
+        }
+      };
+    }
+
+    default:
+      return state;
+  }
 }
 
 export function useBatchFileUpload(options: BatchUploadOptions = {}) {
@@ -27,19 +276,24 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   // Use the base file upload hook for file selection and validation
   const baseUpload = useFileUpload();
 
-  // Batch upload specific state
-  const [batchUploads, setBatchUploads] = useState<ReceiptUpload[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [activeUploads, setActiveUploads] = useState<string[]>([]);
-  const [completedUploads, setCompletedUploads] = useState<string[]>([]);
-  const [failedUploads, setFailedUploads] = useState<string[]>([]);
-  const [receiptIds, setReceiptIds] = useState<Record<string, string>>({});
-  const [processingRecommendations, setProcessingRecommendations] = useState<Record<string, ProcessingRecommendation>>({});
+  // Use reducer for complex state management
+  const [state, dispatch] = useReducer(batchUploadReducer, initialBatchState);
   const processingRef = useRef<boolean>(false);
 
   const { user } = useAuth();
   const { settings } = useSettings();
+
+  // Destructure state for easier access
+  const {
+    uploads: batchUploads,
+    isProcessing,
+    isPaused,
+    activeUploads,
+    completedUploads,
+    failedUploads,
+    receiptIds,
+    processingRecommendations
+  } = state;
 
   // Computed properties
   const queuedUploads = batchUploads.filter(upload =>
@@ -79,7 +333,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   }, [batchUploads]);
 
   // Add files to the batch queue
-  const addToBatchQueue = useCallback((files: FileList | File[]) => {
+  const addToBatchQueue = useCallback(async (files: FileList | File[]) => {
     console.log('addToBatchQueue called with files:', files);
     console.log('Files array type:', Object.prototype.toString.call(files));
     console.log('Files length:', files.length);
@@ -97,6 +351,19 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     }
 
     console.log('Converted files to array with length:', filesArray.length);
+
+    // ENHANCED SECURITY: Check subscription limits before adding to batch queue
+    console.log("Checking subscription limits for batch upload...");
+    const averageFileSizeMB = filesArray.reduce((sum, file) => sum + file.size, 0) / filesArray.length / (1024 * 1024);
+    const enforcementResult = await SubscriptionEnforcementService.canUploadBatch(filesArray.length, averageFileSizeMB);
+
+    if (!enforcementResult.allowed) {
+      console.warn("Batch upload blocked by subscription limits:", enforcementResult.reason);
+      handleActionResult(enforcementResult, "upload this batch");
+      return [];
+    }
+
+    console.log("Subscription check passed, proceeding with batch upload");
 
     // Filter for valid file types
     const validFiles = filesArray.filter(file => {
@@ -134,8 +401,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     const batchOptimization = getBatchProcessingOptimization(validFiles);
     console.log('Batch optimization:', batchOptimization);
 
-    // Create ReceiptUpload objects for all valid files with processing recommendations
-    const newUploads: ReceiptUpload[] = validFiles.map((file, index) => {
+    // Create recommendations map for the reducer
+    const recommendations: Record<string, ProcessingRecommendation> = {};
+    const fileIds: string[] = [];
+
+    validFiles.forEach((file, index) => {
       const id = crypto.randomUUID();
       const recommendation = batchOptimization.recommendations[index];
 
@@ -145,44 +415,18 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         riskLevel: recommendation.riskLevel
       });
 
-      // Store the processing recommendation
-      setProcessingRecommendations(prev => ({
-        ...prev,
-        [id]: recommendation
-      }));
-
-      return {
-        id,
-        file,
-        status: 'pending',
-        uploadProgress: 0,
-      };
+      recommendations[id] = recommendation;
+      fileIds.push(id);
     });
 
-    console.log('Created new uploads:', newUploads.length);
+    console.log('Created recommendations for new uploads:', Object.keys(recommendations).length);
     console.log('Batch strategy:', batchOptimization.batchStrategy);
 
-    // Update state with new uploads (sorted by priority)
-    setBatchUploads(prevUploads => {
-      const allUploads = [...prevUploads, ...newUploads];
-
-      // Sort by priority order from optimization
-      const sortedUploads = allUploads.sort((a, b) => {
-        const aRecommendation = processingRecommendations[a.id];
-        const bRecommendation = processingRecommendations[b.id];
-
-        if (!aRecommendation || !bRecommendation) return 0;
-
-        const aPriority = aRecommendation.riskLevel === 'low' ? 1 :
-                        aRecommendation.riskLevel === 'medium' ? 2 : 3;
-        const bPriority = bRecommendation.riskLevel === 'low' ? 1 :
-                        bRecommendation.riskLevel === 'medium' ? 2 : 3;
-
-        return aPriority - bPriority;
-      });
-
-      console.log('Updated batch uploads array length:', sortedUploads.length);
-      return sortedUploads;
+    // Dispatch action to add files with recommendations
+    dispatch({
+      type: 'ADD_FILES',
+      files: validFiles,
+      recommendations
     });
 
     // If autoStart is enabled, start processing
@@ -193,25 +437,24 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       }, 100);
     }
 
-    return newUploads;
+    // Return the files that were added (for compatibility)
+    return validFiles.map((file, index) => ({
+      id: fileIds[index],
+      file,
+      status: 'pending' as const,
+      uploadProgress: 0,
+    }));
   }, [autoStart]);
 
   // Remove a file from the batch queue
   const removeFromBatchQueue = useCallback((uploadId: string) => {
-    setBatchUploads(prevUploads =>
-      prevUploads.filter(upload => upload.id !== uploadId)
-    );
+    dispatch({ type: 'REMOVE_UPLOAD', uploadId });
   }, []);
 
   // Clear all pending uploads
   const clearBatchQueue = useCallback(() => {
-    // Only remove pending uploads, keep active/completed/failed
-    setBatchUploads(prevUploads =>
-      prevUploads.filter(upload =>
-        upload.status !== 'pending' || activeUploads.includes(upload.id)
-      )
-    );
-  }, [activeUploads]);
+    dispatch({ type: 'CLEAR_PENDING' });
+  }, []);
 
   // Clear all uploads (including completed and failed)
   const clearAllUploads = useCallback(() => {
@@ -220,11 +463,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
-    setBatchUploads([]);
-    setActiveUploads([]);
-    setCompletedUploads([]);
-    setFailedUploads([]);
-    setReceiptIds({});
+    dispatch({ type: 'CLEAR_ALL' });
   }, [isProcessing, isPaused]);
 
   // Update a single upload's status and progress
@@ -234,43 +473,27 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     progress: number,
     error?: { code: string; message: string } | null
   ) => {
-    // First check if this upload already has the target status to avoid duplicate updates
-    let shouldUpdate = true;
-
-    setBatchUploads(prevUploads => {
-      // Check if this upload already has the target status
-      const existingUpload = prevUploads.find(u => u.id === uploadId);
-      if (existingUpload && existingUpload.status === status && existingUpload.uploadProgress === progress) {
-        shouldUpdate = false;
-        return prevUploads; // No change needed
-      }
-
-      // Otherwise update the upload
-      return prevUploads.map(upload =>
-        upload.id === uploadId
-          ? { ...upload, status, uploadProgress: progress, error }
-          : upload
-      );
-    });
-
-    // Only update tracking arrays if we're actually changing the status
-    if (shouldUpdate) {
-      // Update tracking arrays based on status
-      if (status === 'completed') {
-        setCompletedUploads(prev => {
-          if (prev.includes(uploadId)) return prev;
-          return [...prev, uploadId];
-        });
-        setActiveUploads(prev => prev.filter(id => id !== uploadId));
-      } else if (status === 'error') {
-        setFailedUploads(prev => {
-          if (prev.includes(uploadId)) return prev;
-          return [...prev, uploadId];
-        });
-        setActiveUploads(prev => prev.filter(id => id !== uploadId));
-      }
+    // Check if this upload already has the target status to avoid duplicate updates
+    const existingUpload = batchUploads.find(u => u.id === uploadId);
+    if (existingUpload && existingUpload.status === status && existingUpload.uploadProgress === progress) {
+      return; // No change needed
     }
-  }, []);
+
+    // Dispatch appropriate action based on status
+    if (status === 'uploading' || status === 'processing') {
+      if (status === 'uploading' && !activeUploads.includes(uploadId)) {
+        dispatch({ type: 'UPLOAD_STARTED', uploadId });
+      }
+      dispatch({ type: 'UPLOAD_PROGRESS', uploadId, progress, status });
+    } else if (status === 'completed') {
+      dispatch({ type: 'UPLOAD_COMPLETED', uploadId });
+    } else if (status === 'error' && error) {
+      dispatch({ type: 'UPLOAD_FAILED', uploadId, error });
+    } else {
+      // For other status changes, use the progress action
+      dispatch({ type: 'UPLOAD_PROGRESS', uploadId, progress, status });
+    }
+  }, [batchUploads, activeUploads]);
 
   // Process a single file
   const processFile = useCallback(async (upload: ReceiptUpload) => {
@@ -364,7 +587,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       }
 
       // Store the receipt ID for this upload
-      setReceiptIds(prev => ({ ...prev, [upload.id]: newReceiptId }));
+      dispatch({ type: 'SET_RECEIPT_ID', uploadId: upload.id, receiptId: newReceiptId });
 
       // Mark as uploaded
       await markReceiptUploaded(newReceiptId);
@@ -500,7 +723,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
     // If no more pending uploads, we're done
     if (pendingUploads.length === 0) {
-      setIsProcessing(false);
+      dispatch({ type: 'STOP_PROCESSING' });
       processingRef.current = false;
 
       // Show completion toast
@@ -528,9 +751,10 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     // Get the next batch of uploads to process
     const nextBatch = pendingUploads.slice(0, slotsAvailable);
 
-    // Mark these as active
-    const newActiveIds = nextBatch.map(upload => upload.id);
-    setActiveUploads(prev => [...prev, ...newActiveIds]);
+    // Mark these as active by dispatching UPLOAD_STARTED for each
+    nextBatch.forEach(upload => {
+      dispatch({ type: 'UPLOAD_STARTED', uploadId: upload.id });
+    });
 
     // Process each file in parallel
     nextBatch.forEach(upload => {
@@ -541,7 +765,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   }, [batchUploads, activeUploads, isPaused, maxConcurrent, completedUploads, failedUploads, processFile]);
 
   // Start batch processing
-  const startBatchProcessing = useCallback(() => {
+  const startBatchProcessing = useCallback(async () => {
     console.log('startBatchProcessing called');
     if (processingRef.current && !isPaused) {
       toast.info("Batch processing is already running");
@@ -550,7 +774,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
     // If paused, just resume
     if (isPaused) {
-      setIsPaused(false);
+      dispatch({ type: 'START_PROCESSING' });
       toast.info("Resuming batch processing");
       return;
     }
@@ -566,10 +790,22 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // ENHANCED SECURITY: Final check before starting batch processing
+    console.log("Final subscription check before starting batch processing...");
+    const averageFileSizeMB = pendingUploads.reduce((sum, upload) => sum + upload.file.size, 0) / pendingUploads.length / (1024 * 1024);
+    const enforcementResult = await SubscriptionEnforcementService.canUploadBatch(pendingUploads.length, averageFileSizeMB);
+
+    if (!enforcementResult.allowed) {
+      console.warn("Batch processing blocked by subscription limits:", enforcementResult.reason);
+      handleActionResult(enforcementResult, "start batch processing");
+      return;
+    }
+
+    console.log("Final subscription check passed, starting batch processing");
+
     // Start processing
-    setIsProcessing(true);
+    dispatch({ type: 'START_PROCESSING' });
     processingRef.current = true;
-    setIsPaused(false);
 
     toast.info(`Starting batch processing of ${pendingUploads.length} files`);
 
@@ -584,7 +820,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
-    setIsPaused(true);
+    dispatch({ type: 'PAUSE_PROCESSING' });
     toast.info("Batch processing paused. Currently active uploads will complete.");
   }, []);
 
@@ -653,20 +889,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
-    // Create a new upload with the same file
-    const newUpload: ReceiptUpload = {
-      id: crypto.randomUUID(),
-      file: upload.file,
-      status: 'pending',
-      uploadProgress: 0
-    };
-
-    // Add the new upload to the queue
-    setBatchUploads(prev => [...prev, newUpload]);
-
-    // Remove the failed upload
-    removeFromBatchQueue(uploadId);
-    setFailedUploads(prev => prev.filter(id => id !== uploadId));
+    // Use the reducer to handle retry logic
+    dispatch({ type: 'RETRY_UPLOAD', uploadId });
 
     toast.info("Upload queued for retry");
 
@@ -676,7 +900,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         startBatchProcessing();
       }, 100);
     }
-  }, [batchUploads, removeFromBatchQueue, isProcessing, autoStart, startBatchProcessing]);
+  }, [batchUploads, isProcessing, autoStart, startBatchProcessing]);
 
   // Log when batchUploads changes
   useEffect(() => {
@@ -727,7 +951,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   }, [activeUploads, completedUploads, failedUploads, isPaused, processNextBatch]);
 
   // Handle file drop and selection using the base hook
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     console.log('handleFiles called in useBatchFileUpload with:', files);
     console.log('Files type:', Object.prototype.toString.call(files));
     console.log('Files length:', files.length);
@@ -773,8 +997,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     });
 
     if (validFiles && validFiles.length > 0) {
-      // Add to our batch queue
-      const result = addToBatchQueue(validFiles);
+      // Add to our batch queue (now async with subscription enforcement)
+      const result = await addToBatchQueue(validFiles);
       console.log('Result from addToBatchQueue in handleFiles:', result);
 
       // Reset the base hook's uploads to avoid duplication

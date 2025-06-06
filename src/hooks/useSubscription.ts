@@ -4,6 +4,7 @@ import { useStripe } from '@/contexts/StripeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { SUBSCRIPTION_TIERS } from '@/config/stripe';
 import type { SubscriptionTier } from '@/config/stripe';
+import { SubscriptionEnforcementService } from '@/services/subscriptionEnforcementService';
 
 interface SubscriptionLimits {
   monthlyReceipts: number;
@@ -116,15 +117,23 @@ export const useSubscription = () => {
     if (!user) return false;
 
     try {
-      const { data, error } = await supabase.rpc('check_subscription_limit', {
-        _user_id: user.id,
-        _limit_type: 'monthly_receipts'
-      });
-
-      if (error) throw error;
-      return data;
+      // Use the enhanced enforcement service
+      const result = await SubscriptionEnforcementService.canUploadReceipt();
+      return result.allowed;
     } catch (error) {
       console.error('Error checking upload limit:', error);
+      return false;
+    }
+  };
+
+  const checkCanUploadBatch = async (batchSize: number, averageFileSizeMB: number = 0.5): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const result = await SubscriptionEnforcementService.canUploadBatch(batchSize, averageFileSizeMB);
+      return result.allowed;
+    } catch (error) {
+      console.error('Error checking batch upload limit:', error);
       return false;
     }
   };
@@ -175,6 +184,17 @@ export const useSubscription = () => {
     }
   };
 
+  const isFeatureAvailableAsync = async (feature: string): Promise<boolean> => {
+    try {
+      const result = await SubscriptionEnforcementService.isFeatureAvailable(feature);
+      return result.allowed;
+    } catch (error) {
+      console.error('Error checking feature availability:', error);
+      // Fallback to synchronous check
+      return isFeatureAvailable(feature);
+    }
+  };
+
   const getFeatureLimit = (feature: string): number | string => {
     const tier = getCurrentTier();
     const tierConfig = SUBSCRIPTION_TIERS[tier];
@@ -196,9 +216,11 @@ export const useSubscription = () => {
     usage,
     isLoading,
     checkCanUpload,
+    checkCanUploadBatch,
     getUpgradeMessage,
     getCurrentTier,
     isFeatureAvailable,
+    isFeatureAvailableAsync,
     getFeatureLimit,
     refreshUsage: fetchUsageData,
   };

@@ -16,6 +16,8 @@ import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt"
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
+import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
+import { useSubscription } from "@/hooks/useSubscription";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
@@ -476,14 +478,27 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     }
   };
 
-  const handleStartUpload = () => {
+  const handleStartUpload = async () => {
     // Use receiptUploads to get the file
     const fileToUpload = receiptUploads[0]?.file;
-    if (fileToUpload) {
-      processUploadedFiles([fileToUpload]); // Pass as array as function expects it
-    } else {
+    if (!fileToUpload) {
       openFileDialog();
+      return;
     }
+
+    // ENHANCED SECURITY: Check subscription limits before starting upload
+    console.log("Checking subscription limits before upload...");
+    const fileSizeMB = fileToUpload.size / (1024 * 1024);
+    const enforcementResult = await SubscriptionEnforcementService.canUploadReceipt(fileSizeMB);
+
+    if (!enforcementResult.allowed) {
+      console.warn("Upload blocked by subscription limits:", enforcementResult.reason);
+      handleActionResult(enforcementResult, "upload this receipt");
+      return;
+    }
+
+    console.log("Subscription check passed, proceeding with upload");
+    processUploadedFiles([fileToUpload]); // Pass as array as function expects it
   };
 
   const retryUpload = () => {
