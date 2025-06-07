@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -636,6 +636,8 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
 };
 
 const AnalysisPage = () => {
+  const queryClient = useQueryClient();
+
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
     const today = new Date();
@@ -755,6 +757,13 @@ const AnalysisPage = () => {
     setDailyReceiptBrowserData(null);
   };
 
+  // Handler for when a receipt is deleted from the modal
+  const handleReceiptDeleted = (deletedId: string) => {
+    // Invalidate the daily spending queries to refresh the data
+    queryClient.invalidateQueries({ queryKey: ['dailySpendingDetails'] });
+    queryClient.invalidateQueries({ queryKey: ['spendingByCategory'] });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       <Navbar />
@@ -839,6 +848,7 @@ const AnalysisPage = () => {
             onClose={handleCloseDailyReceiptBrowser}
             date={dailyReceiptBrowserData.date}
             receiptIds={dailyReceiptBrowserData.receiptIds}
+            onReceiptDeleted={handleReceiptDeleted}
           />
         )}
       </main>

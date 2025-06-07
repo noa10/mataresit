@@ -26,9 +26,10 @@ interface DailyReceiptBrowserModalProps {
   receiptIds: string[];
   isOpen: boolean;
   onClose: () => void;
+  onReceiptDeleted?: (deletedId: string) => void;
 }
 
-const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose }) => {
+const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted }) => {
   // Fetch all receipts for the given IDs
   const { data: receiptsData, isLoading, error } = useQuery<ReceiptWithDetails[], Error>({
     queryKey: ['receiptsForDay', date, receiptIds],
@@ -64,6 +65,11 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
     const idx = localReceiptsData.findIndex(r => r.id === deletedId);
     const newReceipts = localReceiptsData.filter(r => r.id !== deletedId);
     setLocalReceiptsData(newReceipts);
+
+    // Notify parent component about the deletion
+    if (onReceiptDeleted) {
+      onReceiptDeleted(deletedId);
+    }
 
     if (newReceipts.length === 0) {
       setSelectedReceiptId(null); // No receipts left
