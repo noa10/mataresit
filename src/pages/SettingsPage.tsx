@@ -9,6 +9,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { Separator } from "@/components/ui/separator";
+import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import {
   Tabs,
   TabsContent,
@@ -27,14 +28,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const UsageStatsPanelPlaceholder = () => (
+const UsageStatsPanel = () => (
   <Card>
     <CardHeader>
-      <CardTitle>Usage Statistics</CardTitle>
-      <CardDescription>View statistics about your receipt processing methods.</CardDescription>
+      <CardTitle>Your Current Usage</CardTitle>
+      <CardDescription>Track your subscription limits and usage in real-time</CardDescription>
     </CardHeader>
     <CardContent>
-      <p className="text-muted-foreground">Usage statistics will be available here soon.</p>
+      <SubscriptionLimitsDisplay showUpgradePrompts={true} />
     </CardContent>
   </Card>
 );
@@ -153,7 +154,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="usage">
-            <UsageStatsPanelPlaceholder />
+            <UsageStatsPanel />
           </TabsContent>
           </Tabs>
         </div>

@@ -25,7 +25,6 @@ import {
   Sparkles,
   Loader2
 } from "lucide-react";
-import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { SubscriptionStatusRefresh } from "@/components/SubscriptionStatusRefresh";
 
 interface PricingTier {
@@ -506,26 +505,6 @@ export default function PricingPage() {
             </motion.div>
           ))}
         </div>
-
-        {/* Current Usage Section for Logged-in Users */}
-        {user && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="mt-16"
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold mb-4">Your Current Usage</h2>
-              <p className="text-muted-foreground">
-                Track your subscription limits and usage in real-time
-              </p>
-            </div>
-            <div className="max-w-2xl mx-auto">
-              <SubscriptionLimitsDisplay showUpgradePrompts={true} />
-            </div>
-          </motion.div>
-        )}
 
         {/* FAQ Section */}
         <motion.div
