@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeProvider } from "@/contexts/StripeContext";
+import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
+import { AppLayout } from "@/components/AppLayout";
+import { PublicLayout } from "@/components/PublicLayout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -54,59 +57,65 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <StripeProvider>
-        <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+        <ChatControlsProvider>
+          <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Index />} />
+            {/* Public Routes with Layout */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/pricing" element={
+                <Suspense fallback={<PageLoading />}>
+                  <PricingPage />
+                </Suspense>
+              } />
+              <Route path="/payment-success" element={
+                <Suspense fallback={<PageLoading />}>
+                  <PaymentSuccessPage />
+                </Suspense>
+              } />
+            </Route>
+
+            {/* Auth Routes (no layout) */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/reset-password" element={<AuthCallback />} />
-            <Route path="/pricing" element={
-              <Suspense fallback={<PageLoading />}>
-                <PricingPage />
-              </Suspense>
-            } />
-            <Route path="/payment-success" element={
-              <Suspense fallback={<PageLoading />}>
-                <PaymentSuccessPage />
-              </Suspense>
-            } />
             <Route path="*" element={<NotFound />} />
 
             {/* Protected Routes - Require Authentication */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/receipt/:id" element={
-                <Suspense fallback={<PageLoading />}>
-                  <ViewReceipt />
-                </Suspense>
-              } />
-              <Route path="/profile" element={
-                <Suspense fallback={<PageLoading />}>
-                  <Profile />
-                </Suspense>
-              } />
-              <Route path="/analysis" element={
-                <Suspense fallback={<PageLoading />}>
-                  <AnalysisPage />
-                </Suspense>
-              } />
-              <Route path="/search" element={
-                <Suspense fallback={<PageLoading />}>
-                  <SemanticSearch />
-                </Suspense>
-              } />
-              <Route path="/features" element={
-                <Suspense fallback={<PageLoading />}>
-                  <FeaturesPage />
-                </Suspense>
-              } />
-
+              <Route element={<AppLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/receipt/:id" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ViewReceipt />
+                  </Suspense>
+                } />
+                <Route path="/profile" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <Profile />
+                  </Suspense>
+                } />
+                <Route path="/analysis" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AnalysisPage />
+                  </Suspense>
+                } />
+                <Route path="/search" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <SemanticSearch />
+                  </Suspense>
+                } />
+                <Route path="/features" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <FeaturesPage />
+                  </Suspense>
+                } />
+              </Route>
             </Route>
 
             {/* Admin Routes - Require Admin Role */}
@@ -121,7 +130,8 @@ const App = () => (
             </Route>
           </Routes>
         </BrowserRouter>
-        </TooltipProvider>
+          </TooltipProvider>
+        </ChatControlsProvider>
       </StripeProvider>
     </AuthProvider>
   </QueryClientProvider>
