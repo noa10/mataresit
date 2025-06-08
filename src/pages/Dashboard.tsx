@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import Navbar from "@/components/Navbar";
+
 import ReceiptCard from "@/components/ReceiptCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -666,8 +666,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <Navbar />
-
       <main className="container px-4 py-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <motion.div

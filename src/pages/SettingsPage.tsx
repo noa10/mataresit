@@ -7,7 +7,6 @@ import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
 import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
-import Navbar from "@/components/Navbar";
 import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import {
@@ -52,7 +51,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">

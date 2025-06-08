@@ -1,6 +1,5 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import Navbar from '@/components/Navbar';
 import { VersionControl } from '@/components/features/VersionControl';
 import { Integrations } from '@/components/features/Integrations';
 import { CustomBranding } from '@/components/features/CustomBranding';
@@ -48,8 +47,6 @@ export default function FeaturesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      <Navbar />
-      
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <motion.div

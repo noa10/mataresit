@@ -6,7 +6,6 @@ import {
   User, Moon, Sun, LogOut, ChevronRight,
   Mail, Edit, Camera, Key
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -72,8 +71,6 @@ export default function Profile() {
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <Navbar />
-      
       <main className="container px-4 py-8">
         {/* Profile Header */}
         <motion.div

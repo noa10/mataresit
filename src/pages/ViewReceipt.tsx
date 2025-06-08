@@ -1,7 +1,6 @@
 
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import Navbar from "@/components/Navbar";
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trash2, Loader2, Search } from "lucide-react";
@@ -58,7 +57,6 @@ export default function ViewReceipt() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-        <Navbar />
         <div className="container flex items-center justify-center min-h-[80vh]">
           <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
         </div>
@@ -69,7 +67,6 @@ export default function ViewReceipt() {
   if (error || !receipt) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-        <Navbar />
         <div className="container flex flex-col items-center justify-center min-h-[80vh] text-center">
           <h2 className="text-2xl font-bold mb-4">Receipt Not Found</h2>
           <p className="text-muted-foreground mb-6">
@@ -85,7 +82,6 @@ export default function ViewReceipt() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <Navbar />
 
       <main className="container px-4 py-8">
         {/* Page Header */}

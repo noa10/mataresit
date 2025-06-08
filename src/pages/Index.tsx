@@ -130,9 +130,7 @@ export default function Index() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      <Navbar />
-
+    <>
       <div className="relative overflow-hidden">
         {/* Enhanced background pattern */}
         <div className="absolute inset-0 overflow-hidden z-0">
@@ -550,6 +548,6 @@ export default function Index() {
           </div>
         </div>
       </footer>
-    </div>
+    </>
   );
 }

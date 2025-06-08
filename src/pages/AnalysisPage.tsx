@@ -35,7 +35,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, Ca
 import ReceiptViewer from '@/components/ReceiptViewer';
 import { fetchReceiptById } from '@/services/receiptService';
 import { ReceiptWithDetails } from '@/types/receipt';
-import Navbar from '@/components/Navbar'; // Import Navbar
+
 import { supabase } from '@/integrations/supabase/client'; // Corrected supabase client import path
 
 // Import the new DailyReceiptBrowserModal
@@ -766,7 +766,6 @@ const AnalysisPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <Navbar />
       {/* Apply container, padding, and spacing consistent with Index.tsx */}
       <main className="container py-6 md:py-8 space-y-8">
         {/* Dashboard Header */}
