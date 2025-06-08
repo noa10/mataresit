@@ -5,9 +5,9 @@ This document outlines the complete Stripe integration implementation for the Re
 ## Overview
 
 The Stripe integration provides subscription-based billing with three tiers:
-- **Free**: 25 receipts/month, 100MB storage, 7-day retention
-- **Pro**: 200 receipts/month, 2GB storage, 90-day retention ($9.99/month)
-- **Max**: Unlimited receipts, 10GB storage, 1-year retention ($19.99/month)
+- **Free**: 50 receipts/month, 1GB storage, 7-day retention
+- **Pro**: 500 receipts/month, 10GB storage, 90-day retention ($10/month)
+- **Max**: Unlimited receipts, unlimited storage, 1-year retention ($20/month)
 
 ## Architecture
 

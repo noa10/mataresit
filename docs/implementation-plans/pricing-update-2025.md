@@ -8,14 +8,19 @@ This document outlines the updated pricing structure implemented in January 2025
 
 ### Free Tier ($0/month)
 - **Target Audience**: Individuals getting started
-- **Monthly Receipts**: 25
+- **Monthly Receipts**: 50
 - **Storage**: 1GB
 - **Data Retention**: 7 days
 - **Batch Upload**: 1 concurrent upload
 - **Users**: Single user access
+- **AI Models**: Google Gemini 2.0 Flash Lite (default) + BYOK support
 - **Features**:
-  - Basic search functionality
-  - Basic OCR with AI enhancement
+  - AI Vision and AI categorization processing
+  - Merchant Normalization
+  - Line item extraction
+  - Currency Detection
+  - Confidence Scoring
+  - Basic receipt summary
   - Simple monthly overview
 - **Limitations**:
   - No batch processing
@@ -25,18 +30,24 @@ This document outlines the updated pricing structure implemented in January 2025
 
 ### Pro Tier ($10/month, $108/year)
 - **Target Audience**: Small teams and advanced users
-- **Monthly Receipts**: 200
+- **Monthly Receipts**: 500
 - **Storage**: 10GB
 - **Data Retention**: 90 days
 - **Batch Upload**: 5 concurrent uploads
 - **Users**: Up to 5 users
+- **AI Models**: Google Gemini 2.5 Flash (default) + BYOK support
 - **Features**:
+  - All Free tier processing
+  - Full merchant normalization
+  - Currency detection with conversion
+  - Advanced confidence scoring
   - Advanced search with filters and tags
   - Version control
-  - Basic integrations (QuickBooks, Xero, Google Drive)
+  - Basic integrations
   - Custom branding
   - Standard support
   - Advanced analytics
+  - Basic data export (CSV)
 - **Annual Savings**: 10% ($12 savings)
 
 ### Max Tier ($20/month, $216/year)
@@ -46,13 +57,21 @@ This document outlines the updated pricing structure implemented in January 2025
 - **Data Retention**: 365 days
 - **Batch Upload**: 20 concurrent uploads
 - **Users**: Unlimited
+- **AI Models**: Google Gemini 2.5 Flash (default) + BYOK support
 - **Features**:
-  - All Pro features
-  - Advanced integrations (Slack, Zapier, Custom API)
+  - All Pro Processing
+  - Advanced batch processing (up to 20)
+  - Advanced search with all features
+  - Advanced reporting dashboard
+  - Custom category creation
+  - Year-over-year comparisons
+  - Tax deduction identification
+  - Full data export (CSV, JSON, PDF)
+  - Advanced integrations
   - Priority support
   - API access
   - Advanced version control
-  - Custom dashboards
+  - Custom branding
 - **Annual Savings**: 10% ($24 savings)
 
 ## Key Changes from Previous Structure
