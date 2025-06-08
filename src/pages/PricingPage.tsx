@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,15 +57,24 @@ const pricingTiers: PricingTier[] = [
     description: "Perfect for individuals getting started",
     icon: <Upload className="h-6 w-6" />,
     features: {
-      uploads: "25 receipts per month",
-      processing: "Basic OCR with AI enhancement",
+      uploads: "50 receipts per month",
+      processing: "AI Vision and AI categorization processing",
       retention: "7-day data retention",
       storage: "1GB storage",
-      models: ["Free OpenRouter models", "Gemma 3n", "Devstral Small"],
+      models: [
+        "Google Gemini 2.0 Flash Lite (default)",
+        "BYOK (bring your own key) for:",
+        "• Google Gemini",
+        "• OpenAI",
+        "• Claude",
+        "• Open Router",
+        "• Grok"
+      ],
       capabilities: [
-        "Basic merchant normalization",
-        "Simple currency detection",
-        "Basic confidence scoring",
+        "Merchant Normalization",
+        "Line item extraction",
+        "Currency Detection",
+        "Confidence Scoring",
         "Single processing method",
         "Single user access"
       ],
@@ -82,21 +90,25 @@ const pricingTiers: PricingTier[] = [
     icon: <Zap className="h-6 w-6" />,
     popular: true,
     features: {
-      uploads: "200 receipts per month",
-      processing: "Advanced OCR + AI processing",
+      uploads: "500 receipts per month",
+      processing: "AI Vision and AI categorization processing",
       retention: "90-day data retention",
       storage: "10GB storage",
       models: [
-        "All Free tier models",
-        "Gemini 1.5 Flash",
-        "Gemini 2.0 Flash Lite",
-        "Limited Gemini 1.5 Pro (50/month)"
+        "Google Gemini 2.5 Flash (default)",
+        "BYOK (bring your own key) for:",
+        "• Google Gemini",
+        "• OpenAI",
+        "• Claude",
+        "• Open Router",
+        "• Grok"
       ],
       capabilities: [
+        "All Free tier processing",
         "Full merchant normalization",
         "Currency detection with conversion",
+        "Line item extraction",
         "Advanced confidence scoring",
-        "Dual processing methods",
         "Batch processing (up to 5)",
         "Up to 5 users",
         "Version control",
@@ -125,18 +137,17 @@ const pricingTiers: PricingTier[] = [
       retention: "1-year retention + archiving",
       storage: "Unlimited storage",
       models: [
-        "All Pro tier models",
-        "Unlimited premium models",
-        "Gemini 2.5 Flash Preview",
-        "Custom API key support"
+        "Google Gemini 2.5 Flash (default)",
+        "BYOK (bring your own key) for:",
+        "• Google Gemini",
+        "• OpenAI",
+        "• Claude",
+        "• Open Router",
+        "• Grok"
       ],
       capabilities: [
-        "Advanced merchant learning",
-        "Full currency conversion",
-        "Premium confidence scoring",
-        "Automatic dual processing",
+        "All Pro Processing",
         "Advanced batch processing (up to 20)",
-        "Line item extraction",
         "Unlimited users",
         "Advanced version control",
         "Advanced integrations",
@@ -252,9 +263,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
-      <Navbar />
-
+    <>
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <motion.div
@@ -603,7 +612,7 @@ export default function PricingPage() {
                       <li>• Your subscription will be canceled</li>
                       <li>• You'll lose access to premium features</li>
                       <li>• Data retention will be limited to 7 days</li>
-                      <li>• Monthly receipt limit will be reduced to 25</li>
+                      <li>• Monthly receipt limit will be reduced to 50</li>
                     </>
                   ) : (
                     <>
@@ -664,6 +673,6 @@ export default function PricingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

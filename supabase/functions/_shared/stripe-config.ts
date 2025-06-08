@@ -45,7 +45,7 @@ export const PRICE_ID_TO_TIER_MAP: Record<string, SubscriptionTier> = {
  */
 export const TIER_LIMITS = {
   free: {
-    monthlyReceipts: 25,
+    monthlyReceipts: 50,
     storageLimitMB: 1024, // 1GB
     retentionDays: 7,
     batchUploadLimit: 1,
@@ -59,7 +59,7 @@ export const TIER_LIMITS = {
     }
   },
   pro: {
-    monthlyReceipts: 200,
+    monthlyReceipts: 500,
     storageLimitMB: 10240, // 10GB
     retentionDays: 90,
     batchUploadLimit: 5,

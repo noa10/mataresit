@@ -16,7 +16,7 @@ export const FREE_PLAN_ID = 'free';
 export const SUBSCRIPTION_TIERS = {
   free: {
     name: 'Free',
-    monthlyReceipts: 25,
+    monthlyReceipts: 50,
     storageLimitMB: 1024, // 1GB
     retentionDays: 7,
     batchUploadLimit: 1,
@@ -32,7 +32,7 @@ export const SUBSCRIPTION_TIERS = {
   },
   pro: {
     name: 'Pro',
-    monthlyReceipts: 200,
+    monthlyReceipts: 500,
     storageLimitMB: 10240, // 10GB
     retentionDays: 90,
     batchUploadLimit: 5,
