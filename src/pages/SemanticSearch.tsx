@@ -4,12 +4,13 @@ import { MessageSquare, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { semanticSearch, SearchParams, SearchResult } from '../lib/ai-search';
 import { generateIntelligentResponse, detectUserIntent } from '../lib/chat-response-generator';
-import Navbar from "@/components/Navbar";
+
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { ConversationSidebar } from '../components/chat/ConversationSidebar';
 import { SidebarToggle } from '../components/chat/SidebarToggle';
+import { useChatControls } from '@/contexts/ChatControlsContext';
 
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -38,76 +39,8 @@ export default function SemanticSearchPage() {
   // Conversation updater for real-time updates
   const { saveConversation: saveConversationWithEvents } = useConversationUpdater();
 
-  // Initialize sidebar state based on screen size and localStorage preference
-  useEffect(() => {
-    const handleResize = () => {
-      const isLargeScreen = window.innerWidth >= 1024;
-      setIsDesktop(isLargeScreen);
-
-      if (isLargeScreen) {
-        // On large screens, check localStorage preference or default to open
-        const savedState = localStorage.getItem('chat-sidebar-open');
-        setSidebarOpen(savedState !== null ? savedState === 'true' : true);
-      } else {
-        // On mobile/tablet, always start closed
-        setSidebarOpen(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Save sidebar state to localStorage when it changes (only on large screens)
-  useEffect(() => {
-    if (isDesktop) {
-      localStorage.setItem('chat-sidebar-open', sidebarOpen.toString());
-    }
-  }, [sidebarOpen, isDesktop]);
-
-  // Enhanced keyboard shortcuts with visual feedback
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+B or Cmd+B to toggle sidebar (standard shortcut)
-      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
-        event.preventDefault();
-        setSidebarOpen(prev => !prev);
-
-        // Show visual feedback
-        const feedback = document.createElement('div');
-        feedback.className = 'fixed top-4 right-4 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium z-50 animate-in fade-in slide-in-from-top-2 duration-200';
-        feedback.textContent = `Sidebar ${!sidebarOpen ? 'opened' : 'closed'}`;
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          feedback.classList.add('animate-out', 'fade-out', 'slide-out-to-top-2');
-          setTimeout(() => document.body.removeChild(feedback), 200);
-        }, 1500);
-      }
-
-      // Escape key to close sidebar on mobile
-      if (event.key === 'Escape' && sidebarOpen && !isDesktop) {
-        event.preventDefault();
-        setSidebarOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sidebarOpen, isDesktop]);
-
-  // Initialize from URL if there's a query parameter
-  useEffect(() => {
-    const query = urlSearchParams.get('q');
-    const conversationId = urlSearchParams.get('c');
-
-    if (conversationId) {
-      loadConversation(conversationId);
-    } else if (query) {
-      handleSendMessage(query);
-    }
-  }, []);
+  // Chat controls context
+  const { setChatControls } = useChatControls();
 
   // Generate unique message ID
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -143,6 +76,126 @@ export default function SemanticSearchPage() {
       setUrlSearchParams({ c: conversationId });
     }
   }, [setUrlSearchParams]);
+
+  // Handle new chat
+  const handleNewChat = useCallback(() => {
+    // Save current conversation before starting new one
+    if (messages.length > 0) {
+      saveCurrentConversation();
+    }
+
+    setMessages([]);
+    setCurrentConversationId(null);
+    setLastSearchParams(null);
+    setCurrentOffset(0);
+    setUrlSearchParams({});
+  }, [messages, saveCurrentConversation, setUrlSearchParams]);
+
+  // Enhanced sidebar handlers with focus management
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => {
+      const newState = !prev;
+
+      // Focus management for accessibility
+      if (newState && isDesktop) {
+        // When opening sidebar on desktop, focus the first interactive element
+        setTimeout(() => {
+          const sidebar = document.querySelector('[role="complementary"]');
+          const firstFocusable = sidebar?.querySelector('button, input, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+          firstFocusable?.focus();
+        }, 300);
+      } else if (!newState && !isDesktop) {
+        // When closing sidebar on mobile, return focus to toggle button
+        setTimeout(() => {
+          const toggleButton = document.querySelector('[aria-label*="sidebar"]') as HTMLElement;
+          toggleButton?.focus();
+        }, 100);
+      }
+
+      return newState;
+    });
+  }, [isDesktop]);
+
+  // Set up chat controls for the navbar
+  useEffect(() => {
+    setChatControls({
+      sidebarToggle: (
+        <SidebarToggle
+          isOpen={sidebarOpen}
+          onToggle={handleToggleSidebar}
+          showKeyboardHint={true}
+        />
+      ),
+      onNewChat: handleNewChat,
+      showChatTitle: true
+    });
+
+    // Cleanup when component unmounts
+    return () => {
+      setChatControls(null);
+    };
+  }, [sidebarOpen, handleToggleSidebar, handleNewChat, setChatControls]);
+
+  // Initialize sidebar state based on screen size and localStorage preference
+  useEffect(() => {
+    const handleResize = () => {
+      const isLargeScreen = window.innerWidth >= 1024;
+      setIsDesktop(isLargeScreen);
+
+      if (isLargeScreen) {
+        // On large screens, check localStorage preference or default to open
+        const savedState = localStorage.getItem('chat-sidebar-open');
+        setSidebarOpen(savedState !== null ? savedState === 'true' : true);
+      } else {
+        // On mobile/tablet, always start closed
+        setSidebarOpen(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Save sidebar state to localStorage when it changes (only on large screens)
+  useEffect(() => {
+    if (isDesktop) {
+      localStorage.setItem('chat-sidebar-open', sidebarOpen.toString());
+    }
+  }, [sidebarOpen, isDesktop]);
+
+  // Enhanced keyboard shortcuts with visual feedback
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+B or Cmd+B to toggle sidebar (standard shortcut)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+        event.preventDefault();
+        handleToggleSidebar();
+
+        // Show visual feedback
+        const feedback = document.createElement('div');
+        feedback.className = 'fixed top-4 right-4 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium z-50 animate-in fade-in slide-in-from-top-2 duration-200';
+        feedback.textContent = `Sidebar ${!sidebarOpen ? 'opened' : 'closed'}`;
+        document.body.appendChild(feedback);
+
+        setTimeout(() => {
+          feedback.classList.add('animate-out', 'fade-out', 'slide-out-to-top-2');
+          setTimeout(() => document.body.removeChild(feedback), 200);
+        }, 1500);
+      }
+
+      // Escape key to close sidebar on mobile
+      if (event.key === 'Escape' && sidebarOpen && !isDesktop) {
+        event.preventDefault();
+        handleToggleSidebar();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarOpen, isDesktop, handleToggleSidebar]);
+
+
 
   // Auto-save conversation when messages change (more aggressive for real-time updates)
   useEffect(() => {
@@ -330,44 +383,7 @@ export default function SemanticSearchPage() {
     // TODO: Implement feedback storage/analytics
   };
 
-  // Handle new chat
-  const handleNewChat = useCallback(() => {
-    // Save current conversation before starting new one
-    if (messages.length > 0) {
-      saveCurrentConversation();
-    }
 
-    setMessages([]);
-    setCurrentConversationId(null);
-    setLastSearchParams(null);
-    setCurrentOffset(0);
-    setUrlSearchParams({});
-  }, [messages, saveCurrentConversation, setUrlSearchParams]);
-
-  // Enhanced sidebar handlers with focus management
-  const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen(prev => {
-      const newState = !prev;
-
-      // Focus management for accessibility
-      if (newState && isDesktop) {
-        // When opening sidebar on desktop, focus the first interactive element
-        setTimeout(() => {
-          const sidebar = document.querySelector('[role="complementary"]');
-          const firstFocusable = sidebar?.querySelector('button, input, [tabindex]:not([tabindex="-1"])') as HTMLElement;
-          firstFocusable?.focus();
-        }, 300);
-      } else if (!newState && !isDesktop) {
-        // When closing sidebar on mobile, return focus to toggle button
-        setTimeout(() => {
-          const toggleButton = document.querySelector('[aria-label*="sidebar"]') as HTMLElement;
-          toggleButton?.focus();
-        }, 100);
-      }
-
-      return newState;
-    });
-  }, [isDesktop]);
 
   // Handle sidebar width changes
   const handleSidebarWidthChange = useCallback((width: number) => {
@@ -383,10 +399,22 @@ export default function SemanticSearchPage() {
     loadConversation(conversationId);
   };
 
+  // Initialize from URL if there's a query parameter (after all functions are defined)
+  useEffect(() => {
+    const query = urlSearchParams.get('q');
+    const conversationId = urlSearchParams.get('c');
+
+    if (conversationId) {
+      loadConversation(conversationId);
+    } else if (query) {
+      handleSendMessage(query);
+    }
+  }, [loadConversation, handleSendMessage, urlSearchParams]);
+
   return (
     <div className="min-h-screen bg-background flex">
       <Helmet>
-        <title>AI Chat - Paperless Maverick</title>
+        <title>AI Chat - ReceiptScan</title>
       </Helmet>
 
       {/* Conversation Sidebar */}
@@ -402,20 +430,6 @@ export default function SemanticSearchPage() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <Navbar
-          chatControls={{
-            sidebarToggle: (
-              <SidebarToggle
-                isOpen={sidebarOpen}
-                onToggle={handleToggleSidebar}
-                showKeyboardHint={true}
-              />
-            ),
-            onNewChat: handleNewChat,
-            showChatTitle: true,
-            useChatLayout: true
-          }}
-        />
 
         {/* Chat Content Area - Optimized for fixed input */}
         <div className="flex-1 flex flex-col relative overflow-hidden">

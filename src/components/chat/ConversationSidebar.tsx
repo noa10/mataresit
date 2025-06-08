@@ -326,10 +326,10 @@ export function ConversationSidebar({
   return (
     <>
       {/* Enhanced Mobile Overlay with better animations */}
-      {isOpen && (
+      {isOpen && !isDesktop && (
         <div
           className={cn(
-            "fixed inset-0 bg-black/50 z-40 lg:hidden",
+            "fixed inset-0 bg-black/50 z-40",
             "animate-in fade-in duration-300",
             "backdrop-blur-sm"
           )}
@@ -347,11 +347,18 @@ export function ConversationSidebar({
       {/* Enhanced Sidebar with improved animations */}
       <div
         className={cn(
-          "fixed top-0 left-0 h-full bg-background border-r border-border z-50",
-          "transform transition-all duration-300 ease-in-out",
-          "shadow-lg lg:shadow-none",
-          isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:relative lg:transform-none lg:transition-all lg:duration-300",
+          "h-full bg-background border-r border-border",
+          "transition-all duration-300 ease-in-out",
+          // Mobile behavior: fixed positioning with transform
+          !isDesktop && [
+            "fixed top-0 left-0 z-50 shadow-lg",
+            isOpen ? "translate-x-0" : "-translate-x-full"
+          ],
+          // Desktop behavior: relative positioning with proper transforms
+          isDesktop && [
+            "relative z-50 flex-shrink-0",
+            isOpen ? "translate-x-0" : "-translate-x-full"
+          ],
           // Enhanced focus management
           "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 lg:focus-within:ring-0",
           // Resizing state
