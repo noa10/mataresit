@@ -4,7 +4,9 @@ import { adminService } from "@/services/adminService";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ShoppingBag, Users, AlertCircle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ShoppingBag, Users, AlertCircle, BookOpen } from "lucide-react";
+import { BlogAnalytics } from "@/components/admin/BlogAnalytics";
 
 interface SystemStats {
   userCount: number;
@@ -52,7 +54,13 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* System Overview */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              System Overview
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -97,11 +105,26 @@ export default function AdminDashboard() {
                 </p>
               </CardContent>
             </Card>
+            </div>
           </div>
 
+          <Separator className="my-8" />
+
+          {/* Blog Analytics */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Blog Analytics
+            </h2>
+            <BlogAnalytics />
+          </div>
+
+          <Separator className="my-8" />
+
+          {/* Recent Activity */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
+              <CardTitle>Recent Receipt Activity</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>

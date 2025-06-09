@@ -2,7 +2,7 @@
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, FileText, Home, Settings, Shield, Users, Menu, ChevronDown } from "lucide-react";
+import { BarChart3, FileText, Home, Settings, Shield, Users, Menu, ChevronDown, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { path: '/admin', label: 'Dashboard', icon: Home, exact: true },
     { path: '/admin/users', label: 'Users', icon: Users },
     { path: '/admin/receipts', label: 'Receipts', icon: FileText },
+    { path: '/admin/blog', label: 'Blog', icon: BookOpen },
     { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/admin/settings', label: 'Settings', icon: Settings },
   ];
