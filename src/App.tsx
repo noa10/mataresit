@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeProvider } from "@/contexts/StripeContext";
 import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
@@ -24,6 +25,7 @@ import UsersManagement from "./pages/admin/UsersManagement";
 import ReceiptsManagement from "./pages/admin/ReceiptsManagement";
 import AnalyticsPage from "./pages/admin/AnalyticsPage";
 import AdminSettingsPage from "./pages/admin/SettingsPage";
+import BlogManagement from "./pages/admin/BlogManagement";
 
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
@@ -33,6 +35,10 @@ const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
+const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 
 
 // Create a loading component for suspense
@@ -54,14 +60,15 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <StripeProvider>
-        <ChatControlsProvider>
-          <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+  <HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <StripeProvider>
+          <ChatControlsProvider>
+            <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
           <Routes>
             {/* Public Routes with Layout */}
             <Route element={<PublicLayout />}>
@@ -69,6 +76,26 @@ const App = () => (
               <Route path="/pricing" element={
                 <Suspense fallback={<PageLoading />}>
                   <PricingPage />
+                </Suspense>
+              } />
+              <Route path="/help" element={
+                <Suspense fallback={<PageLoading />}>
+                  <HelpCenter />
+                </Suspense>
+              } />
+              <Route path="/docs" element={
+                <Suspense fallback={<PageLoading />}>
+                  <DocumentationPage />
+                </Suspense>
+              } />
+              <Route path="/blog" element={
+                <Suspense fallback={<PageLoading />}>
+                  <BlogIndexPage />
+                </Suspense>
+              } />
+              <Route path="/blog/:slug" element={
+                <Suspense fallback={<PageLoading />}>
+                  <BlogPostPage />
                 </Suspense>
               } />
               <Route path="/payment-success" element={
@@ -125,16 +152,18 @@ const App = () => (
                 <Route path="users" element={<UsersManagement />} />
                 <Route path="receipts" element={<ReceiptsManagement />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="blog" element={<BlogManagement />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Route>
           </Routes>
-        </BrowserRouter>
-          </TooltipProvider>
-        </ChatControlsProvider>
-      </StripeProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+          </BrowserRouter>
+            </TooltipProvider>
+          </ChatControlsProvider>
+        </StripeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;
