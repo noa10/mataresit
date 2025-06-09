@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { PRICE_IDS } from "@/config/stripe";
@@ -22,7 +24,9 @@ import {
   Shield,
   Clock,
   Sparkles,
-  Loader2
+  Loader2,
+  CheckCircle,
+  ChevronDown
 } from "lucide-react";
 import { SubscriptionStatusRefresh } from "@/components/SubscriptionStatusRefresh";
 
@@ -54,16 +58,16 @@ const pricingTiers: PricingTier[] = [
     id: "free",
     name: "Free",
     price: { monthly: 0, annual: 0 },
-    description: "Perfect for individuals getting started",
+    description: "Perfect for individuals and freelancers getting started with automated expense tracking.",
     icon: <Upload className="h-6 w-6" />,
     features: {
-      uploads: "50 receipts per month",
-      processing: "AI Vision and AI categorization processing",
-      retention: "7-day data retention",
-      storage: "1GB storage",
+      uploads: "Up to 50 receipts per month",
+      processing: "AI-powered data extraction",
+      retention: "7-day data history",
+      storage: "1GB secure storage",
       models: [
-        "Google Gemini 2.0 Flash Lite (default)",
-        "BYOK (bring your own key) for:",
+        "Default AI Models",
+        "Bring Your Own API Key (BYOK) support",
         "• Google Gemini",
         "• OpenAI",
         "• Claude",
@@ -71,10 +75,10 @@ const pricingTiers: PricingTier[] = [
         "• Grok"
       ],
       capabilities: [
-        "Merchant Normalization",
-        "Line item extraction",
-        "Currency Detection",
-        "Confidence Scoring",
+        "Smart merchant normalization",
+        "Automatic line item extraction",
+        "Multi-currency detection",
+        "Confidence scoring",
         "Single processing method",
         "Single user access"
       ],
@@ -86,15 +90,16 @@ const pricingTiers: PricingTier[] = [
     id: "pro",
     name: "Pro",
     price: { monthly: 10, annual: 108 },
-    description: "Advanced features for small teams",
+    description: "For growing businesses and teams who need more power and collaboration.",
     icon: <Zap className="h-6 w-6" />,
     popular: true,
     features: {
-      uploads: "500 receipts per month",
-      processing: "AI Vision and AI categorization processing",
-      retention: "90-day data retention",
-      storage: "10GB storage",
+      uploads: "Everything in Free, plus:",
+      processing: "500 receipts per month",
+      retention: "90-day data history",
+      storage: "10GB secure storage",
       models: [
+        "Access to premium AI models",
         "Google Gemini 2.5 Flash (default)",
         "BYOK (bring your own key) for:",
         "• Google Gemini",
@@ -105,15 +110,15 @@ const pricingTiers: PricingTier[] = [
       ],
       capabilities: [
         "All Free tier processing",
-        "Full merchant normalization",
+        "Enhanced merchant normalization",
         "Currency detection with conversion",
-        "Line item extraction",
+        "Advanced line item extraction",
         "Advanced confidence scoring",
         "Batch processing (up to 5)",
-        "Up to 5 users",
+        "Team access for up to 5 users",
         "Version control",
         "Basic integrations",
-        "Custom branding"
+        "Custom branding options"
       ],
       analytics: [
         "Advanced search with filters and tags",
@@ -129,14 +134,15 @@ const pricingTiers: PricingTier[] = [
     id: "max",
     name: "Max",
     price: { monthly: 20, annual: 216 },
-    description: "Complete solution for growing businesses",
+    description: "Enterprise-grade solution for scaling businesses with unlimited potential.",
     icon: <Crown className="h-6 w-6" />,
     features: {
-      uploads: "Unlimited receipts",
-      processing: "Priority processing queue",
+      uploads: "Everything in Pro, plus:",
+      processing: "Unlimited receipts with priority processing",
       retention: "1-year retention + archiving",
-      storage: "Unlimited storage",
+      storage: "Unlimited secure storage",
       models: [
+        "Premium AI models with priority access",
         "Google Gemini 2.5 Flash (default)",
         "BYOK (bring your own key) for:",
         "• Google Gemini",
@@ -148,10 +154,10 @@ const pricingTiers: PricingTier[] = [
       capabilities: [
         "All Pro Processing",
         "Advanced batch processing (up to 20)",
-        "Unlimited users",
+        "Unlimited team members",
         "Advanced version control",
-        "Advanced integrations",
-        "Custom branding"
+        "Enterprise integrations",
+        "Full custom branding"
       ],
       analytics: [
         "Advanced search with all features",
@@ -167,10 +173,80 @@ const pricingTiers: PricingTier[] = [
   }
 ];
 
+// Feature Comparison Table Component
+const FeatureComparisonTable = ({ tiers }: { tiers: PricingTier[] }) => {
+  const allFeatures = [
+    { key: "uploads", label: "Monthly Receipts" },
+    { key: "processing", label: "Processing Type" },
+    { key: "retention", label: "Data Retention" },
+    { key: "storage", label: "Storage" },
+    { key: "models", label: "AI Models" },
+    { key: "capabilities", label: "Processing Capabilities" },
+    { key: "analytics", label: "Analytics & Reporting" },
+    { key: "support", label: "Support Level" }
+  ];
+
+  const getFeatureValue = (tier: PricingTier, featureKey: string) => {
+    const feature = tier.features[featureKey as keyof typeof tier.features];
+    if (Array.isArray(feature)) {
+      return feature.slice(0, 3).join(", ") + (feature.length > 3 ? "..." : "");
+    }
+    return feature || "Not included";
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">Feature</TableHead>
+            {tiers.map(tier => (
+              <TableHead key={tier.id} className="text-center min-w-[200px]">
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`p-2 rounded-full ${
+                    tier.id === 'free' ? 'bg-green-100 text-green-600' :
+                    tier.id === 'pro' ? 'bg-blue-100 text-blue-600' :
+                    'bg-purple-100 text-purple-600'
+                  }`}>
+                    {tier.icon}
+                  </div>
+                  <span className="font-semibold">{tier.name}</span>
+                  {tier.popular && (
+                    <Badge className="bg-primary text-primary-foreground">
+                      <Star className="h-3 w-3 mr-1" />
+                      Popular
+                    </Badge>
+                  )}
+                </div>
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {allFeatures.map(feature => (
+            <TableRow key={feature.key}>
+              <TableCell className="font-medium">{feature.label}</TableCell>
+              {tiers.map(tier => (
+                <TableCell key={tier.id} className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <span className="text-sm">{getFeatureValue(tier, feature.key)}</span>
+                  </div>
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
 export default function PricingPage() {
   const { user } = useAuth();
   const { createCheckoutSession, downgradeSubscription, isLoading, subscriptionData } = useStripe();
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [downgradeDialog, setDowngradeDialog] = useState<{
     isOpen: boolean;
     targetTier: 'free' | 'pro' | 'max' | null;
@@ -278,61 +354,179 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
             Unlock the power of AI-driven receipt processing with flexible pricing that scales with your needs
           </p>
-          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+          {/* Enhanced Trust Signals */}
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mt-8">
             <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-green-500" />
-              <span>No setup fees</span>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span>14-day free trial</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-500" />
+              <CheckCircle className="h-4 w-4 text-green-500" />
               <span>Cancel anytime</span>
             </div>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-purple-500" />
-              <span>14-day free trial</span>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span>No setup fees</span>
             </div>
           </div>
         </motion.div>
 
-        {/* Billing Interval Toggle */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-muted p-1 rounded-lg">
-            <ToggleGroup
-              type="single"
-              value={billingInterval}
-              onValueChange={(value) => value && setBillingInterval(value as 'monthly' | 'annual')}
-              className="flex items-center"
-            >
-              <ToggleGroupItem value="monthly" className="px-4">
-                Monthly
-              </ToggleGroupItem>
-              <ToggleGroupItem value="annual" className="px-4">
-                Yearly <Badge variant="outline" className="ml-2 text-green-600 border-green-200">Save up to 20%</Badge>
-              </ToggleGroupItem>
-            </ToggleGroup>
+        {/* Enhanced Billing Interval Toggle */}
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.6,
+            delay: 0.2,
+            type: "spring",
+            stiffness: 200,
+            damping: 20
+          }}
+          className="flex justify-center mb-12"
+        >
+          <div className="relative bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-1.5 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 backdrop-blur-sm">
+            {/* Sliding Background Indicator */}
+            <motion.div
+              className="absolute top-1.5 h-[calc(100%-12px)] bg-gradient-to-r from-white to-slate-50 dark:from-slate-700 dark:to-slate-600 rounded-xl shadow-lg border border-slate-200 dark:border-slate-500"
+              style={{
+                boxShadow: billingInterval === 'annual'
+                  ? '0 4px 20px rgba(34, 197, 94, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)'
+                  : '0 4px 15px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05)'
+              }}
+              initial={false}
+              animate={{
+                left: billingInterval === 'monthly' ? '6px' : '50%',
+                width: billingInterval === 'monthly' ? 'calc(50% - 6px)' : 'calc(50% - 6px)',
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+              }}
+            />
+
+            {/* Toggle Buttons */}
+            <div className="relative flex">
+              {/* Monthly Button */}
+              <motion.button
+                onClick={() => setBillingInterval('monthly')}
+                className={`relative z-10 flex items-center justify-center px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[140px] h-[52px] ${
+                  billingInterval === 'monthly'
+                    ? 'text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                whileHover={{
+                  scale: 1.02,
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.98 }}
+                initial={false}
+                animate={{
+                  fontWeight: billingInterval === 'monthly' ? 600 : 500,
+                }}
+              >
+                <motion.span
+                  initial={false}
+                  animate={{
+                    textShadow: billingInterval === 'monthly'
+                      ? '0 1px 2px rgba(0, 0, 0, 0.1)'
+                      : '0 0 0px rgba(0, 0, 0, 0)'
+                  }}
+                  className="text-center"
+                >
+                  Monthly
+                </motion.span>
+              </motion.button>
+
+              {/* Yearly Button */}
+              <motion.button
+                onClick={() => setBillingInterval('annual')}
+                className={`relative z-10 flex items-center justify-center px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[140px] h-[52px] ${
+                  billingInterval === 'annual'
+                    ? 'text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                whileHover={{
+                  scale: 1.02,
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.98 }}
+                initial={false}
+                animate={{
+                  fontWeight: billingInterval === 'annual' ? 600 : 500,
+                }}
+              >
+                {/* Main text container - centered */}
+                <div className="flex flex-col items-center justify-center">
+                  <motion.span
+                    initial={false}
+                    animate={{
+                      textShadow: billingInterval === 'annual'
+                        ? '0 1px 2px rgba(0, 0, 0, 0.1)'
+                        : '0 0 0px rgba(0, 0, 0, 0)'
+                    }}
+                    className="text-center leading-none"
+                  >
+                    Yearly
+                  </motion.span>
+
+                  {/* Badge positioned below text */}
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{
+                      scale: 1,
+                      opacity: 1,
+                    }}
+                    transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                    whileHover={{ scale: 1.05 }}
+                    className="mt-1"
+                  >
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.05, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-400 shadow-sm font-medium px-1.5 py-0.5 leading-none"
+                      >
+                        Save 20%
+                      </Badge>
+                    </motion.div>
+                  </motion.div>
+                </div>
+              </motion.button>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
           {pricingTiers.map((tier, index) => (
             <motion.div
               key={tier.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              className={`relative ${tier.popular ? 'md:scale-105 pt-6' : ''}`}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ y: -10, transition: { duration: 0.2 } }}
+              className={`relative ${tier.popular ? 'md:scale-105' : ''}`}
             >
               {tier.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                  <Badge className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-4 py-1 shadow-lg">
+                  <Badge className="bg-primary text-primary-foreground shadow-lg">
                     <Star className="h-3 w-3 mr-1" />
                     Most Popular
                   </Badge>
                 </div>
               )}
 
-              <Card className={`h-full glass-card ${tier.popular ? 'border-primary/50 shadow-lg pt-4' : ''}`}>
+              <Card className={`h-full ${tier.popular ? 'border-primary shadow-lg pt-4' : ''}`}>
                 <CardHeader className="text-center pb-8">
                   <div className="flex items-center justify-center mb-4">
                     <div className={`p-3 rounded-full ${
@@ -514,6 +708,28 @@ export default function PricingPage() {
             </motion.div>
           ))}
         </div>
+
+        {/* Feature Comparison Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-16 text-center"
+        >
+          <Collapsible open={isComparisonOpen} onOpenChange={setIsComparisonOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="text-lg">
+                Compare all features
+                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isComparisonOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-8">
+              <Card className="p-6">
+                <FeatureComparisonTable tiers={pricingTiers} />
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        </motion.div>
 
         {/* FAQ Section */}
         <motion.div

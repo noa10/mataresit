@@ -11,7 +11,7 @@ interface ProcessingTimelineProps {
 }
 
 export function ProcessingTimeline({ currentStage, stageHistory, uploadProgress }: ProcessingTimelineProps) {
-  const orderedStages = ['START', 'FETCH', 'OCR', 'GEMINI', 'SAVE', 'COMPLETE'];
+  const orderedStages = ['START', 'FETCH', 'PROCESSING', 'SAVE', 'COMPLETE'];
   
   return (
     <div className="mt-6 pt-4 w-full">
@@ -29,6 +29,13 @@ export function ProcessingTimeline({ currentStage, stageHistory, uploadProgress 
         {/* Steps */}
         {orderedStages.map((stage, idx) => {
           const stageConfig = PROCESSING_STAGES[stage as keyof typeof PROCESSING_STAGES];
+
+          // Skip if stage config is not found
+          if (!stageConfig) {
+            console.warn(`Stage config not found for: ${stage}`);
+            return null;
+          }
+
           const isCurrent = currentStage === stage;
           const isCompleted = stageHistory.includes(stage) || 
                              currentStage === 'COMPLETE' || 

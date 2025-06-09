@@ -8,7 +8,7 @@ import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw,
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
-import { updateReceipt, processReceiptWithOCR, logCorrections, fixProcessingStatus } from "@/services/receiptService";
+import { updateReceipt, processReceiptWithAI, logCorrections, fixProcessingStatus } from "@/services/receiptService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
@@ -544,10 +544,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   });
 
   const reprocessMutation = useMutation({
-    mutationFn: () => processReceiptWithOCR(receipt.id, {
-      primaryMethod: 'ai-vision', // Force AI Vision
-      modelId: settings.selectedModel,
-      compareWithAlternative: settings.compareWithAlternative
+    mutationFn: () => processReceiptWithAI(receipt.id, {
+      modelId: settings.selectedModel
     }),
     onSuccess: (data) => {
       if (data) {
@@ -558,8 +556,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     },
     onError: (error) => {
       console.error("Failed to process receipt:", error);
-      const methodName = settings.processingMethod === 'ai-vision' ? 'AI Vision' : 'OCR-AI';
-      toast.error(`Failed to process receipt with ${methodName}`);
+      toast.error(`Failed to process receipt with AI Vision`);
     }
   });
 
@@ -1015,24 +1012,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         colorClass = 'bg-blue-500';
         break;
       case 'uploaded':
-        statusText = 'Preparing for OCR...';
+        statusText = 'Preparing for AI Processing...';
         colorClass = 'bg-indigo-500';
         break;
-      case 'processing_ocr':
-        statusText = 'Running OCR...';
-        colorClass = 'bg-violet-500';
-        break;
-      case 'processing_ai':
-        statusText = 'AI Analysis...';
+      case 'processing':
+        statusText = 'AI Processing...';
         colorClass = 'bg-purple-500';
         break;
-      case 'failed_ocr':
-        statusText = 'OCR Failed';
-        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
-        colorClass = 'bg-red-500';
-        break;
-      case 'failed_ai':
-        statusText = 'AI Analysis Failed';
+      case 'failed':
+        statusText = 'Processing Failed';
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
         colorClass = 'bg-red-500';
         break;
@@ -1052,7 +1040,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             {icon}
             {statusText}
           </Badge>
-          {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
+          {currentStatus === 'failed' && (
             <Button
               size="sm"
               variant="outline"
@@ -1064,7 +1052,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             </Button>
           )}
 
-          {(currentStatus === 'failed_ocr' || currentStatus === 'failed_ai') && (
+          {currentStatus === 'failed' && (
             <Button
               size="sm"
               variant="outline"

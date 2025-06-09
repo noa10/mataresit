@@ -5,7 +5,7 @@ import { useFileUpload } from "./useFileUpload";
 import {
   createReceipt,
   uploadReceiptImage,
-  processReceiptWithOCR,
+  processReceiptWithAI,
   markReceiptUploaded
 } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -271,7 +271,7 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
 }
 
 export function useBatchFileUpload(options: BatchUploadOptions = {}) {
-  const { maxConcurrent = 2, autoStart = false, useEnhancedFallback = true } = options;
+  const { maxConcurrent = 2, autoStart = false, useEnhancedFallback = false } = options; // Temporarily disabled for consistency
 
   // Use the base file upload hook for file selection and validation
   const baseUpload = useFileUpload();
@@ -638,6 +638,10 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       try {
         console.log(`Processing receipt ${newReceiptId}...`);
 
+        // Add a small delay for batch uploads to avoid potential race conditions
+        // This helps ensure AI model state consistency between requests
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         const recommendation = processingRecommendations[upload.id];
         let result;
 
@@ -665,10 +669,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           );
         } else {
           // Fallback to original processing with AI Vision
-          result = await processReceiptWithOCR(newReceiptId, {
-            primaryMethod: 'ai-vision', // Force AI Vision
+          result = await processReceiptWithAI(newReceiptId, {
             modelId: recommendation?.recommendedModel || settings.selectedModel,
-            compareWithAlternative: settings.compareWithAlternative
+            uploadContext: 'batch'
           });
         }
 

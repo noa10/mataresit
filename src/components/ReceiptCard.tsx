@@ -86,21 +86,12 @@ export default function ReceiptCard({
         statusText = 'Uploaded';
         colorClass = 'border-indigo-500 text-indigo-500';
         break;
-      case 'processing_ocr':
-        statusText = 'OCR...';
-        colorClass = 'border-violet-500 text-violet-500';
-        break;
-      case 'processing_ai':
-        statusText = 'AI Analysis...';
+      case 'processing':
+        statusText = 'AI Processing...';
         colorClass = 'border-purple-500 text-purple-500';
         break;
-      case 'failed_ocr':
-        statusText = 'OCR Failed';
-        icon = <AlertTriangle size={12} className="mr-1" />;
-        colorClass = 'border-red-500 text-red-500';
-        break;
-      case 'failed_ai':
-        statusText = 'AI Failed';
+      case 'failed':
+        statusText = 'Processing Failed';
         icon = <AlertTriangle size={12} className="mr-1" />;
         colorClass = 'border-red-500 text-red-500';
         break;
@@ -145,8 +136,8 @@ export default function ReceiptCard({
         {processingStatus && processingStatus !== 'complete' && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10">
             <div className="text-white flex flex-col items-center">
-              {processingStatus === 'uploading' || processingStatus === 'uploaded' || 
-               processingStatus === 'processing_ocr' || processingStatus === 'processing_ai' ? (
+              {processingStatus === 'uploading' || processingStatus === 'uploaded' ||
+               processingStatus === 'processing' ? (
                 <Loader2 size={32} className="animate-spin mb-3" />
               ) : (
                 <AlertTriangle size={32} className="mb-3 text-red-500" />
@@ -154,10 +145,8 @@ export default function ReceiptCard({
               <p className="text-sm font-medium">
                 {processingStatus === 'uploading' && 'Uploading...'}
                 {processingStatus === 'uploaded' && 'Processing...'}
-                {processingStatus === 'processing_ocr' && 'OCR Processing...'}
-                {processingStatus === 'processing_ai' && 'AI Analysis...'}
-                {processingStatus === 'failed_ocr' && 'OCR Failed'}
-                {processingStatus === 'failed_ai' && 'AI Failed'}
+                {processingStatus === 'processing' && 'AI Processing...'}
+                {processingStatus === 'failed' && 'Processing Failed'}
               </p>
             </div>
           </div>

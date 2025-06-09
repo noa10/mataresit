@@ -19,7 +19,7 @@ interface EnhancedProcessingTimelineProps {
   stageHistory: string[];
   uploadProgress: number;
   fileSize?: number;
-  processingMethod?: 'ocr-ai' | 'ai-vision';
+  processingMethod?: 'ai-vision';
   modelId?: string;
   startTime?: number;
 }
@@ -33,7 +33,7 @@ export function EnhancedProcessingTimeline({
   modelId = 'gemini-2.0-flash-lite',
   startTime
 }: EnhancedProcessingTimelineProps) {
-  const orderedStages = ['START', 'FETCH', 'OCR', 'GEMINI', 'SAVE', 'COMPLETE'];
+  const orderedStages = ['START', 'FETCH', 'PROCESSING', 'SAVE', 'COMPLETE'];
   const [timeEstimate, setTimeEstimate] = useState<ProcessingTimeEstimate | null>(null);
   const [stageStartTimes, setStageStartTimes] = useState<Record<string, number>>({});
   const [stageCompletionTimes, setStageCompletionTimes] = useState<Record<string, number>>({});
@@ -171,6 +171,13 @@ export function EnhancedProcessingTimeline({
         {/* Steps */}
         {orderedStages.map((stage, idx) => {
           const stageConfig = PROCESSING_STAGES[stage as keyof typeof PROCESSING_STAGES];
+
+          // Skip if stage config is not found
+          if (!stageConfig) {
+            console.warn(`Stage config not found for: ${stage}`);
+            return null;
+          }
+
           const isCurrent = currentStage === stage;
           const isCompleted = stageHistory.includes(stage) || 
                              currentStage === 'COMPLETE' || 

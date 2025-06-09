@@ -14,9 +14,9 @@ export const PROCESSING_STAGES = {
     icon: <Loader2 size={16} className="animate-spin" />,
     color: "text-blue-500 border-blue-500"
   },
-  OCR: {
-    name: "OCR Processing",
-    description: "Performing text recognition on receipt",
+  PROCESSING: {
+    name: "AI Processing",
+    description: "Processing receipt with AI",
     icon: <Loader2 size={16} className="animate-spin" />,
     color: "text-indigo-500 border-indigo-500"
   },

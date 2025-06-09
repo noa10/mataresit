@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   createReceipt,
   uploadReceiptImage,
-  processReceiptWithOCR,
+  processReceiptWithAI,
   markReceiptUploaded,
   fixProcessingStatus
 } from "@/services/receiptService";
@@ -49,7 +49,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [showOptions, setShowOptions] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
-  const [useEnhancedFallback, setUseEnhancedFallback] = useState(true);
+  const [useEnhancedFallback, setUseEnhancedFallback] = useState(false); // Temporarily disabled for consistency
 
   // Use settings hook instead of local state
   const { settings, updateSettings } = useSettings();
@@ -82,12 +82,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         return 'START';
       case 'uploaded':
         return 'FETCH';
-      case 'processing_ocr':
-        return 'OCR';
-      case 'processing_ai':
-        return 'GEMINI';
-      case 'failed_ocr':
-      case 'failed_ai':
+      case 'processing':
+        return 'PROCESSING';
+      case 'failed':
         return 'ERROR';
       case 'complete':
         return 'COMPLETE';
@@ -118,17 +115,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           case 'uploaded':
             setUploadProgress(50);
             break;
-          case 'processing_ocr':
-            setUploadProgress(70);
-            break;
-          case 'processing_ai':
-            setUploadProgress(85);
+          case 'processing':
+            setUploadProgress(80);
             break;
           case 'complete':
             setUploadProgress(100);
             break;
-          case 'failed_ocr':
-          case 'failed_ai':
+          case 'failed':
             setUploadProgress(100);
             break;
         }
@@ -139,8 +132,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           ariaLiveRegion.textContent = `Receipt processing ${processingStatus.replace('_', ' ')}`;
           if (processingStatus === 'complete') {
             ariaLiveRegion.textContent = 'Receipt processed successfully';
-          } else if (processingStatus === 'failed_ocr' || processingStatus === 'failed_ai') {
-            ariaLiveRegion.textContent = `Receipt processing failed: ${processingStatus}`;
+          } else if (processingStatus === 'failed') {
+            ariaLiveRegion.textContent = `Receipt processing failed`;
           }
         }
       }
@@ -172,10 +165,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             toast.error(`Processing error: ${newError}`);
           } else if (newStatus === 'complete') {
             toast.success("Receipt processed successfully!");
-          } else if (newStatus === 'failed_ocr' || newStatus === 'failed_ai') {
-            const errorMsg = newStatus === 'failed_ocr'
-              ? "OCR processing failed. Please edit manually."
-              : "AI analysis failed. Please edit manually.";
+          } else if (newStatus === 'failed') {
+            const errorMsg = "AI processing failed. Please edit manually.";
             setError(errorMsg);
             toast.error(errorMsg);
           }
@@ -317,9 +308,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         image_url: imageUrl,
         // user_id is added by the createReceipt function automatically, remove it here
         processing_status: 'uploading', // Initialize with uploading status
-        primary_method: settings.processingMethod, // Use settings from the hook
         model_used: settings.selectedModel, // Use settings from the hook
-        has_alternative_data: settings.compareWithAlternative, // Use settings from the hook
         payment_method: "" // Add required field
       }, [], {
         merchant: 0,
@@ -338,7 +327,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       await markReceiptUploaded(newReceiptId);
 
       if (ariaLiveRegion) {
-        ariaLiveRegion.textContent = `Processing receipt with ${settings.processingMethod === 'ocr-ai' ? 'OCR + AI' : 'AI Vision'}`;
+        ariaLiveRegion.textContent = `Processing receipt with AI Vision`;
       }
 
       const channel = supabase.channel(`receipt-logs-${newReceiptId}`)
@@ -397,7 +386,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               },
               onFallback: (reason, newMethod) => {
                 console.log(`Fallback triggered: ${reason} → ${newMethod}`);
-                toast.info(`Switching to ${newMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'} method...`);
+                toast.info(`Switching to AI Vision method...`);
               },
               onRetry: (attempt, maxAttempts) => {
                 console.log(`Processing attempt ${attempt}/${maxAttempts}`);
@@ -426,11 +415,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             throw new Error('Enhanced processing failed after all fallback attempts');
           }
         } else {
-          // Fallback to original processing method
-          await processReceiptWithOCR(newReceiptId, {
-            primaryMethod: processingRecommendation?.recommendedMethod || settings.processingMethod,
+          // Fallback to AI processing method
+          await processReceiptWithAI(newReceiptId, {
             modelId: processingRecommendation?.recommendedModel || settings.selectedModel,
-            compareWithAlternative: settings.compareWithAlternative
+            uploadContext: 'single'
           });
         }
 

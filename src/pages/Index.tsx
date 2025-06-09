@@ -21,112 +21,93 @@ import {
   Brain,
   Search,
   Zap,
-  Shield
+  Shield,
+  Clock,
+  DollarSign,
+  Target
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from "@/components/ui/separator";
 
-// Enhanced features array with latest AI capabilities
+// Business-focused features array inspired by Dext
 const featuresList = [
   {
-    icon: <Brain className="h-8 w-8 text-primary" />,
-    title: "Multi-Provider AI Processing",
-    description: "Advanced AI Vision with Google Gemini and OpenRouter integration. Support for multiple AI providers including GPT-4, Claude, and more through unified API."
+    icon: <Clock className="h-8 w-8 text-primary" />,
+    title: "Save Hours Every Week",
+    description: "Eliminate manual data entry forever. Our AI processes receipts in seconds, not hours, giving you time to focus on growing your business."
   },
   {
-    icon: <Sparkles className="h-8 w-8 text-primary" />,
-    title: "Smart Confidence Scoring",
-    description: "Real-time confidence indicators for every extracted field. AI-powered validation with visual feedback and automatic error detection."
+    icon: <Target className="h-8 w-8 text-primary" />,
+    title: "99% Accuracy Guaranteed",
+    description: "Advanced AI with confidence scoring ensures your financial data is always accurate. Catch errors before they become problems."
   },
   {
     icon: <Search className="h-8 w-8 text-primary" />,
-    title: "Semantic Search & Analytics",
-    description: "Vector-powered search across receipts and line items. Find receipts by natural language queries with pgvector integration."
+    title: "Find Any Receipt Instantly",
+    description: "Smart search that understands natural language. Find receipts by asking 'coffee expenses last month' or 'client dinner receipts'."
   },
   {
-    icon: <Layers className="h-8 w-8 text-primary" />,
-    title: "Dual Processing Methods",
-    description: "Choose between AI Vision (direct image processing) and OCR + AI Enhancement. Compare results with alternative processing methods."
+    icon: <DollarSign className="h-8 w-8 text-primary" />,
+    title: "Maximize Tax Deductions",
+    description: "Never miss a deductible expense again. Automatically categorize and organize receipts for tax season and financial reporting."
   },
   {
-    icon: <CheckCircle className="h-8 w-8 text-primary" />,
-    title: "Real-time Processing Status",
-    description: "Live processing updates with detailed logs. Track every step from upload through AI enhancement to final verification."
+    icon: <Users className="h-8 w-8 text-primary" />,
+    title: "Team Collaboration Made Easy",
+    description: "Share receipts and reports with your team or accountant. Real-time collaboration with role-based permissions and audit trails."
   },
   {
-    icon: <Zap className="h-8 w-8 text-primary" />,
-    title: "Batch Processing & Optimization",
-    description: "Intelligent batch upload with concurrent processing. Auto-optimization based on image quality and content complexity."
+    icon: <Shield className="h-8 w-8 text-primary" />,
+    title: "Bank-Level Security",
+    description: "Your financial data is protected with enterprise-grade security. SOC 2 compliant with end-to-end encryption."
   }
+];
+
+// How it works steps
+const howItWorksSteps = [
+  {
+    step: "1",
+    icon: <Upload className="h-8 w-8 text-primary" />,
+    title: "Upload",
+    description: "Snap a photo or upload files. Drag and drop multiple receipts for batch processing."
+  },
+  {
+    step: "2",
+    icon: <Sparkles className="h-8 w-8 text-primary" />,
+    title: "AI Processing",
+    description: "Our AI extracts all data with confidence scores. Review and approve in seconds."
+  },
+  {
+    step: "3",
+    icon: <CheckCircle className="h-8 w-8 text-primary" />,
+    title: "Export & Analyze",
+    description: "Export to Excel, QuickBooks, or your favorite accounting software. Generate reports instantly."
+  }
+];
+
+// Trusted by section (placeholder logos - replace with actual client logos)
+const trustedByLogos = [
+  { name: "TechCorp", logo: "/api/placeholder/120/40" },
+  { name: "StartupXYZ", logo: "/api/placeholder/120/40" },
+  { name: "BusinessPro", logo: "/api/placeholder/120/40" },
+  { name: "InnovateInc", logo: "/api/placeholder/120/40" },
+  { name: "GrowthCo", logo: "/api/placeholder/120/40" }
 ];
 
 export default function Index() {
   const { user } = useAuth();
 
   useEffect(() => {
-    document.title = "AI-Powered Receipt Processing - ReceiptScan";
+    document.title = "More Business, Less Paperwork - ReceiptScan";
   }, []);
 
-  // Enhanced workflow with AI-first approach
-  const featureGroups = [
-    {
-      title: "AI-Powered Upload",
-      features: [
-        {
-          icon: <Upload className="h-8 w-8 text-primary" />,
-          title: "Smart Upload & Detection",
-          description: "AI-powered file validation with automatic format detection. Supports images, PDFs, and batch uploads up to 5MB.",
-          link: "/upload"
-        },
-      ]
-    },
-    {
-      title: "Advanced AI Processing",
-      features: [
-        {
-          icon: <Brain className="h-8 w-8 text-primary" />,
-          title: "Multi-Model AI Processing",
-          description: "Choose from Google Gemini, OpenRouter models, or custom AI providers. Real-time model switching and performance optimization.",
-          link: "/settings"
-        },
-        {
-          icon: <BarChart4 className="h-8 w-8 text-primary" />,
-          title: "Confidence-Driven Validation",
-          description: "Field-level confidence scoring with visual indicators. AI suggests corrections and flags potential issues automatically.",
-          link: "/dashboard"
-        },
-      ]
-    },
-    {
-      title: "Intelligent Management",
-      features: [
-        {
-          icon: <Search className="h-8 w-8 text-primary" />,
-          title: "Semantic Search & Discovery",
-          description: "Natural language search powered by vector embeddings. Find receipts by description, merchant, or transaction details.",
-          link: "/semantic-search"
-        },
-        {
-          icon: <History className="h-8 w-8 text-primary" />,
-          title: "Processing Intelligence",
-          description: "Complete audit trail with AI decision logging. Track confidence improvements and processing method effectiveness.",
-          link: "/dashboard"
-        },
-        {
-          icon: <Settings2 className="h-8 w-8 text-primary" />,
-          title: "AI Model Configuration",
-          description: "Configure multiple AI providers and API keys. Compare processing methods and optimize for accuracy or speed.",
-          link: "/settings"
-        }
-      ]
-    },
-  ];
 
-  // Updated stats reflecting AI capabilities
+
+  // Business-focused stats
   const stats = [
-    { value: "500+", label: "AI Models Available", icon: <Brain className="h-6 w-6 text-primary mb-2" /> },
-    { value: "95%+", label: "Average Confidence", icon: <TrendingUp className="h-6 w-6 text-primary mb-2" /> },
-    { value: "10,000+", label: "Receipts Processed", icon: <FileText className="h-6 w-6 text-primary mb-2" /> },
+    { value: "10,000+", label: "Businesses Trust Us", icon: <Users className="h-6 w-6 text-primary mb-2" /> },
+    { value: "99%", label: "Accuracy Rate", icon: <Target className="h-6 w-6 text-primary mb-2" /> },
+    { value: "5 Hours", label: "Saved Per Week", icon: <Clock className="h-6 w-6 text-primary mb-2" /> },
   ];
 
   return (
@@ -138,7 +119,7 @@ export default function Index() {
         </div>
 
         <main className="relative z-10 container py-16 space-y-32">
-          {/* Enhanced Hero Section with AI focus */}
+          {/* Enhanced Hero Section with business focus */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center pt-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -146,55 +127,63 @@ export default function Index() {
               transition={{ duration: 0.5 }}
             >
               <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight">
-                <span className="text-primary">AI-Powered</span> Receipt Processing
+                More Business, <span className="text-primary">Less Paperwork</span>
               </h1>
               <p className="mt-4 text-xl text-muted-foreground lg:text-2xl">
-                Advanced multi-model AI with confidence scoring and semantic search.
+                Transform your receipts into organized data instantly. Save hours every week and never miss a tax deduction again.
               </p>
-              {/* AI Features highlight */}
+              {/* Business benefits highlight */}
               <div className="mt-6 flex flex-wrap gap-3">
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <Brain className="h-4 w-4 text-primary" />
-                  <span>Multi-Provider AI</span>
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span>Save 5+ Hours/Week</span>
                 </div>
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <BarChart4 className="h-4 w-4 text-primary" />
-                  <span>Confidence Scoring</span>
+                  <Target className="h-4 w-4 text-primary" />
+                  <span>99% Accuracy</span>
                 </div>
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <Search className="h-4 w-4 text-primary" />
-                  <span>Semantic Search</span>
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span>Bank-Level Security</span>
                 </div>
               </div>
               
               <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4">
                 {!user ? (
                   <>
-                    <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                      <Link to="/auth" className="flex items-center justify-center sm:justify-start">
-                        Try AI Processing Free
-                        <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="lg" asChild className="w-full sm:w-auto">
-                      <Link to="/auth?mode=signin" className="flex items-center justify-center sm:justify-start">
-                        Log In
-                      </Link>
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
+                        <Link to="/auth" className="flex items-center justify-center sm:justify-start">
+                          Get Started Free
+                          <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                        </Link>
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
+                        <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
+                          View Pricing
+                        </Link>
+                      </Button>
+                    </motion.div>
                   </>
                 ) : (
                   <>
-                    <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                      <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
-                        Upload with AI
-                        <Upload className="ml-2 h-5 w-5 transition-transform group-hover:translate-y-[-2px]" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="lg" asChild className="w-full sm:w-auto">
-                      <Link to="/semantic-search" className="flex items-center justify-center sm:justify-start">
-                        Try Semantic Search
-                      </Link>
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
+                        <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
+                          Go to Dashboard
+                          <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                        </Link>
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
+                        <Link to="/semantic-search" className="flex items-center justify-center sm:justify-start">
+                          Try Smart Search
+                        </Link>
+                      </Button>
+                    </motion.div>
                   </>
                 )}
               </div>
@@ -219,13 +208,13 @@ export default function Index() {
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
                   <div className="flex items-center">
                     <div>
-                      <p className="text-white font-medium">AI-Enhanced Processing</p>
-                      <p className="text-white/80 text-sm">Smart, confident, and accurate</p>
+                      <p className="text-white font-medium">Transform Your Business</p>
+                      <p className="text-white/80 text-sm">Save time, increase accuracy</p>
                     </div>
                     <Button size="sm" variant="secondary" className="ml-auto" asChild>
                       <Link to="/dashboard">
-                        <Brain className="h-4 w-4 mr-2" />
-                        Try AI
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Start Now
                       </Link>
                     </Button>
                   </div>
@@ -234,173 +223,167 @@ export default function Index() {
             </motion.div>
           </section>
 
-          {/* Enhanced Workflow Section */}
-          <section id="how-it-works" className="scroll-mt-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-12"
-            >
-              <div className="inline-flex items-center justify-center">
-                <Separator className="w-8 bg-primary h-1" />
-                <h2 className="text-lg font-medium px-4">AI-First Workflow</h2>
-                <Separator className="w-8 bg-primary h-1" />
-              </div>
-              <h3 className="text-3xl font-bold mt-4">Intelligent 3-Step Process</h3>
-              <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-                Powered by advanced AI models with real-time confidence scoring and semantic understanding.
-              </p>
-            </motion.div>
-
-            {/* Keep existing workflow structure but with updated content */}
-            <div className="flex flex-col md:flex-row gap-8 mt-12 items-start relative">
-              {featureGroups.map((group, groupIndex) => (
+          {/* Trusted By Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="py-16 text-center"
+          >
+            <h3 className="text-lg text-muted-foreground mb-8 font-medium tracking-wide uppercase">
+              Trusted by Leading Businesses
+            </h3>
+            <div className="flex justify-center items-center gap-8 flex-wrap opacity-60 hover:opacity-100 transition-opacity duration-300">
+              {trustedByLogos.map((company, index) => (
                 <motion.div
-                  key={groupIndex}
-                  className="flex-1 relative pb-8 md:pb-0"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: groupIndex * 0.2 }}
+                  key={company.name}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                  className="flex items-center justify-center h-12 w-32 bg-muted/30 rounded-lg border border-border/50"
                 >
-                  <div className="flex items-center mb-6">
-                    <span className="bg-primary/10 text-primary rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shrink-0">
-                      {groupIndex + 1}
-                    </span>
-                    <h3 className="ml-4 text-xl font-semibold text-primary">{group.title}</h3>
-                  </div>
-
-                  <div className="space-y-4 pl-2 md:pl-0">
-                    {group.features.map((feature, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: (groupIndex * 0.2) + (index * 0.1) + 0.2 }}
-                        whileHover={{ scale: 1.02, z: 10 }}
-                        className="relative"
-                      >
-                        <Link to={feature.link} className="block h-full">
-                          <Card className="h-full hover:bg-primary/5 hover:shadow-lg transition-all duration-300 cursor-pointer border-border/60 bg-card">
-                            <CardContent className="pt-6">
-                              <div className="mb-4 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10 scale-110">
-                                {React.cloneElement(feature.icon, { className: "h-10 w-10 text-primary" })}
-                              </div>
-                              <h4 className="text-lg font-medium mb-2">{feature.title}</h4>
-                              <p className="text-muted-foreground text-sm">
-                                {feature.description}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {groupIndex < featureGroups.length - 1 && (
-                    <div className="hidden md:block absolute top-1/2 right-[-2rem] transform -translate-y-1/2 z-0">
-                      <ArrowRight className="h-8 w-8 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  {groupIndex < featureGroups.length - 1 && (
-                    <div className="absolute left-[23px] top-16 bottom-0 w-px bg-border md:hidden" />
-                  )}
+                  <span className="text-sm font-medium text-muted-foreground">{company.name}</span>
                 </motion.div>
               ))}
             </div>
-          </section>
+          </motion.section>
+
+          {/* How It Works Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="py-20"
+          >
+            <div className="text-center mb-16">
+              <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="text-3xl md:text-4xl font-bold mb-4"
+              >
+                How It Works
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="text-lg text-muted-foreground max-w-2xl mx-auto"
+              >
+                From receipt to organized data in three simple steps. No training required.
+              </motion.p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+              {howItWorksSteps.map((step, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.2 }}
+                  className="text-center relative"
+                >
+                  {/* Step connector line */}
+                  {index < howItWorksSteps.length - 1 && (
+                    <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-primary/30 to-transparent z-0" />
+                  )}
+
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                      {step.icon}
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                        {step.step}
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed">{step.description}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+
 
           {/* Enhanced Stats Section */}
-          <section className="py-16 px-4 bg-secondary/10 backdrop-blur-sm rounded-2xl">
-            <motion.div
+          <motion.section
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="py-20 text-center"
+          >
+            <motion.h2
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12"
+              className="text-3xl md:text-4xl font-bold mb-16"
             >
-              <h2 className="text-3xl font-bold">
-                Powered by <span className="text-primary">Advanced AI</span>
-              </h2>
-            </motion.div>
+              Join thousands of businesses saving time and money
+            </motion.h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               {stats.map((stat, index) => (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="text-center flex flex-col items-center"
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="text-center flex flex-col items-center p-6 rounded-lg hover:bg-primary/5 transition-all duration-300"
                 >
-                  {stat.icon}
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    whileInView={{ scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 + 0.2 }}
+                  >
+                    {stat.icon}
+                  </motion.div>
                   <motion.h3
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.8, delay: index * 0.1 + 0.2 }}
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, delay: index * 0.1 + 0.3 }}
                     className="text-5xl font-bold text-primary"
                   >
                     {stat.value}
                   </motion.h3>
-                  <p className="text-muted-foreground mt-1">{stat.label}</p>
+                  <p className="text-muted-foreground mt-2 font-medium">{stat.label}</p>
                 </motion.div>
               ))}
             </div>
-
-            {/* AI Features showcase */}
-            <div className="flex justify-center mt-12">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="flex flex-col items-center">
-                  <Brain className="h-8 w-8 text-primary mb-2" />
-                  <span className="text-sm font-medium">Multi-Model AI</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <Shield className="h-8 w-8 text-primary mb-2" />
-                  <span className="text-sm font-medium">Confidence Scoring</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <Search className="h-8 w-8 text-primary mb-2" />
-                  <span className="text-sm font-medium">Vector Search</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <Zap className="h-8 w-8 text-primary mb-2" />
-                  <span className="text-sm font-medium">Real-time Processing</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-center mt-16">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                whileHover={{ scale: 1.05 }}
-              >
-                <Button asChild size="lg">
-                  <Link to="/dashboard" className="flex items-center">
-                    Explore AI Features
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </motion.div>
-            </div>
-          </section>
+          </motion.section>
 
           {/* Enhanced Features Section */}
-          <section id="features" className="scroll-mt-16">
+          <motion.section
+            id="features"
+            className="scroll-mt-16 py-20"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12"
+              className="text-center mb-16"
             >
-              <div className="inline-flex items-center justify-center">
-                <Separator className="w-8 bg-primary h-1" />
-                <h2 className="text-lg font-medium px-4">AI Features</h2>
-                <Separator className="w-8 bg-primary h-1" />
-              </div>
-              <h3 className="text-3xl font-bold mt-4">Next-Generation Intelligence</h3>
-              <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-                Harness the power of multiple AI providers with confidence-driven processing and semantic understanding.
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Everything you need to <span className="text-primary">transform your business</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                Stop wasting time on manual data entry. Our intelligent platform handles everything from receipt capture to financial reporting.
               </p>
             </motion.div>
 
@@ -408,58 +391,74 @@ export default function Index() {
               {featuresList.map((feature, index) => (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.03, y: -5, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
+                  whileHover={{ scale: 1.03, y: -5 }}
                   className="h-full"
                 >
-                  <Card className="h-full hover:bg-primary/5 transition-all duration-300 border-border/60 bg-card">
+                  <Card className="h-full hover:bg-primary/5 transition-all duration-300 border-border/60 bg-card hover:shadow-lg">
                     <CardContent className="pt-8">
-                      <div className="mb-6 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10">
+                      <motion.div
+                        className="mb-6 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10"
+                        whileHover={{ scale: 1.1, rotate: 5 }}
+                        transition={{ duration: 0.2 }}
+                      >
                         {feature.icon}
-                      </div>
-                      <h4 className="text-xl font-semibold mb-2">{feature.title}</h4>
-                      <p className="text-muted-foreground">{feature.description}</p>
+                      </motion.div>
+                      <h4 className="text-xl font-semibold mb-3">{feature.title}</h4>
+                      <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                     </CardContent>
                   </Card>
                 </motion.div>
               ))}
             </div>
-          </section>
+          </motion.section>
 
           {/* Enhanced CTA Section */}
-          <section className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden">
+          <motion.section
+            className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             <div className="absolute inset-0 z-0 opacity-5">
               <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="scale(2) rotate(45)"><rect x="0" y="0" width="100%" height="100%" fill="hsla(0,0%,100%,0)"/><path d="M10-5C10 5 10 5 0 5A10 10 0 0 1 10-5M10 15c0 10 0 10-10 10a10 10 0 0 1 10-10" strokeWidth="0.5" stroke="hsla(215, 28%, 17%, 0.2)" fill="none"/></pattern></defs><rect width="800%" height="800%" transform="translate(0,0)" fill="url(#a)"/></svg>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
               transition={{ duration: 0.5 }}
               className="max-w-2xl mx-auto relative z-10"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to experience AI-powered processing?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to transform your business?</h2>
               <p className="text-lg md:text-xl text-muted-foreground mb-8">
-                Join hundreds of companies using our multi-model AI platform with confidence scoring and semantic search.
+                Join thousands of businesses already saving hours every week. Start your free trial today.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button asChild size="lg" className="group w-full sm:w-auto">
-                  <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
-                    {user ? 'Start AI Processing' : 'Try AI Features Free'}
-                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                </Button>
-                {!user && (
-                  <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-                    <Link to="/auth?mode=signin" className="flex items-center justify-center sm:justify-start">
-                      Log In
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button asChild size="lg" className="group w-full sm:w-auto">
+                    <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
+                      {user ? 'Go to Dashboard' : 'Start Free Trial'}
+                      <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
+                </motion.div>
+                {!user && (
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
+                      <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
+                        View Pricing
+                      </Link>
+                    </Button>
+                  </motion.div>
                 )}
               </div>
             </motion.div>
-          </section>
+          </motion.section>
         </main>
       </div>
 
@@ -472,7 +471,7 @@ export default function Index() {
               {/* <img src="/logo.svg" alt="ReceiptScan Logo" className="h-8 mb-2" /> */}
               <h4 className="font-semibold text-lg">ReceiptScan</h4>
               <p className="text-sm text-muted-foreground">
-                AI-powered receipt processing for modern businesses.
+                Transform your receipts into organized data. Save time, increase accuracy, and never miss a deduction.
               </p>
             </div>
 
