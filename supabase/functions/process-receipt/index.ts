@@ -1,7 +1,7 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 /// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { TextractClient, AnalyzeExpenseCommand } from 'npm:@aws-sdk/client-textract'
+// AWS Textract import removed - OCR processing no longer used
 import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encodeBase64 } from "jsr:@std/encoding/base64"
@@ -11,8 +11,8 @@ import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 // Maximum image size for processing (in bytes)
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB - increased for AI Vision processing
 
-// Maximum image dimensions for OCR processing
-const MAX_IMAGE_DIMENSION = 1500; // 1500px - reduced from 2000px
+// Maximum image dimensions for AI processing
+const MAX_IMAGE_DIMENSION = 1500; // 1500px - optimized for AI Vision
 
 // Always optimize images regardless of size
 const ALWAYS_OPTIMIZE = true;
@@ -28,23 +28,14 @@ const corsHeaders = {
 // Construct the target function URL dynamically
 const enhanceFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/enhance-receipt-data`;
 
-// Configure AWS Textract client
-const textractClient = new TextractClient({
-  region: Deno.env.get('AWS_REGION') || 'us-east-1',
-  credentials: {
-    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') || '',
-    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') || '',
-  },
-})
+// AWS Textract client configuration removed - OCR processing no longer used
 
-// Main function to process receipt image and extract data
+// Main function to process receipt image and extract data using AI Vision only
 async function processReceiptImage(
   imageBytes: Uint8Array,
   imageUrl: string,
   receiptId: string,
-  primaryMethod: 'ocr-ai' | 'ai-vision' = 'ai-vision',
   modelId: string = '',
-  compareWithAlternative: boolean = false,
   requestHeaders: { Authorization?: string | null; apikey?: string | null } = { Authorization: null, apikey: null }
 ) {
   const logger = new ProcessingLogger(receiptId);
@@ -52,10 +43,8 @@ async function processReceiptImage(
   let processingTime = 0;
 
   try {
-    // Initialize results for primary and alternative methods
-    let primaryResult: any = null;
-    let alternativeResult: any = null;
-    let discrepancies: any[] = [];
+    // Initialize results for AI Vision processing
+    let result: any = null;
     let modelUsed = '';
 
     // Prepare headers for the internal fetch call
@@ -69,78 +58,25 @@ async function processReceiptImage(
       internalFetchHeaders['apikey'] = requestHeaders.apikey;
     }
 
-    // Process with primary method
-    if (primaryMethod === 'ocr-ai') {
-      // OCR + AI method
-      await logger.log("Using OCR + AI as primary method", "METHOD");
+    // Process with AI Vision only
+    // AI Vision method - send image directly to AI
+    await logger.log("Using AI Vision for processing", "METHOD");
+    console.log("Calling AI Vision for direct image processing...");
 
-      // Step 1: Perform OCR with Amazon Textract
-      await logger.log("Starting OCR processing with Amazon Textract", "OCR");
-      console.log("Calling Amazon Textract for OCR processing...");
+    // Log the target URL
+    console.log(`Attempting to call enhance-receipt-data at: ${enhanceFunctionUrl}`);
+    await logger.log(`Calling enhance-receipt-data at: ${enhanceFunctionUrl}`, "DEBUG");
 
-      // Call Amazon Textract to analyze the expense document (receipt/invoice)
-      const command = new AnalyzeExpenseCommand({
-        Document: { Bytes: imageBytes },
-      });
-
-      const response = await textractClient.send(command);
-      console.log("Received response from Amazon Textract");
-      await logger.log("Amazon Textract analysis complete", "OCR");
-
-      // Step 2: Extract structured data from Textract response
-      const textractResult = extractTextractData(response, logger);
-
-      // Step 3: Enhance with selected AI model
-      await logger.log("Starting AI enhancement of OCR data", "AI");
-      console.log("Calling AI to enhance OCR data...");
-
-      try {
-        const enhanceResponse = await fetch(
-          enhanceFunctionUrl,
-          {
-            method: 'POST',
-            headers: internalFetchHeaders,
-            body: JSON.stringify({
-              textractData: textractResult,
-              fullText: textractResult.fullText,
-              receiptId: receiptId,
-              modelId: modelId
-            }),
-          }
-        );
-
-        if (enhanceResponse.ok) {
-          const enhancedData = await enhanceResponse.json();
-          console.log("Received enhanced data from AI:", enhancedData);
-          await logger.log("AI enhancement complete", "AI");
-
-          // Update results with AI enhanced data
-          primaryResult = mergeTextractAndAIData(textractResult, enhancedData.result);
-          modelUsed = enhancedData.model_used;
-        } else {
-          console.error("Error calling AI enhancement:", await enhanceResponse.text());
-          await logger.log("AI enhancement failed", "AI");
-          // Continue with Textract data only
-          primaryResult = textractResult;
-        }
-      } catch (enhanceError) {
-        console.error("Error during AI enhancement:", enhanceError);
-        await logger.log(`AI error: ${enhanceError.message}`, "ERROR");
-        // Continue with Textract data only
-        primaryResult = textractResult;
-      }
-    } else {
-      // AI Vision method - send image directly to AI
-      await logger.log("Using AI Vision as primary method", "METHOD");
-      console.log("Calling AI Vision for direct image processing...");
-
-      // Log the target URL
-      console.log(`Attempting to call enhance-receipt-data at: ${enhanceFunctionUrl}`);
-      await logger.log(`Calling enhance-receipt-data at: ${enhanceFunctionUrl}`, "DEBUG");
+    // Enhanced debugging for consistency investigation
+    const requestStartTime = Date.now();
+    console.log(`🔍 EDGE FUNCTION DEBUG - Starting AI Vision processing at ${new Date().toISOString()}`);
+    console.log(`🔍 Receipt ID: ${receiptId}`);
+    console.log(`🔍 Model ID: ${modelId}`);
 
       try {
         // Ensure image is optimized for AI Vision to reduce resource usage
         const encodedImage = encodeBase64(imageBytes);
+        console.log(`🔍 Encoded image size: ${encodedImage.length} bytes`);
         const imageSize = encodedImage.length;
 
         // Log image size for debugging
@@ -148,93 +84,57 @@ async function processReceiptImage(
 
         // Check if image is too large for AI Vision
         if (imageSize > 1.5 * 1024 * 1024) { // 1.5MB limit for base64 encoded image
-          await logger.log(`Image too large for AI Vision (${imageSize} bytes), falling back to OCR+AI method`, "WARNING");
-
-          // Fall back to OCR+AI method
-          await logger.log("Falling back to OCR+AI method due to image size constraints", "METHOD");
-
-          // Step 1: Perform OCR with Amazon Textract
-          await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
-          console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
-
-          const command = new AnalyzeExpenseCommand({
-            Document: { Bytes: imageBytes },
-          });
-
-          const response = await textractClient.send(command);
-          console.log("Received response from Amazon Textract");
-          await logger.log("Amazon Textract analysis complete", "OCR");
-
-          // Step 2: Extract structured data from Textract response
-          const textractResult = extractTextractData(response, logger);
-
-          // Step 3: Enhance with selected AI model
-          await logger.log("Starting AI enhancement of OCR data (fallback)", "AI");
-          console.log("Calling AI to enhance OCR data...");
-
-          try {
-            const enhanceResponse = await fetch(
-              enhanceFunctionUrl,
-              {
-                method: 'POST',
-                headers: internalFetchHeaders,
-                body: JSON.stringify({
-                  textractData: textractResult,
-                  fullText: textractResult.fullText,
-                  receiptId: receiptId,
-                  modelId: modelId
-                }),
-              }
-            );
-
-            if (enhanceResponse.ok) {
-              const enhancedData = await enhanceResponse.json();
-              console.log("Received enhanced data from AI:", enhancedData);
-              await logger.log("AI enhancement complete (fallback)", "AI");
-
-              // Update results with AI enhanced data
-              primaryResult = mergeTextractAndAIData(textractResult, enhancedData.result);
-              modelUsed = enhancedData.model_used;
-            } else {
-              console.error("Error calling AI enhancement (fallback):", await enhanceResponse.text());
-              await logger.log("AI enhancement failed (fallback)", "AI");
-              // Continue with Textract data only
-              primaryResult = textractResult;
-            }
-          } catch (enhanceError) {
-            console.error("Error during AI enhancement (fallback):", enhanceError);
-            await logger.log(`AI error (fallback): ${enhanceError.message}`, "ERROR");
-            // Continue with Textract data only
-            primaryResult = textractResult;
-          }
-
-          return; // Exit this block, we've handled the fallback
+          await logger.log(`Image too large for AI Vision (${imageSize} bytes)`, "ERROR");
+          throw new Error(`Image too large for processing. Please use a smaller image (max 1.5MB when encoded).`);
         }
 
         // Proceed with AI Vision if image is not too large
+        const enhanceRequestPayload = {
+          imageData: {
+            data: encodedImage,
+            mimeType: 'image/jpeg',
+            isBase64: true
+          },
+          receiptId: receiptId,
+          modelId: modelId
+        };
+
+        console.log(`🔍 Calling enhance-receipt-data with payload:`, {
+          receiptId,
+          modelId,
+          imageDataSize: encodedImage.length,
+          mimeType: 'image/jpeg',
+          isBase64: true
+        });
+
         const visionResponse = await fetch(
           enhanceFunctionUrl,
           {
             method: 'POST',
             headers: internalFetchHeaders,
-            body: JSON.stringify({
-              imageData: {
-                data: encodedImage,
-                mimeType: 'image/jpeg',
-                isBase64: true
-              },
-              receiptId: receiptId,
-              modelId: modelId
-            }),
+            body: JSON.stringify(enhanceRequestPayload),
           }
         );
 
         if (visionResponse.ok) {
           const visionData = await visionResponse.json();
+          const requestEndTime = Date.now();
+          const requestDuration = (requestEndTime - requestStartTime) / 1000;
+
           console.log("Received data from AI Vision:", visionData);
+          console.log(`🔍 AI Vision request completed in ${requestDuration.toFixed(2)} seconds`);
+          console.log(`🔍 AI Vision response:`, {
+            success: visionData.success,
+            model_used: visionData.model_used,
+            result_merchant: visionData.result?.merchant,
+            result_total: visionData.result?.total,
+            result_line_items_count: visionData.result?.line_items?.length || 0,
+            result_line_items: visionData.result?.line_items
+          });
+
           await logger.log("AI Vision processing complete", "AI");
 
-          primaryResult = formatAIVisionResult(visionData.result);
+          result = formatAIVisionResult(visionData.result);
           modelUsed = visionData.model_used;
         } else {
           // Check for resource limit errors
@@ -244,31 +144,8 @@ async function processReceiptImage(
 
           // Check if this is a resource limit error
           if (errorText.includes("WORKER_LIMIT") || errorText.includes("compute resources")) {
-            await logger.log("Detected resource limit error, falling back to OCR+AI method", "ERROR");
-
-            // Fall back to OCR+AI method
-            await logger.log("Falling back to OCR+AI method due to resource constraints", "METHOD");
-
-            // Step 1: Perform OCR with Amazon Textract
-            await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
-            console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
-
-            const command = new AnalyzeExpenseCommand({
-              Document: { Bytes: imageBytes },
-            });
-
-            const response = await textractClient.send(command);
-            console.log("Received response from Amazon Textract");
-            await logger.log("Amazon Textract analysis complete", "OCR");
-
-            // Step 2: Extract structured data from Textract response
-            const textractResult = extractTextractData(response, logger);
-
-            // Use Textract data only since we already hit resource limits
-            primaryResult = textractResult;
-            modelUsed = "textract-only";
-
-            await logger.log("Using Textract data only due to resource constraints", "AI");
+            await logger.log("Detected resource limit error", "ERROR");
+            throw new Error(`Processing failed due to resource limits. Please try again later or use a smaller image.`);
           } else {
             // For other errors, throw normally
             throw new Error(`AI Vision processing failed with status ${visionResponse.status}: ${errorText}`);
@@ -281,143 +158,24 @@ async function processReceiptImage(
 
         // Check if this is a resource limit error
         if (visionError.message && (visionError.message.includes("WORKER_LIMIT") || visionError.message.includes("compute resources"))) {
-          await logger.log("Detected resource limit error in exception, falling back to OCR+AI method", "ERROR");
-
-          try {
-            // Fall back to OCR+AI method
-            await logger.log("Falling back to OCR+AI method due to resource constraints", "METHOD");
-
-            // Step 1: Perform OCR with Amazon Textract
-            await logger.log("Starting OCR processing with Amazon Textract (fallback)", "OCR");
-            console.log("Calling Amazon Textract for OCR processing (fallback from AI Vision)...");
-
-            const command = new AnalyzeExpenseCommand({
-              Document: { Bytes: imageBytes },
-            });
-
-            const response = await textractClient.send(command);
-            console.log("Received response from Amazon Textract");
-            await logger.log("Amazon Textract analysis complete", "OCR");
-
-            // Step 2: Extract structured data from Textract response
-            const textractResult = extractTextractData(response, logger);
-
-            // Use Textract data only since we already hit resource limits
-            primaryResult = textractResult;
-            modelUsed = "textract-only";
-
-            await logger.log("Using Textract data only due to resource constraints", "AI");
-          } catch (fallbackError) {
-            console.error("Error during fallback processing:", fallbackError);
-            await logger.log(`Fallback processing error: ${fallbackError.message}`, "ERROR");
-            throw fallbackError; // If fallback also fails, propagate the error
-          }
+          await logger.log("Detected resource limit error in exception", "ERROR");
+          throw new Error(`Processing failed due to resource limits. Please try again later or use a smaller image.`);
         } else {
           // For other errors, rethrow
           throw visionError;
         }
       }
-    }
-
-    // If comparison is requested, process with alternative method
-    if (compareWithAlternative) {
-      await logger.log("Starting comparison with alternative method", "COMPARE");
-
-      if (primaryMethod === 'ocr-ai') {
-        // Primary was OCR+AI, alternative is AI Vision
-        await logger.log("Using AI Vision as alternative method", "METHOD");
-
-        try {
-          const visionResponse = await fetch(
-            enhanceFunctionUrl,
-            {
-              method: 'POST',
-              headers: internalFetchHeaders,
-              body: JSON.stringify({
-                imageData: {
-                  data: encodeBase64(imageBytes),
-                  mimeType: 'image/jpeg',
-                  isBase64: true
-                },
-                receiptId: `${receiptId}-alt`, // Use different ID for logging
-                modelId: '' // Use default vision model
-              }),
-            }
-          );
-
-          if (visionResponse.ok) {
-            const visionData = await visionResponse.json();
-            console.log("Received data from alternative AI Vision:", visionData);
-            await logger.log("Alternative AI Vision processing complete", "AI");
-
-            alternativeResult = formatAIVisionResult(visionData.result);
-          }
-        } catch (altError) {
-          console.error("Error during alternative method:", altError);
-          await logger.log(`Alternative method error: ${altError.message}`, "ERROR");
-        }
-      } else {
-        // Primary was AI Vision, alternative is OCR+AI
-        await logger.log("Using OCR + AI as alternative method", "METHOD");
-
-        try {
-          // Step 1: Perform OCR with Amazon Textract
-          const command = new AnalyzeExpenseCommand({
-            Document: { Bytes: imageBytes },
-          });
-
-          const response = await textractClient.send(command);
-
-          // Step 2: Extract structured data from Textract response
-          const textractResult = extractTextractData(response, logger);
-
-          // Step 3: Enhance with default text model
-          const enhanceResponse = await fetch(
-            enhanceFunctionUrl,
-            {
-              method: 'POST',
-              headers: internalFetchHeaders,
-              body: JSON.stringify({
-                textractData: textractResult,
-                fullText: textractResult.fullText,
-                receiptId: `${receiptId}-alt`, // Use different ID for logging
-                modelId: '' // Use default text model
-              }),
-            }
-          );
-
-          if (enhanceResponse.ok) {
-            const enhancedData = await enhanceResponse.json();
-            await logger.log("Alternative OCR + AI processing complete", "AI");
-
-            alternativeResult = mergeTextractAndAIData(textractResult, enhancedData.result);
-          }
-        } catch (altError) {
-          console.error("Error during alternative method:", altError);
-          await logger.log(`Alternative method error: ${altError.message}`, "ERROR");
-        }
-      }
-
-      // Compare results and identify discrepancies if alternative method was successful
-      if (alternativeResult) {
-        discrepancies = findDiscrepancies(primaryResult, alternativeResult);
-        await logger.log(`Found ${discrepancies.length} discrepancies between methods`, "COMPARE");
-      }
-    }
 
     const endTime = performance.now(); // Record end time
     processingTime = (endTime - startTime) / 1000; // Calculate duration in seconds
 
     await logger.log(`Processing complete in ${processingTime.toFixed(2)} seconds`, "COMPLETE");
 
-    // Include processing time and comparison results in the result
+    // Include processing time in the result
     return {
-      ...primaryResult,
+      ...result,
       processing_time: processingTime,
-      alternativeResult: alternativeResult,
-      discrepancies: discrepancies,
-      modelUsed: modelUsed,
-      primaryMethod: primaryMethod
+      modelUsed: modelUsed
     };
   } catch (error) {
     console.error('Error processing receipt:', error);
@@ -426,7 +184,7 @@ async function processReceiptImage(
   }
 }
 
-// Helper function to extract structured data from Textract response
+// Helper function to extract structured data from Textract response (deprecated - OCR removed)
 function extractTextractData(response: any, logger: ProcessingLogger) {
   // Feature flag to control whether to use the new columns
   const ENABLE_GEOMETRY_COLUMNS = true; // Re-enabled now that columns exist in the database
@@ -758,7 +516,7 @@ function extractTextractData(response: any, logger: ProcessingLogger) {
   return result;
 }
 
-// Merge Textract and AI enhanced data
+// Merge Textract and AI enhanced data (deprecated - OCR removed)
 function mergeTextractAndAIData(textractData: any, enhancedData: any) {
   const result = { ...textractData };
 
@@ -913,7 +671,7 @@ function formatAIVisionResult(visionData: any) {
   return result;
 }
 
-// Find discrepancies between primary and alternative results
+// Find discrepancies between primary and alternative results (deprecated - OCR removed)
 function findDiscrepancies(primaryResult: any, alternativeResult: any) {
   const discrepancies: any[] = [];
 
@@ -970,8 +728,8 @@ function findDiscrepancies(primaryResult: any, alternativeResult: any) {
   return discrepancies;
 }
 
-// Helper function to optimize image for OCR processing
-async function optimizeImageForOCR(imageBytes: Uint8Array, logger: ProcessingLogger): Promise<Uint8Array> {
+// Helper function to optimize image for AI processing
+async function optimizeImageForProcessing(imageBytes: Uint8Array, logger: ProcessingLogger): Promise<Uint8Array> {
   try {
     // Always log the original image size
     await logger.log(`Original image size: ${imageBytes.length} bytes`, "OPTIMIZE");
@@ -1157,9 +915,7 @@ async function validateAndExtractParams(req: Request) {
   const {
     imageUrl,
     receiptId,
-    primaryMethod = 'ai-vision', // Default to AI Vision
-    modelId = '', // Use default model based on method
-    compareWithAlternative = false // Don't compare by default
+    modelId = '' // Use default model
   } = requestData;
 
   if (!imageUrl) {
@@ -1170,12 +926,7 @@ async function validateAndExtractParams(req: Request) {
     throw new Error('Missing required parameter: receiptId');
   }
 
-  // Validate primaryMethod
-  if (primaryMethod !== 'ocr-ai' && primaryMethod !== 'ai-vision') {
-    throw new Error('Invalid primaryMethod. Use "ocr-ai" or "ai-vision"');
-  }
-
-  return { imageUrl, receiptId, primaryMethod, modelId, compareWithAlternative };
+  return { imageUrl, receiptId, modelId };
 }
 
 /**
@@ -1199,9 +950,9 @@ async function fetchAndOptimizeImage(imageUrl: string, logger: ProcessingLogger)
   const imageBytes = new Uint8Array(imageArrayBuffer);
   await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
 
-  // Optimize image for OCR processing
-  await logger.log("Starting image optimization for OCR", "OPTIMIZE");
-  const optimizedImageBytes = await optimizeImageForOCR(imageBytes, logger);
+  // Optimize image for AI processing
+  await logger.log("Starting image optimization for AI processing", "OPTIMIZE");
+  const optimizedImageBytes = await optimizeImageForProcessing(imageBytes, logger);
 
   return optimizedImageBytes;
 }
@@ -1343,11 +1094,8 @@ async function saveResultsToDatabase(
     processing_status: 'complete',
     processing_time: extractedData.processing_time,
     updated_at: new Date().toISOString(),
-    // Add new fields for AI enhancement features
+    // Add new fields for AI processing
     model_used: extractedData.modelUsed,
-    primary_method: extractedData.primaryMethod,
-    has_alternative_data: !!extractedData.alternativeResult,
-    discrepancies: extractedData.discrepancies || [],
     // Save confidence scores directly to receipts table
     confidence_scores: extractedData.confidence,
     thumbnail_url: thumbnailUrl
@@ -1392,9 +1140,80 @@ async function saveResultsToDatabase(
     throw new Error(`Failed to update receipt record: ${updateError.message}`);
   }
 
-  // Handle line items logging
+  // Handle line items storage
+  console.log(`DEBUG: Checking line items - extractedData.line_items exists: ${!!extractedData.line_items}, length: ${extractedData.line_items?.length || 0}`);
+  await logger.log(`DEBUG: Line items check - exists: ${!!extractedData.line_items}, length: ${extractedData.line_items?.length || 0}`, "DEBUG");
+
   if (extractedData.line_items && extractedData.line_items.length > 0) {
-    await logger.log(`Extracted ${extractedData.line_items.length} line items (saving not implemented in this function)`, "SAVE");
+    try {
+      await logger.log(`Storing ${extractedData.line_items.length} line items in database`, "SAVE");
+
+      // Delete existing line items first to avoid duplicates
+      const { error: deleteError } = await supabase
+        .from("line_items")
+        .delete()
+        .eq("receipt_id", receiptId);
+
+      if (deleteError) {
+        console.error("Error deleting old line items:", deleteError);
+        await logger.log(`Warning: Could not delete old line items: ${deleteError.message}`, "WARNING");
+        // Continue with insertion anyway
+      }
+
+      // Format line items for database insertion
+      console.log(`DEBUG: Raw line items:`, extractedData.line_items);
+      const formattedLineItems = extractedData.line_items.map(item => ({
+        description: item.description || '',
+        amount: parseFloat(item.amount) || 0,
+        receipt_id: receiptId
+      }));
+      console.log(`DEBUG: Formatted line items:`, formattedLineItems);
+
+      // Filter out invalid line items (empty description or zero amount)
+      const validLineItems = formattedLineItems.filter(item =>
+        item.description.trim() !== '' && item.amount > 0
+      );
+      console.log(`DEBUG: Valid line items after filtering:`, validLineItems);
+
+      if (validLineItems.length > 0) {
+        // Insert new line items
+        const { error: insertError } = await supabase
+          .from("line_items")
+          .insert(validLineItems);
+
+        if (insertError) {
+          console.error("Error inserting line items:", insertError);
+          await logger.log(`Line item insertion error: ${insertError.message}`, "ERROR");
+          await logger.log(`Full insert error details: ${JSON.stringify(insertError)}`, "ERROR");
+          // Don't throw - this shouldn't fail the entire receipt processing
+        } else {
+          await logger.log(`Successfully saved ${validLineItems.length} line items to database`, "SAVE");
+          console.log(`Stored ${validLineItems.length} line items for receipt ${receiptId}`);
+
+          // Double-check that items were actually inserted
+          try {
+            const { data: checkItems, error: checkError } = await supabase
+              .from("line_items")
+              .select("count")
+              .eq("receipt_id", receiptId);
+
+            if (!checkError) {
+              await logger.log(`Verification: Found ${checkItems?.length || 0} line items in database after insert`, "DEBUG");
+            }
+          } catch (verifyError) {
+            await logger.log(`Verification error: ${verifyError.message}`, "DEBUG");
+          }
+        }
+      } else {
+        await logger.log("No valid line items to store (all items had empty descriptions or zero amounts)", "SAVE");
+      }
+    } catch (lineItemError) {
+      console.error("Unexpected error handling line items:", lineItemError);
+      await logger.log(`Unexpected line item error: ${lineItemError.message}`, "ERROR");
+      // Don't throw - this shouldn't fail the entire receipt processing
+    }
+  } else {
+    await logger.log("No line items extracted to store", "SAVE");
   }
 
   await logger.log("Processing results saved successfully", "SAVE");
@@ -1571,7 +1390,7 @@ serve(async (req: Request) => {
     }
 
     // 1. Validate and extract parameters
-    const { imageUrl, receiptId, primaryMethod, modelId, compareWithAlternative } =
+    const { imageUrl, receiptId, modelId } =
       await validateAndExtractParams(req);
 
     // 2. Initialize logger and Supabase client
@@ -1605,9 +1424,7 @@ serve(async (req: Request) => {
         optimizedImageBytes,
         imageUrl,
         receiptId,
-        primaryMethod,
         modelId,
-        compareWithAlternative,
         { Authorization: authorization, apikey: apikey }
       );
 
@@ -1659,10 +1476,7 @@ serve(async (req: Request) => {
         receiptId,
         result: extractedData,
         // Include additional information for the client
-        model_used: extractedData.modelUsed,
-        primary_method: extractedData.primaryMethod,
-        has_alternative_data: !!extractedData.alternativeResult,
-        discrepancies: extractedData.discrepancies || []
+        model_used: extractedData.modelUsed
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

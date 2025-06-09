@@ -355,7 +355,21 @@ Return your findings in the following JSON format:
   };
 
   // Call Gemini API
+  console.log(`🔍 GEMINI API CALL DEBUG:`);
+  console.log(`🔍 Model: ${modelConfig.id}`);
+  console.log(`🔍 Endpoint: ${modelConfig.endpoint}`);
+  console.log(`🔍 Payload contents:`, {
+    model: payload.model,
+    generationConfig: payload.generationConfig,
+    contents_length: payload.contents?.length,
+    contents_parts: payload.contents?.[0]?.parts?.map(part => ({
+      text_length: part.text?.length,
+      inline_data_mime_type: part.inline_data?.mime_type
+    }))
+  });
+
   await logger.log("Calling Gemini API", "AI");
+  const geminiCallStart = Date.now();
   const response = await fetch(
     `${modelConfig.endpoint}?key=${apiKey}`,
     {
@@ -366,21 +380,36 @@ Return your findings in the following JSON format:
       body: JSON.stringify(payload),
     }
   );
+  const geminiCallEnd = Date.now();
+  const geminiCallDuration = (geminiCallEnd - geminiCallStart) / 1000;
+
+  console.log(`🔍 Gemini API call completed in ${geminiCallDuration.toFixed(2)} seconds`);
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Gemini API error:', errorText);
     await logger.log(`Gemini API error: ${response.status} ${response.statusText}`, "ERROR");
+
+    // If we get a 429 rate limit error, suggest using a different model
+    if (response.status === 429) {
+      await logger.log("Rate limit detected - consider using gemini-2.0-flash-lite for better reliability", "ERROR");
+    }
+
     throw new Error(`Failed to process with Gemini API: ${response.status} ${response.statusText}`);
   }
 
   const geminiResponse = await response.json();
+  console.log(`🔍 Gemini API response received:`, {
+    candidates_length: geminiResponse.candidates?.length,
+    first_candidate_content: geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text?.substring(0, 200) + '...'
+  });
   await logger.log("Received response from Gemini API", "AI");
 
   // Parse the response
   try {
     // Extract the text content from Gemini response
     const responseText = geminiResponse.candidates[0].content.parts[0].text;
+    console.log(`🔍 Full Gemini response text:`, responseText);
     await logger.log("Parsing Gemini response", "AI");
 
     // Extract JSON from the response (handle case where other text might be included)
@@ -621,14 +650,34 @@ async function enhanceReceiptData(
   const logger = new ProcessingLogger(receiptId);
 
   try {
+    const enhanceStartTime = Date.now();
+    console.log(`🔍 ENHANCE-RECEIPT-DATA DEBUG - Starting processing at ${new Date().toISOString()}`);
+    console.log(`🔍 Receipt ID: ${receiptId}`);
+    console.log(`🔍 Input type: ${input.type}`);
+    console.log(`🔍 Model ID requested: ${modelId}`);
+
     await logger.log(`Starting ${modelId || 'AI'} processing`, "AI");
 
     // Use the specified model or default based on input type
     const modelToUse = modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL);
+    console.log(`🔍 Model to use: ${modelToUse}`);
     await logger.log(`Using model: ${modelToUse}`, "AI");
 
     // Call the appropriate AI model
+    console.log(`🔍 Calling AI model: ${modelToUse}`);
+    const aiCallStartTime = Date.now();
     const enhancedData = await callAIModel(input, modelToUse, receiptId, logger);
+    const aiCallEndTime = Date.now();
+    const aiCallDuration = (aiCallEndTime - aiCallStartTime) / 1000;
+
+    console.log(`🔍 AI model call completed in ${aiCallDuration.toFixed(2)} seconds`);
+    console.log(`🔍 Enhanced data result:`, {
+      merchant: enhancedData.merchant,
+      total: enhancedData.total,
+      line_items_count: enhancedData.line_items?.length || 0,
+      line_items: enhancedData.line_items,
+      confidence: enhancedData.confidence
+    });
 
     // Log results
     if (enhancedData.payment_method) {

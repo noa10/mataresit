@@ -125,20 +125,19 @@ export function getProcessingRecommendation(
   recommendedMethod = 'ai-vision';
 
   // Analyze file characteristics for model selection
-  if (fileAnalysis.size > 4 * 1024 * 1024) {
-    recommendedModel = 'gemini-1.5-pro';
-    reasoning.push('Large file size detected - using high-capacity AI Vision model');
+  // Prefer gemini-2.0-flash-lite to avoid rate limiting issues with gemini-1.5-pro
+  if (fileAnalysis.size > 6 * 1024 * 1024) {
+    recommendedModel = 'gemini-1.5-flash-latest';
+    reasoning.push('Very large file size detected - using high-capacity AI Vision model');
     riskLevel = 'medium';
-  } else if (fileAnalysis.complexity === 'high') {
-    recommendedModel = 'gemini-1.5-pro';
-    reasoning.push('High complexity receipt - AI Vision with advanced model provides better accuracy');
-  } else if (fileAnalysis.complexity === 'low' && fileAnalysis.size < 2 * 1024 * 1024) {
-    recommendedModel = 'gemini-2.0-flash-lite';
-    reasoning.push('Simple receipt detected - fast AI Vision processing recommended');
-    confidence = 'high';
+  } else if (fileAnalysis.complexity === 'high' && fileAnalysis.size > 4 * 1024 * 1024) {
+    recommendedModel = 'gemini-1.5-flash-latest';
+    reasoning.push('High complexity large receipt - AI Vision with advanced model provides better accuracy');
   } else {
+    // Default to gemini-2.0-flash-lite for better reliability and rate limit avoidance
     recommendedModel = 'gemini-2.0-flash-lite';
-    reasoning.push('Standard receipt - AI Vision with balanced model recommended');
+    reasoning.push('Using reliable fast AI Vision model for optimal processing');
+    confidence = 'high';
   }
 
   // Apply user preferences (always AI Vision, but respect model preferences)
@@ -152,7 +151,7 @@ export function getProcessingRecommendation(
     reasoning.push('Speed prioritized - using fastest model');
   }
 
-  if (userPreferences?.prioritizeAccuracy && fileAnalysis.size < 3 * 1024 * 1024) {
+  if (userPreferences?.prioritizeAccuracy && fileAnalysis.size < 4 * 1024 * 1024) {
     recommendedModel = 'gemini-1.5-flash-latest';
     reasoning.push('Accuracy prioritized - using more accurate model');
   }
@@ -202,11 +201,12 @@ function createFallbackStrategy(
   const fallbackMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai';
 
   // Choose fallback model based on file characteristics
-  let fallbackModel = 'gemini-1.5-flash';
+  // Avoid gemini-1.5-pro due to rate limiting issues
+  let fallbackModel = 'gemini-1.5-flash-latest';
   if (fileAnalysis.size > 3 * 1024 * 1024) {
     fallbackModel = 'gemini-2.0-flash-lite'; // Use fastest for large files
   } else if (fileAnalysis.complexity === 'high') {
-    fallbackModel = 'gemini-1.5-pro'; // Use more accurate for complex files
+    fallbackModel = 'gemini-1.5-flash-latest'; // Use reliable model for complex files
   }
 
   // Define triggers for fallback

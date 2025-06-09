@@ -4,10 +4,8 @@ export type ReceiptStatus = "unreviewed" | "reviewed";
 export type ProcessingStatus =
   | 'uploading'
   | 'uploaded'
-  | 'processing_ocr'
-  | 'processing_ai'
-  | 'failed_ocr'
-  | 'failed_ai'
+  | 'processing'
+  | 'failed'
   | 'complete'
   | null;
 
@@ -17,7 +15,7 @@ export interface ReceiptUpload {
   file: File; // The actual file object
   status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
   uploadProgress: number; // Percentage 0-100
-  processingStage?: 'queueing' | 'ocr' | 'ai_enhancement' | 'categorization' | string;
+  processingStage?: 'queueing' | 'ai_processing' | 'categorization' | string;
   error?: {
     code: 'FILE_TYPE' | 'SIZE_LIMIT' | 'UPLOAD_FAILED' | 'PROCESSING_FAILED' | string;
     message: string;
@@ -63,13 +61,6 @@ export interface Receipt {
   processing_time?: number; // Time taken for backend processing (e.g., in seconds)
   // New fields for AI model selection
   model_used?: string; // The AI model used for processing
-  primary_method?: 'ocr-ai' | 'ai-vision'; // The primary processing method
-  has_alternative_data?: boolean; // Whether alternative data is available
-  discrepancies?: Array<{
-    field: string;
-    primaryValue: any;
-    alternativeValue: any;
-  }>; // Discrepancies between primary and alternative methods
 }
 
 export interface ReceiptLineItem {
@@ -154,25 +145,38 @@ export interface ReceiptWithDetails extends Receipt {
   processing_error?: string | null;
   processing_time?: number;
   model_used?: string;
-  primary_method?: 'ocr-ai' | 'ai-vision';
-  has_alternative_data?: boolean;
-  discrepancies?: Array<{
-    field: string;
-    primaryValue: any;
-    alternativeValue: any;
-  }>;
   // New fields for bounding box visualization
   field_geometry?: FieldGeometry;
   document_structure?: DocumentStructure;
 }
 
-export interface OCRResult {
+// Simplified AI processing result interface (replacing OCRResult)
+export interface AIResult {
   merchant: string;
-  date: string;
+  date: string | null; // Allow null for invalid dates
   total: number;
   tax?: number;
   payment_method?: string;
   line_items?: LineItem[];
+  confidence_scores?: {
+    merchant?: number;
+    date?: number;
+    total?: number;
+    tax?: number;
+    line_items?: number;
+    payment_method?: number;
+  };
+  fullText?: string;
+  currency?: string;
+  ai_suggestions?: AISuggestions;
+  predicted_category?: string;
+  modelUsed?: string;
+  processing_time?: number;
+}
+
+// Keep OCRResult for backward compatibility but mark as deprecated
+/** @deprecated Use AIResult instead */
+export interface OCRResult extends AIResult {
   confidence: {
     merchant: number;
     date: number;
@@ -181,21 +185,13 @@ export interface OCRResult {
     line_items?: number;
     payment_method?: number;
   };
-  fullText?: string;
-  // New fields from AI enhancement
-  currency?: string;
-  ai_suggestions?: AISuggestions;
-  predicted_category?: string;
-  // New fields for model selection and comparison
-  modelUsed?: string;
-  primaryMethod?: 'ocr-ai' | 'ai-vision';
-  alternativeResult?: any; // The result from the alternative method
+  primaryMethod?: 'ai-vision';
+  alternativeResult?: any;
   discrepancies?: Array<{
     field: string;
     primaryValue: any;
     alternativeValue: any;
-  }>; // Discrepancies between primary and alternative methods
-  processing_time?: number;
+  }>;
 }
 
 // Interface for processing logs

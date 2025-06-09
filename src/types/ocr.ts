@@ -1,7 +1,7 @@
-// OCR result interface
-export interface OCRResult {
+// AI processing result interface (simplified from OCR)
+export interface AIResult {
   merchant: string;
-  date: string;
+  date: string | null; // Allow null for invalid dates
   total: number;
   tax?: number;
   currency?: string;
@@ -14,12 +14,18 @@ export interface OCRResult {
     amount: number;
   }>;
   processing_time?: number;
+  modelUsed?: string;
+  confidence_scores?: Record<string, number>;
+}
+
+// Backward compatibility alias
+/** @deprecated Use AIResult instead */
+export interface OCRResult extends AIResult {
   alternativeResult?: OCRResult;
   discrepancies?: Array<{
     field: string;
     primaryValue: any;
     alternativeValue: any;
   }>;
-  modelUsed?: string;
-  primaryMethod?: 'ocr-ai' | 'ai-vision';
-} 
+  primaryMethod?: 'ai-vision';
+}
