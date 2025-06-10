@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { MessageSquare, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -11,6 +11,7 @@ import { ChatMessage } from '../components/chat/ChatMessage';
 import { ConversationSidebar } from '../components/chat/ConversationSidebar';
 import { SidebarToggle } from '../components/chat/SidebarToggle';
 import { useChatControls } from '@/contexts/ChatControlsContext';
+import { useMainNav } from '../components/AppLayout';
 
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -42,6 +43,14 @@ export default function SemanticSearchPage() {
   // Chat controls context
   const { setChatControls } = useChatControls();
 
+  // Main navigation context
+  const { navSidebarOpen, isDesktop: isMainNavDesktop, navSidebarWidth } = useMainNav();
+
+  // Refs to prevent infinite loops
+  const isUpdatingUrlRef = useRef(false);
+  const processedQueryRef = useRef<string | null>(null);
+  const isInitializedRef = useRef(false);
+
   // Generate unique message ID
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -61,7 +70,13 @@ export default function SemanticSearchPage() {
 
     if (!currentConversationId) {
       setCurrentConversationId(conversationId);
+      // Set flag to indicate this is a programmatic URL update
+      isUpdatingUrlRef.current = true;
       setUrlSearchParams({ c: conversationId });
+      // Reset flag after a brief delay to allow URL update to complete
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
   }, [messages, currentConversationId, setUrlSearchParams, saveConversationWithEvents]);
 
@@ -73,7 +88,13 @@ export default function SemanticSearchPage() {
       setCurrentConversationId(conversationId);
       setLastSearchParams(null);
       setCurrentOffset(0);
+      // Set flag to indicate this is a programmatic URL update
+      isUpdatingUrlRef.current = true;
       setUrlSearchParams({ c: conversationId });
+      // Reset flag after a brief delay to allow URL update to complete
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
   }, [setUrlSearchParams]);
 
@@ -88,7 +109,14 @@ export default function SemanticSearchPage() {
     setCurrentConversationId(null);
     setLastSearchParams(null);
     setCurrentOffset(0);
+    processedQueryRef.current = null;
+    // Set flag to indicate this is a programmatic URL update
+    isUpdatingUrlRef.current = true;
     setUrlSearchParams({});
+    // Reset flag after a brief delay to allow URL update to complete
+    setTimeout(() => {
+      isUpdatingUrlRef.current = false;
+    }, 100);
   }, [messages, saveCurrentConversation, setUrlSearchParams]);
 
   // Enhanced sidebar handlers with focus management
@@ -333,7 +361,14 @@ export default function SemanticSearchPage() {
       }
 
       // Update URL to reflect current query
+      processedQueryRef.current = content;
+      // Set flag to indicate this is a programmatic URL update
+      isUpdatingUrlRef.current = true;
       setUrlSearchParams({ q: content });
+      // Reset flag after a brief delay to allow URL update to complete
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
 
     } catch (error) {
       console.error('Search error:', error);
@@ -401,15 +436,35 @@ export default function SemanticSearchPage() {
 
   // Initialize from URL if there's a query parameter (after all functions are defined)
   useEffect(() => {
+    // Skip if this is a programmatic URL update from within the component
+    if (isUpdatingUrlRef.current) {
+      return;
+    }
+
     const query = urlSearchParams.get('q');
     const conversationId = urlSearchParams.get('c');
 
-    if (conversationId) {
-      loadConversation(conversationId);
-    } else if (query) {
-      handleSendMessage(query);
+    // Only process on initial load or when URL changes externally
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+
+      if (conversationId) {
+        loadConversation(conversationId);
+      } else if (query && query !== processedQueryRef.current) {
+        processedQueryRef.current = query;
+        handleSendMessage(query);
+      }
+    } else {
+      // For subsequent URL changes, only process if it's a different query/conversation
+      // and not from our own URL updates
+      if (conversationId && conversationId !== currentConversationId) {
+        loadConversation(conversationId);
+      } else if (query && query !== processedQueryRef.current && !conversationId) {
+        processedQueryRef.current = query;
+        handleSendMessage(query);
+      }
     }
-  }, [loadConversation, handleSendMessage, urlSearchParams]);
+  }, [loadConversation, handleSendMessage, urlSearchParams, currentConversationId]);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -426,10 +481,19 @@ export default function SemanticSearchPage() {
         currentConversationId={currentConversationId}
         className={sidebarOpen ? "lg:relative" : ""}
         onWidthChange={handleSidebarWidthChange}
+        mainNavWidth={navSidebarWidth}
+        mainNavOpen={navSidebarOpen}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div
+        className="flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out"
+        style={{
+          marginLeft: isMainNavDesktop ?
+            (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px')
+            : (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px')
+        }}
+      >
 
         {/* Chat Content Area - Optimized for fixed input */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -460,7 +524,9 @@ export default function SemanticSearchPage() {
         <div
           className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg"
           style={{
-            left: sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0'
+            left: isMainNavDesktop ?
+              (sidebarOpen && isDesktop ? `${navSidebarWidth + sidebarWidth}px` : `${navSidebarWidth}px`)
+              : (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0')
           }}
         >
           <div className={`transition-all duration-300 ease-in-out ${

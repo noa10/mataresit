@@ -67,6 +67,8 @@ interface ConversationSidebarProps {
   currentConversationId?: string;
   className?: string;
   onWidthChange?: (width: number) => void;
+  mainNavWidth?: number;
+  mainNavOpen?: boolean;
 }
 
 export function ConversationSidebar({
@@ -76,7 +78,9 @@ export function ConversationSidebar({
   onSelectConversation,
   currentConversationId,
   className,
-  onWidthChange
+  onWidthChange,
+  mainNavWidth = 0,
+  mainNavOpen = false
 }: ConversationSidebarProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
@@ -351,12 +355,12 @@ export function ConversationSidebar({
           "transition-all duration-300 ease-in-out",
           // Mobile behavior: fixed positioning with transform
           !isDesktop && [
-            "fixed top-0 left-0 z-50 shadow-lg",
+            "fixed top-0 z-50 shadow-lg",
             isOpen ? "translate-x-0" : "-translate-x-full"
           ],
-          // Desktop behavior: relative positioning with proper transforms
+          // Desktop behavior: fixed positioning to account for main nav
           isDesktop && [
-            "relative z-50 flex-shrink-0",
+            "fixed top-0 z-50 flex-shrink-0",
             isOpen ? "translate-x-0" : "-translate-x-full"
           ],
           // Enhanced focus management
@@ -366,7 +370,10 @@ export function ConversationSidebar({
           className
         )}
         style={{
-          width: isDesktop ? `${sidebarWidth}px` : '280px'
+          width: isDesktop ? `${sidebarWidth}px` : '280px',
+          // Position the sidebar to the right of the main navigation
+          left: isDesktop ? `${mainNavWidth}px` : '0px',
+          height: '100vh'
         }}
         role="complementary"
         aria-label="Chat history sidebar"

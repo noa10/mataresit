@@ -1,14 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import { MainNavigationSidebar } from "./MainNavigationSidebar";
 import { MainNavigationToggle } from "./MainNavigationToggle";
 import { useChatControls } from "@/contexts/ChatControlsContext";
 
+// Context for main navigation state
+interface MainNavContextType {
+  navSidebarOpen: boolean;
+  isDesktop: boolean;
+  navSidebarWidth: number;
+}
+
+const MainNavContext = createContext<MainNavContextType | undefined>(undefined);
+
+export function useMainNav() {
+  const context = useContext(MainNavContext);
+  if (context === undefined) {
+    throw new Error('useMainNav must be used within MainNavContext');
+  }
+  return context;
+}
+
 export function AppLayout() {
   const [navSidebarOpen, setNavSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   const { chatControls } = useChatControls();
+
+  // Calculate navigation sidebar width based on state
+  const navSidebarWidth = isDesktop ? (navSidebarOpen ? 256 : 64) : 0;
 
   // Initialize sidebar state based on screen size
   useEffect(() => {
@@ -57,30 +77,32 @@ export function AppLayout() {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Main Navigation Sidebar */}
-      <MainNavigationSidebar 
-        isOpen={navSidebarOpen} 
-        onToggle={toggleNavSidebar} 
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar
-          navControls={{
-            navSidebarToggle: (
-              <MainNavigationToggle
-                isOpen={navSidebarOpen}
-                onToggle={toggleNavSidebar}
-              />
-            )
-          }}
-          chatControls={chatControls}
+    <MainNavContext.Provider value={{ navSidebarOpen, isDesktop, navSidebarWidth }}>
+      <div className="flex min-h-screen bg-background">
+        {/* Main Navigation Sidebar */}
+        <MainNavigationSidebar
+          isOpen={navSidebarOpen}
+          onToggle={toggleNavSidebar}
         />
-        <main className="flex-1">
-          <Outlet />
-        </main>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <Navbar
+            navControls={{
+              navSidebarToggle: (
+                <MainNavigationToggle
+                  isOpen={navSidebarOpen}
+                  onToggle={toggleNavSidebar}
+                />
+              )
+            }}
+            chatControls={chatControls}
+          />
+          <main className="flex-1">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </MainNavContext.Provider>
   );
 }
