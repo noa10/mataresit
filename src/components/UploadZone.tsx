@@ -47,6 +47,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [isProgressUpdating, setIsProgressUpdating] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
   const [useEnhancedFallback, setUseEnhancedFallback] = useState(false); // Temporarily disabled for consistency
@@ -107,23 +108,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           }
         }
 
-        // Update progress based on stage
-        switch (processingStatus) {
-          case 'uploading':
-            setUploadProgress(30);
-            break;
-          case 'uploaded':
-            setUploadProgress(50);
-            break;
-          case 'processing':
-            setUploadProgress(80);
-            break;
-          case 'complete':
-            setUploadProgress(100);
-            break;
-          case 'failed':
-            setUploadProgress(100);
-            break;
+        // Progress is now handled by log-based updates
+        // Keep this for any status-based updates that don't have logs
+        if (processingStatus === 'complete' && uploadProgress < 100) {
+          updateProgressSmooth(100);
+        } else if (processingStatus === 'failed' && uploadProgress < 100) {
+          updateProgressSmooth(100);
         }
 
         // Update ARIA live region for accessibility
@@ -221,6 +211,130 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     };
   }, [openFileDialog]);
 
+  // Progress mapping for granular log-based progress updates
+  const LOG_PROGRESS_MAP: Record<string, Record<string, number>> = {
+    'START': {
+      'Starting upload process': 5,
+      'Detected image file': 8,
+      'Detected PDF file': 8,
+      'Optimizing image': 12,
+      'Image optimized': 18,
+      'Image optimization failed': 15,
+      'PDF file detected': 15
+    },
+    'FETCH': {
+      'Starting file upload': 20,
+      'Upload progress: 25%': 25,
+      'Upload progress: 50%': 35,
+      'Upload progress: 75%': 45,
+      'File uploaded successfully': 50
+    },
+    'SAVE': {
+      'Creating receipt record': 55,
+      'Receipt record created': 60
+    },
+    'PROCESSING': {
+      'Starting AI processing': 65,
+      'Analyzing receipt content': 70,
+      'Extracting merchant information': 72,
+      'Processing line items': 75,
+      'Calculating totals': 78,
+      'Finalizing results': 82,
+      'Validating extracted data': 85,
+      'Saving processed data': 88,
+      'Generating confidence scores': 92,
+      'Processing completed': 95
+    },
+    'GEMINI': {
+      'Starting AI analysis': 68,
+      'Processing with Gemini': 72,
+      'Extracting text content': 76,
+      'Analyzing receipt structure': 80,
+      'Identifying key fields': 84,
+      'Processing complete': 88
+    },
+    'COMPLETE': {
+      'Processing complete': 100
+    },
+    'ERROR': {
+      'Processing failed': 100
+    }
+  };
+
+  // Helper function to add local logs and update progress
+  const addLocalLog = (stepName: string, message: string, forceProgress?: number) => {
+    const localLog: ProcessingLog = {
+      id: `local-${Date.now()}-${Math.random()}`,
+      receipt_id: receiptId || 'pending',
+      created_at: new Date().toISOString(),
+      status_message: message,
+      step_name: stepName
+    };
+
+    setProcessLogs(prev => [...prev, localLog]);
+
+    // Update progress based on log content if not forced
+    if (forceProgress !== undefined) {
+      updateProgressSmooth(forceProgress);
+    } else {
+      updateProgressFromLog(stepName, message);
+    }
+  };
+
+  // Smooth progress update function
+  const updateProgressSmooth = (targetProgress: number) => {
+    const currentProgress = uploadProgress;
+    const difference = targetProgress - currentProgress;
+
+    if (difference <= 0) return; // Don't go backwards
+
+    setIsProgressUpdating(true);
+
+    // Animate progress in small increments for smooth transition
+    const steps = Math.max(1, Math.abs(difference));
+    const increment = difference / steps;
+    const duration = 400; // Total animation duration in ms
+    const stepDuration = duration / steps;
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      const newProgress = Math.min(100, currentProgress + (increment * step));
+      setUploadProgress(newProgress);
+
+      if (step >= steps || newProgress >= targetProgress) {
+        clearInterval(interval);
+        setUploadProgress(targetProgress);
+        // Stop the updating indicator after a short delay
+        setTimeout(() => setIsProgressUpdating(false), 200);
+      }
+    }, stepDuration);
+  };
+
+  // Function to update progress based on log content
+  const updateProgressFromLog = (stepName: string, message: string) => {
+    const stageMap = LOG_PROGRESS_MAP[stepName];
+    if (!stageMap) return;
+
+    // Find the best matching message
+    let bestMatch = '';
+    let bestScore = 0;
+
+    Object.keys(stageMap).forEach(logKey => {
+      if (message.toLowerCase().includes(logKey.toLowerCase())) {
+        const score = logKey.length; // Longer matches are more specific
+        if (score > bestScore) {
+          bestMatch = logKey;
+          bestScore = score;
+        }
+      }
+    });
+
+    if (bestMatch && stageMap[bestMatch]) {
+      updateProgressSmooth(stageMap[bestMatch]);
+    }
+  };
+
   const processUploadedFiles = async (files: File[]) => {
     if (!user) {
       toast.error("Please login first");
@@ -231,9 +345,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setError(null);
     setProcessLogs([]);
     setStageHistory([]);
-    setCurrentStage('QUEUED');
+    setCurrentStage('START');
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(0);
+    setIsProgressUpdating(false);
     setStartTime(Date.now());
 
     try {
@@ -244,6 +359,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         ariaLiveRegion.textContent = `Preparing ${file.name} for upload`;
       }
 
+      // Add initial logs for immediate feedback
+      addLocalLog('START', `Starting upload process for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+
+      // Add file validation log
+      if (file.type.startsWith('image/')) {
+        addLocalLog('START', `Detected image file: ${file.type}`);
+      } else if (file.type === 'application/pdf') {
+        addLocalLog('START', `Detected PDF file: ${file.name}`);
+      }
+
       // Using the directly imported optimizeImageForUpload function
       console.log('Using directly imported optimizeImageForUpload function');
 
@@ -252,7 +377,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
       // Only optimize images, not PDFs
       if (file.type.startsWith('image/')) {
-        setUploadProgress(15);
+        addLocalLog('START', 'Optimizing image for better processing...');
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = `Optimizing image for better processing`;
         }
@@ -263,26 +388,37 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           fileToUpload = await optimizeImageForUpload(file, 1500, quality);
           console.log(`Image optimized: ${file.size} bytes → ${fileToUpload.size} bytes (${Math.round(fileToUpload.size / file.size * 100)}% of original)`);
 
+          const compressionRatio = Math.round(fileToUpload.size / file.size * 100);
+          addLocalLog('START', `Image optimized: ${compressionRatio}% of original size (${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB)`);
+
           if (ariaLiveRegion) {
             ariaLiveRegion.textContent = `Image optimized, uploading ${fileToUpload.name}`;
           }
         } catch (optimizeError) {
           console.error("Image optimization failed, using original file:", optimizeError);
+          addLocalLog('START', 'Image optimization failed, using original file');
           // Continue with original file if optimization fails
           if (ariaLiveRegion) {
             ariaLiveRegion.textContent = `Optimization skipped, uploading original file`;
           }
         }
+      } else {
+        addLocalLog('START', 'PDF file detected, skipping optimization');
       }
 
       console.log("Starting upload process with bucket: receipt-images");
+      addLocalLog('FETCH', 'Starting file upload to cloud storage...');
 
-      setUploadProgress(30);
       setProcessingStatus('uploading');
       const imageUrl = await uploadReceiptImage(fileToUpload, user.id, (progress) => {
-        // Update progress percentage based on upload progress
-        const scaledProgress = Math.floor(progress * 0.5); // Scale to 0-50%
-        setUploadProgress(scaledProgress);
+        // Add progress logs at key milestones
+        if (progress === 25) {
+          addLocalLog('FETCH', 'Upload progress: 25% complete');
+        } else if (progress === 50) {
+          addLocalLog('FETCH', 'Upload progress: 50% complete');
+        } else if (progress === 75) {
+          addLocalLog('FETCH', 'Upload progress: 75% complete');
+        }
       });
 
       if (!imageUrl) {
@@ -290,12 +426,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       console.log("Image uploaded successfully:", imageUrl);
-      setUploadProgress(50);
+      addLocalLog('FETCH', `File uploaded successfully to: ${imageUrl.split('/').pop()}`);
 
       if (ariaLiveRegion) {
         ariaLiveRegion.textContent = 'Image uploaded successfully, creating receipt record';
       }
 
+      addLocalLog('SAVE', 'Creating receipt record in database...');
       const today = new Date().toISOString().split('T')[0];
       // Fix line 274 - Remove user_id from the object as it's not in the Receipt type
       // The createReceipt function adds the user_id internally
@@ -321,10 +458,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       setReceiptId(newReceiptId);
-      setUploadProgress(60);
+      addLocalLog('SAVE', `Receipt record created with ID: ${newReceiptId.slice(0, 8)}...`);
 
       // Mark receipt as uploaded
       await markReceiptUploaded(newReceiptId);
+      addLocalLog('PROCESSING', `Starting AI processing with ${settings.selectedModel}...`);
 
       if (ariaLiveRegion) {
         ariaLiveRegion.textContent = `Processing receipt with AI Vision`;
@@ -351,6 +489,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
               );
             });
+
+            // Update progress based on the received log
+            if (newLog.step_name && newLog.status_message) {
+              updateProgressFromLog(newLog.step_name, newLog.status_message);
+            }
 
             if (ariaLiveRegion && newLog.status_message) {
               ariaLiveRegion.textContent = newLog.status_message;
@@ -422,7 +565,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           });
         }
 
-        setUploadProgress(100);
+        addLocalLog('COMPLETE', 'Processing complete - receipt ready for review');
 
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
@@ -430,7 +573,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       } catch (ocrError: any) {
         console.error("Processing error:", ocrError);
         toast.error("Processing failed. Please edit manually or try again.");
-        setUploadProgress(100);
+        addLocalLog('ERROR', `Processing failed: ${ocrError.message || 'Unknown error'}`);
         setCurrentStage('ERROR');
 
         if (ariaLiveRegion) {
@@ -493,6 +636,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setError(null);
     setIsUploading(false);
     setUploadProgress(0);
+    setIsProgressUpdating(false);
     setCurrentStage(null);
     setStageHistory([]);
     setProcessLogs([]);
@@ -509,7 +653,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col space-y-6 p-4">
+    <div className="w-full h-full grid grid-rows-[1fr_auto] gap-4 p-4">
       <div
         className={`relative w-full flex flex-col rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
@@ -541,166 +685,178 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
       </div>
 
-        <div className="flex flex-col items-center justify-center text-center gap-4 min-h-[300px]">
-          <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Header Section */}
+          <div className="flex flex-col items-center text-center gap-3 flex-shrink-0 py-4">
             <motion.div
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className={`relative rounded-full p-6 ${
+              className={`relative rounded-full p-4 ${
                 isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
               }`}
             >
               {isUploading ? (
-                <Loader2 size={36} className="text-primary animate-spin" />
+                <Loader2 size={32} className="text-primary animate-spin" />
               ) : error ? (
-                <XCircle size={36} className="text-destructive" />
+                <XCircle size={32} className="text-destructive" />
               ) : isDragging ? (
-                <Upload size={36} className="text-primary" />
+                <Upload size={32} className="text-primary" />
               ) : (
-                <Upload size={36} className="text-primary" />
+                <Upload size={32} className="text-primary" />
               )}
             </motion.div>
 
-          <div className="space-y-2">
-            <h3 className="text-xl font-medium">
-              {isUploading
-                ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..."
-                : error
-                  ? "Upload Failed"
-                  : isDragging
-                    ? "Drop Files Here"
-                    : "Upload Receipt"}
-            </h3>
-            <p
-              id="upload-zone-description"
-              className="text-base text-muted-foreground max-w-md mx-auto"
-            >
-              {isUploading
-                ? currentStage === 'ERROR'
-                  ? "An error occurred during processing"
-                  : currentStage
-                    ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.description || `Processing your receipt (${uploadProgress}%)`
-                    : `Processing your receipt (${uploadProgress}%)`
-                : error
-                  ? error
-                  : isDragging
-                    ? isInvalidFile
-                      ? "This file type is not supported"
-                      : "Release to start upload"
-                    : "Drag & drop your receipt images or PDFs here, or click to browse"
-              }
-            </p>
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {receiptUploads.length > 0 && !isUploading && !error && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full max-w-2xl mt-4 space-y-4"
-            >
-              {/* File Preview */}
-              <div className="p-4 border rounded-lg bg-secondary/50 flex items-center space-x-4">
-                {receiptUploads[0].file.type === 'application/pdf' ? (
-                  <FileText className="w-10 h-10 text-muted-foreground flex-shrink-0" />
-                ) : previewUrl ? (
-                  <img src={previewUrl} alt={`Preview of ${receiptUploads[0].file.name}`} className="w-16 h-16 object-cover rounded flex-shrink-0" />
-                ) : (
-                  <FileImage className="w-10 h-10 text-muted-foreground flex-shrink-0" />
-                )}
-                <div className="flex-grow overflow-hidden">
-                  <p className="text-sm font-medium truncate">{receiptUploads[0].file.name}</p>
-                  <p className="text-xs text-muted-foreground">{(receiptUploads[0].file.size / 1024).toFixed(1)} KB</p>
-                </div>
-              </div>
-
-              {/* File Analysis */}
-              <FileAnalyzer
-                file={receiptUploads[0].file}
-                onRecommendationChange={setProcessingRecommendation}
-                showDetails={true}
-                compact={false}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {!isUploading && !error && !receiptUploads.length && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="my-4"
-            >
-              {isInvalidFile
-                ? DropZoneIllustrations.error
-                : isDragging
-                  ? DropZoneIllustrations.drag
-                  : DropZoneIllustrations.default}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-          <div className="w-full flex justify-center items-center mt-4">
-            {isUploading ? (
-              <EnhancedProcessingTimeline
-                currentStage={currentStage}
-                stageHistory={stageHistory}
-                uploadProgress={uploadProgress}
-                fileSize={receiptUploads[0]?.file?.size}
-                processingMethod={settings.processingMethod}
-                modelId={settings.selectedModel}
-                startTime={startTime}
-              />
-            ) : error ? (
-              <Button
-                onClick={retryUpload}
-                variant="default"
-                className="mt-4 px-6 py-2 text-base"
-                size="lg"
+            <div className="space-y-1">
+              <h3 className="text-lg font-medium">
+                {isUploading
+                  ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..."
+                  : error
+                    ? "Upload Failed"
+                    : isDragging
+                      ? "Drop Files Here"
+                      : "Upload Receipt"}
+              </h3>
+              <p
+                id="upload-zone-description"
+                className="text-sm text-muted-foreground max-w-md mx-auto"
               >
-                Try Again
-              </Button>
-            ) : (
-              <Button
-                onClick={handleStartUpload}
-                variant="default"
-                className="mt-4 px-6 py-2 text-base group"
-                size="lg"
-              >
-                <span className="mr-2">
-                  {receiptUploads.length > 0 ? "Upload File" : "Select File"}
-                </span>
-                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
-                  JPG, PNG, PDF (up to 5MB)
-                </span>
-              </Button>
-            )}
+                {isUploading
+                  ? currentStage === 'ERROR'
+                    ? "An error occurred during processing"
+                    : currentStage
+                      ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.description || `Processing your receipt (${uploadProgress}%)`
+                      : `Processing your receipt (${uploadProgress}%)`
+                  : error
+                    ? error
+                    : isDragging
+                      ? isInvalidFile
+                        ? "This file type is not supported"
+                        : "Release to start upload"
+                      : "Drag & drop your receipt images or PDFs here, or click to browse"
+                }
+              </p>
+            </div>
           </div>
 
-          <div className="w-full max-w-2xl mt-4">
+          {/* Content Section - Scrollable */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-0 overflow-y-auto px-4">
+
+            <AnimatePresence>
+              {receiptUploads.length > 0 && !isUploading && !error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="w-full max-w-2xl space-y-4 flex-shrink-0"
+                >
+                  {/* File Preview */}
+                  <div className="p-4 border rounded-lg bg-secondary/50 flex items-center space-x-4">
+                    {receiptUploads[0].file.type === 'application/pdf' ? (
+                      <FileText className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+                    ) : previewUrl ? (
+                      <img src={previewUrl} alt={`Preview of ${receiptUploads[0].file.name}`} className="w-16 h-16 object-cover rounded flex-shrink-0" />
+                    ) : (
+                      <FileImage className="w-10 h-10 text-muted-foreground flex-shrink-0" />
+                    )}
+                    <div className="flex-grow overflow-hidden">
+                      <p className="text-sm font-medium truncate">{receiptUploads[0].file.name}</p>
+                      <p className="text-xs text-muted-foreground">{(receiptUploads[0].file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+
+                  {/* File Analysis */}
+                  <FileAnalyzer
+                    file={receiptUploads[0].file}
+                    onRecommendationChange={setProcessingRecommendation}
+                    showDetails={true}
+                    compact={false}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {!isUploading && !error && !receiptUploads.length && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex-shrink-0"
+                >
+                  {isInvalidFile
+                    ? DropZoneIllustrations.error
+                    : isDragging
+                      ? DropZoneIllustrations.drag
+                      : DropZoneIllustrations.default}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Processing Timeline and Action Buttons */}
+            <div className="w-full flex flex-col items-center gap-4 flex-shrink-0">
+              {isUploading ? (
+                <EnhancedProcessingTimeline
+                  currentStage={currentStage}
+                  stageHistory={stageHistory}
+                  uploadProgress={uploadProgress}
+                  fileSize={receiptUploads[0]?.file?.size}
+                  processingMethod={settings.processingMethod}
+                  modelId={settings.selectedModel}
+                  startTime={startTime}
+                  isProgressUpdating={isProgressUpdating}
+                />
+              ) : error ? (
+                <Button
+                  onClick={retryUpload}
+                  variant="default"
+                  className="px-6 py-2 text-base"
+                  size="lg"
+                >
+                  Try Again
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleStartUpload}
+                  variant="default"
+                  className="px-6 py-2 text-base group"
+                  size="lg"
+                >
+                  <span className="mr-2">
+                    {receiptUploads.length > 0 ? "Upload File" : "Select File"}
+                  </span>
+                  <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
+                    JPG, PNG, PDF (up to 5MB)
+                  </span>
+                </Button>
+              )}
+            </div>
+
+            {/* Processing Logs - Scrollable when present */}
             {isUploading && (
-              <ProcessingLogs
-                processLogs={processLogs}
-                currentStage={currentStage}
-                showDetailedLogs={true}
-                startTime={startTime}
-              />
+              <div className="w-full max-w-2xl flex-1 min-h-0 overflow-y-auto">
+                <ProcessingLogs
+                  processLogs={processLogs}
+                  currentStage={currentStage}
+                  showDetailedLogs={true}
+                  startTime={startTime}
+                />
+              </div>
             )}
 
-            {currentStage === 'ERROR' && <ErrorState error={error} />}
+            {currentStage === 'ERROR' && (
+              <div className="w-full max-w-2xl flex-shrink-0">
+                <ErrorState error={error} />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Processing Options Section */}
+      {/* Processing Options Section - Collapsible footer */}
       {!isUploading && (
-        <div className="w-full">
+        <div className="w-full flex-shrink-0">
           <ReceiptProcessingOptions
             defaultMethod={settings.processingMethod}
             defaultModel={settings.selectedModel}
