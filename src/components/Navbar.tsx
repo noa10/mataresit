@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
   const isSearchPage = location.pathname === '/search';
 
   // Check if we're on a public page (outside AppLayout)
-  const isPublicPage = ['/', '/pricing', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success'].includes(location.pathname);
+  const isPublicPage = ['/', '/pricing', '/help', '/docs', '/status', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success'].includes(location.pathname);
 
   useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -129,6 +129,12 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     <Link to="/help" className="flex items-center gap-2 w-full">
                       <MessageSquare className="h-4 w-4" />
                       Help Center
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/status" className="flex items-center gap-2 w-full">
+                      <ShieldCheck className="h-4 w-4" />
+                      System Status
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -295,6 +301,13 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Help Center
+                    </Link>
+                    <Link
+                      to="/status"
+                      className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      System Status
                     </Link>
                     <Link
                       to="/blog"

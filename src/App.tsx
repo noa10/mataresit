@@ -37,6 +37,7 @@ const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const StatusPage = lazy(() => import("./pages/StatusPage"));
 const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 
@@ -86,6 +87,11 @@ const App = () => (
               <Route path="/docs" element={
                 <Suspense fallback={<PageLoading />}>
                   <DocumentationPage />
+                </Suspense>
+              } />
+              <Route path="/status" element={
+                <Suspense fallback={<PageLoading />}>
+                  <StatusPage />
                 </Suspense>
               } />
               <Route path="/blog" element={
