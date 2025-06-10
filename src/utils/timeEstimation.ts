@@ -50,10 +50,11 @@ const SIZE_MULTIPLIERS = {
 
 // Model-specific multipliers
 const MODEL_MULTIPLIERS: Record<string, number> = {
-  'gemini-1.5-flash': 0.8,
-  'gemini-1.5-flash-latest': 0.8,
-  'gemini-1.5-pro': 1.3,
   'gemini-2.0-flash-lite': 0.7,
+  'gemini-2.5-flash-preview-05-20': 0.8,
+  'openrouter/google/gemini-2.0-flash-exp:free': 0.9,
+  'openrouter/meta-llama/llama-4-maverick:free': 1.1,
+  'openrouter/moonshotai/kimi-vl-a3b-thinking:free': 1.2,
 };
 
 /**

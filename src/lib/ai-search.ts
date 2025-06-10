@@ -554,7 +554,7 @@ export async function checkEmbeddings(receiptId: string): Promise<{exists: boole
 /**
  * Generate embeddings for a specific receipt
  */
-export async function generateEmbeddings(receiptId: string, model: string = 'gemini-1.5-flash-latest'): Promise<boolean> {
+export async function generateEmbeddings(receiptId: string, model: string = 'gemini-2.0-flash-lite'): Promise<boolean> {
   try {
     console.log(`Generating embeddings for receipt ${receiptId} using model ${model}`);
     const response = await callEdgeFunction('generate-embeddings', 'POST', {
@@ -574,7 +574,7 @@ export async function generateEmbeddings(receiptId: string, model: string = 'gem
 /**
  * Generate embeddings for multiple receipts
  */
-export async function generateAllEmbeddings(model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
+export async function generateAllEmbeddings(model: string = 'gemini-2.0-flash-lite', forceRegenerate: boolean = false): Promise<{
   success: boolean;
   count: number;
   total: number;
@@ -824,7 +824,7 @@ export async function generateLineItemEmbeddings(limit: number = 50, forceRegene
 /**
  * Generate all embeddings (receipts and line items)
  */
-export async function generateAllTypeEmbeddings(limit: number = 10, model: string = 'gemini-1.5-flash-latest', forceRegenerate: boolean = false): Promise<{
+export async function generateAllTypeEmbeddings(limit: number = 10, model: string = 'gemini-2.0-flash-lite', forceRegenerate: boolean = false): Promise<{
   success: boolean;
   message: string;
   receiptResults: {
@@ -1240,7 +1240,7 @@ export async function generateReceiptEmbeddings(batchSize: number = 10, forceReg
 }> {
   try {
     // Use the existing generateAllEmbeddings function
-    const result = await generateAllEmbeddings('gemini-1.5-flash-latest', forceRegenerate);
+    const result = await generateAllEmbeddings('gemini-2.0-flash-lite', forceRegenerate);
 
     // Get the current status of embeddings
     const stats = await checkReceiptEmbeddings();

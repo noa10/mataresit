@@ -63,7 +63,7 @@ const pricingTiers: PricingTier[] = [
     features: {
       uploads: "Up to 50 receipts per month",
       processing: "AI-powered data extraction",
-      retention: "7-day data history",
+      retention: "Unlimited retention",
       storage: "1GB secure storage",
       models: [
         "Default AI Models",
@@ -82,7 +82,7 @@ const pricingTiers: PricingTier[] = [
         "Single processing method",
         "Single user access"
       ],
-      analytics: ["Basic receipt summary", "Simple monthly overview"]
+      analytics: ["Basic receipt summary", "Simple monthly overview", "Basic data export (CSV)"]
     },
     limitations: ["No batch processing", "No version control", "No integrations", "Basic support only"]
   },
@@ -96,7 +96,7 @@ const pricingTiers: PricingTier[] = [
     features: {
       uploads: "Everything in Free, plus:",
       processing: "500 receipts per month",
-      retention: "90-day data history",
+      retention: "Unlimited retention",
       storage: "10GB secure storage",
       models: [
         "Access to premium AI models",
@@ -110,10 +110,6 @@ const pricingTiers: PricingTier[] = [
       ],
       capabilities: [
         "All Free tier processing",
-        "Enhanced merchant normalization",
-        "Currency detection with conversion",
-        "Advanced line item extraction",
-        "Advanced confidence scoring",
         "Batch processing (up to 5)",
         "Team access for up to 5 users",
         "Version control",
@@ -125,7 +121,7 @@ const pricingTiers: PricingTier[] = [
         "Detailed spending reports",
         "Merchant analysis",
         "Monthly/quarterly trends",
-        "Basic data export (CSV)"
+        "Basic data export (CSV, XLSX)"
       ],
       support: "Standard support"
     }
@@ -139,7 +135,7 @@ const pricingTiers: PricingTier[] = [
     features: {
       uploads: "Everything in Pro, plus:",
       processing: "Unlimited receipts with priority processing",
-      retention: "1-year retention + archiving",
+      retention: "Unlimited retention + archiving",
       storage: "Unlimited secure storage",
       models: [
         "Premium AI models with priority access",

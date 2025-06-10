@@ -125,13 +125,13 @@ export function getProcessingRecommendation(
   recommendedMethod = 'ai-vision';
 
   // Analyze file characteristics for model selection
-  // Prefer gemini-2.0-flash-lite to avoid rate limiting issues with gemini-1.5-pro
+  // Prefer gemini-2.0-flash-lite for reliability and rate limit avoidance
   if (fileAnalysis.size > 6 * 1024 * 1024) {
-    recommendedModel = 'gemini-1.5-flash-latest';
+    recommendedModel = 'gemini-2.5-flash-preview-05-20';
     reasoning.push('Very large file size detected - using high-capacity AI Vision model');
     riskLevel = 'medium';
   } else if (fileAnalysis.complexity === 'high' && fileAnalysis.size > 4 * 1024 * 1024) {
-    recommendedModel = 'gemini-1.5-flash-latest';
+    recommendedModel = 'gemini-2.5-flash-preview-05-20';
     reasoning.push('High complexity large receipt - AI Vision with advanced model provides better accuracy');
   } else {
     // Default to gemini-2.0-flash-lite for better reliability and rate limit avoidance
@@ -152,7 +152,7 @@ export function getProcessingRecommendation(
   }
 
   if (userPreferences?.prioritizeAccuracy && fileAnalysis.size < 4 * 1024 * 1024) {
-    recommendedModel = 'gemini-1.5-flash-latest';
+    recommendedModel = 'gemini-2.5-flash-preview-05-20';
     reasoning.push('Accuracy prioritized - using more accurate model');
   }
 
@@ -201,12 +201,12 @@ function createFallbackStrategy(
   const fallbackMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai';
 
   // Choose fallback model based on file characteristics
-  // Avoid gemini-1.5-pro due to rate limiting issues
-  let fallbackModel = 'gemini-1.5-flash-latest';
+  // Use available models for reliable fallback processing
+  let fallbackModel = 'gemini-2.5-flash-preview-05-20';
   if (fileAnalysis.size > 3 * 1024 * 1024) {
     fallbackModel = 'gemini-2.0-flash-lite'; // Use fastest for large files
   } else if (fileAnalysis.complexity === 'high') {
-    fallbackModel = 'gemini-1.5-flash-latest'; // Use reliable model for complex files
+    fallbackModel = 'gemini-2.5-flash-preview-05-20'; // Use reliable model for complex files
   }
 
   // Define triggers for fallback

@@ -32,28 +32,6 @@ interface ModelConfig {
  */
 const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   // Google Gemini Models
-  'gemini-1.5-flash': {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true
-  },
-  'gemini-1.5-pro': {
-    id: 'gemini-1.5-pro',
-    name: 'Gemini 1.5 Pro',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.1,
-    maxTokens: 2048,
-    supportsText: true,
-    supportsVision: true
-  },
   'gemini-2.0-flash-lite': {
     id: 'gemini-2.0-flash-lite',
     name: 'Gemini 2.0 Flash Lite',
@@ -78,17 +56,6 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   },
 
   // OpenRouter Free Models
-  'openrouter/google/gemma-3-27b-it:free': {
-    id: 'openrouter/google/gemma-3-27b-it:free',
-    name: 'Gemma 3 27B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: false
-  },
   'openrouter/google/gemini-2.0-flash-exp:free': {
     id: 'openrouter/google/gemini-2.0-flash-exp:free',
     name: 'Gemini 2.0 Flash Experimental',
@@ -111,39 +78,7 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     supportsText: true,
     supportsVision: true
   },
-  'openrouter/google/gemma-3n-e4b-it:free': {
-    id: 'openrouter/google/gemma-3n-e4b-it:free',
-    name: 'Gemma 3N E4B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: false
-  },
-  'openrouter/mistralai/devstral-small:free': {
-    id: 'openrouter/mistralai/devstral-small:free',
-    name: 'Devstral Small',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: false
-  },
-  'openrouter/nvidia/llama-3.3-nemotron-super-49b-v1:free': {
-    id: 'openrouter/nvidia/llama-3.3-nemotron-super-49b-v1:free',
-    name: 'Llama 3.3 Nemotron Super 49B',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: false
-  },
+
   'openrouter/moonshotai/kimi-vl-a3b-thinking:free': {
     id: 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
     name: 'Kimi VL A3B Thinking',
