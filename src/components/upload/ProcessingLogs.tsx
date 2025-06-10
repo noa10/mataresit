@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,47 @@ export function ProcessingLogs({
 }: ProcessingLogsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [displayedLogs, setDisplayedLogs] = useState<ProcessingLog[]>([]);
+  const [isStreaming, setIsStreaming] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new logs arrive
+  const scrollToBottom = useCallback(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, []);
+
+  // Stream logs with animation delays
+  useEffect(() => {
+    if (!isStreaming || processLogs.length === 0) {
+      setDisplayedLogs(processLogs);
+      return;
+    }
+
+    // If we have new logs, stream them in progressively
+    if (processLogs.length > displayedLogs.length) {
+      const newLogs = processLogs.slice(displayedLogs.length);
+
+      // For performance, if there are many logs, reduce the delay
+      const delay = newLogs.length > 5 ? 50 : 150;
+
+      newLogs.forEach((log, index) => {
+        setTimeout(() => {
+          setDisplayedLogs(prev => [...prev, log]);
+          // Auto-scroll after a short delay to allow animation to start
+          setTimeout(scrollToBottom, 100);
+        }, index * delay);
+      });
+    } else {
+      // If logs were reset or changed, update immediately
+      setDisplayedLogs(processLogs);
+    }
+  }, [processLogs, displayedLogs.length, isStreaming, scrollToBottom]);
 
   // Update elapsed time every second
   useEffect(() => {
@@ -35,6 +76,24 @@ export function ProcessingLogs({
 
     return () => clearInterval(interval);
   }, [startTime]);
+
+  // Auto-expand when logs start streaming
+  useEffect(() => {
+    if (processLogs.length > 0 && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [processLogs.length, isExpanded]);
+
+  // Stop streaming when processing is complete
+  useEffect(() => {
+    if (currentStage === 'COMPLETE' || currentStage === 'ERROR') {
+      // Add a small delay to ensure all logs are displayed
+      setTimeout(() => {
+        setIsStreaming(false);
+        setDisplayedLogs(processLogs);
+      }, 500);
+    }
+  }, [currentStage, processLogs]);
 
   const getStepColor = (step: string | null) => {
     if (!step) return 'text-gray-500';
@@ -93,6 +152,12 @@ export function ProcessingLogs({
                 {PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || currentStage}
               </Badge>
             )}
+            {isStreaming && displayedLogs.length > 0 && (
+              <Badge variant="secondary" className="px-2 py-1 text-xs">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Live
+              </Badge>
+            )}
             {startTime && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock size={12} />
@@ -101,14 +166,24 @@ export function ProcessingLogs({
             )}
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="h-6 w-6 p-0"
-          >
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{displayedLogs.length} logs</span>
+              {isStreaming && displayedLogs.length < processLogs.length && (
+                <span className="text-primary">
+                  +{processLogs.length - displayedLogs.length} pending
+                </span>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-6 w-6 p-0"
+            >
+              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -120,33 +195,78 @@ export function ProcessingLogs({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <ScrollArea className="h-[180px] w-full p-4">
-              <div className="space-y-2">
-                <AnimatePresence>
-                  {processLogs.map((log, index) => (
+            <ScrollArea ref={scrollAreaRef} className="h-[180px] w-full p-4">
+              <div ref={logContainerRef} className="space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {displayedLogs.map((log, index) => (
                     <motion.div
-                      key={log.id || index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="text-sm flex items-start gap-2"
+                      key={log.id || `${log.created_at}-${index}`}
+                      initial={{
+                        opacity: 0,
+                        y: 20,
+                        scale: 0.95
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: -10,
+                        scale: 0.95
+                      }}
+                      transition={{
+                        duration: 0.3,
+                        ease: "easeOut"
+                      }}
+                      className="text-sm flex items-start gap-2 p-2 rounded-md bg-background/50 border border-border/50 hover:bg-background/80 transition-colors"
                     >
-                      {getLogIcon('info')}
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getLogIcon('info')}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <span className={`font-medium mr-2 ${getStepColor(log.step_name)}`}>
-                          {log.step_name || 'INFO'}:
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`font-medium text-xs uppercase tracking-wide ${getStepColor(log.step_name)}`}>
+                            {log.step_name || 'INFO'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(log.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <span className="text-muted-foreground break-words leading-relaxed">
+                          {log.status_message}
                         </span>
-                        <span className="text-muted-foreground break-all">{log.status_message}</span>
                       </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
 
-                {processLogs.length === 0 && (
-                  <div className="text-center text-muted-foreground text-xs py-4">
-                    Processing logs will appear here...
-                  </div>
+                {displayedLogs.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center text-muted-foreground text-xs py-8 flex flex-col items-center gap-2"
+                  >
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Waiting for processing logs...</span>
+                  </motion.div>
+                )}
+
+                {/* Streaming indicator */}
+                {isStreaming && displayedLogs.length > 0 && displayedLogs.length < processLogs.length && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2"
+                  >
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Streaming logs...</span>
+                  </motion.div>
                 )}
               </div>
             </ScrollArea>
