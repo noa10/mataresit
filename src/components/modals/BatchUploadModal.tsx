@@ -29,8 +29,8 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw] h-[85vh] max-h-[95vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="sm:max-w-[900px] w-[95vw] h-[85vh] max-h-[95vh] min-h-[500px] sm:min-h-[600px] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0 pb-4">
           <DialogTitle>Upload Receipts</DialogTitle>
           <DialogDescription>
             Upload and process your receipts. You can upload a single receipt or process multiple receipts at once.
@@ -41,7 +41,7 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
           defaultValue="single"
           value={activeTab}
           onValueChange={setActiveTab}
-          className="flex-grow flex flex-col min-h-0"
+          className="flex-grow flex flex-col min-h-0 overflow-hidden"
         >
           <TabsList className="mb-4 self-center flex-shrink-0">
             <TabsTrigger value="single" className="flex items-center gap-2">
@@ -54,16 +54,16 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="single" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0">
-            <div className="flex-grow overflow-y-auto overflow-x-hidden">
+          <TabsContent value="single" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden">
+            <div className="flex-grow min-h-0 overflow-y-auto overflow-x-hidden">
               <UploadZone
                 onUploadComplete={handleUploadComplete}
               />
             </div>
           </TabsContent>
 
-          <TabsContent value="batch" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0">
-            <div className="flex-grow overflow-y-auto overflow-x-hidden">
+          <TabsContent value="batch" className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden">
+            <div className="flex-grow min-h-0 overflow-y-auto overflow-x-hidden">
               <BatchUploadZone
                 onUploadComplete={handleUploadComplete}
               />

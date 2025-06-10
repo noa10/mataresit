@@ -10,6 +10,7 @@ import { BatchProcessingControls } from "@/components/upload/BatchProcessingCont
 import { BatchUploadReview } from "@/components/upload/BatchUploadReview";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EnhancedScrollArea } from "@/components/ui/enhanced-scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 import imageCompression from "browser-image-compression";
@@ -24,6 +25,8 @@ export default function BatchUploadZone({
 }: BatchUploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef<number>(0);
+  const fileQueueRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { settings } = useSettings();
 
@@ -39,6 +42,10 @@ export default function BatchUploadZone({
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   // State to track compression status
   const [isCompressing, setIsCompressing] = useState(false);
+  // State to track previous file count for auto-scroll
+  const [previousFileCount, setPreviousFileCount] = useState(0);
+  // State to preserve scroll position during updates
+  const [preserveScrollPosition, setPreserveScrollPosition] = useState(false);
 
   const {
     isDragging,
@@ -66,7 +73,8 @@ export default function BatchUploadZone({
     pauseBatchProcessing,
     cancelUpload,
     retryUpload,
-    receiptIds
+    receiptIds,
+    progressUpdating
   } = useBatchFileUpload({
     maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
     autoStart: settings?.batchUpload?.autoStart || false
@@ -299,6 +307,76 @@ export default function BatchUploadZone({
     return "border-border bg-background/50";
   };
 
+  // Auto-scroll to bottom when new files are added (but not during progress updates)
+  useEffect(() => {
+    if (batchUploads.length > previousFileCount && scrollAreaRef.current && !preserveScrollPosition) {
+      // Small delay to ensure the new items are rendered
+      setTimeout(() => {
+        const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+          // Smooth scroll to bottom
+          scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 150);
+    }
+    setPreviousFileCount(batchUploads.length);
+  }, [batchUploads.length, previousFileCount, preserveScrollPosition]);
+
+  // Preserve scroll position during progress updates
+  useEffect(() => {
+    const hasActiveProgress = Object.values(progressUpdating).some(Boolean);
+    setPreserveScrollPosition(hasActiveProgress);
+  }, [progressUpdating]);
+
+  // Scroll to active uploads when processing starts
+  useEffect(() => {
+    if (isProcessing && activeUploads.length > 0 && scrollAreaRef.current) {
+      setTimeout(() => {
+        const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+          // Find the first active upload element and scroll to it
+          const activeUploadElement = scrollContainer.querySelector(`[data-upload-status="uploading"], [data-upload-status="processing"]`);
+          if (activeUploadElement) {
+            activeUploadElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+          }
+        }
+      }, 200);
+    }
+  }, [isProcessing, activeUploads.length]);
+
+  // Keyboard navigation for scroll area
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!scrollAreaRef.current) return;
+
+    const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollContainer) return;
+
+    switch (e.key) {
+      case 'Home':
+        e.preventDefault();
+        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'End':
+        e.preventDefault();
+        scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+        break;
+      case 'PageUp':
+        e.preventDefault();
+        scrollContainer.scrollBy({ top: -scrollContainer.clientHeight * 0.8, behavior: 'smooth' });
+        break;
+      case 'PageDown':
+        e.preventDefault();
+        scrollContainer.scrollBy({ top: scrollContainer.clientHeight * 0.8, behavior: 'smooth' });
+        break;
+    }
+  }, []);
+
   // Log component state for debugging
   useEffect(() => {
     console.log('BatchUploadZone state:', {
@@ -399,7 +477,7 @@ export default function BatchUploadZone({
       />
 
       <div
-        className={`relative w-full h-full flex flex-col overflow-auto rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        className={`relative w-full h-full grid grid-rows-[auto_1fr_auto] gap-4 rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -439,53 +517,55 @@ export default function BatchUploadZone({
             : 'Ready to upload multiple receipt files'}
       </div>
 
-      <div className="flex flex-col items-center justify-center text-center gap-4 flex-grow">
-        {/* Header section */}
-        <div className="flex flex-col items-center gap-3">
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{
-              scale: isDragging ? 1.1 : 1,
-              rotate: isDragging ? [0, -5, 5, -5, 0] : 0
-            }}
-            whileHover={{ scale: 1.05 }}
-            transition={{
-              type: "spring",
-              stiffness: 260,
-              damping: 20,
-              rotate: { duration: 0.5, ease: "easeInOut" }
-            }}
-            className={`relative rounded-full p-6 ${
-              isDragging ? "bg-primary/10" : "bg-secondary"
-            }`}
-          >
-            {isDragging ? (
-              <Upload size={36} className="text-primary" />
-            ) : (
-              <FileUp size={36} className="text-primary" />
-            )}
-          </motion.div>
+      {/* Header Section - Auto height */}
+      <div className="flex flex-col items-center text-center gap-3">
+        <motion.div
+          initial={{ scale: 0.8 }}
+          animate={{
+            scale: isDragging ? 1.1 : 1,
+            rotate: isDragging ? [0, -5, 5, -5, 0] : 0
+          }}
+          whileHover={{ scale: 1.05 }}
+          transition={{
+            type: "spring",
+            stiffness: 260,
+            damping: 20,
+            rotate: { duration: 0.5, ease: "easeInOut" }
+          }}
+          className={`relative rounded-full p-4 ${
+            isDragging ? "bg-primary/10" : "bg-secondary"
+          }`}
+        >
+          {isDragging ? (
+            <Upload size={32} className="text-primary" />
+          ) : (
+            <FileUp size={32} className="text-primary" />
+          )}
+        </motion.div>
 
-          <div className="space-y-2">
-            <h3 className="text-xl font-medium">
-              {isDragging
-                ? "Drop Files Here"
-                : "Batch Upload Receipts"}
-            </h3>
-            <p
-              id="batch-upload-zone-description"
-              className="text-base text-muted-foreground max-w-md mx-auto"
-            >
-              {isCompressing
-                ? "Compressing selected images..."
-                : isInvalidFile
-                  ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
-                  : isDragging
-                    ? "Release to add files to the queue"
-                    : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h3 className="text-lg font-medium">
+            {isDragging
+              ? "Drop Files Here"
+              : "Batch Upload Receipts"}
+          </h3>
+          <p
+            id="batch-upload-zone-description"
+            className="text-sm text-muted-foreground max-w-md mx-auto"
+          >
+            {isCompressing
+              ? "Compressing selected images..."
+              : isInvalidFile
+                ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
+                : isDragging
+                  ? "Release to add files to the queue"
+                  : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
+          </p>
         </div>
+      </div>
+
+      {/* Main Content Section - Flexible height with proper scrolling */}
+      <div className="flex flex-col items-center gap-4 min-h-0 overflow-y-auto overflow-x-hidden">
 
         {/* Illustration when empty */}
         <AnimatePresence>
@@ -494,7 +574,7 @@ export default function BatchUploadZone({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="my-4"
+              className="flex-shrink-0"
             >
               {isInvalidFile
                 ? DropZoneIllustrations.error
@@ -508,36 +588,40 @@ export default function BatchUploadZone({
         {/* Processing controls */}
         <AnimatePresence>
           {batchUploads.length > 0 && (
-            <BatchProcessingControls
-              totalFiles={batchUploads.length}
-              pendingFiles={queuedUploads.length}
-              activeFiles={activeUploads.length}
-              completedFiles={completedUploads.length}
-              failedFiles={failedUploads.length}
-              totalProgress={totalProgress}
-              isProcessing={isProcessing}
-              isPaused={isPaused}
-              onStartProcessing={startBatchProcessing}
-              onPauseProcessing={pauseBatchProcessing}
-              onClearQueue={clearBatchQueue}
-              onClearAll={clearAllUploads}
-              onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
-              onShowReview={() => setShowReview(true)}
-              allComplete={allProcessingComplete}
-            />
+            <div className="flex-shrink-0">
+              <BatchProcessingControls
+                totalFiles={batchUploads.length}
+                pendingFiles={queuedUploads.length}
+                activeFiles={activeUploads.length}
+                completedFiles={completedUploads.length}
+                failedFiles={failedUploads.length}
+                totalProgress={totalProgress}
+                isProcessing={isProcessing}
+                isPaused={isPaused}
+                onStartProcessing={startBatchProcessing}
+                onPauseProcessing={pauseBatchProcessing}
+                onClearQueue={clearBatchQueue}
+                onClearAll={clearAllUploads}
+                onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+                onShowReview={() => setShowReview(true)}
+                allComplete={allProcessingComplete}
+                isProgressUpdating={Object.values(progressUpdating).some(Boolean)}
+              />
+            </div>
           )}
         </AnimatePresence>
 
-        {/* File queue */}
+        {/* File queue - Enhanced scrolling with proper height management */}
         <AnimatePresence>
           {batchUploads.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="w-full mt-4"
+              className="w-full flex-1 min-h-0 flex flex-col max-h-[400px] sm:max-h-[450px] md:max-h-[500px]"
+              ref={fileQueueRef}
             >
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-2 flex-shrink-0">
                 <h4 className="text-sm font-medium">Files ({batchUploads.length})</h4>
                 {failedUploads.length > 0 && (
                   <Button
@@ -551,26 +635,43 @@ export default function BatchUploadZone({
                   </Button>
                 )}
               </div>
-              <ScrollArea className="h-[300px] w-full rounded-md border">
+              <EnhancedScrollArea
+                className="flex-1 w-full rounded-md border min-h-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                maxHeight="min(350px, 60vh)"
+                showScrollIndicator={true}
+                fadeEdges={true}
+                ref={scrollAreaRef}
+                tabIndex={0}
+                onKeyDown={handleKeyDown}
+                role="region"
+                aria-label="File upload queue"
+              >
                 <div className="p-4 space-y-2">
-                  {batchUploads.map(upload => (
-                    <UploadQueueItem
+                  {batchUploads.map((upload, index) => (
+                    <motion.div
                       key={upload.id}
-                      upload={upload}
-                      receiptId={receiptIds[upload.id]}
-                      onRemove={removeFromBatchQueue}
-                      onCancel={cancelUpload}
-                      onRetry={retryUpload}
-                      onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
-                    />
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <UploadQueueItem
+                        upload={upload}
+                        receiptId={receiptIds[upload.id]}
+                        onRemove={removeFromBatchQueue}
+                        onCancel={cancelUpload}
+                        onRetry={retryUpload}
+                        onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
+                        isProgressUpdating={progressUpdating[upload.id] || false}
+                      />
+                    </motion.div>
                   ))}
                 </div>
-              </ScrollArea>
+              </EnhancedScrollArea>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Add files button */}
+        {/* Action buttons when no files */}
         {batchUploads.length === 0 && (
           <Button
             onClick={() => {
@@ -578,7 +679,7 @@ export default function BatchUploadZone({
               handleFileSelection();
             }}
             variant="default"
-            className="mt-4 px-6 py-2 text-base group"
+            className="px-6 py-2 text-base group flex-shrink-0"
             size="lg"
           >
             <span className="mr-2">Select Files</span>
@@ -588,16 +689,15 @@ export default function BatchUploadZone({
           </Button>
         )}
 
-        {/* Add more files button when queue exists */}
+        {/* Action buttons when files exist */}
         {batchUploads.length > 0 && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-shrink-0">
             <Button
               onClick={() => {
                 console.log('Add More Files button clicked');
                 handleFileSelection();
               }}
               variant="outline"
-              className="mt-2"
               size="sm"
             >
               <FileUp className="h-4 w-4 mr-2" />
@@ -612,7 +712,6 @@ export default function BatchUploadZone({
                   setShowReview(true);
                 }}
                 variant="default"
-                className="mt-2"
                 size="sm"
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
@@ -621,28 +720,28 @@ export default function BatchUploadZone({
             )}
           </div>
         )}
+      </div>
 
-        {/* Current settings and link to settings page */}
-        <div className="w-full max-w-md mt-4 mb-4">
-          <div className="flex flex-wrap gap-2 justify-center mb-2">
-            <div className="text-xs px-2 py-1 bg-muted rounded-full">
-              Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
-            </div>
-            <div className="text-xs px-2 py-1 bg-muted rounded-full">
-              Auto-start: {settings?.batchUpload?.autoStart ? "On" : "Off"}
-            </div>
+      {/* Footer Section - Auto height */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-wrap gap-2 justify-center">
+          <div className="text-xs px-2 py-1 bg-muted rounded-full">
+            Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
           </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Configure batch upload settings in the{" "}
-            <Button
-              variant="link"
-              className="h-auto p-0 text-xs"
-              onClick={() => navigate("/settings")}
-            >
-              Settings Page
-            </Button>
-          </p>
+          <div className="text-xs px-2 py-1 bg-muted rounded-full">
+            Auto-start: {settings?.batchUpload?.autoStart ? "On" : "Off"}
+          </div>
         </div>
+        <p className="text-xs text-muted-foreground text-center">
+          Configure batch upload settings in the{" "}
+          <Button
+            variant="link"
+            className="h-auto p-0 text-xs"
+            onClick={() => navigate("/settings")}
+          >
+            Settings Page
+          </Button>
+        </p>
       </div>
     </div>
     </>

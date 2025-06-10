@@ -22,6 +22,56 @@ interface BatchUploadOptions {
   useEnhancedFallback?: boolean;
 }
 
+// Progress mapping for granular log-based progress updates (same as single upload)
+const LOG_PROGRESS_MAP: Record<string, Record<string, number>> = {
+  'START': {
+    'Starting upload process': 5,
+    'Detected image file': 8,
+    'Detected PDF file': 8,
+    'Optimizing image': 12,
+    'Image optimized': 18,
+    'Image optimization failed': 15,
+    'PDF file detected': 15
+  },
+  'FETCH': {
+    'Starting file upload': 20,
+    'Upload progress: 25%': 25,
+    'Upload progress: 50%': 35,
+    'Upload progress: 75%': 45,
+    'File uploaded successfully': 50
+  },
+  'SAVE': {
+    'Creating receipt record': 55,
+    'Receipt record created': 60
+  },
+  'PROCESSING': {
+    'Starting AI processing': 65,
+    'Analyzing receipt content': 70,
+    'Extracting merchant information': 72,
+    'Processing line items': 75,
+    'Calculating totals': 78,
+    'Finalizing results': 82,
+    'Validating extracted data': 85,
+    'Saving processed data': 88,
+    'Generating confidence scores': 92,
+    'Processing completed': 95
+  },
+  'GEMINI': {
+    'Starting AI analysis': 68,
+    'Processing with Gemini': 72,
+    'Extracting text content': 76,
+    'Analyzing receipt structure': 80,
+    'Identifying key fields': 84,
+    'Processing complete': 88
+  },
+  'COMPLETE': {
+    'Processing complete': 100
+  },
+  'ERROR': {
+    'Processing failed': 100
+  }
+};
+
 // ============================================================================
 // STATE MANAGEMENT WITH REDUCER
 // ============================================================================
@@ -42,7 +92,8 @@ type BatchUploadAction =
   | { type: 'UPLOAD_COMPLETED'; uploadId: string }
   | { type: 'UPLOAD_FAILED'; uploadId: string; error: { code: string; message: string } }
   | { type: 'SET_RECEIPT_ID'; uploadId: string; receiptId: string }
-  | { type: 'RETRY_UPLOAD'; uploadId: string };
+  | { type: 'RETRY_UPLOAD'; uploadId: string }
+  | { type: 'SET_PROGRESS_UPDATING'; uploadId: string; isUpdating: boolean };
 
 /**
  * State shape for batch upload management
@@ -56,6 +107,7 @@ interface BatchUploadState {
   failedUploads: string[];
   receiptIds: Record<string, string>;
   processingRecommendations: Record<string, ProcessingRecommendation>;
+  progressUpdating: Record<string, boolean>; // Track which uploads are actively updating progress
 }
 
 /**
@@ -69,7 +121,8 @@ const initialBatchState: BatchUploadState = {
   completedUploads: [],
   failedUploads: [],
   receiptIds: {},
-  processingRecommendations: {}
+  processingRecommendations: {},
+  progressUpdating: {}
 };
 
 /**
@@ -265,6 +318,16 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
       };
     }
 
+    case 'SET_PROGRESS_UPDATING': {
+      return {
+        ...state,
+        progressUpdating: {
+          ...state.progressUpdating,
+          [action.uploadId]: action.isUpdating
+        }
+      };
+    }
+
     default:
       return state;
   }
@@ -292,7 +355,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     completedUploads,
     failedUploads,
     receiptIds,
-    processingRecommendations
+    processingRecommendations,
+    progressUpdating
   } = state;
 
   // Computed properties
@@ -311,6 +375,75 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const currentlyFailedUploads = batchUploads.filter(upload =>
     failedUploads.includes(upload.id)
   );
+
+  // Smooth progress update function for individual uploads
+  const updateProgressSmooth = useCallback((uploadId: string, targetProgress: number) => {
+    const upload = batchUploads.find(u => u.id === uploadId);
+    if (!upload) return;
+
+    const currentProgress = upload.uploadProgress;
+    const difference = targetProgress - currentProgress;
+
+    if (difference <= 0) return; // Don't go backwards
+
+    dispatch({ type: 'SET_PROGRESS_UPDATING', uploadId, isUpdating: true });
+
+    // Animate progress in small increments for smooth transition
+    const steps = Math.max(1, Math.abs(difference));
+    const increment = difference / steps;
+    const duration = 400; // Total animation duration in ms
+    const stepDuration = duration / steps;
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      const newProgress = Math.min(100, currentProgress + (increment * step));
+      dispatch({ type: 'UPLOAD_PROGRESS', uploadId, progress: newProgress });
+
+      if (step >= steps || newProgress >= targetProgress) {
+        clearInterval(interval);
+        dispatch({ type: 'UPLOAD_PROGRESS', uploadId, progress: targetProgress });
+        // Stop the updating indicator after a short delay
+        setTimeout(() => {
+          dispatch({ type: 'SET_PROGRESS_UPDATING', uploadId, isUpdating: false });
+        }, 200);
+      }
+    }, stepDuration);
+  }, [batchUploads]);
+
+  // Function to update progress based on log content
+  const updateProgressFromLog = useCallback((uploadId: string, stepName: string, message: string) => {
+    const stageMap = LOG_PROGRESS_MAP[stepName];
+    if (!stageMap) return;
+
+    // Find the best matching message
+    let bestMatch = '';
+    let bestScore = 0;
+
+    Object.keys(stageMap).forEach(logKey => {
+      if (message.toLowerCase().includes(logKey.toLowerCase())) {
+        const score = logKey.length; // Longer matches are more specific
+        if (score > bestScore) {
+          bestMatch = logKey;
+          bestScore = score;
+        }
+      }
+    });
+
+    if (bestMatch && stageMap[bestMatch]) {
+      updateProgressSmooth(uploadId, stageMap[bestMatch]);
+    }
+  }, [updateProgressSmooth]);
+
+  // Helper function to add local logs and update progress for individual uploads
+  const addLocalLog = useCallback((uploadId: string, stepName: string, message: string, forceProgress?: number) => {
+    // For batch uploads, we don't store local logs in state, but we still update progress
+    if (forceProgress !== undefined) {
+      updateProgressSmooth(uploadId, forceProgress);
+    } else {
+      updateProgressFromLog(uploadId, stepName, message);
+    }
+  }, [updateProgressSmooth, updateProgressFromLog]);
 
   // Total progress calculation
   const calculateTotalProgress = useCallback(() => {
@@ -506,8 +639,16 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     }
 
     try {
-      // Update status to uploading
-      updateUploadStatus(upload.id, 'uploading', 5);
+      // Add initial logs and update progress
+      addLocalLog(upload.id, 'START', `Starting upload process for ${upload.file.name} (${(upload.file.size / 1024 / 1024).toFixed(2)} MB)`);
+      updateUploadStatus(upload.id, 'uploading', 0);
+
+      // Add file validation log
+      if (upload.file.type.startsWith('image/')) {
+        addLocalLog(upload.id, 'START', `Detected image file: ${upload.file.type}`);
+      } else if (upload.file.type === 'application/pdf') {
+        addLocalLog(upload.id, 'START', `Detected PDF file: ${upload.file.name}`);
+      }
 
       // Optimize the image before uploading (if it's an image)
       let fileToUpload = upload.file;
@@ -515,7 +656,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       if (upload.file.type.startsWith('image/')) {
         try {
           // Using the directly imported optimizeImageForUpload function
-          updateUploadStatus(upload.id, 'uploading', 10);
+          addLocalLog(upload.id, 'START', 'Optimizing image for better processing...');
           console.log(`Optimizing image: ${upload.file.name}, size: ${upload.file.size}`);
 
           // Use a lower quality for larger files
@@ -534,24 +675,34 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
             throw new Error('Optimization returned null file');
           }
 
-          console.log(`Optimized image: ${upload.file.name}, new size: ${fileToUpload.size} (${Math.round(fileToUpload.size / upload.file.size * 100)}% of original)`);
+          const compressionRatio = Math.round(fileToUpload.size / upload.file.size * 100);
+          addLocalLog(upload.id, 'START', `Image optimized: ${compressionRatio}% of original size (${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB)`);
+          console.log(`Optimized image: ${upload.file.name}, new size: ${fileToUpload.size} (${compressionRatio}% of original)`);
         } catch (optimizeError) {
           console.error(`Error optimizing file ${upload.file.name}:`, optimizeError);
+          addLocalLog(upload.id, 'START', 'Image optimization failed, using original file');
           // Continue with original file if optimization fails
           console.log(`Using original file for ${upload.file.name} due to optimization error`);
         }
+      } else {
+        addLocalLog(upload.id, 'START', 'PDF file detected, skipping optimization');
       }
 
-      updateUploadStatus(upload.id, 'uploading', 15);
+      addLocalLog(upload.id, 'FETCH', 'Starting file upload to cloud storage...');
 
       // Upload the image (optimized or original)
       const imageUrl = await uploadReceiptImage(
         fileToUpload,
         user.id,
         (progress) => {
-          // Scale progress to 15-50%
-          const scaledProgress = 15 + Math.floor(progress * 0.35);
-          updateUploadStatus(upload.id, 'uploading', scaledProgress);
+          // Add progress logs at key milestones
+          if (progress === 25) {
+            addLocalLog(upload.id, 'FETCH', 'Upload progress: 25% complete');
+          } else if (progress === 50) {
+            addLocalLog(upload.id, 'FETCH', 'Upload progress: 50% complete');
+          } else if (progress === 75) {
+            addLocalLog(upload.id, 'FETCH', 'Upload progress: 75% complete');
+          }
         }
       );
 
@@ -559,8 +710,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         throw new Error("Failed to upload image");
       }
 
-      updateUploadStatus(upload.id, 'uploading', 50);
+      addLocalLog(upload.id, 'FETCH', `File uploaded successfully to: ${imageUrl.split('/').pop()}`);
 
+      addLocalLog(upload.id, 'SAVE', 'Creating receipt record in database...');
       // Create receipt record
       const today = new Date().toISOString().split('T')[0];
       const newReceiptId = await createReceipt({
@@ -588,9 +740,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
       // Store the receipt ID for this upload
       dispatch({ type: 'SET_RECEIPT_ID', uploadId: upload.id, receiptId: newReceiptId });
+      addLocalLog(upload.id, 'SAVE', `Receipt record created with ID: ${newReceiptId.slice(0, 8)}...`);
 
       // Mark as uploaded
       await markReceiptUploaded(newReceiptId);
+      addLocalLog(upload.id, 'PROCESSING', `Starting AI processing with ${settings.selectedModel}...`);
       updateUploadStatus(upload.id, 'processing', 60);
 
       // Subscribe to status updates for this receipt
@@ -616,6 +770,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
               updateUploadStatus(upload.id, 'processing', 85);
             } else if (newStatus === 'complete') {
               console.log(`Receipt ${newReceiptId} processing complete, updating UI to 100%`);
+              addLocalLog(upload.id, 'COMPLETE', 'Processing complete - receipt ready for review');
               updateUploadStatus(upload.id, 'completed', 100);
               statusChannel.unsubscribe();
             } else if (newStatus === 'failed_ocr' || newStatus === 'failed_ai') {
@@ -624,6 +779,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
                 : "AI analysis failed";
 
               console.log(`Receipt ${newReceiptId} processing failed: ${errorMsg}`);
+              addLocalLog(upload.id, 'ERROR', `Processing failed: ${errorMsg}`);
               updateUploadStatus(upload.id, 'error', 0, {
                 code: newStatus,
                 message: newError || errorMsg
@@ -697,6 +853,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         }
       } catch (processError: any) {
         console.error("Processing error:", processError);
+        addLocalLog(upload.id, 'ERROR', `Processing failed: ${processError.message || "Failed to process receipt"}`);
         updateUploadStatus(upload.id, 'error', 0, {
           code: 'PROCESSING_ERROR',
           message: processError.message || "Failed to process receipt"
@@ -707,6 +864,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return newReceiptId;
     } catch (error: any) {
       console.error("Upload error:", error);
+      addLocalLog(upload.id, 'ERROR', `Upload failed: ${error.message || "Failed to upload receipt"}`);
       updateUploadStatus(upload.id, 'error', 0, {
         code: 'UPLOAD_ERROR',
         message: error.message || "Failed to upload receipt"
@@ -953,6 +1111,46 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     }
   }, [activeUploads, completedUploads, failedUploads, isPaused, processNextBatch]);
 
+  // Subscribe to real-time processing logs for progress updates
+  useEffect(() => {
+    if (!user?.id || batchUploads.length === 0) return;
+
+    const receiptIdsToWatch = Object.values(receiptIds).filter(Boolean);
+    if (receiptIdsToWatch.length === 0) return;
+
+    console.log('Setting up real-time log subscription for batch uploads:', receiptIdsToWatch);
+
+    const subscription = supabase
+      .channel('batch-processing-logs')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processing_logs',
+          filter: `receipt_id=in.(${receiptIdsToWatch.join(',')})`
+        },
+        (payload) => {
+          const newLog = payload.new as ProcessingLog;
+          console.log('New batch upload log received:', newLog);
+
+          // Find the upload ID for this receipt
+          const uploadId = Object.keys(receiptIds).find(id => receiptIds[id] === newLog.receipt_id);
+
+          if (uploadId && newLog.step_name && newLog.status_message) {
+            // Update progress based on the received log
+            updateProgressFromLog(uploadId, newLog.step_name, newLog.status_message);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up batch processing logs subscription');
+      subscription.unsubscribe();
+    };
+  }, [user?.id, receiptIds, updateProgressFromLog]);
+
   // Handle file drop and selection using the base hook
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     console.log('handleFiles called in useBatchFileUpload with:', files);
@@ -1038,6 +1236,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     retryUpload,
 
     // Receipt IDs for navigation
-    receiptIds
+    receiptIds,
+
+    // Progress updating state
+    progressUpdating
   };
 }

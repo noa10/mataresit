@@ -136,7 +136,7 @@ export function BatchUploadReview({
           </button>
         </div>
 
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="flex-1 max-h-[40vh]">
           {selectedTab === 'completed' && completedUploads.length > 0 && (
             <Table>
               <TableHeader>

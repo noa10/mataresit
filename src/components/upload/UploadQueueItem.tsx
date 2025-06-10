@@ -22,6 +22,7 @@ interface UploadQueueItemProps {
   onCancel?: (uploadId: string) => void;
   onRetry?: (uploadId: string) => void;
   onViewReceipt?: (receiptId: string) => void;
+  isProgressUpdating?: boolean; // New prop to indicate when progress is actively updating
 }
 
 export function UploadQueueItem({
@@ -30,7 +31,8 @@ export function UploadQueueItem({
   onRemove,
   onCancel,
   onRetry,
-  onViewReceipt
+  onViewReceipt,
+  isProgressUpdating = false
 }: UploadQueueItemProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -157,6 +159,8 @@ export function UploadQueueItem({
       } flex items-center space-x-3`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      data-upload-status={upload.status}
+      data-upload-id={upload.id}
     >
       {/* File icon or preview */}
       <div className="flex-shrink-0">
@@ -195,13 +199,43 @@ export function UploadQueueItem({
           <span>{formatFileSize(upload.file.size)}</span>
         </div>
 
-        {/* Progress bar for uploading/processing */}
+        {/* Enhanced Progress bar for uploading/processing */}
         {(upload.status === 'uploading' || upload.status === 'processing') && (
-          <Progress
-            value={upload.uploadProgress}
-            className="h-1 mt-2"
-            aria-label={`Upload progress: ${upload.uploadProgress}%`}
-          />
+          <div className="mt-2">
+            <Progress
+              value={upload.uploadProgress}
+              className={`h-1 transition-all duration-300 ${
+                isProgressUpdating
+                  ? 'shadow-sm shadow-primary/30'
+                  : ''
+              }`}
+              aria-label={`Upload progress: ${upload.uploadProgress}%`}
+            />
+            {/* Progress percentage with animation */}
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-xs text-muted-foreground">
+                {upload.status === 'uploading' ? 'Uploading...' : 'Processing...'}
+              </span>
+              <motion.span
+                className={`text-xs font-medium ${
+                  isProgressUpdating ? 'text-primary' : 'text-muted-foreground'
+                }`}
+                key={Math.round(upload.uploadProgress)}
+                initial={{ scale: 1.1, opacity: 0.8 }}
+                animate={{
+                  scale: 1,
+                  opacity: 1,
+                  color: isProgressUpdating ? '#3b82f6' : undefined
+                }}
+                transition={{
+                  duration: 0.3,
+                  ease: "easeOut"
+                }}
+              >
+                {Math.round(upload.uploadProgress)}%
+              </motion.span>
+            </div>
+          </div>
         )}
 
         {/* Error message */}

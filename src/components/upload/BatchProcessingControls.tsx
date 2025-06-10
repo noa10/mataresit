@@ -40,6 +40,7 @@ interface BatchProcessingControlsProps {
   startTime?: number;
   averageFileSize?: number;
   processingMethod?: 'ocr-ai' | 'ai-vision';
+  isProgressUpdating?: boolean; // New prop to indicate when progress is actively updating
 }
 
 export function BatchProcessingControls({
@@ -60,7 +61,8 @@ export function BatchProcessingControls({
   allComplete = false,
   startTime,
   averageFileSize = 1024 * 1024, // Default 1MB
-  processingMethod = 'ai-vision'
+  processingMethod = 'ai-vision',
+  isProgressUpdating = false
 }: BatchProcessingControlsProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
@@ -173,6 +175,15 @@ export function BatchProcessingControls({
                     ? "Ready to process"
                     : "Complete"}
               </span>
+
+              {/* Live indicator when progress is updating */}
+              {isProgressUpdating && (
+                <Badge variant="secondary" className="px-2 py-1 text-xs">
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Live
+                </Badge>
+              )}
+
               {isProcessing && !isPaused && (
                 <TooltipProvider>
                   <Tooltip>
@@ -194,9 +205,24 @@ export function BatchProcessingControls({
                 </TooltipProvider>
               )}
             </div>
-            <span className="text-xs font-medium">
+            <motion.span
+              className={`text-xs font-medium ${
+                isProgressUpdating ? 'text-primary' : 'text-muted-foreground'
+              }`}
+              key={Math.round(totalProgress)}
+              initial={{ scale: 1.1, opacity: 0.8 }}
+              animate={{
+                scale: 1,
+                opacity: 1,
+                color: isProgressUpdating ? '#3b82f6' : undefined
+              }}
+              transition={{
+                duration: 0.3,
+                ease: "easeOut"
+              }}
+            >
               {completedFiles}/{totalFiles} ({Math.round(totalProgress)}%)
-            </span>
+            </motion.span>
           </div>
 
           {/* Time information */}
@@ -215,11 +241,32 @@ export function BatchProcessingControls({
             </div>
           )}
 
-          <Progress
-            value={totalProgress}
-            className="h-3"
-            aria-label={`Batch progress: ${totalProgress}%`}
-          />
+          <div className="relative">
+            <Progress
+              value={totalProgress}
+              className={`h-3 transition-all duration-300 ${
+                isProgressUpdating
+                  ? 'shadow-sm shadow-primary/30'
+                  : ''
+              }`}
+              aria-label={`Batch progress: ${totalProgress}%`}
+            />
+            {/* Pulse effect when updating */}
+            {isProgressUpdating && (
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 rounded-full"
+                animate={{
+                  opacity: [0.3, 0.7, 0.3],
+                  scale: [1, 1.02, 1]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Action buttons */}
