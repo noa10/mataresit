@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { Check, Clock, Zap, Turtle, Activity } from "lucide-react";
 import { PROCESSING_STAGES } from "./ProcessingStages";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { 
   calculateInitialEstimate, 
@@ -22,16 +21,18 @@ interface EnhancedProcessingTimelineProps {
   processingMethod?: 'ai-vision';
   modelId?: string;
   startTime?: number;
+  isProgressUpdating?: boolean; // New prop to indicate when progress is actively updating
 }
 
-export function EnhancedProcessingTimeline({ 
-  currentStage, 
-  stageHistory, 
+export function EnhancedProcessingTimeline({
+  currentStage,
+  stageHistory,
   uploadProgress,
   fileSize = 1024 * 1024, // Default 1MB
   processingMethod = 'ai-vision',
   modelId = 'gemini-2.0-flash-lite',
-  startTime
+  startTime,
+  isProgressUpdating = false
 }: EnhancedProcessingTimelineProps) {
   const orderedStages = ['START', 'FETCH', 'PROCESSING', 'SAVE', 'COMPLETE'];
   const [timeEstimate, setTimeEstimate] = useState<ProcessingTimeEstimate | null>(null);
@@ -111,7 +112,7 @@ export function EnhancedProcessingTimeline({
   const speedIndicator = getSpeedIndicator();
 
   return (
-    <div className="mt-6 pt-4 w-full space-y-4">
+    <div className="mt-6 pt-4 w-full space-y-6">
       {/* Time estimation and speed indicator */}
       {timeEstimate && startTime && (
         <div className="flex items-center justify-between text-sm">
@@ -141,31 +142,67 @@ export function EnhancedProcessingTimeline({
         </div>
       )}
 
-      {/* Enhanced progress bar */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">
-            {currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name : 'Processing'}
-          </span>
-          <span className="font-medium">{Math.round(uploadProgress)}%</span>
-        </div>
-        <Progress 
-          value={uploadProgress} 
-          className="h-2"
-          aria-label={`Processing progress: ${uploadProgress}%`}
-        />
+      {/* Current stage and progress indicator */}
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-muted-foreground font-medium">
+          {currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name : 'Processing'}
+        </span>
+        <motion.span
+          className={`font-semibold ${isProgressUpdating ? 'text-primary' : 'text-primary'}`}
+          key={Math.round(uploadProgress)}
+          initial={{ scale: 1.1, opacity: 0.8 }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            color: isProgressUpdating ? '#3b82f6' : undefined
+          }}
+          transition={{
+            duration: 0.3,
+            ease: "easeOut"
+          }}
+        >
+          {Math.round(uploadProgress)}%
+        </motion.span>
       </div>
 
-      {/* Stage timeline */}
+      {/* Enhanced stage timeline with prominent progress bar */}
       <div className="flex items-start justify-between relative px-2">
-        {/* Progress bar behind the steps */}
-        <div className="absolute left-0 top-[20px] w-full h-1 bg-muted -translate-y-1/2">
-          <motion.div 
-            className="h-full bg-primary"
+        {/* Enhanced progress bar behind the steps */}
+        <div className="absolute left-0 top-[20px] w-full h-2 bg-muted rounded-full -translate-y-1/2">
+          <motion.div
+            className={`h-full rounded-full shadow-sm transition-all duration-300 ${
+              isProgressUpdating
+                ? 'bg-gradient-to-r from-primary via-blue-500 to-primary/80 shadow-blue-200'
+                : 'bg-gradient-to-r from-primary to-primary/80'
+            }`}
             initial={{ width: "0%" }}
-            animate={{ width: `${(stageHistory.length / orderedStages.length) * 100}%` }}
-            transition={{ duration: 0.3 }}
+            animate={{
+              width: `${uploadProgress}%`,
+              boxShadow: isProgressUpdating
+                ? '0 0 8px rgba(59, 130, 246, 0.4)'
+                : '0 1px 3px rgba(0, 0, 0, 0.1)'
+            }}
+            transition={{
+              duration: 0.5,
+              ease: "easeOut",
+              boxShadow: { duration: 0.3 }
+            }}
           />
+          {/* Pulse effect when updating */}
+          {isProgressUpdating && (
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-primary/30 to-primary/10 rounded-full"
+              animate={{
+                opacity: [0.3, 0.7, 0.3],
+                scale: [1, 1.02, 1]
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            />
+          )}
         </div>
         
         {/* Steps */}
@@ -199,26 +236,34 @@ export function EnhancedProcessingTimeline({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="z-10 flex flex-col items-center gap-2 flex-1 min-w-0 px-1">
-                    <motion.div 
-                      className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 ${stateClass}`}
-                      animate={{ 
+                    <motion.div
+                      className={`relative flex items-center justify-center w-12 h-12 rounded-full border-2 shadow-sm ${stateClass}`}
+                      animate={{
                         scale: isCurrent && !isError ? [1, 1.1, 1] : 1,
-                        rotate: isCurrent && !isError ? [0, 5, -5, 0] : 0
+                        rotate: isCurrent && !isError ? [0, 5, -5, 0] : 0,
+                        boxShadow: isCurrent && !isError
+                          ? ['0 0 0 rgba(59, 130, 246, 0)', '0 0 8px rgba(59, 130, 246, 0.3)', '0 0 0 rgba(59, 130, 246, 0)']
+                          : '0 0 0 rgba(59, 130, 246, 0)'
                       }}
-                      transition={{ 
-                        duration: 0.5, 
-                        repeat: isCurrent && !isError ? Infinity : 0, 
-                        repeatDelay: 1 
+                      transition={{
+                        duration: 0.5,
+                        repeat: isCurrent && !isError ? Infinity : 0,
+                        repeatDelay: 1,
+                        boxShadow: {
+                          duration: 2,
+                          repeat: isCurrent && !isError ? Infinity : 0,
+                          ease: "easeInOut"
+                        }
                       }}
                     >
                       {isError && (isCurrent || isCompleted) ? (
                         PROCESSING_STAGES.ERROR.icon
                       ) : isCompleted ? (
-                        <Check size={18} />
+                        <Check size={20} />
                       ) : isCurrent ? (
                         stageConfig.icon
                       ) : (
-                        <div className="w-2 h-2 rounded-full bg-current" />
+                        <div className="w-3 h-3 rounded-full bg-current" />
                       )}
                     </motion.div>
                     <span className="text-xs uppercase font-medium text-center break-words w-full">
