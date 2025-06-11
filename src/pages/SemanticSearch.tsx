@@ -46,6 +46,11 @@ export default function SemanticSearchPage() {
   // Main navigation context
   const { navSidebarOpen, isDesktop: isMainNavDesktop, navSidebarWidth } = useMainNav();
 
+  // Helper to compute left offset for main content and fixed input
+  const calcContentLeft = useCallback(() => {
+    return (navSidebarOpen ? navSidebarWidth : 0) + (sidebarOpen && isDesktop ? sidebarWidth : 0);
+  }, [navSidebarOpen, navSidebarWidth, sidebarOpen, isDesktop, sidebarWidth]);
+
   // Refs to prevent infinite loops
   const isUpdatingUrlRef = useRef(false);
   const processedQueryRef = useRef<string | null>(null);
@@ -140,6 +145,11 @@ export default function SemanticSearchPage() {
         }, 100);
       }
 
+      // Lock body scroll when a sidebar is open on mobile
+      if (!isDesktop) {
+        document.body.classList.toggle('overflow-hidden', newState);
+      }
+
       return newState;
     });
   }, [isDesktop]);
@@ -195,8 +205,8 @@ export default function SemanticSearchPage() {
   // Enhanced keyboard shortcuts with visual feedback
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+B or Cmd+B to toggle sidebar (standard shortcut)
-      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+      // Ctrl+B or Cmd+B to toggle chat sidebar (standard shortcut)
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'b') {
         event.preventDefault();
         handleToggleSidebar();
 
@@ -212,6 +222,20 @@ export default function SemanticSearchPage() {
         }, 1500);
       }
 
+      // F6 cycles focus between nav, chat container, chat input and chat sidebar
+      if (event.key === 'F6') {
+        event.preventDefault();
+        const order = [
+          '[aria-label="Main navigation"]',
+          '#chat-scroll-anchor',
+          'textarea[name="chat-input"]',
+          '[aria-label="Chat history sidebar"]'
+        ];
+        const idx = order.findIndex(sel => (document.activeElement as HTMLElement | null)?.matches?.(sel));
+        const next = order[(idx + 1) % order.length];
+        (document.querySelector(next) as HTMLElement | null)?.focus();
+      }
+
       // Escape key to close sidebar on mobile
       if (event.key === 'Escape' && sidebarOpen && !isDesktop) {
         event.preventDefault();
@@ -222,8 +246,6 @@ export default function SemanticSearchPage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [sidebarOpen, isDesktop, handleToggleSidebar]);
-
-
 
   // Auto-save conversation when messages change (more aggressive for real-time updates)
   useEffect(() => {
@@ -401,8 +423,6 @@ export default function SemanticSearchPage() {
     }
   };
 
-
-
   // Handle example clicks from welcome screen
   const handleExampleClick = (example: string) => {
     handleSendMessage(example);
@@ -417,8 +437,6 @@ export default function SemanticSearchPage() {
     console.log('Feedback:', messageId, feedback);
     // TODO: Implement feedback storage/analytics
   };
-
-
 
   // Handle sidebar width changes
   const handleSidebarWidthChange = useCallback((width: number) => {
@@ -466,6 +484,12 @@ export default function SemanticSearchPage() {
     }
   }, [loadConversation, handleSendMessage, urlSearchParams, currentConversationId]);
 
+  // Sync CSS variable for chat sidebar width
+  useEffect(() => {
+    const value = sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px';
+    document.documentElement.style.setProperty('--chat-width', value);
+  }, [sidebarOpen, sidebarWidth, isDesktop]);
+
   return (
     <div className="min-h-screen bg-background flex">
       <Helmet>
@@ -487,12 +511,7 @@ export default function SemanticSearchPage() {
 
       {/* Main Content Area */}
       <div
-        className="flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out"
-        style={{
-          marginLeft: isMainNavDesktop ?
-            (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px')
-            : (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px')
-        }}
+        className="flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out layout-shift"
       >
 
         {/* Chat Content Area - Optimized for fixed input */}
@@ -522,12 +541,7 @@ export default function SemanticSearchPage() {
 
         {/* Fixed Chat Input at bottom of viewport */}
         <div
-          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg"
-          style={{
-            left: isMainNavDesktop ?
-              (sidebarOpen && isDesktop ? `${navSidebarWidth + sidebarWidth}px` : `${navSidebarWidth}px`)
-              : (sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0')
-          }}
+          className="fixed bottom-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg fixed-chat-input"
         >
           <div className={`transition-all duration-300 ease-in-out ${
             sidebarOpen

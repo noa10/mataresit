@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, ChevronLeft, Sidebar } from 'lucide-react';
+import { MessageSquare, ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 
@@ -41,8 +41,8 @@ export function SidebarToggle({
           "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
           className
         )}
-        title={`${isOpen ? "Close" : "Open"} sidebar (Ctrl+B)`}
-        aria-label={`${isOpen ? "Close" : "Open"} sidebar`}
+        title={`${isOpen ? "Close chat" : "Open chat history"} (Ctrl+B)`}
+        aria-label={`${isOpen ? "Close chat" : "Open chat history"}`}
       >
         <div className="relative">
           {isOpen ? (
@@ -51,7 +51,7 @@ export function SidebarToggle({
               isHovered && "transform -translate-x-0.5"
             )} />
           ) : (
-            <Menu className={cn(
+            <MessageSquare className={cn(
               "h-4 w-4 transition-all duration-300",
               isHovered && "transform rotate-180"
             )} />

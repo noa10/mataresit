@@ -371,8 +371,8 @@ export function ConversationSidebar({
         )}
         style={{
           width: isDesktop ? `${sidebarWidth}px` : '280px',
-          // Position the sidebar to the right of the main navigation
-          left: isDesktop ? `${mainNavWidth}px` : '0px',
+          // Align with nav var to avoid gaps
+          left: isDesktop ? 'var(--nav-width)' : '0px',
           height: '100vh'
         }}
         role="complementary"
@@ -380,7 +380,7 @@ export function ConversationSidebar({
         tabIndex={-1}
       >
         {/* Sidebar Header */}
-        <div className="border-b border-border">
+        <div className="sticky top-0 z-10 bg-background border-b border-border">
           {/* Title and Actions */}
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-2">
@@ -692,7 +692,7 @@ interface ConversationItemProps {
   onDelete: () => void;
 }
 
-function ConversationItem({ conversation, isActive, onSelect, onDelete }: ConversationItemProps) {
+const ConversationItem = React.memo(function ConversationItem({ conversation, isActive, onSelect, onDelete }: ConversationItemProps) {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -756,4 +756,4 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: Conver
       </DropdownMenu>
     </div>
   );
-}
+});

@@ -43,6 +43,10 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Layout vars and helpers */
+    --nav-width: 0px;
+    --chat-width: 0px;
   }
 
   .dark {
@@ -151,5 +155,26 @@
      &::before {
         @apply mr-auto;
      }
+  }
+}
+
+/* Shiftable content wrapper */
+.layout-shift {
+  margin-left: calc(var(--nav-width) + var(--chat-width));
+  transition: margin-left 0.3s ease-in-out;
+}
+
+/* Fixed chat input alignment */
+.fixed-chat-input {
+  left: calc(var(--nav-width) + var(--chat-width));
+  transition: left 0.3s ease-in-out;
+}
+
+/* Motion-safe overrides */
+@media (prefers-reduced-motion: reduce) {
+  .layout-shift,
+  .fixed-chat-input,
+  .transition-all {
+    transition: none !important;
   }
 }

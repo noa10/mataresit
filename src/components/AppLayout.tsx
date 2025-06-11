@@ -43,6 +43,12 @@ export function AppLayout() {
       } else {
         // On mobile/tablet, always start closed
         setNavSidebarOpen(false);
+
+        // Update CSS var immediately on resize
+        document.documentElement.style.setProperty(
+          '--nav-width',
+          isLargeScreen ? `${(isLargeScreen ? (navSidebarOpen ? 256 : 64) : 0)}px` : '0px'
+        );
       }
     };
 
@@ -60,7 +66,21 @@ export function AppLayout() {
     if (isDesktop) {
       localStorage.setItem('nav-sidebar-open', String(newState));
     }
+
+    // Update CSS variable
+    document.documentElement.style.setProperty(
+      '--nav-width',
+      isDesktop ? `${(newState ? 256 : 64)}px` : '0px'
+    );
   };
+
+  // Sync CSS variable for layout shift
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--nav-width',
+      isDesktop ? `${navSidebarWidth}px` : '0px'
+    );
+  }, [isDesktop, navSidebarOpen, navSidebarWidth]);
 
   // Enhanced keyboard shortcuts
   useEffect(() => {
