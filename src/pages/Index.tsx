@@ -85,15 +85,6 @@ const howItWorksSteps = [
   }
 ];
 
-// Trusted by section (placeholder logos - replace with actual client logos)
-const trustedByLogos = [
-  { name: "TechCorp", logo: "/api/placeholder/120/40" },
-  { name: "StartupXYZ", logo: "/api/placeholder/120/40" },
-  { name: "BusinessPro", logo: "/api/placeholder/120/40" },
-  { name: "InnovateInc", logo: "/api/placeholder/120/40" },
-  { name: "GrowthCo", logo: "/api/placeholder/120/40" }
-];
-
 export default function Index() {
   const { user } = useAuth();
 
@@ -222,33 +213,6 @@ export default function Index() {
               </div>
             </motion.div>
           </section>
-
-          {/* Trusted By Section */}
-          <motion.section
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="py-16 text-center"
-          >
-            <h3 className="text-lg text-muted-foreground mb-8 font-medium tracking-wide uppercase">
-              Trusted by Leading Businesses
-            </h3>
-            <div className="flex justify-center items-center gap-8 flex-wrap opacity-60 hover:opacity-100 transition-opacity duration-300">
-              {trustedByLogos.map((company, index) => (
-                <motion.div
-                  key={company.name}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className="flex items-center justify-center h-12 w-32 bg-muted/30 rounded-lg border border-border/50"
-                >
-                  <span className="text-sm font-medium text-muted-foreground">{company.name}</span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
 
           {/* How It Works Section */}
           <motion.section
