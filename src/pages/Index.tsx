@@ -89,7 +89,7 @@ export default function Index() {
   const { user } = useAuth();
 
   useEffect(() => {
-    document.title = "More Business, Less Paperwork - ReceiptScan";
+    document.title = "More Business, Less Paperwork - Mataresit";
   }, []);
 
 
@@ -431,9 +431,10 @@ export default function Index() {
         <div className="container">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div className="space-y-4">
-              {/* Placeholder for Logo */}
-              {/* <img src="/logo.svg" alt="ReceiptScan Logo" className="h-8 mb-2" /> */}
-              <h4 className="font-semibold text-lg">ReceiptScan</h4>
+              <div className="flex items-center gap-2">
+                <img src="/mataresit-icon.png" alt="Mataresit Logo" className="h-8" />
+                <h4 className="font-semibold text-lg">Mataresit</h4>
+              </div>
               <p className="text-sm text-muted-foreground">
                 Transform your receipts into organized data. Save time, increase accuracy, and never miss a deduction.
               </p>
@@ -486,7 +487,7 @@ export default function Index() {
 
           <div className="flex flex-col md:flex-row justify-between items-center pt-6 border-t">
             <p className="text-sm text-muted-foreground order-2 md:order-1 mt-4 md:mt-0">
-              © {new Date().getFullYear()} ReceiptScan. All rights reserved.
+              © {new Date().getFullYear()} Mataresit. All rights reserved.
             </p>
             {/* Increased icon size and added hover effect */}
             <div className="flex space-x-6 order-1 md:order-2">

@@ -1,4 +1,4 @@
-# Automated Receipt Processing Application
+# Mataresit: Automated Receipt Processing
 
 A web-based application for automating receipt data extraction using OCR technology with Amazon Textract.
 
@@ -14,7 +14,7 @@ A web-based application for automating receipt data extraction using OCR technol
 
 ## Overview
 
-The Automated Receipt Processing Application streamlines the digitization and management of paper receipts through a complete workflow:
+Mataresit streamlines the digitization and management of paper receipts through a complete workflow:
 
 1. **Upload** - Users upload receipt images (JPEG, PNG, PDF). The UI provides real-time feedback on upload progress and backend processing stages.
 2. **Process** - Amazon Textract performs OCR, extracting text and structured data.

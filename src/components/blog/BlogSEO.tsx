@@ -3,7 +3,7 @@ import { BlogSEOProps } from '@/types/blog';
 
 export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
   // Default SEO values for the blog
-  const defaultTitle = 'The Paperless Maverick Blog';
+  const defaultTitle = 'The Mataresit Blog';
   const defaultDescription = 'Insights, updates, and expert tips on AI-powered expense management, productivity, and digital transformation for modern businesses.';
   const defaultImage = '/og-blog.jpg'; // You can add a default blog OG image
   const siteUrl = window.location.origin;
@@ -22,7 +22,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
 
     if (!post) {
       return {
-        title: 'Blog Post Not Found | Paperless Maverick',
+        title: 'Blog Post Not Found | Mataresit',
         description: 'The requested blog post could not be found.',
         url: `${siteUrl}/blog`,
         image: defaultImage,
@@ -31,7 +31,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
     }
 
     // Individual post SEO
-    const title = `${post.title} | Paperless Maverick Blog`;
+    const title = `${post.title} | Mataresit Blog`;
     const description = post.excerpt || defaultDescription;
     const url = `${siteUrl}/blog/${post.slug}`;
     const image = post.image_url || defaultImage;
@@ -44,7 +44,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
       type: 'article',
       publishedTime: post.published_at,
       modifiedTime: post.updated_at,
-      author: post.author ? `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim() : 'Paperless Maverick Team',
+      author: post.author ? `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim() : 'Mataresit Team',
       tags: post.tags,
     };
   };
@@ -64,7 +64,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
       <meta property="og:url" content={seoData.url} />
       <meta property="og:image" content={seoData.image} />
       <meta property="og:type" content={seoData.type} />
-      <meta property="og:site_name" content="Paperless Maverick" />
+      <meta property="og:site_name" content="Mataresit" />
 
       {/* Twitter Card Meta Tags */}
       <meta name="twitter:card" content="summary_large_image" />
@@ -93,7 +93,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
 
       {/* Additional SEO Meta Tags */}
       <meta name="robots" content="index, follow" />
-      <meta name="author" content={seoData.author || 'Paperless Maverick Team'} />
+      <meta name="author" content={seoData.author || 'Mataresit Team'} />
       
       {/* Schema.org JSON-LD */}
       <script type="application/ld+json">
@@ -107,7 +107,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
                 url: seoData.url,
                 publisher: {
                   '@type': 'Organization',
-                  name: 'Paperless Maverick',
+                  name: 'Mataresit',
                   url: siteUrl,
                 },
               }
@@ -127,7 +127,7 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
                 },
                 publisher: {
                   '@type': 'Organization',
-                  name: 'Paperless Maverick',
+                  name: 'Mataresit',
                   url: siteUrl,
                 },
                 mainEntityOfPage: {

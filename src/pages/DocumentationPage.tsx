@@ -26,7 +26,7 @@ const sections = [
 
 export default function DocumentationPage() {
   useEffect(() => {
-    document.title = "Documentation - Paperless Maverick";
+    document.title = "Documentation - Mataresit";
   }, []);
 
   return (
@@ -39,7 +39,7 @@ export default function DocumentationPage() {
       >
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Application Documentation</h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Your complete guide to using Paperless Maverick.
+          Your complete guide to using Mataresit.
         </p>
       </motion.div>
 
@@ -68,9 +68,9 @@ export default function DocumentationPage() {
           <section id="1-overview" className="scroll-mt-24">
             <h2 className="text-3xl font-bold border-b pb-2 mb-6">1. Overview</h2>
             <div className="space-y-4 text-muted-foreground">
-              <h3 className="text-2xl font-semibold text-foreground">What is Paperless Maverick?</h3>
+              <h3 className="text-2xl font-semibold text-foreground">What is Mataresit?</h3>
               <p>
-                Paperless Maverick is an intelligent application designed to eliminate the manual data entry associated with receipt and expense management. By leveraging Optical Character Recognition (OCR) and advanced AI models like Google's Gemini, it automatically extracts, categorizes, and normalizes your receipt data, saving you hours of work and ensuring your financial records are accurate and organized.
+                Mataresit is an intelligent application designed to eliminate the manual data entry associated with receipt and expense management. By leveraging Optical Character Recognition (OCR) and advanced AI models like Google's Gemini, it automatically extracts, categorizes, and normalizes your receipt data, saving you hours of work and ensuring your financial records are accurate and organized.
               </p>
               <h3 className="text-2xl font-semibold text-foreground mt-6">Key Features</h3>
               <ul className="list-disc list-inside space-y-2">
@@ -118,7 +118,7 @@ export default function DocumentationPage() {
                   <CardTitle>Uploading Receipts (Single & Batch)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Paperless Maverick supports both single and multiple file uploads. The **Batch Upload** feature allows you to process multiple receipts in parallel, with controls to start, pause, and retry failed uploads, making it ideal for handling large volumes of receipts efficiently.</p>
+                  <p className="text-muted-foreground">Mataresit supports both single and multiple file uploads. The **Batch Upload** feature allows you to process multiple receipts in parallel, with controls to start, pause, and retry failed uploads, making it ideal for handling large volumes of receipts efficiently.</p>
                 </CardContent>
               </Card>
 

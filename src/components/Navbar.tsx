@@ -83,9 +83,9 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
             </div>
           )}
 
-          <NavLink to="/" className="flex items-center gap-3 text-xl font-bold text-foreground hover:text-primary transition-colors">
-            <FileText className="h-7 w-7 text-primary" />
-            <span>ReceiptScan</span>
+          <NavLink to="/" className="flex items-center gap-2 text-xl font-bold text-foreground hover:text-primary transition-colors">
+            <img src="/mataresit-icon.png" alt="Mataresit Logo" className="h-7 w-7" />
+            <span>Mataresit</span>
           </NavLink>
 
           {getTierBadge()}
