@@ -9,6 +9,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeProvider } from "@/contexts/StripeContext";
 import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
+import { TeamProvider } from "@/contexts/TeamContext";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 import Index from "./pages/Index";
@@ -40,6 +41,8 @@ const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 const StatusPage = lazy(() => import("./pages/StatusPage"));
 const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
+const TeamManagement = lazy(() => import("./pages/TeamManagement"));
+const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
 
 // Create a loading component for suspense
@@ -64,9 +67,10 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <StripeProvider>
-          <ChatControlsProvider>
-            <TooltipProvider>
+        <TeamProvider>
+          <StripeProvider>
+            <ChatControlsProvider>
+              <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -115,6 +119,14 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/reset-password" element={<AuthCallback />} />
+
+            {/* Team Invitation Route (no layout) */}
+            <Route path="/invite/:token" element={
+              <Suspense fallback={<PageLoading />}>
+                <TeamInvitation />
+              </Suspense>
+            } />
+
             <Route path="*" element={<NotFound />} />
 
             {/* Protected Routes - Require Authentication */}
@@ -148,6 +160,11 @@ const App = () => (
                     <FeaturesPage />
                   </Suspense>
                 } />
+                <Route path="/teams" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TeamManagement />
+                  </Suspense>
+                } />
               </Route>
             </Route>
 
@@ -164,9 +181,10 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-            </TooltipProvider>
-          </ChatControlsProvider>
-        </StripeProvider>
+              </TooltipProvider>
+            </ChatControlsProvider>
+          </StripeProvider>
+        </TeamProvider>
       </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>

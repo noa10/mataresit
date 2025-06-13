@@ -80,7 +80,10 @@ The batch upload functionality includes robust error handling:
 
 1. **File Types**: Upload only supported file types (JPG, PNG, PDF)
 2. **File Size**: Keep file sizes reasonable (under 10MB per file)
-3. **Batch Size**: For optimal performance, process batches of 10-20 files at a time
+3. **Batch Size**: Batch upload limits depend on your subscription plan:
+   - Free plan: Up to 5 files per batch
+   - Pro plan: Up to 50 files per batch
+   - Max plan: Up to 100 files per batch
 4. **Network Connection**: Ensure a stable internet connection for reliable uploads
 
 ## Troubleshooting

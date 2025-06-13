@@ -17,6 +17,10 @@ dist-ssr
 tmp/
 temp/
 
+# Lock files from other package managers (project uses npm)
+bun.lockb
+deno.lock
+
 # Test artifacts
 tests/coverage/
 tests/reports/

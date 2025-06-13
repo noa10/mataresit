@@ -80,7 +80,7 @@ const LOG_PROGRESS_MAP: Record<string, Record<string, number>> = {
  * Actions for the batch upload state reducer
  */
 type BatchUploadAction =
-  | { type: 'ADD_FILES'; files: File[]; recommendations: Record<string, ProcessingRecommendation> }
+  | { type: 'ADD_FILES'; files: File[]; recommendations: Record<string, ProcessingRecommendation>; categoryId?: string | null }
   | { type: 'REMOVE_UPLOAD'; uploadId: string }
   | { type: 'CLEAR_PENDING' }
   | { type: 'CLEAR_ALL' }
@@ -138,6 +138,7 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
         file,
         status: 'pending',
         uploadProgress: 0,
+        categoryId: action.categoryId,
       }));
 
       // Sort uploads by priority based on recommendations
@@ -466,10 +467,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   }, [batchUploads]);
 
   // Add files to the batch queue
-  const addToBatchQueue = useCallback(async (files: FileList | File[]) => {
+  const addToBatchQueue = useCallback(async (files: FileList | File[], categoryId?: string | null) => {
     console.log('addToBatchQueue called with files:', files);
     console.log('Files array type:', Object.prototype.toString.call(files));
     console.log('Files length:', files.length);
+    console.log('Category ID:', categoryId);
 
     // Ensure we have an array to work with
     let filesArray: File[];
@@ -559,7 +561,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     dispatch({
       type: 'ADD_FILES',
       files: validFiles,
-      recommendations
+      recommendations,
+      categoryId
     });
 
     // If autoStart is enabled, start processing
@@ -727,7 +730,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         primary_method: settings.processingMethod,
         model_used: settings.selectedModel,
         has_alternative_data: settings.compareWithAlternative,
-        payment_method: "" // Add required field
+        payment_method: "", // Add required field
+        custom_category_id: upload.categoryId || null // Include category from upload
       }, [], {
         merchant: 0,
         date: 0,

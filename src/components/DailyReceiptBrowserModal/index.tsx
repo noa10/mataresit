@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
+import { supabase } from '@/integrations/supabase/client';
 import ReceiptViewer from '@/components/ReceiptViewer';
 import { formatCurrencySafe } from '@/utils/currency';
 
@@ -30,12 +31,14 @@ interface DailyReceiptBrowserModalProps {
 }
 
 const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted }) => {
+  const queryClient = useQueryClient();
+
   // Fetch all receipts for the given IDs
   const { data: receiptsData, isLoading, error } = useQuery<ReceiptWithDetails[], Error>({
     queryKey: ['receiptsForDay', date, receiptIds],
     queryFn: () => fetchReceiptsByIds(receiptIds),
     enabled: isOpen && receiptIds.length > 0,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 1 * 60 * 1000, // Reduced cache time to 1 minute for fresher data
   });
 
   // State to track the currently selected receipt ID and local receipts data
@@ -49,6 +52,63 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
     setLocalReceiptsData(receiptsData);
   }, [receiptsData]);
 
+  // Listen for query invalidations and refresh data
+  useEffect(() => {
+    const handleQueryInvalidation = () => {
+      // Force refetch when queries are invalidated
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
+    };
+
+    // Set up a listener for query cache changes
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'updated' && event.query.queryKey[0] === 'receiptsForDay') {
+        // Query was updated, sync local data
+        const updatedData = event.query.state.data as ReceiptWithDetails[] | undefined;
+        if (updatedData) {
+          setLocalReceiptsData(updatedData);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [queryClient, date, receiptIds]);
+
+  // Set up real-time subscription for receipt processing status updates
+  useEffect(() => {
+    if (!isOpen || !receiptIds.length) return;
+
+    const channel = supabase.channel(`modal-receipts-${date}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'receipts',
+          filter: `id=in.(${receiptIds.join(',')})`
+        },
+        (payload) => {
+          console.log('Receipt update in modal:', payload.new);
+          const updatedReceipt = payload.new as ReceiptWithDetails;
+
+          // Update local data immediately
+          setLocalReceiptsData(prev => {
+            if (!prev) return prev;
+            return prev.map(r =>
+              r.id === updatedReceipt.id ? { ...r, ...updatedReceipt } : r
+            );
+          });
+
+          // Also invalidate the query to ensure consistency
+          queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [isOpen, receiptIds, date, queryClient]);
+
   // Handler for when a receipt is updated
   const handleReceiptUpdate = (updatedReceipt: ReceiptWithDetails) => {
     if (localReceiptsData) {
@@ -57,6 +117,9 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
       );
       setLocalReceiptsData(updatedData);
     }
+
+    // Invalidate the modal's query to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
   };
 
   // Handler for when a receipt is deleted
@@ -133,13 +196,13 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
             </div>
 
             {/* Collapsible content */}
-            <div className={`flex flex-col flex-1 ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`flex flex-col flex-1 min-h-0 ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
               {isLoading ? (
                 <div className="p-4 text-center text-muted-foreground text-sm">Loading receipts...</div>
               ) : error ? (
                 <div className="p-4 text-center text-destructive text-sm">Error: {(error as Error).message}</div>
               ) : localReceiptsData && localReceiptsData.length > 0 ? (
-                <ScrollArea className="flex-1 max-h-[200px] md:max-h-none">
+                <ScrollArea className="flex-1">
                   <div className="p-2 space-y-1">
                     {localReceiptsData.map((receipt) => (
                       <Button

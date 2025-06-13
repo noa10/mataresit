@@ -31,6 +31,8 @@ import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
+import { fetchUserCategories, bulkAssignCategory } from "@/services/categoryService";
+import { CategorySelector } from "@/components/categories/CategorySelector";
 
 import {
   Table,
@@ -90,6 +92,9 @@ export default function Dashboard() {
   const [filterByCurrency, setFilterByCurrency] = useState<string | null>(
     searchParams.get('currency') || null
   );
+  const [filterByCategory, setFilterByCategory] = useState<string | null>(
+    searchParams.get('category') || null
+  );
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
     (searchParams.get('sort') as any) || "newest"
   );
@@ -114,6 +119,7 @@ export default function Dashboard() {
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<string[]>([]);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string | null>(null);
 
   // Toggle selection mode
   const toggleSelectionMode = () => {
@@ -178,6 +184,26 @@ export default function Dashboard() {
     }
   });
 
+  // Bulk category assignment mutation
+  const bulkCategoryMutation = useMutation({
+    mutationFn: async ({ receiptIds, categoryId }: { receiptIds: string[]; categoryId: string | null }) => {
+      return await bulkAssignCategory(receiptIds, categoryId);
+    },
+    onSuccess: (updatedCount) => {
+      if (updatedCount > 0) {
+        setSelectedReceiptIds([]);
+        setBulkCategoryId(null);
+        setSelectionMode(false);
+        // Refresh the receipts data
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      }
+    },
+    onError: (error) => {
+      console.error('Bulk category assignment error:', error);
+      toast.error('An error occurred while assigning category');
+    }
+  });
+
   // Read view mode from URL params first, then local storage, or use default
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     return (searchParams.get('view') as ViewMode) || (localStorage.getItem('dashboardViewMode') as ViewMode) || "grid";
@@ -206,11 +232,21 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchUserCategories,
+    enabled: !!user,
+  });
+
   const processedReceipts = receipts
     .filter(receipt => {
       const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTab = activeTab === "all" || receipt.status === activeTab;
       const matchesCurrency = !filterByCurrency || receipt.currency === filterByCurrency;
+
+      // Category filtering
+      const matchesCategory = !filterByCategory ||
+        (filterByCategory === 'uncategorized' ? !receipt.custom_category_id : receipt.custom_category_id === filterByCategory);
 
       // Date range filtering
       let matchesDateRange = true;
@@ -225,7 +261,7 @@ export default function Dashboard() {
         }
       }
 
-      return matchesSearch && matchesTab && matchesCurrency && matchesDateRange;
+      return matchesSearch && matchesTab && matchesCurrency && matchesCategory && matchesDateRange;
     })
     .sort((a, b) => {
       if (sortOrder === "newest") {
@@ -285,6 +321,7 @@ export default function Dashboard() {
     setSearchQuery("");
     setActiveTab("all");
     setFilterByCurrency(null);
+    setFilterByCategory(null);
     setSortOrder("newest");
     setDateRange(undefined);
     // Don't reset view mode when clearing filters, just keep current value if any
@@ -298,6 +335,7 @@ export default function Dashboard() {
     searchQuery: searchQuery || undefined,
     activeTab: activeTab !== 'all' ? activeTab : undefined,
     filterByCurrency: filterByCurrency || undefined,
+    filterByCategory: filterByCategory || undefined,
     sortOrder: sortOrder !== 'newest' ? sortOrder : undefined,
     dateRange: dateRange || undefined
   };
@@ -444,6 +482,7 @@ export default function Dashboard() {
                       confidence={confidenceScore}
                       processingStatus={receipt.processing_status}
                       disableInternalLink={true} // Disable internal Link to prevent nesting
+                      category={categories.find(cat => cat.id === receipt.custom_category_id) || null}
                     />
                   </Link>
                 </div>
@@ -508,7 +547,21 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                        <span>{formatDate(receipt.date)}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{formatDate(receipt.date)}</span>
+                          {(() => {
+                            const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                            return category ? (
+                              <Badge variant="secondary" className="text-xs gap-1">
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                {category.name}
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                             receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
@@ -553,7 +606,21 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                        <span>{formatDate(receipt.date)}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{formatDate(receipt.date)}</span>
+                          {(() => {
+                            const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                            return category ? (
+                              <Badge variant="secondary" className="text-xs gap-1">
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                {category.name}
+                              </Badge>
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                             receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
@@ -600,6 +667,7 @@ export default function Dashboard() {
                 <TableHead>Merchant</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Confidence</TableHead>
               </TableRow>
@@ -636,6 +704,22 @@ export default function Dashboard() {
                     <TableCell className="font-medium">{receipt.merchant}</TableCell>
                     <TableCell>{formatDate(receipt.date)}</TableCell>
                     <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                        return category ? (
+                          <Badge variant="secondary" className="text-xs gap-1">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            {category.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Uncategorized</span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                         receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
@@ -781,28 +865,64 @@ export default function Dashboard() {
 
               {/* Bulk Actions (visible only in selection mode) */}
               {selectionMode && selectedReceiptIds.length > 0 && (
-                <Button
-                  variant="destructive"
-                  className="gap-2 whitespace-nowrap"
-                  onClick={() => {
-                    if (window.confirm(`Are you sure you want to delete ${selectedReceiptIds.length} receipt${selectedReceiptIds.length !== 1 ? 's' : ''}?`)) {
-                      bulkDeleteMutation.mutate(selectedReceiptIds);
-                    }
-                  }}
-                  disabled={bulkDeleteMutation.isPending}
-                >
-                  {bulkDeleteMutation.isPending ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={16} />
-                      Delete ({selectedReceiptIds.length})
-                    </>
-                  )}
-                </Button>
+                <>
+                  {/* Bulk Category Assignment */}
+                  <div className="flex items-center gap-2">
+                    <CategorySelector
+                      value={bulkCategoryId}
+                      onChange={setBulkCategoryId}
+                      placeholder="Assign category..."
+                      className="w-48"
+                    />
+                    <Button
+                      variant="outline"
+                      className="gap-2 whitespace-nowrap"
+                      onClick={() => {
+                        bulkCategoryMutation.mutate({
+                          receiptIds: selectedReceiptIds,
+                          categoryId: bulkCategoryId
+                        });
+                      }}
+                      disabled={bulkCategoryMutation.isPending}
+                    >
+                      {bulkCategoryMutation.isPending ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Assigning...
+                        </>
+                      ) : (
+                        <>
+                          <Tag size={16} />
+                          Assign ({selectedReceiptIds.length})
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Bulk Delete */}
+                  <Button
+                    variant="destructive"
+                    className="gap-2 whitespace-nowrap"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete ${selectedReceiptIds.length} receipt${selectedReceiptIds.length !== 1 ? 's' : ''}?`)) {
+                        bulkDeleteMutation.mutate(selectedReceiptIds);
+                      }
+                    }}
+                    disabled={bulkDeleteMutation.isPending}
+                  >
+                    {bulkDeleteMutation.isPending ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} />
+                        Delete ({selectedReceiptIds.length})
+                      </>
+                    )}
+                  </Button>
+                </>
               )}
 
               {/* Date Filter Button */}
@@ -907,6 +1027,42 @@ export default function Dashboard() {
                         </ToggleGroup>
                       </>
                     )}
+
+                    {/* Filter by Category */}
+                    <h4 className="font-medium pt-2">Category</h4>
+                    <ToggleGroup
+                      type="single"
+                      value={filterByCategory || "all"}
+                      onValueChange={(value) => {
+                        const newCategory = value === "all" ? null : value;
+                        setFilterByCategory(newCategory);
+                        updateSearchParams({ category: newCategory });
+                      }}
+                      className="flex flex-wrap justify-start gap-2"
+                    >
+                      <ToggleGroupItem value="all" aria-label="Show all categories" className="flex-grow-0">
+                        All
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="uncategorized" aria-label="Show uncategorized receipts" className="flex-grow-0">
+                        Uncategorized
+                      </ToggleGroupItem>
+                      {categories.map(category => (
+                        <ToggleGroupItem
+                          key={category.id}
+                          value={category.id}
+                          aria-label={`Filter by ${category.name}`}
+                          className="flex-grow-0"
+                        >
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            {category.name}
+                          </div>
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
 
                     {/* Clear Filters Button */}
                     <div className="pt-2">

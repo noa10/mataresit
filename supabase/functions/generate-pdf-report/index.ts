@@ -232,8 +232,19 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       pdf.text(`Generated: ${timestamp}`, 20, 287)
 
       // Add app name at bottom right
-      pdf.text('Paperless Maverick', 190, 287, { align: 'right' })
+      pdf.text('Mataresit', 190, 287, { align: 'right' })
     }
+  }
+
+  // Helper function to check if we need a page break
+  const checkPageBreak = (currentY: number, requiredSpace: number = 20) => {
+    // Leave at least 25mm from footer (287 - 25 = 262)
+    if (currentY + requiredSpace > 262) {
+      pdf.addPage()
+      addHeader()
+      return 60 // Return new Y position after header
+    }
+    return currentY
   }
 
   addHeader()
@@ -266,49 +277,130 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
   // Fetch images in parallel with timeout and error handling
   console.time("TotalImageProcessing");
   const imageCache = new Map();
-  const MAX_IMAGES = 10; // Limit images per report
+  const MAX_IMAGES = includeImages ? 20 : 0; // Increased limit for better reports
   let imageCount = 0;
 
+  console.log(`=== IMAGE PROCESSING DEBUG START ===`);
+  console.log(`includeImages parameter: ${includeImages}`);
+  console.log(`Total receipts to process: ${receipts.length}`);
+  console.log(`MAX_IMAGES limit: ${MAX_IMAGES}`);
+
+  // Log receipt details for debugging
+  receipts.forEach((receipt, index) => {
+    console.log(`Receipt ${index + 1}: ${receipt.id}`);
+    console.log(`  - merchant: ${receipt.merchant}`);
+    console.log(`  - thumbnail_url: ${receipt.thumbnail_url}`);
+    console.log(`  - has thumbnail: ${!!receipt.thumbnail_url}`);
+  });
+  console.log(`=== END RECEIPT DETAILS ===`);
+
   async function getCachedImage(url) {
-    if (imageCache.has(url)) return imageCache.get(url);
-    
+    if (imageCache.has(url)) {
+      console.log(`Using cached image for: ${url}`);
+      return imageCache.get(url);
+    }
+
+    console.log(`Fetching image from: ${url}`);
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased timeout for full-size images
+
+      console.log(`Starting fetch for: ${url}`);
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
+
+      console.log(`Fetch response for ${url}: status=${response.status}, ok=${response.ok}, headers=${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`HTTP ${response.status} for ${url}: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
       const buffer = await response.arrayBuffer();
+      console.log(`Successfully fetched image from ${url}, size: ${buffer.byteLength} bytes`);
       imageCache.set(url, buffer);
       return buffer;
     } catch (error) {
-      console.warn(`Failed to fetch image from ${url}:`, error.message);
+      console.error(`Failed to fetch image from ${url}:`, error.message);
+      console.error(`Error details:`, error);
       return null;
     }
   }
 
+  // Helper function to get full-size image URL from thumbnail URL
+  function getFullSizeImageUrl(thumbnailUrl) {
+    if (!thumbnailUrl) return null;
+
+    // If it's already a full URL, try to get the original image
+    // Replace thumbnail path with full image path if needed
+    if (thumbnailUrl.includes('thumbnail_')) {
+      return thumbnailUrl.replace('thumbnail_', '');
+    }
+
+    // Return the URL as-is if it doesn't appear to be a thumbnail
+    return thumbnailUrl;
+  }
+
   const imageFetchPromises = receipts.map(async (receipt, index) => {
-    if (!includeImages || !receipt.thumbnail_url || receipt.thumbnail_url.trim() === "" || imageCount >= MAX_IMAGES) {
+    console.log(`Processing receipt ${index + 1}/${receipts.length}: ${receipt.id}`);
+    console.log(`  - includeImages: ${includeImages}`);
+    console.log(`  - thumbnail_url: ${receipt.thumbnail_url}`);
+    console.log(`  - imageCount: ${imageCount}/${MAX_IMAGES}`);
+
+    if (!includeImages) {
+      console.log(`  - Skipping: includeImages is false`);
+      return { index, imageData: null };
+    }
+
+    if (!receipt.thumbnail_url || receipt.thumbnail_url.trim() === "") {
+      console.log(`  - Skipping: no thumbnail_url`);
+      return { index, imageData: null };
+    }
+
+    if (imageCount >= MAX_IMAGES) {
+      console.log(`  - Skipping: reached MAX_IMAGES limit`);
       return { index, imageData: null };
     }
 
     imageCount++;
     try {
-      const buffer = await getCachedImage(receipt.thumbnail_url);
-      if (!buffer) return { index, imageData: null };
-      
-      const contentType = "image/jpeg"; // Default content type
+      // Try to get full-size image first, fallback to thumbnail
+      const fullSizeUrl = getFullSizeImageUrl(receipt.thumbnail_url);
+      console.log(`  - Trying full-size URL: ${fullSizeUrl}`);
+      let buffer = await getCachedImage(fullSizeUrl);
+
+      // If full-size image fails, try thumbnail
+      if (!buffer && fullSizeUrl !== receipt.thumbnail_url) {
+        console.log(`  - Full-size image failed for receipt ${receipt.id}, trying thumbnail: ${receipt.thumbnail_url}`);
+        buffer = await getCachedImage(receipt.thumbnail_url);
+      }
+
+      if (!buffer) {
+        console.log(`  - Failed to fetch any image for receipt ${receipt.id}`);
+        return { index, imageData: null };
+      }
+
+      console.log(`  - Successfully fetched image, buffer size: ${buffer.byteLength} bytes`);
+
+      // Detect content type from buffer or URL
+      let contentType = "image/jpeg"; // Default
+      if (receipt.thumbnail_url.toLowerCase().includes('.png')) {
+        contentType = "image/png";
+      }
+
       const base64Image = encodeBase64(buffer); // From Deno std
       const format = contentType.includes("png") ? "PNG" : "JPEG";
-      
-      return { 
-        index, 
-        imageData: { base64Image, contentType, format } 
+
+      console.log(`  - Image processed successfully: ${format}, base64 length: ${base64Image.length}`);
+
+      return {
+        index,
+        imageData: { base64Image, contentType, format }
       };
     } catch (error) {
-      console.warn(`Failed to process image for receipt ${receipt.id}:`, error.message);
+      console.error(`  - Failed to process image for receipt ${receipt.id}:`, error.message);
       return { index, imageData: null };
     }
   });
@@ -318,19 +410,26 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
   const imageMap = new Map(imageResults.map(({ index, imageData }) => [index, imageData]));
   console.timeEnd("TotalImageProcessing");
 
-  // Define fixed dimensions for images (reduced size for optimization)
-  const fixedWidth = 40; // Reduced from 80 to 40 mm
-  const fixedHeight = 20; // Reduced from 40 to 20 mm
+  // Debug image results
+  console.log(`Image processing complete:`);
+  console.log(`  - Total receipts: ${receipts.length}`);
+  console.log(`  - Image results: ${imageResults.length}`);
+  console.log(`  - Successful images: ${imageResults.filter(r => r.imageData !== null).length}`);
+  console.log(`  - Failed images: ${imageResults.filter(r => r.imageData === null).length}`);
+
+  imageResults.forEach(({ index, imageData }) => {
+    const receipt = receipts[index];
+    console.log(`  - Receipt ${index} (${receipt?.id}): ${imageData ? 'SUCCESS' : 'FAILED'}`);
+  });
+
+  // Define fixed dimensions for images (optimized for auditing readability)
+  const fixedWidth = 140; // mm - significantly increased for audit readability
+  const fixedHeight = 100; // mm - significantly increased for audit readability
 
   // Process each receipt
   for (const receipt of receipts) {
-    // Check if we need a new page
-    if (yPosition > 240) {
-      pdf.addPage()
-      addHeader()
-      // Start content with more space after the date
-      yPosition = 60
-    }
+    // Check if we need a new page using the helper function
+    yPosition = checkPageBreak(yPosition, 140); // Increased space estimate for larger images
 
     // Add receipt section with colored background
     pdf.setFillColor(240, 240, 250) // Light blue background
@@ -399,16 +498,32 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
 
     // Add receipt image if available
     if (includeImages) {
-      const imageData = imageMap.get(receipts.indexOf(receipt))?.imageData;
+      const receiptIndex = receipts.indexOf(receipt);
+      const imageData = imageMap.get(receiptIndex);
+      console.log(`Adding image for receipt ${receipt.id} (index ${receiptIndex}):`, {
+        hasImageData: !!imageData,
+        imageMapSize: imageMap.size,
+        includeImages
+      });
+
       if (imageData) {
         try {
+          // Check if we need a page break for the image
+          yPosition = checkPageBreak(yPosition, fixedHeight + 10);
+
           const dataUri = `data:${imageData.contentType};base64,${imageData.base64Image}`;
+          console.log(`Adding image to PDF: format=${imageData.format}, position=(20, ${yPosition}), size=(${fixedWidth}x${fixedHeight})`);
           pdf.addImage(dataUri, imageData.format, 20, yPosition, fixedWidth, fixedHeight);
           yPosition += fixedHeight + 5;
+          console.log(`Image added successfully for receipt ${receipt.id}`);
         } catch (e) {
           console.error(`Error adding image to PDF for receipt ${receipt.id}:`, e.message);
         }
+      } else {
+        console.log(`No image data available for receipt ${receipt.id} (index ${receiptIndex})`);
       }
+    } else {
+      console.log(`Images disabled for receipt ${receipt.id}`);
     }
 
     // Add receipt total with highlighted box
@@ -425,12 +540,8 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       pdf.line(20, yPosition, 190, yPosition)
       yPosition += 10
 
-      // Add page break if we're close to the bottom
-      if (yPosition > 240) {
-        pdf.addPage()
-        addHeader()
-        yPosition = 40
-      }
+      // Check if we need a page break using the helper function
+      yPosition = checkPageBreak(yPosition, 40);
     }
   }
 
@@ -521,6 +632,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       statsY = pdf.lastAutoTable.finalY + 15; // Start position for stats after table
 
       // --- Add Category Statistics Display ---
+      // Check if we need a page break before starting statistics
+      statsY = checkPageBreak(statsY, 50);
+
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
       pdf.text('Expense Statistics:', 20, statsY);
@@ -558,11 +672,7 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
           const average = stats.count > 0 ? stats.total / stats.count : 0;
 
           // Check for page break before adding category block
-          if (statsY + 30 > 280) { // Estimate space needed for category block
-              pdf.addPage();
-              addHeader();
-              statsY = 60; // Start content with space
-          }
+          statsY = checkPageBreak(statsY, 35); // Use helper function with proper spacing
 
           pdf.setFont('helvetica', 'bold');
           pdf.text(`${category || 'Uncategorized'}:`, 25, statsY); // Ensure category name is shown
@@ -579,6 +689,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       }
 
       // -- Spending Highlights (Category Mode) --
+      // Check for page break before spending highlights
+      statsY = checkPageBreak(statsY, 25);
+
       pdf.setFont('helvetica', 'bold');
       pdf.text('Spending Highlights:', 20, statsY);
       statsY += 7;
@@ -728,6 +841,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       // --- End Statistics Calculation (Payer) ---
 
       // --- Add Payer Statistics Display ---
+      // Check if we need a page break before starting statistics
+      statsY = checkPageBreak(statsY, 80); // More space needed for payer stats
+
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12); // Slightly larger heading for the section
       pdf.text('Expense Statistics:', 20, statsY);
@@ -744,6 +860,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       pdf.setFont('helvetica', 'normal');
 
       // Abah's Stats
+      // Check for page break before Abah's stats
+      statsY = checkPageBreak(statsY, 35);
+
       pdf.setFont('helvetica', 'bold'); // Payer name bold
       pdf.text('Abah (Mastercard Payments):', 25, statsY);
       statsY += 6;
@@ -758,6 +877,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       statsY += 8; // Extra space before Bakaris
 
       // Bakaris' Stats
+      // Check for page break before Bakaris' stats
+      statsY = checkPageBreak(statsY, 35);
+
       pdf.setFont('helvetica', 'bold'); // Payer name bold
       pdf.text('Bakaris (Other Payments):', 25, statsY);
       statsY += 6;
@@ -772,6 +894,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
       statsY += 8; // Extra space before Highlights
 
       // -- Spending Highlights (Payer Mode) --
+      // Check for page break before spending highlights
+      statsY = checkPageBreak(statsY, 25);
+
       pdf.setFont('helvetica', 'bold');
       pdf.text('Spending Highlights:', 20, statsY);
       statsY += 7; // Space after sub-heading
@@ -793,7 +918,14 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
   // --- End Conditional Logic ---
 
   // Add grand total with styled box (This is outside the if/else as it's always shown)
-  const finalY = pdf.lastAutoTable.finalY + 10
+  let finalY = pdf.lastAutoTable.finalY + 10
+
+  // Check for page break before grand total
+  if (finalY > 252) { // Ensure grand total doesn't overlap with footer
+    pdf.addPage()
+    addHeader()
+    finalY = 60
+  }
 
   // Add a colored box for the grand total with dark background
   pdf.setFillColor(51, 51, 51) // Dark background

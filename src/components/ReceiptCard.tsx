@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle } from "lucide-react";
+import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ReceiptStatus, ProcessingStatus } from "@/types/receipt";
+import { ReceiptStatus, ProcessingStatus, CustomCategory } from "@/types/receipt";
 import { getFormattedImageUrlSync } from "@/utils/imageUtils";
 import { formatCurrencySafe } from "@/utils/currency";
 
@@ -21,6 +21,7 @@ interface ReceiptCardProps {
   confidence: number;
   processingStatus?: ProcessingStatus;
   disableInternalLink?: boolean;
+  category?: CustomCategory | null;
 }
 
 export default function ReceiptCard({
@@ -33,7 +34,8 @@ export default function ReceiptCard({
   status,
   confidence,
   processingStatus,
-  disableInternalLink
+  disableInternalLink,
+  category
 }: ReceiptCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
@@ -174,7 +176,7 @@ export default function ReceiptCard({
           </div>
           <div className="flex items-center gap-1">
             {getProcessingInfo() ? (
-              <Badge 
+              <Badge
                 variant="outline"
                 className={`text-xs font-medium flex items-center ${getProcessingInfo()?.colorClass}`}
               >
@@ -191,6 +193,19 @@ export default function ReceiptCard({
             )}
           </div>
         </div>
+
+        {/* Category display */}
+        {category && (
+          <div className="mt-2 flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs gap-1">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: category.color }}
+              />
+              {category.name}
+            </Badge>
+          </div>
+        )}
         
         <div className="mt-4">
           {disableInternalLink ? (

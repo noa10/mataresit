@@ -19,7 +19,7 @@ export const SUBSCRIPTION_TIERS = {
     monthlyReceipts: 50,
     storageLimitMB: 1024, // 1GB
     retentionDays: 7,
-    batchUploadLimit: 1,
+    batchUploadLimit: 5,
     features: {
       versionControl: false,
       integrations: false,
@@ -35,7 +35,7 @@ export const SUBSCRIPTION_TIERS = {
     monthlyReceipts: 500,
     storageLimitMB: 10240, // 10GB
     retentionDays: 90,
-    batchUploadLimit: 5,
+    batchUploadLimit: 50,
     features: {
       versionControl: true,
       integrations: 'basic',
@@ -52,7 +52,7 @@ export const SUBSCRIPTION_TIERS = {
     monthlyReceipts: -1, // unlimited
     storageLimitMB: -1, // unlimited
     retentionDays: 365,
-    batchUploadLimit: 20,
+    batchUploadLimit: 100,
     features: {
       versionControl: true,
       integrations: 'advanced',

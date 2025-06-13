@@ -44,7 +44,7 @@ export default function FeaturesPage() {
       icon: <Upload className="h-8 w-8 text-green-500" />,
       title: "Smart Upload & Management",
       description: "Upload receipts individually or in batches with intelligent processing and organization.",
-      benefits: ["Batch upload support", "Real-time progress tracking", "Image optimization", "Automatic categorization"],
+      benefits: ["Batch upload support (5-100 files based on plan)", "Real-time progress tracking", "Image optimization", "Automatic categorization"],
       available: true
     },
     {
@@ -280,7 +280,11 @@ export default function FeaturesPage() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    10 receipts per month
+                    50 receipts per month
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Batch upload (up to 5 files)
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -312,7 +316,11 @@ export default function FeaturesPage() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-blue-500" />
-                    100 receipts per month
+                    500 receipts per month
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-blue-500" />
+                    Batch upload (up to 50 files)
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-blue-500" />
@@ -345,6 +353,10 @@ export default function FeaturesPage() {
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-purple-500" />
                     Unlimited receipts
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-purple-500" />
+                    Batch upload (up to 100 files)
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-purple-500" />

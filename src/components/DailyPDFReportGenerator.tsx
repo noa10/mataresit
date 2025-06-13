@@ -159,7 +159,7 @@ export function DailyPDFReportGenerator() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ date: dateStr, mode: reportMode })
+        body: JSON.stringify({ date: dateStr, mode: reportMode, includeImages: true })
       });
 
       if (!response.ok) {

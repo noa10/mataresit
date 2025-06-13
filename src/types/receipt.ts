@@ -16,6 +16,7 @@ export interface ReceiptUpload {
   status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
   uploadProgress: number; // Percentage 0-100
   processingStage?: 'queueing' | 'ai_processing' | 'categorization' | string;
+  categoryId?: string | null; // Optional category assignment
   error?: {
     code: 'FILE_TYPE' | 'SIZE_LIMIT' | 'UPLOAD_FAILED' | 'PROCESSING_FAILED' | string;
     message: string;
@@ -47,6 +48,8 @@ export interface Receipt {
   fullText?: string;
   ai_suggestions?: AISuggestions;
   predicted_category?: string;
+  // Custom category support
+  custom_category_id?: string | null;
   // New fields for real-time status updates
   processing_status?: ProcessingStatus;
   processing_error?: string | null;
@@ -145,6 +148,8 @@ export interface ReceiptWithDetails extends Receipt {
   processing_error?: string | null;
   processing_time?: number;
   model_used?: string;
+  // Custom category details
+  custom_category?: CustomCategory | null;
   // New fields for bounding box visualization
   field_geometry?: FieldGeometry;
   document_structure?: DocumentStructure;
@@ -221,4 +226,41 @@ export interface Correction {
   ai_suggestion: string | null;
   corrected_value: string;
   created_at: string;
+}
+
+// Interface for custom categories
+export interface CustomCategory {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  icon: string;
+  created_at: string;
+  updated_at: string;
+  receipt_count?: number; // Optional, included when fetching with counts
+}
+
+// Interface for category creation/update
+export interface CreateCategoryRequest {
+  name: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface UpdateCategoryRequest {
+  name?: string;
+  color?: string;
+  icon?: string;
+}
+
+// Interface for bulk category assignment
+export interface BulkCategoryAssignmentRequest {
+  receipt_ids: string[];
+  category_id?: string | null; // null to remove category
+}
+
+// Interface for category deletion with reassignment
+export interface DeleteCategoryRequest {
+  category_id: string;
+  reassign_to_category_id?: string | null;
 }

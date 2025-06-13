@@ -5,6 +5,7 @@ export interface ExportFilters {
   searchQuery?: string;
   activeTab?: string;
   filterByCurrency?: string;
+  filterByCategory?: string;
   sortOrder?: string;
   dateRange?: {
     from?: Date;
@@ -49,7 +50,7 @@ export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters): void 
     receipt.tax?.toString() || '',
     receipt.payment_method,
     receipt.status,
-    receipt.predicted_category || '',
+    receipt.predicted_category || receipt.custom_category_id || '',
     receipt.processing_status || '',
     receipt.model_used || '',
     receipt.primary_method || '',
@@ -91,7 +92,11 @@ export const generateFilterInfo = (filters?: ExportFilters): string => {
   if (filters.filterByCurrency) {
     parts.push(`currency-${filters.filterByCurrency}`);
   }
-  
+
+  if (filters.filterByCategory) {
+    parts.push(`category-${filters.filterByCategory}`);
+  }
+
   if (filters.dateRange?.from) {
     const fromDate = format(filters.dateRange.from, 'yyyy-MM-dd');
     const toDate = filters.dateRange.to ? format(filters.dateRange.to, 'yyyy-MM-dd') : 'now';

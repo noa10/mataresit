@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
+import { TeamSelector } from "@/components/team/TeamSelector";
 import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -89,6 +90,13 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
           </NavLink>
 
           {getTierBadge()}
+
+          {/* Team Selector (only show on protected pages) */}
+          {!isPublicPage && user && (
+            <div className="ml-4">
+              <TeamSelector showCreateButton={true} />
+            </div>
+          )}
         </div>
 
         {/* Center: Main Navigation (Discord-style) */}

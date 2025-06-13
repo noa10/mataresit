@@ -9,6 +9,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
+import { CategoryManager } from "@/components/categories/CategoryManager";
 import {
   Tabs,
   TabsContent,
@@ -61,8 +62,9 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="processing" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8 max-w-md">
+            <TabsList className="grid w-full grid-cols-4 mb-8 max-w-lg">
               <TabsTrigger value="processing">Processing</TabsTrigger>
+              <TabsTrigger value="categories">Categories</TabsTrigger>
               <TabsTrigger value="providers">AI Providers</TabsTrigger>
               <TabsTrigger value="usage">Usage Stats</TabsTrigger>
             </TabsList>
@@ -143,6 +145,20 @@ export default function SettingsPage() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="categories">
+            <Card>
+              <CardHeader>
+                <CardTitle>Category Management</CardTitle>
+                <CardDescription>
+                  Create and manage custom categories to organize your receipts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CategoryManager />
               </CardContent>
             </Card>
           </TabsContent>

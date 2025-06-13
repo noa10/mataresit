@@ -72,7 +72,7 @@ export function LineItemEmbeddingsCard() {
 
       // Generate embeddings in batches until all are done
       let totalProcessed = 0;
-      const batchSize = 50; // Process in batches of 50
+      const batchSize = 200; // Process in batches of 200 receipts (increased to handle all receipts with missing embeddings)
 
       // Set the target based on whether we're regenerating all or just missing
       const targetCount = regenerate ?

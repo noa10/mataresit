@@ -758,14 +758,87 @@ export async function generateLineItemEmbeddings(limit: number = 50, forceRegene
       };
     }
 
-    // Get receipts that need line item embeddings
-    const { data: receipts, error } = await supabase
-      .from('receipts')
-      .select('id')
-      .order('date', { ascending: false })
-      .limit(limit);
+    // Get receipts that actually have line items without embeddings
+    // Use a more targeted approach to find receipts that need processing
+    let receipts: { id: string }[] = [];
 
-    if (error) throw error;
+    if (forceRegenerate) {
+      // If force regenerating, get all receipts that have line items
+      const { data, error: receiptsError } = await supabase
+        .from('receipts')
+        .select('id')
+        .order('date', { ascending: false })
+        .limit(limit);
+
+      if (receiptsError) throw receiptsError;
+      receipts = data || [];
+    } else {
+      // Get receipts that have line items without embeddings
+      // Use a raw SQL query to efficiently find these receipts
+      const { data, error } = await supabase.rpc('get_receipts_with_missing_line_item_embeddings', {
+        p_limit: limit
+      });
+
+      if (error) {
+        console.warn('RPC function not available, falling back to alternative method:', error);
+
+        // Fallback: Use a more comprehensive approach to find receipts with missing embeddings
+        // Since the RPC function failed, we'll use a different strategy
+        console.log('Using comprehensive fallback method to find receipts with missing embeddings...');
+
+        // Get a larger set of receipts to check
+        const { data: allReceipts, error: fallbackError } = await supabase
+          .from('receipts')
+          .select('id, date')
+          .order('date', { ascending: false })
+          .limit(limit * 10); // Get many more receipts to ensure we find ones with missing embeddings
+
+        if (fallbackError) {
+          console.error('Fallback query failed:', fallbackError);
+          throw fallbackError;
+        }
+
+        console.log(`Checking ${allReceipts?.length || 0} receipts for missing line item embeddings...`);
+
+        // Filter to only receipts that have line items without embeddings
+        const receiptsWithMissingEmbeddings = [];
+        let checkedCount = 0;
+
+        for (const receipt of allReceipts || []) {
+          checkedCount++;
+
+          // Check if this receipt has any line items without embeddings
+          const { data: missingLineItems, error: rpcError } = await supabase.rpc('get_line_items_without_embeddings_for_receipt', {
+            p_receipt_id: receipt.id
+          });
+
+          if (rpcError) {
+            console.warn(`RPC error for receipt ${receipt.id}:`, rpcError);
+            continue;
+          }
+
+          if (missingLineItems && missingLineItems.length > 0) {
+            receiptsWithMissingEmbeddings.push({ id: receipt.id });
+            console.log(`Found receipt ${receipt.id} with ${missingLineItems.length} missing line item embeddings`);
+
+            if (receiptsWithMissingEmbeddings.length >= limit) {
+              console.log(`Found enough receipts (${limit}), stopping search`);
+              break;
+            }
+          }
+
+          // Log progress every 50 receipts
+          if (checkedCount % 50 === 0) {
+            console.log(`Checked ${checkedCount} receipts, found ${receiptsWithMissingEmbeddings.length} with missing embeddings`);
+          }
+        }
+
+        console.log(`Fallback method: checked ${checkedCount} receipts, found ${receiptsWithMissingEmbeddings.length} with missing embeddings`);
+        receipts = receiptsWithMissingEmbeddings;
+      } else {
+        receipts = data || [];
+      }
+    }
 
     console.log(`Found ${receipts?.length || 0} receipts to process for line item embeddings`);
 

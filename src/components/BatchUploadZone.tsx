@@ -15,6 +15,8 @@ import { toast } from "@/components/ui/use-toast";
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 import imageCompression from "browser-image-compression";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
+import { CategorySelector } from "./categories/CategorySelector";
+import { Label } from "@/components/ui/label";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -46,6 +48,8 @@ export default function BatchUploadZone({
   const [previousFileCount, setPreviousFileCount] = useState(0);
   // State to preserve scroll position during updates
   const [preserveScrollPosition, setPreserveScrollPosition] = useState(false);
+  // State for selected category
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   const {
     isDragging,
@@ -189,7 +193,7 @@ export default function BatchUploadZone({
     // Add the processed (optimized or original) files to the batch queue
     console.log(`Ready to add ${processedFiles.length} files to batch queue:`, processedFiles);
     if (processedFiles.length > 0) {
-      const result = addToBatchQueue(processedFiles);
+      const result = addToBatchQueue(processedFiles, selectedCategoryId);
       console.log('Result from addToBatchQueue:', result);
     } else {
       console.error('No processed files to add to batch queue');
@@ -687,6 +691,22 @@ export default function BatchUploadZone({
               JPG, PNG, PDF
             </span>
           </Button>
+        )}
+
+        {/* Category Selection */}
+        {batchUploads.length > 0 && !isProcessing && (
+          <div className="w-full max-w-md mx-auto space-y-2 flex-shrink-0">
+            <Label htmlFor="batch-category-selector">Category (Optional)</Label>
+            <CategorySelector
+              value={selectedCategoryId}
+              onChange={setSelectedCategoryId}
+              placeholder="Select a category for all receipts..."
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground text-center">
+              This category will be applied to all receipts in this batch
+            </p>
+          </div>
         )}
 
         {/* Action buttons when files exist */}

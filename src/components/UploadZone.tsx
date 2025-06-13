@@ -31,6 +31,8 @@ import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
 import { ProcessingRecommendation } from "@/utils/processingOptimizer";
+import { CategorySelector } from "./categories/CategorySelector";
+import { Label } from "@/components/ui/label";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
@@ -51,6 +53,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
   const [useEnhancedFallback, setUseEnhancedFallback] = useState(false); // Temporarily disabled for consistency
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // Use settings hook instead of local state
   const { settings, updateSettings } = useSettings();
@@ -446,7 +449,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         // user_id is added by the createReceipt function automatically, remove it here
         processing_status: 'uploading', // Initialize with uploading status
         model_used: settings.selectedModel, // Use settings from the hook
-        payment_method: "" // Add required field
+        payment_method: "", // Add required field
+        custom_category_id: selectedCategoryId // Include selected category
       }, [], {
         merchant: 0,
         date: 0,
@@ -853,6 +857,21 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           </div>
         </div>
       </div>
+
+      {/* Category Selection */}
+      {!isUploading && receiptUploads.length > 0 && (
+        <div className="w-full flex-shrink-0 px-4 pb-4">
+          <div className="max-w-md mx-auto space-y-2">
+            <Label htmlFor="category-selector">Category (Optional)</Label>
+            <CategorySelector
+              value={selectedCategoryId}
+              onChange={setSelectedCategoryId}
+              placeholder="Select a category..."
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Processing Options Section - Collapsible footer */}
       {!isUploading && (

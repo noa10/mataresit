@@ -160,6 +160,10 @@ const generateFilterInfoForExcel = (filters?: ExportFilters): string => {
     parts.push(`currency-${filters.filterByCurrency}`);
   }
 
+  if (filters.filterByCategory) {
+    parts.push(`category-${filters.filterByCategory}`);
+  }
+
   if (filters.dateRange?.from) {
     const fromDate = format(filters.dateRange.from, 'yyyy-MM-dd');
     const toDate = filters.dateRange.to ? format(filters.dateRange.to, 'yyyy-MM-dd') : 'now';
@@ -185,6 +189,10 @@ const formatFiltersForSummary = (filters: ExportFilters): string => {
 
   if (filters.filterByCurrency) {
     parts.push(`Currency: ${filters.filterByCurrency}`);
+  }
+
+  if (filters.filterByCategory) {
+    parts.push(`Category: ${filters.filterByCategory}`);
   }
 
   if (filters.dateRange?.from) {

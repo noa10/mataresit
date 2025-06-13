@@ -8,9 +8,11 @@ import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw,
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
-import { updateReceipt, processReceiptWithAI, logCorrections, fixProcessingStatus } from "@/services/receiptService";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { updateReceipt, updateReceiptWithLineItems, processReceiptWithAI, logCorrections, fixProcessingStatus } from "@/services/receiptService";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchUserCategories } from "@/services/categoryService";
+import { CategorySelector } from "@/components/categories/CategorySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +140,12 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Get user settings for processing method
   const { settings } = useSettings();
 
+  // Fetch user categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchUserCategories,
+  });
+
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
@@ -149,8 +157,29 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     tax: receipt.tax || 0,
     currency: normalizeCurrencyCode(receipt.currency, "MYR"),
     payment_method: receipt.payment_method || "",
-    predicted_category: receipt.predicted_category || ""
+    predicted_category: receipt.predicted_category || "",
+    custom_category_id: receipt.custom_category_id || null
   });
+
+  // Sync processing status with receipt prop changes
+  useEffect(() => {
+    setProcessingStatus(receipt.processing_status || null);
+  }, [receipt.processing_status]);
+
+  // Sync edited receipt with receipt prop changes (for fresh data after reprocessing)
+  useEffect(() => {
+    setEditedReceipt(receipt);
+    setInputValues({
+      merchant: receipt.merchant || "",
+      date: receipt.date || "",
+      total: receipt.total || 0,
+      tax: receipt.tax || 0,
+      currency: normalizeCurrencyCode(receipt.currency, "MYR"),
+      payment_method: receipt.payment_method || "",
+      predicted_category: receipt.predicted_category || "",
+      custom_category_id: receipt.custom_category_id || null
+    });
+  }, [receipt.id, receipt.merchant, receipt.date, receipt.total, receipt.tax, receipt.currency, receipt.payment_method, receipt.predicted_category]);
 
   // State for tracking manual total override
   const [isManualTotal, setIsManualTotal] = useState(false);
@@ -215,7 +244,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       tax: receipt.tax || 0,
       currency: receipt.currency || "MYR",
       payment_method: receipt.payment_method || "",
-      predicted_category: receipt.predicted_category || ""
+      predicted_category: receipt.predicted_category || "",
+      custom_category_id: receipt.custom_category_id || null
     });
     // Initialize/Update editedConfidence when receipt changes
     // Handle different formats of confidence_scores
@@ -248,7 +278,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       tax: debouncedInputValues.tax,
       currency: validatedCurrency,
       payment_method: debouncedInputValues.payment_method,
-      predicted_category: debouncedInputValues.predicted_category
+      predicted_category: debouncedInputValues.predicted_category,
+      custom_category_id: debouncedInputValues.custom_category_id
     }));
 
     // Update confidence scores for fields that have been edited
@@ -324,6 +355,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             toast.success("Receipt processed successfully!");
             // Refresh data - this will also re-run the first useEffect to update confidence
             queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+            // Invalidate batch receipt queries (for modals and lists)
+            queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+            queryClient.invalidateQueries({ queryKey: ['receipts'] });
           }
         }
       )
@@ -434,7 +468,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           lineItems: formattedLineItems
         });
 
-        return await updateReceipt(
+        return await updateReceiptWithLineItems(
           receipt.id,
           {
             merchant: editedReceipt.merchant,
@@ -444,8 +478,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             currency: editedReceipt.currency,
             payment_method: editedReceipt.payment_method,
             predicted_category: editedReceipt.predicted_category,
+            custom_category_id: editedReceipt.custom_category_id,
             status: "reviewed",
           },
+          formattedLineItems,
           { skipEmbeddings: false }
         );
       } catch (error) {
@@ -464,6 +500,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
       // Invalidate the receipt query to force a refresh
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
 
       // Update the local state to reflect the changes
       // This ensures the UI shows the updated data immediately
@@ -476,8 +514,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         currency: editedReceipt.currency,
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
+        custom_category_id: editedReceipt.custom_category_id,
         status: "reviewed",
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        lineItems: editedReceipt.lineItems // Include updated line items
       };
 
       // Force update the UI with the new data
@@ -508,6 +548,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       // Invalidate queries to refetch data including updated confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
       toast.success("Receipt updated successfully!");
 
       // If the receipt was in a failed state, try to mark it as fixed
@@ -549,8 +590,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     }),
     onSuccess: (data) => {
       if (data) {
-        // Invalidate query, the useEffect hook will handle state update
+        // Invalidate individual receipt query
         queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+        // Invalidate batch receipt queries (for modals and lists)
+        queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
         toast.success(`Receipt processed successfully with AI Vision!`);
       }
     },
@@ -937,6 +981,14 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       predicted_category: value
     }));
     // The actual editedReceipt update will happen in the useEffect that watches debouncedInputValues
+  };
+
+  // Add custom category change handler
+  const handleCustomCategoryChange = (categoryId: string | null) => {
+    setInputValues(prev => ({
+      ...prev,
+      custom_category_id: categoryId
+    }));
   };
 
   // Function to handle field hover for bounding box highlighting (removed highlight functionality)
@@ -1510,21 +1562,12 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                  <div className="flex justify-between">
                    <Label htmlFor="category">Category</Label>
                  </div>
-                <Select
-                  value={inputValues.predicted_category}
-                  onValueChange={handleCategoryChange}
-                >
-                  <SelectTrigger id="category" className="bg-background/50">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {expenseCategories.map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CategorySelector
+                  value={inputValues.custom_category_id}
+                  onChange={handleCustomCategoryChange}
+                  placeholder="Select category..."
+                  className="bg-background/50"
+                />
                 {renderSuggestion('predicted_category', 'category')}
               </div>
 

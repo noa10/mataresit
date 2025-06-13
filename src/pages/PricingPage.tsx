@@ -84,7 +84,7 @@ const pricingTiers: PricingTier[] = [
       ],
       analytics: ["Basic receipt summary", "Simple monthly overview", "Basic data export (CSV)"]
     },
-    limitations: ["No batch processing", "No version control", "No integrations", "Basic support only"]
+    limitations: ["Batch upload limit: 5 files", "No version control", "No integrations", "Basic support only"]
   },
   {
     id: "pro",
@@ -110,7 +110,7 @@ const pricingTiers: PricingTier[] = [
       ],
       capabilities: [
         "All Free tier processing",
-        "Batch processing (up to 5)",
+        "Batch processing (up to 50 files)",
         "Team access for up to 5 users",
         "Version control",
         "Basic integrations",
@@ -149,7 +149,7 @@ const pricingTiers: PricingTier[] = [
       ],
       capabilities: [
         "All Pro Processing",
-        "Advanced batch processing (up to 20)",
+        "Advanced batch processing (up to 100 files)",
         "Unlimited team members",
         "Advanced version control",
         "Enterprise integrations",

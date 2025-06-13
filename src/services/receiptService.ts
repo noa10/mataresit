@@ -26,7 +26,16 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
 
   const { data, error } = await supabase
     .from("receipts")
-    .select("*, processing_time")
+    .select(`
+      *,
+      processing_time,
+      custom_categories (
+        id,
+        name,
+        color,
+        icon
+      )
+    `)
     .eq("user_id", user.user.id)
     .order("created_at", { ascending: false });
 
@@ -48,10 +57,18 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
 
 // Fetch a single receipt by ID with line items
 export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails | null> => {
-  // First get the receipt
+  // First get the receipt with category information
   const { data: receiptData, error: receiptError } = await supabase
     .from("receipts")
-    .select("*")
+    .select(`
+      *,
+      custom_categories (
+        id,
+        name,
+        color,
+        icon
+      )
+    `)
     .eq("id", id)
     .single();
 
@@ -97,6 +114,8 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
       date: 0,
       total: 0
     }, // Provide default if missing
+    // Include custom category information
+    custom_category: (receiptData as any).custom_categories || null,
     // Explicitly type cast ai_suggestions if needed (already casted here)
     ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
   };
@@ -406,6 +425,110 @@ export const updateReceipt = async (
     return receipt;
   } catch (error) {
     console.error('Error updating receipt:', error);
+    throw error;
+  }
+};
+
+// Update an existing receipt with line items
+export const updateReceiptWithLineItems = async (
+  receiptId: string,
+  receiptData: Partial<Receipt>,
+  lineItems?: ReceiptLineItem[],
+  options?: { skipEmbeddings?: boolean }
+): Promise<Receipt> => {
+  try {
+    console.log('updateReceiptWithLineItems called with:', {
+      receiptId,
+      receiptData,
+      lineItemsCount: lineItems?.length || 0,
+      options
+    });
+
+    // First update the receipt data
+    const { data: responseData, error } = await supabase
+      .from('receipts')
+      .update(receiptData)
+      .eq('id', receiptId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating receipt:', error);
+      throw error;
+    }
+
+    if (!responseData) {
+      throw new Error('Receipt not found after update');
+    }
+
+    // Cast the response data to Receipt type
+    const receipt = responseData as unknown as Receipt;
+
+    // Update line items if provided
+    if (lineItems && lineItems.length > 0) {
+      console.log('Updating line items for receipt:', receiptId);
+
+      // Delete existing line items first
+      const { error: deleteError } = await supabase
+        .from("line_items")
+        .delete()
+        .eq("receipt_id", receiptId);
+
+      if (deleteError) {
+        console.error("Error deleting old line items:", deleteError);
+        // Log but continue trying to insert - this is non-critical
+      }
+
+      // Filter out temporary IDs and format line items for insertion
+      const formattedLineItems = lineItems
+        .filter(item => item.description && item.description.trim() !== '') // Only include items with descriptions
+        .map(item => ({
+          description: item.description,
+          amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0,
+          receipt_id: receiptId
+        }));
+
+      if (formattedLineItems.length > 0) {
+        const { error: insertError } = await supabase
+          .from("line_items")
+          .insert(formattedLineItems);
+
+        if (insertError) {
+          console.error("Error inserting line items:", insertError);
+          // This is a critical error for line item updates, so we should throw
+          throw new Error(`Failed to update line items: ${insertError.message}`);
+        }
+
+        console.log(`Successfully updated ${formattedLineItems.length} line items for receipt ${receiptId}`);
+      }
+    } else if (lineItems && lineItems.length === 0) {
+      // If empty array is explicitly passed, delete all line items
+      console.log('Deleting all line items for receipt:', receiptId);
+
+      const { error: deleteError } = await supabase
+        .from("line_items")
+        .delete()
+        .eq("receipt_id", receiptId);
+
+      if (deleteError) {
+        console.error("Error deleting line items:", deleteError);
+        // Non-critical error, don't throw
+      }
+    }
+
+    // Generate embeddings if not explicitly skipped and receipt is reviewed
+    if (!options?.skipEmbeddings && receipt.status === 'reviewed') {
+      try {
+        await generateEmbeddingsForReceipt(receiptId);
+      } catch (embeddingError) {
+        console.error('Failed to generate embeddings:', embeddingError);
+        // Continue with the update even if embedding fails
+      }
+    }
+
+    return receipt;
+  } catch (error) {
+    console.error('Error updating receipt with line items:', error);
     throw error;
   }
 };
