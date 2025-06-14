@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Panel Flow</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Test Admin Panel Flow</h1>
+    <button id="testButton">Test Line Item Embedding Generation</button>
+    <div id="output"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message) {
+            console.log(message);
+            document.getElementById('output').innerHTML += '<p>' + message + '</p>';
+        }
+        
+        // Simulate the callEdgeFunction utility
+        async function callEdgeFunction(functionName, method, body) {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const authToken = session?.access_token || SUPABASE_ANON_KEY;
+                
+                const url = `${SUPABASE_URL}/functions/v1/${functionName}?t=${Date.now()}`;
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    },
+                    credentials: 'omit',
+                    mode: 'cors',
+                    ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {})
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                log(`❌ Error calling edge function: ${error.message}`);
+                throw error;
+            }
+        }
+        
+        // Simulate the generateLineItemEmbeddings function logic
+        async function testGenerateLineItemEmbeddings() {
+            try {
+                log('🔍 Testing line item embedding generation...');
+                
+                // Step 1: Check current stats
+                log('📊 Checking current stats...');
+                
+                const { count: totalLineItems } = await supabase
+                    .from('line_items')
+                    .select('id', { count: 'exact' })
+                    .not('description', 'is', null);
+                
+                const { count: embeddingsCount } = await supabase
+                    .from('receipt_embeddings')
+                    .select('id', { count: 'exact' })
+                    .eq('content_type', 'line_item');
+                
+                const withoutEmbeddings = (totalLineItems || 0) - (embeddingsCount || 0);
+                
+                log(`Current stats: ${totalLineItems} total, ${embeddingsCount} with embeddings, ${withoutEmbeddings} without`);
+                
+                if (withoutEmbeddings === 0) {
+                    log('✅ All line items already have embeddings!');
+                    return;
+                }
+                
+                // Step 2: Try to find receipts with missing embeddings using fallback method
+                log('🔄 Finding receipts with missing embeddings...');
+                
+                const { data: allReceipts } = await supabase
+                    .from('receipts')
+                    .select('id')
+                    .order('date', { ascending: false })
+                    .limit(50);
+                
+                log(`Found ${allReceipts?.length || 0} recent receipts to check`);
+                
+                const receiptsWithMissing = [];
+                for (const receipt of allReceipts || []) {
+                    const { data: missingLineItems } = await supabase.rpc('get_line_items_without_embeddings_for_receipt', {
+                        p_receipt_id: receipt.id
+                    });
+                    
+                    if (missingLineItems && missingLineItems.length > 0) {
+                        receiptsWithMissing.push(receipt);
+                        log(`Receipt ${receipt.id} has ${missingLineItems.length} line items without embeddings`);
+                        
+                        if (receiptsWithMissing.length >= 3) break; // Test with first 3
+                    }
+                }
+                
+                log(`Found ${receiptsWithMissing.length} receipts with missing line item embeddings`);
+                
+                if (receiptsWithMissing.length === 0) {
+                    log('ℹ️ No receipts with missing embeddings found in recent receipts');
+                    return;
+                }
+                
+                // Step 3: Test edge function with one receipt
+                const testReceipt = receiptsWithMissing[0];
+                log(`🧪 Testing edge function with receipt: ${testReceipt.id}`);
+                
+                const result = await callEdgeFunction('generate-embeddings', 'POST', {
+                    receiptId: testReceipt.id,
+                    processLineItems: true,
+                    forceRegenerate: false
+                });
+                
+                log(`✅ Edge function result: ${JSON.stringify(result, null, 2)}`);
+                
+                if (result.success) {
+                    log(`🎉 Successfully processed ${result.count} line items!`);
+                } else {
+                    log(`❌ Edge function failed: ${result.error}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        document.getElementById('testButton').addEventListener('click', testGenerateLineItemEmbeddings);
+        
+        log('Ready to test! Click the button to start.');
+    </script>
+</body>
+</html>
