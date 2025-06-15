@@ -53,6 +53,7 @@ const TeamManagement = lazy(() => import("./pages/TeamManagement"));
 const ClaimsManagement = lazy(() => import("./pages/ClaimsManagement"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptIntegrationTest"));
+const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 
 
 // Create a loading component for suspense
@@ -184,6 +185,11 @@ const App = () => (
                 <Route path="/test/claims-receipt-integration" element={
                   <Suspense fallback={<PageLoading />}>
                     <ClaimsReceiptIntegrationTest />
+                  </Suspense>
+                } />
+                <Route path="/test/invitation" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestInvitation />
                   </Suspense>
                 } />
               </Route>
