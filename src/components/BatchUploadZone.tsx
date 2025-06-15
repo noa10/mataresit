@@ -481,7 +481,7 @@ export default function BatchUploadZone({
       />
 
       <div
-        className={`relative w-full h-full grid grid-rows-[auto_1fr_auto] gap-4 rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        className={`relative w-full h-full grid grid-rows-[auto_1fr_auto] gap-2 sm:gap-4 rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -522,7 +522,7 @@ export default function BatchUploadZone({
       </div>
 
       {/* Header Section - Auto height */}
-      <div className="flex flex-col items-center text-center gap-3">
+      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
         <motion.div
           initial={{ scale: 0.8 }}
           animate={{
@@ -536,26 +536,26 @@ export default function BatchUploadZone({
             damping: 20,
             rotate: { duration: 0.5, ease: "easeInOut" }
           }}
-          className={`relative rounded-full p-4 ${
+          className={`relative rounded-full p-3 sm:p-4 ${
             isDragging ? "bg-primary/10" : "bg-secondary"
           }`}
         >
           {isDragging ? (
-            <Upload size={32} className="text-primary" />
+            <Upload size={24} className="sm:w-8 sm:h-8 text-primary" />
           ) : (
-            <FileUp size={32} className="text-primary" />
+            <FileUp size={24} className="sm:w-8 sm:h-8 text-primary" />
           )}
         </motion.div>
 
         <div className="space-y-1">
-          <h3 className="text-lg font-medium">
+          <h3 className="text-base sm:text-lg font-medium">
             {isDragging
               ? "Drop Files Here"
               : "Batch Upload Receipts"}
           </h3>
           <p
             id="batch-upload-zone-description"
-            className="text-sm text-muted-foreground max-w-md mx-auto"
+            className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
           >
             {isCompressing
               ? "Compressing selected images..."
@@ -683,10 +683,10 @@ export default function BatchUploadZone({
               handleFileSelection();
             }}
             variant="default"
-            className="px-6 py-2 text-base group flex-shrink-0"
-            size="lg"
+            className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-shrink-0 flex-col sm:flex-row gap-1 sm:gap-0"
+            size="default"
           >
-            <span className="mr-2">Select Files</span>
+            <span className="sm:mr-2">Select Files</span>
             <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
               JPG, PNG, PDF
             </span>
@@ -711,7 +711,7 @@ export default function BatchUploadZone({
 
         {/* Action buttons when files exist */}
         {batchUploads.length > 0 && (
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
             <Button
               onClick={() => {
                 console.log('Add More Files button clicked');
@@ -719,6 +719,7 @@ export default function BatchUploadZone({
               }}
               variant="outline"
               size="sm"
+              className="w-full sm:w-auto"
             >
               <FileUp className="h-4 w-4 mr-2" />
               Add More Files
@@ -733,6 +734,7 @@ export default function BatchUploadZone({
                 }}
                 variant="default"
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Review Results

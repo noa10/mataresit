@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
-import { TeamSelector } from "@/components/team/TeamSelector";
+import { useTeam } from "@/contexts/TeamContext";
+
 import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -30,6 +32,7 @@ interface NavbarProps {
 export default function Navbar({ chatControls, navControls }: NavbarProps = {}) {
   const { user, signOut, isAdmin } = useAuth();
   const { subscriptionData } = useStripe();
+  const { currentTeam } = useTeam();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -91,12 +94,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
 
           {getTierBadge()}
 
-          {/* Team Selector (only show on protected pages) */}
-          {!isPublicPage && user && (
-            <div className="ml-4">
-              <TeamSelector showCreateButton={true} />
-            </div>
-          )}
+
         </div>
 
         {/* Center: Main Navigation (Discord-style) */}
@@ -210,6 +208,9 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
             </Button>
           ) : (
             <div className="flex items-center space-x-3">
+              {/* Notification Center (only show for authenticated users) */}
+              <NotificationCenter teamId={currentTeam?.id} />
+
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -234,12 +235,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                       Profile
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/settings" className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
+
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -399,14 +395,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     <User className="h-4 w-4" />
                     Profile
                   </Link>
-                  <Link
-                    to="/settings"
-                    className="flex items-center gap-2 w-full py-2 px-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </Link>
+
                   {isAdmin && (
                     <Link
                       to="/admin"

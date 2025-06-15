@@ -21,11 +21,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ChevronDown, 
-  Plus, 
-  Users, 
-  Settings,
+import {
+  ChevronDown,
+  Plus,
+  Users,
   Check,
   Building2,
 } from 'lucide-react';
@@ -45,6 +44,7 @@ export function TeamSelector({ className, showCreateButton = true }: TeamSelecto
     loading,
     switchTeam,
     createTeam,
+    hasPermission,
   } = useTeam();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -77,6 +77,8 @@ export function TeamSelector({ className, showCreateButton = true }: TeamSelecto
   const handleTeamSwitch = async (teamId: string | null) => {
     await switchTeam(teamId);
   };
+
+
 
   return (
     <>
@@ -169,18 +171,7 @@ export function TeamSelector({ className, showCreateButton = true }: TeamSelecto
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {currentTeam && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              // TODO: Navigate to team settings
-              console.log('Navigate to team settings');
-            }}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        )}
+
       </div>
 
       {/* Create Team Dialog */}

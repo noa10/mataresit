@@ -80,37 +80,41 @@ export default function SettingsPage() {
               <CardContent className="space-y-6">
                 <div className="prose prose-sm max-w-none text-muted-foreground">
                   <p>
-                    We now exclusively use <strong>AI Vision</strong> for receipt processing, which provides superior accuracy with support for larger images (up to 5MB). This advanced method processes your receipts directly using AI models with vision capabilities.
+                    <strong>Mataresit</strong> uses advanced <strong>AI Vision</strong> technology for receipt processing, providing superior accuracy with support for larger images (up to 5MB). This method processes your receipts directly using AI models with vision capabilities, eliminating the need for traditional OCR processing.
                   </p>
                   <p>
-                    You can still enable 'Compare with Alternative' to also process receipts using OCR + AI for comparison, which can help improve accuracy but increases processing time.
+                    Configure your preferred AI models for single and batch processing below. Different models offer various trade-offs between speed, accuracy, and cost.
                   </p>
                 </div>
 
-                <ReceiptProcessingOptions
-                  defaultMethod={settings.processingMethod}
-                  defaultModel={settings.selectedModel}
-                  defaultCompare={settings.compareWithAlternative}
-                  onMethodChange={(method) => updateSettings({ processingMethod: method })}
-                  onModelChange={(model) => updateSettings({ selectedModel: model })}
-                  onCompareChange={(compare) => updateSettings({ compareWithAlternative: compare })}
-                />
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">AI Model Configuration</h3>
+                  <ReceiptProcessingOptions
+                    defaultModel={settings.selectedModel}
+                    defaultBatchModel={settings.batchModel}
+                    showBatchModelSelection={true}
+                    onModelChange={(model) => updateSettings({ selectedModel: model })}
+                    onBatchModelChange={(model) => updateSettings({ batchModel: model })}
+                  />
+                </div>
 
                 <Separator className="my-6" />
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Batch Upload Settings</h3>
+                  <h3 className="text-lg font-medium">Batch Processing Configuration</h3>
                   <p className="text-sm text-muted-foreground">
-                    Configure how multiple receipts are processed when using batch upload.
+                    Configure how multiple receipts are processed during batch uploads, including subscription limits, concurrency, timeouts, and retry behavior.
                   </p>
 
                   <BatchUploadSettings
                     maxConcurrent={settings?.batchUpload?.maxConcurrent || 2}
                     autoStart={settings?.batchUpload?.autoStart || false}
+                    timeoutSeconds={settings?.batchUpload?.timeoutSeconds || 120}
+                    maxRetries={settings?.batchUpload?.maxRetries || 2}
                     onMaxConcurrentChange={(value) =>
                       updateSettings({
                         batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false }),
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
                           maxConcurrent: value
                         }
                       })
@@ -118,8 +122,24 @@ export default function SettingsPage() {
                     onAutoStartChange={(value) =>
                       updateSettings({
                         batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false }),
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
                           autoStart: value
+                        }
+                      })
+                    }
+                    onTimeoutChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          timeoutSeconds: value
+                        }
+                      })
+                    }
+                    onMaxRetriesChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          maxRetries: value
                         }
                       })
                     }

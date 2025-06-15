@@ -657,9 +657,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   return (
-    <div className="w-full h-full grid grid-rows-[1fr_auto] gap-4 p-4">
+    <div className="w-full h-full grid grid-rows-[1fr_auto] gap-2 sm:gap-4 p-2 sm:p-4">
       <div
-        className={`relative w-full flex flex-col rounded-md p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        className={`relative w-full flex flex-col rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -691,29 +691,29 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
         <div className="flex flex-col h-full overflow-hidden">
           {/* Header Section */}
-          <div className="flex flex-col items-center text-center gap-3 flex-shrink-0 py-4">
+          <div className="flex flex-col items-center text-center gap-2 sm:gap-3 flex-shrink-0 py-2 sm:py-4">
             <motion.div
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className={`relative rounded-full p-4 ${
+              className={`relative rounded-full p-3 sm:p-4 ${
                 isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
               }`}
             >
               {isUploading ? (
-                <Loader2 size={32} className="text-primary animate-spin" />
+                <Loader2 size={24} className="sm:w-8 sm:h-8 text-primary animate-spin" />
               ) : error ? (
-                <XCircle size={32} className="text-destructive" />
+                <XCircle size={24} className="sm:w-8 sm:h-8 text-destructive" />
               ) : isDragging ? (
-                <Upload size={32} className="text-primary" />
+                <Upload size={24} className="sm:w-8 sm:h-8 text-primary" />
               ) : (
-                <Upload size={32} className="text-primary" />
+                <Upload size={24} className="sm:w-8 sm:h-8 text-primary" />
               )}
             </motion.div>
 
             <div className="space-y-1">
-              <h3 className="text-lg font-medium">
+              <h3 className="text-base sm:text-lg font-medium">
                 {isUploading
                   ? currentStage ? PROCESSING_STAGES[currentStage as keyof typeof PROCESSING_STAGES]?.name || "Processing..." : "Uploading..."
                   : error
@@ -724,7 +724,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               </h3>
               <p
                 id="upload-zone-description"
-                className="text-sm text-muted-foreground max-w-md mx-auto"
+                className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
               >
                 {isUploading
                   ? currentStage === 'ERROR'
@@ -815,8 +815,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 <Button
                   onClick={retryUpload}
                   variant="default"
-                  className="px-6 py-2 text-base"
-                  size="lg"
+                  className="px-4 sm:px-6 py-2 text-sm sm:text-base"
+                  size="default"
                 >
                   Try Again
                 </Button>
@@ -824,10 +824,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 <Button
                   onClick={handleStartUpload}
                   variant="default"
-                  className="px-6 py-2 text-base group"
-                  size="lg"
+                  className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-col sm:flex-row gap-1 sm:gap-0"
+                  size="default"
                 >
-                  <span className="mr-2">
+                  <span className="sm:mr-2">
                     {receiptUploads.length > 0 ? "Upload File" : "Select File"}
                   </span>
                   <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">

@@ -28,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2 } from "lucide-react";
 
 // Import services and types
-import { fetchDailySpending, fetchSpendingByCategory, DailySpendingData, CategorySpendingData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
+import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar } from 'recharts';
 
 // Import ReceiptViewer and related types/functions
@@ -73,7 +73,7 @@ const formatFullDate = (dateString: string) => {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D'];
 
 // Define the enhanced data structure for the table
-type EnhancedDailySpendingData = {
+type EnhancedDailyExpenseData = {
   date: string;
   total: number;
   receiptIds: string[];
@@ -83,14 +83,14 @@ type EnhancedDailySpendingData = {
 
 // ExpenseStats Component
 interface ExpenseStatsProps {
-  totalSpending: number;
+  totalExpenses: number;
   totalReceipts: number;
   averagePerReceipt: number;
   dateRange: DateRange | undefined;
   onDateRangeClick: (range: DateRange | undefined) => void;
 }
 
-const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
+const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
   // Format date range for display
   const formattedDateRange = dateRange?.from && dateRange?.to
     ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
@@ -98,8 +98,8 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
 
   const stats = [
     {
-      title: "Total Spending",
-      value: formatCurrency(totalSpending),
+      title: "Total Expenses",
+      value: formatCurrency(totalExpenses),
       period: formattedDateRange,
       icon: CreditCard,
       trend: "",  // We'll leave trends empty since we don't have trend data yet
@@ -150,13 +150,13 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
           </PopoverContent>
         </Popover>
       </CardHeader>
-      <CardContent className="p-6 pt-2">
-        <div className="grid gap-6">
+      <CardContent className="p-4 sm:p-6 pt-2">
+        <div className="grid gap-4 sm:gap-6">
           {stats.map((stat, index) => (
             <div key={index} className="flex items-start justify-between">
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-xl sm:text-2xl font-bold text-foreground break-words">{stat.value}</p>
                 <p className="text-xs text-muted-foreground">{stat.period}</p>
                 {stat.trend && (
                   <p className={`text-sm flex items-center gap-1 ${stat.trendUp ? 'text-green-600' : 'text-red-600'}`}>
@@ -165,8 +165,8 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
                   </p>
                 )}
               </div>
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <stat.icon className="w-6 h-6 text-primary" />
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-lg flex-shrink-0 ml-3">
+                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
             </div>
           ))}
@@ -178,7 +178,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalSpending, totalReceipt
 
 // CategoryPieChart Component
 interface CategoryPieChartProps {
-  categoryData: CategorySpendingData[];
+  categoryData: CategoryExpenseData[];
   isLoading?: boolean;
 }
 
@@ -187,7 +187,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
     return (
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Spending by Category</CardTitle>
+          <CardTitle>Expenses by Category</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[300px]">
           <p className="text-muted-foreground">Loading...</p>
@@ -205,10 +205,10 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader>
-        <CardTitle>Spending by Category</CardTitle>
+        <CardTitle>Expenses by Category</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
+        <div className="h-[250px] sm:h-[300px]">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -216,8 +216,8 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
+                  innerRadius={40}
+                  outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -243,21 +243,21 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
   );
 };
 
-// SpendingChart Component
-interface SpendingChartProps {
-  dailyData: EnhancedDailySpendingData[];
+// ExpenseChart Component
+interface ExpenseChartProps {
+  dailyData: EnhancedDailyExpenseData[];
   isLoading?: boolean;
   dateRange: DateRange | undefined; // Add dateRange prop
 }
 
-const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dateRange }) => {
+const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange }) => {
   // Add state for chart type toggle
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
   if (isLoading) {
     return (
       <Card className="border border-border/40 shadow-sm">
         <CardHeader>
-          <CardTitle>Daily Spending Trend</CardTitle>
+          <CardTitle>Daily Expense Trend</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[350px]">
           <p className="text-muted-foreground">Loading...</p>
@@ -277,10 +277,10 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
   }));
 
   // Calculate statistics for annotations
-  const totalSpending = chartData.reduce((sum, day) => sum + day.amount, 0);
-  const avgSpending = totalSpending / (chartData.length || 1);
-  const maxSpending = Math.max(...chartData.map(d => d.amount), 0);
-  const peakDay = chartData.find(d => d.amount === maxSpending);
+  const totalExpenses = chartData.reduce((sum, day) => sum + day.amount, 0);
+  const avgExpenses = totalExpenses / (chartData.length || 1);
+  const maxExpenses = Math.max(...chartData.map(d => d.amount), 0);
+  const peakDay = chartData.find(d => d.amount === maxExpenses);
 
   // Custom tooltip to display more information
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -290,19 +290,19 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
         <div className="p-3 bg-popover border border-border rounded-md shadow-md">
           <p className="font-medium text-sm mb-1 text-popover-foreground">{format(new Date(data.fullDate), 'MMM d, yyyy')}</p>
           <p className="text-sm text-popover-foreground mb-1">
-            <span className="font-medium">Spent:</span> {formatCurrency(data.amount)}
+            <span className="font-medium">Expenses:</span> {formatCurrency(data.amount)}
           </p>
           <p className="text-xs text-popover-foreground/80">
             {data.receipts} {data.receipts === 1 ? 'receipt' : 'receipts'}
           </p>
-          {data.amount > avgSpending && (
+          {data.amount > avgExpenses && (
             <p className="text-xs text-destructive mt-1">
-              {((data.amount / avgSpending - 1) * 100).toFixed(0)}% above average
+              {((data.amount / avgExpenses - 1) * 100).toFixed(0)}% above average
             </p>
           )}
-          {data.amount < avgSpending && (
+          {data.amount < avgExpenses && (
             <p className="text-xs text-green-500 mt-1">
-              {((1 - data.amount / avgSpending) * 100).toFixed(0)}% below average
+              {((1 - data.amount / avgExpenses) * 100).toFixed(0)}% below average
             </p>
           )}
         </div>
@@ -318,13 +318,17 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
 
   return (
     <Card className="border border-border/40 shadow-sm">
-      <CardHeader className="flex flex-row justify-between items-start">
-        <div>
-          <CardTitle>Daily Spending Trend</CardTitle>
+      <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
+        <div className="flex-1 min-w-0">
+          <CardTitle className="text-lg sm:text-xl">Daily Expense Trend</CardTitle>
           {chartData.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Average daily spend: {formatCurrency(avgSpending)}
-              {dateRange?.from && dateRange?.to && ` (${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')})`}
+            <p className="text-xs text-muted-foreground mt-1 break-words">
+              Average daily expenses: {formatCurrency(avgExpenses)}
+              {dateRange?.from && dateRange?.to && (
+                <span className="hidden sm:inline">
+                  {` (${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')})`}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -333,23 +337,23 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
           variant="outline"
           size="sm"
           onClick={toggleChartType}
-          className="flex items-center gap-1"
+          className="flex items-center gap-1 flex-shrink-0 self-start sm:self-auto"
         >
           {chartType === 'line' ? (
             <>
               <BarChart2 className="h-4 w-4" />
-              <span className="text-xs">Bar View</span>
+              <span className="text-xs hidden xs:inline">Bar View</span>
             </>
           ) : (
             <>
               <TrendingUp className="h-4 w-4" />
-              <span className="text-xs">Line View</span>
+              <span className="text-xs hidden xs:inline">Line View</span>
             </>
           )}
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="h-[350px]">
+        <div className="h-[300px] sm:h-[350px]">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'line' ? (
@@ -407,9 +411,9 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                     className="dark:opacity-30"
                   />
 
-                  {/* Average spending reference line */}
+                  {/* Average expenses reference line */}
                   <ReferenceLine
-                    y={avgSpending}
+                    y={avgExpenses}
                     stroke="var(--muted-foreground)"
                     strokeDasharray="3 3"
                     className="dark:stroke-gray-400"
@@ -508,7 +512,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <ReferenceLine
-                    y={avgSpending}
+                    y={avgExpenses}
                     stroke="var(--muted-foreground)"
                     strokeDasharray="3 3"
                     className="stroke-muted-foreground stroke-opacity-100 stroke-dasharray-3 dark:stroke-gray-400"
@@ -528,13 +532,13 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
                     {chartData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={entry.amount > avgSpending ? 'var(--destructive)' : 'var(--primary)'}
+                        fill={entry.amount > avgExpenses ? 'var(--destructive)' : 'var(--primary)'}
                         className={cn(
                           'fill-opacity-95',
                           'stroke-gray-200 stroke-width-1',
                           'dark:fill-opacity-100',
                           'dark:brightness-125',
-                          entry.amount > avgSpending ? 'dark:fill-red-300' : 'dark:fill-blue-300',
+                          entry.amount > avgExpenses ? 'dark:fill-red-300' : 'dark:fill-blue-300',
                           'dark:stroke-gray-800 dark:stroke-width-1'
                         )}
                       />
@@ -545,7 +549,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No spending data available</p>
+              <p className="text-muted-foreground">No expense data available</p>
             </div>
           )}
         </div>
@@ -556,7 +560,7 @@ const SpendingChart: React.FC<SpendingChartProps> = ({ dailyData, isLoading, dat
 
 // ExpenseTable Component
 interface ExpenseTableProps {
-  sortedData: EnhancedDailySpendingData[];
+  sortedData: EnhancedDailyExpenseData[];
   onViewReceipts: (date: string, receiptIds: string[]) => void;
   isLoading?: boolean;
 }
@@ -570,7 +574,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
     return (
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Daily Spending Details</CardTitle>
+          <CardTitle>Daily Expense Details</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[200px]">
           <p className="text-muted-foreground">Loading...</p>
@@ -582,24 +586,33 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader>
-        <CardTitle>Daily Spending Details</CardTitle>
+        <CardTitle>Daily Expense Details</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Receipts</TableHead>
-                <TableHead>Top Merchant</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead className="text-right">Total Spent</TableHead>
+                <TableHead className="min-w-[100px]">Date</TableHead>
+                <TableHead className="min-w-[120px]">Receipts</TableHead>
+                <TableHead className="min-w-[120px] hidden sm:table-cell">Top Merchant</TableHead>
+                <TableHead className="min-w-[100px] hidden md:table-cell">Payment Method</TableHead>
+                <TableHead className="text-right min-w-[100px]">Total Expenses</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length > 0 ? sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
                 <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
-                  <TableCell data-label="Date">{formatFullDate(date)}</TableCell>
+                  <TableCell data-label="Date" className="font-medium">
+                    <div className="flex flex-col">
+                      <span className="text-sm">{formatFullDate(date)}</span>
+                      {/* Show merchant and payment method on mobile when hidden columns */}
+                      <div className="sm:hidden text-xs text-muted-foreground mt-1">
+                        <div>{topMerchant}</div>
+                        <div className="md:hidden">{paymentMethod}</div>
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell data-label="Receipts">
                     {receiptIds.length > 0 ? (
                       <Button
@@ -610,20 +623,21 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                         title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
                       >
                         <Receipt className="w-3 h-3" />
-                        <span>{receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}</span>
+                        <span className="hidden xs:inline">{receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}</span>
+                        <span className="xs:hidden">{receiptIds.length}</span>
                       </Button>
                     ) : (
                       <span className="text-xs text-muted-foreground">No Receipts</span>
                     )}
                   </TableCell>
-                  <TableCell data-label="Top Merchant">{topMerchant}</TableCell>
-                  <TableCell data-label="Payment Method">{paymentMethod}</TableCell>
-                  <TableCell data-label="Total Spent" className="text-right">{formatCurrency(total)}</TableCell>
+                  <TableCell data-label="Top Merchant" className="hidden sm:table-cell">{topMerchant}</TableCell>
+                  <TableCell data-label="Payment Method" className="hidden md:table-cell">{paymentMethod}</TableCell>
+                  <TableCell data-label="Total Expenses" className="text-right font-medium">{formatCurrency(total)}</TableCell>
                 </TableRow>
               )) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                    No spending data available for this period
+                    No expense data available for this period
                   </TableCell>
                 </TableRow>
               )}
@@ -659,13 +673,13 @@ const AnalysisPage = () => {
   const startDateISO = date?.from ? date.from.toISOString() : null;
   const endDateISO = date?.to ? startOfDay(addDays(date.to, 1)).toISOString() : null;
 
-  // Fetch daily spending data - using new function and select transformation
-  const { data: enhancedDailySpendingData, isLoading: isLoadingDaily, error: dailyError } = useQuery<
+  // Fetch daily expense data - using new function and select transformation
+  const { data: enhancedDailyExpenseData, isLoading: isLoadingDaily, error: dailyError } = useQuery<
     ReceiptSummary[], // Fetch raw summaries
     Error,
-    EnhancedDailySpendingData[] // Select transforms to this
+    EnhancedDailyExpenseData[] // Select transforms to this
   >({
-    queryKey: ['dailySpendingDetails', startDateISO, endDateISO], // Updated queryKey
+    queryKey: ['dailyExpenseDetails', startDateISO, endDateISO], // Updated queryKey
     queryFn: () => fetchReceiptDetailsForRange(startDateISO, endDateISO), // Use the new fetch function
     select: (receipts) => { // Apply the transformation logic
       const grouped = receipts.reduce((acc, receipt) => {
@@ -677,7 +691,7 @@ const AnalysisPage = () => {
         return acc;
       }, {} as Record<string, ReceiptSummary[]>);
 
-      const dailyData: EnhancedDailySpendingData[] = Object.entries(grouped).map(([date, dayReceipts]) => {
+      const dailyData: EnhancedDailyExpenseData[] = Object.entries(grouped).map(([date, dayReceipts]) => {
         const total = dayReceipts.reduce((sum, r) => sum + (r.total || 0), 0);
         const receiptIds = dayReceipts.map(r => r.id);
 
@@ -700,33 +714,33 @@ const AnalysisPage = () => {
     enabled: !!date, // Only fetch if date range is set
   });
 
-  // Fetch category breakdown data (remains the same)
-  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategorySpendingData[], Error>({
-    queryKey: ['spendingByCategory', startDateISO, endDateISO],
-    queryFn: () => fetchSpendingByCategory(startDateISO, endDateISO),
+  // Fetch category breakdown data (updated to use new function)
+  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategoryExpenseData[], Error>({
+    queryKey: ['expensesByCategory', startDateISO, endDateISO],
+    queryFn: () => fetchExpensesByCategory(startDateISO, endDateISO),
     enabled: !!date,
   });
 
-  const totalCategorySpending = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
+  const totalCategoryExpenses = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
 
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
     // Create data suitable for the chart (date, total) from enhanced data
     // Ensure it's sorted chronologically for the line chart
-    return [...(enhancedDailySpendingData || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [enhancedDailySpendingData]);
+    return [...(enhancedDailyExpenseData || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [enhancedDailyExpenseData]);
 
-  // Calculate total spending from transformed data
-  const totalSpending = React.useMemo(() => {
-    return enhancedDailySpendingData?.reduce((sum, item) => sum + item.total, 0) || 0;
-  }, [enhancedDailySpendingData]);
+  // Calculate total expenses from transformed data
+  const totalExpenses = React.useMemo(() => {
+    return enhancedDailyExpenseData?.reduce((sum, item) => sum + item.total, 0) || 0;
+  }, [enhancedDailyExpenseData]);
 
   // Calculate average per receipt from transformed data
   const averagePerReceipt = React.useMemo(() => {
-    const totalReceipts = enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0;
+    const totalReceipts = enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0;
     if (totalReceipts === 0) return 0;
-    return totalSpending / totalReceipts;
-  }, [enhancedDailySpendingData, totalSpending]);
+    return totalExpenses / totalReceipts;
+  }, [enhancedDailyExpenseData, totalExpenses]);
 
   // Format selected date range for display
   const formattedDateRange = React.useMemo(() => {
@@ -739,12 +753,12 @@ const AnalysisPage = () => {
     return "Select Date Range";
   }, [date]);
 
-  // Sort the daily spending data for the table (default descending by date)
-  const sortedDailySpendingDataForTable = React.useMemo(() => {
+  // Sort the daily expense data for the table (default descending by date)
+  const sortedDailyExpenseDataForTable = React.useMemo(() => {
     // Data is already sorted descending in the select transformation,
     // but we can re-sort here if needed for future sorting features.
-    return [...(enhancedDailySpendingData || [])];
-  }, [enhancedDailySpendingData]);
+    return [...(enhancedDailyExpenseData || [])];
+  }, [enhancedDailyExpenseData]);
 
   // UPDATED: Handler for viewing receipts - now opens the DailyReceiptBrowserModal
   const handleViewReceipts = (date: string, receiptIds: string[]) => {
@@ -759,80 +773,91 @@ const AnalysisPage = () => {
 
   // Handler for when a receipt is deleted from the modal
   const handleReceiptDeleted = (deletedId: string) => {
-    // Invalidate the daily spending queries to refresh the data
-    queryClient.invalidateQueries({ queryKey: ['dailySpendingDetails'] });
-    queryClient.invalidateQueries({ queryKey: ['spendingByCategory'] });
+    // Invalidate the daily expense queries to refresh the data
+    queryClient.invalidateQueries({ queryKey: ['dailyExpenseDetails'] });
+    queryClient.invalidateQueries({ queryKey: ['expensesByCategory'] });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
       {/* Apply container, padding, and spacing consistent with Index.tsx */}
-      <main className="container py-6 md:py-8 space-y-8">
+      <main className="container px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8">
         {/* Dashboard Header */}
-        <div className="mb-6"> {/* Reduced margin to remove gap */}
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
-          <p className="text-muted-foreground">Track and analyze your spending patterns</p>
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Track and analyze your expense patterns</p>
         </div>
 
         {/* Display errors if any */}
         {(dailyError || categoriesError) && (
-          <Alert variant="destructive" className="mb-8"> {/* Adjusted margin bottom */}
+          <Alert variant="destructive" className="mb-6 sm:mb-8">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="text-sm">
               {dailyError?.message || categoriesError?.message || "An unknown error occurred."}
             </AlertDescription>
           </Alert>
         )}
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Spending Overview</TabsTrigger>
-            <TabsTrigger value="details">Daily Spending Details</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 h-auto">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm py-2 sm:py-3">
+              <span className="hidden xs:inline">Expense Overview</span>
+              <span className="xs:hidden">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="details" className="text-xs sm:text-sm py-2 sm:py-3">
+              <span className="hidden xs:inline">Daily Expense Details</span>
+              <span className="xs:hidden">Details</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
-              {/* Category Pie Chart - Now at top-left */}
-              <div className="lg:col-span-1"> {/* Take 1/3 width on large screens */}
-                <CategoryPieChart
-                  categoryData={categoryData || []}
-                  isLoading={isLoadingCategories}
-                />
-              </div>
+            {/* Responsive Grid Layout */}
+            <div className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
+              {/* Mobile: Stack vertically, Tablet+: Grid layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
 
-              {/* Spending Chart - Now at top-right */}
-              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
-                <SpendingChart
-                  dailyData={aggregatedChartData}
-                  isLoading={isLoadingDaily}
-                  dateRange={date}
-                />
-              </div>
+                {/* Expense Chart - Takes full width on mobile, 2 cols on tablet, 2 cols on desktop */}
+                <div className="md:col-span-2 lg:col-span-2">
+                  <ExpenseChart
+                    dailyData={aggregatedChartData}
+                    isLoading={isLoadingDaily}
+                    dateRange={date}
+                  />
+                </div>
 
-              {/* Expense Stats - Now below the top containers */}
-              <div className="lg:col-span-2"> {/* Take 2/3 width on large screens */}
-                <ExpenseStats
-                  totalSpending={totalSpending}
-                  totalReceipts={enhancedDailySpendingData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
-                  averagePerReceipt={averagePerReceipt}
-                  dateRange={date}
-                  onDateRangeClick={setDate}
-                />
-              </div>
+                {/* Category Pie Chart - Full width on mobile, 1 col on tablet+ */}
+                <div className="md:col-span-1 lg:col-span-1">
+                  <CategoryPieChart
+                    categoryData={categoryData || []}
+                    isLoading={isLoadingCategories}
+                  />
+                </div>
 
-              {/* PDF Report Generator - Now to the right of Financial Summary */}
-              <div className="lg:col-span-1">
-                <DailyPDFReportGenerator />
+                {/* Expense Stats - Full width on mobile, 2 cols on tablet, 2 cols on desktop */}
+                <div className="md:col-span-2 lg:col-span-2">
+                  <ExpenseStats
+                    totalExpenses={totalExpenses}
+                    totalReceipts={enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
+                    averagePerReceipt={averagePerReceipt}
+                    dateRange={date}
+                    onDateRangeClick={setDate}
+                  />
+                </div>
+
+                {/* PDF Report Generator - Full width on mobile, 1 col on tablet+ */}
+                <div className="md:col-span-1 lg:col-span-1">
+                  <DailyPDFReportGenerator />
+                </div>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="details">
-            {/* Daily Spending Details Table */}
-            <div className="mt-6">
+            {/* Daily Expense Details Table */}
+            <div className="mt-4 sm:mt-6">
               <ExpenseTable
-                sortedData={sortedDailySpendingDataForTable}
+                sortedData={sortedDailyExpenseDataForTable}
                 onViewReceipts={handleViewReceipts}
                 isLoading={isLoadingDaily}
               />

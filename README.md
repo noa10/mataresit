@@ -238,8 +238,8 @@ graph TD
 #### Generate PDF Report
 -   **Endpoint**: `POST /api/reports/daily-pdf` (Inferred from `generate-pdf-report` function)
 -   **Function**: Generates a PDF report for a specific day's receipts
--   **Parameters**: `date` (YYYY-MM-DD), `mode` ('payer' or 'category'), `includeImages` (boolean)
--   **Returns**: PDF file (binary data)
+-   **Parameters**: `date` (YYYY-MM-DD), `includeImages` (boolean)
+-   **Returns**: PDF file (binary data) with category-based summary
 
 #### Get Receipt
 -   **Endpoint**: `GET /api/receipts/:id`
@@ -346,7 +346,7 @@ The frontend is built using React and utilizes [Shadcn UI](https://ui.shadcn.com
 -   A modal component triggered from `ReceiptViewer` to display the full processing history for a specific receipt, combining processing logs and manual corrections.
 
 #### `DailyPDFReportGenerator`
--   Component on the Dashboard allowing users to select a date and generate a PDF report of receipts for that day, with options for summary mode ('payer' or 'category'). Uses `react-day-picker` to show days with receipts.
+-   Component on the Dashboard allowing users to select a date and generate a PDF report of receipts for that day with category-based summary. Uses `react-day-picker` to show days with receipts.
 
 #### `DailyReceiptBrowserModal`
 -   A modal component triggered from the `BatchUploadReview` or potentially the `DailyPDFReportGenerator` (though currently triggered from BatchReview) to browse receipts from a specific day within a modal interface.
@@ -403,7 +403,7 @@ Used within the `generate-pdf-report` Edge Function to create PDF documents on t
 1.  **Edge Function**: `generate-pdf-report`
     -   Fetches receipt data for a given date from the Supabase DB.
     -   Uses `jsPDF` and `jspdf-autotable` to structure the data into a PDF document.
-    -   Includes summary statistics based on the selected mode ('payer' or 'category').
+    -   Includes summary statistics based on category breakdown.
     -   Optionally includes thumbnail images.
     -   Returns the generated PDF binary data.
 

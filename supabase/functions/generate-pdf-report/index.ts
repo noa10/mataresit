@@ -63,8 +63,8 @@ serve(async (req) => {
       });
     }
 
-    // Extract date, mode, and includeImages from the request body
-    const { date, mode = 'payer', includeImages = true } = requestBody; // Default includeImages to true
+    // Extract date and includeImages from the request body
+    const { date, includeImages = true } = requestBody; // Default includeImages to true
 
     if (!date) {
       console.error('Date parameter is missing');
@@ -74,16 +74,7 @@ serve(async (req) => {
       })
     }
     
-    // Validate mode
-    if (mode !== 'payer' && mode !== 'category') {
-        console.error('Invalid mode parameter:', mode);
-         return new Response(JSON.stringify({ error: 'Invalid mode parameter. Must be "payer" or "category".' }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-    }
-
-    console.log(`Processing request for date: ${date}, mode: ${mode}, includeImages: ${includeImages}`);
+    console.log(`Processing request for date: ${date}, includeImages: ${includeImages}`);
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
@@ -118,11 +109,21 @@ serve(async (req) => {
     const startTime = startOfDay(selectedDay).toISOString()
     const endTime = endOfDay(selectedDay).toISOString()
 
-    // Fetch receipts for the selected day, including thumbnail_url
-    console.log("Fetching receipts including thumbnail_url");
+    // Fetch receipts for the selected day, including thumbnail_url and custom categories
+    console.log("Fetching receipts including thumbnail_url and custom categories");
     const { data: receiptsData, error: receiptsError } = await supabaseClient
       .from('receipts')
-      .select('*, thumbnail_url, line_items!line_items_receipt_id_fkey(*)') // Add thumbnail_url
+      .select(`
+        *,
+        thumbnail_url,
+        line_items!line_items_receipt_id_fkey(*),
+        custom_categories (
+          id,
+          name,
+          color,
+          icon
+        )
+      `)
       .gte('date', startTime)
       .lte('date', endTime)
       .order('date', { ascending: true });
@@ -142,9 +143,9 @@ serve(async (req) => {
     console.log(`Found ${receiptsWithLineItems.length} receipts for ${date}`);
 
     try {
-      // Generate PDF, passing the mode and includeImages flag
-      console.log(`Generating PDF in ${mode} mode...`);
-      const pdfBytes = await generatePDF(receiptsWithLineItems, selectedDay, mode, includeImages);
+      // Generate PDF with category mode and includeImages flag
+      console.log(`Generating PDF in category mode...`);
+      const pdfBytes = await generatePDF(receiptsWithLineItems, selectedDay, includeImages);
       console.log(`PDF generated successfully, size: ${pdfBytes.byteLength} bytes`);
 
       // Send PDF as response with correct headers
@@ -153,7 +154,7 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="expense-report-${format(selectedDay, 'yyyy-MM-dd')}-${mode}-mode.pdf"` // Add mode to filename
+          'Content-Disposition': `attachment; filename="expense-report-${format(selectedDay, 'yyyy-MM-dd')}-category-mode.pdf"`
         }
       });
     } catch (pdfError) {
@@ -172,9 +173,21 @@ serve(async (req) => {
   }
 })
 
+// Helper function to extract category from receipt data
+function getReceiptCategory(receipt) {
+  // Priority: custom category name → predicted category → 'Uncategorized'
+  if (receipt.custom_categories && receipt.custom_categories.name) {
+    return receipt.custom_categories.name;
+  }
+  if (receipt.predicted_category && receipt.predicted_category.trim()) {
+    return receipt.predicted_category;
+  }
+  return 'Uncategorized';
+}
+
 // Function to generate PDF
-async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
-  console.log(`Generating PDF for ${receipts.length} receipts on ${selectedDay} in ${mode} mode, includeImages: ${includeImages}`);
+async function generatePDF(receipts, selectedDay, includeImages = true) {
+  console.log(`Generating PDF for ${receipts.length} receipts on ${selectedDay} in category mode, includeImages: ${includeImages}`);
 
   // Precompute grandTotal
   const grandTotal = receipts.reduce((sum, r) => sum + (r?.total || 0), 0);
@@ -291,6 +304,9 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
     console.log(`  - merchant: ${receipt.merchant}`);
     console.log(`  - thumbnail_url: ${receipt.thumbnail_url}`);
     console.log(`  - has thumbnail: ${!!receipt.thumbnail_url}`);
+    console.log(`  - custom_category_id: ${receipt.custom_category_id}`);
+    console.log(`  - custom_categories: ${JSON.stringify(receipt.custom_categories)}`);
+    console.log(`  - predicted_category: ${receipt.predicted_category}`);
   });
   console.log(`=== END RECEIPT DETAILS ===`);
 
@@ -561,361 +577,169 @@ async function generatePDF(receipts, selectedDay, mode, includeImages = true) {
   let summaryData;
   let statsY = 0; // Will be calculated after the table
 
-  // --- Conditional Logic for Summary Table and Statistics ---
-  if (mode === 'category') {
-      console.log('Generating Category mode summary and statistics');
-      summaryTableHeaders = [['Merchant', 'Category', 'Payment Method', 'Amount (RM)']];
+  // --- Generate Category Mode Summary and Statistics ---
+  console.log('Generating Category mode summary and statistics');
+  summaryTableHeaders = [['Merchant', 'Category', 'Payment Method', 'Amount (RM)']];
 
-      // Calculate category statistics
-      const categoryStats = new Map<string, { total: number, count: number, receipts: any[] }>();
-      let highestExpenseValue = -Infinity;
-      let highestExpenseReceipt: any = null;
-      let lowestExpenseValue = Infinity;
-      let lowestExpenseReceipt: any = null;
-
-
-      summaryData = receipts.map(receipt => {
-          const merchant = receipt.merchant || 'Unknown';
-          const category = receipt.category || 'Uncategorized'; // Use 'Uncategorized' for null/empty
-          const paymentMethod = (receipt.payment_method || '').toString();
-          const total = (typeof receipt.total === 'number' && !isNaN(receipt.total)) ? receipt.total : 0;
-
-          // Aggregate category stats
-          if (!categoryStats.has(category)) {
-              categoryStats.set(category, { total: 0, count: 0, receipts: [] });
-          }
-          const currentStats = categoryStats.get(category)!;
-          currentStats.total += total;
-          currentStats.count++;
-          currentStats.receipts.push(receipt); // Optionally store receipts for highlights
-
-          // Track overall highest/lowest
-          if (total > highestExpenseValue) {
-              highestExpenseValue = total;
-              highestExpenseReceipt = receipt;
-          }
-           // Ensure lowest check only considers positive expenses if desired, or just lowest overall
-          if (total < lowestExpenseValue) {
-              lowestExpenseValue = total;
-              lowestExpenseReceipt = receipt;
-          }
+  // Calculate category statistics
+  const categoryStats = new Map<string, { total: number, count: number, receipts: any[] }>();
+  let highestExpenseValue = -Infinity;
+  let highestExpenseReceipt: any = null;
+  let lowestExpenseValue = Infinity;
+  let lowestExpenseReceipt: any = null;
 
 
-          return [
-              merchant,
-              category, // Add category here
-              paymentMethod,
-              total.toFixed(2)
-          ];
-      });
+  summaryData = receipts.map(receipt => {
+      const merchant = receipt.merchant || 'Unknown';
+      // Extract category with proper fallback logic
+      const category = getReceiptCategory(receipt);
+      const paymentMethod = (receipt.payment_method || '').toString();
+      const total = (typeof receipt.total === 'number' && !isNaN(receipt.total)) ? receipt.total : 0;
 
-      // Generate Summary Table
-      autoTable(pdf, {
-        startY: 75,
-        head: summaryTableHeaders,
-        body: summaryData,
-         styles: {
-          fontSize: 10,
-          cellPadding: 4
-        },
-        headStyles: {
-          fillColor: [41, 98, 255],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 250]
-        },
-        margin: { left: 20, right: 20 }
-      });
+      // Aggregate category stats
+      if (!categoryStats.has(category)) {
+          categoryStats.set(category, { total: 0, count: 0, receipts: [] });
+      }
+      const currentStats = categoryStats.get(category)!;
+      currentStats.total += total;
+      currentStats.count++;
+      currentStats.receipts.push(receipt); // Optionally store receipts for highlights
 
-      statsY = pdf.lastAutoTable.finalY + 15; // Start position for stats after table
+      // Debug logging for category extraction
+      console.log(`Receipt ${receipt.id}: category="${category}", custom_category_id=${receipt.custom_category_id}, predicted_category="${receipt.predicted_category}"`);
 
-      // --- Add Category Statistics Display ---
-      // Check if we need a page break before starting statistics
-      statsY = checkPageBreak(statsY, 50);
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
-      pdf.text('Expense Statistics:', 20, statsY);
-      statsY += 8;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(11);
-
-      // -- Breakdown by Category --
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Breakdown by Category:', 20, statsY);
-      statsY += 7;
-      pdf.setFont('helvetica', 'normal');
-
-      // Sort categories alphabetically for consistent report generation
-      const sortedCategories = Array.from(categoryStats.keys()).sort();
-
-      if (sortedCategories.length === 0 && receipts.length > 0) {
-           // This might happen if all receipts had null/empty category and we defaulted to 'Uncategorized'
-           sortedCategories.push('Uncategorized');
-           // Ensure 'Uncategorized' stats are calculated if necessary
-           if (!categoryStats.has('Uncategorized') && receipts.length > 0) {
-               const uncategorizedTotal = receipts.reduce((sum, r) => sum + ((r.category === null || r.category === '') ? (r.total || 0) : 0), 0);
-               const uncategorizedCount = receipts.filter(r => r.category === null || r.category === '').length;
-               categoryStats.set('Uncategorized', { total: uncategorizedTotal, count: uncategorizedCount, receipts: receipts.filter(r => r.category === null || r.category === '') });
-           }
-      } else if (sortedCategories.length === 0 && receipts.length === 0) {
-           // No receipts, no stats to show
+      // Track overall highest/lowest
+      if (total > highestExpenseValue) {
+          highestExpenseValue = total;
+          highestExpenseReceipt = receipt;
+      }
+       // Ensure lowest check only considers positive expenses if desired, or just lowest overall
+      if (total < lowestExpenseValue) {
+          lowestExpenseValue = total;
+          lowestExpenseReceipt = receipt;
       }
 
 
-      for (const category of sortedCategories) {
-          const stats = categoryStats.get(category)!;
-          const percentage = grandTotal > 0 ? (stats.total / grandTotal) * 100 : 0;
-          const average = stats.count > 0 ? stats.total / stats.count : 0;
+      return [
+          merchant,
+          category, // Add category here
+          paymentMethod,
+          total.toFixed(2)
+      ];
+  });
 
-          // Check for page break before adding category block
-          statsY = checkPageBreak(statsY, 35); // Use helper function with proper spacing
+  // Generate Summary Table
+  autoTable(pdf, {
+    startY: 75,
+    head: summaryTableHeaders,
+    body: summaryData,
+     styles: {
+      fontSize: 10,
+      cellPadding: 4
+    },
+    headStyles: {
+      fillColor: [41, 98, 255],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 250]
+    },
+    margin: { left: 20, right: 20 }
+  });
 
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`${category || 'Uncategorized'}:`, 25, statsY); // Ensure category name is shown
-          statsY += 6;
-          pdf.setFont('helvetica', 'normal');
-          pdf.text(`• Total Spent: RM ${stats.total.toFixed(2)}`, 30, statsY);
-          statsY += 6;
-          pdf.text(`• Percentage of Total: ${percentage.toFixed(1)}%`, 30, statsY);
-          statsY += 6;
-          pdf.text(`• Number of Transactions: ${stats.count}`, 30, statsY);
-          statsY += 6;
-          pdf.text(`• Average Transaction Amount: RM ${average.toFixed(2)}`, 30, statsY);
-          statsY += 8; // Extra space after category
-      }
+  statsY = pdf.lastAutoTable.finalY + 15; // Start position for stats after table
 
-      // -- Spending Highlights (Category Mode) --
-      // Check for page break before spending highlights
-      statsY = checkPageBreak(statsY, 25);
+  // --- Add Category Statistics Display ---
+  // Check if we need a page break before starting statistics
+  statsY = checkPageBreak(statsY, 50);
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Spending Highlights:', 20, statsY);
-      statsY += 7;
-      pdf.setFont('helvetica', 'normal');
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(12);
+  pdf.text('Expense Statistics:', 20, statsY);
+  statsY += 8;
 
-       // Handle edge case where no receipts exist for highlights
-      if (receipts.length === 0) {
-          highestExpenseValue = 0;
-          lowestExpenseValue = 0;
-          highestExpenseReceipt = null;
-          lowestExpenseReceipt = null;
-      } else if (receipts.length === 1) {
-          // Special case for single receipt
-           highestExpenseValue = lowestExpenseValue = receipts[0].total || 0;
-           highestExpenseReceipt = lowestExpenseReceipt = receipts[0];
-      }
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(11);
 
+  // -- Breakdown by Category --
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Breakdown by Category:', 20, statsY);
+  statsY += 7;
+  pdf.setFont('helvetica', 'normal');
 
-      const highestText = highestExpenseReceipt
-          ? `RM ${highestExpenseValue.toFixed(2)} (Category: ${highestExpenseReceipt.category || 'Uncategorized'})`
-          : 'N/A';
-      const lowestText = lowestExpenseReceipt
-          ? `RM ${lowestExpenseValue.toFixed(2)} (Category: ${lowestExpenseReceipt.category || 'Uncategorized'})`
-          : 'N/A';
+  // Sort categories alphabetically for consistent report generation
+  const sortedCategories = Array.from(categoryStats.keys()).sort();
 
-
-      pdf.text(`• Highest Single Expense: ${highestText}`, 25, statsY);
-      statsY += 6;
-      pdf.text(`• Lowest Single Expense: ${lowestText}`, 25, statsY);
-
-
-  } else { // mode === 'payer' (Existing Logic)
-      console.log('Generating Payer mode summary and statistics (existing logic)');
-      summaryTableHeaders = [['Merchant', 'Paid by', 'Payment Method', 'Amount (RM)']];
-
-       // Process receipts for statistics calculation - using paid_by logic
-      const processedReceiptsForStats = receipts.map(receipt => {
-        // Safely handle potentially null/undefined values
-        if (!receipt) {
-          console.warn('Found null or undefined receipt in receipts array');
-          return {
-            merchant: 'Unknown',
-            payment_method: '',
-            paid_by: 'Unknown',
-            total: 0,
-            id: 'unknown'
-          };
-        }
-
-        const paymentMethod = (receipt.payment_method || '').toString().toLowerCase();
-        // Define "Mastercard" as any payment method containing 'master'
-        const isMastercard = paymentMethod.includes('master');
-        const paidBy = isMastercard ? 'Abah' : 'Bakaris';
-
-        // Ensure total is a valid number, default to 0 if not
-        const total = (typeof receipt.total === 'number' && !isNaN(receipt.total)) ? receipt.total : 0;
-
-        return {
-          ...receipt, // Keep original receipt data
-          total: total, // Use the validated/defaulted total
-          paid_by: paidBy
-        };
-      });
-
-       summaryData = processedReceiptsForStats.map(receipt => {
-            const merchant = receipt.merchant || 'Unknown';
-            const paidBy = receipt.paid_by; // Use pre-calculated paid_by
-            const paymentMethod = (receipt.payment_method || '').toString();
-            const totalString = receipt.total.toFixed(2); // Use validated total
-
-            return [
-              merchant,
-              paidBy,
-              paymentMethod,
-              totalString
-            ];
-        });
-
-      // Generate Summary Table
-      autoTable(pdf, {
-        startY: 75,
-        head: summaryTableHeaders,
-        body: summaryData,
-        styles: {
-          fontSize: 10,
-          cellPadding: 4
-        },
-        headStyles: {
-          fillColor: [41, 98, 255],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 250]
-        },
-        margin: { left: 20, right: 20 }
-      });
-
-       statsY = pdf.lastAutoTable.finalY + 15; // Start position for stats after table
-
-      // --- Calculate Abah vs Bakaris Statistics ---
-      let abahTotal = 0;
-      let abahCount = 0;
-      let bakarisTotal = 0;
-      let bakarisCount = 0;
-      let highestExpenseValue = -Infinity;
-      let highestExpensePayer = 'N/A';
-      let lowestExpenseValue = Infinity;
-      let lowestExpensePayer = 'N/A';
-
-      // Use processedReceiptsForStats which includes 'paid_by' and validated 'total'
-      for (const receipt of processedReceiptsForStats) {
-          if (receipt.paid_by === 'Abah') {
-              abahTotal += receipt.total;
-              abahCount++;
-          } else { // Bakaris
-              bakarisTotal += receipt.total;
-              bakarisCount++;
-          }
-
-          if (receipt.total > highestExpenseValue) {
-              highestExpenseValue = receipt.total;
-              highestExpensePayer = receipt.paid_by; // Store who paid
-          }
-          // Ensure lowest check only considers positive expenses
-          if (receipt.total < lowestExpenseValue) {
-              lowestExpenseValue = receipt.total;
-              lowestExpensePayer = receipt.paid_by; // Store who paid
-          }
-      }
-
-      // Calculate averages (handle division by zero)
-      const abahAverage = abahCount > 0 ? abahTotal / abahCount : 0;
-      const bakarisAverage = bakarisCount > 0 ? bakarisTotal / bakarisCount : 0;
-
-      // Calculate percentages (handle division by zero)
-      const abahPercentage = grandTotal > 0 ? (abahTotal / grandTotal) * 100 : 0;
-      const bakarisPercentage = grandTotal > 0 ? (bakarisTotal / grandTotal) * 100 : 0;
-
-      // Handle edge case where no receipts exist for highest/lowest display
-      if (processedReceiptsForStats.length === 0) {
-          highestExpenseValue = 0;
-          lowestExpenseValue = 0;
-          highestExpensePayer = 'N/A';
-          lowestExpensePayer = 'N/A';
-      }
-      // --- End Statistics Calculation (Payer) ---
-
-      // --- Add Payer Statistics Display ---
-      // Check if we need a page break before starting statistics
-      statsY = checkPageBreak(statsY, 80); // More space needed for payer stats
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12); // Slightly larger heading for the section
-      pdf.text('Expense Statistics:', 20, statsY);
-      statsY += 8; // Space after heading
-
-      // Reset font for details
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(11);
-
-      // -- Breakdown by Payer --
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Breakdown by Payer:', 20, statsY);
-      statsY += 7; // Space after sub-heading
-      pdf.setFont('helvetica', 'normal');
-
-      // Abah's Stats
-      // Check for page break before Abah's stats
-      statsY = checkPageBreak(statsY, 35);
-
-      pdf.setFont('helvetica', 'bold'); // Payer name bold
-      pdf.text('Abah (Mastercard Payments):', 25, statsY);
-      statsY += 6;
-      pdf.setFont('helvetica', 'normal'); // Details normal
-      pdf.text(`• Total Spent: RM ${abahTotal.toFixed(2)}`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Percentage of Total: ${abahPercentage.toFixed(1)}%`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Number of Transactions: ${abahCount}`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Average Transaction Amount: RM ${abahAverage.toFixed(2)}`, 30, statsY);
-      statsY += 8; // Extra space before Bakaris
-
-      // Bakaris' Stats
-      // Check for page break before Bakaris' stats
-      statsY = checkPageBreak(statsY, 35);
-
-      pdf.setFont('helvetica', 'bold'); // Payer name bold
-      pdf.text('Bakaris (Other Payments):', 25, statsY);
-      statsY += 6;
-      pdf.setFont('helvetica', 'normal'); // Details normal
-      pdf.text(`• Total Spent: RM ${bakarisTotal.toFixed(2)}`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Percentage of Total: ${bakarisPercentage.toFixed(1)}%`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Number of Transactions: ${bakarisCount}`, 30, statsY);
-      statsY += 6;
-      pdf.text(`• Average Transaction Amount: RM ${bakarisAverage.toFixed(2)}`, 30, statsY);
-      statsY += 8; // Extra space before Highlights
-
-      // -- Spending Highlights (Payer Mode) --
-      // Check for page break before spending highlights
-      statsY = checkPageBreak(statsY, 25);
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Spending Highlights:', 20, statsY);
-      statsY += 7; // Space after sub-heading
-      pdf.setFont('helvetica', 'normal');
-
-      // Format highest/lowest strings safely
-      const highestText = processedReceiptsForStats.length > 0
-          ? `RM ${highestExpenseValue.toFixed(2)} (Paid by ${highestExpensePayer})`
-          : 'N/A';
-      const lowestText = processedReceiptsForStats.length > 0
-          ? `RM ${lowestExpenseValue.toFixed(2)} (Paid by ${lowestExpensePayer})`
-          : 'N/A';
-
-      pdf.text(`• Highest Single Expense: ${highestText}`, 25, statsY);
-      statsY += 6;
-      pdf.text(`• Lowest Single Expense: ${lowestText}`, 25, statsY);
-      // --- End Payer Statistics Display ---
+  if (sortedCategories.length === 0 && receipts.length > 0) {
+       // This might happen if all receipts had null/empty category and we defaulted to 'Uncategorized'
+       sortedCategories.push('Uncategorized');
+       // Ensure 'Uncategorized' stats are calculated if necessary
+       if (!categoryStats.has('Uncategorized') && receipts.length > 0) {
+           const uncategorizedTotal = receipts.reduce((sum, r) => sum + ((r.category === null || r.category === '') ? (r.total || 0) : 0), 0);
+           const uncategorizedCount = receipts.filter(r => r.category === null || r.category === '').length;
+           categoryStats.set('Uncategorized', { total: uncategorizedTotal, count: uncategorizedCount, receipts: receipts.filter(r => r.category === null || r.category === '') });
+       }
+  } else if (sortedCategories.length === 0 && receipts.length === 0) {
+       // No receipts, no stats to show
   }
-  // --- End Conditional Logic ---
+
+
+  for (const category of sortedCategories) {
+      const stats = categoryStats.get(category)!;
+      const percentage = grandTotal > 0 ? (stats.total / grandTotal) * 100 : 0;
+      const average = stats.count > 0 ? stats.total / stats.count : 0;
+
+      // Check for page break before adding category block
+      statsY = checkPageBreak(statsY, 35); // Use helper function with proper spacing
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${category || 'Uncategorized'}:`, 25, statsY); // Ensure category name is shown
+      statsY += 6;
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`• Total Spent: RM ${stats.total.toFixed(2)}`, 30, statsY);
+      statsY += 6;
+      pdf.text(`• Percentage of Total: ${percentage.toFixed(1)}%`, 30, statsY);
+      statsY += 6;
+      pdf.text(`• Number of Transactions: ${stats.count}`, 30, statsY);
+      statsY += 6;
+      pdf.text(`• Average Transaction Amount: RM ${average.toFixed(2)}`, 30, statsY);
+      statsY += 8; // Extra space after category
+  }
+
+  // -- Spending Highlights (Category Mode) --
+  // Check for page break before spending highlights
+  statsY = checkPageBreak(statsY, 25);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Spending Highlights:', 20, statsY);
+  statsY += 7;
+  pdf.setFont('helvetica', 'normal');
+
+   // Handle edge case where no receipts exist for highlights
+  if (receipts.length === 0) {
+      highestExpenseValue = 0;
+      lowestExpenseValue = 0;
+      highestExpenseReceipt = null;
+      lowestExpenseReceipt = null;
+  } else if (receipts.length === 1) {
+      // Special case for single receipt
+       highestExpenseValue = lowestExpenseValue = receipts[0].total || 0;
+       highestExpenseReceipt = lowestExpenseReceipt = receipts[0];
+  }
+
+
+  const highestText = highestExpenseReceipt
+      ? `RM ${highestExpenseValue.toFixed(2)} (Category: ${getReceiptCategory(highestExpenseReceipt)})`
+      : 'N/A';
+  const lowestText = lowestExpenseReceipt
+      ? `RM ${lowestExpenseValue.toFixed(2)} (Category: ${getReceiptCategory(lowestExpenseReceipt)})`
+      : 'N/A';
+
+
+  pdf.text(`• Highest Single Expense: ${highestText}`, 25, statsY);
+  statsY += 6;
+  pdf.text(`• Lowest Single Expense: ${lowestText}`, 25, statsY);
 
   // Add grand total with styled box (This is outside the if/else as it's always shown)
   let finalY = pdf.lastAutoTable.finalY + 10

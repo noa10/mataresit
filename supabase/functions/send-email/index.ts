@@ -1,4 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
+// Initialize Supabase client for database operations
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,45 +45,104 @@ serve(async (req) => {
     console.log('Text length:', text?.length || 0);
     console.log('========================');
 
-    // Example implementation with Resend (uncomment when you have API key):
-    /*
+    // Enhanced implementation with Resend and delivery tracking
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    
-    if (!RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY environment variable is not set');
-    }
+    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'Mataresit <noreply@mataresit.com>';
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'ReceiptScan <noreply@yourdomain.com>',
-        to: [to],
-        subject: subject,
-        html: html,
-        text: text,
-      }),
+    let result;
+    let deliveryId;
+
+    // Extract additional parameters for delivery tracking
+    const { template_name, related_entity_type, related_entity_id, team_id, metadata } = await req.json();
+
+    // Create email delivery record
+    const { data: deliveryData, error: deliveryError } = await supabaseClient.rpc('create_email_delivery', {
+      _recipient_email: to,
+      _subject: subject,
+      _template_name: template_name || null,
+      _related_entity_type: related_entity_type || null,
+      _related_entity_id: related_entity_id || null,
+      _team_id: team_id || null,
+      _metadata: metadata || {}
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to send email: ${error}`);
+    if (deliveryError) {
+      console.error('Error creating email delivery record:', deliveryError);
+    } else {
+      deliveryId = deliveryData;
     }
 
-    const result = await response.json();
-    */
+    if (RESEND_API_KEY) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [to],
+            subject: subject,
+            html: html,
+            text: text,
+          }),
+        });
 
-    // Mock successful response for now
-    const result = {
-      id: `mock_${Date.now()}`,
-      to: [to],
-      subject: subject,
-      status: 'sent',
-      created_at: new Date().toISOString(),
-    };
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Resend API error: ${errorText}`);
+        }
+
+        result = await response.json();
+
+        // Update delivery status to sent
+        if (deliveryId) {
+          await supabaseClient.rpc('update_email_delivery_status', {
+            _delivery_id: deliveryId,
+            _status: 'sent',
+            _provider_message_id: result.id
+          });
+        }
+
+        console.log('Email sent successfully via Resend:', result.id);
+
+      } catch (error) {
+        console.error('Error sending email via Resend:', error);
+
+        // Update delivery status to failed
+        if (deliveryId) {
+          await supabaseClient.rpc('update_email_delivery_status', {
+            _delivery_id: deliveryId,
+            _status: 'failed',
+            _error_message: error.message
+          });
+        }
+
+        throw error;
+      }
+    } else {
+      console.log('RESEND_API_KEY not configured, using mock response');
+      // Mock successful response for development
+      result = {
+        id: `mock_${Date.now()}`,
+        to: [to],
+        subject: subject,
+        status: 'sent',
+        created_at: new Date().toISOString(),
+      };
+
+      // Update delivery status to sent (mock)
+      if (deliveryId) {
+        await supabaseClient.rpc('update_email_delivery_status', {
+          _delivery_id: deliveryId,
+          _status: 'sent',
+          _provider_message_id: result.id
+        });
+      }
+    }
+
+
 
     return new Response(
       JSON.stringify({ 

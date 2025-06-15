@@ -6,23 +6,25 @@ export interface UserApiKeys {
 }
 
 export interface ProcessingSettings {
-  processingMethod: 'ocr-ai' | 'ai-vision';
   selectedModel: string;
-  compareWithAlternative: boolean;
+  batchModel?: string; // Optional separate model for batch processing
   batchUpload: {
     maxConcurrent: number;
     autoStart: boolean;
+    timeoutSeconds: number;
+    maxRetries: number;
   };
   userApiKeys: UserApiKeys;
 }
 
 const defaultSettings: ProcessingSettings = {
-  processingMethod: 'ai-vision',
   selectedModel: 'gemini-2.0-flash-lite',
-  compareWithAlternative: false,
+  batchModel: 'gemini-2.0-flash-lite', // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,
+    timeoutSeconds: 120, // 2 minutes timeout
+    maxRetries: 2,
   },
   userApiKeys: {},
 };

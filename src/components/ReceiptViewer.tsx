@@ -37,6 +37,7 @@ import DocumentStructureViewer from "@/components/receipts/DocumentStructureView
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 import { useSettings } from "@/hooks/useSettings";
+import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -160,6 +161,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     predicted_category: receipt.predicted_category || "",
     custom_category_id: receipt.custom_category_id || null
   });
+  // Add a flag to track if we're in the middle of a save operation
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
@@ -169,17 +172,21 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Sync edited receipt with receipt prop changes (for fresh data after reprocessing)
   useEffect(() => {
     setEditedReceipt(receipt);
-    setInputValues({
-      merchant: receipt.merchant || "",
-      date: receipt.date || "",
-      total: receipt.total || 0,
-      tax: receipt.tax || 0,
-      currency: normalizeCurrencyCode(receipt.currency, "MYR"),
-      payment_method: receipt.payment_method || "",
-      predicted_category: receipt.predicted_category || "",
-      custom_category_id: receipt.custom_category_id || null
-    });
-  }, [receipt.id, receipt.merchant, receipt.date, receipt.total, receipt.tax, receipt.currency, receipt.payment_method, receipt.predicted_category]);
+
+    // Only reset input values if we're not in the middle of a save operation
+    if (!isSaving) {
+      setInputValues({
+        merchant: receipt.merchant || "",
+        date: receipt.date || "",
+        total: receipt.total || 0,
+        tax: receipt.tax || 0,
+        currency: normalizeCurrencyCode(receipt.currency, "MYR"),
+        payment_method: receipt.payment_method || "",
+        predicted_category: receipt.predicted_category || "",
+        custom_category_id: receipt.custom_category_id || null
+      });
+    }
+  }, [receipt.id, receipt.merchant, receipt.date, receipt.total, receipt.tax, receipt.currency, receipt.payment_method, receipt.predicted_category, isSaving]);
 
   // State for tracking manual total override
   const [isManualTotal, setIsManualTotal] = useState(false);
@@ -236,17 +243,23 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   useEffect(() => {
     setEditedReceipt(receipt);
-    // Initialize input values when receipt changes
-    setInputValues({
-      merchant: receipt.merchant || "",
-      date: receipt.date || "",
-      total: receipt.total || 0,
-      tax: receipt.tax || 0,
-      currency: receipt.currency || "MYR",
-      payment_method: receipt.payment_method || "",
-      predicted_category: receipt.predicted_category || "",
-      custom_category_id: receipt.custom_category_id || null
-    });
+
+    // Only reset input values if we're not in the middle of a save operation
+    // This prevents the date field from becoming non-functional after saving
+    if (!isSaving) {
+      // Initialize input values when receipt changes
+      setInputValues({
+        merchant: receipt.merchant || "",
+        date: receipt.date || "",
+        total: receipt.total || 0,
+        tax: receipt.tax || 0,
+        currency: receipt.currency || "MYR",
+        payment_method: receipt.payment_method || "",
+        predicted_category: receipt.predicted_category || "",
+        custom_category_id: receipt.custom_category_id || null
+      });
+    }
+
     // Initialize/Update editedConfidence when receipt changes
     // Handle different formats of confidence_scores
     if (receipt.confidence_scores) {
@@ -263,7 +276,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       setEditedConfidence(defaultConfidence);
     }
     setProcessingStatus(receipt.processing_status || null);
-  }, [receipt]);
+  }, [receipt, isSaving]);
 
   // Effect to update editedReceipt when debounced input values change
   useEffect(() => {
@@ -492,6 +505,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       }
     },
     onSuccess: async () => {
+      // Reset saving flag
+      setIsSaving(false);
+
       // Dismiss the loading toast
       toast.dismiss();
 
@@ -557,6 +573,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       }
     },
     onError: (error: any) => {
+      // Reset saving flag
+      setIsSaving(false);
+
       // Dismiss the loading toast
       toast.dismiss();
 
@@ -703,6 +722,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       toast.error("Please enter a total amount");
       return;
     }
+
+    // Set saving flag to prevent input values reset during save operation
+    setIsSaving(true);
 
     // Show a loading toast
     toast.loading("Saving receipt details...");
@@ -1779,27 +1801,37 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             </div>
         </div>
 
-        <div className="pt-4 mt-auto flex justify-between flex-shrink-0">
-          <Button
+        <div className="pt-4 mt-auto space-y-3 flex-shrink-0">
+          {/* Create Claim Button */}
+          <ClaimFromReceiptButton
+            receipt={receipt}
             variant="outline"
-            className="gap-2"
-            onClick={() => setIsHistoryModalOpen(true)}
-          >
-            <History size={16} />
-            View History
-          </Button>
-          <Button
-            variant="default"
-            onClick={handleSaveChanges}
-            disabled={updateMutation.isPending}
-          >
-            {updateMutation.isPending ? (
-              <>
-                <Loader2 size={16} className="mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : "Save Changes"}
-          </Button>
+            size="default"
+            className="w-full"
+          />
+
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setIsHistoryModalOpen(true)}
+            >
+              <History size={16} />
+              View History
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleSaveChanges}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save Changes"}
+            </Button>
+          </div>
         </div>
 
         {/* Move Similar Receipts to the bottom */}

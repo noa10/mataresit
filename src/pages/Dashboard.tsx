@@ -10,7 +10,7 @@ import {
   Upload, Search, Filter, SlidersHorizontal,
   PlusCircle, XCircle, Calendar as CalendarIcon, DollarSign, X,
   LayoutGrid, LayoutList, Table as TableIcon,
-  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap
+  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
@@ -274,6 +274,20 @@ export default function Dashboard() {
         return a.total - b.total;
       }
     });
+
+  // Clean up selected receipt IDs when filters change
+  // Remove any selected receipts that are no longer visible in the filtered results
+  useEffect(() => {
+    if (selectedReceiptIds.length > 0) {
+      const visibleReceiptIds = new Set(processedReceipts.map(receipt => receipt.id));
+      const validSelectedIds = selectedReceiptIds.filter(id => visibleReceiptIds.has(id));
+
+      // Only update if there's a difference to avoid unnecessary re-renders
+      if (validSelectedIds.length !== selectedReceiptIds.length) {
+        setSelectedReceiptIds(validSelectedIds);
+      }
+    }
+  }, [processedReceipts, selectedReceiptIds]);
 
   const currencies = [...new Set(receipts.map(r => r.currency))];
 
@@ -658,7 +672,7 @@ export default function Dashboard() {
                 {selectionMode && (
                   <TableHead className="w-[50px]">
                     <Checkbox
-                      checked={selectedReceiptIds.length === processedReceipts.length && processedReceipts.length > 0}
+                      checked={processedReceipts.length > 0 && processedReceipts.every(receipt => selectedReceiptIds.includes(receipt.id))}
                       onCheckedChange={handleSelectAll}
                       className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                     />

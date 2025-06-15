@@ -24,26 +24,24 @@ const PROVIDER_INFO = {
 };
 
 interface ReceiptProcessingOptionsProps {
-  onMethodChange: (method: 'ocr-ai' | 'ai-vision') => void;
   onModelChange: (modelId: string) => void;
-  onCompareChange: (compare: boolean) => void;
-  defaultMethod?: 'ocr-ai' | 'ai-vision';
+  onBatchModelChange?: (modelId: string) => void;
   defaultModel?: string;
-  defaultCompare?: boolean;
+  defaultBatchModel?: string;
+  showBatchModelSelection?: boolean;
 }
 
 export function ReceiptProcessingOptions({
-  onMethodChange,
   onModelChange,
-  onCompareChange,
-  defaultMethod = 'ai-vision',
+  onBatchModelChange,
   defaultModel = 'gemini-2.0-flash-lite',
-  defaultCompare = false
+  defaultBatchModel,
+  showBatchModelSelection = false
 }: ReceiptProcessingOptionsProps) {
-  // Always use AI Vision - no longer allow method selection
-  const method = 'ai-vision';
   const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
-  const [compare, setCompare] = useState<boolean>(defaultCompare);
+  const [selectedBatchModel, setSelectedBatchModel] = useState<string>(
+    defaultBatchModel || defaultModel
+  );
 
   // Always use vision models since we're exclusively using AI Vision
   const availableModels = getModelsByCapability('vision');
@@ -75,12 +73,21 @@ export function ReceiptProcessingOptions({
     return <Badge variant="outline" className="text-xs bg-red-100 text-red-700">$$$</Badge>;
   };
 
-  // Always notify parent that we're using AI Vision
+  // Update parent when model changes
   useEffect(() => {
-    onMethodChange('ai-vision');
     onModelChange(selectedModel);
-    onCompareChange(compare);
-  }, [selectedModel, compare, onMethodChange, onModelChange, onCompareChange]);
+  }, [selectedModel, onModelChange]);
+
+  // Update parent when batch model changes
+  useEffect(() => {
+    if (onBatchModelChange) {
+      onBatchModelChange(selectedBatchModel);
+    }
+  }, [selectedBatchModel, onBatchModelChange]);
+
+  const handleBatchModelChange = (modelId: string) => {
+    setSelectedBatchModel(modelId);
+  };
 
   return (
     <div className="space-y-4 p-4 border rounded-md bg-background/50">
@@ -203,39 +210,103 @@ export function ReceiptProcessingOptions({
         </SelectContent>
       </Select>
 
-      <div className="flex items-center space-x-2 pt-2">
-        <Switch
-          id="compare-methods"
-          checked={compare}
-          onCheckedChange={(checked) => {
-            setCompare(checked);
-            onCompareChange(checked);
-          }}
-        />
-        <div className="grid gap-1.5 leading-none">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="compare-methods">Compare with alternative method</Label>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs">
-                    When enabled, we'll also process your receipt using OCR + AI as an alternative method
-                    and highlight any discrepancies between AI Vision and OCR + AI results.
-                    <br /><br />
-                    Note: This will increase processing time but can improve accuracy.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+      {/* Batch Model Selection (if enabled) */}
+      {showBatchModelSelection && (
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="batch-ai-model">Batch Processing Model</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">
+                        Choose a different AI model specifically for batch processing.
+                        Faster models can improve batch processing speed.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Optionally use a different model for batch uploads
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Also process with OCR + AI method to compare results and improve accuracy
-          </p>
+
+          <Select
+            value={selectedBatchModel}
+            onValueChange={handleBatchModelChange}
+          >
+            <SelectTrigger id="batch-ai-model">
+              <SelectValue placeholder="Select batch processing model">
+                {selectedBatchModel && AVAILABLE_MODELS[selectedBatchModel] && (
+                  <div className="flex items-center gap-2">
+                    <span>{AVAILABLE_MODELS[selectedBatchModel].name}</span>
+                    <div className="flex items-center gap-1">
+                      {getPricingBadge(AVAILABLE_MODELS[selectedBatchModel].pricing)}
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${getPerformanceBadgeColor(
+                          AVAILABLE_MODELS[selectedBatchModel].performance.speed,
+                          AVAILABLE_MODELS[selectedBatchModel].performance.accuracy
+                        )}`}
+                      >
+                        {AVAILABLE_MODELS[selectedBatchModel].performance.speed === 'fast' ? '⚡' :
+                         AVAILABLE_MODELS[selectedBatchModel].performance.accuracy === 'excellent' ? '🎯' : '⏱️'}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="max-h-96">
+              {Object.entries(modelsByProvider).map(([provider, models]) => (
+                <div key={provider}>
+                  {/* Provider Header */}
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <span>{PROVIDER_INFO[provider as ModelProvider]?.icon}</span>
+                      <span>{PROVIDER_INFO[provider as ModelProvider]?.name}</span>
+                      <Badge variant="outline" className={`text-xs ${PROVIDER_INFO[provider as ModelProvider]?.color}`}>
+                        {models.length}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Models for this provider */}
+                  {models.map(model => (
+                    <SelectItem key={model.id} value={model.id} className="py-2">
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{model.name}</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {getPricingBadge(model.pricing)}
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getPerformanceBadgeColor(model.performance.speed, model.performance.accuracy)}`}
+                              >
+                                {model.performance.speed === 'fast' ? '⚡' : model.performance.accuracy === 'excellent' ? '🎯' : '⏱️'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {model.description.length > 50 ? `${model.description.substring(0, 50)}...` : model.description}
+                          </p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
+      )}
     </div>
   );
 }

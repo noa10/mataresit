@@ -12,7 +12,15 @@ import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
+// Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";
 import Index from "./pages/Index";
+
+// Cross-browser testing disabled - uncomment to enable debug mode
+// if (process.env.NODE_ENV === 'development') {
+//   import("@/utils/cross-browser-test");
+//   import("@/utils/validate-cross-browser");
+//   import("@/utils/verify-fix");
+// }
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -42,7 +50,9 @@ const StatusPage = lazy(() => import("./pages/StatusPage"));
 const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const TeamManagement = lazy(() => import("./pages/TeamManagement"));
+const ClaimsManagement = lazy(() => import("./pages/ClaimsManagement"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
+const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptIntegrationTest"));
 
 
 // Create a loading component for suspense
@@ -73,6 +83,7 @@ const App = () => (
               <TooltipProvider>
             <Toaster />
             <Sonner />
+            {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
             <BrowserRouter>
           <Routes>
             {/* Public Routes with Layout */}
@@ -163,6 +174,16 @@ const App = () => (
                 <Route path="/teams" element={
                   <Suspense fallback={<PageLoading />}>
                     <TeamManagement />
+                  </Suspense>
+                } />
+                <Route path="/claims" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ClaimsManagement />
+                  </Suspense>
+                } />
+                <Route path="/test/claims-receipt-integration" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ClaimsReceiptIntegrationTest />
                   </Suspense>
                 } />
               </Route>

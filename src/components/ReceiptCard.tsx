@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ReceiptStatus, ProcessingStatus, CustomCategory } from "@/types/receipt";
+import { ReceiptStatus, ProcessingStatus, CustomCategory, Receipt } from "@/types/receipt";
 import { getFormattedImageUrlSync } from "@/utils/imageUtils";
 import { formatCurrencySafe } from "@/utils/currency";
+import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 
 interface ReceiptCardProps {
   id: string;
@@ -207,7 +208,7 @@ export default function ReceiptCard({
           </div>
         )}
         
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
           {disableInternalLink ? (
             <Button className="w-full gap-2">
               <Eye size={16} />
@@ -221,6 +222,25 @@ export default function ReceiptCard({
               </Button>
             </Link>
           )}
+
+          {/* Create Claim Button */}
+          <ClaimFromReceiptButton
+            receipt={{
+              id,
+              merchant,
+              date,
+              total,
+              currency,
+              image_url: imageUrl,
+              status,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              payment_method: '',
+            } as Receipt}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          />
         </div>
       </div>
     </motion.div>

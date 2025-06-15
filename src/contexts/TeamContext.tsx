@@ -397,8 +397,8 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = (permission: string): boolean => {
     if (!state.currentTeamRole) return false;
-    
-    // Simple permission check - can be expanded based on requirements
+
+    // Permission check based on team roles and claim requirements
     switch (permission) {
       case 'manage_team':
         return ['owner', 'admin'].includes(state.currentTeamRole);
@@ -408,6 +408,23 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         return ['owner', 'admin', 'member'].includes(state.currentTeamRole);
       case 'view_receipts':
         return ['owner', 'admin', 'member', 'viewer'].includes(state.currentTeamRole);
+
+      // Claim permissions
+      case 'create_claims':
+        return ['owner', 'admin', 'member'].includes(state.currentTeamRole);
+      case 'view_claims':
+        return ['owner', 'admin', 'member', 'viewer'].includes(state.currentTeamRole);
+      case 'edit_claims':
+        return ['owner', 'admin', 'member'].includes(state.currentTeamRole);
+      case 'submit_claims':
+        return ['owner', 'admin', 'member'].includes(state.currentTeamRole);
+      case 'approve_claims':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
+      case 'review_claims':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
+      case 'delete_claims':
+        return ['owner'].includes(state.currentTeamRole);
+
       default:
         return false;
     }

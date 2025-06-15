@@ -2,15 +2,15 @@ import { supabase } from '@/integrations/supabase/client';
 // No need for Receipt type here if we select specific columns
 // import { Receipt } from '@/types/receipt';
 
-// Update DailySpendingData to include receipt IDs
-export interface DailySpendingData {
+// Update DailyExpenseData to include receipt IDs
+export interface DailyExpenseData {
   date: string;
   total: number;
   receiptIds: string[]; // Add receipt IDs
 }
 
-// Fetch daily spending data with optional date filtering, aggregating IDs
-export const fetchDailySpending = async (startDateISO?: string | null, endDateISO?: string | null): Promise<DailySpendingData[]> => {
+// Fetch daily expense data with optional date filtering, aggregating IDs
+export const fetchDailyExpenses = async (startDateISO?: string | null, endDateISO?: string | null): Promise<DailyExpenseData[]> => {
   let query = supabase
     .from('receipts')
     // Select id, date, and total
@@ -33,7 +33,7 @@ export const fetchDailySpending = async (startDateISO?: string | null, endDateIS
   const { data: receiptsData, error } = await query;
 
   if (error) {
-    console.error('Error fetching receipts for daily spending:', error);
+    console.error('Error fetching receipts for daily expenses:', error);
     throw new Error('Could not fetch receipts data');
   }
 
@@ -51,7 +51,7 @@ export const fetchDailySpending = async (startDateISO?: string | null, endDateIS
   });
 
   // Convert aggregated object to the desired array format
-  const results: DailySpendingData[] = Object.entries(aggregated).map(([date, data]) => ({
+  const results: DailyExpenseData[] = Object.entries(aggregated).map(([date, data]) => ({
     date,
     total: data.total,
     receiptIds: data.receiptIds,
@@ -63,19 +63,25 @@ export const fetchDailySpending = async (startDateISO?: string | null, endDateIS
   return results;
 };
 
-// Define the shape for category spending data
-export interface CategorySpendingData {
-  category: string | null; // Use correct column name 'predicted_category'
+// Define the shape for category expense data
+export interface CategoryExpenseData {
+  category: string | null; // Category name (from custom categories or predicted)
   total_spent: number;
 }
 
-// Fetch spending grouped by category with optional date filtering
-export const fetchSpendingByCategory = async (startDateISO?: string | null, endDateISO?: string | null): Promise<CategorySpendingData[]> => {
-    // Use an RPC function for robust aggregation, or handle null categories in the query
-    // Basic approach:
+// Fetch expenses grouped by category with optional date filtering
+// This function now prioritizes custom categories over predicted categories
+export const fetchExpensesByCategory = async (startDateISO?: string | null, endDateISO?: string | null): Promise<CategoryExpenseData[]> => {
+    // Query receipts with custom category information
     let query = supabase
       .from('receipts')
-      .select('predicted_category, total') // Use predicted_category
+      .select(`
+        predicted_category,
+        total,
+        custom_categories (
+          name
+        )
+      `)
 
     if (startDateISO) {
       query = query.gte('date', startDateISO); // Use ISO string here too
@@ -88,14 +94,15 @@ export const fetchSpendingByCategory = async (startDateISO?: string | null, endD
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching category spending:', error);
-      throw new Error('Could not fetch category spending data');
+      console.error('Error fetching category expenses:', error);
+      throw new Error('Could not fetch category expense data');
     }
 
     // Aggregate in the client-side (less efficient than DB aggregation)
     const aggregated: { [category: string]: number } = {};
     (data || []).forEach(item => {
-      const categoryKey = item.predicted_category || 'Uncategorized'; // Handle null categories
+      // Priority: custom category name → predicted category → 'Uncategorized'
+      const categoryKey = (item.custom_categories?.name) || item.predicted_category || 'Uncategorized';
       if (!aggregated[categoryKey]) {
         aggregated[categoryKey] = 0;
       }
@@ -110,13 +117,13 @@ export const fetchSpendingByCategory = async (startDateISO?: string | null, endD
     // --- Alternative: Using Supabase aggregation (Potentially more efficient but requires testing) ---
     /*
     let rpcParams = { start_date_param: startDateISO };
-    // You would need to create a function like 'get_category_spending' in Supabase
-    const { data, error } = await supabase.rpc('get_category_spending', rpcParams);
+    // You would need to create a function like 'get_category_expenses' in Supabase
+    const { data, error } = await supabase.rpc('get_category_expenses', rpcParams);
     if (error) {
-        console.error('Error fetching category spending via RPC:', error);
-        throw new Error('Could not fetch category spending data');
+        console.error('Error fetching category expenses via RPC:', error);
+        throw new Error('Could not fetch category expense data');
     }
-    return (data || []) as CategorySpendingData[];
+    return (data || []) as CategoryExpenseData[];
     */
 };
 
@@ -161,4 +168,4 @@ export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, 
 };
 
 // Potential future improvement: Aggregate directly in Supabase using an RPC function
-// const { data, error } = await supabase.rpc('get_daily_spending_summary'); 
+// const { data, error } = await supabase.rpc('get_daily_expense_summary');

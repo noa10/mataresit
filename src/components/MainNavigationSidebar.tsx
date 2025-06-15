@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { TeamSelector } from "@/components/team/TeamSelector";
 import {
   BrainCircuit, BarChart3, Sparkles, Settings,
-  DollarSign, ChevronLeft, Menu, X, Users
+  DollarSign, ChevronLeft, Menu, X, Users, Crown, FileText
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,13 @@ export function MainNavigationSidebar({
             {isDesktop ? <ChevronLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
           </Button>
         </div>
+
+        {/* Team Selector */}
+        {(isOpen || !isDesktop) && (
+          <div className="p-4 border-b">
+            <TeamSelector showCreateButton={true} />
+          </div>
+        )}
 
         {/* Navigation Items */}
         <nav className="p-4">
@@ -153,6 +161,20 @@ export function MainNavigationSidebar({
             </li>
             <li>
               <NavLink
+                to="/claims"
+                className={({ isActive }) =>
+                  cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
+                  isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
+                  !isOpen && isDesktop && "justify-center")}
+                onClick={handleItemClick}
+                title={!isOpen && isDesktop ? "Claims" : undefined}
+              >
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                {(isOpen || !isDesktop) && <span>Claims</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
                 to="/pricing"
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
@@ -190,7 +212,7 @@ export function MainNavigationSidebar({
                   onClick={handleItemClick}
                   title={!isOpen && isDesktop ? "Admin Panel" : undefined}
                 >
-                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  <Crown className="h-4 w-4 flex-shrink-0" />
                   {(isOpen || !isDesktop) && <span>Admin Panel</span>}
                 </NavLink>
               </li>
