@@ -99,17 +99,33 @@ export class TeamService {
   }
 
   async inviteTeamMember(request: InviteTeamMemberRequest): Promise<string> {
-    const { data, error } = await supabase.rpc('invite_team_member', {
+    const { data: invitationId, error } = await supabase.rpc('invite_team_member', {
       _team_id: request.team_id,
       _email: request.email,
       _role: request.role,
     });
 
     if (error) {
+      console.error('Error creating team invitation:', error);
       throw new Error(error.message);
     }
 
-    return data;
+    // Manually trigger the email sending since the database trigger might not work reliably
+    try {
+      const { error: emailError } = await supabase.functions.invoke('send-team-invitation-email', {
+        body: { invitation_id: invitationId }
+      });
+
+      if (emailError) {
+        console.error('Error sending invitation email:', emailError);
+        // Don't throw here - the invitation was created successfully, email is secondary
+      }
+    } catch (emailError) {
+      console.error('Failed to trigger invitation email:', emailError);
+      // Don't throw here - the invitation was created successfully
+    }
+
+    return invitationId;
   }
 
   async acceptInvitation(token: string): Promise<boolean> {
@@ -153,34 +169,51 @@ export class TeamService {
 
   async getTeamInvitations(teamId: string): Promise<TeamInvitation[]> {
     try {
+      // Use a simpler query approach that doesn't rely on complex foreign key references
       const { data, error } = await supabase
         .from('team_invitations')
         .select(`
           *,
-          teams!inner(name),
-          invited_by_user:auth.users!team_invitations_invited_by_fkey(
-            email,
-            profiles(first_name, last_name)
-          )
+          teams!team_invitations_team_id_fkey(name)
         `)
         .eq('team_id', teamId)
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If it's a foreign key constraint error or similar, try a simpler query
-        if (error.code === 'PGRST301' || error.message.includes('foreign key')) {
-          return await this.getTeamInvitationsSimple(teamId);
-        }
-        throw new Error(error.message);
+        console.warn('Team invitations query failed, falling back to simple query:', error.message);
+        return await this.getTeamInvitationsSimple(teamId);
       }
 
-      return data?.map(invitation => ({
-        ...invitation,
-        team_name: invitation.teams?.name,
-        invited_by_name: invitation.invited_by_user?.profiles?.first_name
-          ? `${invitation.invited_by_user.profiles.first_name} ${invitation.invited_by_user.profiles.last_name || ''}`.trim()
-          : invitation.invited_by_user?.email,
-      })) || [];
+      // Get inviter details separately to avoid complex join issues
+      const invitationsWithInviterInfo = await Promise.all(
+        (data || []).map(async (invitation) => {
+          try {
+            // Get inviter profile information
+            const { data: inviterData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email')
+              .eq('id', invitation.invited_by)
+              .single();
+
+            return {
+              ...invitation,
+              team_name: invitation.teams?.name,
+              invited_by_name: inviterData?.first_name
+                ? `${inviterData.first_name} ${inviterData.last_name || ''}`.trim()
+                : inviterData?.email || 'Unknown',
+            };
+          } catch (profileError) {
+            // If profile lookup fails, just return basic invitation data
+            return {
+              ...invitation,
+              team_name: invitation.teams?.name,
+              invited_by_name: 'Unknown',
+            };
+          }
+        })
+      );
+
+      return invitationsWithInviterInfo;
     } catch (error: any) {
       // Fallback to simple query if complex query fails
       console.warn('Complex invitation query failed, falling back to simple query:', error.message);
@@ -223,11 +256,7 @@ export class TeamService {
       .from('team_invitations')
       .select(`
         *,
-        teams!inner(name),
-        invited_by_user:auth.users!team_invitations_invited_by_fkey(
-          email,
-          profiles(first_name, last_name)
-        )
+        teams!team_invitations_team_id_fkey(name)
       `)
       .eq('token', token)
       .eq('status', 'pending')
@@ -241,13 +270,29 @@ export class TeamService {
       throw new Error(error.message);
     }
 
-    return {
-      ...data,
-      team_name: data.teams?.name,
-      invited_by_name: data.invited_by_user?.profiles?.first_name
-        ? `${data.invited_by_user.profiles.first_name} ${data.invited_by_user.profiles.last_name || ''}`.trim()
-        : data.invited_by_user?.email,
-    };
+    // Get inviter details separately
+    try {
+      const { data: inviterData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, email')
+        .eq('id', data.invited_by)
+        .single();
+
+      return {
+        ...data,
+        team_name: data.teams?.name,
+        invited_by_name: inviterData?.first_name
+          ? `${inviterData.first_name} ${inviterData.last_name || ''}`.trim()
+          : inviterData?.email || 'Unknown',
+      };
+    } catch (profileError) {
+      // If profile lookup fails, return basic invitation data
+      return {
+        ...data,
+        team_name: data.teams?.name,
+        invited_by_name: 'Unknown',
+      };
+    }
   }
 
   // =============================================

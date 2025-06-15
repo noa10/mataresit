@@ -18,7 +18,19 @@ serve(async (req) => {
   }
 
   try {
-    const { to, subject, html, text } = await req.json();
+    // Parse request body once and extract all needed fields
+    const requestBody = await req.json();
+    const {
+      to,
+      subject,
+      html,
+      text,
+      template_name,
+      related_entity_type,
+      related_entity_id,
+      team_id,
+      metadata
+    } = requestBody;
 
     if (!to || !subject || (!html && !text)) {
       return new Response(
@@ -30,30 +42,25 @@ serve(async (req) => {
       );
     }
 
-    // For now, we'll just log the email details
-    // In production, you would integrate with an email service like:
-    // - Resend (recommended for Supabase)
-    // - SendGrid
-    // - AWS SES
-    // - Mailgun
-    // - Postmark
-
-    console.log('=== EMAIL WOULD BE SENT ===');
-    console.log('To:', to);
-    console.log('Subject:', subject);
-    console.log('HTML length:', html?.length || 0);
-    console.log('Text length:', text?.length || 0);
-    console.log('========================');
+    console.log('Processing email request:', {
+      to,
+      subject,
+      template_name,
+      html_length: html?.length || 0,
+      text_length: text?.length || 0
+    });
 
     // Enhanced implementation with Resend and delivery tracking
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'Mataresit <noreply@mataresit.com>';
 
+    console.log('Environment check:', {
+      hasResendKey: !!RESEND_API_KEY,
+      fromEmail: FROM_EMAIL
+    });
+
     let result;
     let deliveryId;
-
-    // Extract additional parameters for delivery tracking
-    const { template_name, related_entity_type, related_entity_id, team_id, metadata } = await req.json();
 
     // Create email delivery record
     const { data: deliveryData, error: deliveryError } = await supabaseClient.rpc('create_email_delivery', {
@@ -74,6 +81,8 @@ serve(async (req) => {
 
     if (RESEND_API_KEY) {
       try {
+        console.log('Sending email via Resend API...');
+
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -91,10 +100,20 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Resend API error: ${errorText}`);
+          console.error('Resend API error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Resend API error (${response.status}): ${errorText}`);
         }
 
         result = await response.json();
+        console.log('Email sent successfully via Resend:', {
+          id: result.id,
+          to: result.to,
+          subject: result.subject
+        });
 
         // Update delivery status to sent
         if (deliveryId) {
@@ -104,8 +123,6 @@ serve(async (req) => {
             _provider_message_id: result.id
           });
         }
-
-        console.log('Email sent successfully via Resend:', result.id);
 
       } catch (error) {
         console.error('Error sending email via Resend:', error);
@@ -119,7 +136,18 @@ serve(async (req) => {
           });
         }
 
-        throw error;
+        // Return error response instead of throwing
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to send email via Resend',
+            details: error.message,
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
     } else {
       console.log('RESEND_API_KEY not configured, using mock response');
@@ -144,11 +172,17 @@ serve(async (req) => {
 
 
 
+    // Determine success message based on whether real email was sent
+    const successMessage = RESEND_API_KEY
+      ? 'Email sent successfully via Resend'
+      : 'Email sent successfully (mocked)';
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Email sent successfully (mocked)',
-        data: result 
+      JSON.stringify({
+        success: true,
+        message: successMessage,
+        data: result,
+        delivery_id: deliveryId
       }),
       {
         status: 200,
