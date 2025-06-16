@@ -126,7 +126,7 @@ export function ClaimApprovalDialog({
 
         <div className="space-y-6">
           {/* Claim Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{claim.title}</h3>
               <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
@@ -192,12 +192,12 @@ export function ClaimApprovalDialog({
           </Form>
 
           {/* Warning */}
-          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-lg">
             <div className="flex items-start gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-green-800">Approval Confirmation</p>
-                <p className="text-green-700 mt-1">
+                <p className="font-medium text-green-800 dark:text-green-200">Approval Confirmation</p>
+                <p className="text-green-700 dark:text-green-300 mt-1">
                   By approving this claim, you confirm that the expense is valid and should be processed for payment.
                   The claimant will be notified of the approval.
                 </p>

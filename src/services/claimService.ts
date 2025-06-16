@@ -56,14 +56,10 @@ export class ClaimService {
   }
 
   async getClaim(claimId: string): Promise<Claim | null> {
+    // First get the basic claim data
     const { data, error } = await supabase
       .from('claims')
-      .select(`
-        *,
-        claimant:claimant_id(email, profiles(first_name, last_name)),
-        reviewer:reviewed_by(email, profiles(first_name, last_name)),
-        approver:approved_by(email, profiles(first_name, last_name))
-      `)
+      .select('*')
       .eq('id', claimId)
       .single();
 
@@ -74,19 +70,46 @@ export class ClaimService {
       throw new Error(error.message);
     }
 
+    if (!data) {
+      return null;
+    }
+
+    // Get user information for claimant, reviewer, and approver
+    const userIds = [data.claimant_id, data.reviewed_by, data.approved_by].filter(Boolean);
+    let userMap = new Map();
+
+    if (userIds.length > 0) {
+      try {
+        const { data: userData, error: userError } = await supabase.rpc('get_users_by_ids', {
+          user_ids: userIds
+        });
+
+        if (!userError && userData) {
+          userMap = new Map(userData.map((user: any) => [user.id, user]));
+        }
+      } catch (userError) {
+        console.warn('Failed to fetch user data for claim:', userError);
+        // Continue without user names
+      }
+    }
+
     // Transform the data to match our Claim interface
+    const claimant = userMap.get(data.claimant_id);
+    const reviewer = userMap.get(data.reviewed_by);
+    const approver = userMap.get(data.approved_by);
+
     const claim: Claim = {
       ...data,
-      claimant_name: data.claimant?.profiles?.first_name 
-        ? `${data.claimant.profiles.first_name} ${data.claimant.profiles.last_name || ''}`.trim()
-        : data.claimant?.email,
-      claimant_email: data.claimant?.email,
-      reviewer_name: data.reviewer?.profiles?.first_name 
-        ? `${data.reviewer.profiles.first_name} ${data.reviewer.profiles.last_name || ''}`.trim()
-        : data.reviewer?.email,
-      approver_name: data.approver?.profiles?.first_name 
-        ? `${data.approver.profiles.first_name} ${data.approver.profiles.last_name || ''}`.trim()
-        : data.approver?.email,
+      claimant_name: claimant?.first_name
+        ? `${claimant.first_name} ${claimant.last_name || ''}`.trim()
+        : claimant?.email || 'Unknown User',
+      claimant_email: claimant?.email,
+      reviewer_name: reviewer?.first_name
+        ? `${reviewer.first_name} ${reviewer.last_name || ''}`.trim()
+        : reviewer?.email,
+      approver_name: approver?.first_name
+        ? `${approver.first_name} ${approver.last_name || ''}`.trim()
+        : approver?.email,
     };
 
     return claim;

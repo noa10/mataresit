@@ -169,8 +169,8 @@ export function ClaimDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             {claim.title}
@@ -180,7 +180,8 @@ export function ClaimDetailsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
           {/* Status and Priority */}
           <div className="flex items-center gap-4">
             <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
@@ -336,7 +337,7 @@ export function ClaimDetailsDialog({
                       } catch (e) {
                         // Handle legacy string attachments
                         return (
-                          <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                          <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
                             <FileText className="h-4 w-4" />
                             <span className="text-sm">{attachment}</span>
                           </div>
@@ -393,9 +394,10 @@ export function ClaimDetailsDialog({
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
 
-        <DialogFooter className="flex items-center gap-2">
+        <DialogFooter className="px-6 py-4 border-t border-border shrink-0 flex items-center gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Eye, Check, X, Clock, DollarSign } from 'lucide-react';
+import { Plus, Eye, Check, X, Clock, DollarSign, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -46,6 +47,7 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
   const [priorityFilter, setPriorityFilter] = useState<ClaimPriority | 'all'>('all');
   const { currentTeam, hasPermission } = useTeam();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Load claims
   const loadClaims = async () => {
@@ -80,6 +82,11 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
   // Handle reject claim - delegate to parent
   const handleRejectClaim = (claim: Claim) => {
     onRejectClaim?.(claim);
+  };
+
+  // Navigate to claim details page
+  const handleViewClaimDetails = (claim: Claim) => {
+    navigate(`/claims/${claim.id}`);
   };
 
   // Format currency
@@ -246,10 +253,20 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
                           variant="ghost"
                           size="sm"
                           onClick={() => onViewClaim?.(claim)}
+                          title="View in modal"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewClaimDetails(claim)}
+                          title="View details page"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+
                         {canApproveClaims && ['submitted', 'under_review'].includes(claim.status) && (
                           <>
                             <Button
@@ -257,6 +274,7 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
                               size="sm"
                               onClick={() => handleApproveClaim(claim)}
                               className="text-green-600 hover:text-green-700"
+                              title="Approve claim"
                             >
                               <Check className="h-4 w-4" />
                             </Button>
@@ -266,6 +284,7 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
                               size="sm"
                               onClick={() => handleRejectClaim(claim)}
                               className="text-red-600 hover:text-red-700"
+                              title="Reject claim"
                             >
                               <X className="h-4 w-4" />
                             </Button>

@@ -264,7 +264,7 @@ export function ReceiptClaimDashboard({
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-orange-600" />
                     <span className="text-sm font-medium">
@@ -277,7 +277,7 @@ export function ReceiptClaimDashboard({
                 </div>
                 
                 {stats.available > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-blue-600" />
                       <span className="text-sm font-medium">

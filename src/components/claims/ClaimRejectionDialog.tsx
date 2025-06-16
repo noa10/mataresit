@@ -126,7 +126,7 @@ export function ClaimRejectionDialog({
 
         <div className="space-y-6">
           {/* Claim Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{claim.title}</h3>
               <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
@@ -192,12 +192,12 @@ export function ClaimRejectionDialog({
           </Form>
 
           {/* Warning */}
-          <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-lg">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-red-800">Rejection Notice</p>
-                <p className="text-red-700 mt-1">
+                <p className="font-medium text-red-800 dark:text-red-200">Rejection Notice</p>
+                <p className="text-red-700 dark:text-red-300 mt-1">
                   Rejecting this claim will notify the claimant via email and in-app notification. 
                   They may resubmit the claim after addressing the issues mentioned in your rejection reason.
                 </p>

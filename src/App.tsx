@@ -51,6 +51,8 @@ const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const TeamManagement = lazy(() => import("./pages/TeamManagement"));
 const ClaimsManagement = lazy(() => import("./pages/ClaimsManagement"));
+const ClaimDetailsPage = lazy(() => import("./pages/ClaimDetailsPage"));
+const TestClaimDetails = lazy(() => import("./pages/TestClaimDetails"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptIntegrationTest"));
 const TestInvitation = lazy(() => import("./pages/TestInvitation"));
@@ -182,6 +184,16 @@ const App = () => (
                 <Route path="/claims" element={
                   <Suspense fallback={<PageLoading />}>
                     <ClaimsManagement />
+                  </Suspense>
+                } />
+                <Route path="/claims/:claimId" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ClaimDetailsPage />
+                  </Suspense>
+                } />
+                <Route path="/test/claim-details" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestClaimDetails />
                   </Suspense>
                 } />
                 <Route path="/test/claims-receipt-integration" element={
