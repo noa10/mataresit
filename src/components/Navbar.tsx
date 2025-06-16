@@ -7,8 +7,10 @@ import { useTeam } from "@/contexts/TeamContext";
 import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
+import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -59,6 +61,8 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
   };
 
   const initial = user?.email?.charAt(0).toUpperCase() ?? "";
+  const avatarUrl = user ? getAvatarUrl(user) : null;
+  const userInitials = user ? getUserInitials(user) : "";
 
   const getTierBadge = () => {
     if (!subscriptionData?.tier || subscriptionData.tier === 'free') return null;
@@ -215,17 +219,23 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2 p-2 rounded-full hover:bg-secondary/50">
-                    <span className="rounded-full bg-primary text-primary-foreground w-8 h-8 flex items-center justify-center font-bold text-sm">
-                      {initial}
-                    </span>
+                    <Avatar className="h-8 w-8">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
+                      <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="flex items-center gap-2">
-                    <span className="rounded-full bg-primary text-primary-foreground w-6 h-6 flex items-center justify-center font-bold text-xs">
-                      {initial}
-                    </span>
+                    <Avatar className="h-6 w-6">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
+                      <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xs">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
                     {user.email}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -382,9 +392,12 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
               {user ? (
                 <div className="space-y-2 pt-2 border-t border-border">
                   <div className="flex items-center gap-3 px-4 py-2">
-                    <span className="rounded-full bg-primary text-primary-foreground w-8 h-8 flex items-center justify-center font-bold text-sm">
-                      {initial}
-                    </span>
+                    <Avatar className="h-8 w-8">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
+                      <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
                     <span className="text-sm font-medium">{user.email}</span>
                   </div>
                   <Link

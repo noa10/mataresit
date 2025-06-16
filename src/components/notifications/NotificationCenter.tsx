@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Check, Archive, Trash2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Load notifications
   const loadNotifications = async () => {
@@ -159,11 +161,12 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
     if (!notification.read_at) {
       await markAsRead(notification.id);
     }
-    
+
     if (notification.action_url) {
-      window.location.href = notification.action_url;
+      // Use React Router navigation instead of window.location for better UX
+      navigate(notification.action_url);
     }
-    
+
     setOpen(false);
   };
 

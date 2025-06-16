@@ -3,7 +3,7 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { TeamSelector } from "@/components/team/TeamSelector";
 import {
-  BrainCircuit, BarChart3, Sparkles, Settings,
+  BrainCircuit, BarChart3, Settings,
   DollarSign, ChevronLeft, Menu, X, Users, Crown, FileText
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -131,20 +131,7 @@ export function MainNavigationSidebar({
                 {(isOpen || !isDesktop) && <span>Analysis</span>}
               </NavLink>
             </li>
-            <li>
-              <NavLink
-                to="/features"
-                className={({ isActive }) =>
-                  cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
-                  isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
-                onClick={handleItemClick}
-                title={!isOpen && isDesktop ? "Features" : undefined}
-              >
-                <Sparkles className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>Features</span>}
-              </NavLink>
-            </li>
+
             <li>
               <NavLink
                 to="/teams"
@@ -187,6 +174,7 @@ export function MainNavigationSidebar({
                 {(isOpen || !isDesktop) && <span>Pricing</span>}
               </NavLink>
             </li>
+
             <li>
               <NavLink
                 to="/settings"
