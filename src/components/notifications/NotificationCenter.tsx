@@ -208,7 +208,12 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs"
+              className={cn(
+                "absolute -top-1 -right-1 rounded-full p-0 flex items-center justify-center font-bold leading-none",
+                unreadCount > 99
+                  ? "h-5 min-w-6 px-1 text-[10px]"
+                  : "h-5 w-5 text-[11px]"
+              )}
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -286,12 +291,15 @@ function NotificationItem({
     <div
       className={cn(
         "group relative p-3 hover:bg-muted/50 cursor-pointer border-l-2 transition-colors",
-        isUnread ? "bg-blue-50 border-l-blue-500" : "border-l-transparent"
+        isUnread ? "bg-blue-900/10 border-l-blue-400" : "border-l-transparent"
       )}
       onClick={onClick}
     >
       <div className="flex items-start gap-3">
-        <div className={cn("text-lg", typeColor)}>
+        <div className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-full text-sm",
+          typeColor
+        )}>
           {icon}
         </div>
         

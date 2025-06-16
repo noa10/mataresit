@@ -114,22 +114,22 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
 };
 
 export const NOTIFICATION_TYPE_COLORS: Record<NotificationType, string> = {
-  team_invitation_sent: 'text-blue-600 bg-blue-100',
-  team_invitation_accepted: 'text-green-600 bg-green-100',
-  team_member_joined: 'text-green-600 bg-green-100',
-  team_member_left: 'text-gray-600 bg-gray-100',
-  team_member_role_changed: 'text-blue-600 bg-blue-100',
-  claim_submitted: 'text-blue-600 bg-blue-100',
-  claim_approved: 'text-green-600 bg-green-100',
-  claim_rejected: 'text-red-600 bg-red-100',
-  claim_review_requested: 'text-yellow-600 bg-yellow-100',
-  team_settings_updated: 'text-gray-600 bg-gray-100',
+  team_invitation_sent: 'text-blue-400 bg-blue-900/20',
+  team_invitation_accepted: 'text-green-400 bg-green-900/20',
+  team_member_joined: 'text-green-400 bg-green-900/20',
+  team_member_left: 'text-gray-400 bg-gray-800/20',
+  team_member_role_changed: 'text-blue-400 bg-blue-900/20',
+  claim_submitted: 'text-blue-400 bg-blue-900/20',
+  claim_approved: 'text-green-400 bg-green-900/20',
+  claim_rejected: 'text-red-400 bg-red-900/20',
+  claim_review_requested: 'text-yellow-400 bg-yellow-900/20',
+  team_settings_updated: 'text-gray-400 bg-gray-800/20',
 };
 
 export const NOTIFICATION_PRIORITY_COLORS: Record<NotificationPriority, string> = {
-  low: 'text-gray-600',
-  medium: 'text-blue-600',
-  high: 'text-red-600',
+  low: 'text-gray-400',
+  medium: 'text-blue-400',
+  high: 'text-red-400',
 };
 
 export function getNotificationTypeDisplayName(type: NotificationType): string {
