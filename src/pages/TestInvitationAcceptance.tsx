@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeam } from '@/contexts/TeamContext';
 import { teamService } from '@/services/teamService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function TestInvitationAcceptance() {
   const { user } = useAuth();
+  const { currentTeam, userTeams, refreshCurrentTeam, loadUserTeams } = useTeam();
   const [token, setToken] = useState('e1c86fe6bd5bbda976df3c4db342ca51eadc93dac06032bf1942a021d0da18fe');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -23,10 +25,22 @@ export default function TestInvitationAcceptance() {
     try {
       console.log('Testing invitation acceptance for token:', token);
       console.log('Current user:', user?.email);
-      
+      console.log('Current team before acceptance:', currentTeam);
+      console.log('User teams before acceptance:', userTeams);
+
       const success = await teamService.acceptInvitation(token.trim());
-      setResult(`Successfully accepted invitation! Result: ${success}`);
       console.log('Invitation accepted successfully:', success);
+
+      // Test the refresh flow
+      console.log('Refreshing current team...');
+      await refreshCurrentTeam();
+      console.log('Current team after refresh:', currentTeam);
+
+      console.log('Loading user teams...');
+      await loadUserTeams();
+      console.log('User teams after reload:', userTeams);
+
+      setResult(`Successfully accepted invitation! Result: ${success}\nTeam refresh completed.`);
     } catch (err: any) {
       console.error('Invitation acceptance failed:', err);
       setError(err.message || 'Failed to accept invitation');
@@ -75,9 +89,15 @@ export default function TestInvitationAcceptance() {
           <CardTitle>Test Invitation Acceptance</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
               Current user: {user.email}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Current team: {currentTeam ? `${currentTeam.name} (${currentTeam.id})` : 'None'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              User teams: {userTeams.length} teams
             </p>
           </div>
 
@@ -91,19 +111,36 @@ export default function TestInvitationAcceptance() {
             />
           </div>
 
-          <div className="flex gap-2">
-            <Button 
+          <div className="flex gap-2 flex-wrap">
+            <Button
               onClick={handleTestGetInvitation}
               disabled={loading || !token.trim()}
               variant="outline"
             >
               {loading ? 'Loading...' : 'Get Invitation Details'}
             </Button>
-            <Button 
+            <Button
               onClick={handleTestAcceptance}
               disabled={loading || !token.trim()}
             >
               {loading ? 'Loading...' : 'Accept Invitation'}
+            </Button>
+            <Button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  await loadUserTeams();
+                  setResult('User teams reloaded successfully');
+                } catch (err: any) {
+                  setError(err.message);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              variant="outline"
+            >
+              Reload Teams
             </Button>
           </div>
 

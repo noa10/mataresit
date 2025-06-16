@@ -252,7 +252,8 @@ export class TeamService {
   }
 
   async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
-    const { data, error } = await supabase
+    // First try to get pending invitation
+    let { data, error } = await supabase
       .from('team_invitations')
       .select(`
         *,
@@ -263,10 +264,31 @@ export class TeamService {
       .gt('expires_at', new Date().toISOString())
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Invitation not found
+    // If no pending invitation found, check if it exists with any status
+    if (error && error.code === 'PGRST116') {
+      const { data: anyStatusData, error: anyStatusError } = await supabase
+        .from('team_invitations')
+        .select(`
+          *,
+          teams!team_invitations_team_id_fkey(name)
+        `)
+        .eq('token', token)
+        .single();
+
+      if (anyStatusData) {
+        // Invitation exists but is not pending - throw specific error
+        if (anyStatusData.status === 'accepted') {
+          throw new Error('This invitation has already been accepted');
+        } else if (anyStatusData.status === 'declined') {
+          throw new Error('This invitation has been declined');
+        } else if (anyStatusData.expires_at <= new Date().toISOString()) {
+          throw new Error('This invitation has expired');
+        }
       }
+      return null; // Invitation not found
+    }
+
+    if (error) {
       throw new Error(error.message);
     }
 

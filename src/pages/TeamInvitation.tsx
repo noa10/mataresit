@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 export default function TeamInvitationPage() {
   const { token } = useParams<{ token: string }>();
   const { user } = useAuth();
-  const { refreshCurrentTeam } = useTeam();
+  const { refreshCurrentTeam, loadUserTeams } = useTeam();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -63,7 +63,12 @@ export default function TeamInvitationPage() {
 
       setInvitation(invitationData);
     } catch (error: any) {
-      setError(error.message || 'Failed to load invitation');
+      // Handle specific error cases
+      if (error.message?.includes('already been accepted')) {
+        setError('already_accepted');
+      } else {
+        setError(error.message || 'Failed to load invitation');
+      }
     } finally {
       setLoading(false);
     }
@@ -85,16 +90,37 @@ export default function TeamInvitationPage() {
     try {
       setAccepting(true);
 
+      // Check if user is already a team member before accepting
+      const currentRole = await teamService.checkTeamMembership(invitation.team_id);
+
       await teamService.acceptInvitation(token);
 
-      toast({
-        title: 'Success',
-        description: `You've joined ${invitation.team_name}!`,
-      });
+      // Provide appropriate success message based on membership status
+      if (currentRole) {
+        toast({
+          title: 'Invitation Accepted',
+          description: `You were already a ${currentRole} of ${invitation.team_name}. The invitation has been marked as accepted.`,
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: 'Welcome to the Team!',
+          description: `You've successfully joined ${invitation.team_name} as a ${invitation.role}.`,
+          duration: 5000,
+        });
+      }
 
-      // Refresh team data and navigate to team management
-      await refreshCurrentTeam();
-      navigate('/teams');
+      // Refresh team data to ensure current state
+      await Promise.all([
+        refreshCurrentTeam(),
+        loadUserTeams()
+      ]);
+
+      // Small delay to ensure context is updated
+      setTimeout(() => {
+        navigate('/teams');
+      }, 1000);
+
     } catch (error: any) {
       console.error('Error accepting invitation:', error);
       toast({
@@ -153,18 +179,31 @@ export default function TeamInvitationPage() {
 
   if (error || !invitation) {
     const isEmailMismatch = error?.includes('signed in as');
+    const isAlreadyAccepted = error === 'already_accepted';
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-lg">
           <CardContent className="flex items-center justify-center py-8">
             <div className="text-center space-y-4">
-              <XCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+              {isAlreadyAccepted ? (
+                <CheckCircle className="h-12 w-12 mx-auto text-green-600 mb-4" />
+              ) : (
+                <XCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+              )}
               <h3 className="text-lg font-semibold">
-                {isEmailMismatch ? 'Email Mismatch' : 'Invalid Invitation'}
+                {isAlreadyAccepted
+                  ? 'Invitation Already Accepted'
+                  : isEmailMismatch
+                    ? 'Email Mismatch'
+                    : 'Invalid Invitation'
+                }
               </h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                {error || 'This invitation is invalid or has expired.'}
+                {isAlreadyAccepted
+                  ? 'This invitation has already been accepted. You should now have access to the team.'
+                  : error || 'This invitation is invalid or has expired.'
+                }
               </p>
 
               {isEmailMismatch && (
@@ -179,13 +218,26 @@ export default function TeamInvitationPage() {
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => navigate('/dashboard')}>
-                  Go to Dashboard
-                </Button>
-                {isEmailMismatch && (
-                  <Button onClick={() => navigate('/auth')}>
-                    Sign In with Different Email
-                  </Button>
+                {isAlreadyAccepted ? (
+                  <>
+                    <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                      Go to Dashboard
+                    </Button>
+                    <Button onClick={() => navigate('/teams')}>
+                      View Teams
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                      Go to Dashboard
+                    </Button>
+                    {isEmailMismatch && (
+                      <Button onClick={() => navigate('/auth')}>
+                        Sign In with Different Email
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
