@@ -55,6 +55,7 @@ const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptIntegrationTest"));
 const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
+const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
 
 
 // Create a loading component for suspense
@@ -196,6 +197,11 @@ const App = () => (
                 <Route path="/test/invitation-acceptance" element={
                   <Suspense fallback={<PageLoading />}>
                     <TestInvitationAcceptance />
+                  </Suspense>
+                } />
+                <Route path="/test/production-invitation-debug" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ProductionInvitationDebug />
                   </Suspense>
                 } />
               </Route>

@@ -252,68 +252,46 @@ export class TeamService {
   }
 
   async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
-    // First try to get pending invitation
-    let { data, error } = await supabase
-      .from('team_invitations')
-      .select(`
-        *,
-        teams!team_invitations_team_id_fkey(name)
-      `)
-      .eq('token', token)
-      .eq('status', 'pending')
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    // If no pending invitation found, check if it exists with any status
-    if (error && error.code === 'PGRST116') {
-      const { data: anyStatusData, error: anyStatusError } = await supabase
-        .from('team_invitations')
-        .select(`
-          *,
-          teams!team_invitations_team_id_fkey(name)
-        `)
-        .eq('token', token)
-        .single();
-
-      if (anyStatusData) {
-        // Invitation exists but is not pending - throw specific error
-        if (anyStatusData.status === 'accepted') {
-          throw new Error('This invitation has already been accepted');
-        } else if (anyStatusData.status === 'declined') {
-          throw new Error('This invitation has been declined');
-        } else if (anyStatusData.expires_at <= new Date().toISOString()) {
-          throw new Error('This invitation has expired');
-        }
-      }
-      return null; // Invitation not found
-    }
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    // Get inviter details separately
     try {
-      const { data: inviterData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', data.invited_by)
-        .single();
+      // Use RPC function to bypass TypeScript type issues
+      const { data: pendingData, error: pendingError } = await (supabase as any).rpc('get_invitation_by_token', {
+        _token: token,
+        _pending_only: true
+      });
 
-      return {
-        ...data,
-        team_name: data.teams?.name,
-        invited_by_name: inviterData?.first_name
-          ? `${inviterData.first_name} ${inviterData.last_name || ''}`.trim()
-          : inviterData?.email || 'Unknown',
-      };
-    } catch (profileError) {
-      // If profile lookup fails, return basic invitation data
-      return {
-        ...data,
-        team_name: data.teams?.name,
-        invited_by_name: 'Unknown',
-      };
+      if (!pendingError && pendingData) {
+        return pendingData as TeamInvitation;
+      }
+
+      // If no pending invitation found, check if it exists with any status
+      if (pendingError?.code === 'PGRST116' || !pendingData) {
+        const { data: anyStatusData, error: anyStatusError } = await (supabase as any).rpc('get_invitation_by_token', {
+          _token: token,
+          _pending_only: false
+        });
+
+        if (anyStatusData) {
+          const invitation = anyStatusData as any;
+          // Invitation exists but is not pending - throw specific error
+          if (invitation.status === 'accepted') {
+            throw new Error('This invitation has already been accepted');
+          } else if (invitation.status === 'declined') {
+            throw new Error('This invitation has been declined');
+          } else if (invitation.expires_at <= new Date().toISOString()) {
+            throw new Error('This invitation has expired');
+          }
+        }
+        return null; // Invitation not found
+      }
+
+      if (pendingError) {
+        throw new Error(pendingError.message);
+      }
+
+      return pendingData as TeamInvitation;
+    } catch (error: any) {
+      console.error('Error getting invitation by token:', error);
+      throw new Error(`Failed to get invitation: ${error.message}`);
     }
   }
 
