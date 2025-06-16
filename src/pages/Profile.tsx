@@ -1,22 +1,24 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  User, Moon, Sun, LogOut, ChevronRight,
-  Mail, Edit, Camera, Key
+  User, Moon, Sun, LogOut, Settings, CreditCard, Users, Shield
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { ChangePasswordDialog } from "@/components/modals/ChangePasswordDialog";
+import { useToast } from "@/hooks/use-toast";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { ProfileInfoEditor } from "@/components/profile/ProfileInfoEditor";
+import { SubscriptionInfo } from "@/components/profile/SubscriptionInfo";
+import { TeamMemberships } from "@/components/profile/TeamMemberships";
+import { AccountSettings } from "@/components/profile/AccountSettings";
+import { getProfile, ProfileData } from "@/services/profileService";
 
 export default function Profile() {
   const { user, signOut } = useAuth();
@@ -25,8 +27,32 @@ export default function Profile() {
   const [isDarkMode, setIsDarkMode] = useState(
     document.documentElement.classList.contains('dark')
   );
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-  
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch profile data on component mount
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!user?.id) return;
+
+      try {
+        const profileData = await getProfile(user.id);
+        setProfile(profileData);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        toast({
+          title: "Error loading profile",
+          description: "Failed to load profile information. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [user?.id, toast]);
+
   // Handle dark mode toggle
   const toggleDarkMode = () => {
     if (isDarkMode) {
@@ -37,27 +63,14 @@ export default function Profile() {
       localStorage.setItem('theme', 'dark');
     }
     setIsDarkMode(!isDarkMode);
-    
+
     toast({
       title: `${!isDarkMode ? 'Dark' : 'Light'} mode activated`,
       description: `The application theme has been changed to ${!isDarkMode ? 'dark' : 'light'} mode.`,
       duration: 2000,
     });
   };
-  
-  // Get user initials for avatar
-  const getUserInitials = () => {
-    if (!user) return "U";
-    return user.email?.charAt(0).toUpperCase() || "U";
-  };
-  
-  // Format email to show only first part
-  const formatEmail = (email: string | null | undefined) => {
-    if (!email) return "";
-    const [username, domain] = email.split('@');
-    return `${username}@${domain}`;
-  };
-  
+
   // Handle sign out
   const handleSignOut = async () => {
     await signOut();
@@ -68,6 +81,49 @@ export default function Profile() {
       duration: 3000,
     });
   };
+
+  // Handle profile updates
+  const handleProfileUpdate = (updatedProfile: ProfileData) => {
+    setProfile(updatedProfile);
+  };
+
+  // Handle avatar updates
+  const handleAvatarUpdate = (avatarUrl: string | null) => {
+    if (profile) {
+      setProfile({
+        ...profile,
+        avatar_url: avatarUrl,
+        avatar_updated_at: new Date().toISOString()
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+        <main className="container px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!profile || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+        <main className="container px-4 py-8">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Unable to load profile information.</p>
+            <Button onClick={() => window.location.reload()} className="mt-4">
+              Refresh Page
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
@@ -82,10 +138,10 @@ export default function Profile() {
           <div>
             <h1 className="text-3xl font-bold">Profile</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your account settings
+              Manage your account settings and preferences
             </p>
           </div>
-          
+
           <Button
             variant="destructive"
             onClick={handleSignOut}
@@ -95,10 +151,10 @@ export default function Profile() {
             Sign Out
           </Button>
         </motion.div>
-        
+
         {/* Profile Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* User Card */}
+          {/* Avatar and Quick Info */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -107,62 +163,92 @@ export default function Profile() {
           >
             <Card>
               <CardHeader className="flex flex-col items-center text-center pb-2">
-                <div className="relative mb-4 group">
-                  <Avatar className="h-24 w-24">
-                    <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                      {getUserInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <Camera className="text-white" size={20} />
-                  </div>
-                </div>
-                <CardTitle className="text-xl">{user?.email ? user.email.split('@')[0] : 'User'}</CardTitle>
-                <div className="flex items-center text-muted-foreground mt-1 text-sm">
-                  <Mail size={14} className="mr-1" />
-                  {formatEmail(user?.email)}
+                <AvatarUpload
+                  profile={profile}
+                  onAvatarUpdate={handleAvatarUpdate}
+                  size="xl"
+                />
+                <div className="mt-4">
+                  <CardTitle className="text-xl">
+                    {profile.first_name && profile.last_name
+                      ? `${profile.first_name} ${profile.last_name}`
+                      : profile.email?.split('@')[0] || 'User'
+                    }
+                  </CardTitle>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    {profile.email}
+                  </p>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mt-2">
-                  <Separator className="my-4" />
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <User size={16} className="mr-2 text-muted-foreground" />
-                        <span className="text-sm">Account</span>
-                      </div>
-                      <ChevronRight size={16} className="text-muted-foreground" />
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Edit size={16} className="mr-2 text-muted-foreground" />
-                        <span className="text-sm">Edit Profile</span>
-                      </div>
-                      <ChevronRight size={16} className="text-muted-foreground" />
-                    </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plan</span>
+                    <span className="font-medium capitalize">
+                      {profile.subscription_tier || 'Free'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Member since</span>
+                    <span className="font-medium">
+                      {new Date(profile.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
-          
-          {/* Settings Tabs */}
+
+          {/* Main Content Tabs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <Tabs defaultValue="preferences">
-              <TabsList className="mb-4 w-full bg-background/50">
-                <TabsTrigger value="preferences" className="flex-1">Preferences</TabsTrigger>
-                <TabsTrigger value="security" className="flex-1">Security</TabsTrigger>
-                <TabsTrigger value="notifications" className="flex-1">Notifications</TabsTrigger>
+            <Tabs defaultValue="profile" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="profile" className="gap-1">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Profile</span>
+                </TabsTrigger>
+                <TabsTrigger value="subscription" className="gap-1">
+                  <CreditCard className="h-4 w-4" />
+                  <span className="hidden sm:inline">Billing</span>
+                </TabsTrigger>
+                <TabsTrigger value="teams" className="gap-1">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">Teams</span>
+                </TabsTrigger>
+                <TabsTrigger value="preferences" className="gap-1">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </TabsTrigger>
+                <TabsTrigger value="security" className="gap-1">
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">Security</span>
+                </TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="preferences">
+
+              <TabsContent value="profile" className="space-y-6">
+                <ProfileInfoEditor
+                  profile={profile}
+                  onProfileUpdate={handleProfileUpdate}
+                />
+              </TabsContent>
+
+              <TabsContent value="subscription" className="space-y-6">
+                <SubscriptionInfo userId={profile.id} />
+              </TabsContent>
+
+              <TabsContent value="teams" className="space-y-6">
+                <TeamMemberships userId={profile.id} />
+              </TabsContent>
+
+              <TabsContent value="preferences" className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Appearance Settings</CardTitle>
@@ -182,8 +268,8 @@ export default function Profile() {
                           Switch between light and dark theme
                         </p>
                       </div>
-                      <Switch 
-                        id="dark-mode" 
+                      <Switch
+                        id="dark-mode"
                         checked={isDarkMode}
                         onCheckedChange={toggleDarkMode}
                       />
@@ -193,68 +279,14 @@ export default function Profile() {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
-              <TabsContent value="security">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Security Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">Manage your security settings here.</p>
-                    <div className="mt-6 space-y-4">
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start gap-2"
-                        onClick={() => setIsChangePasswordOpen(true)}
-                      >
-                        <Key size={16} />
-                        Change Password
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start">
-                        Two-Factor Authentication
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="notifications">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Notification Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">Manage how you receive notifications.</p>
-                    <div className="mt-6 space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="email-notifs">Email Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Receive updates via email</p>
-                        </div>
-                        <Switch id="email-notifs" defaultChecked />
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="receipt-notifs">Receipt Processing</Label>
-                          <p className="text-sm text-muted-foreground">Get notified when receipts are processed</p>
-                        </div>
-                        <Switch id="receipt-notifs" defaultChecked />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+
+              <TabsContent value="security" className="space-y-6">
+                <AccountSettings userId={profile.id} />
               </TabsContent>
             </Tabs>
           </motion.div>
         </div>
       </main>
-
-      {/* Change Password Dialog */}
-      <ChangePasswordDialog
-        isOpen={isChangePasswordOpen}
-        onClose={() => setIsChangePasswordOpen(false)}
-      />
     </div>
   );
 }

@@ -71,7 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           subscription_status,
           stripe_customer_id,
           stripe_subscription_id,
-          receipts_used_this_month
+          receipts_used_this_month,
+          avatar_url,
+          google_avatar_url,
+          first_name,
+          last_name
         `)
         .eq('id', currentUser.id)
         .single();
@@ -84,6 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         stripe_customer_id: profile?.stripe_customer_id,
         stripe_subscription_id: profile?.stripe_subscription_id,
         receipts_used_this_month: profile?.receipts_used_this_month || 0,
+        avatar_url: profile?.avatar_url,
+        google_avatar_url: profile?.google_avatar_url,
+        first_name: profile?.first_name,
+        last_name: profile?.last_name,
       };
 
       setUser(userWithRole);

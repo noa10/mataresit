@@ -11,6 +11,10 @@ export interface UserWithRole extends User {
   stripe_customer_id?: string;
   stripe_subscription_id?: string;
   receipts_used_this_month?: number;
+  avatar_url?: string | null;
+  google_avatar_url?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 export interface AuthState {
