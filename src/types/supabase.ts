@@ -204,9 +204,12 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_updated_at: string | null
+          avatar_url: string | null
           created_at: string
           email: string | null
           first_name: string | null
+          google_avatar_url: string | null
           id: string
           last_name: string | null
           monthly_reset_date: string | null
@@ -221,9 +224,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_updated_at?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           first_name?: string | null
+          google_avatar_url?: string | null
           id: string
           last_name?: string | null
           monthly_reset_date?: string | null
@@ -238,9 +244,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_updated_at?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           first_name?: string | null
+          google_avatar_url?: string | null
           id?: string
           last_name?: string | null
           monthly_reset_date?: string | null
