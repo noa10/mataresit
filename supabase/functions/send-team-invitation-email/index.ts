@@ -36,8 +36,7 @@ serve(async (req) => {
       .from('team_invitations')
       .select(`
         *,
-        team:team_id(name),
-        inviter:invited_by(email, profiles(first_name, last_name))
+        teams!team_id(name)
       `)
       .eq('id', invitation_id)
       .single();
@@ -53,16 +52,23 @@ serve(async (req) => {
       );
     }
 
-    // Prepare email data
-    const inviterName = invitation.inviter?.profiles?.first_name 
-      ? `${invitation.inviter.profiles.first_name} ${invitation.inviter.profiles.last_name || ''}`.trim()
-      : invitation.inviter?.email || 'Someone';
+    // Get inviter information separately
+    const { data: inviterProfile, error: inviterError } = await supabaseClient
+      .from('profiles')
+      .select('first_name, last_name, email')
+      .eq('id', invitation.invited_by)
+      .single();
 
-    const acceptUrl = `${Deno.env.get('SITE_URL') || 'http://localhost:3000'}/auth/accept-invitation?token=${invitation.token}`;
+    // Prepare email data
+    const inviterName = inviterProfile?.first_name
+      ? `${inviterProfile.first_name} ${inviterProfile.last_name || ''}`.trim()
+      : inviterProfile?.email || 'Someone';
+
+    const acceptUrl = `${Deno.env.get('SITE_URL') || 'http://localhost:3000'}/invite/${invitation.token}`;
 
     const emailData = {
       inviteeEmail: invitation.email,
-      teamName: invitation.team?.name || 'Unknown Team',
+      teamName: invitation.teams?.name || 'Unknown Team',
       inviterName,
       role: invitation.role,
       acceptUrl,
@@ -85,9 +91,9 @@ serve(async (req) => {
         team_id: invitation.team_id,
         metadata: {
           invitation_id,
-          team_name: invitation.team?.name,
+          team_name: invitation.teams?.name,
           role: invitation.role,
-          inviter_email: invitation.inviter?.email,
+          inviter_email: inviterProfile?.email,
         },
       },
     });
@@ -109,7 +115,7 @@ serve(async (req) => {
     console.log('Team invitation email sent successfully:', {
       invitation_id,
       recipient: invitation.email,
-      team: invitation.team?.name,
+      team: invitation.teams?.name,
     });
 
     return new Response(
