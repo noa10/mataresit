@@ -3,6 +3,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { encodeBase64, decodeBase64 } from "jsr:@std/encoding/base64";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+
+// Initialize Supabase client for tax processing
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -115,6 +121,100 @@ interface ImageInput {
 type AIModelInput = TextInput | ImageInput;
 
 /**
+ * Process Malaysian tax information for a receipt
+ */
+async function processMalaysianTax(
+  merchant: string,
+  total: number,
+  receiptDate: string,
+  aiTaxInfo: any,
+  logger: ProcessingLogger
+): Promise<any> {
+  try {
+    await logger.log("Processing Malaysian tax information", "TAX");
+
+    // Get tax information from database
+    const { data: taxInfo, error } = await supabase
+      .rpc('get_malaysian_tax_info', {
+        merchant_name: merchant,
+        receipt_date: receiptDate
+      });
+
+    if (error) {
+      console.error('Error getting Malaysian tax info:', error);
+      await logger.log(`Error getting tax info: ${error.message}`, "ERROR");
+      return null;
+    }
+
+    let finalTaxInfo = taxInfo;
+
+    // If AI provided tax information, use it to enhance or override database detection
+    if (aiTaxInfo && aiTaxInfo.tax_type) {
+      await logger.log(`AI detected tax type: ${aiTaxInfo.tax_type}`, "TAX");
+
+      // Use AI tax information if it has higher confidence or provides more specific details
+      if (aiTaxInfo.tax_rate && aiTaxInfo.tax_amount) {
+        finalTaxInfo = {
+          tax_type: aiTaxInfo.tax_type,
+          tax_rate: parseFloat(aiTaxInfo.tax_rate),
+          category_name: aiTaxInfo.business_category || taxInfo?.category_name || 'Unknown',
+          confidence_score: 85, // High confidence for AI detection
+          is_detected: true
+        };
+      }
+    }
+
+    if (!finalTaxInfo || !finalTaxInfo.is_detected) {
+      await logger.log("No Malaysian tax category detected, using exempt", "TAX");
+      return {
+        detected_tax_type: 'EXEMPT',
+        detected_tax_rate: 0.00,
+        tax_breakdown: {
+          subtotal: total,
+          tax_amount: 0.00,
+          tax_rate: 0.00,
+          total: total,
+          is_inclusive: true,
+          calculation_method: 'exempt'
+        },
+        is_tax_inclusive: true,
+        malaysian_business_category: 'Unknown'
+      };
+    }
+
+    // Calculate tax breakdown
+    const isInclusive = aiTaxInfo?.is_tax_inclusive !== false; // Default to inclusive
+    const { data: taxBreakdown, error: calcError } = await supabase
+      .rpc('calculate_malaysian_tax', {
+        total_amount: total,
+        tax_rate: finalTaxInfo.tax_rate,
+        is_inclusive: isInclusive
+      });
+
+    if (calcError) {
+      console.error('Error calculating tax:', calcError);
+      await logger.log(`Error calculating tax: ${calcError.message}`, "ERROR");
+      return null;
+    }
+
+    await logger.log(`Tax calculation complete: ${finalTaxInfo.tax_type} at ${finalTaxInfo.tax_rate}%`, "TAX");
+
+    return {
+      detected_tax_type: finalTaxInfo.tax_type,
+      detected_tax_rate: finalTaxInfo.tax_rate,
+      tax_breakdown: taxBreakdown,
+      is_tax_inclusive: isInclusive,
+      malaysian_business_category: finalTaxInfo.category_name
+    };
+
+  } catch (error) {
+    console.error('Error processing Malaysian tax:', error);
+    await logger.log(`Error processing tax: ${error.message}`, "ERROR");
+    return null;
+  }
+}
+
+/**
  * Call the appropriate AI model based on the model configuration and input type
  */
 async function callAIModel(
@@ -178,9 +278,9 @@ async function callGeminiAPI(
   let payload: any;
 
   if (input.type === 'text') {
-    // Text-based prompt for OCR data
+    // Text-based prompt for OCR data with Malaysian business context
     const prompt = `
-You are an AI assistant specialized in analyzing receipt data.
+You are an AI assistant specialized in analyzing receipt data with expertise in Malaysian business terminology and Malay language.
 
 RECEIPT TEXT:
 ${input.fullText}
@@ -189,10 +289,25 @@ TEXTRACT EXTRACTED DATA:
 ${JSON.stringify(input.textractData, null, 2)}
 
 Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD, CASH).
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD including Malaysian-specific methods:
+   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
+   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
+   - Cash: CASH, TUNAI
+   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
 3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Provide SUGGESTIONS for potential OCR errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
+4. Recognize Malaysian business terminology:
+   - Common Malaysian business names and chains (e.g., 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer)
+   - Malaysian food establishments (e.g., Mamak, Kopitiam, Restoran, Kedai Kopi)
+   - Malaysian service providers (e.g., Astro, Unifi, Celcom, Digi, Maxis, TNB, Syabas)
+5. Identify MALAYSIAN TAX information:
+   - Look for GST (6% - historical 2015-2018) or SST (Sales & Service Tax - current from 2018)
+   - SST Sales Tax: 5-10% on goods (varies by category)
+   - SST Service Tax: 6% on services
+   - Zero-rated items: Basic food, medical, education
+   - Detect if tax is inclusive or exclusive in the total
+6. Handle Malay language text and mixed English-Malay content
+7. Provide SUGGESTIONS for potential OCR errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
 
 Return your findings in the following JSON format:
 {
@@ -201,6 +316,13 @@ Return your findings in the following JSON format:
   "predicted_category": "One of the categories from the list above",
   "merchant": "The merchant name if you find a better match than Textract",
   "total": "The total amount if you find a better match than Textract",
+  "malaysian_tax_info": {
+    "tax_type": "GST, SST_SALES, SST_SERVICE, EXEMPT, or ZERO_RATED",
+    "tax_rate": "Tax rate percentage (e.g., 6.00, 10.00)",
+    "tax_amount": "Calculated or detected tax amount",
+    "is_tax_inclusive": "true if tax is included in total, false if added separately",
+    "business_category": "Detected Malaysian business category"
+  },
   "suggestions": {
     "merchant": "A suggested correction for merchant name if OCR made errors",
     "date": "A suggested date correction in YYYY-MM-DD format if needed",
@@ -211,6 +333,7 @@ Return your findings in the following JSON format:
     "currency": "Confidence score 0-100 for currency",
     "payment_method": "Confidence score 0-100 for payment method",
     "predicted_category": "Confidence score 0-100 for category prediction",
+    "malaysian_tax_info": "Confidence score 0-100 for tax detection",
     "suggestions": {
       "merchant": "Confidence score 0-100 for merchant suggestion",
       "date": "Confidence score 0-100 for date suggestion",
@@ -228,22 +351,39 @@ Return your findings in the following JSON format:
       }]
     };
   } else {
-    // Vision-based prompt for direct image analysis
+    // Vision-based prompt for direct image analysis with Malaysian business context
     payload = {
       contents: [{
         parts: [
           {
-            text: `You are an AI assistant specialized in analyzing receipt images.
+            text: `You are an AI assistant specialized in analyzing receipt images with expertise in Malaysian business terminology and Malay language.
 
 Please examine this receipt image and extract the following information:
-1. MERCHANT name (store or business name)
-2. DATE of purchase (in YYYY-MM-DD format)
+1. MERCHANT name (store or business name) - recognize Malaysian business chains and local establishments
+2. DATE of purchase (in YYYY-MM-DD format) - handle DD/MM/YYYY format common in Malaysia
 3. TOTAL amount
-4. TAX amount (if present)
-5. LINE ITEMS (product/service name and price for each item)
-6. CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous.
-7. PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD, CASH).
+4. TAX amount (if present) - recognize GST/SST terminology
+5. LINE ITEMS (product/service name and price for each item) - handle mixed English-Malay product names
+6. CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous.
+7. PAYMENT METHOD including Malaysian-specific methods:
+   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
+   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
+   - Cash: CASH, TUNAI
+   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
 8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+9. Identify MALAYSIAN TAX information:
+   - Look for GST (6% - historical 2015-2018) or SST (Sales & Service Tax - current from 2018)
+   - SST Sales Tax: 5-10% on goods (varies by category)
+   - SST Service Tax: 6% on services
+   - Zero-rated items: Basic food, medical, education
+   - Detect if tax is inclusive or exclusive in the total
+
+Malaysian Business Recognition:
+- Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer, Jaya Grocer, Cold Storage
+- Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC, Pizza Hut, Subway
+- Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB (Tenaga Nasional), Syabas, IWK
+- Petrol stations: Petronas, Shell, BHP, Caltex
+- Pharmacies: Guardian, Watsons, Caring, Big Pharmacy
 
 Return your findings in the following JSON format:
 {
@@ -254,6 +394,13 @@ Return your findings in the following JSON format:
   "currency": "The currency code (e.g., MYR, USD)",
   "payment_method": "The payment method used",
   "predicted_category": "One of the categories from the list above",
+  "malaysian_tax_info": {
+    "tax_type": "GST, SST_SALES, SST_SERVICE, EXEMPT, or ZERO_RATED",
+    "tax_rate": "Tax rate percentage (e.g., 6.00, 10.00)",
+    "tax_amount": "Calculated or detected tax amount",
+    "is_tax_inclusive": "true if tax is included in total, false if added separately",
+    "business_category": "Detected Malaysian business category"
+  },
   "line_items": [
     { "description": "Item 1 description", "amount": "Item 1 price as a number" },
     { "description": "Item 2 description", "amount": "Item 2 price as a number" }
@@ -266,6 +413,7 @@ Return your findings in the following JSON format:
     "currency": "Confidence score 0-100",
     "payment_method": "Confidence score 0-100",
     "predicted_category": "Confidence score 0-100",
+    "malaysian_tax_info": "Confidence score 0-100 for tax detection",
     "line_items": "Confidence score 0-100"
   }
 }`
@@ -407,10 +555,15 @@ TEXTRACT EXTRACTED DATA:
 ${JSON.stringify(input.textractData, null, 2)}
 
 Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD including Malaysian-specific methods:
+   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
+   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
+   - Cash: CASH, TUNAI
+   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
 3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Provide SUGGESTIONS for potential OCR errors.
+4. Recognize Malaysian business terminology and handle Malay language text.
+5. Provide SUGGESTIONS for potential OCR errors.
 
 Return your findings in JSON format:
 {
@@ -451,17 +604,28 @@ Return your findings in JSON format:
         content: [
           {
             type: "text",
-            text: `You are an AI assistant specialized in analyzing receipt images.
+            text: `You are an AI assistant specialized in analyzing receipt images with expertise in Malaysian business terminology and Malay language.
 
 Please examine this receipt image and extract the following information:
-1. MERCHANT name (store or business name)
-2. DATE of purchase (in YYYY-MM-DD format)
+1. MERCHANT name (store or business name) - recognize Malaysian business chains and local establishments
+2. DATE of purchase (in YYYY-MM-DD format) - handle DD/MM/YYYY format common in Malaysia
 3. TOTAL amount
-4. TAX amount (if present)
-5. LINE ITEMS (product/service name and price for each item)
-6. CURRENCY used (look for symbols like RM, $, MYR, USD). Default to MYR if ambiguous.
-7. PAYMENT METHOD (e.g., VISA, Mastercard, Cash, GrabPay, Touch 'n Go eWallet).
+4. TAX amount (if present) - recognize GST/SST terminology
+5. LINE ITEMS (product/service name and price for each item) - handle mixed English-Malay product names
+6. CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous.
+7. PAYMENT METHOD including Malaysian-specific methods:
+   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
+   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
+   - Cash: CASH, TUNAI
+   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
 8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+
+Malaysian Business Recognition:
+- Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer, Jaya Grocer, Cold Storage
+- Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC, Pizza Hut, Subway
+- Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB (Tenaga Nasional), Syabas, IWK
+- Petrol stations: Petronas, Shell, BHP, Caltex
+- Pharmacies: Guardian, Watsons, Caring, Big Pharmacy
 
 Return your findings in JSON format:
 {
@@ -627,6 +791,33 @@ async function enhanceReceiptData(
       const suggestionFields = Object.keys(enhancedData.suggestions);
       if (suggestionFields.length > 0) {
         await logger.log(`Found ${suggestionFields.length} suggestion(s) for: ${suggestionFields.join(', ')}`, "AI");
+      }
+    }
+
+    // Process Malaysian tax information if we have merchant and total
+    if (enhancedData.merchant && enhancedData.total) {
+      const taxProcessingStart = Date.now();
+      const taxInfo = await processMalaysianTax(
+        enhancedData.merchant,
+        parseFloat(enhancedData.total),
+        enhancedData.date || new Date().toISOString().split('T')[0],
+        enhancedData.malaysian_tax_info,
+        logger
+      );
+      const taxProcessingEnd = Date.now();
+      const taxProcessingDuration = (taxProcessingEnd - taxProcessingStart) / 1000;
+
+      console.log(`🔍 Tax processing completed in ${taxProcessingDuration.toFixed(2)} seconds`);
+
+      if (taxInfo) {
+        // Add tax information to enhanced data
+        enhancedData.detected_tax_type = taxInfo.detected_tax_type;
+        enhancedData.detected_tax_rate = taxInfo.detected_tax_rate;
+        enhancedData.tax_breakdown = taxInfo.tax_breakdown;
+        enhancedData.is_tax_inclusive = taxInfo.is_tax_inclusive;
+        enhancedData.malaysian_business_category = taxInfo.malaysian_business_category;
+
+        await logger.log(`Tax processing complete: ${taxInfo.detected_tax_type} at ${taxInfo.detected_tax_rate}%`, "TAX");
       }
     }
 

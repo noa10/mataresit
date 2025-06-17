@@ -52,10 +52,10 @@ serve(async (req) => {
       );
     }
 
-    // Get inviter information separately
+    // Get inviter information separately including language preference
     const { data: inviterProfile, error: inviterError } = await supabaseClient
       .from('profiles')
-      .select('first_name, last_name, email')
+      .select('first_name, last_name, email, preferred_language')
       .eq('id', invitation.invited_by)
       .single();
 
@@ -73,6 +73,7 @@ serve(async (req) => {
       role: invitation.role,
       acceptUrl,
       expiresAt: invitation.expires_at,
+      language: inviterProfile?.preferred_language || 'en', // Use inviter's language preference
     };
 
     // Generate email content

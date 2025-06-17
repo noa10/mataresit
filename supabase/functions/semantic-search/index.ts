@@ -56,8 +56,73 @@ const DEFAULT_EMBEDDING_MODEL = 'embedding-001';
 const EMBEDDING_DIMENSIONS = 1536; // Gemini's standard dimension
 
 /**
+ * Preprocess multilingual text for better embedding generation
+ * Handles English-Malay mixed content and Malaysian business terminology
+ */
+function preprocessMultilingualText(text: string): string {
+  if (!text) return text;
+
+  // Normalize Malaysian business terminology
+  const malayBusinessTerms: Record<string, string> = {
+    'kedai': 'shop store',
+    'restoran': 'restaurant dining',
+    'kopitiam': 'coffee shop cafe',
+    'mamak': 'indian muslim restaurant',
+    'pasar': 'market grocery',
+    'farmasi': 'pharmacy',
+    'hospital': 'hospital healthcare',
+    'klinik': 'clinic healthcare',
+    'sekolah': 'school education',
+    'universiti': 'university education',
+    'bank': 'bank financial',
+    'pos': 'post office',
+    'pejabat': 'office',
+    'hotel': 'hotel accommodation',
+    'stesen minyak': 'petrol station gas station',
+    'tunai': 'cash',
+    'kad kredit': 'credit card',
+    'kad debit': 'debit card',
+    'makanan': 'food dining',
+    'minuman': 'drinks beverage',
+    'ubat': 'medicine healthcare',
+    'buku': 'book education',
+    'pakaian': 'clothing shopping',
+    'elektronik': 'electronics',
+    'perabot': 'furniture',
+    'kereta': 'car transportation',
+    'bas': 'bus transportation',
+    'teksi': 'taxi transportation',
+    'grab': 'grab transportation rideshare',
+    'touch n go': 'touch and go ewallet payment',
+    'boost': 'boost ewallet payment',
+    'shopeepay': 'shopee pay ewallet payment',
+    'bigpay': 'big pay ewallet payment'
+  };
+
+  // Convert to lowercase for matching
+  let processedText = text.toLowerCase();
+
+  // Replace Malay terms with English equivalents for better semantic matching
+  for (const [malayTerm, englishEquivalent] of Object.entries(malayBusinessTerms)) {
+    const regex = new RegExp(`\\b${malayTerm}\\b`, 'gi');
+    processedText = processedText.replace(regex, `${malayTerm} ${englishEquivalent}`);
+  }
+
+  // Normalize Malaysian payment methods
+  processedText = processedText
+    .replace(/\btng\b/gi, 'touch n go ewallet')
+    .replace(/\btouchngowallet\b/gi, 'touch n go ewallet')
+    .replace(/\bgrabpay\b/gi, 'grab pay ewallet')
+    .replace(/\bfpx\b/gi, 'fpx online banking')
+    .replace(/\bmae\b/gi, 'mae ewallet maybank')
+    .replace(/\brm\b/gi, 'ringgit malaysia myr currency');
+
+  return processedText;
+}
+
+/**
  * Generate embeddings using Google's Gemini embedding model
- * Improved to handle dimension conversion more effectively
+ * Enhanced to handle multilingual content (English and Malay)
  */
 async function generateEmbedding(input: { text: string; model?: string }): Promise<number[]> {
   if (!geminiApiKey) {
@@ -65,9 +130,12 @@ async function generateEmbedding(input: { text: string; model?: string }): Promi
   }
 
   try {
+    // Preprocess text for better multilingual embedding
+    const preprocessedText = preprocessMultilingualText(input.text);
+
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'embedding-001' });
-    const result = await model.embedContent(input.text);
+    const result = await model.embedContent(preprocessedText);
     let embedding = result.embedding.values;
 
     // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536 for pgvector
@@ -374,20 +442,39 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
     const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
 
     // Construct an improved prompt to help the model understand how to parse the query
+    // Enhanced to support both English and Malay queries
     const prompt = `
       Parse the following search query for a receipt tracking app and extract structured parameters.
       You can extract dates, amounts, categories, merchants, and other relevant filters.
+      The query may be in English, Malay (Bahasa Malaysia), or a mix of both languages.
 
       Today's date is ${now.toISOString().split('T')[0]}.
 
       Guidelines for parsing:
       1. For dates, convert to ISO format (YYYY-MM-DD).
-      2. For relative dates like 'last month', 'last week', etc., calculate the actual date range.
-      3. For amounts, extract numeric values only.
-      4. For merchants, extract exact store or business names.
+      2. For relative dates like 'last month'/'bulan lepas', 'last week'/'minggu lepas', etc., calculate the actual date range.
+      3. For amounts, extract numeric values only. Handle both RM and $ symbols.
+      4. For merchants, extract exact store or business names, including Malaysian chains.
       5. For categories, map to common shopping categories (groceries, dining, entertainment, etc.)
       6. If a field is not mentioned, return null for that field.
       7. For search target, determine if the user is looking for receipts or line items (individual items on receipts).
+
+      Malaysian Business Recognition:
+      - Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer
+      - Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC
+      - Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB, Syabas
+
+      Malay Language Terms:
+      - 'resit' = receipt
+      - 'kedai' = shop/store
+      - 'makanan' = food
+      - 'minuman' = drinks
+      - 'bulan lepas' = last month
+      - 'minggu lepas' = last week
+      - 'hari ini' = today
+      - 'semalam' = yesterday
+      - 'tunai' = cash
+      - 'kad kredit' = credit card
 
       Examples:
       Query: "Show me all receipts from last month over $50"
