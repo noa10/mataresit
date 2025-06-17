@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Language Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .code {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Language Fix Verification Test</h1>
+    
+    <div class="test-container">
+        <h2>Database Schema Fix Status</h2>
+        <div class="status success">
+            ✅ <strong>FIXED:</strong> LanguageContext.tsx now uses correct table name 'profiles' instead of 'user_profiles'
+        </div>
+        <div class="status success">
+            ✅ <strong>VERIFIED:</strong> Database 'profiles' table exists with language columns
+        </div>
+        <div class="status success">
+            ✅ <strong>UPDATED:</strong> Documentation files corrected to reference 'profiles' table
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Database Schema Verification</h2>
+        <div class="status info">
+            <strong>Table:</strong> profiles<br>
+            <strong>Language Columns:</strong>
+            <ul>
+                <li>preferred_language (default: 'en')</li>
+                <li>date_format_preference (default: 'DD/MM/YYYY')</li>
+                <li>time_format_preference (default: '24h')</li>
+                <li>number_format_preference (default: 'MY')</li>
+                <li>timezone_preference (default: 'Asia/Kuala_Lumpur')</li>
+                <li>cultural_context (default: 'MY')</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Files Modified</h2>
+        <div class="code">✅ src/contexts/LanguageContext.tsx
+   - Line 46: Changed 'user_profiles' to 'profiles' (load preference)
+   - Line 94: Changed 'user_profiles' to 'profiles' (save preference)
+
+✅ docs/implementation-plans/multi-lang-support.md
+   - Line 64: Updated table reference in documentation
+   - Line 146: Updated language detection priority documentation
+
+✅ supabase/migrations/20250617030000_add_malaysian_cultural_adaptations.sql
+   - Line 303: Updated comment to reference correct table</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Error Resolution</h2>
+        <div class="status error">
+            <strong>Previous Error:</strong><br>
+            relation "public.user_profiles" does not exist (PostgreSQL error code 42P01)
+        </div>
+        <div class="status success">
+            <strong>Resolution:</strong><br>
+            Fixed table name mismatch - LanguageContext.tsx now correctly references the existing 'profiles' table
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Testing Instructions</h2>
+        <div class="status info">
+            <strong>To test the fix:</strong>
+            <ol>
+                <li>Open the application at <a href="http://localhost:5002" target="_blank">http://localhost:5002</a></li>
+                <li>Log in with your Google OAuth account</li>
+                <li>Navigate to any page with the language selector</li>
+                <li>Try switching from English to Malay (Bahasa Malaysia)</li>
+                <li>Check browser console - should see no database errors</li>
+                <li>Verify language preference is saved and persists on page refresh</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Expected Behavior</h2>
+        <div class="status success">
+            ✅ Language switching should work without errors<br>
+            ✅ User language preference should be saved to database<br>
+            ✅ Language preference should persist across sessions<br>
+            ✅ No PostgreSQL "relation does not exist" errors<br>
+            ✅ Malay language content should display correctly
+        </div>
+    </div>
+
+    <script>
+        // Add timestamp
+        document.addEventListener('DOMContentLoaded', function() {
+            const timestamp = new Date().toLocaleString();
+            document.title += ` - ${timestamp}`;
+        });
+    </script>
+</body>
+</html>
