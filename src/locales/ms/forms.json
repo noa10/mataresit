@@ -1,0 +1,100 @@
+{
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be no more than {{max}} characters",
+    "pattern": "Please enter a valid format",
+    "number": "Please enter a valid number",
+    "positive": "Must be a positive number",
+    "integer": "Must be a whole number",
+    "decimal": "Please enter a valid decimal number",
+    "date": "Please enter a valid date",
+    "url": "Please enter a valid URL",
+    "phone": "Please enter a valid phone number",
+    "password": {
+      "minLength": "Password must be at least {{min}} characters",
+      "uppercase": "Password must contain at least one uppercase letter",
+      "lowercase": "Password must contain at least one lowercase letter",
+      "number": "Password must contain at least one number",
+      "special": "Password must contain at least one special character",
+      "match": "Passwords do not match"
+    },
+    "file": {
+      "required": "Please select a file",
+      "size": "File size must be less than {{max}}MB",
+      "type": "Invalid file type. Allowed types: {{types}}"
+    }
+  },
+  "placeholders": {
+    "email": "Enter your email",
+    "password": "Enter your password",
+    "confirmPassword": "Confirm your password",
+    "firstName": "Enter your first name",
+    "lastName": "Enter your last name",
+    "name": "Enter name",
+    "description": "Enter description",
+    "amount": "0.00",
+    "date": "Select date",
+    "search": "Search...",
+    "notes": "Add notes...",
+    "tags": "Add tags...",
+    "merchant": "Enter merchant name",
+    "category": "Select category",
+    "phone": "Enter phone number",
+    "address": "Enter address",
+    "city": "Enter city",
+    "country": "Select country",
+    "website": "Enter website URL"
+  },
+  "labels": {
+    "required": "Required",
+    "optional": "Optional",
+    "recommended": "Recommended",
+    "characters": "characters",
+    "charactersRemaining": "{{count}} characters remaining",
+    "fileSize": "File size",
+    "fileType": "File type",
+    "lastModified": "Last modified",
+    "selectFile": "Select file",
+    "dragDropFile": "Drag and drop file here",
+    "or": "or",
+    "browse": "Browse"
+  },
+  "actions": {
+    "submit": "Submit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "clear": "Clear",
+    "add": "Add",
+    "remove": "Remove",
+    "edit": "Edit",
+    "delete": "Delete",
+    "upload": "Upload",
+    "download": "Download",
+    "preview": "Preview",
+    "next": "Next",
+    "previous": "Previous",
+    "finish": "Finish"
+  },
+  "messages": {
+    "saved": "Form saved successfully",
+    "submitted": "Form submitted successfully",
+    "error": "Please correct the errors below",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "uploading": "Uploading...",
+    "processing": "Processing...",
+    "unsavedChanges": "You have unsaved changes",
+    "confirmDiscard": "Are you sure you want to discard your changes?"
+  },
+  "steps": {
+    "step": "Step",
+    "of": "of",
+    "next": "Next",
+    "previous": "Previous",
+    "complete": "Complete",
+    "incomplete": "Incomplete"
+  }
+}

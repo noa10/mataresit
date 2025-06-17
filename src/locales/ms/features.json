@@ -1,0 +1,162 @@
+{
+  "meta": {
+    "title": "Ciri-ciri - Mataresit",
+    "description": "Temui semua ciri berkuasa yang menjadikan Mataresit penyelesaian pengurusan resit terbaik untuk perniagaan anda."
+  },
+  "hero": {
+    "title": "Ciri Berkuasa untuk Perniagaan Moden",
+    "subtitle": "Semua yang anda perlukan untuk mengubah pengurusan resit dan memperlancar aliran kerja kewangan anda."
+  },
+  "categories": {
+    "core": {
+      "title": "Ciri Teras",
+      "description": "Alat penting untuk pengurusan resit"
+    },
+    "ai": {
+      "title": "Berkuasa AI",
+      "description": "Automasi pintar dan wawasan"
+    },
+    "collaboration": {
+      "title": "Kerjasama Pasukan",
+      "description": "Bekerja bersama dengan lancar"
+    },
+    "integration": {
+      "title": "Integrasi",
+      "description": "Sambung dengan alat sedia ada anda"
+    }
+  },
+  "features": {
+    "aiProcessing": {
+      "title": "Pemprosesan Resit AI",
+      "description": "Ekstrak data dari resit secara automatik dengan ketepatan 99% menggunakan teknologi AI canggih.",
+      "benefits": [
+        "Ekstraksi data automatik",
+        "Kadar ketepatan 99%",
+        "Sokongan pelbagai bahasa",
+        "Mengendalikan pelbagai format resit"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "smartSearch": {
+      "title": "Carian Pintar",
+      "description": "Cari mana-mana resit dengan serta-merta menggunakan pertanyaan bahasa semula jadi berkuasa AI.",
+      "benefits": [
+        "Carian bahasa semula jadi",
+        "Hasil segera",
+        "Cari mengikut kandungan, tarikh, atau jumlah",
+        "Pilihan penapisan lanjutan"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "batchProcessing": {
+      "title": "Pemprosesan Kelompok",
+      "description": "Muat naik dan proses berbilang resit serentak untuk menjimatkan masa.",
+      "benefits": [
+        "Proses sehingga 100 resit sekaligus",
+        "Penjejakan kemajuan masa nyata",
+        "Pengkategorian pukal",
+        "Pengendalian ralat dan cuba semula"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "customCategories": {
+      "title": "Kategori Tersuai",
+      "description": "Susun resit dengan kategori dan tag tersuai anda sendiri.",
+      "benefits": [
+        "Kategori tersuai tanpa had",
+        "Organisasi berkod warna",
+        "Pengkategorian automatik",
+        "Penetapan kategori pukal"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "teamCollaboration": {
+      "title": "Kerjasama Pasukan",
+      "description": "Bekerja bersama dengan pasukan anda dalam pengurusan resit dan penjejakan perbelanjaan.",
+      "benefits": [
+        "Ruang kerja pasukan",
+        "Kebenaran berdasarkan peranan",
+        "Kategori dikongsi",
+        "Aliran kerja kolaboratif"
+      ],
+      "status": "available",
+      "category": "collaboration"
+    },
+    "claimsManagement": {
+      "title": "Pengurusan Tuntutan",
+      "description": "Hantar dan urus tuntutan perbelanjaan dengan lampiran resit bersepadu.",
+      "benefits": [
+        "Penyerahan tuntutan mudah",
+        "Aliran kerja kelulusan",
+        "Lampiran resit",
+        "Penjejakan status"
+      ],
+      "status": "available",
+      "category": "collaboration"
+    },
+    "exportOptions": {
+      "title": "Pilihan Eksport",
+      "description": "Eksport data anda dalam pelbagai format untuk perakaunan dan pelaporan.",
+      "benefits": [
+        "Laporan PDF",
+        "Eksport Excel/CSV",
+        "Julat tarikh tersuai",
+        "Eksport bertapis"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "secureStorage": {
+      "title": "Storan Selamat",
+      "description": "Keselamatan tahap bank memastikan data kewangan anda sentiasa dilindungi.",
+      "benefits": [
+        "Penyulitan hujung ke hujung",
+        "Storan awan selamat",
+        "Sandaran berkala",
+        "Sedia untuk pematuhan"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "mobileApp": {
+      "title": "Aplikasi Mudah Alih",
+      "description": "Tangkap dan proses resit semasa dalam perjalanan dengan aplikasi mudah alih kami.",
+      "benefits": [
+        "Tangkapan kamera",
+        "Pemprosesan luar talian",
+        "Segerak merentas peranti",
+        "Pemberitahuan tolak"
+      ],
+      "status": "coming_soon",
+      "category": "core"
+    },
+    "apiAccess": {
+      "title": "Akses API",
+      "description": "Integrasikan Mataresit dengan sistem perniagaan dan aliran kerja sedia ada anda.",
+      "benefits": [
+        "API RESTful",
+        "Sokongan webhook",
+        "Dokumentasi pembangun",
+        "Pengehadan kadar"
+      ],
+      "status": "beta",
+      "category": "integration"
+    }
+  },
+  "status": {
+    "available": "Tersedia",
+    "beta": "Beta",
+    "coming_soon": "Akan Datang",
+    "planned": "Dirancang"
+  },
+  "cta": {
+    "title": "Bersedia untuk mengalami ciri-ciri ini?",
+    "subtitle": "Mulakan percubaan percuma anda hari ini dan lihat bagaimana Mataresit boleh mengubah perniagaan anda.",
+    "button": "Mula Percubaan Percuma",
+    "contact": "Hubungi Jualan"
+  }
+}

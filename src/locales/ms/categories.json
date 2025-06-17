@@ -1,0 +1,47 @@
+{
+  "title": "Urus Kategori",
+  "description": "Cipta dan atur kategori tersuai untuk resit anda",
+  "actions": {
+    "newCategory": "Kategori Baharu",
+    "createCategory": "Cipta Kategori",
+    "edit": "Edit",
+    "delete": "Padam",
+    "save": "Simpan",
+    "cancel": "Batal"
+  },
+  "empty": {
+    "title": "Tiada kategori lagi",
+    "description": "Cipta kategori pertama anda untuk mula mengatur resit anda"
+  },
+  "error": {
+    "loadFailed": "Gagal memuatkan kategori",
+    "tryRefresh": "Sila cuba muat semula halaman."
+  },
+  "form": {
+    "name": "Nama Kategori",
+    "namePlaceholder": "Masukkan nama kategori",
+    "color": "Warna",
+    "colorDescription": "Pilih warna untuk mengenal pasti kategori ini",
+    "nameRequired": "Nama kategori diperlukan",
+    "nameMinLength": "Nama kategori mestilah sekurang-kurangnya 2 aksara",
+    "nameMaxLength": "Nama kategori mestilah kurang dari 50 aksara",
+    "colorRequired": "Sila pilih warna"
+  },
+  "delete": {
+    "title": "Padam Kategori",
+    "description": "Adakah anda pasti mahu memadam kategori ini?",
+    "hasReceipts": "Kategori ini mempunyai {{count}} resit yang ditetapkan kepadanya.",
+    "reassignLabel": "Tetapkan semula resit kepada:",
+    "reassignOption": "Pilih kategori",
+    "noReassign": "Jangan tetapkan semula (resit akan menjadi tidak berkategori)",
+    "confirmDelete": "Ya, padam kategori",
+    "deleting": "Memadam..."
+  },
+  "receipts": "resit",
+  "receiptCount": "{{count}} resit",
+  "success": {
+    "created": "Kategori berjaya dicipta",
+    "updated": "Kategori berjaya dikemas kini",
+    "deleted": "Kategori berjaya dipadam"
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "title": "Receipts Dashboard",
+  "upload": {
+    "button": "Upload Receipt",
+    "batchButton": "Batch Upload",
+    "dragDrop": "Drag and drop files here",
+    "or": "or",
+    "browse": "browse files",
+    "maxSize": "Max file size: {{size}}MB",
+    "supportedFormats": "Supported formats: JPG, PNG, PDF"
+  },
+  "filters": {
+    "title": "Filters",
+    "all": "All Receipts",
+    "unreviewed": "Unreviewed",
+    "reviewed": "Reviewed",
+    "processing": "Processing",
+    "completed": "Completed",
+    "failed": "Failed",
+    "dateRange": "Date Range",
+    "category": "Category",
+    "merchant": "Merchant",
+    "amount": "Amount",
+    "currency": "Currency",
+    "status": "Status",
+    "search": "Search receipts...",
+    "clear": "Clear Filters",
+    "apply": "Apply Filters"
+  },
+  "stats": {
+    "totalReceipts": "Total Receipts",
+    "totalReceipts_admin": "System Total Receipts",
+    "totalReceipts_user": "My Receipts",
+    "totalReceipts_team_member": "Team Receipts",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "avgConfidence": "Average Confidence",
+    "totalAmount": "Total Amount",
+    "processingTime": "Avg. Processing Time",
+    "receiptCount": "{{count}} receipt",
+    "receiptCount_zero": "No receipts",
+    "receiptCount_one": "{{count}} receipt",
+    "receiptCount_other": "{{count}} receipts",
+    "userCount": "{{count}} user",
+    "userCount_zero": "No users",
+    "userCount_one": "{{count}} user",
+    "userCount_other": "{{count}} users",
+    "processingCount": "{{count}} processing",
+    "processingCount_zero": "Nothing processing",
+    "processingCount_one": "{{count}} processing",
+    "processingCount_other": "{{count}} processing"
+  },
+  "views": {
+    "grid": "Grid View",
+    "list": "List View",
+    "table": "Table View",
+    "calendar": "Calendar View"
+  },
+  "actions": {
+    "select": "Select",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "delete": "Delete",
+    "export": "Export",
+    "share": "Share",
+    "print": "Print",
+    "edit": "Edit",
+    "view": "View",
+    "process": "Process",
+    "reprocess": "Reprocess",
+    "download": "Download",
+    "generateReport": "Generate Report",
+    "assignCategory": "Assign category...",
+    "assign": "Assign"
+  },
+  "empty": {
+    "title": "No receipts found",
+    "description": "Upload your first receipt to get started",
+    "uploadButton": "Upload Receipt"
+  },
+  "selection": {
+    "selected": "{{count}} selected",
+    "actions": "Bulk Actions"
+  },
+  "export": {
+    "title": "Export Receipts",
+    "format": "Format",
+    "options": {
+      "csv": "CSV",
+      "excel": "Excel",
+      "pdf": "PDF",
+      "json": "JSON"
+    },
+    "dateRange": "Date Range",
+    "includeImages": "Include Images",
+    "includeMetadata": "Include Metadata",
+    "button": "Export"
+  },
+  "sort": {
+    "title": "Sort By",
+    "date": "Date",
+    "amount": "Amount",
+    "merchant": "Merchant",
+    "category": "Category",
+    "confidence": "Confidence",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "newest": "Newest",
+    "oldest": "Oldest",
+    "highest": "Highest",
+    "lowest": "Lowest"
+  },
+  "contextual": {
+    "title": "Dashboard",
+    "title_admin": "Admin Dashboard - System Overview",
+    "title_user": "My Receipt Dashboard",
+    "title_team_member": "Team Dashboard",
+    "subtitle": "Manage your receipts",
+    "subtitle_admin": "Monitor system activity and user management",
+    "subtitle_user": "Track and organize your receipts",
+    "subtitle_team_member": "Collaborate with your team on receipts"
+  },
+  "malaysian": {
+    "currency": {
+      "format": "RM {{amount}}",
+      "ringgit": "Ringgit",
+      "sen": "Sen"
+    },
+    "businessContext": {
+      "gstReceipts": "GST Receipts",
+      "sstReceipts": "SST Receipts",
+      "malaysianMerchants": "Malaysian Merchants",
+      "localBusinesses": "Local Businesses"
+    }
+  }
+}

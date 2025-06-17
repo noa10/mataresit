@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "title": "Team Management - Mataresit",
+    "description": "Manage your team, workspaces, and collaboration settings."
+  },
+  "navigation": {
+    "overview": "Overview",
+    "members": "Members",
+    "workspaces": "Workspaces",
+    "settings": "Settings",
+    "invitations": "Invitations"
+  },
+  "overview": {
+    "title": "Team Overview",
+    "stats": {
+      "totalMembers": "Total Members",
+      "activeWorkspaces": "Active Workspaces",
+      "pendingInvitations": "Pending Invitations",
+      "receiptsProcessed": "Receipts Processed"
+    }
+  },
+  "selector": {
+    "personalWorkspace": "Personal Workspace",
+    "switchWorkspace": "Switch Workspace",
+    "teams": "Teams",
+    "memberCount": "{{count}} member",
+    "memberCount_plural": "{{count}} members"
+  },
+  "actions": {
+    "createTeam": "Create Team"
+  },
+  "create": {
+    "title": "Create New Team",
+    "description": "Create a new team to collaborate with others on receipt management.",
+    "fields": {
+      "name": "Team Name",
+      "description": "Description (Optional)"
+    },
+    "placeholders": {
+      "name": "Enter team name",
+      "description": "Describe your team's purpose"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create Team",
+      "creating": "Creating..."
+    }
+  },
+  "members": {
+    "title": "Team Members",
+    "subtitle": "Manage your team members and their permissions",
+    "actions": {
+      "invite": "Invite Member",
+      "remove": "Remove Member",
+      "changeRole": "Change Role",
+      "resendInvitation": "Resend Invitation"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "joinedDate": "Joined Date",
+      "lastActive": "Last Active",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "pending": "Pending",
+      "inactive": "Inactive",
+      "suspended": "Suspended"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member",
+      "viewer": "Viewer"
+    },
+    "permissions": {
+      "owner": "Full access to all features and settings",
+      "admin": "Manage members, workspaces, and most settings",
+      "member": "Access workspaces and manage receipts",
+      "viewer": "View-only access to assigned workspaces"
+    }
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "subtitle": "Organize your team's work into separate workspaces",
+    "actions": {
+      "create": "Create Workspace",
+      "edit": "Edit Workspace",
+      "delete": "Delete Workspace",
+      "archive": "Archive Workspace"
+    },
+    "table": {
+      "name": "Workspace Name",
+      "description": "Description",
+      "members": "Members",
+      "receipts": "Receipts",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "create": {
+      "title": "Create New Workspace",
+      "fields": {
+        "name": "Workspace Name",
+        "description": "Description",
+        "visibility": "Visibility",
+        "members": "Initial Members"
+      },
+      "visibility": {
+        "private": "Private",
+        "team": "Team",
+        "public": "Public"
+      }
+    }
+  },
+  "invitations": {
+    "title": "Team Invitations",
+    "subtitle": "Manage pending and sent invitations",
+    "noPending": "No Pending Invitations",
+    "allProcessed": "All team invitations have been processed.",
+
+    "table": {
+      "email": "Email",
+      "role": "Role",
+      "workspace": "Workspace",
+      "sentDate": "Sent Date",
+      "expiresDate": "Expires",
+      "status": "Status",
+      "actions": "Actions",
+      "invitedBy": "Invited By"
+    },
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "form": {
+      "title": "Invite Team Member",
+      "description": "Send an invitation to join {{teamName}}",
+      "fields": {
+        "email": "Email Address",
+        "role": "Role",
+        "workspace": "Workspace",
+        "message": "Personal Message"
+      },
+      "placeholders": {
+        "email": "Enter email address",
+        "role": "Select a role",
+        "message": "Add a personal message (optional)"
+      }
+    },
+    "actions": {
+      "sendInvitation": "Send Invitation",
+      "resend": "Resend",
+      "cancel": "Cancel",
+      "accept": "Accept",
+      "decline": "Decline",
+      "sending": "Sending..."
+    }
+  },
+  "settings": {
+    "title": "Team Settings",
+    "subtitle": "Configure team-wide settings and preferences",
+    "comingSoon": "Settings Coming Soon",
+    "futureUpdate": "Team settings will be available in a future update.",
+    "sections": {
+      "general": {
+        "title": "General Settings",
+        "teamName": "Team Name",
+        "description": "Team Description",
+        "timezone": "Default Timezone",
+        "language": "Default Language"
+      },
+      "permissions": {
+        "title": "Default Permissions",
+        "newMemberRole": "Default Role for New Members",
+        "workspaceCreation": "Who can create workspaces",
+        "memberInvitation": "Who can invite members"
+      },
+      "notifications": {
+        "title": "Team Notifications",
+        "emailNotifications": "Email Notifications",
+        "newMemberJoined": "New member joined",
+        "workspaceActivity": "Workspace activity",
+        "receiptProcessing": "Receipt processing updates"
+      }
+    }
+  },
+  "dialogs": {
+    "removeMember": {
+      "title": "Remove Team Member",
+      "message": "Are you sure you want to remove {{name}} from the team? This action cannot be undone.",
+      "confirm": "Remove Member",
+      "cancel": "Cancel"
+    },
+    "deleteWorkspace": {
+      "title": "Delete Workspace",
+      "message": "Are you sure you want to delete the workspace '{{name}}'? All receipts and data will be permanently deleted.",
+      "confirm": "Delete Workspace",
+      "cancel": "Cancel"
+    },
+    "changeRole": {
+      "title": "Change Member Role",
+      "message": "Change role for {{name}} from {{currentRole}} to:",
+      "confirm": "Change Role",
+      "cancel": "Cancel"
+    }
+  },
+  "notifications": {
+    "memberInvited": "Invitation sent to {{email}}",
+    "memberRemoved": "{{name}} has been removed from the team",
+    "roleChanged": "Role changed for {{name}}",
+    "workspaceCreated": "Workspace '{{name}}' created successfully",
+    "workspaceDeleted": "Workspace '{{name}}' deleted successfully",
+    "invitationCancelled": "Invitation cancelled",
+    "invitationResent": "Invitation resent to {{email}}"
+  },
+  "errors": {
+    "memberNotFound": "Team member not found",
+    "workspaceNotFound": "Workspace not found",
+    "invitationNotFound": "Invitation not found",
+    "insufficientPermissions": "You don't have permission to perform this action",
+    "emailAlreadyInvited": "This email has already been invited",
+    "memberAlreadyExists": "This person is already a team member",
+    "cannotRemoveOwner": "Cannot remove the team owner",
+    "cannotChangeOwnerRole": "Cannot change the owner's role",
+    "noTeamSelected": "No Team Selected",
+    "selectTeamMessage": "Please select a team to manage its members and settings."
+  }
+}

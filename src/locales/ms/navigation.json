@@ -1,0 +1,68 @@
+{
+  "brand": {
+    "name": "Mataresit",
+    "tagline": "Pengurusan Resit Pintar"
+  },
+  "mainMenu": {
+    "dashboard": "Papan Pemuka",
+    "search": "Carian",
+    "analysis": "Analisis",
+    "claims": "Tuntutan",
+    "teams": "Pasukan",
+    "settings": "Tetapan",
+    "profile": "Profil",
+    "admin": "Admin",
+    "help": "Bantuan",
+    "documentation": "Dokumentasi",
+    "pricing": "Harga",
+    "features": "Ciri-ciri",
+    "blog": "Blog",
+    "status": "Status",
+    "resources": "Sumber"
+  },
+  "userMenu": {
+    "profile": "Profil",
+    "settings": "Tetapan",
+    "billing": "Pengebilan",
+    "team": "Pasukan",
+    "help": "Bantuan & Sokongan",
+    "logout": "Log Keluar",
+    "login": "Log Masuk",
+    "signup": "Daftar"
+  },
+  "sidebar": {
+    "navigation": "Navigasi",
+    "collapse": "Kuncup",
+    "expand": "Kembang",
+    "close": "Tutup"
+  },
+  "breadcrumbs": {
+    "home": "Laman Utama",
+    "dashboard": "Papan Pemuka",
+    "receipts": "Resit",
+    "settings": "Tetapan",
+    "profile": "Profil",
+    "admin": "Admin",
+    "teams": "Pasukan",
+    "claims": "Tuntutan",
+    "analysis": "Analisis",
+    "search": "Carian"
+  },
+  "tabs": {
+    "overview": "Gambaran Keseluruhan",
+    "details": "Butiran",
+    "history": "Sejarah",
+    "settings": "Tetapan",
+    "members": "Ahli",
+    "permissions": "Kebenaran",
+    "billing": "Pengebilan",
+    "notifications": "Pemberitahuan"
+  },
+  "footer": {
+    "copyright": "© 2024 Mataresit. Hak cipta terpelihara.",
+    "privacy": "Dasar Privasi",
+    "terms": "Terma Perkhidmatan",
+    "support": "Sokongan",
+    "contact": "Hubungi Kami"
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "title": "Pelan Harga - Mataresit",
+    "description": "Pilih pelan yang sempurna untuk perniagaan anda. Mula percuma dan berkembang mengikut keperluan."
+  },
+  "hero": {
+    "title": "Harga yang Mudah dan Telus",
+    "subtitle": "Pilih pelan yang sesuai dengan keperluan perniagaan anda. Mula percuma dan naik taraf bila-bila masa.",
+    "monthlyBilling": "Pengebilan Bulanan",
+    "annualBilling": "Pengebilan Tahunan",
+    "annualDiscount": "Jimat 20% dengan pengebilan tahunan"
+  },
+  "plans": {
+    "free": {
+      "name": "Percuma",
+      "price": "RM0",
+      "period": "/bulan",
+      "description": "Sempurna untuk permulaan",
+      "features": {
+        "receipts": "5 resit sebulan",
+        "storage": "Storan 100MB",
+        "processing": "Pemprosesan AI asas",
+        "support": "Sokongan komuniti",
+        "exports": "Eksport asas",
+        "categories": "Kategori standard"
+      },
+      "cta": "Mula Percuma",
+      "popular": false
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "RM45",
+      "period": "/bulan",
+      "description": "Untuk perniagaan yang berkembang",
+      "features": {
+        "receipts": "50 resit sebulan",
+        "storage": "Storan 5GB",
+        "processing": "Pemprosesan AI lanjutan",
+        "support": "Sokongan e-mel",
+        "exports": "Eksport lanjutan",
+        "categories": "Kategori tersuai",
+        "batch": "Pemprosesan kelompok",
+        "search": "Carian pintar",
+        "team": "Kerjasama pasukan"
+      },
+      "cta": "Mula Percubaan Pro",
+      "popular": true
+    },
+    "max": {
+      "name": "Maksimum",
+      "price": "RM90",
+      "period": "/bulan",
+      "description": "Untuk perniagaan yang mantap",
+      "features": {
+        "receipts": "100 resit sebulan",
+        "storage": "Storan 20GB",
+        "processing": "Pemprosesan AI premium",
+        "support": "Sokongan keutamaan",
+        "exports": "Eksport premium",
+        "categories": "Kategori tanpa had",
+        "batch": "Pemprosesan kelompok lanjutan",
+        "search": "Carian berkuasa AI",
+        "team": "Ciri pasukan lanjutan",
+        "api": "Akses API",
+        "integrations": "Integrasi pihak ketiga"
+      },
+      "cta": "Mula Percubaan Maksimum",
+      "popular": false
+    }
+  },
+  "features": {
+    "title": "Semua yang anda perlukan untuk mengurus resit",
+    "subtitle": "Semua pelan termasuk ciri teras kami dengan had dan keupayaan yang berbeza",
+    "list": {
+      "aiProcessing": {
+        "title": "Pemprosesan AI",
+        "description": "Ekstrak data dari resit secara automatik"
+      },
+      "smartSearch": {
+        "title": "Carian Pintar",
+        "description": "Cari resit dengan serta-merta menggunakan carian berkuasa AI"
+      },
+      "categories": {
+        "title": "Kategori",
+        "description": "Susun resit dengan kategori tersuai"
+      },
+      "exports": {
+        "title": "Pilihan Eksport",
+        "description": "Eksport data dalam pelbagai format"
+      },
+      "storage": {
+        "title": "Storan Selamat",
+        "description": "Keselamatan tahap bank untuk dokumen anda"
+      },
+      "support": {
+        "title": "Sokongan Pelanggan",
+        "description": "Dapatkan bantuan bila anda memerlukannya"
+      }
+    }
+  },
+  "faq": {
+    "title": "Soalan Lazim",
+    "items": {
+      "billing": {
+        "question": "Bagaimana pengebilan berfungsi?",
+        "answer": "Anda akan dikenakan bayaran bulanan atau tahunan berdasarkan pelan yang dipilih. Anda boleh naik taraf, turun taraf, atau batal bila-bila masa."
+      },
+      "limits": {
+        "question": "Apa yang berlaku jika saya melebihi had?",
+        "answer": "Anda akan dimaklumkan apabila menghampiri had. Anda boleh naik taraf pelan atau tunggu kitaran pengebilan seterusnya."
+      },
+      "trial": {
+        "question": "Adakah anda menawarkan percubaan percuma?",
+        "answer": "Ya! Pelan Pro dan Maksimum termasuk percubaan percuma 14 hari. Tiada kad kredit diperlukan."
+      },
+      "refund": {
+        "question": "Apakah polisi bayaran balik anda?",
+        "answer": "Kami menawarkan jaminan wang dikembalikan 30 hari untuk semua pelan berbayar."
+      },
+      "support": {
+        "question": "Sokongan apa yang anda berikan?",
+        "answer": "Pengguna percuma mendapat sokongan komuniti. Pengguna Pro mendapat sokongan e-mel. Pengguna Maksimum mendapat sokongan keutamaan."
+      }
+    }
+  },
+  "cta": {
+    "title": "Bersedia untuk bermula?",
+    "subtitle": "Sertai ribuan perniagaan yang sudah menggunakan Mataresit",
+    "button": "Mula Percubaan Percuma",
+    "contact": "Hubungi Jualan"
+  }
+}

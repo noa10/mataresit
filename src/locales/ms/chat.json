@@ -1,0 +1,182 @@
+{
+  "meta": {
+    "title": "Carian Pintar - Mataresit",
+    "description": "Cari resit anda menggunakan bahasa semula jadi dengan bantuan berkuasa AI."
+  },
+  "welcome": {
+    "title": "Selamat Datang ke Carian Pintar",
+    "subtitle": "Tanya saya apa-apa tentang resit anda menggunakan bahasa semula jadi",
+    "examples": {
+      "title": "Cuba tanya:",
+      "queries": [
+        "Tunjukkan semua resit bulan lepas",
+        "Cari resit lebih RM400 dari restoran",
+        "Berapa saya belanja untuk bekalan pejabat tahun ini?",
+        "Tunjukkan resit dari Starbucks bulan Disember",
+        "Cari semua perbelanjaan perjalanan dari Q1",
+        "Berapa jumlah perbelanjaan saya untuk barangan runcit?"
+      ]
+    },
+    "features": {
+      "naturalLanguage": {
+        "title": "Bahasa Semula Jadi",
+        "description": "Tanya soalan dalam Bahasa Malaysia"
+      },
+      "instantResults": {
+        "title": "Hasil Segera",
+        "description": "Dapatkan jawapan dalam beberapa saat"
+      },
+      "smartFiltering": {
+        "title": "Penapisan Pintar",
+        "description": "AI memahami konteks dan niat"
+      }
+    }
+  },
+  "input": {
+    "placeholder": "Tanya saya tentang resit anda...",
+    "placeholders": [
+      "Tanya saya tentang resit anda...",
+      "Cari resit minggu lepas...",
+      "Tunjukkan perbelanjaan restoran...",
+      "Berapa saya belanja untuk perjalanan?",
+      "Cari resit lebih RM200..."
+    ],
+    "send": "Hantar",
+    "clear": "Kosongkan",
+    "suggestions": {
+      "title": "Cadangan",
+      "recent": "Carian terkini",
+      "popular": "Pertanyaan popular",
+      "categories": "Cari mengikut kategori",
+      "dateRanges": "Cari mengikut tarikh"
+    }
+  },
+  "messages": {
+    "thinking": "Berfikir...",
+    "searching": "Mencari resit anda...",
+    "analyzing": "Menganalisis hasil...",
+    "noResults": "Tiada resit dijumpai yang sepadan dengan pertanyaan anda.",
+    "error": "Maaf, saya tidak dapat memproses permintaan anda. Sila cuba lagi.",
+    "tryAgain": "Cuba lagi",
+    "refineSearch": "Perhalusi carian",
+    "actions": {
+      "copy": "Salin",
+      "share": "Kongsi",
+      "export": "Eksport",
+      "viewReceipt": "Lihat Resit",
+      "editReceipt": "Edit Resit",
+      "deleteReceipt": "Padam Resit"
+    }
+  },
+  "results": {
+    "found": "Dijumpai {{count}} resit",
+    "totalAmount": "Jumlah keseluruhan: {{amount}}",
+    "dateRange": "Dari {{startDate}} hingga {{endDate}}",
+    "categories": "Kategori: {{categories}}",
+    "merchants": "Pedagang: {{merchants}}",
+    "summary": {
+      "title": "Ringkasan",
+      "totalReceipts": "Jumlah resit",
+      "totalAmount": "Jumlah keseluruhan",
+      "averageAmount": "Purata jumlah",
+      "topCategory": "Kategori teratas",
+      "topMerchant": "Pedagang teratas",
+      "dateRange": "Julat tarikh"
+    },
+    "filters": {
+      "title": "Perhalusi Hasil",
+      "dateRange": "Julat Tarikh",
+      "amount": "Julat Jumlah",
+      "category": "Kategori",
+      "merchant": "Pedagang",
+      "apply": "Gunakan Penapis",
+      "clear": "Kosongkan Penapis"
+    }
+  },
+  "history": {
+    "title": "Sejarah Carian",
+    "recent": "Carian Terkini",
+    "saved": "Carian Tersimpan",
+    "clear": "Kosongkan Sejarah",
+    "save": "Simpan Carian",
+    "delete": "Padam",
+    "empty": "Belum ada sejarah carian",
+    "actions": {
+      "runAgain": "Jalankan Lagi",
+      "edit": "Edit Pertanyaan",
+      "save": "Simpan",
+      "delete": "Padam"
+    }
+  },
+  "suggestions": {
+    "quickSearches": {
+      "title": "Carian Pantas",
+      "thisMonth": "Resit bulan ini",
+      "lastMonth": "Resit bulan lepas",
+      "thisYear": "Resit tahun ini",
+      "highValue": "Resit nilai tinggi (>RM400)",
+      "recent": "Resit terkini (7 hari lepas)",
+      "restaurants": "Resit restoran",
+      "travel": "Perbelanjaan perjalanan",
+      "office": "Bekalan pejabat"
+    },
+    "categories": {
+      "title": "Cari mengikut Kategori",
+      "food": "Makanan & Makan",
+      "travel": "Perjalanan",
+      "office": "Bekalan Pejabat",
+      "entertainment": "Hiburan",
+      "utilities": "Utiliti",
+      "healthcare": "Penjagaan Kesihatan",
+      "shopping": "Membeli-belah",
+      "other": "Lain-lain"
+    },
+    "dateRanges": {
+      "title": "Cari mengikut Tarikh",
+      "today": "Hari ini",
+      "yesterday": "Semalam",
+      "thisWeek": "Minggu ini",
+      "lastWeek": "Minggu lepas",
+      "thisMonth": "Bulan ini",
+      "lastMonth": "Bulan lepas",
+      "thisQuarter": "Suku tahun ini",
+      "thisYear": "Tahun ini"
+    }
+  },
+  "export": {
+    "title": "Eksport Hasil Carian",
+    "formats": {
+      "pdf": "Laporan PDF",
+      "excel": "Spreadsheet Excel",
+      "csv": "Fail CSV",
+      "json": "Data JSON"
+    },
+    "options": {
+      "includeImages": "Sertakan imej resit",
+      "includeSummary": "Sertakan statistik ringkasan",
+      "groupByCategory": "Kumpulkan mengikut kategori",
+      "groupByMerchant": "Kumpulkan mengikut pedagang",
+      "groupByDate": "Kumpulkan mengikut tarikh"
+    },
+    "download": "Muat Turun",
+    "generating": "Menjana eksport..."
+  },
+  "errors": {
+    "networkError": "Ralat rangkaian. Sila semak sambungan anda.",
+    "searchFailed": "Carian gagal. Sila cuba lagi.",
+    "noPermission": "Anda tidak mempunyai kebenaran untuk mengakses resit ini.",
+    "invalidQuery": "Pertanyaan carian tidak sah. Sila cuba ubah suai.",
+    "serverError": "Ralat pelayan. Sila cuba lagi kemudian.",
+    "exportFailed": "Eksport gagal. Sila cuba lagi."
+  },
+  "tips": {
+    "title": "Petua Carian",
+    "items": [
+      "Gunakan bahasa semula jadi seperti 'Tunjukkan resit restoran bulan lepas'",
+      "Nyatakan jumlah dengan 'lebih RM200' atau 'kurang RM80'",
+      "Cari mengikut nama pedagang seperti 'Starbucks' atau 'Amazon'",
+      "Gunakan julat tarikh seperti 'minggu lepas', 'tahun ini', atau 'Disember 2023'",
+      "Gabungkan kriteria seperti 'perbelanjaan perjalanan lebih RM400 dari suku lepas'"
+    ]
+  }
+}

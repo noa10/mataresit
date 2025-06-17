@@ -1,0 +1,112 @@
+{
+  "general": {
+    "unknown": "An unknown error occurred",
+    "network": "Network error. Please check your connection.",
+    "server": "Server error. Please try again later.",
+    "timeout": "Request timed out. Please try again.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "forbidden": "Access denied.",
+    "notFound": "The requested resource was not found.",
+    "conflict": "A conflict occurred. Please refresh and try again.",
+    "validation": "Please check your input and try again.",
+    "maintenance": "The system is currently under maintenance."
+  },
+  "auth": {
+    "invalidCredentials": "Invalid email or password",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "accountLocked": "Your account has been locked. Please contact support.",
+    "emailNotVerified": "Please verify your email address before continuing.",
+    "passwordTooWeak": "Password is too weak. Please choose a stronger password.",
+    "emailAlreadyExists": "An account with this email already exists.",
+    "invalidToken": "Invalid or expired token.",
+    "twoFactorRequired": "Two-factor authentication is required."
+  },
+  "upload": {
+    "fileTooLarge": "File size exceeds the maximum limit of {{maxSize}}MB",
+    "invalidFormat": "Invalid file format. Please upload JPG, PNG, or PDF files.",
+    "uploadFailed": "Failed to upload file. Please try again.",
+    "processingFailed": "Failed to process the receipt. Please try again.",
+    "noFileSelected": "Please select a file to upload.",
+    "corruptedFile": "The file appears to be corrupted.",
+    "quotaExceeded": "You have exceeded your upload quota.",
+    "batchLimitExceeded": "Batch upload limit exceeded. Maximum {{limit}} files allowed."
+  },
+  "processing": {
+    "extractionFailed": "Failed to extract data from the receipt",
+    "lowConfidence": "Low confidence in extracted data. Please review manually.",
+    "aiServiceUnavailable": "AI processing service is currently unavailable",
+    "ocrFailed": "OCR processing failed",
+    "imageQualityPoor": "Image quality is too poor for processing",
+    "unsupportedLanguage": "Language not supported for processing",
+    "timeoutError": "Processing timed out. Please try again."
+  },
+  "data": {
+    "saveError": "Failed to save data. Please try again.",
+    "loadError": "Failed to load data. Please refresh the page.",
+    "deleteError": "Failed to delete item. Please try again.",
+    "updateError": "Failed to update item. Please try again.",
+    "duplicateEntry": "This entry already exists.",
+    "invalidData": "Invalid data format.",
+    "missingRequired": "Required fields are missing."
+  },
+  "team": {
+    "invitationFailed": "Failed to send team invitation",
+    "memberNotFound": "Team member not found",
+    "insufficientPermissions": "You don't have permission to perform this action",
+    "teamLimitReached": "Team member limit reached",
+    "alreadyMember": "User is already a team member",
+    "cannotRemoveSelf": "You cannot remove yourself from the team",
+    "cannotChangeOwnRole": "You cannot change your own role"
+  },
+  "billing": {
+    "paymentFailed": "Payment failed. Please check your payment method.",
+    "subscriptionExpired": "Your subscription has expired.",
+    "planLimitReached": "You have reached your plan limit.",
+    "invalidPaymentMethod": "Invalid payment method.",
+    "billingAddressRequired": "Billing address is required.",
+    "cardDeclined": "Your card was declined.",
+    "insufficientFunds": "Insufficient funds."
+  },
+  "export": {
+    "exportFailed": "Failed to export data",
+    "noDataToExport": "No data available to export",
+    "formatNotSupported": "Export format not supported",
+    "fileTooLarge": "Export file is too large"
+  },
+  "search": {
+    "searchFailed": "Search failed. Please try again.",
+    "noResults": "No results found for your search.",
+    "invalidQuery": "Invalid search query.",
+    "searchTimeout": "Search timed out. Please try again."
+  },
+  "contextual": {
+    "unauthorized": "Access denied",
+    "unauthorized_admin": "Administrator access required",
+    "unauthorized_user": "User authentication required",
+    "unauthorized_guest": "Please sign in to continue",
+    "unauthorized_team_member": "Team member access required",
+    "forbidden": "Action not allowed",
+    "forbidden_admin": "Insufficient administrator privileges",
+    "forbidden_user": "User permission denied",
+    "forbidden_team_member": "Team permission required",
+    "validation": "Input validation failed",
+    "validation_admin": "Administrator input validation failed",
+    "validation_user": "Please check your input",
+    "validation_team_member": "Team data validation failed"
+  },
+  "malaysian": {
+    "businessErrors": {
+      "invalidGstNumber": "Invalid GST registration number format",
+      "invalidSstNumber": "Invalid SST registration number format",
+      "invalidBusinessNumber": "Invalid Malaysian business registration number",
+      "unsupportedCurrency": "Currency not supported in Malaysia",
+      "invalidMalaysianAddress": "Invalid Malaysian address format"
+    },
+    "processingErrors": {
+      "malayTextProcessing": "Error processing Malay text",
+      "malaysianReceiptFormat": "Unrecognized Malaysian receipt format",
+      "gstCalculationError": "GST calculation error",
+      "sstCalculationError": "SST calculation error"
+    }
+  }
+}

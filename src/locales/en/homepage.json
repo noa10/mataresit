@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "title": "More Business, Less Paperwork - Mataresit"
+  },
+  "hero": {
+    "title": "More Business, <span class=\"text-primary\">Less Paperwork</span>",
+    "subtitle": "Transform your receipts into organized data instantly. Save hours every week and never miss a tax deduction again.",
+    "benefits": {
+      "saveTime": "Save 5+ Hours/Week",
+      "accuracy": "99% Accuracy",
+      "security": "Bank-Level Security"
+    },
+    "cta": {
+      "getStarted": "Get Started Free",
+      "viewPricing": "View Pricing",
+      "goToDashboard": "Go to Dashboard",
+      "trySmartSearch": "Try Smart Search"
+    },
+    "imageOverlay": {
+      "title": "Transform Your Business",
+      "subtitle": "Save time, increase accuracy",
+      "startNow": "Start Now"
+    }
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "subtitle": "From receipt to organized data in three simple steps. No training required.",
+    "steps": {
+      "upload": {
+        "title": "Upload",
+        "description": "Snap a photo or upload files. Drag and drop multiple receipts for batch processing."
+      },
+      "aiProcessing": {
+        "title": "AI Processing",
+        "description": "Our AI extracts all data with confidence scores. Review and approve in seconds."
+      },
+      "exportAnalyze": {
+        "title": "Export & Analyze",
+        "description": "Export to Excel, QuickBooks, or your favorite accounting software. Generate reports instantly."
+      }
+    }
+  },
+  "stats": {
+    "title": "Join thousands of businesses saving time and money",
+    "items": {
+      "businesses": "Businesses Trust Us",
+      "accuracy": "Accuracy Rate",
+      "timeSaved": "Saved Per Week"
+    }
+  },
+  "features": {
+    "title": "Everything you need to <span class=\"text-primary\">transform your business</span>",
+    "subtitle": "Stop wasting time on manual data entry. Our intelligent platform handles everything from receipt capture to financial reporting.",
+    "list": {
+      "saveTime": {
+        "title": "Save Hours Every Week",
+        "description": "Eliminate manual data entry forever. Our AI processes receipts in seconds, not hours, giving you time to focus on growing your business."
+      },
+      "accuracy": {
+        "title": "99% Accuracy Guaranteed",
+        "description": "Advanced AI with confidence scoring ensures your financial data is always accurate. Catch errors before they become problems."
+      },
+      "search": {
+        "title": "Find Any Receipt Instantly",
+        "description": "Smart search that understands natural language. Find receipts by asking 'coffee expenses last month' or 'client dinner receipts'."
+      },
+      "taxDeductions": {
+        "title": "Maximize Tax Deductions",
+        "description": "Never miss a deductible expense again. Automatically categorize and organize receipts for tax season and financial reporting."
+      },
+      "teamCollaboration": {
+        "title": "Team Collaboration Made Easy",
+        "description": "Share receipts and reports with your team or accountant. Real-time collaboration with role-based permissions and audit trails."
+      },
+      "security": {
+        "title": "Bank-Level Security",
+        "description": "Your financial data is protected with enterprise-grade security. SOC 2 compliant with end-to-end encryption."
+      }
+    }
+  },
+  "cta": {
+    "title": "Ready to transform your business?",
+    "subtitle": "Join thousands of businesses already saving hours every week. Start your free trial today.",
+    "startFreeTrial": "Start Free Trial",
+    "viewPricing": "View Pricing",
+    "goToDashboard": "Go to Dashboard"
+  },
+  "footer": {
+    "description": "Transform your receipts into organized data. Save time, increase accuracy, and never miss a deduction.",
+    "sections": {
+      "product": {
+        "title": "Product",
+        "features": "Features",
+        "dashboard": "Dashboard",
+        "apiReference": "API Reference",
+        "pricing": "Pricing"
+      },
+      "resources": {
+        "title": "Resources",
+        "documentation": "Documentation",
+        "helpCenter": "Help Center",
+        "systemStatus": "System Status",
+        "blog": "Blog"
+      },
+      "legal": {
+        "title": "Legal",
+        "privacyPolicy": "Privacy Policy",
+        "termsOfService": "Terms of Service",
+        "contactUs": "Contact Us"
+      }
+    },
+    "copyright": "© {{year}} Mataresit. All rights reserved."
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "title": "Profil",
+  "description": "Urus tetapan akaun dan keutamaan anda",
+  "signOut": "Log Keluar",
+  "loading": {
+    "profile": "Memuatkan profil..."
+  },
+  "error": {
+    "loadingProfile": "Ralat memuatkan profil",
+    "loadingDescription": "Gagal memuatkan maklumat profil. Sila muat semula halaman.",
+    "unableToLoad": "Tidak dapat memuatkan maklumat profil.",
+    "refreshPage": "Muat Semula Halaman"
+  },
+  "info": {
+    "plan": "Pelan",
+    "memberSince": "Ahli sejak",
+    "free": "Percuma"
+  },
+  "tabs": {
+    "profile": "Profil",
+    "billing": "Pengebilan",
+    "teams": "Pasukan",
+    "settings": "Tetapan",
+    "security": "Keselamatan"
+  },
+  "editor": {
+    "title": "Maklumat Peribadi",
+    "fields": {
+      "firstName": "Nama Pertama",
+      "lastName": "Nama Keluarga",
+      "email": "Alamat E-mel"
+    },
+    "placeholders": {
+      "firstName": "Masukkan nama pertama anda",
+      "lastName": "Masukkan nama keluarga anda",
+      "email": "Masukkan alamat e-mel anda"
+    },
+    "validation": {
+      "firstNameTooLong": "Nama pertama mestilah 50 aksara atau kurang",
+      "lastNameTooLong": "Nama keluarga mestilah 50 aksara atau kurang",
+      "invalidEmail": "Sila masukkan alamat e-mel yang sah"
+    },
+    "descriptions": {
+      "emailNote": "Nota: Menukar e-mel anda mungkin memerlukan pengesahan semula"
+    },
+    "display": {
+      "fullName": "Nama Penuh",
+      "email": "E-mel",
+      "notProvided": "Tidak disediakan"
+    },
+    "actions": {
+      "edit": "Edit",
+      "saveChanges": "Simpan Perubahan",
+      "saving": "Menyimpan...",
+      "cancel": "Batal"
+    }
+  },
+  "notifications": {
+    "updateSuccess": "Profil dikemaskini",
+    "updateSuccessDescription": "Maklumat profil anda telah berjaya dikemaskini.",
+    "updateFailed": "Kemaskini gagal",
+    "updateFailedDescription": "Gagal mengemaskini profil. Sila cuba lagi.",
+    "unexpectedError": "Ralat tidak dijangka berlaku. Sila cuba lagi."
+  },
+  "avatar": {
+    "uploadPhoto": "Muat Naik Foto",
+    "uploading": "Memuat naik...",
+    "remove": "Buang",
+    "removing": "Membuang..."
+  },
+  "subscription": {
+    "title": "Langganan & Penggunaan",
+    "managePlan": "Urus Pelan",
+    "unableToLoad": "Tidak dapat memuatkan maklumat langganan.",
+    "currentPlan": "Pelan Semasa",
+    "planName": "Pelan {{tier}}"
+  },
+  "settings": {
+    "security": {
+      "title": "Tetapan Keselamatan",
+      "password": {
+        "title": "Kata Laluan",
+        "description": "Tukar kata laluan akaun anda",
+        "changeButton": "Tukar Kata Laluan"
+      }
+    },
+    "notifications": {
+      "signOutSuccess": "Berjaya log keluar",
+      "signOutSuccessDescription": "Anda telah berjaya log keluar dari akaun anda.",
+      "signOutFailed": "Log keluar gagal",
+      "signOutFailedDescription": "Ralat berlaku semasa log keluar. Sila cuba lagi."
+    }
+  },
+  "appearance": {
+    "title": "Tetapan Penampilan",
+    "darkMode": "Mod Gelap",
+    "darkModeDescription": "Tukar antara tema terang dan gelap",
+    "darkModeActivated": "Mod gelap diaktifkan",
+    "lightModeActivated": "Mod terang diaktifkan",
+    "themeChanged": "Tema aplikasi telah ditukar kepada mod {{mode}}."
+  },
+  "signOutSuccess": {
+    "title": "Berjaya log keluar",
+    "description": "Anda telah log keluar dari akaun anda."
+  }
+}

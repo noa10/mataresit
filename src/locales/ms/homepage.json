@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "title": "Lebih Perniagaan, Kurang Kertas Kerja - Mataresit"
+  },
+  "hero": {
+    "title": "Lebih Perniagaan, <span class=\"text-primary\">Kurang Kertas Kerja</span>",
+    "subtitle": "Tukar resit anda kepada data teratur dengan serta-merta. Jimat masa berjam-jam setiap minggu dan jangan terlepas potongan cukai lagi.",
+    "benefits": {
+      "saveTime": "Jimat 5+ Jam/Minggu",
+      "accuracy": "99% Ketepatan",
+      "security": "Keselamatan Tahap Bank"
+    },
+    "cta": {
+      "getStarted": "Mula Percuma",
+      "viewPricing": "Lihat Harga",
+      "goToDashboard": "Pergi ke Papan Pemuka",
+      "trySmartSearch": "Cuba Carian Pintar"
+    },
+    "imageOverlay": {
+      "title": "Transformasi Perniagaan Anda",
+      "subtitle": "Jimat masa, tingkatkan ketepatan",
+      "startNow": "Mula Sekarang"
+    }
+  },
+  "howItWorks": {
+    "title": "Bagaimana Ia Berfungsi",
+    "subtitle": "Dari resit kepada data teratur dalam tiga langkah mudah. Tiada latihan diperlukan.",
+    "steps": {
+      "upload": {
+        "title": "Muat Naik",
+        "description": "Ambil foto atau muat naik fail. Seret dan lepas beberapa resit untuk pemprosesan kelompok."
+      },
+      "aiProcessing": {
+        "title": "Pemprosesan AI",
+        "description": "AI kami mengekstrak semua data dengan skor keyakinan. Semak dan luluskan dalam beberapa saat."
+      },
+      "exportAnalyze": {
+        "title": "Eksport & Analisis",
+        "description": "Eksport ke Excel, QuickBooks, atau perisian perakaunan kegemaran anda. Jana laporan dengan serta-merta."
+      }
+    }
+  },
+  "stats": {
+    "title": "Sertai ribuan perniagaan yang menjimatkan masa dan wang",
+    "items": {
+      "businesses": "Perniagaan Mempercayai Kami",
+      "accuracy": "Kadar Ketepatan",
+      "timeSaved": "Dijimatkan Setiap Minggu"
+    }
+  },
+  "features": {
+    "title": "Semua yang anda perlukan untuk <span class=\"text-primary\">mengubah perniagaan anda</span>",
+    "subtitle": "Berhenti membuang masa pada kemasukan data manual. Platform pintar kami mengendalikan segala-galanya dari tangkapan resit hingga pelaporan kewangan.",
+    "list": {
+      "saveTime": {
+        "title": "Jimat Jam Setiap Minggu",
+        "description": "Hapuskan kemasukan data manual selama-lamanya. AI kami memproses resit dalam beberapa saat, bukan jam, memberi anda masa untuk fokus mengembangkan perniagaan anda."
+      },
+      "accuracy": {
+        "title": "99% Ketepatan Dijamin",
+        "description": "AI canggih dengan pemarkahan keyakinan memastikan data kewangan anda sentiasa tepat. Tangkap ralat sebelum ia menjadi masalah."
+      },
+      "search": {
+        "title": "Cari Mana-mana Resit Dengan Serta-merta",
+        "description": "Carian pintar yang memahami bahasa semula jadi. Cari resit dengan bertanya 'perbelanjaan kopi bulan lepas' atau 'resit makan malam klien'."
+      },
+      "taxDeductions": {
+        "title": "Maksimumkan Potongan Cukai",
+        "description": "Jangan terlepas perbelanjaan boleh ditolak lagi. Kategorikan dan atur resit secara automatik untuk musim cukai dan pelaporan kewangan."
+      },
+      "teamCollaboration": {
+        "title": "Kerjasama Pasukan Dipermudahkan",
+        "description": "Kongsi resit dan laporan dengan pasukan atau akauntan anda. Kerjasama masa nyata dengan kebenaran berdasarkan peranan dan jejak audit."
+      },
+      "security": {
+        "title": "Keselamatan Tahap Bank",
+        "description": "Data kewangan anda dilindungi dengan keselamatan gred perusahaan. Mematuhi SOC 2 dengan penyulitan hujung ke hujung."
+      }
+    }
+  },
+  "cta": {
+    "title": "Bersedia untuk mengubah perniagaan anda?",
+    "subtitle": "Sertai ribuan perniagaan yang sudah menjimatkan jam setiap minggu. Mulakan percubaan percuma anda hari ini.",
+    "startFreeTrial": "Mula Percubaan Percuma",
+    "viewPricing": "Lihat Harga",
+    "goToDashboard": "Pergi ke Papan Pemuka"
+  },
+  "footer": {
+    "description": "Tukar resit anda kepada data teratur. Jimat masa, tingkatkan ketepatan, dan jangan terlepas potongan.",
+    "sections": {
+      "product": {
+        "title": "Produk",
+        "features": "Ciri-ciri",
+        "dashboard": "Papan Pemuka",
+        "apiReference": "Rujukan API",
+        "pricing": "Harga"
+      },
+      "resources": {
+        "title": "Sumber",
+        "documentation": "Dokumentasi",
+        "helpCenter": "Pusat Bantuan",
+        "systemStatus": "Status Sistem",
+        "blog": "Blog"
+      },
+      "legal": {
+        "title": "Undang-undang",
+        "privacyPolicy": "Dasar Privasi",
+        "termsOfService": "Terma Perkhidmatan",
+        "contactUs": "Hubungi Kami"
+      }
+    },
+    "copyright": "© {{year}} Mataresit. Semua hak terpelihara."
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "title": "Admin Panel",
+  "navigation": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "receipts": "Receipts",
+    "analytics": "Analytics",
+    "blog": "Blog",
+    "settings": "Settings"
+  },
+  "actions": {
+    "exitAdmin": "Exit Admin",
+    "signOut": "Sign Out",
+    "signedInAs": "Signed in as"
+  },
+  "dashboard": {
+    "title": "Admin Dashboard",
+    "systemOverview": "System Overview",
+    "stats": {
+      "totalUsers": "Total Users",
+      "activeUsers": "Active Users",
+      "totalReceipts": "Total Receipts",
+      "processingQueue": "Processing Queue",
+      "storageUsed": "Storage Used",
+      "revenue": "Revenue",
+      "recentActivity": "Recent Activity"
+    },
+    "descriptions": {
+      "totalUsers": "Registered users on the platform",
+      "totalReceipts": "Total number of receipts processed",
+      "recentActivity": "Last 10 receipts"
+    },
+    "charts": {
+      "userGrowth": "User Growth",
+      "receiptProcessing": "Receipt Processing",
+      "revenue": "Revenue Trends",
+      "usage": "Usage Statistics"
+    }
+  },
+  "users": {
+    "title": "User Management",
+    "table": {
+      "id": "ID",
+      "email": "Email",
+      "name": "Name",
+      "role": "Role",
+      "status": "Status",
+      "createdAt": "Created",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "suspend": "Suspend",
+      "activate": "Activate",
+      "delete": "Delete",
+      "impersonate": "Impersonate"
+    },
+    "filters": {
+      "all": "All Users",
+      "active": "Active",
+      "suspended": "Suspended",
+      "admin": "Admins",
+      "pro": "Pro Users",
+      "free": "Free Users"
+    },
+    "roles": {
+      "admin": "Admin",
+      "user": "User",
+      "moderator": "Moderator"
+    }
+  },
+  "receipts": {
+    "title": "Receipt Management",
+    "table": {
+      "id": "ID",
+      "user": "User",
+      "merchant": "Merchant",
+      "amount": "Amount",
+      "status": "Status",
+      "confidence": "Confidence",
+      "createdAt": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "reprocess": "Reprocess",
+      "delete": "Delete",
+      "flag": "Flag",
+      "unflag": "Unflag"
+    },
+    "filters": {
+      "all": "All Receipts",
+      "flagged": "Flagged",
+      "lowConfidence": "Low Confidence",
+      "failed": "Failed Processing",
+      "recent": "Recent"
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "description": "System-wide analytics and reporting",
+    "comingSoon": "Advanced analytics coming soon",
+    "futureFeatures": "Advanced analytics features will be implemented in the future",
+    "metrics": {
+      "userEngagement": "User Engagement",
+      "processingAccuracy": "Processing Accuracy",
+      "systemPerformance": "System Performance",
+      "errorRates": "Error Rates"
+    },
+    "reports": {
+      "daily": "Daily Report",
+      "weekly": "Weekly Report",
+      "monthly": "Monthly Report",
+      "custom": "Custom Report"
+    }
+  },
+  "blog": {
+    "title": "Blog Management",
+    "posts": {
+      "title": "Blog Posts",
+      "create": "Create Post",
+      "edit": "Edit Post",
+      "delete": "Delete Post",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "draft": "Save as Draft"
+    },
+    "categories": {
+      "title": "Categories",
+      "create": "Create Category",
+      "edit": "Edit Category",
+      "delete": "Delete Category"
+    }
+  },
+  "settings": {
+    "title": "System Settings",
+    "general": {
+      "title": "General",
+      "siteName": "Site Name",
+      "siteDescription": "Site Description",
+      "maintenanceMode": "Maintenance Mode"
+    },
+    "email": {
+      "title": "Email Settings",
+      "smtpServer": "SMTP Server",
+      "smtpPort": "SMTP Port",
+      "smtpUsername": "SMTP Username",
+      "smtpPassword": "SMTP Password"
+    },
+    "storage": {
+      "title": "Storage Settings",
+      "provider": "Storage Provider",
+      "bucket": "Bucket Name",
+      "region": "Region",
+      "maxFileSize": "Max File Size"
+    },
+    "ai": {
+      "title": "AI Settings",
+      "provider": "AI Provider",
+      "apiKey": "API Key",
+      "model": "Default Model",
+      "confidenceThreshold": "Confidence Threshold"
+    }
+  },
+  "plurals": {
+    "user": "user",
+    "user_zero": "no users",
+    "user_one": "{{count}} user",
+    "user_other": "{{count}} users",
+    "receipt": "receipt",
+    "receipt_zero": "no receipts",
+    "receipt_one": "{{count}} receipt",
+    "receipt_other": "{{count}} receipts",
+    "activeUser": "active user",
+    "activeUser_zero": "no active users",
+    "activeUser_one": "{{count}} active user",
+    "activeUser_other": "{{count}} active users",
+    "flaggedReceipt": "flagged receipt",
+    "flaggedReceipt_zero": "no flagged receipts",
+    "flaggedReceipt_one": "{{count}} flagged receipt",
+    "flaggedReceipt_other": "{{count}} flagged receipts"
+  },
+  "contextual": {
+    "access": "Administrator Access",
+    "access_admin": "Full System Administrator",
+    "access_moderator": "Content Moderator",
+    "dashboard": "Admin Dashboard",
+    "dashboard_admin": "System Administration Dashboard",
+    "dashboard_moderator": "Content Moderation Dashboard",
+    "userManagement": "User Management",
+    "userManagement_admin": "Complete User Administration",
+    "userManagement_moderator": "User Content Moderation"
+  },
+  "errors": {
+    "title": "Error",
+    "loadStatsFailed": "Failed to load system statistics",
+    "loadUsersFailed": "Failed to load users"
+  },
+  "malaysian": {
+    "systemSettings": {
+      "timezone": "Malaysia Time (GMT+8)",
+      "currency": "Malaysian Ringgit (MYR)",
+      "language": "Bahasa Malaysia / English",
+      "businessHours": "Malaysian Business Hours"
+    },
+    "compliance": {
+      "dataProtection": "Personal Data Protection Act (PDPA)",
+      "businessRegistration": "Malaysian Business Registration",
+      "taxCompliance": "GST/SST Compliance"
+    }
+  }
+}

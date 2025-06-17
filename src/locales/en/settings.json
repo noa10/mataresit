@@ -1,0 +1,216 @@
+{
+  "title": "Settings",
+  "description": "Configure your receipt processing preferences and AI model providers",
+  "tabs": {
+    "general": "General",
+    "processing": "Processing",
+    "categories": "Categories",
+    "providers": "AI Providers",
+    "usage": "Usage Stats",
+    "notifications": "Notifications",
+    "billing": "Billing",
+    "team": "Team",
+    "security": "Security",
+    "integrations": "Integrations",
+    "advanced": "Advanced"
+  },
+  "categories": {
+    "title": "Category Management",
+    "description": "Create and manage custom categories to organize your receipts"
+  },
+  "providers": {
+    "title": "AI Model Providers",
+    "description": "Configure and monitor your AI model providers",
+    "status": {
+      "testing": "Testing",
+      "available": "Available",
+      "unavailable": "Unavailable"
+    },
+    "stats": {
+      "models": "Models"
+    },
+    "tooltips": {
+      "fastModels": "Fast models"
+    },
+    "actions": {
+      "refreshStatus": "Refresh Status"
+    },
+    "notifications": {
+      "apiKeySaved": "{{provider}} API key saved successfully",
+      "apiKeySaveFailed": "Failed to save API key",
+      "apiKeyCleared": "{{provider}} API key cleared"
+    }
+  },
+  "apiKeys": {
+    "title": "API Key Configuration",
+    "description": "Configure your API keys to enable additional AI model providers",
+    "openrouter": {
+      "title": "OpenRouter API Key",
+      "description": "Access multiple AI providers through OpenRouter's unified API"
+    },
+    "fields": {
+      "apiKey": "API Key"
+    },
+    "status": {
+      "configured": "Configured"
+    },
+    "actions": {
+      "getKey": "Get Key",
+      "save": "Save API Key",
+      "saving": "Saving...",
+      "clear": "Clear Key"
+    },
+    "notifications": {
+      "saved": "API key saved successfully",
+      "saveFailed": "Failed to save API key",
+      "cleared": "API key cleared"
+    }
+  },
+  "usage": {
+    "title": "Your Current Usage",
+    "description": "Track your subscription limits and usage in real-time"
+  },
+  "general": {
+    "title": "General Settings",
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred language",
+      "options": {
+        "en": "English",
+        "ms": "Bahasa Malaysia"
+      }
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose your preferred theme",
+      "options": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
+    },
+    "timezone": {
+      "title": "Timezone",
+      "description": "Set your local timezone"
+    },
+    "dateFormat": {
+      "title": "Date Format",
+      "description": "Choose your preferred date format",
+      "options": {
+        "mdy": "MM/DD/YYYY",
+        "dmy": "DD/MM/YYYY",
+        "ymd": "YYYY-MM-DD"
+      }
+    },
+    "currency": {
+      "title": "Default Currency",
+      "description": "Set your default currency for receipts"
+    }
+  },
+  "processing": {
+    "title": "Processing Settings",
+    "description": "Configure how your receipts are processed after upload. Changes are saved automatically.",
+    "aiVisionDescription": "Mataresit uses advanced AI Vision technology for receipt processing, providing superior accuracy with support for larger images (up to 5MB). This method processes your receipts directly using AI models with vision capabilities, eliminating the need for traditional OCR processing.",
+    "aiModelConfigDescription": "Configure your preferred AI models for single and batch processing below. Different models offer various trade-offs between speed, accuracy, and cost.",
+    "aiModelConfig": "AI Model Configuration",
+    "batchProcessingConfig": "Batch Processing Configuration",
+    "batchProcessingDescription": "Configure how multiple receipts are processed during batch uploads, including subscription limits, concurrency, timeouts, and retry behavior.",
+    "aiProvider": {
+      "title": "AI Provider",
+      "description": "Choose your preferred AI processing provider",
+      "options": {
+        "gemini-2.0-flash-lite": "Gemini 2.0 Flash Lite",
+        "gemini-1.5-pro": "Gemini 1.5 Pro",
+        "gemini-1.5-flash": "Gemini 1.5 Flash"
+      }
+    },
+    "processingMethod": {
+      "title": "Processing Method",
+      "description": "Choose how receipts should be processed",
+      "options": {
+        "ai-vision": "AI Vision (Recommended)",
+        "ocr-ai": "OCR + AI (Legacy)"
+      }
+    },
+    "batchLimits": {
+      "title": "Batch Upload Limits",
+      "description": "Maximum number of receipts per batch upload",
+      "free": "Free Plan: {{limit}} receipts",
+      "pro": "Pro Plan: {{limit}} receipts",
+      "max": "Max Plan: {{limit}} receipts"
+    },
+    "autoCategories": {
+      "title": "Auto-categorization",
+      "description": "Automatically categorize receipts based on merchant and content",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "confidenceThreshold": {
+      "title": "Confidence Threshold",
+      "description": "Minimum confidence score for auto-approval"
+    }
+  },
+  "notifications": {
+    "title": "Notification Settings",
+    "email": {
+      "title": "Email Notifications",
+      "processingComplete": "Receipt processing complete",
+      "teamInvitations": "Team invitations",
+      "billingUpdates": "Billing updates",
+      "securityAlerts": "Security alerts",
+      "weeklyReports": "Weekly reports"
+    },
+    "push": {
+      "title": "Push Notifications",
+      "enabled": "Enable push notifications",
+      "processingUpdates": "Processing updates",
+      "teamActivity": "Team activity"
+    }
+  },
+  "billing": {
+    "title": "Billing & Subscription",
+    "currentPlan": "Current Plan",
+    "usage": "Usage",
+    "receiptsProcessed": "Receipts Processed",
+    "storageUsed": "Storage Used",
+    "teamMembers": "Team Members",
+    "upgrade": "Upgrade Plan",
+    "downgrade": "Downgrade Plan",
+    "cancelSubscription": "Cancel Subscription",
+    "paymentMethod": "Payment Method",
+    "billingHistory": "Billing History",
+    "invoices": "Invoices"
+  },
+  "team": {
+    "title": "Team Management",
+    "members": "Team Members",
+    "invitations": "Pending Invitations",
+    "roles": "Roles & Permissions",
+    "inviteMember": "Invite Member",
+    "removeMember": "Remove Member",
+    "changeRole": "Change Role"
+  },
+  "security": {
+    "title": "Security Settings",
+    "changePassword": "Change Password",
+    "twoFactor": "Two-Factor Authentication",
+    "sessions": "Active Sessions",
+    "apiKeys": "API Keys",
+    "auditLog": "Audit Log"
+  },
+  "actions": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "reset": "Reset to Defaults",
+    "export": "Export Settings",
+    "import": "Import Settings"
+  },
+  "messages": {
+    "saved": "Settings saved successfully",
+    "error": "Failed to save settings",
+    "resetConfirm": "Are you absolutely sure?",
+    "resetDescription": "This action will reset all processing settings to their default values. This cannot be undone.",
+    "resetToast": "Settings reset to defaults.",
+    "continue": "Continue"
+  }
+}

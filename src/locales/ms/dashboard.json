@@ -1,0 +1,136 @@
+{
+  "title": "Papan Pemuka Resit",
+  "upload": {
+    "button": "Muat Naik Resit",
+    "batchButton": "Muat Naik Berkelompok",
+    "dragDrop": "Seret dan lepas fail di sini",
+    "or": "atau",
+    "browse": "layari fail",
+    "maxSize": "Saiz fail maksimum: {{size}}MB",
+    "supportedFormats": "Format yang disokong: JPG, PNG, PDF"
+  },
+  "filters": {
+    "title": "Penapis",
+    "all": "Semua Resit",
+    "unreviewed": "Belum Dikaji",
+    "reviewed": "Telah Dikaji",
+    "processing": "Memproses",
+    "completed": "Selesai",
+    "failed": "Gagal",
+    "dateRange": "Julat Tarikh",
+    "category": "Kategori",
+    "merchant": "Peniaga",
+    "amount": "Jumlah",
+    "currency": "Mata Wang",
+    "status": "Status",
+    "search": "Cari resit...",
+    "clear": "Kosongkan Penapis",
+    "apply": "Gunakan Penapis"
+  },
+  "stats": {
+    "totalReceipts": "Jumlah Resit",
+    "totalReceipts_admin": "Jumlah Resit Sistem",
+    "totalReceipts_user": "Resit Saya",
+    "totalReceipts_team_member": "Resit Pasukan",
+    "thisMonth": "Bulan Ini",
+    "lastMonth": "Bulan Lepas",
+    "avgConfidence": "Purata Keyakinan",
+    "totalAmount": "Jumlah Keseluruhan",
+    "processingTime": "Purata Masa Pemprosesan",
+    "receiptCount": "{{count}} resit",
+    "receiptCount_zero": "Tiada resit",
+    "receiptCount_one": "{{count}} resit",
+    "receiptCount_other": "{{count}} resit",
+    "userCount": "{{count}} pengguna",
+    "userCount_zero": "Tiada pengguna",
+    "userCount_one": "{{count}} pengguna",
+    "userCount_other": "{{count}} pengguna",
+    "processingCount": "{{count}} memproses",
+    "processingCount_zero": "Tiada yang memproses",
+    "processingCount_one": "{{count}} memproses",
+    "processingCount_other": "{{count}} memproses"
+  },
+  "views": {
+    "grid": "Paparan Grid",
+    "list": "Paparan Senarai",
+    "table": "Paparan Jadual",
+    "calendar": "Paparan Kalendar"
+  },
+  "actions": {
+    "select": "Pilih",
+    "selectAll": "Pilih Semua",
+    "deselectAll": "Nyahpilih Semua",
+    "delete": "Padam",
+    "export": "Eksport",
+    "share": "Kongsi",
+    "print": "Cetak",
+    "edit": "Edit",
+    "view": "Lihat",
+    "process": "Proses",
+    "reprocess": "Proses Semula",
+    "download": "Muat Turun",
+    "generateReport": "Jana Laporan",
+    "assignCategory": "Tetapkan kategori...",
+    "assign": "Tetapkan"
+  },
+  "empty": {
+    "title": "Tiada resit dijumpai",
+    "description": "Muat naik resit pertama anda untuk bermula",
+    "uploadButton": "Muat Naik Resit"
+  },
+  "selection": {
+    "selected": "{{count}} dipilih",
+    "actions": "Tindakan Berkelompok"
+  },
+  "export": {
+    "title": "Eksport Resit",
+    "format": "Format",
+    "options": {
+      "csv": "CSV",
+      "excel": "Excel",
+      "pdf": "PDF",
+      "json": "JSON"
+    },
+    "dateRange": "Julat Tarikh",
+    "includeImages": "Sertakan Imej",
+    "includeMetadata": "Sertakan Metadata",
+    "button": "Eksport"
+  },
+  "sort": {
+    "title": "Susun Mengikut",
+    "date": "Tarikh",
+    "amount": "Jumlah",
+    "merchant": "Peniaga",
+    "category": "Kategori",
+    "confidence": "Keyakinan",
+    "ascending": "Menaik",
+    "descending": "Menurun",
+    "newest": "Terbaharu",
+    "oldest": "Terlama",
+    "highest": "Tertinggi",
+    "lowest": "Terendah"
+  },
+  "contextual": {
+    "title": "Papan Pemuka",
+    "title_admin": "Papan Pemuka Admin - Gambaran Keseluruhan Sistem",
+    "title_user": "Papan Pemuka Resit Saya",
+    "title_team_member": "Papan Pemuka Pasukan",
+    "subtitle": "Urus resit anda",
+    "subtitle_admin": "Pantau aktiviti sistem dan pengurusan pengguna",
+    "subtitle_user": "Jejak dan susun resit anda",
+    "subtitle_team_member": "Bekerjasama dengan pasukan anda pada resit"
+  },
+  "malaysian": {
+    "currency": {
+      "format": "RM {{amount}}",
+      "ringgit": "Ringgit",
+      "sen": "Sen"
+    },
+    "businessContext": {
+      "gstReceipts": "Resit GST",
+      "sstReceipts": "Resit SST",
+      "malaysianMerchants": "Peniaga Malaysia",
+      "localBusinesses": "Perniagaan Tempatan"
+    }
+  }
+}

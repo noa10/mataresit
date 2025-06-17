@@ -1,0 +1,47 @@
+{
+  "title": "Manage Categories",
+  "description": "Create and organize custom categories for your receipts",
+  "actions": {
+    "newCategory": "New Category",
+    "createCategory": "Create Category",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "empty": {
+    "title": "No categories yet",
+    "description": "Create your first category to start organizing your receipts"
+  },
+  "error": {
+    "loadFailed": "Failed to load categories",
+    "tryRefresh": "Please try refreshing the page."
+  },
+  "form": {
+    "name": "Category Name",
+    "namePlaceholder": "Enter category name",
+    "color": "Color",
+    "colorDescription": "Choose a color to identify this category",
+    "nameRequired": "Category name is required",
+    "nameMinLength": "Category name must be at least 2 characters",
+    "nameMaxLength": "Category name must be less than 50 characters",
+    "colorRequired": "Please select a color"
+  },
+  "delete": {
+    "title": "Delete Category",
+    "description": "Are you sure you want to delete this category?",
+    "hasReceipts": "This category has {{count}} receipts assigned to it.",
+    "reassignLabel": "Reassign receipts to:",
+    "reassignOption": "Select a category",
+    "noReassign": "Don't reassign (receipts will become uncategorized)",
+    "confirmDelete": "Yes, delete category",
+    "deleting": "Deleting..."
+  },
+  "receipts": "receipts",
+  "receiptCount": "{{count}} receipts",
+  "success": {
+    "created": "Category created successfully",
+    "updated": "Category updated successfully",
+    "deleted": "Category deleted successfully"
+  }
+}

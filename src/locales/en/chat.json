@@ -1,0 +1,182 @@
+{
+  "meta": {
+    "title": "Smart Search - Mataresit",
+    "description": "Search your receipts using natural language with AI-powered assistance."
+  },
+  "welcome": {
+    "title": "Welcome to Smart Search",
+    "subtitle": "Ask me anything about your receipts using natural language",
+    "examples": {
+      "title": "Try asking:",
+      "queries": [
+        "Show me all receipts from last month",
+        "Find receipts over $100 from restaurants",
+        "What did I spend on office supplies this year?",
+        "Show me receipts from Starbucks in December",
+        "Find all travel expenses from Q1",
+        "What's my total spending on groceries?"
+      ]
+    },
+    "features": {
+      "naturalLanguage": {
+        "title": "Natural Language",
+        "description": "Ask questions in plain English"
+      },
+      "instantResults": {
+        "title": "Instant Results",
+        "description": "Get answers in seconds"
+      },
+      "smartFiltering": {
+        "title": "Smart Filtering",
+        "description": "AI understands context and intent"
+      }
+    }
+  },
+  "input": {
+    "placeholder": "Ask me about your receipts...",
+    "placeholders": [
+      "Ask me about your receipts...",
+      "Find receipts from last week...",
+      "Show me restaurant expenses...",
+      "What did I spend on travel?",
+      "Find receipts over $50..."
+    ],
+    "send": "Send",
+    "clear": "Clear",
+    "suggestions": {
+      "title": "Suggestions",
+      "recent": "Recent searches",
+      "popular": "Popular queries",
+      "categories": "Search by category",
+      "dateRanges": "Search by date"
+    }
+  },
+  "messages": {
+    "thinking": "Thinking...",
+    "searching": "Searching your receipts...",
+    "analyzing": "Analyzing results...",
+    "noResults": "No receipts found matching your query.",
+    "error": "Sorry, I couldn't process your request. Please try again.",
+    "tryAgain": "Try again",
+    "refineSearch": "Refine search",
+    "actions": {
+      "copy": "Copy",
+      "share": "Share",
+      "export": "Export",
+      "viewReceipt": "View Receipt",
+      "editReceipt": "Edit Receipt",
+      "deleteReceipt": "Delete Receipt"
+    }
+  },
+  "results": {
+    "found": "Found {{count}} receipt(s)",
+    "totalAmount": "Total amount: {{amount}}",
+    "dateRange": "From {{startDate}} to {{endDate}}",
+    "categories": "Categories: {{categories}}",
+    "merchants": "Merchants: {{merchants}}",
+    "summary": {
+      "title": "Summary",
+      "totalReceipts": "Total receipts",
+      "totalAmount": "Total amount",
+      "averageAmount": "Average amount",
+      "topCategory": "Top category",
+      "topMerchant": "Top merchant",
+      "dateRange": "Date range"
+    },
+    "filters": {
+      "title": "Refine Results",
+      "dateRange": "Date Range",
+      "amount": "Amount Range",
+      "category": "Category",
+      "merchant": "Merchant",
+      "apply": "Apply Filters",
+      "clear": "Clear Filters"
+    }
+  },
+  "history": {
+    "title": "Search History",
+    "recent": "Recent Searches",
+    "saved": "Saved Searches",
+    "clear": "Clear History",
+    "save": "Save Search",
+    "delete": "Delete",
+    "empty": "No search history yet",
+    "actions": {
+      "runAgain": "Run Again",
+      "edit": "Edit Query",
+      "save": "Save",
+      "delete": "Delete"
+    }
+  },
+  "suggestions": {
+    "quickSearches": {
+      "title": "Quick Searches",
+      "thisMonth": "This month's receipts",
+      "lastMonth": "Last month's receipts",
+      "thisYear": "This year's receipts",
+      "highValue": "High value receipts (>$100)",
+      "recent": "Recent receipts (last 7 days)",
+      "restaurants": "Restaurant receipts",
+      "travel": "Travel expenses",
+      "office": "Office supplies"
+    },
+    "categories": {
+      "title": "Search by Category",
+      "food": "Food & Dining",
+      "travel": "Travel",
+      "office": "Office Supplies",
+      "entertainment": "Entertainment",
+      "utilities": "Utilities",
+      "healthcare": "Healthcare",
+      "shopping": "Shopping",
+      "other": "Other"
+    },
+    "dateRanges": {
+      "title": "Search by Date",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisQuarter": "This quarter",
+      "thisYear": "This year"
+    }
+  },
+  "export": {
+    "title": "Export Search Results",
+    "formats": {
+      "pdf": "PDF Report",
+      "excel": "Excel Spreadsheet",
+      "csv": "CSV File",
+      "json": "JSON Data"
+    },
+    "options": {
+      "includeImages": "Include receipt images",
+      "includeSummary": "Include summary statistics",
+      "groupByCategory": "Group by category",
+      "groupByMerchant": "Group by merchant",
+      "groupByDate": "Group by date"
+    },
+    "download": "Download",
+    "generating": "Generating export..."
+  },
+  "errors": {
+    "networkError": "Network error. Please check your connection.",
+    "searchFailed": "Search failed. Please try again.",
+    "noPermission": "You don't have permission to access these receipts.",
+    "invalidQuery": "Invalid search query. Please try rephrasing.",
+    "serverError": "Server error. Please try again later.",
+    "exportFailed": "Export failed. Please try again."
+  },
+  "tips": {
+    "title": "Search Tips",
+    "items": [
+      "Use natural language like 'Show me restaurant receipts from last month'",
+      "Specify amounts with 'over $50' or 'under $20'",
+      "Search by merchant name like 'Starbucks' or 'Amazon'",
+      "Use date ranges like 'last week', 'this year', or 'December 2023'",
+      "Combine criteria like 'travel expenses over $100 from last quarter'"
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "brand": {
+    "name": "Mataresit",
+    "tagline": "Smart Receipt Management"
+  },
+  "mainMenu": {
+    "dashboard": "Dashboard",
+    "search": "Search",
+    "analysis": "Analysis",
+    "claims": "Claims",
+    "teams": "Teams",
+    "settings": "Settings",
+    "profile": "Profile",
+    "admin": "Admin",
+    "help": "Help",
+    "documentation": "Documentation",
+    "pricing": "Pricing",
+    "features": "Features",
+    "blog": "Blog",
+    "status": "Status",
+    "resources": "Resources"
+  },
+  "userMenu": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "billing": "Billing",
+    "team": "Team",
+    "help": "Help & Support",
+    "logout": "Sign Out",
+    "login": "Sign In",
+    "signup": "Sign Up"
+  },
+  "sidebar": {
+    "navigation": "Navigation",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "close": "Close"
+  },
+  "breadcrumbs": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "receipts": "Receipts",
+    "settings": "Settings",
+    "profile": "Profile",
+    "admin": "Admin",
+    "teams": "Teams",
+    "claims": "Claims",
+    "analysis": "Analysis",
+    "search": "Search"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "details": "Details",
+    "history": "History",
+    "settings": "Settings",
+    "members": "Members",
+    "permissions": "Permissions",
+    "billing": "Billing",
+    "notifications": "Notifications"
+  },
+  "footer": {
+    "copyright": "© 2024 Mataresit. All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "support": "Support",
+    "contact": "Contact Us"
+  }
+}

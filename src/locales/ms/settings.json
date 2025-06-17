@@ -1,0 +1,216 @@
+{
+  "title": "Settings",
+  "description": "Konfigurasikan keutamaan pemprosesan resit dan pembekal model AI anda",
+  "tabs": {
+    "general": "Umum",
+    "processing": "Pemprosesan",
+    "categories": "Kategori",
+    "providers": "Pembekal AI",
+    "usage": "Statistik Penggunaan",
+    "notifications": "Pemberitahuan",
+    "billing": "Pengebilan",
+    "team": "Pasukan",
+    "security": "Keselamatan",
+    "integrations": "Integrasi",
+    "advanced": "Lanjutan"
+  },
+  "categories": {
+    "title": "Pengurusan Kategori",
+    "description": "Cipta dan urus kategori tersuai untuk mengatur resit anda"
+  },
+  "providers": {
+    "title": "Penyedia Model AI",
+    "description": "Konfigurasi dan pantau penyedia model AI anda",
+    "status": {
+      "testing": "Menguji",
+      "available": "Tersedia",
+      "unavailable": "Tidak Tersedia"
+    },
+    "stats": {
+      "models": "Model"
+    },
+    "tooltips": {
+      "fastModels": "Model pantas"
+    },
+    "actions": {
+      "refreshStatus": "Muat Semula Status"
+    },
+    "notifications": {
+      "apiKeySaved": "Kunci API {{provider}} berjaya disimpan",
+      "apiKeySaveFailed": "Gagal menyimpan kunci API",
+      "apiKeyCleared": "Kunci API {{provider}} telah dibersihkan"
+    }
+  },
+  "apiKeys": {
+    "title": "Konfigurasi Kunci API",
+    "description": "Konfigurasi kunci API anda untuk membolehkan penyedia model AI tambahan",
+    "openrouter": {
+      "title": "Kunci API OpenRouter",
+      "description": "Akses pelbagai penyedia AI melalui API bersatu OpenRouter"
+    },
+    "fields": {
+      "apiKey": "Kunci API"
+    },
+    "status": {
+      "configured": "Dikonfigurasi"
+    },
+    "actions": {
+      "getKey": "Dapatkan Kunci",
+      "save": "Simpan Kunci API",
+      "saving": "Menyimpan...",
+      "clear": "Kosongkan Kunci"
+    },
+    "notifications": {
+      "saved": "Kunci API berjaya disimpan",
+      "saveFailed": "Gagal menyimpan kunci API",
+      "cleared": "Kunci API telah dikosongkan"
+    }
+  },
+  "usage": {
+    "title": "Penggunaan Semasa Anda",
+    "description": "Jejaki had langganan dan penggunaan anda dalam masa nyata"
+  },
+  "general": {
+    "title": "General Settings",
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred language",
+      "options": {
+        "en": "English",
+        "ms": "Bahasa Malaysia"
+      }
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose your preferred theme",
+      "options": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
+    },
+    "timezone": {
+      "title": "Timezone",
+      "description": "Set your local timezone"
+    },
+    "dateFormat": {
+      "title": "Date Format",
+      "description": "Choose your preferred date format",
+      "options": {
+        "mdy": "MM/DD/YYYY",
+        "dmy": "DD/MM/YYYY",
+        "ymd": "YYYY-MM-DD"
+      }
+    },
+    "currency": {
+      "title": "Default Currency",
+      "description": "Set your default currency for receipts"
+    }
+  },
+  "processing": {
+    "title": "Tetapan Pemprosesan",
+    "description": "Konfigurasikan cara resit anda diproses selepas dimuat naik. Perubahan disimpan secara automatik.",
+    "aiVisionDescription": "Mataresit menggunakan teknologi AI Vision yang canggih untuk pemprosesan resit, memberikan ketepatan yang unggul dengan sokongan untuk imej yang lebih besar (sehingga 5MB). Kaedah ini memproses resit anda secara langsung menggunakan model AI dengan keupayaan penglihatan, menghapuskan keperluan untuk pemprosesan OCR tradisional.",
+    "aiModelConfigDescription": "Konfigurasikan model AI pilihan anda untuk pemprosesan tunggal dan kelompok di bawah. Model yang berbeza menawarkan pelbagai pertukaran antara kelajuan, ketepatan, dan kos.",
+    "aiModelConfig": "Konfigurasi Model AI",
+    "batchProcessingConfig": "Konfigurasi Pemprosesan Kelompok",
+    "batchProcessingDescription": "Konfigurasikan cara beberapa resit diproses semasa muat naik kelompok, termasuk had langganan, konkurensi, tamat masa, dan tingkah laku cuba semula.",
+    "aiProvider": {
+      "title": "Pembekal AI",
+      "description": "Pilih pembekal pemprosesan AI pilihan anda",
+      "options": {
+        "gemini-2.0-flash-lite": "Gemini 2.0 Flash Lite",
+        "gemini-1.5-pro": "Gemini 1.5 Pro",
+        "gemini-1.5-flash": "Gemini 1.5 Flash"
+      }
+    },
+    "processingMethod": {
+      "title": "Kaedah Pemprosesan",
+      "description": "Pilih cara resit harus diproses",
+      "options": {
+        "ai-vision": "AI Vision (Disyorkan)",
+        "ocr-ai": "OCR + AI (Lama)"
+      }
+    },
+    "batchLimits": {
+      "title": "Had Muat Naik Kelompok",
+      "description": "Bilangan maksimum resit setiap muat naik kelompok",
+      "free": "Pelan Percuma: {{limit}} resit",
+      "pro": "Pelan Pro: {{limit}} resit",
+      "max": "Pelan Maksimum: {{limit}} resit"
+    },
+    "autoCategories": {
+      "title": "Auto-categorization",
+      "description": "Automatically categorize receipts based on merchant and content",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "confidenceThreshold": {
+      "title": "Confidence Threshold",
+      "description": "Minimum confidence score for auto-approval"
+    }
+  },
+  "notifications": {
+    "title": "Notification Settings",
+    "email": {
+      "title": "Email Notifications",
+      "processingComplete": "Receipt processing complete",
+      "teamInvitations": "Team invitations",
+      "billingUpdates": "Billing updates",
+      "securityAlerts": "Security alerts",
+      "weeklyReports": "Weekly reports"
+    },
+    "push": {
+      "title": "Push Notifications",
+      "enabled": "Enable push notifications",
+      "processingUpdates": "Processing updates",
+      "teamActivity": "Team activity"
+    }
+  },
+  "billing": {
+    "title": "Billing & Subscription",
+    "currentPlan": "Current Plan",
+    "usage": "Usage",
+    "receiptsProcessed": "Receipts Processed",
+    "storageUsed": "Storage Used",
+    "teamMembers": "Team Members",
+    "upgrade": "Upgrade Plan",
+    "downgrade": "Downgrade Plan",
+    "cancelSubscription": "Cancel Subscription",
+    "paymentMethod": "Payment Method",
+    "billingHistory": "Billing History",
+    "invoices": "Invoices"
+  },
+  "team": {
+    "title": "Team Management",
+    "members": "Team Members",
+    "invitations": "Pending Invitations",
+    "roles": "Roles & Permissions",
+    "inviteMember": "Invite Member",
+    "removeMember": "Remove Member",
+    "changeRole": "Change Role"
+  },
+  "security": {
+    "title": "Security Settings",
+    "changePassword": "Change Password",
+    "twoFactor": "Two-Factor Authentication",
+    "sessions": "Active Sessions",
+    "apiKeys": "API Keys",
+    "auditLog": "Audit Log"
+  },
+  "actions": {
+    "save": "Simpan Perubahan",
+    "cancel": "Batal",
+    "reset": "Set Semula ke Lalai",
+    "export": "Eksport Tetapan",
+    "import": "Import Tetapan"
+  },
+  "messages": {
+    "saved": "Tetapan berjaya disimpan",
+    "error": "Gagal menyimpan tetapan",
+    "resetConfirm": "Adakah anda benar-benar pasti?",
+    "resetDescription": "Tindakan ini akan menetapkan semula semua tetapan pemprosesan kepada nilai lalai mereka. Ini tidak boleh dibuat asal.",
+    "resetToast": "Tetapan ditetapkan semula kepada lalai.",
+    "continue": "Teruskan"
+  }
+}

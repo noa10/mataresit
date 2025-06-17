@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "title": "Claims Management - Mataresit",
+    "description": "Submit, track, and manage expense claims with integrated receipt attachments."
+  },
+  "navigation": {
+    "overview": "Overview",
+    "myClaims": "My Claims",
+    "pendingApproval": "Pending Approval",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "drafts": "Drafts"
+  },
+  "overview": {
+    "title": "Claims Overview",
+    "stats": {
+      "totalClaims": "Total Claims",
+      "pendingClaims": "Pending Claims",
+      "approvedAmount": "Approved Amount",
+      "rejectedClaims": "Rejected Claims",
+      "draftClaims": "Draft Claims"
+    }
+  },
+  "list": {
+    "title": "Expense Claims",
+    "subtitle": "Manage your expense claims and track their status",
+    "actions": {
+      "createClaim": "Create Claim",
+      "editClaim": "Edit Claim",
+      "deleteClaim": "Delete Claim",
+      "submitClaim": "Submit Claim",
+      "approveClaim": "Approve Claim",
+      "rejectClaim": "Reject Claim",
+      "viewDetails": "View Details"
+    },
+    "table": {
+      "claimNumber": "Claim #",
+      "title": "Title",
+      "amount": "Amount",
+      "category": "Category",
+      "submittedDate": "Submitted",
+      "status": "Status",
+      "approver": "Approver",
+      "actions": "Actions"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "pending": "Pending Approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    },
+    "filters": {
+      "all": "All Claims",
+      "byStatus": "Filter by Status",
+      "byCategory": "Filter by Category",
+      "byDateRange": "Filter by Date Range",
+      "byAmount": "Filter by Amount"
+    }
+  },
+  "create": {
+    "title": "Create New Claim",
+    "subtitle": "Submit a new expense claim with receipt attachments",
+    "steps": {
+      "details": "Claim Details",
+      "receipts": "Attach Receipts",
+      "review": "Review & Submit"
+    },
+    "form": {
+      "title": "Claim Title",
+      "description": "Description",
+      "category": "Category",
+      "totalAmount": "Total Amount",
+      "currency": "Currency",
+      "expenseDate": "Expense Date",
+      "businessPurpose": "Business Purpose",
+      "notes": "Additional Notes"
+    },
+    "placeholders": {
+      "title": "Enter claim title",
+      "description": "Describe the expense",
+      "businessPurpose": "Explain the business purpose",
+      "notes": "Add any additional notes",
+      "currency": "Select currency",
+      "category": "e.g., Travel, Meals, Office Supplies",
+      "priority": "Select priority"
+    },
+    "descriptions": {
+      "category": "Optional category for organizing claims"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "loading": {
+      "receipts": "Loading receipts..."
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create Claim",
+      "creating": "Creating..."
+    },
+    "receipts": {
+      "title": "Attach Receipts",
+      "subtitle": "Select receipts to attach to this claim",
+      "selectReceipts": "Select Receipts",
+      "selectedCount": "{{count}} receipt(s) selected",
+      "totalAmount": "Total from receipts: {{amount}}",
+      "noReceipts": "No receipts selected",
+      "addMore": "Add More Receipts"
+    }
+  },
+  "details": {
+    "title": "Claim Details",
+    "sections": {
+      "information": "Claim Information",
+      "receipts": "Attached Receipts",
+      "history": "Approval History",
+      "comments": "Comments"
+    },
+    "information": {
+      "claimNumber": "Claim Number",
+      "title": "Title",
+      "description": "Description",
+      "category": "Category",
+      "totalAmount": "Total Amount",
+      "submittedBy": "Submitted By",
+      "submittedDate": "Submitted Date",
+      "approver": "Approver",
+      "status": "Status",
+      "businessPurpose": "Business Purpose",
+      "notes": "Notes"
+    },
+    "receipts": {
+      "title": "Attached Receipts",
+      "count": "{{count}} receipt(s) attached",
+      "totalAmount": "Total: {{amount}}",
+      "viewReceipt": "View Receipt",
+      "removeReceipt": "Remove Receipt"
+    },
+    "history": {
+      "title": "Approval History",
+      "submitted": "Claim submitted",
+      "approved": "Claim approved",
+      "rejected": "Claim rejected",
+      "paid": "Claim paid",
+      "cancelled": "Claim cancelled"
+    }
+  },
+  "approval": {
+    "title": "Approve Claim",
+    "subtitle": "Review and approve this expense claim. This action cannot be undone.",
+    "details": {
+      "amount": "Amount",
+      "claimant": "Claimant",
+      "unknown": "Unknown",
+      "category": "Category",
+      "description": "Description"
+    },
+    "form": {
+      "comment": "Approval Comment (Optional)"
+    },
+    "placeholders": {
+      "comment": "Add any comments about this approval..."
+    },
+    "descriptions": {
+      "comment": "This comment will be visible to the claimant and recorded in the audit trail."
+    },
+    "confirmation": {
+      "title": "Approval Confirmation",
+      "message": "By approving this claim, you confirm that the expense is valid and should be processed for payment. The claimant will be notified of the approval."
+    },
+    "actions": {
+      "approve": "Approve Claim",
+      "cancel": "Cancel",
+      "approving": "Approving..."
+    }
+  },
+  "submission": {
+    "title": "Submit Claim for Review",
+    "subtitle": "Review your claim details before submitting for approval. Once submitted, you won't be able to edit the claim.",
+    "details": {
+      "amount": "Amount",
+      "claimant": "Claimant",
+      "you": "You",
+      "created": "Created",
+      "category": "Category",
+      "description": "Description",
+      "attachments": "Attachments",
+      "attachmentCount": "{{count}} file(s) attached"
+    },
+    "checklist": {
+      "title": "Submission Checklist",
+      "hasTitle": "Claim has a title",
+      "hasAmount": "Amount is greater than zero"
+    },
+    "notice": {
+      "title": "Submission Notice",
+      "message": "Once submitted, your claim will be reviewed by team administrators. You will receive notifications about the approval status. You won't be able to edit the claim after submission."
+    },
+    "validation": {
+      "cannotSubmit": "Cannot Submit",
+      "fixIssues": "Please fix the issues above before submitting your claim."
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "submit": "Submit for Review",
+      "submitting": "Submitting..."
+    }
+  },
+  "categories": {
+    "travel": "Travel",
+    "meals": "Meals & Entertainment",
+    "office": "Office Supplies",
+    "equipment": "Equipment",
+    "software": "Software & Subscriptions",
+    "training": "Training & Development",
+    "marketing": "Marketing & Advertising",
+    "utilities": "Utilities",
+    "other": "Other"
+  },
+  "dialogs": {
+    "deleteClaim": {
+      "title": "Delete Claim",
+      "message": "Are you sure you want to delete this claim? This action cannot be undone.",
+      "confirm": "Delete Claim",
+      "cancel": "Cancel"
+    },
+    "submitClaim": {
+      "title": "Submit Claim",
+      "message": "Are you sure you want to submit this claim for approval? You won't be able to edit it after submission.",
+      "confirm": "Submit Claim",
+      "cancel": "Cancel"
+    },
+    "approveClaim": {
+      "title": "Approve Claim",
+      "message": "Are you sure you want to approve this claim for {{amount}}?",
+      "confirm": "Approve Claim",
+      "cancel": "Cancel"
+    },
+    "rejectClaim": {
+      "title": "Reject Claim",
+      "message": "Are you sure you want to reject this claim? Please provide a reason.",
+      "confirm": "Reject Claim",
+      "cancel": "Cancel"
+    }
+  },
+  "notifications": {
+    "success": "Success",
+    "claimCreated": "Claim created successfully",
+    "claimSubmitted": "Claim submitted for review successfully",
+    "claimApproved": "Claim approved successfully",
+    "claimRejected": "Claim rejected",
+    "claimDeleted": "Claim deleted successfully",
+    "receiptAttached": "Receipt attached to claim",
+    "receiptRemoved": "Receipt removed from claim"
+  },
+  "errors": {
+    "title": "Error",
+    "claimNotFound": "Claim not found",
+    "insufficientPermissions": "You don't have permission to perform this action",
+    "cannotEditSubmitted": "Cannot edit a submitted claim",
+    "noReceiptsAttached": "At least one receipt must be attached",
+    "invalidAmount": "Invalid claim amount",
+    "missingRequiredFields": "Please fill in all required fields",
+    "approvalFailed": "Failed to process approval",
+    "submissionFailed": "Failed to submit claim",
+    "noTeamSelected": "No team selected",
+    "createFailed": "Failed to create claim",
+    "approveFailed": "Failed to approve claim"
+  }
+}

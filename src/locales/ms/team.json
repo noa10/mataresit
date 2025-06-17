@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "title": "Pengurusan Pasukan - Mataresit",
+    "description": "Urus pasukan, ruang kerja, dan tetapan kerjasama anda."
+  },
+  "navigation": {
+    "overview": "Gambaran Keseluruhan",
+    "members": "Ahli",
+    "workspaces": "Ruang Kerja",
+    "settings": "Tetapan",
+    "invitations": "Jemputan"
+  },
+  "overview": {
+    "title": "Gambaran Keseluruhan Pasukan",
+    "stats": {
+      "totalMembers": "Jumlah Ahli",
+      "activeWorkspaces": "Ruang Kerja Aktif",
+      "pendingInvitations": "Jemputan Tertangguh",
+      "receiptsProcessed": "Resit Diproses"
+    }
+  },
+  "selector": {
+    "personalWorkspace": "Ruang Kerja Peribadi",
+    "switchWorkspace": "Tukar Ruang Kerja",
+    "teams": "Pasukan",
+    "memberCount": "{{count}} ahli",
+    "memberCount_plural": "{{count}} ahli"
+  },
+  "actions": {
+    "createTeam": "Cipta Pasukan"
+  },
+  "create": {
+    "title": "Cipta Pasukan Baharu",
+    "description": "Cipta pasukan baharu untuk bekerjasama dengan orang lain dalam pengurusan resit.",
+    "fields": {
+      "name": "Nama Pasukan",
+      "description": "Penerangan (Pilihan)"
+    },
+    "placeholders": {
+      "name": "Masukkan nama pasukan",
+      "description": "Terangkan tujuan pasukan anda"
+    },
+    "actions": {
+      "cancel": "Batal",
+      "create": "Cipta Pasukan",
+      "creating": "Mencipta..."
+    }
+  },
+  "members": {
+    "title": "Ahli Pasukan",
+    "subtitle": "Urus ahli pasukan dan kebenaran mereka",
+    "actions": {
+      "invite": "Jemput Ahli",
+      "remove": "Buang Ahli",
+      "changeRole": "Tukar Peranan",
+      "resendInvitation": "Hantar Semula Jemputan"
+    },
+    "table": {
+      "name": "Nama",
+      "email": "E-mel",
+      "role": "Peranan",
+      "status": "Status",
+      "joinedDate": "Tarikh Sertai",
+      "lastActive": "Aktif Terakhir",
+      "actions": "Tindakan"
+    },
+    "status": {
+      "active": "Aktif",
+      "pending": "Tertangguh",
+      "inactive": "Tidak Aktif",
+      "suspended": "Digantung"
+    },
+    "roles": {
+      "owner": "Pemilik",
+      "admin": "Pentadbir",
+      "member": "Ahli",
+      "viewer": "Pemerhati"
+    },
+    "permissions": {
+      "owner": "Akses penuh kepada semua ciri dan tetapan",
+      "admin": "Urus ahli, ruang kerja, dan kebanyakan tetapan",
+      "member": "Akses ruang kerja dan urus resit",
+      "viewer": "Akses lihat sahaja kepada ruang kerja yang ditetapkan"
+    }
+  },
+  "workspaces": {
+    "title": "Ruang Kerja",
+    "subtitle": "Susun kerja pasukan anda ke dalam ruang kerja berasingan",
+    "actions": {
+      "create": "Cipta Ruang Kerja",
+      "edit": "Edit Ruang Kerja",
+      "delete": "Padam Ruang Kerja",
+      "archive": "Arkib Ruang Kerja"
+    },
+    "table": {
+      "name": "Nama Ruang Kerja",
+      "description": "Penerangan",
+      "members": "Ahli",
+      "receipts": "Resit",
+      "created": "Dicipta",
+      "actions": "Tindakan"
+    },
+    "create": {
+      "title": "Cipta Ruang Kerja Baharu",
+      "fields": {
+        "name": "Nama Ruang Kerja",
+        "description": "Penerangan",
+        "visibility": "Keterlihatan",
+        "members": "Ahli Awal"
+      },
+      "visibility": {
+        "private": "Peribadi",
+        "team": "Pasukan",
+        "public": "Awam"
+      }
+    }
+  },
+  "invitations": {
+    "title": "Jemputan Pasukan",
+    "subtitle": "Urus jemputan tertangguh dan yang dihantar",
+    "noPending": "Tiada Jemputan Tertangguh",
+    "allProcessed": "Semua jemputan pasukan telah diproses.",
+
+    "table": {
+      "email": "E-mel",
+      "role": "Peranan",
+      "workspace": "Ruang Kerja",
+      "sentDate": "Tarikh Dihantar",
+      "expiresDate": "Tamat Tempoh",
+      "status": "Status",
+      "actions": "Tindakan",
+      "invitedBy": "Dijemput Oleh"
+    },
+    "status": {
+      "pending": "Tertangguh",
+      "accepted": "Diterima",
+      "declined": "Ditolak",
+      "expired": "Tamat Tempoh",
+      "cancelled": "Dibatalkan"
+    },
+    "form": {
+      "title": "Jemput Ahli Pasukan",
+      "description": "Hantar jemputan untuk menyertai {{teamName}}",
+      "fields": {
+        "email": "Alamat E-mel",
+        "role": "Peranan",
+        "workspace": "Ruang Kerja",
+        "message": "Mesej Peribadi"
+      },
+      "placeholders": {
+        "email": "Masukkan alamat e-mel",
+        "role": "Pilih peranan",
+        "message": "Tambah mesej peribadi (pilihan)"
+      }
+    },
+    "actions": {
+      "sendInvitation": "Hantar Jemputan",
+      "resend": "Hantar Semula",
+      "cancel": "Batal",
+      "accept": "Terima",
+      "decline": "Tolak",
+      "sending": "Menghantar..."
+    }
+  },
+  "settings": {
+    "title": "Tetapan Pasukan",
+    "subtitle": "Konfigur tetapan dan keutamaan seluruh pasukan",
+    "comingSoon": "Tetapan Akan Datang",
+    "futureUpdate": "Tetapan pasukan akan tersedia dalam kemaskini akan datang.",
+    "sections": {
+      "general": {
+        "title": "Tetapan Am",
+        "teamName": "Nama Pasukan",
+        "description": "Penerangan Pasukan",
+        "timezone": "Zon Masa Lalai",
+        "language": "Bahasa Lalai"
+      },
+      "permissions": {
+        "title": "Kebenaran Lalai",
+        "newMemberRole": "Peranan Lalai untuk Ahli Baharu",
+        "workspaceCreation": "Siapa boleh cipta ruang kerja",
+        "memberInvitation": "Siapa boleh jemput ahli"
+      },
+      "notifications": {
+        "title": "Pemberitahuan Pasukan",
+        "emailNotifications": "Pemberitahuan E-mel",
+        "newMemberJoined": "Ahli baharu menyertai",
+        "workspaceActivity": "Aktiviti ruang kerja",
+        "receiptProcessing": "Kemaskini pemprosesan resit"
+      }
+    }
+  },
+  "dialogs": {
+    "removeMember": {
+      "title": "Buang Ahli Pasukan",
+      "message": "Adakah anda pasti mahu membuang {{name}} dari pasukan? Tindakan ini tidak boleh dibuat asal.",
+      "confirm": "Buang Ahli",
+      "cancel": "Batal"
+    },
+    "deleteWorkspace": {
+      "title": "Padam Ruang Kerja",
+      "message": "Adakah anda pasti mahu memadam ruang kerja '{{name}}'? Semua resit dan data akan dipadam secara kekal.",
+      "confirm": "Padam Ruang Kerja",
+      "cancel": "Batal"
+    },
+    "changeRole": {
+      "title": "Tukar Peranan Ahli",
+      "message": "Tukar peranan untuk {{name}} dari {{currentRole}} kepada:",
+      "confirm": "Tukar Peranan",
+      "cancel": "Batal"
+    }
+  },
+  "notifications": {
+    "memberInvited": "Jemputan dihantar kepada {{email}}",
+    "memberRemoved": "{{name}} telah dibuang dari pasukan",
+    "roleChanged": "Peranan ditukar untuk {{name}}",
+    "workspaceCreated": "Ruang kerja '{{name}}' berjaya dicipta",
+    "workspaceDeleted": "Ruang kerja '{{name}}' berjaya dipadam",
+    "invitationCancelled": "Jemputan dibatalkan",
+    "invitationResent": "Jemputan dihantar semula kepada {{email}}"
+  },
+  "errors": {
+    "memberNotFound": "Ahli pasukan tidak dijumpai",
+    "workspaceNotFound": "Ruang kerja tidak dijumpai",
+    "invitationNotFound": "Jemputan tidak dijumpai",
+    "insufficientPermissions": "Anda tidak mempunyai kebenaran untuk melakukan tindakan ini",
+    "emailAlreadyInvited": "E-mel ini telah dijemput",
+    "memberAlreadyExists": "Orang ini sudah menjadi ahli pasukan",
+    "cannotRemoveOwner": "Tidak boleh membuang pemilik pasukan",
+    "cannotChangeOwnerRole": "Tidak boleh menukar peranan pemilik",
+    "noTeamSelected": "Tiada Pasukan Dipilih",
+    "selectTeamMessage": "Sila pilih pasukan untuk mengurus ahli dan tetapannya."
+  }
+}

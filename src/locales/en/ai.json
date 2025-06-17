@@ -1,0 +1,112 @@
+{
+  "processing": {
+    "title": "AI Processing",
+    "status": {
+      "queued": "Queued for processing",
+      "analyzing": "Analyzing receipt",
+      "extracting": "Extracting data",
+      "validating": "Validating results",
+      "completed": "Processing completed",
+      "failed": "Processing failed",
+      "retrying": "Retrying..."
+    },
+    "steps": {
+      "imageAnalysis": "Image Analysis",
+      "textExtraction": "Text Extraction",
+      "dataValidation": "Data Validation",
+      "categoryDetection": "Category Detection",
+      "confidenceScoring": "Confidence Scoring"
+    },
+    "confidence": {
+      "high": "High Confidence ({{score}}%)",
+      "medium": "Medium Confidence ({{score}}%)",
+      "low": "Low Confidence ({{score}}%)",
+      "description": "AI confidence in extracted data"
+    }
+  },
+  "models": {
+    "title": "AI Models",
+    "gemini-2.0-flash-lite": {
+      "name": "Gemini 2.0 Flash Lite",
+      "description": "Fast and efficient processing for batch uploads"
+    },
+    "gemini-1.5-pro": {
+      "name": "Gemini 1.5 Pro",
+      "description": "High accuracy processing for complex receipts"
+    },
+    "gemini-1.5-flash": {
+      "name": "Gemini 1.5 Flash",
+      "description": "Balanced speed and accuracy"
+    }
+  },
+  "features": {
+    "textExtraction": {
+      "title": "Text Extraction",
+      "description": "Extract text from receipt images using advanced OCR"
+    },
+    "dataStructuring": {
+      "title": "Data Structuring",
+      "description": "Organize extracted text into structured data fields"
+    },
+    "categoryDetection": {
+      "title": "Category Detection",
+      "description": "Automatically categorize receipts based on merchant and items"
+    },
+    "merchantRecognition": {
+      "title": "Merchant Recognition",
+      "description": "Identify and standardize merchant names"
+    },
+    "amountValidation": {
+      "title": "Amount Validation",
+      "description": "Validate and cross-check monetary amounts"
+    },
+    "dateExtraction": {
+      "title": "Date Extraction",
+      "description": "Extract and format transaction dates"
+    }
+  },
+  "settings": {
+    "title": "AI Settings",
+    "provider": {
+      "title": "AI Provider",
+      "description": "Choose your preferred AI processing provider"
+    },
+    "model": {
+      "title": "Processing Model",
+      "description": "Select the AI model for receipt processing"
+    },
+    "confidenceThreshold": {
+      "title": "Confidence Threshold",
+      "description": "Minimum confidence score for auto-approval",
+      "low": "Low ({{value}}%)",
+      "medium": "Medium ({{value}}%)",
+      "high": "High ({{value}}%)"
+    },
+    "autoReview": {
+      "title": "Auto Review",
+      "description": "Automatically mark high-confidence receipts as reviewed",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "batchProcessing": {
+      "title": "Batch Processing",
+      "description": "Process multiple receipts simultaneously",
+      "concurrent": "Concurrent uploads: {{count}}"
+    }
+  },
+  "errors": {
+    "processingFailed": "AI processing failed",
+    "modelUnavailable": "Selected AI model is currently unavailable",
+    "quotaExceeded": "AI processing quota exceeded",
+    "imageQuality": "Image quality too poor for AI processing",
+    "unsupportedFormat": "File format not supported by AI processor",
+    "timeout": "AI processing timed out",
+    "apiError": "AI service API error"
+  },
+  "tips": {
+    "imageQuality": "For best results, ensure receipt images are clear and well-lit",
+    "fileFormat": "JPG and PNG formats work best for AI processing",
+    "confidence": "Review receipts with confidence scores below {{threshold}}%",
+    "batchUpload": "Use batch upload for processing multiple receipts efficiently"
+  }
+}

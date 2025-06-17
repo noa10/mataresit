@@ -1,0 +1,162 @@
+{
+  "meta": {
+    "title": "Features - Mataresit",
+    "description": "Discover all the powerful features that make Mataresit the best receipt management solution for your business."
+  },
+  "hero": {
+    "title": "Powerful Features for Modern Businesses",
+    "subtitle": "Everything you need to transform your receipt management and streamline your financial workflows."
+  },
+  "categories": {
+    "core": {
+      "title": "Core Features",
+      "description": "Essential tools for receipt management"
+    },
+    "ai": {
+      "title": "AI-Powered",
+      "description": "Intelligent automation and insights"
+    },
+    "collaboration": {
+      "title": "Team Collaboration",
+      "description": "Work together seamlessly"
+    },
+    "integration": {
+      "title": "Integrations",
+      "description": "Connect with your existing tools"
+    }
+  },
+  "features": {
+    "aiProcessing": {
+      "title": "AI Receipt Processing",
+      "description": "Extract data from receipts automatically with 99% accuracy using advanced AI technology.",
+      "benefits": [
+        "Automatic data extraction",
+        "99% accuracy rate",
+        "Support for multiple languages",
+        "Handles various receipt formats"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "smartSearch": {
+      "title": "Smart Search",
+      "description": "Find any receipt instantly using natural language queries powered by AI.",
+      "benefits": [
+        "Natural language search",
+        "Instant results",
+        "Search by content, date, or amount",
+        "Advanced filtering options"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "batchProcessing": {
+      "title": "Batch Processing",
+      "description": "Upload and process multiple receipts simultaneously to save time.",
+      "benefits": [
+        "Process up to 100 receipts at once",
+        "Real-time progress tracking",
+        "Bulk categorization",
+        "Error handling and retry"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "customCategories": {
+      "title": "Custom Categories",
+      "description": "Organize receipts with your own custom categories and tags.",
+      "benefits": [
+        "Unlimited custom categories",
+        "Color-coded organization",
+        "Automatic categorization",
+        "Bulk category assignment"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "teamCollaboration": {
+      "title": "Team Collaboration",
+      "description": "Work together with your team on receipt management and expense tracking.",
+      "benefits": [
+        "Team workspaces",
+        "Role-based permissions",
+        "Shared categories",
+        "Collaborative workflows"
+      ],
+      "status": "available",
+      "category": "collaboration"
+    },
+    "claimsManagement": {
+      "title": "Claims Management",
+      "description": "Submit and manage expense claims with integrated receipt attachments.",
+      "benefits": [
+        "Easy claim submission",
+        "Approval workflows",
+        "Receipt attachments",
+        "Status tracking"
+      ],
+      "status": "available",
+      "category": "collaboration"
+    },
+    "exportOptions": {
+      "title": "Export Options",
+      "description": "Export your data in multiple formats for accounting and reporting.",
+      "benefits": [
+        "PDF reports",
+        "Excel/CSV exports",
+        "Custom date ranges",
+        "Filtered exports"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "secureStorage": {
+      "title": "Secure Storage",
+      "description": "Bank-level security ensures your financial data is always protected.",
+      "benefits": [
+        "End-to-end encryption",
+        "Secure cloud storage",
+        "Regular backups",
+        "Compliance ready"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "mobileApp": {
+      "title": "Mobile App",
+      "description": "Capture and process receipts on the go with our mobile application.",
+      "benefits": [
+        "Camera capture",
+        "Offline processing",
+        "Sync across devices",
+        "Push notifications"
+      ],
+      "status": "coming_soon",
+      "category": "core"
+    },
+    "apiAccess": {
+      "title": "API Access",
+      "description": "Integrate Mataresit with your existing business systems and workflows.",
+      "benefits": [
+        "RESTful API",
+        "Webhook support",
+        "Developer documentation",
+        "Rate limiting"
+      ],
+      "status": "beta",
+      "category": "integration"
+    }
+  },
+  "status": {
+    "available": "Available",
+    "beta": "Beta",
+    "coming_soon": "Coming Soon",
+    "planned": "Planned"
+  },
+  "cta": {
+    "title": "Ready to experience these features?",
+    "subtitle": "Start your free trial today and see how Mataresit can transform your business.",
+    "button": "Start Free Trial",
+    "contact": "Contact Sales"
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "title": "Panel Admin",
+  "navigation": {
+    "dashboard": "Papan Pemuka",
+    "users": "Pengguna",
+    "receipts": "Resit",
+    "analytics": "Analitik",
+    "blog": "Blog",
+    "settings": "Tetapan"
+  },
+  "actions": {
+    "exitAdmin": "Keluar Admin",
+    "signOut": "Log Keluar",
+    "signedInAs": "Log masuk sebagai"
+  },
+  "dashboard": {
+    "title": "Papan Pemuka Admin",
+    "systemOverview": "Gambaran Keseluruhan Sistem",
+    "stats": {
+      "totalUsers": "Jumlah Pengguna",
+      "activeUsers": "Pengguna Aktif",
+      "totalReceipts": "Jumlah Resit",
+      "processingQueue": "Baris Gilir Pemprosesan",
+      "storageUsed": "Storan Digunakan",
+      "revenue": "Hasil",
+      "recentActivity": "Aktiviti Terkini"
+    },
+    "descriptions": {
+      "totalUsers": "Pengguna berdaftar di platform",
+      "totalReceipts": "Jumlah keseluruhan resit yang diproses",
+      "recentActivity": "10 resit terakhir"
+    },
+    "charts": {
+      "userGrowth": "Pertumbuhan Pengguna",
+      "receiptProcessing": "Pemprosesan Resit",
+      "revenue": "Trend Hasil",
+      "usage": "Statistik Penggunaan"
+    }
+  },
+  "users": {
+    "title": "User Management",
+    "table": {
+      "id": "ID",
+      "email": "Email",
+      "name": "Name",
+      "role": "Role",
+      "status": "Status",
+      "createdAt": "Created",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "suspend": "Suspend",
+      "activate": "Activate",
+      "delete": "Delete",
+      "impersonate": "Impersonate"
+    },
+    "filters": {
+      "all": "All Users",
+      "active": "Active",
+      "suspended": "Suspended",
+      "admin": "Admins",
+      "pro": "Pro Users",
+      "free": "Free Users"
+    },
+    "roles": {
+      "admin": "Admin",
+      "user": "User",
+      "moderator": "Moderator"
+    }
+  },
+  "receipts": {
+    "title": "Receipt Management",
+    "table": {
+      "id": "ID",
+      "user": "User",
+      "merchant": "Merchant",
+      "amount": "Amount",
+      "status": "Status",
+      "confidence": "Confidence",
+      "createdAt": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "reprocess": "Reprocess",
+      "delete": "Delete",
+      "flag": "Flag",
+      "unflag": "Unflag"
+    },
+    "filters": {
+      "all": "All Receipts",
+      "flagged": "Flagged",
+      "lowConfidence": "Low Confidence",
+      "failed": "Failed Processing",
+      "recent": "Recent"
+    }
+  },
+  "analytics": {
+    "title": "Analitik",
+    "description": "Analitik dan pelaporan seluruh sistem",
+    "comingSoon": "Analitik lanjutan akan datang",
+    "futureFeatures": "Ciri analitik lanjutan akan dilaksanakan pada masa hadapan",
+    "metrics": {
+      "userEngagement": "Penglibatan Pengguna",
+      "processingAccuracy": "Ketepatan Pemprosesan",
+      "systemPerformance": "Prestasi Sistem",
+      "errorRates": "Kadar Ralat"
+    },
+    "reports": {
+      "daily": "Laporan Harian",
+      "weekly": "Laporan Mingguan",
+      "monthly": "Laporan Bulanan",
+      "custom": "Laporan Tersuai"
+    }
+  },
+  "blog": {
+    "title": "Blog Management",
+    "posts": {
+      "title": "Blog Posts",
+      "create": "Create Post",
+      "edit": "Edit Post",
+      "delete": "Delete Post",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "draft": "Save as Draft"
+    },
+    "categories": {
+      "title": "Kategori",
+      "create": "Cipta Kategori",
+      "edit": "Edit Kategori",
+      "delete": "Padam Kategori"
+    }
+  },
+  "settings": {
+    "title": "Tetapan Sistem",
+    "general": {
+      "title": "Umum",
+      "siteName": "Nama Laman",
+      "siteDescription": "Penerangan Laman",
+      "maintenanceMode": "Mod Penyelenggaraan"
+    },
+    "email": {
+      "title": "Tetapan E-mel",
+      "smtpServer": "Pelayan SMTP",
+      "smtpPort": "Port SMTP",
+      "smtpUsername": "Nama Pengguna SMTP",
+      "smtpPassword": "Kata Laluan SMTP"
+    },
+    "storage": {
+      "title": "Tetapan Storan",
+      "provider": "Penyedia Storan",
+      "bucket": "Nama Bucket",
+      "region": "Wilayah",
+      "maxFileSize": "Saiz Fail Maksimum"
+    },
+    "ai": {
+      "title": "Tetapan AI",
+      "provider": "Penyedia AI",
+      "apiKey": "Kunci API",
+      "model": "Model Lalai",
+      "confidenceThreshold": "Ambang Keyakinan"
+    }
+  },
+  "plurals": {
+    "user": "pengguna",
+    "user_zero": "tiada pengguna",
+    "user_one": "{{count}} pengguna",
+    "user_other": "{{count}} pengguna",
+    "receipt": "resit",
+    "receipt_zero": "tiada resit",
+    "receipt_one": "{{count}} resit",
+    "receipt_other": "{{count}} resit",
+    "activeUser": "pengguna aktif",
+    "activeUser_zero": "tiada pengguna aktif",
+    "activeUser_one": "{{count}} pengguna aktif",
+    "activeUser_other": "{{count}} pengguna aktif",
+    "flaggedReceipt": "resit ditanda",
+    "flaggedReceipt_zero": "tiada resit ditanda",
+    "flaggedReceipt_one": "{{count}} resit ditanda",
+    "flaggedReceipt_other": "{{count}} resit ditanda"
+  },
+  "contextual": {
+    "access": "Akses Pentadbir",
+    "access_admin": "Pentadbir Sistem Penuh",
+    "access_moderator": "Moderator Kandungan",
+    "dashboard": "Papan Pemuka Admin",
+    "dashboard_admin": "Papan Pemuka Pentadbiran Sistem",
+    "dashboard_moderator": "Papan Pemuka Moderasi Kandungan",
+    "userManagement": "Pengurusan Pengguna",
+    "userManagement_admin": "Pentadbiran Pengguna Lengkap",
+    "userManagement_moderator": "Moderasi Kandungan Pengguna"
+  },
+  "errors": {
+    "title": "Ralat",
+    "loadStatsFailed": "Gagal memuatkan statistik sistem",
+    "loadUsersFailed": "Gagal memuatkan pengguna"
+  },
+  "malaysian": {
+    "systemSettings": {
+      "timezone": "Waktu Malaysia (GMT+8)",
+      "currency": "Ringgit Malaysia (MYR)",
+      "language": "Bahasa Malaysia / English",
+      "businessHours": "Waktu Perniagaan Malaysia"
+    },
+    "compliance": {
+      "dataProtection": "Akta Perlindungan Data Peribadi (PDPA)",
+      "businessRegistration": "Pendaftaran Perniagaan Malaysia",
+      "taxCompliance": "Pematuhan GST/SST"
+    }
+  }
+}

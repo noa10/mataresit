@@ -1,0 +1,106 @@
+{
+  "title": "Profile",
+  "description": "Manage your account settings and preferences",
+  "signOut": "Sign Out",
+  "loading": {
+    "profile": "Loading profile..."
+  },
+  "error": {
+    "loadingProfile": "Error loading profile",
+    "loadingDescription": "Failed to load profile information. Please refresh the page.",
+    "unableToLoad": "Unable to load profile information.",
+    "refreshPage": "Refresh Page"
+  },
+  "info": {
+    "plan": "Plan",
+    "memberSince": "Member since",
+    "free": "Free"
+  },
+  "tabs": {
+    "profile": "Profile",
+    "billing": "Billing",
+    "teams": "Teams",
+    "settings": "Settings",
+    "security": "Security"
+  },
+  "editor": {
+    "title": "Personal Information",
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address"
+    },
+    "placeholders": {
+      "firstName": "Enter your first name",
+      "lastName": "Enter your last name",
+      "email": "Enter your email address"
+    },
+    "validation": {
+      "firstNameTooLong": "First name must be 50 characters or less",
+      "lastNameTooLong": "Last name must be 50 characters or less",
+      "invalidEmail": "Please enter a valid email address"
+    },
+    "descriptions": {
+      "emailNote": "Note: Changing your email may require re-verification"
+    },
+    "display": {
+      "fullName": "Full Name",
+      "email": "Email",
+      "notProvided": "Not provided"
+    },
+    "actions": {
+      "edit": "Edit",
+      "saveChanges": "Save Changes",
+      "saving": "Saving...",
+      "cancel": "Cancel"
+    }
+  },
+  "notifications": {
+    "updateSuccess": "Profile updated",
+    "updateSuccessDescription": "Your profile information has been updated successfully.",
+    "updateFailed": "Update failed",
+    "updateFailedDescription": "Failed to update profile. Please try again.",
+    "unexpectedError": "An unexpected error occurred. Please try again."
+  },
+  "avatar": {
+    "uploadPhoto": "Upload Photo",
+    "uploading": "Uploading...",
+    "remove": "Remove",
+    "removing": "Removing..."
+  },
+  "subscription": {
+    "title": "Subscription & Usage",
+    "managePlan": "Manage Plan",
+    "unableToLoad": "Unable to load subscription information.",
+    "currentPlan": "Current Plan",
+    "planName": "{{tier}} Plan"
+  },
+  "settings": {
+    "security": {
+      "title": "Security Settings",
+      "password": {
+        "title": "Password",
+        "description": "Change your account password",
+        "changeButton": "Change Password"
+      }
+    },
+    "notifications": {
+      "signOutSuccess": "Signed out successfully",
+      "signOutSuccessDescription": "You have been signed out of your account.",
+      "signOutFailed": "Sign out failed",
+      "signOutFailedDescription": "An error occurred while signing out. Please try again."
+    }
+  },
+  "appearance": {
+    "title": "Appearance Settings",
+    "darkMode": "Dark Mode",
+    "darkModeDescription": "Switch between light and dark theme",
+    "darkModeActivated": "Dark mode activated",
+    "lightModeActivated": "Light mode activated",
+    "themeChanged": "The application theme has been changed to {{mode}} mode."
+  },
+  "signOutSuccess": {
+    "title": "Signed out successfully",
+    "description": "You have been signed out of your account."
+  }
+}

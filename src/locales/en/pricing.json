@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "title": "Pricing Plans - Mataresit",
+    "description": "Choose the perfect plan for your business. Start free and scale as you grow."
+  },
+  "hero": {
+    "title": "Simple, Transparent Pricing",
+    "subtitle": "Choose the plan that fits your business needs. Start free and upgrade anytime.",
+    "monthlyBilling": "Monthly Billing",
+    "annualBilling": "Annual Billing",
+    "annualDiscount": "Save 20% with annual billing"
+  },
+  "plans": {
+    "free": {
+      "name": "Free",
+      "price": "$0",
+      "period": "/month",
+      "description": "Perfect for getting started",
+      "features": {
+        "receipts": "5 receipts per month",
+        "storage": "100MB storage",
+        "processing": "Basic AI processing",
+        "support": "Community support",
+        "exports": "Basic exports",
+        "categories": "Standard categories"
+      },
+      "cta": "Get Started Free",
+      "popular": false
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$10",
+      "period": "/month",
+      "description": "For growing businesses",
+      "features": {
+        "receipts": "50 receipts per month",
+        "storage": "5GB storage",
+        "processing": "Advanced AI processing",
+        "support": "Email support",
+        "exports": "Advanced exports",
+        "categories": "Custom categories",
+        "batch": "Batch processing",
+        "search": "Smart search",
+        "team": "Team collaboration"
+      },
+      "cta": "Start Pro Trial",
+      "popular": true
+    },
+    "max": {
+      "name": "Max",
+      "price": "$20",
+      "period": "/month",
+      "description": "For established businesses",
+      "features": {
+        "receipts": "100 receipts per month",
+        "storage": "20GB storage",
+        "processing": "Premium AI processing",
+        "support": "Priority support",
+        "exports": "Premium exports",
+        "categories": "Unlimited categories",
+        "batch": "Advanced batch processing",
+        "search": "AI-powered search",
+        "team": "Advanced team features",
+        "api": "API access",
+        "integrations": "Third-party integrations"
+      },
+      "cta": "Start Max Trial",
+      "popular": false
+    }
+  },
+  "features": {
+    "title": "Everything you need to manage receipts",
+    "subtitle": "All plans include our core features with different limits and capabilities",
+    "list": {
+      "aiProcessing": {
+        "title": "AI Processing",
+        "description": "Extract data from receipts automatically"
+      },
+      "smartSearch": {
+        "title": "Smart Search",
+        "description": "Find receipts instantly with AI-powered search"
+      },
+      "categories": {
+        "title": "Categories",
+        "description": "Organize receipts with custom categories"
+      },
+      "exports": {
+        "title": "Export Options",
+        "description": "Export data in multiple formats"
+      },
+      "storage": {
+        "title": "Secure Storage",
+        "description": "Bank-level security for your documents"
+      },
+      "support": {
+        "title": "Customer Support",
+        "description": "Get help when you need it"
+      }
+    }
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "items": {
+      "billing": {
+        "question": "How does billing work?",
+        "answer": "You're billed monthly or annually based on your chosen plan. You can upgrade, downgrade, or cancel anytime."
+      },
+      "limits": {
+        "question": "What happens if I exceed my limits?",
+        "answer": "You'll be notified when approaching limits. You can upgrade your plan or wait for the next billing cycle."
+      },
+      "trial": {
+        "question": "Do you offer free trials?",
+        "answer": "Yes! Pro and Max plans include a 14-day free trial. No credit card required."
+      },
+      "refund": {
+        "question": "What's your refund policy?",
+        "answer": "We offer a 30-day money-back guarantee for all paid plans."
+      },
+      "support": {
+        "question": "What support do you provide?",
+        "answer": "Free users get community support. Pro users get email support. Max users get priority support."
+      }
+    }
+  },
+  "cta": {
+    "title": "Ready to get started?",
+    "subtitle": "Join thousands of businesses already using Mataresit",
+    "button": "Start Free Trial",
+    "contact": "Contact Sales"
+  }
+}

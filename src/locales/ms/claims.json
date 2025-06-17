@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "title": "Pengurusan Tuntutan - Mataresit",
+    "description": "Hantar, jejak, dan urus tuntutan perbelanjaan dengan lampiran resit bersepadu."
+  },
+  "navigation": {
+    "overview": "Gambaran Keseluruhan",
+    "myClaims": "Tuntutan Saya",
+    "pendingApproval": "Menunggu Kelulusan",
+    "approved": "Diluluskan",
+    "rejected": "Ditolak",
+    "drafts": "Draf"
+  },
+  "overview": {
+    "title": "Gambaran Keseluruhan Tuntutan",
+    "stats": {
+      "totalClaims": "Jumlah Tuntutan",
+      "pendingClaims": "Tuntutan Tertangguh",
+      "approvedAmount": "Jumlah Diluluskan",
+      "rejectedClaims": "Tuntutan Ditolak",
+      "draftClaims": "Tuntutan Draf"
+    }
+  },
+  "list": {
+    "title": "Tuntutan Perbelanjaan",
+    "subtitle": "Urus tuntutan perbelanjaan anda dan jejak status mereka",
+    "actions": {
+      "createClaim": "Cipta Tuntutan",
+      "editClaim": "Edit Tuntutan",
+      "deleteClaim": "Padam Tuntutan",
+      "submitClaim": "Hantar Tuntutan",
+      "approveClaim": "Luluskan Tuntutan",
+      "rejectClaim": "Tolak Tuntutan",
+      "viewDetails": "Lihat Butiran"
+    },
+    "table": {
+      "claimNumber": "Tuntutan #",
+      "title": "Tajuk",
+      "amount": "Jumlah",
+      "category": "Kategori",
+      "submittedDate": "Dihantar",
+      "status": "Status",
+      "approver": "Pelulus",
+      "actions": "Tindakan"
+    },
+    "status": {
+      "draft": "Draf",
+      "submitted": "Dihantar",
+      "pending": "Menunggu Kelulusan",
+      "approved": "Diluluskan",
+      "rejected": "Ditolak",
+      "paid": "Dibayar",
+      "cancelled": "Dibatalkan"
+    },
+    "filters": {
+      "all": "Semua Tuntutan",
+      "byStatus": "Tapis mengikut Status",
+      "byCategory": "Tapis mengikut Kategori",
+      "byDateRange": "Tapis mengikut Julat Tarikh",
+      "byAmount": "Tapis mengikut Jumlah"
+    }
+  },
+  "create": {
+    "title": "Cipta Tuntutan Baharu",
+    "subtitle": "Hantar tuntutan perbelanjaan baharu dengan lampiran resit",
+    "steps": {
+      "details": "Butiran Tuntutan",
+      "receipts": "Lampirkan Resit",
+      "review": "Semak & Hantar"
+    },
+    "form": {
+      "title": "Tajuk Tuntutan",
+      "description": "Penerangan",
+      "category": "Kategori",
+      "totalAmount": "Jumlah Keseluruhan",
+      "currency": "Mata Wang",
+      "expenseDate": "Tarikh Perbelanjaan",
+      "businessPurpose": "Tujuan Perniagaan",
+      "notes": "Nota Tambahan"
+    },
+    "placeholders": {
+      "title": "Masukkan tajuk tuntutan",
+      "description": "Terangkan perbelanjaan",
+      "businessPurpose": "Jelaskan tujuan perniagaan",
+      "notes": "Tambah nota tambahan",
+      "currency": "Pilih mata wang",
+      "category": "cth., Perjalanan, Makanan, Bekalan Pejabat",
+      "priority": "Pilih keutamaan"
+    },
+    "descriptions": {
+      "category": "Kategori pilihan untuk mengatur tuntutan"
+    },
+    "priority": {
+      "low": "Rendah",
+      "medium": "Sederhana",
+      "high": "Tinggi",
+      "urgent": "Mendesak"
+    },
+    "loading": {
+      "receipts": "Memuatkan resit..."
+    },
+    "actions": {
+      "cancel": "Batal",
+      "create": "Cipta Tuntutan",
+      "creating": "Mencipta..."
+    },
+    "receipts": {
+      "title": "Lampirkan Resit",
+      "subtitle": "Pilih resit untuk dilampirkan pada tuntutan ini",
+      "selectReceipts": "Pilih Resit",
+      "selectedCount": "{{count}} resit dipilih",
+      "totalAmount": "Jumlah dari resit: {{amount}}",
+      "noReceipts": "Tiada resit dipilih",
+      "addMore": "Tambah Lagi Resit"
+    }
+  },
+  "details": {
+    "title": "Butiran Tuntutan",
+    "sections": {
+      "information": "Maklumat Tuntutan",
+      "receipts": "Resit Dilampirkan",
+      "history": "Sejarah Kelulusan",
+      "comments": "Komen"
+    },
+    "information": {
+      "claimNumber": "Nombor Tuntutan",
+      "title": "Tajuk",
+      "description": "Penerangan",
+      "category": "Kategori",
+      "totalAmount": "Jumlah Keseluruhan",
+      "submittedBy": "Dihantar Oleh",
+      "submittedDate": "Tarikh Dihantar",
+      "approver": "Pelulus",
+      "status": "Status",
+      "businessPurpose": "Tujuan Perniagaan",
+      "notes": "Nota"
+    },
+    "receipts": {
+      "title": "Resit Dilampirkan",
+      "count": "{{count}} resit dilampirkan",
+      "totalAmount": "Jumlah: {{amount}}",
+      "viewReceipt": "Lihat Resit",
+      "removeReceipt": "Buang Resit"
+    },
+    "history": {
+      "title": "Sejarah Kelulusan",
+      "submitted": "Tuntutan dihantar",
+      "approved": "Tuntutan diluluskan",
+      "rejected": "Tuntutan ditolak",
+      "paid": "Tuntutan dibayar",
+      "cancelled": "Tuntutan dibatalkan"
+    }
+  },
+  "approval": {
+    "title": "Luluskan Tuntutan",
+    "subtitle": "Semak dan luluskan tuntutan perbelanjaan ini. Tindakan ini tidak boleh dibatalkan.",
+    "details": {
+      "amount": "Jumlah",
+      "claimant": "Penuntut",
+      "unknown": "Tidak Diketahui",
+      "category": "Kategori",
+      "description": "Penerangan"
+    },
+    "form": {
+      "comment": "Komen Kelulusan (Pilihan)"
+    },
+    "placeholders": {
+      "comment": "Tambah sebarang komen mengenai kelulusan ini..."
+    },
+    "descriptions": {
+      "comment": "Komen ini akan kelihatan kepada penuntut dan direkodkan dalam jejak audit."
+    },
+    "confirmation": {
+      "title": "Pengesahan Kelulusan",
+      "message": "Dengan meluluskan tuntutan ini, anda mengesahkan bahawa perbelanjaan adalah sah dan patut diproses untuk pembayaran. Penuntut akan dimaklumkan tentang kelulusan."
+    },
+    "actions": {
+      "approve": "Luluskan Tuntutan",
+      "cancel": "Batal",
+      "approving": "Meluluskan..."
+    }
+  },
+  "submission": {
+    "title": "Hantar Tuntutan untuk Semakan",
+    "subtitle": "Semak butiran tuntutan anda sebelum menghantar untuk kelulusan. Setelah dihantar, anda tidak akan dapat mengedit tuntutan.",
+    "details": {
+      "amount": "Jumlah",
+      "claimant": "Penuntut",
+      "you": "Anda",
+      "created": "Dicipta",
+      "category": "Kategori",
+      "description": "Penerangan",
+      "attachments": "Lampiran",
+      "attachmentCount": "{{count}} fail dilampirkan"
+    },
+    "checklist": {
+      "title": "Senarai Semak Penyerahan",
+      "hasTitle": "Tuntutan mempunyai tajuk",
+      "hasAmount": "Jumlah lebih besar daripada sifar"
+    },
+    "notice": {
+      "title": "Notis Penyerahan",
+      "message": "Setelah dihantar, tuntutan anda akan disemak oleh pentadbir pasukan. Anda akan menerima pemberitahuan tentang status kelulusan. Anda tidak akan dapat mengedit tuntutan selepas penyerahan."
+    },
+    "validation": {
+      "cannotSubmit": "Tidak Boleh Hantar",
+      "fixIssues": "Sila betulkan isu di atas sebelum menghantar tuntutan anda."
+    },
+    "actions": {
+      "cancel": "Batal",
+      "submit": "Hantar untuk Semakan",
+      "submitting": "Menghantar..."
+    }
+  },
+  "categories": {
+    "travel": "Perjalanan",
+    "meals": "Makanan & Hiburan",
+    "office": "Bekalan Pejabat",
+    "equipment": "Peralatan",
+    "software": "Perisian & Langganan",
+    "training": "Latihan & Pembangunan",
+    "marketing": "Pemasaran & Pengiklanan",
+    "utilities": "Utiliti",
+    "other": "Lain-lain"
+  },
+  "dialogs": {
+    "deleteClaim": {
+      "title": "Padam Tuntutan",
+      "message": "Adakah anda pasti mahu memadam tuntutan ini? Tindakan ini tidak boleh dibuat asal.",
+      "confirm": "Padam Tuntutan",
+      "cancel": "Batal"
+    },
+    "submitClaim": {
+      "title": "Hantar Tuntutan",
+      "message": "Adakah anda pasti mahu menghantar tuntutan ini untuk kelulusan? Anda tidak akan dapat mengeditnya selepas penghantaran.",
+      "confirm": "Hantar Tuntutan",
+      "cancel": "Batal"
+    },
+    "approveClaim": {
+      "title": "Luluskan Tuntutan",
+      "message": "Adakah anda pasti mahu meluluskan tuntutan ini untuk {{amount}}?",
+      "confirm": "Luluskan Tuntutan",
+      "cancel": "Batal"
+    },
+    "rejectClaim": {
+      "title": "Tolak Tuntutan",
+      "message": "Adakah anda pasti mahu menolak tuntutan ini? Sila berikan sebab.",
+      "confirm": "Tolak Tuntutan",
+      "cancel": "Batal"
+    }
+  },
+  "notifications": {
+    "success": "Berjaya",
+    "claimCreated": "Tuntutan berjaya dicipta",
+    "claimSubmitted": "Tuntutan berjaya dihantar untuk semakan",
+    "claimApproved": "Tuntutan berjaya diluluskan",
+    "claimRejected": "Tuntutan ditolak",
+    "claimDeleted": "Tuntutan berjaya dipadam",
+    "receiptAttached": "Resit dilampirkan pada tuntutan",
+    "receiptRemoved": "Resit dibuang dari tuntutan"
+  },
+  "errors": {
+    "title": "Ralat",
+    "claimNotFound": "Tuntutan tidak dijumpai",
+    "insufficientPermissions": "Anda tidak mempunyai kebenaran untuk melakukan tindakan ini",
+    "cannotEditSubmitted": "Tidak boleh mengedit tuntutan yang telah dihantar",
+    "noReceiptsAttached": "Sekurang-kurangnya satu resit mesti dilampirkan",
+    "invalidAmount": "Jumlah tuntutan tidak sah",
+    "missingRequiredFields": "Sila isi semua medan yang diperlukan",
+    "approvalFailed": "Gagal memproses kelulusan",
+    "submissionFailed": "Gagal menghantar tuntutan",
+    "noTeamSelected": "Tiada pasukan dipilih",
+    "createFailed": "Gagal mencipta tuntutan",
+    "approveFailed": "Gagal meluluskan tuntutan"
+  }
+}
