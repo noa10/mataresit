@@ -96,6 +96,23 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Ensure proper scrolling on mobile devices */
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+
+  /* Ensure root and html allow proper scrolling */
+  html, #root {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Mobile viewport fixes */
+  @supports (height: 100dvh) {
+    html, #root {
+      height: 100dvh;
+    }
   }
 }
 
@@ -250,6 +267,125 @@
 
   .xs\:inline {
     display: inline !important;
+  }
+}
+
+/* Mobile List View Horizontal Scrolling */
+@media (max-width: 1024px) {
+  .list-view-container {
+    /* Enable smooth horizontal scrolling on mobile */
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    /* Add padding for better touch interaction */
+    padding-bottom: 8px;
+  }
+
+  /* Ensure list items maintain proper width on mobile */
+  .list-view-container > div {
+    min-width: max-content;
+  }
+
+  /* Hide scrollbar on mobile for cleaner look */
+  .list-view-container::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .list-view-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  /* Improve touch interaction for list items on mobile */
+  .list-view-container .border {
+    /* Ensure proper touch targets */
+    min-height: 60px;
+    /* Prevent content from being cut off */
+    overflow: visible;
+  }
+
+  /* Ensure proper spacing for horizontal scroll content */
+  .list-view-container .min-w-max {
+    /* Add minimum width to prevent content compression */
+    min-width: max-content;
+  }
+}
+
+/* Mobile Dashboard Scrolling Improvements */
+@media (max-width: 1024px) {
+  /* Ensure dashboard content can scroll properly on mobile/tablet */
+  .dashboard-container {
+    height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+
+  /* Fix main content area for mobile scrolling */
+  main {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 4rem); /* Account for navbar height */
+    position: relative;
+  }
+
+  /* Ensure receipt grids don't break mobile scrolling */
+  .receipt-container,
+  .grid {
+    overflow: visible;
+  }
+
+  /* Improve touch scrolling for mobile devices */
+  .glass-card {
+    overflow: visible;
+  }
+
+  /* Prevent body scroll when sidebar is open on mobile */
+  body.sidebar-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+
+  /* Ensure main content area scrolls properly when sidebar is closed */
+  body:not(.sidebar-open) main {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Support for modern viewport units */
+  @supports (height: 100dvh) {
+    .dashboard-container {
+      height: 100dvh;
+    }
+
+    main {
+      height: calc(100dvh - 4rem);
+    }
+  }
+
+  /* List View Horizontal Scrolling */
+  .list-view-container {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+
+  /* Custom scrollbar for webkit browsers */
+  .list-view-container::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .list-view-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .list-view-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+
+  .list-view-container::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
   }
 }
 

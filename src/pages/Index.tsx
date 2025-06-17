@@ -27,78 +27,80 @@ import {
   Target
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
+import { useHomepageTranslation } from '@/contexts/LanguageContext';
 import { Separator } from "@/components/ui/separator";
 
-// Business-focused features array inspired by Dext
-const featuresList = [
-  {
-    icon: <Clock className="h-8 w-8 text-primary" />,
-    title: "Save Hours Every Week",
-    description: "Eliminate manual data entry forever. Our AI processes receipts in seconds, not hours, giving you time to focus on growing your business."
-  },
-  {
-    icon: <Target className="h-8 w-8 text-primary" />,
-    title: "99% Accuracy Guaranteed",
-    description: "Advanced AI with confidence scoring ensures your financial data is always accurate. Catch errors before they become problems."
-  },
-  {
-    icon: <Search className="h-8 w-8 text-primary" />,
-    title: "Find Any Receipt Instantly",
-    description: "Smart search that understands natural language. Find receipts by asking 'coffee expenses last month' or 'client dinner receipts'."
-  },
-  {
-    icon: <DollarSign className="h-8 w-8 text-primary" />,
-    title: "Maximize Tax Deductions",
-    description: "Never miss a deductible expense again. Automatically categorize and organize receipts for tax season and financial reporting."
-  },
-  {
-    icon: <Users className="h-8 w-8 text-primary" />,
-    title: "Team Collaboration Made Easy",
-    description: "Share receipts and reports with your team or accountant. Real-time collaboration with role-based permissions and audit trails."
-  },
-  {
-    icon: <Shield className="h-8 w-8 text-primary" />,
-    title: "Bank-Level Security",
-    description: "Your financial data is protected with enterprise-grade security. SOC 2 compliant with end-to-end encryption."
-  }
-];
 
-// How it works steps
-const howItWorksSteps = [
-  {
-    step: "1",
-    icon: <Upload className="h-8 w-8 text-primary" />,
-    title: "Upload",
-    description: "Snap a photo or upload files. Drag and drop multiple receipts for batch processing."
-  },
-  {
-    step: "2",
-    icon: <Sparkles className="h-8 w-8 text-primary" />,
-    title: "AI Processing",
-    description: "Our AI extracts all data with confidence scores. Review and approve in seconds."
-  },
-  {
-    step: "3",
-    icon: <CheckCircle className="h-8 w-8 text-primary" />,
-    title: "Export & Analyze",
-    description: "Export to Excel, QuickBooks, or your favorite accounting software. Generate reports instantly."
-  }
-];
 
 export default function Index() {
   const { user } = useAuth();
+  const { t } = useHomepageTranslation();
 
   useEffect(() => {
-    document.title = "More Business, Less Paperwork - Mataresit";
-  }, []);
+    document.title = t('meta.title');
+  }, [t]);
 
+  // Business-focused features array with translations
+  const featuresList = [
+    {
+      icon: <Clock className="h-8 w-8 text-primary" />,
+      title: t('features.list.saveTime.title'),
+      description: t('features.list.saveTime.description')
+    },
+    {
+      icon: <Target className="h-8 w-8 text-primary" />,
+      title: t('features.list.accuracy.title'),
+      description: t('features.list.accuracy.description')
+    },
+    {
+      icon: <Search className="h-8 w-8 text-primary" />,
+      title: t('features.list.search.title'),
+      description: t('features.list.search.description')
+    },
+    {
+      icon: <DollarSign className="h-8 w-8 text-primary" />,
+      title: t('features.list.taxDeductions.title'),
+      description: t('features.list.taxDeductions.description')
+    },
+    {
+      icon: <Users className="h-8 w-8 text-primary" />,
+      title: t('features.list.teamCollaboration.title'),
+      description: t('features.list.teamCollaboration.description')
+    },
+    {
+      icon: <Shield className="h-8 w-8 text-primary" />,
+      title: t('features.list.security.title'),
+      description: t('features.list.security.description')
+    }
+  ];
 
+  // How it works steps with translations
+  const howItWorksSteps = [
+    {
+      step: "1",
+      icon: <Upload className="h-8 w-8 text-primary" />,
+      title: t('howItWorks.steps.upload.title'),
+      description: t('howItWorks.steps.upload.description')
+    },
+    {
+      step: "2",
+      icon: <Sparkles className="h-8 w-8 text-primary" />,
+      title: t('howItWorks.steps.aiProcessing.title'),
+      description: t('howItWorks.steps.aiProcessing.description')
+    },
+    {
+      step: "3",
+      icon: <CheckCircle className="h-8 w-8 text-primary" />,
+      title: t('howItWorks.steps.exportAnalyze.title'),
+      description: t('howItWorks.steps.exportAnalyze.description')
+    }
+  ];
 
-  // Business-focused stats
+  // Business-focused stats with translations
   const stats = [
-    { value: "10,000+", label: "Businesses Trust Us", icon: <Users className="h-6 w-6 text-primary mb-2" /> },
-    { value: "99%", label: "Accuracy Rate", icon: <Target className="h-6 w-6 text-primary mb-2" /> },
-    { value: "5 Hours", label: "Saved Per Week", icon: <Clock className="h-6 w-6 text-primary mb-2" /> },
+    { value: "10,000+", label: t('stats.items.businesses'), icon: <Users className="h-6 w-6 text-primary mb-2" /> },
+    { value: "99%", label: t('stats.items.accuracy'), icon: <Target className="h-6 w-6 text-primary mb-2" /> },
+    { value: "5 Hours", label: t('stats.items.timeSaved'), icon: <Clock className="h-6 w-6 text-primary mb-2" /> },
   ];
 
   return (
@@ -117,25 +119,24 @@ export default function Index() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight">
-                More Business, <span className="text-primary">Less Paperwork</span>
+              <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight" dangerouslySetInnerHTML={{ __html: t('hero.title') }}>
               </h1>
               <p className="mt-4 text-xl text-muted-foreground lg:text-2xl">
-                Transform your receipts into organized data instantly. Save hours every week and never miss a tax deduction again.
+                {t('hero.subtitle')}
               </p>
               {/* Business benefits highlight */}
               <div className="mt-6 flex flex-wrap gap-3">
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
                   <Clock className="h-4 w-4 text-primary" />
-                  <span>Save 5+ Hours/Week</span>
+                  <span>{t('hero.benefits.saveTime')}</span>
                 </div>
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
                   <Target className="h-4 w-4 text-primary" />
-                  <span>99% Accuracy</span>
+                  <span>{t('hero.benefits.accuracy')}</span>
                 </div>
                 <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
                   <Shield className="h-4 w-4 text-primary" />
-                  <span>Bank-Level Security</span>
+                  <span>{t('hero.benefits.security')}</span>
                 </div>
               </div>
               
@@ -145,7 +146,7 @@ export default function Index() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
                         <Link to="/auth" className="flex items-center justify-center sm:justify-start">
-                          Get Started Free
+                          {t('hero.cta.getStarted')}
                           <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                         </Link>
                       </Button>
@@ -153,7 +154,7 @@ export default function Index() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
                         <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
-                          View Pricing
+                          {t('hero.cta.viewPricing')}
                         </Link>
                       </Button>
                     </motion.div>
@@ -163,7 +164,7 @@ export default function Index() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
                         <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
-                          Go to Dashboard
+                          {t('hero.cta.goToDashboard')}
                           <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                         </Link>
                       </Button>
@@ -171,7 +172,7 @@ export default function Index() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
                         <Link to="/semantic-search" className="flex items-center justify-center sm:justify-start">
-                          Try Smart Search
+                          {t('hero.cta.trySmartSearch')}
                         </Link>
                       </Button>
                     </motion.div>
@@ -199,13 +200,13 @@ export default function Index() {
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
                   <div className="flex items-center">
                     <div>
-                      <p className="text-white font-medium">Transform Your Business</p>
-                      <p className="text-white/80 text-sm">Save time, increase accuracy</p>
+                      <p className="text-white font-medium">{t('hero.imageOverlay.title')}</p>
+                      <p className="text-white/80 text-sm">{t('hero.imageOverlay.subtitle')}</p>
                     </div>
                     <Button size="sm" variant="secondary" className="ml-auto" asChild>
                       <Link to="/dashboard">
                         <ArrowRight className="h-4 w-4 mr-2" />
-                        Start Now
+                        {t('hero.imageOverlay.startNow')}
                       </Link>
                     </Button>
                   </div>
@@ -230,7 +231,7 @@ export default function Index() {
                 transition={{ duration: 0.5 }}
                 className="text-3xl md:text-4xl font-bold mb-4"
               >
-                How It Works
+                {t('howItWorks.title')}
               </motion.h2>
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
@@ -239,7 +240,7 @@ export default function Index() {
                 transition={{ duration: 0.5, delay: 0.1 }}
                 className="text-lg text-muted-foreground max-w-2xl mx-auto"
               >
-                From receipt to organized data in three simple steps. No training required.
+                {t('howItWorks.subtitle')}
               </motion.p>
             </div>
 
@@ -290,7 +291,7 @@ export default function Index() {
               transition={{ duration: 0.5 }}
               className="text-3xl md:text-4xl font-bold mb-16"
             >
-              Join thousands of businesses saving time and money
+              {t('stats.title')}
             </motion.h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -343,11 +344,10 @@ export default function Index() {
               transition={{ duration: 0.5 }}
               className="text-center mb-16"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Everything you need to <span className="text-primary">transform your business</span>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" dangerouslySetInnerHTML={{ __html: t('features.title') }}>
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                Stop wasting time on manual data entry. Our intelligent platform handles everything from receipt capture to financial reporting.
+                {t('features.subtitle')}
               </p>
             </motion.div>
 
@@ -398,15 +398,15 @@ export default function Index() {
               transition={{ duration: 0.5 }}
               className="max-w-2xl mx-auto relative z-10"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to transform your business?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('cta.title')}</h2>
               <p className="text-lg md:text-xl text-muted-foreground mb-8">
-                Join thousands of businesses already saving hours every week. Start your free trial today.
+                {t('cta.subtitle')}
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button asChild size="lg" className="group w-full sm:w-auto">
                     <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
-                      {user ? 'Go to Dashboard' : 'Start Free Trial'}
+                      {user ? t('cta.goToDashboard') : t('cta.startFreeTrial')}
                       <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
@@ -415,7 +415,7 @@ export default function Index() {
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
                       <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
-                        View Pricing
+                        {t('cta.viewPricing')}
                       </Link>
                     </Button>
                   </motion.div>

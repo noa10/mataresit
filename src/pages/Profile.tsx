@@ -6,6 +6,7 @@ import {
   User, Moon, Sun, LogOut, Settings, CreditCard, Users, Shield
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useProfileTranslation();
   const [isDarkMode, setIsDarkMode] = useState(
     document.documentElement.classList.contains('dark')
   );
@@ -41,8 +43,8 @@ export default function Profile() {
       } catch (error) {
         console.error("Error fetching profile:", error);
         toast({
-          title: "Error loading profile",
-          description: "Failed to load profile information. Please refresh the page.",
+          title: t('error.loadingProfile'),
+          description: t('error.loadingDescription'),
           variant: "destructive",
         });
       } finally {
@@ -65,8 +67,8 @@ export default function Profile() {
     setIsDarkMode(!isDarkMode);
 
     toast({
-      title: `${!isDarkMode ? 'Dark' : 'Light'} mode activated`,
-      description: `The application theme has been changed to ${!isDarkMode ? 'dark' : 'light'} mode.`,
+      title: !isDarkMode ? t('appearance.darkModeActivated') : t('appearance.lightModeActivated'),
+      description: t('appearance.themeChanged', { mode: !isDarkMode ? 'dark' : 'light' }),
       duration: 2000,
     });
   };
@@ -76,8 +78,8 @@ export default function Profile() {
     await signOut();
     navigate('/auth');
     toast({
-      title: "Signed out successfully",
-      description: "You have been signed out of your account.",
+      title: t('signOutSuccess.title'),
+      description: t('signOutSuccess.description'),
       duration: 3000,
     });
   };
@@ -115,9 +117,9 @@ export default function Profile() {
       <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
         <main className="container px-4 py-8">
           <div className="text-center py-8">
-            <p className="text-muted-foreground">Unable to load profile information.</p>
+            <p className="text-muted-foreground">{t('error.unableToLoad')}</p>
             <Button onClick={() => window.location.reload()} className="mt-4">
-              Refresh Page
+              {t('error.refreshPage')}
             </Button>
           </div>
         </main>
@@ -136,9 +138,9 @@ export default function Profile() {
           className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4"
         >
           <div>
-            <h1 className="text-3xl font-bold">Profile</h1>
+            <h1 className="text-3xl font-bold">{t('title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your account settings and preferences
+              {t('description')}
             </p>
           </div>
 
@@ -148,7 +150,7 @@ export default function Profile() {
             className="gap-2"
           >
             <LogOut size={16} />
-            Sign Out
+            {t('signOut')}
           </Button>
         </motion.div>
 
@@ -183,13 +185,13 @@ export default function Profile() {
               <CardContent>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan</span>
+                    <span className="text-muted-foreground">{t('info.plan')}</span>
                     <span className="font-medium capitalize">
-                      {profile.subscription_tier || 'Free'}
+                      {profile.subscription_tier || t('info.free')}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Member since</span>
+                    <span className="text-muted-foreground">{t('info.memberSince')}</span>
                     <span className="font-medium">
                       {new Date(profile.created_at).toLocaleDateString('en-US', {
                         month: 'short',
@@ -213,23 +215,23 @@ export default function Profile() {
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="profile" className="gap-1">
                   <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">Profile</span>
+                  <span className="hidden sm:inline">{t('tabs.profile')}</span>
                 </TabsTrigger>
                 <TabsTrigger value="subscription" className="gap-1">
                   <CreditCard className="h-4 w-4" />
-                  <span className="hidden sm:inline">Billing</span>
+                  <span className="hidden sm:inline">{t('tabs.billing')}</span>
                 </TabsTrigger>
                 <TabsTrigger value="teams" className="gap-1">
                   <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline">Teams</span>
+                  <span className="hidden sm:inline">{t('tabs.teams')}</span>
                 </TabsTrigger>
                 <TabsTrigger value="preferences" className="gap-1">
                   <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Settings</span>
+                  <span className="hidden sm:inline">{t('tabs.settings')}</span>
                 </TabsTrigger>
                 <TabsTrigger value="security" className="gap-1">
                   <Shield className="h-4 w-4" />
-                  <span className="hidden sm:inline">Security</span>
+                  <span className="hidden sm:inline">{t('tabs.security')}</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -251,7 +253,7 @@ export default function Profile() {
               <TabsContent value="preferences" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Appearance Settings</CardTitle>
+                    <CardTitle>{t('appearance.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -262,10 +264,10 @@ export default function Profile() {
                           ) : (
                             <Sun className="mr-2" size={18} />
                           )}
-                          <Label htmlFor="dark-mode">Dark Mode</Label>
+                          <Label htmlFor="dark-mode">{t('appearance.darkMode')}</Label>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Switch between light and dark theme
+                          {t('appearance.darkModeDescription')}
                         </p>
                       </div>
                       <Switch

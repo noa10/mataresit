@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useFeaturesTranslation } from '@/contexts/LanguageContext';
 import {
   Brain,
   Upload,
@@ -30,84 +31,98 @@ import { Link } from 'react-router-dom';
 
 export default function FeaturesPage() {
   const { getCurrentTier, isFeatureAvailable } = useSubscription();
+  const { t } = useFeaturesTranslation();
   const tier = getCurrentTier();
 
+  // Generate core features with translations
   const coreFeatures = [
     {
       icon: <Brain className="h-8 w-8 text-blue-500" />,
-      title: "AI-Powered Receipt Processing",
-      description: "Advanced AI models extract data from your receipts with high accuracy, supporting multiple currencies and formats.",
-      benefits: ["Gemini 2.0 Flash Lite processing", "Confidence scoring", "Multi-currency support", "Real-time processing feedback"],
-      available: true
+      title: t('features.aiProcessing.title'),
+      description: t('features.aiProcessing.description'),
+      benefits: t('features.aiProcessing.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <Upload className="h-8 w-8 text-green-500" />,
-      title: "Smart Upload & Management",
-      description: "Upload receipts individually or in batches with intelligent processing and organization.",
-      benefits: ["Batch upload support (5-100 files based on plan)", "Real-time progress tracking", "Image optimization", "Automatic categorization"],
-      available: true
+      title: t('features.batchProcessing.title'),
+      description: t('features.batchProcessing.description'),
+      benefits: t('features.batchProcessing.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <Eye className="h-8 w-8 text-purple-500" />,
-      title: "Interactive Receipt Viewer",
-      description: "Review and edit receipt data with side-by-side image viewing and AI-powered suggestions.",
-      benefits: ["Side-by-side editing", "AI correction suggestions", "Image manipulation tools", "Confidence indicators"],
-      available: true
+      title: t('features.smartSearch.title'),
+      description: t('features.smartSearch.description'),
+      benefits: t('features.smartSearch.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <Search className="h-8 w-8 text-orange-500" />,
-      title: "Semantic Search",
-      description: "Find receipts using natural language queries with our ChatGPT-like search interface.",
-      benefits: ["Natural language search", "Conversational interface", "Smart filtering", "Context-aware results"],
-      available: true
+      title: t('features.smartSearch.title'),
+      description: t('features.smartSearch.description'),
+      benefits: t('features.smartSearch.benefits'),
+      available: true,
+      status: t('status.available')
     }
   ];
 
+  // Generate analytics features with translations
   const analyticsFeatures = [
     {
       icon: <BarChart3 className="h-8 w-8 text-indigo-500" />,
-      title: "Spending Analytics",
-      description: "Visualize your expenses with interactive charts and detailed breakdowns.",
-      benefits: ["Category pie charts", "Spending trends", "Date range analysis", "Export capabilities"],
-      available: true
+      title: t('features.exportOptions.title'),
+      description: t('features.exportOptions.description'),
+      benefits: t('features.exportOptions.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <FileText className="h-8 w-8 text-red-500" />,
-      title: "PDF Report Generation",
-      description: "Generate comprehensive PDF reports of your expenses for any date range.",
-      benefits: ["Custom date ranges", "Detailed summaries", "Professional formatting", "Download & share"],
-      available: true
+      title: t('features.exportOptions.title'),
+      description: t('features.exportOptions.description'),
+      benefits: t('features.exportOptions.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <PieChart className="h-8 w-8 text-teal-500" />,
-      title: "Dashboard Overview",
-      description: "Get a complete view of your receipts with filtering, search, and bulk operations.",
-      benefits: ["Multi-select operations", "Advanced filtering", "Status tracking", "Export options"],
-      available: true
+      title: t('features.customCategories.title'),
+      description: t('features.customCategories.description'),
+      benefits: t('features.customCategories.benefits'),
+      available: true,
+      status: t('status.available')
     }
   ];
 
+  // Generate platform features with translations
   const platformFeatures = [
     {
       icon: <Shield className="h-8 w-8 text-green-600" />,
-      title: "Secure Authentication",
-      description: "Google OAuth integration with Supabase for secure, hassle-free access.",
-      benefits: ["Google OAuth", "Secure data storage", "User privacy protection", "Session management"],
-      available: true
+      title: t('features.secureStorage.title'),
+      description: t('features.secureStorage.description'),
+      benefits: t('features.secureStorage.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <Settings className="h-8 w-8 text-gray-600" />,
-      title: "Profile & Settings",
-      description: "Customize your experience with personal preferences and account management.",
-      benefits: ["User preferences", "Currency settings", "Account management", "Privacy controls"],
-      available: true
+      title: t('features.teamCollaboration.title'),
+      description: t('features.teamCollaboration.description'),
+      benefits: t('features.teamCollaboration.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
       icon: <MessageSquare className="h-8 w-8 text-blue-600" />,
-      title: "Help & Support",
-      description: "Comprehensive help center with searchable FAQ and category-based assistance.",
-      benefits: ["Searchable FAQ", "Category organization", "Step-by-step guides", "Quick answers"],
-      available: true
+      title: t('features.claimsManagement.title'),
+      description: t('features.claimsManagement.description'),
+      benefits: t('features.claimsManagement.benefits'),
+      available: true,
+      status: t('status.available')
     }
   ];
 
@@ -130,7 +145,7 @@ export default function FeaturesPage() {
                 {feature.available && (
                   <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Available
+                    {feature.status || t('status.available')}
                   </Badge>
                 )}
               </div>
@@ -142,7 +157,7 @@ export default function FeaturesPage() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {feature.benefits.map((benefit: string, idx: number) => (
+            {(Array.isArray(feature.benefits) ? feature.benefits : [feature.benefits]).map((benefit: string, idx: number) => (
               <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                 {benefit}
@@ -166,10 +181,10 @@ export default function FeaturesPage() {
         >
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold">Mataresit Features</h1>
+            <h1 className="text-4xl font-bold">{t('hero.title')}</h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Discover what you can do with our AI-powered receipt management platform
+            {t('hero.subtitle')}
           </p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <Badge className={`${
@@ -180,17 +195,17 @@ export default function FeaturesPage() {
               {tier === 'pro' ? (
                 <>
                   <Zap className="h-4 w-4 mr-1" />
-                  Pro Plan
+                  {t('categories.ai.title')}
                 </>
               ) : tier === 'max' ? (
                 <>
                   <Crown className="h-4 w-4 mr-1" />
-                  Max Plan
+                  {t('categories.integration.title')}
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-1" />
-                  Free Plan
+                  {t('categories.core.title')}
                 </>
               )}
             </Badge>
@@ -205,9 +220,9 @@ export default function FeaturesPage() {
           className="mb-16"
         >
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Core Features</h2>
+            <h2 className="text-3xl font-bold mb-4">{t('categories.core.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to manage your receipts efficiently with AI-powered automation
+              {t('categories.core.description')}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -223,9 +238,9 @@ export default function FeaturesPage() {
           className="mb-16"
         >
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Analytics & Reporting</h2>
+            <h2 className="text-3xl font-bold mb-4">{t('categories.ai.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Gain insights into your spending patterns with powerful analytics and reporting tools
+              {t('categories.ai.description')}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -241,9 +256,9 @@ export default function FeaturesPage() {
           className="mb-16"
         >
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Platform & Security</h2>
+            <h2 className="text-3xl font-bold mb-4">{t('categories.collaboration.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Built with security, usability, and support in mind
+              {t('categories.collaboration.description')}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -259,9 +274,9 @@ export default function FeaturesPage() {
           className="mb-16"
         >
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">Subscription Benefits</h2>
+            <h2 className="text-3xl font-bold mb-4">{t('cta.title')}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Unlock additional capabilities with our Pro and Max plans
+              {t('cta.subtitle')}
             </p>
           </div>
 
@@ -271,10 +286,10 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Upload className="h-6 w-6 text-green-500" />
-                  <CardTitle>Free Plan</CardTitle>
-                  {tier === 'free' && <Badge className="bg-green-500 text-white">Current</Badge>}
+                  <CardTitle>{t('categories.core.title')}</CardTitle>
+                  {tier === 'free' && <Badge className="bg-green-500 text-white">{t('status.available')}</Badge>}
                 </div>
-                <CardDescription>Perfect for getting started</CardDescription>
+                <CardDescription>{t('categories.core.description')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
@@ -307,10 +322,10 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-6 w-6 text-blue-500" />
-                  <CardTitle>Pro Plan</CardTitle>
-                  {tier === 'pro' && <Badge className="bg-blue-500 text-white">Current</Badge>}
+                  <CardTitle>{t('categories.ai.title')}</CardTitle>
+                  {tier === 'pro' && <Badge className="bg-blue-500 text-white">{t('status.available')}</Badge>}
                 </div>
-                <CardDescription>For regular users</CardDescription>
+                <CardDescription>{t('categories.ai.description')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
@@ -343,10 +358,10 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Crown className="h-6 w-6 text-purple-500" />
-                  <CardTitle>Max Plan</CardTitle>
-                  {tier === 'max' && <Badge className="bg-purple-500 text-white">Current</Badge>}
+                  <CardTitle>{t('categories.integration.title')}</CardTitle>
+                  {tier === 'max' && <Badge className="bg-purple-500 text-white">{t('status.available')}</Badge>}
                 </div>
-                <CardDescription>For power users</CardDescription>
+                <CardDescription>{t('categories.integration.description')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
@@ -387,10 +402,10 @@ export default function FeaturesPage() {
             <CardHeader>
               <CardTitle className="text-2xl flex items-center justify-center gap-2">
                 <Sparkles className="h-6 w-6 text-primary" />
-                Ready to Get Started?
+                {t('cta.title')}
               </CardTitle>
               <CardDescription className="text-lg">
-                Experience the power of AI-driven receipt management today
+                {t('cta.subtitle')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -398,21 +413,21 @@ export default function FeaturesPage() {
                 <Button asChild size="lg" className="gap-2">
                   <Link to="/dashboard">
                     <Upload className="h-5 w-5" />
-                    Start Uploading Receipts
+                    {t('cta.button')}
                   </Link>
                 </Button>
                 {tier === 'free' && (
                   <Button asChild variant="outline" size="lg" className="gap-2">
                     <Link to="/pricing">
                       <Crown className="h-5 w-5" />
-                      Upgrade Plan
+                      {t('cta.contact')}
                     </Link>
                   </Button>
                 )}
                 <Button asChild variant="ghost" size="lg" className="gap-2">
                   <Link to="/help">
                     <MessageSquare className="h-5 w-5" />
-                    Get Help
+                    {t('cta.contact')}
                   </Link>
                 </Button>
               </div>
@@ -427,21 +442,21 @@ export default function FeaturesPage() {
           transition={{ duration: 0.6, delay: 1.2 }}
           className="mt-16 text-center"
         >
-          <h2 className="text-2xl font-bold mb-4 text-muted-foreground">Coming Soon</h2>
+          <h2 className="text-2xl font-bold mb-4 text-muted-foreground">{t('status.coming_soon')}</h2>
           <p className="text-muted-foreground mb-6">
-            We're constantly working on new features to enhance your experience
+            {t('cta.subtitle')}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="opacity-60">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Globe className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">API Access</CardTitle>
+                  <CardTitle className="text-sm">{t('features.apiAccess.title')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  Integrate with your existing systems
+                  {t('features.apiAccess.description')}
                 </p>
               </CardContent>
             </Card>
@@ -449,12 +464,12 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">Team Collaboration</CardTitle>
+                  <CardTitle className="text-sm">{t('features.teamCollaboration.title')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  Share and collaborate on receipts
+                  {t('features.teamCollaboration.description')}
                 </p>
               </CardContent>
             </Card>
@@ -462,12 +477,12 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">Advanced Exports</CardTitle>
+                  <CardTitle className="text-sm">{t('features.exportOptions.title')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  Export to accounting software
+                  {t('features.exportOptions.description')}
                 </p>
               </CardContent>
             </Card>

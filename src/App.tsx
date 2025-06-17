@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeProvider } from "@/contexts/StripeContext";
 import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
 import { TeamProvider } from "@/contexts/TeamContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 // Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";
@@ -82,10 +83,11 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TeamProvider>
-          <StripeProvider>
-            <ChatControlsProvider>
-              <TooltipProvider>
+        <LanguageProvider>
+          <TeamProvider>
+            <StripeProvider>
+              <ChatControlsProvider>
+                <TooltipProvider>
             <Toaster />
             <Sonner />
             {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
@@ -232,10 +234,11 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-              </TooltipProvider>
-            </ChatControlsProvider>
-          </StripeProvider>
-        </TeamProvider>
+                </TooltipProvider>
+              </ChatControlsProvider>
+            </StripeProvider>
+          </TeamProvider>
+        </LanguageProvider>
       </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>

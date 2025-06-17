@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminService } from "@/services/adminService";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingBag, Users, AlertCircle, BookOpen } from "lucide-react";
@@ -18,6 +19,7 @@ export default function AdminDashboard() {
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { t } = useAdminTranslation();
 
   useEffect(() => {
     fetchSystemStats();
@@ -30,8 +32,8 @@ export default function AdminDashboard() {
       setSystemStats(stats);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to load system statistics",
+        title: t("errors.title"),
+        description: error.message || t("errors.loadStatsFailed"),
         variant: "destructive",
       });
     } finally {
@@ -58,20 +60,20 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Users className="h-5 w-5" />
-              System Overview
+              {t("dashboard.systemOverview")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-4 w-4" />
-                  <span>Total Users</span>
+                  <span>{t("dashboard.stats.totalUsers")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{systemStats?.userCount}</div>
                 <p className="text-sm text-muted-foreground">
-                  Registered users on the platform
+                  {t("dashboard.descriptions.totalUsers")}
                 </p>
               </CardContent>
             </Card>
@@ -80,13 +82,13 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <ShoppingBag className="h-4 w-4" />
-                  <span>Total Receipts</span>
+                  <span>{t("dashboard.stats.totalReceipts")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{systemStats?.receiptCount}</div>
                 <p className="text-sm text-muted-foreground">
-                  Total number of receipts processed
+                  {t("dashboard.descriptions.totalReceipts")}
                 </p>
               </CardContent>
             </Card>
@@ -95,13 +97,13 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <AlertCircle className="h-4 w-4" />
-                  <span>Recent Activity</span>
+                  <span>{t("dashboard.stats.recentActivity")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{systemStats?.recentActivity.length}</div>
                 <p className="text-sm text-muted-foreground">
-                  Last 10 receipts
+                  {t("dashboard.descriptions.recentActivity")}
                 </p>
               </CardContent>
             </Card>

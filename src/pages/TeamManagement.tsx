@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTeam } from '@/contexts/TeamContext';
+import { useTeamTranslation } from '@/contexts/LanguageContext';
 import { teamService } from '@/services/teamService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,8 @@ export default function TeamManagement() {
     removeTeamMember,
     updateTeamMemberRole,
   } = useTeam();
+
+  const { t } = useTeamTranslation();
 
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -191,9 +194,9 @@ export default function TeamManagement() {
           <CardContent className="flex items-center justify-center py-8">
             <div className="text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Team Selected</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('errors.noTeamSelected')}</h3>
               <p className="text-muted-foreground">
-                Please select a team to manage its members and settings.
+                {t('errors.selectTeamMessage')}
               </p>
             </div>
           </CardContent>
@@ -209,24 +212,24 @@ export default function TeamManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{currentTeam.name}</h1>
           <p className="text-muted-foreground">
-            Manage team members and settings
+            {t('members.subtitle')}
           </p>
         </div>
-        
+
         {hasPermission('invite_members') && (
           <Button onClick={() => setInviteDialogOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" />
-            Invite Member
+            {t('members.actions.invite')}
           </Button>
         )}
       </div>
 
       <Tabs defaultValue="members" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          <TabsTrigger value="members">{t('navigation.members')}</TabsTrigger>
+          <TabsTrigger value="invitations">{t('navigation.invitations')}</TabsTrigger>
           {hasPermission('manage_team') && (
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="settings">{t('navigation.settings')}</TabsTrigger>
           )}
         </TabsList>
 
@@ -234,9 +237,9 @@ export default function TeamManagement() {
         <TabsContent value="members">
           <Card>
             <CardHeader>
-              <CardTitle>Team Members</CardTitle>
+              <CardTitle>{t('members.title')}</CardTitle>
               <CardDescription>
-                Manage your team members and their roles
+                {t('members.subtitle')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -248,10 +251,10 @@ export default function TeamManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('members.table.name')}</TableHead>
+                      <TableHead>{t('members.table.role')}</TableHead>
+                      <TableHead>{t('members.table.joinedDate')}</TableHead>
+                      <TableHead>{t('members.table.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -306,9 +309,9 @@ export default function TeamManagement() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="viewer">Viewer</SelectItem>
-                                  <SelectItem value="member">Member</SelectItem>
-                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="viewer">{t('members.roles.viewer')}</SelectItem>
+                                  <SelectItem value="member">{t('members.roles.member')}</SelectItem>
+                                  <SelectItem value="admin">{t('members.roles.admin')}</SelectItem>
                                 </SelectContent>
                               </Select>
                               
@@ -336,9 +339,9 @@ export default function TeamManagement() {
         <TabsContent value="invitations">
           <Card>
             <CardHeader>
-              <CardTitle>Pending Invitations</CardTitle>
+              <CardTitle>{t('invitations.title')}</CardTitle>
               <CardDescription>
-                Manage pending team invitations
+                {t('invitations.subtitle')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -349,20 +352,20 @@ export default function TeamManagement() {
               ) : invitations.length === 0 ? (
                 <div className="text-center py-8">
                   <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Pending Invitations</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('invitations.noPending')}</h3>
                   <p className="text-muted-foreground">
-                    All team invitations have been processed.
+                    {t('invitations.allProcessed')}
                   </p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Invited By</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('invitations.table.email')}</TableHead>
+                      <TableHead>{t('invitations.table.role')}</TableHead>
+                      <TableHead>{t('invitations.table.invitedBy')}</TableHead>
+                      <TableHead>{t('invitations.table.expiresDate')}</TableHead>
+                      <TableHead>{t('invitations.table.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -389,7 +392,7 @@ export default function TeamManagement() {
                               onClick={() => handleCancelInvitation(invitation)}
                               className="text-destructive hover:text-destructive"
                             >
-                              Cancel
+                              {t('invitations.actions.cancel')}
                             </Button>
                           )}
                         </TableCell>
@@ -407,17 +410,17 @@ export default function TeamManagement() {
           <TabsContent value="settings">
             <Card>
               <CardHeader>
-                <CardTitle>Team Settings</CardTitle>
+                <CardTitle>{t('settings.title')}</CardTitle>
                 <CardDescription>
-                  Configure team preferences and permissions
+                  {t('settings.subtitle')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8">
                   <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Settings Coming Soon</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('settings.comingSoon')}</h3>
                   <p className="text-muted-foreground">
-                    Team settings will be available in a future update.
+                    {t('settings.futureUpdate')}
                   </p>
                 </div>
               </CardContent>
@@ -430,21 +433,21 @@ export default function TeamManagement() {
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite Team Member</DialogTitle>
+            <DialogTitle>{t('invitations.form.title')}</DialogTitle>
             <DialogDescription>
-              Send an invitation to join your team
+              {t('invitations.form.description', { teamName: currentTeam?.name || t('selector.personalWorkspace') })}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="invite-email" className="text-sm font-medium">
-                Email Address
+                {t('invitations.form.fields.email')}
               </label>
               <Input
                 id="invite-email"
                 type="email"
-                placeholder="Enter email address"
+                placeholder={t('invitations.form.placeholders.email')}
                 value={inviteForm.email}
                 onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
                 disabled={inviting}
@@ -453,7 +456,7 @@ export default function TeamManagement() {
             
             <div className="space-y-2">
               <label htmlFor="invite-role" className="text-sm font-medium">
-                Role
+                {t('invitations.form.fields.role')}
               </label>
               <Select
                 value={inviteForm.role}
@@ -468,25 +471,25 @@ export default function TeamManagement() {
                 <SelectContent>
                   <SelectItem value="viewer">
                     <div className="flex flex-col items-start">
-                      <span>Viewer</span>
+                      <span>{t('members.roles.viewer')}</span>
                       <span className="text-xs text-muted-foreground">
-                        {getTeamRoleDescription('viewer')}
+                        {t('members.permissions.viewer')}
                       </span>
                     </div>
                   </SelectItem>
                   <SelectItem value="member">
                     <div className="flex flex-col items-start">
-                      <span>Member</span>
+                      <span>{t('members.roles.member')}</span>
                       <span className="text-xs text-muted-foreground">
-                        {getTeamRoleDescription('member')}
+                        {t('members.permissions.member')}
                       </span>
                     </div>
                   </SelectItem>
                   <SelectItem value="admin">
                     <div className="flex flex-col items-start">
-                      <span>Admin</span>
+                      <span>{t('members.roles.admin')}</span>
                       <span className="text-xs text-muted-foreground">
-                        {getTeamRoleDescription('admin')}
+                        {t('members.permissions.admin')}
                       </span>
                     </div>
                   </SelectItem>
@@ -501,13 +504,13 @@ export default function TeamManagement() {
               onClick={() => setInviteDialogOpen(false)}
               disabled={inviting}
             >
-              Cancel
+              {t('invitations.actions.cancel')}
             </Button>
             <Button
               onClick={handleInviteMember}
               disabled={!inviteForm.email.trim() || inviting}
             >
-              {inviting ? 'Sending...' : 'Send Invitation'}
+              {inviting ? t('invitations.actions.sending') : t('invitations.actions.sendInvitation')}
             </Button>
           </DialogFooter>
         </DialogContent>

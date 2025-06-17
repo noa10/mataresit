@@ -11,6 +11,7 @@ import {
 import { adminService, AdminUser } from "@/services/adminService";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Mail, Shield, ShieldOff } from "lucide-react";
@@ -34,6 +35,7 @@ export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const { t } = useAdminTranslation();
 
   useEffect(() => {
     fetchUsers();
@@ -46,8 +48,8 @@ export default function UsersManagement() {
       setUsers(userData);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to load users",
+        title: t("errors.title"),
+        description: error.message || t("errors.loadUsersFailed"),
         variant: "destructive",
       });
     } finally {
@@ -112,12 +114,12 @@ export default function UsersManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{t("users.table.email")}</TableHead>
+                    <TableHead>{t("users.table.name")}</TableHead>
+                    <TableHead>{t("users.table.role")}</TableHead>
+                    <TableHead>{t("users.table.createdAt")}</TableHead>
+                    <TableHead>{t("users.table.lastLogin")}</TableHead>
+                    <TableHead>{t("users.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

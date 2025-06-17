@@ -6,6 +6,7 @@ import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
 
 import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
 import { useSettings } from "@/hooks/useSettings";
+import { useSettingsTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
@@ -28,25 +29,30 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const UsageStatsPanel = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Your Current Usage</CardTitle>
-      <CardDescription>Track your subscription limits and usage in real-time</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <SubscriptionLimitsDisplay showUpgradePrompts={true} />
-    </CardContent>
-  </Card>
-);
+const UsageStatsPanel = () => {
+  const { t } = useSettingsTranslation();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('usage.title')}</CardTitle>
+        <CardDescription>{t('usage.description')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <SubscriptionLimitsDisplay showUpgradePrompts={true} />
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function SettingsPage() {
   const { settings, updateSettings, resetSettings } = useSettings();
+  const { t } = useSettingsTranslation();
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
 
   const handleResetConfirm = () => {
     resetSettings();
-    toast.info("Settings reset to defaults.");
+    toast.info(t('messages.resetToast'));
     setIsResetAlertOpen(false);
   };
 
@@ -55,40 +61,40 @@ export default function SettingsPage() {
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
             <p className="text-muted-foreground mt-2">
-              Configure your receipt processing preferences and AI model providers
+              {t('description')}
             </p>
           </div>
 
           <Tabs defaultValue="processing" className="w-full">
             <TabsList className="grid w-full grid-cols-4 mb-8 max-w-lg">
-              <TabsTrigger value="processing">Processing</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-              <TabsTrigger value="providers">AI Providers</TabsTrigger>
-              <TabsTrigger value="usage">Usage Stats</TabsTrigger>
+              <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
+              <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>
+              <TabsTrigger value="providers">{t('tabs.providers')}</TabsTrigger>
+              <TabsTrigger value="usage">{t('tabs.usage')}</TabsTrigger>
             </TabsList>
 
           <TabsContent value="processing">
             <Card>
               <CardHeader>
-                <CardTitle>Processing Settings</CardTitle>
+                <CardTitle>{t('processing.title')}</CardTitle>
                 <CardDescription>
-                  Configure how your receipts are processed after upload. Changes are saved automatically.
+                  {t('processing.description')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="prose prose-sm max-w-none text-muted-foreground">
                   <p>
-                    <strong>Mataresit</strong> uses advanced <strong>AI Vision</strong> technology for receipt processing, providing superior accuracy with support for larger images (up to 5MB). This method processes your receipts directly using AI models with vision capabilities, eliminating the need for traditional OCR processing.
+                    {t('processing.aiVisionDescription')}
                   </p>
                   <p>
-                    Configure your preferred AI models for single and batch processing below. Different models offer various trade-offs between speed, accuracy, and cost.
+                    {t('processing.aiModelConfigDescription')}
                   </p>
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium">AI Model Configuration</h3>
+                  <h3 className="text-lg font-medium">{t('processing.aiModelConfig')}</h3>
                   <ReceiptProcessingOptions
                     defaultModel={settings.selectedModel}
                     defaultBatchModel={settings.batchModel}
@@ -101,9 +107,9 @@ export default function SettingsPage() {
                 <Separator className="my-6" />
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Batch Processing Configuration</h3>
+                  <h3 className="text-lg font-medium">{t('processing.batchProcessingConfig')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Configure how multiple receipts are processed during batch uploads, including subscription limits, concurrency, timeouts, and retry behavior.
+                    {t('processing.batchProcessingDescription')}
                   </p>
 
                   <BatchUploadSettings
@@ -148,19 +154,18 @@ export default function SettingsPage() {
                 <div className="flex justify-end space-x-2 pt-4 border-t">
                   <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline">Reset to Defaults</Button>
+                      <Button variant="outline">{t('actions.reset')}</Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogTitle>{t('messages.resetConfirm')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action will reset all processing settings to their default values.
-                          This cannot be undone.
+                          {t('messages.resetDescription')}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleResetConfirm}>Continue</AlertDialogAction>
+                        <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleResetConfirm}>{t('messages.continue')}</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -172,9 +177,9 @@ export default function SettingsPage() {
           <TabsContent value="categories">
             <Card>
               <CardHeader>
-                <CardTitle>Category Management</CardTitle>
+                <CardTitle>{t('categories.title')}</CardTitle>
                 <CardDescription>
-                  Create and manage custom categories to organize your receipts
+                  {t('categories.description')}
                 </CardDescription>
               </CardHeader>
               <CardContent>

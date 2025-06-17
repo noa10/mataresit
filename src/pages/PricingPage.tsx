@@ -10,6 +10,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
+import { usePricingTranslation } from "@/contexts/LanguageContext";
+import { useMalaysianCulture } from "@/hooks/useMalaysianCulture";
 import { PRICE_IDS } from "@/config/stripe";
 import { toast } from "sonner";
 import {
@@ -53,21 +55,22 @@ interface PricingTier {
   limitations?: string[];
 }
 
-const pricingTiers: PricingTier[] = [
+// Function to generate pricing tiers with translations
+const getPricingTiers = (t: (key: string, options?: any) => string): PricingTier[] => [
   {
     id: "free",
-    name: "Free",
+    name: t('plans.free.name'),
     price: { monthly: 0, annual: 0 },
-    description: "Perfect for individuals and freelancers getting started with automated expense tracking.",
+    description: t('plans.free.description'),
     icon: <Upload className="h-6 w-6" />,
     features: {
-      uploads: "Up to 50 receipts per month",
-      processing: "AI-powered data extraction",
-      retention: "Unlimited retention",
-      storage: "1GB secure storage",
+      uploads: t('plans.free.features.receipts'),
+      processing: t('plans.free.features.processing'),
+      retention: t('plans.free.features.storage'),
+      storage: t('plans.free.features.storage'),
       models: [
-        "Default AI Models",
-        "Bring Your Own API Key (BYOK) support",
+        t('plans.free.features.processing'),
+        t('plans.free.features.support'),
         "• Google Gemini",
         "• OpenAI",
         "• Claude",
@@ -75,32 +78,31 @@ const pricingTiers: PricingTier[] = [
         "• Grok"
       ],
       capabilities: [
-        "Smart merchant normalization",
-        "Automatic line item extraction",
+        t('plans.free.features.exports'),
+        t('plans.free.features.categories'),
         "Multi-currency detection",
         "Confidence scoring",
         "Single processing method",
         "Single user access"
       ],
-      analytics: ["Basic receipt summary", "Simple monthly overview", "Basic data export (CSV)"]
-    },
-    limitations: ["Batch upload limit: 5 files", "No version control", "No integrations", "Basic support only"]
+      analytics: [t('plans.free.features.exports'), "Basic data export (CSV)"]
+    }
   },
   {
     id: "pro",
-    name: "Pro",
+    name: t('plans.pro.name'),
     price: { monthly: 10, annual: 108 },
-    description: "For growing businesses and teams who need more power and collaboration.",
+    description: t('plans.pro.description'),
     icon: <Zap className="h-6 w-6" />,
     popular: true,
     features: {
-      uploads: "Everything in Free, plus:",
-      processing: "500 receipts per month",
-      retention: "Unlimited retention",
-      storage: "10GB secure storage",
+      uploads: t('plans.pro.features.receipts'),
+      processing: t('plans.pro.features.processing'),
+      retention: t('plans.pro.features.storage'),
+      storage: t('plans.pro.features.storage'),
       models: [
-        "Access to premium AI models",
-        "Google Gemini 2.5 Flash (default)",
+        t('plans.pro.features.processing'),
+        t('plans.pro.features.support'),
         "BYOK (bring your own key) for:",
         "• Google Gemini",
         "• OpenAI",
@@ -109,37 +111,36 @@ const pricingTiers: PricingTier[] = [
         "• Grok"
       ],
       capabilities: [
-        "All Free tier processing",
-        "Batch processing (up to 50 files)",
-        "Team access for up to 5 users",
-        "Version control",
-        "Basic integrations",
+        t('plans.pro.features.batch'),
+        t('plans.pro.features.search'),
+        t('plans.pro.features.team'),
+        t('plans.pro.features.categories'),
+        t('plans.pro.features.exports'),
         "Custom branding options"
       ],
       analytics: [
-        "Advanced search with filters and tags",
-        "Detailed spending reports",
+        t('plans.pro.features.search'),
+        t('plans.pro.features.exports'),
         "Merchant analysis",
-        "Monthly/quarterly trends",
-        "Basic data export (CSV, XLSX)"
+        "Monthly/quarterly trends"
       ],
-      support: "Standard support"
+      support: t('plans.pro.features.support')
     }
   },
   {
     id: "max",
-    name: "Max",
+    name: t('plans.max.name'),
     price: { monthly: 20, annual: 216 },
-    description: "Enterprise-grade solution for scaling businesses with unlimited potential.",
+    description: t('plans.max.description'),
     icon: <Crown className="h-6 w-6" />,
     features: {
-      uploads: "Everything in Pro, plus:",
-      processing: "Unlimited receipts with priority processing",
-      retention: "Unlimited retention + archiving",
-      storage: "Unlimited secure storage",
+      uploads: t('plans.max.features.receipts'),
+      processing: t('plans.max.features.processing'),
+      retention: t('plans.max.features.storage'),
+      storage: t('plans.max.features.storage'),
       models: [
-        "Premium AI models with priority access",
-        "Google Gemini 2.5 Flash (default)",
+        t('plans.max.features.processing'),
+        t('plans.max.features.support'),
         "BYOK (bring your own key) for:",
         "• Google Gemini",
         "• OpenAI",
@@ -148,38 +149,37 @@ const pricingTiers: PricingTier[] = [
         "• Grok"
       ],
       capabilities: [
-        "All Pro Processing",
-        "Advanced batch processing (up to 100 files)",
-        "Unlimited team members",
-        "Advanced version control",
-        "Enterprise integrations",
-        "Full custom branding"
+        t('plans.max.features.batch'),
+        t('plans.max.features.search'),
+        t('plans.max.features.team'),
+        t('plans.max.features.categories'),
+        t('plans.max.features.exports'),
+        t('plans.max.features.api'),
+        t('plans.max.features.integrations')
       ],
       analytics: [
-        "Advanced search with all features",
-        "Advanced reporting dashboard",
-        "Custom category creation",
+        t('plans.max.features.search'),
+        t('plans.max.features.exports'),
+        t('plans.max.features.api'),
         "Year-over-year comparisons",
-        "Tax deduction identification",
-        "Full data export (CSV, JSON, PDF)",
-        "API access"
+        "Tax deduction identification"
       ],
-      support: "Priority support"
+      support: t('plans.max.features.support')
     }
   }
 ];
 
 // Feature Comparison Table Component
-const FeatureComparisonTable = ({ tiers }: { tiers: PricingTier[] }) => {
+const FeatureComparisonTable = ({ tiers, t }: { tiers: PricingTier[], t: (key: string, options?: any) => string }) => {
   const allFeatures = [
-    { key: "uploads", label: "Monthly Receipts" },
-    { key: "processing", label: "Processing Type" },
-    { key: "retention", label: "Data Retention" },
-    { key: "storage", label: "Storage" },
-    { key: "models", label: "AI Models" },
-    { key: "capabilities", label: "Processing Capabilities" },
-    { key: "analytics", label: "Analytics & Reporting" },
-    { key: "support", label: "Support Level" }
+    { key: "uploads", label: t('features.list.aiProcessing.title') },
+    { key: "processing", label: t('features.list.smartSearch.title') },
+    { key: "retention", label: t('features.list.storage.title') },
+    { key: "storage", label: t('features.list.storage.title') },
+    { key: "models", label: t('features.list.aiProcessing.title') },
+    { key: "capabilities", label: t('features.list.categories.title') },
+    { key: "analytics", label: t('features.list.exports.title') },
+    { key: "support", label: t('features.list.support.title') }
   ];
 
   const getFeatureValue = (tier: PricingTier, featureKey: string) => {
@@ -210,7 +210,7 @@ const FeatureComparisonTable = ({ tiers }: { tiers: PricingTier[] }) => {
                   {tier.popular && (
                     <Badge className="bg-primary text-primary-foreground">
                       <Star className="h-3 w-3 mr-1" />
-                      Popular
+                      {t('plans.pro.popular')}
                     </Badge>
                   )}
                 </div>
@@ -241,7 +241,12 @@ const FeatureComparisonTable = ({ tiers }: { tiers: PricingTier[] }) => {
 export default function PricingPage() {
   const { user } = useAuth();
   const { createCheckoutSession, downgradeSubscription, isLoading, subscriptionData } = useStripe();
+  const { t } = usePricingTranslation();
+  const { formatCurrency } = useMalaysianCulture();
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+
+  // Generate pricing tiers with translations
+  const pricingTiers = getPricingTiers(t);
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [downgradeDialog, setDowngradeDialog] = useState<{
     isOpen: boolean;
@@ -256,11 +261,11 @@ export default function PricingPage() {
   });
 
   useEffect(() => {
-    document.title = "Pricing - ReceiptScan";
-  }, []);
+    document.title = t('meta.title');
+  }, [t]);
 
   const formatPrice = (price: number) => {
-    return price === 0 ? "Free" : `$${price}`;
+    return price === 0 ? t('plans.free.price') : formatCurrency(price);
   };
 
   const getAnnualSavings = (monthly: number, annual: number) => {
@@ -272,7 +277,7 @@ export default function PricingPage() {
 
   const handleSubscribe = async (tierId: string) => {
     if (!user) {
-      toast.error("Please sign in to subscribe");
+      toast.error(t('cta.contact'));
       return;
     }
 
@@ -282,7 +287,11 @@ export default function PricingPage() {
     // Check if this is a downgrade
     if (tierHierarchy[tierId as keyof typeof tierHierarchy] < tierHierarchy[currentTier]) {
       // This is a downgrade - show confirmation dialog
-      const tierNames = { 'free': 'Free', 'pro': 'Pro', 'max': 'Max' };
+      const tierNames = {
+        'free': t('plans.free.name'),
+        'pro': t('plans.pro.name'),
+        'max': t('plans.max.name')
+      };
       setDowngradeDialog({
         isOpen: true,
         targetTier: tierId as 'free' | 'pro' | 'max',
@@ -294,13 +303,14 @@ export default function PricingPage() {
 
     // Handle same tier
     if (tierId === currentTier) {
-      toast.success(`You're already on the ${tierId.charAt(0).toUpperCase() + tierId.slice(1)} plan!`);
+      const tierName = tierNames[tierId as keyof typeof tierNames];
+      toast.success(t('cta.button', { plan: tierName }));
       return;
     }
 
     // Handle free tier for new users
     if (tierId === 'free' && currentTier === 'free') {
-      toast.success("You're already on the Free plan!");
+      toast.success(t('cta.button', { plan: t('plans.free.name') }));
       return;
     }
 
@@ -311,7 +321,7 @@ export default function PricingPage() {
       await createCheckoutSession(priceId, billingInterval);
     } catch (error) {
       console.error('Error subscribing:', error);
-      toast.error("Failed to process subscription. Please try again.");
+      toast.error(t('faq.items.refund.answer'));
     }
   };
 
@@ -345,24 +355,24 @@ export default function PricingPage() {
           className="text-center mb-16"
         >
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Choose Your Plan
+            {t('hero.title')}
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            Unlock the power of AI-driven receipt processing with flexible pricing that scales with your needs
+            {t('hero.subtitle')}
           </p>
           {/* Enhanced Trust Signals */}
           <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mt-8">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>14-day free trial</span>
+              <span>{t('faq.items.trial.answer')}</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>Cancel anytime</span>
+              <span>{t('faq.items.billing.answer')}</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>No setup fees</span>
+              <span>{t('hero.subtitle')}</span>
             </div>
           </div>
         </motion.div>
@@ -430,7 +440,7 @@ export default function PricingPage() {
                   }}
                   className="text-center"
                 >
-                  Monthly
+                  {t('hero.monthlyBilling')}
                 </motion.span>
               </motion.button>
 
@@ -463,7 +473,7 @@ export default function PricingPage() {
                     }}
                     className="text-center leading-none"
                   >
-                    Yearly
+                    {t('hero.annualBilling')}
                   </motion.span>
 
                   {/* Badge positioned below text */}
@@ -492,7 +502,7 @@ export default function PricingPage() {
                         variant="outline"
                         className="text-[10px] bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-400 shadow-sm font-medium px-1.5 py-0.5 leading-none"
                       >
-                        Save 20%
+                        {t('hero.annualDiscount')}
                       </Badge>
                     </motion.div>
                   </motion.div>
@@ -517,7 +527,7 @@ export default function PricingPage() {
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
                   <Badge className="bg-primary text-primary-foreground shadow-lg">
                     <Star className="h-3 w-3 mr-1" />
-                    Most Popular
+                    {t('plans.pro.popular')}
                   </Badge>
                 </div>
               )}
@@ -544,7 +554,7 @@ export default function PricingPage() {
                       }
                       {(billingInterval === 'monthly' ? tier.price.monthly : tier.price.annual) > 0 && (
                         <span className="text-lg font-normal text-muted-foreground">
-                          /{billingInterval === 'monthly' ? 'month' : 'year'}
+                          /{billingInterval === 'monthly' ? t('plans.free.period') : t('plans.pro.period')}
                         </span>
                       )}
                     </div>
@@ -563,7 +573,7 @@ export default function PricingPage() {
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <Upload className="h-4 w-4" />
-                      Core Features
+                      {t('features.title')}
                     </h3>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-center gap-2">
@@ -589,7 +599,7 @@ export default function PricingPage() {
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <Brain className="h-4 w-4" />
-                      AI Models
+                      {t('features.list.aiProcessing.title')}
                     </h3>
                     <ul className="space-y-1 text-sm">
                       {tier.features.models.map((model, idx) => (
@@ -605,7 +615,7 @@ export default function PricingPage() {
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <Zap className="h-4 w-4" />
-                      Processing
+                      {t('features.list.smartSearch.title')}
                     </h3>
                     <ul className="space-y-1 text-sm">
                       {tier.features.capabilities.map((capability, idx) => (
@@ -621,7 +631,7 @@ export default function PricingPage() {
                   <div>
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <BarChart3 className="h-4 w-4" />
-                      Analytics
+                      {t('features.list.exports.title')}
                     </h3>
                     <ul className="space-y-1 text-sm">
                       {tier.features.analytics.map((analytic, idx) => (
@@ -677,13 +687,13 @@ export default function PricingPage() {
                           const isUpgrade = tierHierarchy[tier.id as keyof typeof tierHierarchy] > tierHierarchy[currentTier];
 
                           if (isCurrentPlan) {
-                            return 'Current Plan';
+                            return t('cta.button');
                           } else if (isDowngrade) {
-                            return `Downgrade to ${tier.name}`;
+                            return t('cta.contact', { plan: tier.name });
                           } else if (isUpgrade) {
-                            return `Upgrade to ${tier.name}`;
+                            return t('cta.button', { plan: tier.name });
                           } else {
-                            return tier.id === 'free' ? 'Get Started Free' : `Get ${tier.name}`;
+                            return tier.id === 'free' ? t('plans.free.cta') : t('cta.button');
                           }
                         })()}
                       </Button>
@@ -694,7 +704,7 @@ export default function PricingPage() {
                         variant={tier.popular ? 'default' : 'outline'}
                       >
                         <Link to="/auth">
-                          {tier.id === 'free' ? 'Get Started Free' : 'Start Free Trial'}
+                          {tier.id === 'free' ? t('plans.free.cta') : t('cta.button')}
                         </Link>
                       </Button>
                     )}
@@ -715,13 +725,13 @@ export default function PricingPage() {
           <Collapsible open={isComparisonOpen} onOpenChange={setIsComparisonOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="text-lg">
-                Compare all features
+                {t('features.subtitle')}
                 <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isComparisonOpen ? 'rotate-180' : ''}`} />
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-8">
               <Card className="p-6">
-                <FeatureComparisonTable tiers={pricingTiers} />
+                <FeatureComparisonTable tiers={pricingTiers} t={t} />
               </Card>
             </CollapsibleContent>
           </Collapsible>
@@ -734,52 +744,48 @@ export default function PricingPage() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-24 text-center"
         >
-          <h2 className="text-3xl font-bold mb-8">Frequently Asked Questions</h2>
+          <h2 className="text-3xl font-bold mb-8">{t('faq.title')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Card className="glass-card text-left">
               <CardHeader>
-                <CardTitle className="text-lg">Can I change plans anytime?</CardTitle>
+                <CardTitle className="text-lg">{t('faq.items.billing.question')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately,
-                  and we'll prorate any billing differences.
+                  {t('faq.items.billing.answer')}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="glass-card text-left">
               <CardHeader>
-                <CardTitle className="text-lg">What happens to my data if I downgrade?</CardTitle>
+                <CardTitle className="text-lg">{t('faq.items.limits.question')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Your data remains safe. However, you may lose access to advanced features and
-                  older data beyond your plan's retention period.
+                  {t('faq.items.limits.answer')}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="glass-card text-left">
               <CardHeader>
-                <CardTitle className="text-lg">Do you offer refunds?</CardTitle>
+                <CardTitle className="text-lg">{t('faq.items.refund.question')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  We offer a 14-day free trial for all paid plans. If you're not satisfied,
-                  contact us within 30 days for a full refund.
+                  {t('faq.items.refund.answer')}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="glass-card text-left">
               <CardHeader>
-                <CardTitle className="text-lg">Is my data secure?</CardTitle>
+                <CardTitle className="text-lg">{t('faq.items.support.question')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Absolutely. We use enterprise-grade encryption and follow industry best practices
-                  to keep your receipt data safe and private.
+                  {t('faq.items.support.answer')}
                 </p>
               </CardContent>
             </Card>
@@ -796,10 +802,10 @@ export default function PricingPage() {
           className="mt-16 text-center"
         >
           <p className="text-muted-foreground mb-4">
-            Need a custom solution or have questions?
+            {t('cta.subtitle')}
           </p>
           <Button variant="outline" asChild>
-            <Link to="/contact">Contact Sales</Link>
+            <Link to="/contact">{t('cta.contact')}</Link>
           </Button>
         </motion.div>
       </div>
@@ -808,16 +814,16 @@ export default function PricingPage() {
       <Dialog open={downgradeDialog.isOpen} onOpenChange={(open) => !open && !downgradeDialog.isProcessing && handleDowngradeCancel()}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Confirm Downgrade</DialogTitle>
+            <DialogTitle>{t('cta.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to downgrade to the {downgradeDialog.tierName} plan?
+              {t('cta.subtitle', { plan: downgradeDialog.tierName })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
             <div className="space-y-4">
               <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">What happens when you downgrade:</h4>
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">{t('faq.items.limits.question')}</h4>
                 <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
                   {downgradeDialog.targetTier === 'free' ? (
                     <>
@@ -838,7 +844,7 @@ export default function PricingPage() {
 
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Choose when you'd like the downgrade to take effect:
+                  {t('faq.items.billing.answer')}
                 </p>
               </div>
             </div>
@@ -851,7 +857,7 @@ export default function PricingPage() {
               disabled={downgradeDialog.isProcessing}
               className="w-full sm:w-auto order-3 sm:order-1"
             >
-              Cancel
+              {t('faq.items.billing.answer')}
             </Button>
             <Button
               variant="secondary"
@@ -862,10 +868,10 @@ export default function PricingPage() {
               {downgradeDialog.isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {t('cta.button')}
                 </>
               ) : (
-                'Downgrade at Period End'
+                t('cta.contact')
               )}
             </Button>
             <Button
@@ -876,10 +882,10 @@ export default function PricingPage() {
               {downgradeDialog.isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {t('cta.button')}
                 </>
               ) : (
-                'Downgrade Now'
+                t('cta.button')
               )}
             </Button>
           </DialogFooter>

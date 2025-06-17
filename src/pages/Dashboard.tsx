@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { ExportDropdown } from "@/components/export/ExportDropdown";
 import { ExportFilters } from "@/lib/export";
+import { useDashboardTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 import { fetchReceipts } from "@/services/receiptService";
 import { Badge } from "@/components/ui/badge";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
@@ -80,6 +81,8 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
 export default function Dashboard() {
   const { user } = useAuth();
   const { subscriptionData } = useStripe();
+  const { t: tDash } = useDashboardTranslation();
+  const { t: tCommon } = useCommonTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -400,14 +403,14 @@ export default function Dashboard() {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <PlusCircle size={24} className="text-primary" />
           </div>
-                        <h3 className="text-xl font-medium mb-2">No receipts yet</h3>
+                        <h3 className="text-xl font-medium mb-2">{tDash('empty.title')}</h3>
               <p className="text-muted-foreground mb-6">
-                Upload your first receipt to get started
+                {tDash('empty.description')}
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button onClick={() => setIsBatchUploadModalOpen(true)} className="gap-2">
                   <PlusCircle size={16} />
-                  Upload Receipt
+                  {tDash('upload.button')}
                 </Button>
               </div>
         </motion.div>
@@ -425,12 +428,12 @@ export default function Dashboard() {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Search size={24} className="text-primary" />
           </div>
-          <h3 className="text-xl font-medium mb-2">No matching receipts</h3>
+          <h3 className="text-xl font-medium mb-2">{tDash('empty.title')}</h3>
           <p className="text-muted-foreground mb-6">
-            Try adjusting your search or filters
+            {tDash('empty.description')}
           </p>
           <Button variant="outline" onClick={clearFilters}>
-            Clear Filters
+            {tDash('filters.clear')}
           </Button>
         </motion.div>
       );
@@ -510,7 +513,8 @@ export default function Dashboard() {
     // List view
     else if (viewMode === "list") {
       return (
-        <div className="flex flex-col gap-3">
+        <div className="list-view-container overflow-x-auto overflow-y-visible">
+          <div className="flex flex-col gap-3 min-w-full">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
             const isSelected = selectedReceiptIds.includes(receipt.id);
@@ -521,11 +525,11 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
-                className={`border rounded-lg overflow-hidden bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                className={`border rounded-lg overflow-visible bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''} min-w-0`}
               >
                 {selectionMode ? (
                   <div
-                    className="flex items-center p-4 gap-4 cursor-pointer"
+                    className="flex items-center p-4 gap-4 cursor-pointer min-w-max"
                     onClick={() => handleSelectReceipt(receipt.id, !isSelected)}
                   >
                     {selectionMode && (
@@ -553,30 +557,30 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-medium truncate">{receipt.merchant}</h3>
+                      <div className="flex justify-between items-start gap-4 min-w-max">
+                        <h3 className="font-medium whitespace-nowrap">{receipt.merchant}</h3>
                         <span className="font-semibold whitespace-nowrap">
                           {receipt.currency} {receipt.total.toFixed(2)}
                         </span>
                       </div>
 
-                      <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                        <div className="flex items-center gap-2">
+                      <div className="flex justify-between text-sm text-muted-foreground mt-1 gap-4 min-w-max">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
                             const category = categories.find(cat => cat.id === receipt.custom_category_id);
                             return category ? (
-                              <Badge variant="secondary" className="text-xs gap-1">
+                              <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 shrink-0">
                                 <div
-                                  className="w-2 h-2 rounded-full"
+                                  className="w-2 h-2 rounded-full shrink-0"
                                   style={{ backgroundColor: category.color }}
                                 />
-                                {category.name}
+                                <span className="truncate">{category.name}</span>
                               </Badge>
                             ) : null;
                           })()}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                             receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                             receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
@@ -598,7 +602,7 @@ export default function Dashboard() {
                 ) : (
                   <Link
                     to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
-                    className="flex items-center p-4 gap-4"
+                    className="flex items-center p-4 gap-4 min-w-max"
                   >
                     <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
                       <img
@@ -612,30 +616,30 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-medium truncate">{receipt.merchant}</h3>
+                      <div className="flex justify-between items-start gap-4 min-w-max">
+                        <h3 className="font-medium whitespace-nowrap">{receipt.merchant}</h3>
                         <span className="font-semibold whitespace-nowrap">
                           {receipt.currency} {receipt.total.toFixed(2)}
                         </span>
                       </div>
 
-                      <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                        <div className="flex items-center gap-2">
+                      <div className="flex justify-between text-sm text-muted-foreground mt-1 gap-4 min-w-max">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
                             const category = categories.find(cat => cat.id === receipt.custom_category_id);
                             return category ? (
-                              <Badge variant="secondary" className="text-xs gap-1">
+                              <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 shrink-0">
                                 <div
-                                  className="w-2 h-2 rounded-full"
+                                  className="w-2 h-2 rounded-full shrink-0"
                                   style={{ backgroundColor: category.color }}
                                 />
-                                {category.name}
+                                <span className="truncate">{category.name}</span>
                               </Badge>
                             ) : null;
                           })()}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                             receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                             receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
@@ -658,6 +662,7 @@ export default function Dashboard() {
               </motion.div>
             );
           })}
+          </div>
         </div>
       );
     }
@@ -722,12 +727,12 @@ export default function Dashboard() {
                       {(() => {
                         const category = categories.find(cat => cat.id === receipt.custom_category_id);
                         return category ? (
-                          <Badge variant="secondary" className="text-xs gap-1">
+                          <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 max-w-[120px]">
                             <div
-                              className="w-2 h-2 rounded-full"
+                              className="w-2 h-2 rounded-full shrink-0"
                               style={{ backgroundColor: category.color }}
                             />
-                            {category.name}
+                            <span className="truncate">{category.name}</span>
                           </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">Uncategorized</span>
@@ -763,8 +768,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <main className="container px-4 py-8">
+    <div className="dashboard-container min-h-screen bg-gradient-to-b from-background to-secondary/20">
+      <main className="container px-4 py-8 w-full max-w-none lg:max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -772,7 +777,7 @@ export default function Dashboard() {
             transition={{ duration: 0.3 }}
           >
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">Receipts Dashboard</h1>
+              <h1 className="text-3xl font-bold">{tDash('title')}</h1>
               {subscriptionData?.tier && subscriptionData.tier !== 'free' && (
                 <Badge className={`${
                   subscriptionData.tier === 'pro'
@@ -850,7 +855,7 @@ export default function Dashboard() {
             <div className="relative flex-grow">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by merchant..."
+                placeholder={tDash('filters.search')}
                 className="pl-9 bg-background/50"
                 value={searchQuery}
                 onChange={handleSearch}
@@ -867,12 +872,12 @@ export default function Dashboard() {
                 {selectionMode ? (
                   <>
                     <X size={16} />
-                    Cancel Selection
+                    {tCommon('buttons.cancel')}
                   </>
                 ) : (
                   <>
                     <CheckSquare size={16} />
-                    Select
+                    {tDash('actions.select')}
                   </>
                 )}
               </Button>
@@ -885,7 +890,7 @@ export default function Dashboard() {
                     <CategorySelector
                       value={bulkCategoryId}
                       onChange={setBulkCategoryId}
-                      placeholder="Assign category..."
+                      placeholder={tDash('actions.assignCategory')}
                       className="w-48"
                     />
                     <Button
@@ -902,12 +907,12 @@ export default function Dashboard() {
                       {bulkCategoryMutation.isPending ? (
                         <>
                           <Loader2 size={16} className="animate-spin" />
-                          Assigning...
+                          {tCommon('messages.processing')}
                         </>
                       ) : (
                         <>
                           <Tag size={16} />
-                          Assign ({selectedReceiptIds.length})
+                          {tDash('actions.assign')} ({selectedReceiptIds.length})
                         </>
                       )}
                     </Button>
@@ -927,12 +932,12 @@ export default function Dashboard() {
                     {bulkDeleteMutation.isPending ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        Deleting...
+                        {tCommon('messages.deleting')}
                       </>
                     ) : (
                       <>
                         <Trash2 size={16} />
-                        Delete ({selectedReceiptIds.length})
+                        {tDash('actions.delete')} ({selectedReceiptIds.length})
                       </>
                     )}
                   </Button>
@@ -947,7 +952,7 @@ export default function Dashboard() {
                     className="gap-2 whitespace-nowrap"
                   >
                     <CalendarIcon size={16} />
-                    {dateRange ? formatDateRange() : "Date Filter"}
+                    {dateRange ? formatDateRange() : tDash('filters.dateRange')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -967,7 +972,7 @@ export default function Dashboard() {
                         className="mt-2 w-full"
                         onClick={() => handleDateRangeChange(undefined)}
                       >
-                        Clear Date Filter
+                        {tDash('filters.clear')}
                       </Button>
                     )}
                   </div>
@@ -978,13 +983,13 @@ export default function Dashboard() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2 whitespace-nowrap">
                     <SlidersHorizontal size={16} />
-                    Filters
+                    {tDash('filters.title')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] bg-background/95 backdrop-blur-sm border border-border">
                   <div className="space-y-4">
                     {/* Sort By */}
-                    <h4 className="font-medium">Sort by</h4>
+                    <h4 className="font-medium">{tDash('sort.title')}</h4>
                     <ToggleGroup
                       type="single"
                       value={sortOrder}
@@ -998,23 +1003,23 @@ export default function Dashboard() {
                       className="flex flex-wrap justify-start gap-2"
                     >
                       <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
-                        <CalendarIcon className="h-4 w-4 mr-2" /> Newest
+                        <CalendarIcon className="h-4 w-4 mr-2" /> {tDash('sort.newest')}
                       </ToggleGroupItem>
                       <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
-                        <CalendarIcon className="h-4 w-4 mr-2" /> Oldest
+                        <CalendarIcon className="h-4 w-4 mr-2" /> {tDash('sort.oldest')}
                       </ToggleGroupItem>
                       <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
-                        <DollarSign className="h-4 w-4 mr-2" /> Highest
+                        <DollarSign className="h-4 w-4 mr-2" /> {tDash('sort.highest')}
                       </ToggleGroupItem>
                       <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount" className="flex-grow-0">
-                        <DollarSign className="h-4 w-4 mr-2" /> Lowest
+                        <DollarSign className="h-4 w-4 mr-2" /> {tDash('sort.lowest')}
                       </ToggleGroupItem>
                     </ToggleGroup>
 
                     {/* Filter by Currency */}
                     {currencies.length > 0 && (
                       <>
-                        <h4 className="font-medium pt-2">Currency</h4>
+                        <h4 className="font-medium pt-2">{tDash('filters.currency')}</h4>
                         <ToggleGroup
                           type="single"
                           value={filterByCurrency || "all"}
@@ -1043,7 +1048,7 @@ export default function Dashboard() {
                     )}
 
                     {/* Filter by Category */}
-                    <h4 className="font-medium pt-2">Category</h4>
+                    <h4 className="font-medium pt-2">{tDash('filters.category')}</h4>
                     <ToggleGroup
                       type="single"
                       value={filterByCategory || "all"}
@@ -1081,7 +1086,7 @@ export default function Dashboard() {
                     {/* Clear Filters Button */}
                     <div className="pt-2">
                       <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
-                        Clear Filters
+                        {tDash('filters.clear')}
                       </Button>
                     </div>
                   </div>
@@ -1104,9 +1109,9 @@ export default function Dashboard() {
               updateSearchParams({ tab: newTab === 'all' ? null : newTab });
             }}>
               <TabsList className="bg-background/50">
-                <TabsTrigger value="all">All Receipts</TabsTrigger>
-                <TabsTrigger value="unreviewed">Unreviewed</TabsTrigger>
-                <TabsTrigger value="reviewed">Reviewed</TabsTrigger>
+                <TabsTrigger value="all">{tDash('filters.all')}</TabsTrigger>
+                <TabsTrigger value="unreviewed">{tDash('filters.unreviewed')}</TabsTrigger>
+                <TabsTrigger value="reviewed">{tDash('filters.reviewed')}</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

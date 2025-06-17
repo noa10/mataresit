@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthTranslation } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
@@ -23,27 +24,31 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
-const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+// Schema factory functions that use translations
+const createLoginSchema = (t: (key: string) => string) => z.object({
+  email: z.string().email(t("validation.emailInvalid")),
+  password: z.string().min(6, t("validation.passwordTooShort")),
 });
 
-const signupSchema = loginSchema.extend({
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+const createSignupSchema = (t: (key: string) => string) => {
+  const loginSchema = createLoginSchema(t);
+  return loginSchema.extend({
+    confirmPassword: z.string().min(6, t("validation.passwordTooShort")),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t("validation.passwordMismatch"),
+    path: ["confirmPassword"],
+  });
+};
+
+const createForgotPasswordSchema = (t: (key: string) => string) => z.object({
+  email: z.string().email(t("validation.emailInvalid")),
+});
+
+const createResetPasswordSchema = (t: (key: string) => string) => z.object({
+  password: z.string().min(6, t("validation.passwordTooShort")),
+  confirmPassword: z.string().min(6, t("validation.passwordTooShort")),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-const forgotPasswordSchema = z.object({
-  email: z.string().email("Invalid email address"),
-});
-
-const resetPasswordSchema = z.object({
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
+  message: t("validation.passwordMismatch"),
   path: ["confirmPassword"],
 });
 
@@ -60,9 +65,16 @@ export default function Auth() {
   const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
   const [isRecoverySession, setIsRecoverySession] = useState(false);
   const { user, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
+  const { t } = useAuthTranslation();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const location = useLocation();
   const { toast } = useToast();
+
+  // Create schemas with current translations
+  const loginSchema = createLoginSchema(t);
+  const signupSchema = createSignupSchema(t);
+  const forgotPasswordSchema = createForgotPasswordSchema(t);
+  const resetPasswordSchema = createResetPasswordSchema(t);
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -111,8 +123,8 @@ export default function Auth() {
         setIsRecoverySession(true);
         setIsResetPasswordOpen(true);
         toast({
-          title: "Password Reset",
-          description: "Please set a new password for your account.",
+          title: t("toasts.passwordReset"),
+          description: t("toasts.passwordResetDescription"),
         });
       }
       // It's important NOT to clear the hash here; onResetPasswordSubmit needs it.
@@ -135,8 +147,8 @@ export default function Auth() {
         setIsRecoverySession(true);
         setIsResetPasswordOpen(true);
         toast({
-          title: "Password Recovery Confirmed",
-          description: "Please set your new password.",
+          title: t("toasts.passwordRecoveryConfirmed"),
+          description: t("toasts.passwordRecoveryDescription"),
         });
         // Don't clear URL hash here; onResetPasswordSubmit needs it.
       } else if (event === 'SIGNED_IN') {
@@ -389,12 +401,12 @@ export default function Auth() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-card p-6 md:p-8"
         >
-          <h1 className="text-2xl font-bold text-center mb-6">Welcome to ReceiptScan</h1>
+          <h1 className="text-2xl font-bold text-center mb-6">{t("welcome")}</h1>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")}>
             <TabsList className="grid grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="login">{t("tabs.login")}</TabsTrigger>
+              <TabsTrigger value="signup">{t("tabs.signup")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
@@ -405,9 +417,9 @@ export default function Auth() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>{t("signIn.email")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="your@email.com" {...field} />
+                          <Input placeholder={t("signIn.emailPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -419,9 +431,9 @@ export default function Auth() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel>{t("signIn.password")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder={t("signIn.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -432,10 +444,10 @@ export default function Auth() {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Logging in
+                        {t("signIn.buttonLoading")}
                       </>
                     ) : (
-                      "Log in"
+                      t("signIn.button")
                     )}
                   </Button>
 
@@ -450,7 +462,7 @@ export default function Auth() {
                         forgotPasswordForm.reset();
                       }}
                     >
-                      Forgot password?
+                      {t("signIn.forgotPassword")}
                     </Button>
                   </div>
                 </form>
@@ -463,7 +475,7 @@ export default function Auth() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
+                      {t("common.orContinueWith")}
                     </span>
                   </div>
                 </div>
@@ -498,7 +510,7 @@ export default function Auth() {
                       <path d="M1 1h22v22H1z" fill="none" />
                     </svg>
                   )}
-                  Google
+                  {t("signIn.withGoogle")}
                 </Button>
               </div>
             </TabsContent>
@@ -511,9 +523,9 @@ export default function Auth() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>{t("signUp.email")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="your@email.com" {...field} />
+                          <Input placeholder={t("signUp.emailPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -525,9 +537,9 @@ export default function Auth() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel>{t("signUp.password")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -539,9 +551,9 @@ export default function Auth() {
                     name="confirmPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
+                        <FormLabel>{t("signUp.confirmPassword")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -552,10 +564,10 @@ export default function Auth() {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating account
+                        {t("signUp.buttonLoading")}
                       </>
                     ) : (
-                      "Create account"
+                      t("signUp.button")
                     )}
                   </Button>
                 </form>
@@ -568,7 +580,7 @@ export default function Auth() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                      Or continue with
+                      {t("common.orContinueWith")}
                     </span>
                   </div>
                 </div>
@@ -603,7 +615,7 @@ export default function Auth() {
                       <path d="M1 1h22v22H1z" fill="none" />
                     </svg>
                   )}
-                  Google
+                  {t("signUp.withGoogle")}
                 </Button>
               </div>
             </TabsContent>
@@ -615,11 +627,11 @@ export default function Auth() {
       <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{isPasswordResetSent ? "Email Sent" : "Forgot Password"}</DialogTitle>
+            <DialogTitle>{isPasswordResetSent ? t("forgotPassword.titleSent") : t("forgotPassword.title")}</DialogTitle>
             <DialogDescription>
               {isPasswordResetSent
-                ? "Check your email for a password reset link."
-                : "Enter your email address and we'll send you a link to reset your password."}
+                ? t("forgotPassword.subtitleSent")
+                : t("forgotPassword.subtitle")}
             </DialogDescription>
           </DialogHeader>
 
@@ -631,9 +643,9 @@ export default function Auth() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{t("forgotPassword.email")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="your@email.com" {...field} />
+                        <Input placeholder={t("forgotPassword.emailPlaceholder")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -646,16 +658,16 @@ export default function Auth() {
                     variant="outline"
                     onClick={() => setIsForgotPasswordOpen(false)}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button type="submit" disabled={isLoading}>
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending...
+                        {t("common.sending")}
                       </>
                     ) : (
-                      "Send Reset Link"
+                      t("forgotPassword.button")
                     )}
                   </Button>
                 </DialogFooter>
@@ -668,7 +680,7 @@ export default function Auth() {
                 onClick={() => setIsForgotPasswordOpen(false)}
                 className="w-full"
               >
-                Close
+                {t("common.close")}
               </Button>
             </DialogFooter>
           )}
@@ -687,9 +699,9 @@ export default function Auth() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset Your Password</DialogTitle>
+            <DialogTitle>{t("resetPassword.title")}</DialogTitle>
             <DialogDescription>
-              You've clicked a password reset link. Please set a new password for your account.
+              {t("resetPassword.subtitle")}
             </DialogDescription>
           </DialogHeader>
 
@@ -700,9 +712,9 @@ export default function Auth() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel>{t("resetPassword.password")}</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} autoFocus />
+                      <Input type="password" placeholder={t("resetPassword.passwordPlaceholder")} {...field} autoFocus />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -714,9 +726,9 @@ export default function Auth() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormLabel>{t("resetPassword.confirmPassword")}</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder={t("resetPassword.passwordPlaceholder")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -724,11 +736,9 @@ export default function Auth() {
               />
 
               <div className="text-sm text-muted-foreground mt-2">
-                <p>Password must be at least 6 characters long.</p>
-                {/* Updated dialog text for clarity */}
+                <p>{t("resetPassword.requirements")}</p>
                 <p className="mt-1">
-                  This is a one-time process for account recovery.
-                  After setting a new password, you'll be signed out and can log in with your new password.
+                  {t("resetPassword.recoveryNote")}
                 </p>
               </div>
 
@@ -737,10 +747,10 @@ export default function Auth() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
+                      {t("common.updating")}
                     </>
                   ) : (
-                    "Update Password"
+                    t("resetPassword.button")
                   )}
                 </Button>
               </DialogFooter>

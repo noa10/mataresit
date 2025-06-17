@@ -1,8 +1,8 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  /* Remove constraints that interfere with mobile scrolling */
+  width: 100%;
+  min-height: 100vh;
+  /* Remove max-width, margin, padding, and text-align for mobile compatibility */
 }
 
 .logo {
