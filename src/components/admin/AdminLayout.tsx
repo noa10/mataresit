@@ -1,6 +1,7 @@
 
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Link, useLocation } from "react-router-dom";
 import { BarChart3, FileText, Home, Settings, Shield, Users, Menu, ChevronDown, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { signOut, user } = useAuth();
+  const { t } = useAdminTranslation();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -26,12 +28,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Navigation items
   const navigationItems = [
-    { path: '/admin', label: 'Dashboard', icon: Home, exact: true },
-    { path: '/admin/users', label: 'Users', icon: Users },
-    { path: '/admin/receipts', label: 'Receipts', icon: FileText },
-    { path: '/admin/blog', label: 'Blog', icon: BookOpen },
-    { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/admin/settings', label: 'Settings', icon: Settings },
+    { path: '/admin', label: t('navigation.dashboard'), icon: Home, exact: true },
+    { path: '/admin/users', label: t('navigation.users'), icon: Users },
+    { path: '/admin/receipts', label: t('navigation.receipts'), icon: FileText },
+    { path: '/admin/blog', label: t('navigation.blog'), icon: BookOpen },
+    { path: '/admin/analytics', label: t('navigation.analytics'), icon: BarChart3 },
+    { path: '/admin/settings', label: t('navigation.settings'), icon: Settings },
   ];
 
   return (
@@ -42,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
           <div className="flex items-center gap-2">
             <Shield className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-semibold">Admin Panel</h1>
+            <h1 className="text-lg font-semibold">{t('title')}</h1>
           </div>
 
           {/* Mobile Navigation Dropdown */}
@@ -79,12 +81,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <DropdownMenuItem asChild>
                 <Link to="/dashboard" className="flex items-center gap-2 w-full">
                   <Home className="h-4 w-4" />
-                  <span>Exit Admin</span>
+                  <span>{t('actions.exitAdmin')}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                <span>Sign Out</span>
+                <span>{t('actions.signOut')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -106,7 +108,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <SidebarHeader className="p-4 border-b">
                 <div className="flex items-center gap-2">
                   <Shield className="h-6 w-6 text-primary" />
-                  <h1 className="text-xl font-bold">Admin Panel</h1>
+                  <h1 className="text-xl font-bold">{t('title')}</h1>
                 </div>
               </SidebarHeader>
               <SidebarContent>
@@ -139,14 +141,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div className="flex flex-col gap-2">
                   {user && (
                     <div className="text-sm text-muted-foreground">
-                      Signed in as {user.email}
+                      {t('actions.signedInAs')} {user.email}
                     </div>
                   )}
                   <Button variant="outline" size="sm" onClick={() => signOut()}>
-                    Sign Out
+                    {t('actions.signOut')}
                   </Button>
                   <Button variant="outline" size="sm" asChild>
-                    <Link to="/dashboard">Exit Admin</Link>
+                    <Link to="/dashboard">{t('actions.exitAdmin')}</Link>
                   </Button>
                 </div>
               </SidebarFooter>

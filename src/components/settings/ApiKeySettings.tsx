@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, Key, Save, ExternalLink, AlertCircle } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
+import { useSettingsTranslation } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 
 export function ApiKeySettings() {
   const { settings, updateSettings } = useSettings();
+  const { t } = useSettingsTranslation();
   const [showApiKey, setShowApiKey] = useState(false);
   const [openRouterKey, setOpenRouterKey] = useState(settings.userApiKeys?.openrouter || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -23,10 +25,10 @@ export function ApiKeySettings() {
           openrouter: openRouterKey.trim() || undefined
         }
       });
-      toast.success('API key saved successfully');
+      toast.success(t('apiKeys.notifications.saved'));
     } catch (error) {
       console.error('Error saving API key:', error);
-      toast.error('Failed to save API key');
+      toast.error(t('apiKeys.notifications.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -40,7 +42,7 @@ export function ApiKeySettings() {
         openrouter: undefined
       }
     });
-    toast.success('API key cleared');
+    toast.success(t('apiKeys.notifications.cleared'));
   };
 
   const isKeyConfigured = !!settings.userApiKeys?.openrouter;
@@ -49,9 +51,9 @@ export function ApiKeySettings() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold">API Key Configuration</h3>
+        <h3 className="text-lg font-semibold">{t('apiKeys.title')}</h3>
         <p className="text-sm text-muted-foreground">
-          Configure your API keys to enable additional AI model providers
+          {t('apiKeys.description')}
         </p>
       </div>
 
@@ -63,16 +65,16 @@ export function ApiKeySettings() {
                 <Key className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <CardTitle className="text-base">OpenRouter API Key</CardTitle>
+                <CardTitle className="text-base">{t('apiKeys.openrouter.title')}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Access multiple AI providers through OpenRouter's unified API
+                  {t('apiKeys.openrouter.description')}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {isKeyConfigured && (
                 <Badge variant="outline" className="text-green-600 bg-green-50">
-                  Configured
+                  {t('apiKeys.status.configured')}
                 </Badge>
               )}
               <Button
@@ -81,7 +83,7 @@ export function ApiKeySettings() {
                 onClick={() => window.open('https://openrouter.ai/keys', '_blank')}
                 className="flex items-center gap-1"
               >
-                Get Key
+                {t('apiKeys.actions.getKey')}
                 <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
@@ -90,7 +92,7 @@ export function ApiKeySettings() {
         
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="openrouter-key">API Key</Label>
+            <Label htmlFor="openrouter-key">{t('apiKeys.fields.apiKey')}</Label>
             <div className="relative">
               <Input
                 id="openrouter-key"
@@ -135,7 +137,7 @@ export function ApiKeySettings() {
               className="flex items-center gap-2"
             >
               <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save API Key'}
+              {isSaving ? t('apiKeys.actions.saving') : t('apiKeys.actions.save')}
             </Button>
             
             {isKeyConfigured && (
@@ -144,7 +146,7 @@ export function ApiKeySettings() {
                 onClick={handleClearApiKey}
                 className="text-red-600 hover:text-red-700"
               >
-                Clear Key
+                {t('apiKeys.actions.clear')}
               </Button>
             )}
           </div>

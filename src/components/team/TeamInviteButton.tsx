@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTeam } from '@/contexts/TeamContext';
+import { useTeamTranslation } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -40,6 +41,7 @@ export function TeamInviteButton({
   className,
 }: TeamInviteButtonProps) {
   const { currentTeam, hasPermission, inviteTeamMember } = useTeam();
+  const { t } = useTeamTranslation();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<TeamMemberRole>('member');
@@ -75,25 +77,25 @@ export function TeamInviteButton({
       <DialogTrigger asChild>
         <Button variant={variant} size={size} className={className}>
           <UserPlus className="h-4 w-4 mr-2" />
-          Invite Member
+          {t('members.actions.invite')}
         </Button>
       </DialogTrigger>
       
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Invite Team Member</DialogTitle>
+          <DialogTitle>{t('invitations.form.title')}</DialogTitle>
           <DialogDescription>
-            Send an invitation to join {currentTeam?.name || 'your team'}
+            {t('invitations.form.description', { teamName: currentTeam?.name || t('selector.personalWorkspace') })}
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="invite-email">Email Address</Label>
+            <Label htmlFor="invite-email">{t('invitations.form.fields.email')}</Label>
             <Input
               id="invite-email"
               type="email"
-              placeholder="Enter email address"
+              placeholder={t('invitations.form.placeholders.email')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={inviting}
@@ -101,7 +103,7 @@ export function TeamInviteButton({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="invite-role">Role</Label>
+            <Label htmlFor="invite-role">{t('invitations.form.fields.role')}</Label>
             <Select
               value={role}
               onValueChange={(value: TeamMemberRole) => setRole(value)}
@@ -115,7 +117,7 @@ export function TeamInviteButton({
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{getTeamRoleDisplayName('viewer')}</span>
                     <span className="text-xs text-muted-foreground">
-                      Can view receipts and team members
+                      {t('members.permissions.viewer')}
                     </span>
                   </div>
                 </SelectItem>
@@ -123,7 +125,7 @@ export function TeamInviteButton({
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{getTeamRoleDisplayName('member')}</span>
                     <span className="text-xs text-muted-foreground">
-                      Can upload, edit, and view receipts
+                      {t('members.permissions.member')}
                     </span>
                   </div>
                 </SelectItem>
@@ -131,7 +133,7 @@ export function TeamInviteButton({
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{getTeamRoleDisplayName('admin')}</span>
                     <span className="text-xs text-muted-foreground">
-                      Can manage team members and settings
+                      {t('members.permissions.admin')}
                     </span>
                   </div>
                 </SelectItem>
@@ -149,13 +151,13 @@ export function TeamInviteButton({
             onClick={() => setOpen(false)}
             disabled={inviting}
           >
-            Cancel
+            {t('invitations.actions.cancel')}
           </Button>
           <Button
             onClick={handleInvite}
             disabled={!email.trim() || inviting}
           >
-            {inviting ? 'Sending...' : 'Send Invitation'}
+            {inviting ? t('invitations.actions.sending') : t('invitations.actions.sendInvitation')}
           </Button>
         </DialogFooter>
       </DialogContent>

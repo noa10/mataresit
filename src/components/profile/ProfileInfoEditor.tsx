@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { updateProfile, ProfileData, getFullName } from "@/services/profileService";
 
+// Note: Validation messages will be handled by translation keys in the component
 const profileSchema = z.object({
-  first_name: z.string().max(50, "First name must be 50 characters or less").optional(),
-  last_name: z.string().max(50, "Last name must be 50 characters or less").optional(),
-  email: z.string().email("Please enter a valid email address").optional(),
+  first_name: z.string().max(50).optional(),
+  last_name: z.string().max(50).optional(),
+  email: z.string().email().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -27,6 +29,7 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
+  const { t } = useProfileTranslation();
 
   const {
     register,
@@ -64,23 +67,23 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
       
       if (result.success && result.profile) {
         toast({
-          title: "Profile updated",
-          description: "Your profile information has been updated successfully.",
+          title: t("notifications.updateSuccess"),
+          description: t("notifications.updateSuccessDescription"),
         });
         onProfileUpdate(result.profile);
         setIsEditing(false);
       } else {
         toast({
-          title: "Update failed",
-          description: result.error || "Failed to update profile. Please try again.",
+          title: t("notifications.updateFailed"),
+          description: result.error || t("notifications.updateFailedDescription"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Profile update error:", error);
       toast({
-        title: "Update failed",
-        description: "An unexpected error occurred. Please try again.",
+        title: t("notifications.updateFailed"),
+        description: t("notifications.unexpectedError"),
         variant: "destructive",
       });
     } finally {
@@ -91,7 +94,7 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg">Personal Information</CardTitle>
+        <CardTitle className="text-lg">{t("editor.title")}</CardTitle>
         {!isEditing && (
           <Button
             variant="outline"
@@ -100,7 +103,7 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
             className="gap-2"
           >
             <Edit className="h-4 w-4" />
-            Edit
+            {t("editor.actions.edit")}
           </Button>
         )}
       </CardHeader>
@@ -109,43 +112,43 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="first_name">First Name</Label>
+                <Label htmlFor="first_name">{t("editor.fields.firstName")}</Label>
                 <Input
                   id="first_name"
                   {...register("first_name")}
-                  placeholder="Enter your first name"
+                  placeholder={t("editor.placeholders.firstName")}
                 />
                 {errors.first_name && (
-                  <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                  <p className="text-sm text-destructive">{t("editor.validation.firstNameTooLong")}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name</Label>
+                <Label htmlFor="last_name">{t("editor.fields.lastName")}</Label>
                 <Input
                   id="last_name"
                   {...register("last_name")}
-                  placeholder="Enter your last name"
+                  placeholder={t("editor.placeholders.lastName")}
                 />
                 {errors.last_name && (
-                  <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                  <p className="text-sm text-destructive">{t("editor.validation.lastNameTooLong")}</p>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t("editor.fields.email")}</Label>
               <Input
                 id="email"
                 type="email"
                 {...register("email")}
-                placeholder="Enter your email address"
+                placeholder={t("editor.placeholders.email")}
               />
               {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
+                <p className="text-sm text-destructive">{t("editor.validation.invalidEmail")}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Note: Changing your email may require re-verification
+                {t("editor.descriptions.emailNote")}
               </p>
             </div>
 
@@ -160,7 +163,7 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                {isUpdating ? "Saving..." : "Save Changes"}
+                {isUpdating ? t("editor.actions.saving") : t("editor.actions.saveChanges")}
               </Button>
               <Button
                 type="button"
@@ -170,7 +173,7 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
                 className="gap-2"
               >
                 <X className="h-4 w-4" />
-                Cancel
+                {t("editor.actions.cancel")}
               </Button>
             </div>
           </form>
@@ -178,15 +181,15 @@ export function ProfileInfoEditor({ profile, onProfileUpdate }: ProfileInfoEdito
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Full Name</Label>
+                <Label className="text-sm font-medium text-muted-foreground">{t("editor.display.fullName")}</Label>
                 <p className="text-sm font-medium">
-                  {getFullName(profile) || "Not provided"}
+                  {getFullName(profile) || t("editor.display.notProvided")}
                 </p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                <Label className="text-sm font-medium text-muted-foreground">{t("editor.display.email")}</Label>
                 <p className="text-sm font-medium">
-                  {profile.email || "Not provided"}
+                  {profile.email || t("editor.display.notProvided")}
                 </p>
               </div>
             </div>

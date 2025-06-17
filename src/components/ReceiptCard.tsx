@@ -10,6 +10,7 @@ import { ReceiptStatus, ProcessingStatus, CustomCategory, Receipt } from "@/type
 import { getFormattedImageUrlSync } from "@/utils/imageUtils";
 import { formatCurrencySafe } from "@/utils/currency";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface ReceiptCardProps {
   id: string;
@@ -38,6 +39,7 @@ export default function ReceiptCard({
   disableInternalLink,
   category
 }: ReceiptCardProps) {
+  const { t } = useReceiptsTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
   
@@ -75,31 +77,31 @@ export default function ReceiptCard({
 
   const getProcessingInfo = () => {
     if (!processingStatus || processingStatus === 'complete') return null;
-    
-    let statusText = 'Processing...';
+
+    let statusText = t('processingStatus.processing');
     let icon = <Loader2 size={12} className="animate-spin mr-1" />;
     let colorClass = 'border-blue-500 text-blue-500';
-    
+
     switch (processingStatus) {
       case 'uploading':
-        statusText = 'Uploading...';
+        statusText = t('processingStatus.uploading');
         colorClass = 'border-blue-500 text-blue-500';
         break;
       case 'uploaded':
-        statusText = 'Uploaded';
+        statusText = t('processingStatus.uploaded');
         colorClass = 'border-indigo-500 text-indigo-500';
         break;
       case 'processing':
-        statusText = 'AI Processing...';
+        statusText = t('processingStatus.processing');
         colorClass = 'border-purple-500 text-purple-500';
         break;
       case 'failed':
-        statusText = 'Processing Failed';
+        statusText = t('processingStatus.failed');
         icon = <AlertTriangle size={12} className="mr-1" />;
         colorClass = 'border-red-500 text-red-500';
         break;
     }
-    
+
     return { statusText, icon, colorClass };
   };
 
@@ -131,7 +133,7 @@ export default function ReceiptCard({
             className="text-xs font-medium bg-black/60 backdrop-blur-sm text-white border-white/20"
           >
             <span className={`mr-1.5 inline-block w-2 h-2 rounded-full ${getStatusColor()}`}></span>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {t(`status.${status}`)}
           </Badge>
         </div>
         
@@ -146,10 +148,10 @@ export default function ReceiptCard({
                 <AlertTriangle size={32} className="mb-3 text-red-500" />
               )}
               <p className="text-sm font-medium">
-                {processingStatus === 'uploading' && 'Uploading...'}
-                {processingStatus === 'uploaded' && 'Processing...'}
-                {processingStatus === 'processing' && 'AI Processing...'}
-                {processingStatus === 'failed' && 'Processing Failed'}
+                {processingStatus === 'uploading' && t('processingStatus.uploading')}
+                {processingStatus === 'uploaded' && t('processingStatus.processing')}
+                {processingStatus === 'processing' && t('processingStatus.processing')}
+                {processingStatus === 'failed' && t('processingStatus.failed')}
               </p>
             </div>
           </div>
@@ -186,7 +188,7 @@ export default function ReceiptCard({
               </Badge>
             ) : (
               <>
-                <span className="text-xs">Confidence:</span>
+                <span className="text-xs">{t('confidence.label')}</span>
                 <span className={`text-xs font-semibold ${getConfidenceColor()}`}>
                   {confidence}%
                 </span>
@@ -198,12 +200,12 @@ export default function ReceiptCard({
         {/* Category display */}
         {category && (
           <div className="mt-2 flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs gap-1">
+            <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 max-w-[140px]">
               <div
-                className="w-2 h-2 rounded-full"
+                className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: category.color }}
               />
-              {category.name}
+              <span className="truncate">{category.name}</span>
             </Badge>
           </div>
         )}
@@ -212,13 +214,13 @@ export default function ReceiptCard({
           {disableInternalLink ? (
             <Button className="w-full gap-2">
               <Eye size={16} />
-              View Details
+              {t('actions.viewDetails')}
             </Button>
           ) : (
             <Link to={`/receipt/${id}`}>
               <Button className="w-full gap-2">
                 <Eye size={16} />
-                View Details
+                {t('actions.viewDetails')}
               </Button>
             </Link>
           )}

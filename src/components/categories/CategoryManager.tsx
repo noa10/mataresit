@@ -29,8 +29,10 @@ import {
 import { CustomCategory } from "@/types/receipt";
 import { CategoryFormModal } from "./CategoryFormModal";
 import { DeleteCategoryModal } from "./DeleteCategoryModal";
+import { useCategoriesTranslation } from "@/contexts/LanguageContext";
 
 export const CategoryManager: React.FC = () => {
+  const { t } = useCategoriesTranslation();
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CustomCategory | null>(null);
@@ -80,7 +82,7 @@ export const CategoryManager: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Manage Categories</h2>
+          <h2 className="text-2xl font-bold">{t('title')}</h2>
           <Skeleton className="h-10 w-32" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -96,8 +98,8 @@ export const CategoryManager: React.FC = () => {
     return (
       <div className="text-center py-8">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
-        <h3 className="text-lg font-medium mb-2">Failed to load categories</h3>
-        <p className="text-muted-foreground">Please try refreshing the page.</p>
+        <h3 className="text-lg font-medium mb-2">{t('error.loadFailed')}</h3>
+        <p className="text-muted-foreground">{t('error.tryRefresh')}</p>
       </div>
     );
   }
@@ -107,14 +109,14 @@ export const CategoryManager: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Manage Categories</h2>
+          <h2 className="text-2xl font-bold">{t('title')}</h2>
           <p className="text-muted-foreground">
-            Create and organize custom categories for your receipts
+            {t('description')}
           </p>
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
           <Plus size={16} />
-          New Category
+          {t('actions.newCategory')}
         </Button>
       </div>
 
@@ -126,13 +128,13 @@ export const CategoryManager: React.FC = () => {
           className="text-center py-12"
         >
           <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No categories yet</h3>
+          <h3 className="text-lg font-medium mb-2">{t('empty.title')}</h3>
           <p className="text-muted-foreground mb-6">
-            Create your first category to start organizing your receipts
+            {t('empty.description')}
           </p>
           <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
             <Plus size={16} />
-            Create Category
+            {t('actions.createCategory')}
           </Button>
         </motion.div>
       ) : (
@@ -165,14 +167,14 @@ export const CategoryManager: React.FC = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEdit(category)}>
                             <Edit2 size={16} className="mr-2" />
-                            Edit
+                            {t('actions.edit')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleDelete(category)}
                             className="text-destructive"
                           >
                             <Trash2 size={16} className="mr-2" />
-                            Delete
+                            {t('actions.delete')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -182,7 +184,7 @@ export const CategoryManager: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <Badge variant="secondary" className="gap-1">
                         <Tag size={12} />
-                        {category.receipt_count || 0} receipts
+                        {t('receiptCount', { count: category.receipt_count || 0 })}
                       </Badge>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Palette size={12} />

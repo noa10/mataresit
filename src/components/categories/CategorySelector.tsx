@@ -196,20 +196,20 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   }
 
   const sizeClasses = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+    sm: "text-xs px-2 py-0.5 max-w-[100px]",
+    md: "text-sm px-2 py-0.5 max-w-[120px]",
+    lg: "text-base px-2.5 py-1 max-w-[140px]",
   };
 
   return (
     <Badge variant="secondary" className={`gap-1 ${sizeClasses[size]}`}>
       <div
-        className="w-2 h-2 rounded-full"
+        className="w-2 h-2 rounded-full shrink-0"
         style={{ backgroundColor: category.color }}
       />
-      {category.name}
+      <span className="truncate">{category.name}</span>
       {showCount && category.receipt_count !== undefined && (
-        <span className="ml-1 opacity-70">({category.receipt_count})</span>
+        <span className="ml-1 opacity-70 shrink-0">({category.receipt_count})</span>
       )}
     </Badge>
   );

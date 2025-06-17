@@ -1,12 +1,14 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthTranslation } from "@/contexts/LanguageContext";
 import { useEffect, useState } from "react";
 
 export default function ProtectedRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { toast } = useToast();
+  const { t } = useAuthTranslation();
   const [hasShownToast, setHasShownToast] = useState(false);
 
   // Only show the toast notification once the loading is complete
@@ -19,8 +21,8 @@ export default function ProtectedRoute() {
     if (!user && !loading && !hasShownToast) {
       console.log("ProtectedRoute: Authentication required, showing toast");
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to access this page",
+        title: t("errors.authRequired"),
+        description: t("errors.authRequiredDescription"),
         variant: "destructive",
       });
       setHasShownToast(true);

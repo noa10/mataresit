@@ -33,6 +33,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useTeam } from '@/contexts/TeamContext';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 import { claimService } from '@/services/claimService';
 import { ClaimPriority } from '@/types/claims';
 import { Receipt } from '@/types/receipt';
@@ -79,6 +80,7 @@ export function CreateClaimDialog({
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<string[]>([]);
   const { currentTeam } = useTeam();
   const { toast } = useToast();
+  const { t } = useClaimsTranslation();
 
   const form = useForm<CreateClaimFormData>({
     resolver: zodResolver(createClaimSchema),
@@ -148,8 +150,8 @@ export function CreateClaimDialog({
   const onSubmit = async (data: CreateClaimFormData) => {
     if (!currentTeam) {
       toast({
-        title: 'Error',
-        description: 'No team selected',
+        title: t('errors.title'),
+        description: t('errors.noTeamSelected'),
         variant: 'destructive',
       });
       return;
@@ -183,8 +185,8 @@ export function CreateClaimDialog({
       });
 
       toast({
-        title: 'Success',
-        description: 'Claim created successfully',
+        title: t('notifications.success'),
+        description: t('notifications.claimCreated'),
       });
 
       form.reset();
@@ -194,8 +196,8 @@ export function CreateClaimDialog({
     } catch (error) {
       console.error('Error creating claim:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create claim',
+        title: t('errors.title'),
+        description: t('errors.createFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -207,9 +209,9 @@ export function CreateClaimDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-[800px] h-[95vh] max-h-[800px] p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-4 py-3 border-b shrink-0">
-          <DialogTitle>Create New Claim</DialogTitle>
+          <DialogTitle>{t('create.title')}</DialogTitle>
           <DialogDescription>
-            Create a new expense claim for review and approval.
+            {t('create.subtitle')}
           </DialogDescription>
         </DialogHeader>
 
@@ -219,9 +221,9 @@ export function CreateClaimDialog({
               <Tabs defaultValue="details" className="flex flex-col h-full">
                 <div className="px-4 py-2 border-b shrink-0">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="details">Claim Details</TabsTrigger>
+                    <TabsTrigger value="details">{t('create.steps.details')}</TabsTrigger>
                     <TabsTrigger value="receipts">
-                      Receipts {attachedReceipts.length > 0 && `(${attachedReceipts.length})`}
+                      {t('create.steps.receipts')} {attachedReceipts.length > 0 && `(${attachedReceipts.length})`}
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -233,9 +235,9 @@ export function CreateClaimDialog({
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel>{t('create.form.title')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter claim title" {...field} />
+                        <Input placeholder={t('create.placeholders.title')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -247,10 +249,10 @@ export function CreateClaimDialog({
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>{t('create.form.description')}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Enter claim description (optional)"
+                          placeholder={t('create.placeholders.description')}
                           className="resize-none"
                           {...field}
                         />
@@ -266,7 +268,7 @@ export function CreateClaimDialog({
                         name="amount"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Amount</FormLabel>
+                            <FormLabel>{t('create.form.totalAmount')}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -287,11 +289,11 @@ export function CreateClaimDialog({
                         name="currency"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Currency</FormLabel>
+                            <FormLabel>{t('create.form.currency')}</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select currency" />
+                                  <SelectValue placeholder={t('create.placeholders.currency')} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -313,12 +315,12 @@ export function CreateClaimDialog({
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel>{t('create.form.category')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Travel, Meals, Office Supplies" {...field} />
+                        <Input placeholder={t('create.placeholders.category')} {...field} />
                       </FormControl>
                       <FormDescription>
-                        Optional category for organizing claims
+                        {t('create.descriptions.category')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -330,18 +332,18 @@ export function CreateClaimDialog({
                   name="priority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Priority</FormLabel>
+                      <FormLabel>{t('create.form.priority')}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
+                            <SelectValue placeholder={t('create.placeholders.priority')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
+                          <SelectItem value="low">{t('create.priority.low')}</SelectItem>
+                          <SelectItem value="medium">{t('create.priority.medium')}</SelectItem>
+                          <SelectItem value="high">{t('create.priority.high')}</SelectItem>
+                          <SelectItem value="urgent">{t('create.priority.urgent')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -354,7 +356,7 @@ export function CreateClaimDialog({
                     {receiptsLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        <span className="ml-2 text-sm text-muted-foreground">Loading receipts...</span>
+                        <span className="ml-2 text-sm text-muted-foreground">{t('create.loading.receipts')}</span>
                       </div>
                     ) : (
                       <>
@@ -388,14 +390,14 @@ export function CreateClaimDialog({
                   disabled={loading}
                   className="w-full sm:w-auto"
                 >
-                  Cancel
+                  {t('create.actions.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={loading}
                   className="w-full sm:w-auto"
                 >
-                  {loading ? 'Creating...' : 'Create Claim'}
+                  {loading ? t('create.actions.creating') : t('create.actions.create')}
                 </Button>
               </DialogFooter>
             </form>

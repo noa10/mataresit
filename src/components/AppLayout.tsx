@@ -106,7 +106,7 @@ export function AppLayout() {
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Navbar
             navControls={{
               navSidebarToggle: (
@@ -118,7 +118,7 @@ export function AppLayout() {
             }}
             chatControls={chatControls}
           />
-          <main className="flex-1">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </main>
         </div>

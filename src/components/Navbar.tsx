@@ -3,12 +3,14 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useTeam } from "@/contexts/TeamContext";
+import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 
 import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { cn } from "@/lib/utils";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import {
@@ -35,6 +37,8 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
   const { user, signOut, isAdmin } = useAuth();
   const { subscriptionData } = useStripe();
   const { currentTeam } = useTeam();
+  const { t: tNav } = useNavigationTranslation();
+  const { t: tCommon } = useCommonTranslation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -112,7 +116,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   cn("text-sm font-medium transition-colors hover:text-primary",
                   isActive ? "text-primary" : "text-muted-foreground")}
               >
-                Features
+                {tNav('mainMenu.features')}
               </NavLink>
               <NavLink
                 to="/pricing"
@@ -120,37 +124,37 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   cn("text-sm font-medium transition-colors hover:text-primary",
                   isActive ? "text-primary" : "text-muted-foreground")}
               >
-                Pricing
+                {tNav('mainMenu.pricing')}
               </NavLink>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors p-0 h-auto">
-                    Resources <ChevronDown className="ml-1 h-3 w-3" />
+                    {tNav('mainMenu.resources')} <ChevronDown className="ml-1 h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-48">
                   <DropdownMenuItem asChild>
                     <Link to="/docs" className="flex items-center gap-2 w-full">
                       <FileText className="h-4 w-4" />
-                      Documentation
+                      {tNav('mainMenu.documentation')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/help" className="flex items-center gap-2 w-full">
                       <MessageSquare className="h-4 w-4" />
-                      Help Center
+                      {tNav('mainMenu.help')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/status" className="flex items-center gap-2 w-full">
                       <ShieldCheck className="h-4 w-4" />
-                      System Status
+                      {tNav('mainMenu.status')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/blog" className="flex items-center gap-2 w-full">
                       <FileText className="h-4 w-4" />
-                      Blog
+                      {tNav('mainMenu.blog')}
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -162,7 +166,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     cn("text-sm font-medium transition-colors hover:text-primary",
                     isActive ? "text-primary" : "text-muted-foreground")}
                 >
-                  Dashboard
+                  {tNav('mainMenu.dashboard')}
                 </NavLink>
               )}
             </>
@@ -175,7 +179,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   cn("text-sm font-medium transition-colors hover:text-primary",
                   isActive ? "text-primary" : "text-muted-foreground")}
               >
-                Dashboard
+                {tNav('mainMenu.dashboard')}
               </NavLink>
               <NavLink
                 to="/search"
@@ -184,7 +188,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   isActive ? "text-primary" : "text-muted-foreground")}
               >
                 <BrainCircuit className="h-4 w-4" />
-                AI Search
+                {tNav('mainMenu.search')}
               </NavLink>
             </>
           )}
@@ -196,9 +200,14 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
           {isSearchPage && chatControls?.onNewChat && (
             <Button variant="outline" size="sm" onClick={chatControls.onNewChat} className="hidden sm:flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              New Chat
+              {tCommon('buttons.newChat')}
             </Button>
           )}
+
+          {/* Language Selector */}
+          <div className="hidden sm:block">
+            <LanguageSelector variant="compact" />
+          </div>
 
           {/* Theme Toggle */}
           <Button variant="ghost" size="sm" onClick={toggleTheme} title="Toggle theme" className="hidden sm:flex">
@@ -208,7 +217,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
           {/* Primary CTA Button (Discord-style) */}
           {!user ? (
             <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-4 py-2 rounded-full">
-              <Link to="/auth">Get Started</Link>
+              <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
             </Button>
           ) : (
             <div className="flex items-center space-x-3">
@@ -242,7 +251,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      Profile
+                      {tNav('userMenu.profile')}
                     </Link>
                   </DropdownMenuItem>
 
@@ -252,7 +261,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                       <DropdownMenuItem asChild>
                         <Link to="/admin" className="flex items-center gap-2">
                           <Crown className="h-4 w-4" />
-                          Admin Panel
+                          {tNav('mainMenu.admin')}
                         </Link>
                       </DropdownMenuItem>
                     </>
@@ -260,7 +269,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => signOut()} className="text-red-600 focus:text-red-600">
                     <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
+                    {tNav('userMenu.logout')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -289,46 +298,46 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Features
+                    {tNav('mainMenu.features')}
                   </Link>
                   <Link
                     to="/pricing"
                     className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Pricing
+                    {tNav('mainMenu.pricing')}
                   </Link>
                   <div className="py-2">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2">
-                      Resources
+                      {tNav('mainMenu.resources')}
                     </div>
                     <Link
                       to="/docs"
                       className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Documentation
+                      {tNav('mainMenu.documentation')}
                     </Link>
                     <Link
                       to="/help"
                       className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Help Center
+                      {tNav('mainMenu.help')}
                     </Link>
                     <Link
                       to="/status"
                       className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      System Status
+                      {tNav('mainMenu.status')}
                     </Link>
                     <Link
                       to="/blog"
                       className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      Blog
+                      {tNav('mainMenu.blog')}
                     </Link>
                   </div>
                   {user && (
@@ -348,7 +357,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Dashboard
+                    {tNav('mainMenu.dashboard')}
                   </Link>
                   <Link
                     to="/search"
@@ -356,7 +365,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <BrainCircuit className="h-4 w-4" />
-                    AI Search
+                    {tNav('mainMenu.search')}
                   </Link>
                 </>
               )}
@@ -375,9 +384,13 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   className="w-full justify-start gap-2"
                 >
                   <Plus className="h-4 w-4" />
-                  New Chat
+                  {tCommon('buttons.newChat')}
                 </Button>
               )}
+
+              <div className="w-full">
+                <LanguageSelector variant="default" className="w-full justify-start" />
+              </div>
 
               <Button
                 variant="ghost"
@@ -386,7 +399,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                 className="w-full justify-start gap-2"
               >
                 {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
               </Button>
 
               {user ? (
@@ -406,7 +419,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4" />
-                    Profile
+                    {tNav('userMenu.profile')}
                   </Link>
 
                   {isAdmin && (
@@ -416,7 +429,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Crown className="h-4 w-4" />
-                      Admin Panel
+                      {tNav('mainMenu.admin')}
                     </Link>
                   )}
                   <button
@@ -427,7 +440,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     className="flex items-center gap-2 w-full py-2 px-4 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                   >
                     <LogOut className="h-4 w-4" />
-                    Sign Out
+                    {tNav('userMenu.logout')}
                   </button>
                 </div>
               ) : (
@@ -436,7 +449,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-full"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Link to="/auth">Get Started</Link>
+                  <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
                 </Button>
               )}
             </div>

@@ -33,12 +33,14 @@ import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessin
 import { ProcessingRecommendation } from "@/utils/processingOptimizer";
 import { CategorySelector } from "./categories/CategorySelector";
 import { Label } from "@/components/ui/label";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
 }
 
 export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
+  const { t } = useReceiptsTranslation();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -122,11 +124,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         // Update ARIA live region for accessibility
         const ariaLiveRegion = document.getElementById('upload-status');
         if (ariaLiveRegion) {
-          ariaLiveRegion.textContent = `Receipt processing ${processingStatus.replace('_', ' ')}`;
+          ariaLiveRegion.textContent = `${t('upload.processing')} ${processingStatus.replace('_', ' ')}`;
           if (processingStatus === 'complete') {
-            ariaLiveRegion.textContent = 'Receipt processed successfully';
+            ariaLiveRegion.textContent = t('viewer.processedSuccessfully');
           } else if (processingStatus === 'failed') {
-            ariaLiveRegion.textContent = `Receipt processing failed`;
+            ariaLiveRegion.textContent = t('upload.error');
           }
         }
       }
@@ -155,11 +157,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
           if (newError) {
             setError(newError);
-            toast.error(`Processing error: ${newError}`);
+            toast.error(t('viewer.processingError', { error: newError }));
           } else if (newStatus === 'complete') {
-            toast.success("Receipt processed successfully!");
+            toast.success(t('viewer.processedSuccessfully'));
           } else if (newStatus === 'failed') {
-            const errorMsg = "AI processing failed. Please edit manually.";
+            const errorMsg = t('upload.error');
             setError(errorMsg);
             toast.error(errorMsg);
           }
@@ -340,7 +342,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
   const processUploadedFiles = async (files: File[]) => {
     if (!user) {
-      toast.error("Please login first");
+      toast.error(t('upload.error'));
       navigate("/auth");
       return;
     }

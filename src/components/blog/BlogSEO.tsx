@@ -1,11 +1,25 @@
 import { Helmet } from 'react-helmet-async';
+import { useEffect } from 'react';
 import { BlogSEOProps } from '@/types/blog';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useAdvancedTranslation } from '@/hooks/useAdvancedTranslation';
+import { seoUtils, LANGUAGE_SEO_CONFIGS } from '@/lib/i18n-seo';
 
 export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
-  // Default SEO values for the blog
-  const defaultTitle = 'The Mataresit Blog';
-  const defaultDescription = 'Insights, updates, and expert tips on AI-powered expense management, productivity, and digital transformation for modern businesses.';
-  const defaultImage = '/og-blog.jpg'; // You can add a default blog OG image
+  const { language } = useLanguage();
+  const { t } = useAdvancedTranslation('homepage');
+  const languageConfig = LANGUAGE_SEO_CONFIGS[language];
+  // Initialize SEO for current language
+  useEffect(() => {
+    seoUtils.initializeSEO(language);
+  }, [language]);
+
+  // Default SEO values for the blog (localized)
+  const defaultTitle = t('blog.title', { defaultValue: 'The Mataresit Blog' });
+  const defaultDescription = t('blog.description', {
+    defaultValue: 'Insights, updates, and expert tips on AI-powered expense management, productivity, and digital transformation for modern businesses.'
+  });
+  const defaultImage = '/og-blog.jpg';
   const siteUrl = window.location.origin;
 
   // Generate SEO values based on whether it's index or individual post
@@ -22,18 +36,21 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
 
     if (!post) {
       return {
-        title: 'Blog Post Not Found | Mataresit',
-        description: 'The requested blog post could not be found.',
+        title: t('blog.notFound.title', { defaultValue: 'Blog Post Not Found | Mataresit' }),
+        description: t('blog.notFound.description', { defaultValue: 'The requested blog post could not be found.' }),
         url: `${siteUrl}/blog`,
         image: defaultImage,
         type: 'article',
       };
     }
 
-    // Individual post SEO
-    const title = `${post.title} | Mataresit Blog`;
+    // Individual post SEO with language-specific URL structure
+    const title = `${post.title} | ${t('blog.title', { defaultValue: 'Mataresit Blog' })}`;
     const description = post.excerpt || defaultDescription;
-    const url = `${siteUrl}/blog/${post.slug}`;
+
+    // Build language-aware URL
+    const basePath = language === 'en' ? '/blog' : `/${language}/blog`;
+    const url = `${siteUrl}${basePath}/${post.slug}`;
     const image = post.image_url || defaultImage;
 
     return {
@@ -53,10 +70,20 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
 
   return (
     <Helmet>
+      {/* Language and Locale Meta Tags */}
+      <html lang={languageConfig.locale} dir={languageConfig.direction} />
+      <meta name="language" content={languageConfig.language} />
+      <meta name="locale" content={languageConfig.locale} />
+
       {/* Basic Meta Tags */}
       <title>{seoData.title}</title>
       <meta name="description" content={seoData.description} />
       <link rel="canonical" href={seoData.url} />
+
+      {/* Alternate Language Links */}
+      <link rel="alternate" hreflang="en" href={`${siteUrl}/blog${post ? `/${post.slug}` : ''}`} />
+      <link rel="alternate" hreflang="ms" href={`${siteUrl}/ms/blog${post ? `/${post.slug}` : ''}`} />
+      <link rel="alternate" hreflang="x-default" href={`${siteUrl}/blog${post ? `/${post.slug}` : ''}`} />
 
       {/* Open Graph Meta Tags */}
       <meta property="og:title" content={seoData.title} />
@@ -65,6 +92,11 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
       <meta property="og:image" content={seoData.image} />
       <meta property="og:type" content={seoData.type} />
       <meta property="og:site_name" content="Mataresit" />
+      <meta property="og:locale" content={languageConfig.locale} />
+
+      {/* Alternate locales for Open Graph */}
+      {language === 'en' && <meta property="og:locale:alternate" content="ms_MY" />}
+      {language === 'ms' && <meta property="og:locale:alternate" content="en_US" />}
 
       {/* Twitter Card Meta Tags */}
       <meta name="twitter:card" content="summary_large_image" />

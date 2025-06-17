@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 import { claimService } from '@/services/claimService';
 import {
   Claim,
@@ -43,6 +44,7 @@ export function ClaimSubmissionDialog({
 }: ClaimSubmissionDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useClaimsTranslation();
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -68,8 +70,8 @@ export function ClaimSubmissionDialog({
       await claimService.submitClaim(claim.id);
 
       toast({
-        title: 'Success',
-        description: 'Claim submitted for review successfully',
+        title: t('notifications.success'),
+        description: t('notifications.claimSubmitted'),
       });
 
       onOpenChange(false);
@@ -77,8 +79,8 @@ export function ClaimSubmissionDialog({
     } catch (error) {
       console.error('Error submitting claim:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to submit claim',
+        title: t('errors.title'),
+        description: t('errors.submissionFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -103,10 +105,10 @@ export function ClaimSubmissionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5 text-blue-600" />
-            Submit Claim for Review
+            {t('submission.title')}
           </DialogTitle>
           <DialogDescription>
-            Review your claim details before submitting for approval. Once submitted, you won't be able to edit the claim.
+            {t('submission.subtitle')}
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +130,7 @@ export function ClaimSubmissionDialog({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Amount:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.amount')}:</span>
                 <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                   {formatCurrency(claim.amount, claim.currency)}
                 </span>
@@ -136,19 +138,19 @@ export function ClaimSubmissionDialog({
 
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Claimant:</span>
-                <span className="text-gray-900 dark:text-gray-100">{claim.claimant_name || 'You'}</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.claimant')}:</span>
+                <span className="text-gray-900 dark:text-gray-100">{claim.claimant_name || t('submission.details.you')}</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Created:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.created')}:</span>
                 <span className="text-gray-900 dark:text-gray-100">{formatDate(claim.created_at)}</span>
               </div>
 
               {claim.category && (
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">Category:</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.category')}:</span>
                   <span className="text-gray-900 dark:text-gray-100">{claim.category}</span>
                 </div>
               )}
@@ -156,16 +158,16 @@ export function ClaimSubmissionDialog({
 
             {claim.description && (
               <div className="text-sm">
-                <span className="font-medium text-gray-900 dark:text-gray-100">Description:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.description')}:</span>
                 <p className="mt-1 text-gray-700 dark:text-gray-300">{claim.description}</p>
               </div>
             )}
 
             {claim.attachments && claim.attachments.length > 0 && (
               <div className="text-sm">
-                <span className="font-medium text-gray-900 dark:text-gray-100">Attachments:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.attachments')}:</span>
                 <p className="mt-1 text-gray-700 dark:text-gray-300">
-                  {claim.attachments.length} file(s) attached
+                  {t('submission.details.attachmentCount', { count: claim.attachments.length })}
                 </p>
               </div>
             )}
@@ -173,7 +175,7 @@ export function ClaimSubmissionDialog({
 
           {/* Validation Status */}
           <div className="space-y-3">
-            <h4 className="font-medium text-gray-900 dark:text-gray-100">Submission Checklist</h4>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100">{t('submission.checklist.title')}</h4>
 
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -183,7 +185,7 @@ export function ClaimSubmissionDialog({
                   <AlertCircle className="h-4 w-4 text-red-600" />
                 )}
                 <span className={hasTitle ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
-                  Claim has a title
+                  {t('submission.checklist.hasTitle')}
                 </span>
               </div>
 
@@ -194,7 +196,7 @@ export function ClaimSubmissionDialog({
                   <AlertCircle className="h-4 w-4 text-red-600" />
                 )}
                 <span className={hasAmount ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
-                  Amount is greater than zero
+                  {t('submission.checklist.hasAmount')}
                 </span>
               </div>
             </div>
@@ -205,11 +207,9 @@ export function ClaimSubmissionDialog({
             <div className="flex items-start gap-2">
               <Send className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-blue-800 dark:text-blue-200">Submission Notice</p>
+                <p className="font-medium text-blue-800 dark:text-blue-200">{t('submission.notice.title')}</p>
                 <p className="text-blue-700 dark:text-blue-300 mt-1">
-                  Once submitted, your claim will be reviewed by team administrators.
-                  You will receive notifications about the approval status.
-                  You won't be able to edit the claim after submission.
+                  {t('submission.notice.message')}
                 </p>
               </div>
             </div>
@@ -220,9 +220,9 @@ export function ClaimSubmissionDialog({
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-red-800 dark:text-red-200">Cannot Submit</p>
+                  <p className="font-medium text-red-800 dark:text-red-200">{t('submission.validation.cannotSubmit')}</p>
                   <p className="text-red-700 dark:text-red-300 mt-1">
-                    Please fix the issues above before submitting your claim.
+                    {t('submission.validation.fixIssues')}
                   </p>
                 </div>
               </div>
@@ -232,22 +232,22 @@ export function ClaimSubmissionDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={loading}>
-            Cancel
+            {t('submission.actions.cancel')}
           </Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             disabled={loading || !isValid}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Submitting...
+                {t('submission.actions.submitting')}
               </>
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Submit for Review
+                {t('submission.actions.submit')}
               </>
             )}
           </Button>

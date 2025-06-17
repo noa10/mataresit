@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { ChangePasswordDialog } from "@/components/modals/ChangePasswordDialog";
@@ -38,20 +39,21 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useProfileTranslation();
 
   const handleSignOut = async () => {
     try {
       await signOut();
       navigate('/auth');
       toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account.",
+        title: t("settings.notifications.signOutSuccess"),
+        description: t("settings.notifications.signOutSuccessDescription"),
       });
     } catch (error) {
       console.error("Sign out error:", error);
       toast({
-        title: "Sign out failed",
-        description: "An error occurred while signing out. Please try again.",
+        title: t("settings.notifications.signOutFailed"),
+        description: t("settings.notifications.signOutFailedDescription"),
         variant: "destructive",
       });
     }
@@ -100,16 +102,16 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Security Settings
+            {t("settings.security.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isGoogleUser && (
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-medium">Password</h4>
+                <h4 className="font-medium">{t("settings.security.password.title")}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Change your account password
+                  {t("settings.security.password.description")}
                 </p>
               </div>
               <Button
@@ -118,7 +120,7 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
                 className="gap-2"
               >
                 <Key className="h-4 w-4" />
-                Change Password
+                {t("settings.security.password.changeButton")}
               </Button>
             </div>
           )}

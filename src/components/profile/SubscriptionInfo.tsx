@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { getSubscriptionInfo } from "@/services/profileService";
+import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { Link } from "react-router-dom";
 
 interface SubscriptionInfoProps {
@@ -43,6 +44,7 @@ const tierIcons = {
 export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { t } = useProfileTranslation();
 
   useEffect(() => {
     const fetchSubscriptionInfo = async () => {
@@ -63,7 +65,7 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Subscription & Usage</CardTitle>
+          <CardTitle>{t("subscription.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
@@ -80,10 +82,10 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Subscription & Usage</CardTitle>
+          <CardTitle>{t("subscription.title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Unable to load subscription information.</p>
+          <p className="text-muted-foreground">{t("subscription.unableToLoad")}</p>
         </CardContent>
       </Card>
     );
@@ -114,11 +116,11 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg">Subscription & Usage</CardTitle>
+        <CardTitle className="text-lg">{t("subscription.title")}</CardTitle>
         <Button asChild variant="outline" size="sm">
           <Link to="/pricing" className="gap-2">
             <ExternalLink className="h-4 w-4" />
-            Manage Plan
+            {t("subscription.managePlan")}
           </Link>
         </Button>
       </CardHeader>
@@ -126,14 +128,14 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
         {/* Current Plan */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium">Current Plan</h3>
+            <h3 className="font-medium">{t("subscription.currentPlan")}</h3>
           </div>
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className={`gap-1 ${tierColors[subscription_tier as keyof typeof tierColors] || tierColors.free}`}
           >
             {tierIcons[subscription_tier as keyof typeof tierIcons]}
-            {tierName} Plan
+            {t("subscription.planName", { tier: tierName })}
           </Badge>
         </div>
 

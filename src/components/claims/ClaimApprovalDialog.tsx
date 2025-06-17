@@ -23,6 +23,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 import { claimService } from '@/services/claimService';
 import {
   Claim,
@@ -58,6 +59,7 @@ export function ClaimApprovalDialog({
 }: ClaimApprovalDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useClaimsTranslation();
 
   const form = useForm<ApprovalFormData>({
     resolver: zodResolver(approvalSchema),
@@ -85,8 +87,8 @@ export function ClaimApprovalDialog({
       });
 
       toast({
-        title: 'Success',
-        description: 'Claim approved successfully',
+        title: t('notifications.success'),
+        description: t('notifications.claimApproved'),
       });
 
       form.reset();
@@ -95,8 +97,8 @@ export function ClaimApprovalDialog({
     } catch (error) {
       console.error('Error approving claim:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to approve claim',
+        title: t('errors.title'),
+        description: t('errors.approveFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -117,10 +119,10 @@ export function ClaimApprovalDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            Approve Claim
+            {t('approval.title')}
           </DialogTitle>
           <DialogDescription>
-            Review and approve this expense claim. This action cannot be undone.
+            {t('approval.subtitle')}
           </DialogDescription>
         </DialogHeader>
 
@@ -137,29 +139,29 @@ export function ClaimApprovalDialog({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Amount:</span>
+                <span className="font-medium">{t('approval.details.amount')}:</span>
                 <span className="font-semibold text-lg">
                   {formatCurrency(claim.amount, claim.currency)}
                 </span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Claimant:</span>
-                <span>{claim.claimant_name || 'Unknown'}</span>
+                <span className="font-medium">{t('approval.details.claimant')}:</span>
+                <span>{claim.claimant_name || t('approval.details.unknown')}</span>
               </div>
             </div>
 
             {claim.category && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">Category:</span>
+                <span className="font-medium">{t('approval.details.category')}:</span>
                 <span>{claim.category}</span>
               </div>
             )}
 
             {claim.description && (
               <div className="text-sm">
-                <span className="font-medium">Description:</span>
+                <span className="font-medium">{t('approval.details.description')}:</span>
                 <p className="mt-1 text-muted-foreground">{claim.description}</p>
               </div>
             )}
@@ -173,16 +175,16 @@ export function ClaimApprovalDialog({
                 name="comment"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Approval Comment (Optional)</FormLabel>
+                    <FormLabel>{t('approval.form.comment')}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Add any comments about this approval..."
+                        placeholder={t('approval.placeholders.comment')}
                         className="min-h-[100px]"
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      This comment will be visible to the claimant and recorded in the audit trail.
+                      {t('approval.descriptions.comment')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -196,10 +198,9 @@ export function ClaimApprovalDialog({
             <div className="flex items-start gap-2">
               <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-green-800 dark:text-green-200">Approval Confirmation</p>
+                <p className="font-medium text-green-800 dark:text-green-200">{t('approval.confirmation.title')}</p>
                 <p className="text-green-700 dark:text-green-300 mt-1">
-                  By approving this claim, you confirm that the expense is valid and should be processed for payment.
-                  The claimant will be notified of the approval.
+                  {t('approval.confirmation.message')}
                 </p>
               </div>
             </div>
@@ -208,22 +209,22 @@ export function ClaimApprovalDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={loading}>
-            Cancel
+            {t('approval.actions.cancel')}
           </Button>
-          <Button 
-            onClick={form.handleSubmit(onSubmit)} 
+          <Button
+            onClick={form.handleSubmit(onSubmit)}
             disabled={loading}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Approving...
+                {t('approval.actions.approving')}
               </>
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Approve Claim
+                {t('approval.actions.approve')}
               </>
             )}
           </Button>

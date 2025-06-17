@@ -38,6 +38,7 @@ import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 import { useSettings } from "@/hooks/useSettings";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -76,12 +77,14 @@ const normalizeConfidence = (score?: number | null): number => {
 
 // Enhanced Confidence indicator component with better visual feedback and tooltips
 function ConfidenceIndicator({ score, loading = false }: { score?: number, loading?: boolean }) {
+  const { t } = useReceiptsTranslation();
+
   // Show loading state while processing
   if (loading) {
     return (
       <div className="flex items-center gap-1">
         <span className="inline-block w-4 h-1 rounded bg-gray-300 animate-pulse"></span>
-        <span className="text-xs text-gray-400">Processing...</span>
+        <span className="text-xs text-gray-400">{t('viewer.processing')}</span>
       </div>
     );
   }
@@ -94,9 +97,9 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
                 normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   // Add confidence labels for accessibility
-  const label = normalizedScore >= 80 ? 'High' :
-               normalizedScore >= 60 ? 'Medium' :
-               normalizedScore >= 40 ? 'Low' : 'Very Low';
+  const label = normalizedScore >= 80 ? t('viewer.highConfidence') :
+               normalizedScore >= 60 ? t('viewer.mediumConfidence') :
+               normalizedScore >= 40 ? t('viewer.lowConfidence') : t('viewer.veryLowConfidence');
 
   return (
     <div className="flex items-center gap-1 group relative">
@@ -109,11 +112,11 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
         <p className="font-medium">{label} confidence</p>
         <p className="text-gray-300 text-[10px] mt-1">
           {normalizedScore === 100
-            ? 'Verified by user'
-            : `AI detection with ${label.toLowerCase()} confidence`}
+            ? t('viewer.verifiedByUser')
+            : t('viewer.aiDetection', { level: label.toLowerCase() })}
         </p>
         {normalizedScore < 100 && (
-          <p className="text-gray-300 text-[10px] mt-1">Edit this field to verify.</p>
+          <p className="text-gray-300 text-[10px] mt-1">{t('viewer.editToVerify')}</p>
         )}
       </div>
     </div>
@@ -140,6 +143,7 @@ const useDebounce = <T,>(value: T, delay: number): T => {
 export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
   // Get user settings for processing method
   const { settings } = useSettings();
+  const { t } = useReceiptsTranslation();
 
   // Fetch user categories
   const { data: categories = [] } = useQuery({
@@ -308,7 +312,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           }));
 
           // Only show the verification toast when the value has been debounced
-          toast.success(`Currency verified`, {
+          toast.success(t('viewer.verified', { field: t('fields.currency') }), {
             duration: 1500,
             position: 'bottom-right',
             icon: '✓'
@@ -323,7 +327,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         }));
 
         // Only show the verification toast when the value has been debounced
-        toast.success(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} verified`, {
+        const fieldKey = field as keyof typeof t;
+        const fieldName = t(`fields.${field}` as any) || field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ');
+        toast.success(t('viewer.verified', { field: fieldName }), {
           duration: 1500,
           position: 'bottom-right',
           icon: '✓'
@@ -363,9 +369,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           // }
 
           if (newError) {
-            toast.error(`Processing error: ${newError}`);
+            toast.error(t('viewer.processingError', { error: newError }));
           } else if (newStatus === 'complete') {
-            toast.success("Receipt processed successfully!");
+            toast.success(t('viewer.processedSuccessfully'));
             // Refresh data - this will also re-run the first useEffect to update confidence
             queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
             // Invalidate batch receipt queries (for modals and lists)
@@ -420,7 +426,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
           img.onerror = () => {
             if (isMounted) {
-              console.error("Error loading receipt image despite async formatting:", receipt.image_url);
+              console.error(t('viewer.errorLoadingImage'), receipt.image_url);
               setImageError(true);
               setImageSource("/placeholder.svg");
             }
@@ -430,7 +436,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           img.src = formattedUrl;
         } catch (error) {
           if (isMounted) {
-            console.error("Exception during image loading:", error);
+            console.error(t('viewer.exceptionDuringLoading'), error);
             setImageError(true);
             setImageSource("/placeholder.svg");
           }
@@ -450,7 +456,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     // Update mutation only handles the 'receipts' table update
     mutationFn: async () => {
       // Show a toast to indicate saving has started
-      toast.loading("Saving receipt details...");
+      toast.loading(t('viewer.savingDetails'));
 
       try {
         // Format the date properly if it's a string

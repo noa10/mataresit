@@ -3,6 +3,7 @@ import { Send, Square } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
+import { useChatTranslation } from '@/contexts/LanguageContext';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => Promise<void>;
@@ -11,14 +12,18 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-export function ChatInput({ 
-  onSendMessage, 
-  isLoading = false, 
-  placeholder = "Ask about your receipts...",
-  disabled = false 
+export function ChatInput({
+  onSendMessage,
+  isLoading = false,
+  placeholder,
+  disabled = false
 }: ChatInputProps) {
+  const { t } = useChatTranslation();
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Use translated placeholder if none provided
+  const inputPlaceholder = placeholder || t('input.placeholder');
 
   // Auto-resize textarea
   useEffect(() => {
@@ -34,7 +39,7 @@ export function ChatInput({
 
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
-      toast.error('Please enter a message');
+      toast.error(t('input.validation.empty'));
       return;
     }
 
@@ -56,7 +61,7 @@ export function ChatInput({
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(t('input.validation.failed'));
     }
   };
 
@@ -81,7 +86,7 @@ export function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={inputPlaceholder}
             disabled={disabled || isLoading}
             className="min-h-[44px] max-h-[120px] resize-none pr-12 py-3 text-sm leading-relaxed"
             rows={1}
@@ -115,7 +120,7 @@ export function ChatInput({
 
       {/* Helper text */}
       <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
-        <span>Press Enter to send, Shift+Enter for new line</span>
+        <span>{t('input.helper.shortcuts')}</span>
         <span>{message.length}/2000</span>
       </div>
     </form>

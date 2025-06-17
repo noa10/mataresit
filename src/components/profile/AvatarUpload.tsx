@@ -3,6 +3,7 @@ import { Camera, Upload, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { uploadAvatar, removeAvatar, getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import { ProfileData } from "@/services/profileService";
 
@@ -26,15 +27,16 @@ const iconSizes = {
   xl: 24
 };
 
-export function AvatarUpload({ 
-  profile, 
-  onAvatarUpdate, 
-  size = "lg" 
+export function AvatarUpload({
+  profile,
+  onAvatarUpdate,
+  size = "lg"
 }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { t } = useProfileTranslation();
 
   const avatarUrl = getAvatarUrl(profile);
   const initials = getUserInitials(profile);
@@ -158,7 +160,7 @@ export function AvatarUpload({
           ) : (
             <Upload className="h-4 w-4" />
           )}
-          {isUploading ? "Uploading..." : "Upload Photo"}
+          {isUploading ? t("avatar.uploading") : t("avatar.uploadPhoto")}
         </Button>
 
         {profile.avatar_url && (
@@ -174,7 +176,7 @@ export function AvatarUpload({
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            {isRemoving ? "Removing..." : "Remove"}
+            {isRemoving ? t("avatar.removing") : t("avatar.remove")}
           </Button>
         )}
       </div>

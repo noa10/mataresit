@@ -26,6 +26,7 @@ import {
 import { AVAILABLE_MODELS, getModelsByProvider, ModelProvider } from "@/config/modelProviders";
 import { OpenRouterService } from "@/services/openRouterService";
 import { useSettings } from "@/hooks/useSettings";
+import { useSettingsTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { testGeminiConnection } from "@/lib/edge-function-utils";
 
@@ -63,6 +64,7 @@ const PROVIDER_INFO = {
 
 export function ModelProviderStatus() {
   const { settings, updateSettings } = useSettings();
+  const { t } = useSettingsTranslation();
   const [providerStatuses, setProviderStatuses] = useState<ProviderStatus[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
@@ -214,7 +216,7 @@ export function ModelProviderStatus() {
       };
 
       await updateSettings({ userApiKeys: newApiKeys });
-      toast.success(`${PROVIDER_INFO[provider as ModelProvider]?.name} API key saved successfully`);
+      toast.success(t("providers.notifications.apiKeySaved", { provider: PROVIDER_INFO[provider as ModelProvider]?.name }));
 
       // Refresh provider status after saving key
       const updatedStatuses = providerStatuses.map(status =>
@@ -223,7 +225,7 @@ export function ModelProviderStatus() {
       checkProviderAvailability(updatedStatuses);
     } catch (error) {
       console.error('Error saving API key:', error);
-      toast.error('Failed to save API key');
+      toast.error(t("providers.notifications.apiKeySaveFailed"));
     } finally {
       setSavingKeys(prev => ({ ...prev, [provider]: false }));
     }
@@ -236,7 +238,7 @@ export function ModelProviderStatus() {
       [provider]: undefined
     };
     updateSettings({ userApiKeys: newApiKeys });
-    toast.success(`${PROVIDER_INFO[provider as ModelProvider]?.name} API key cleared`);
+    toast.success(t("providers.notifications.apiKeyCleared", { provider: PROVIDER_INFO[provider as ModelProvider]?.name }));
   };
 
   const toggleApiKeyVisibility = (provider: string) => {
@@ -268,12 +270,12 @@ export function ModelProviderStatus() {
 
   const getStatusBadge = (status: ProviderStatus) => {
     if (status.testing) {
-      return <Badge variant="outline" className="text-blue-600 bg-blue-50">Testing</Badge>;
+      return <Badge variant="outline" className="text-blue-600 bg-blue-50">{t("providers.status.testing")}</Badge>;
     }
     if (status.available) {
-      return <Badge variant="outline" className="text-green-600 bg-green-50">Available</Badge>;
+      return <Badge variant="outline" className="text-green-600 bg-green-50">{t("providers.status.available")}</Badge>;
     }
-    return <Badge variant="outline" className="text-red-600 bg-red-50">Unavailable</Badge>;
+    return <Badge variant="outline" className="text-red-600 bg-red-50">{t("providers.status.unavailable")}</Badge>;
   };
 
   const getModelStats = (provider: ModelProvider) => {
@@ -300,9 +302,9 @@ export function ModelProviderStatus() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-semibold">AI Model Providers</h3>
+          <h3 className="text-xl font-semibold">{t("providers.title")}</h3>
           <p className="text-sm text-muted-foreground">
-            Configure and monitor your AI model providers
+            {t("providers.description")}
           </p>
         </div>
         <Button
@@ -313,7 +315,7 @@ export function ModelProviderStatus() {
           className="flex items-center gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Refresh Status
+          {t("providers.actions.refreshStatus")}
         </Button>
       </div>
 
@@ -367,7 +369,7 @@ export function ModelProviderStatus() {
                 {/* Model Statistics */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Models:</span>
+                    <span className="text-muted-foreground">{t("providers.stats.models")}:</span>
                     <Badge variant="secondary">{status.models}</Badge>
                   </div>
                   <div className="flex items-center gap-3">
@@ -380,7 +382,7 @@ export function ModelProviderStatus() {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Fast models</p>
+                          <p>{t("providers.tooltips.fastModels")}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

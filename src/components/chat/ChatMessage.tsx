@@ -7,6 +7,7 @@ import { Card, CardContent } from '../ui/card';
 import { SearchResult, ReceiptWithSimilarity, LineItemSearchResult } from '@/lib/ai-search';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useChatTranslation } from '@/contexts/LanguageContext';
 
 export interface ChatMessage {
   id: string;
@@ -25,6 +26,7 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
   const navigate = useNavigate();
+  const { t } = useChatTranslation();
   const [displayedText, setDisplayedText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -56,7 +58,7 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
-    toast.success('Message copied to clipboard');
+    toast.success(t('messages.actions.copied'));
     onCopy?.(message.content);
   };
 
@@ -109,23 +111,23 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
               <Card key={receipt.id} className="border-l-4 border-l-primary/50">
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-sm">{receipt.merchant || 'Unknown Merchant'}</h4>
+                    <h4 className="font-medium text-sm">{receipt.merchant || t('results.unknownMerchant')}</h4>
                     {similarityScore > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        {formattedScore}% match
+                        {formattedScore}% {t('results.match')}
                       </Badge>
                     )}
                   </div>
                   
                   <div className="text-sm text-muted-foreground space-y-1">
                     {receiptDate && (
-                      <div>Date: {receiptDate.toLocaleDateString()}</div>
+                      <div>{t('results.date')}: {receiptDate.toLocaleDateString()}</div>
                     )}
                     {receipt.total_amount && (
-                      <div>Total: ${receipt.total_amount.toFixed(2)}</div>
+                      <div>{t('results.total')}: ${receipt.total_amount.toFixed(2)}</div>
                     )}
                     {receipt.notes && (
-                      <div className="text-xs">Notes: {receipt.notes}</div>
+                      <div className="text-xs">{t('results.notes')}: {receipt.notes}</div>
                     )}
                   </div>
                   
@@ -151,21 +153,21 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
               <Card key={lineItem.line_item_id} className="border-l-4 border-l-secondary/50">
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-sm">{lineItem.line_item_description || 'Unknown Item'}</h4>
+                    <h4 className="font-medium text-sm">{lineItem.line_item_description || t('results.unknownItem')}</h4>
                     {similarityScore > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        {formattedScore}% match
+                        {formattedScore}% {t('results.match')}
                       </Badge>
                     )}
                   </div>
                   
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <div>From: {lineItem.parent_receipt_merchant || 'Unknown Merchant'}</div>
+                    <div>{t('results.from')}: {lineItem.parent_receipt_merchant || t('results.unknownMerchant')}</div>
                     {receiptDate && (
-                      <div>Date: {receiptDate.toLocaleDateString()}</div>
+                      <div>{t('results.date')}: {receiptDate.toLocaleDateString()}</div>
                     )}
                     {lineItem.line_item_amount && (
-                      <div>Amount: ${lineItem.line_item_amount.toFixed(2)}</div>
+                      <div>{t('results.amount')}: ${lineItem.line_item_amount.toFixed(2)}</div>
                     )}
                   </div>
                   
