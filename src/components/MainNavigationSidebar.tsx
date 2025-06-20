@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { TeamSelector } from "@/components/team/TeamSelector";
 import { useNavigationTranslation } from "@/contexts/LanguageContext";
+import { useSidebarAccessibility } from "@/hooks/useSidebarAccessibility";
 import {
   BrainCircuit, BarChart3, Settings,
   DollarSign, ChevronLeft, Menu, X, Users, Crown, FileText
@@ -25,6 +26,14 @@ export function MainNavigationSidebar({
   const { t: tNav } = useNavigationTranslation();
   const location = useLocation();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  // Enhanced accessibility support
+  const { sidebarProps } = useSidebarAccessibility({
+    sidebarId: 'main-navigation-sidebar',
+    autoFocus: true,
+    trapFocus: true,
+    announceStateChanges: true
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -61,6 +70,18 @@ export function MainNavigationSidebar({
     }
   };
 
+  // Enhanced focus management when sidebar opens/closes
+  useEffect(() => {
+    if (isOpen && !isDesktop) {
+      // When opening sidebar on mobile, focus the first interactive element
+      setTimeout(() => {
+        const sidebar = document.getElementById('main-navigation-sidebar');
+        const firstFocusable = sidebar?.querySelector('button, a, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+        firstFocusable?.focus();
+      }, 300);
+    }
+  }, [isOpen, isDesktop]);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -74,6 +95,10 @@ export function MainNavigationSidebar({
 
       {/* Sidebar */}
       <div
+        id="main-navigation-sidebar"
+        role="navigation"
+        aria-label="Main navigation"
+        {...sidebarProps}
         className={cn(
           "h-full bg-background border-r border-border",
           "transition-all duration-300 ease-in-out",

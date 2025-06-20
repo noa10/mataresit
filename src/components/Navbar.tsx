@@ -87,11 +87,11 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
       <div className="container mx-auto flex items-center justify-between py-4 px-6">
         {/* Left Side: Logo & Brand */}
         <div className="flex items-center space-x-3">
-          {/* Sidebar Toggles (only show on protected pages) */}
+          {/* Unified Sidebar Toggle (only show on protected pages) */}
           {!isPublicPage && (
             <div className="flex items-center space-x-2">
-              {navControls?.navSidebarToggle}
-              {isSearchPage && chatControls?.sidebarToggle}
+              {/* Show chat sidebar toggle on search page, otherwise show nav sidebar toggle */}
+              {isSearchPage ? chatControls?.sidebarToggle : navControls?.navSidebarToggle}
             </div>
           )}
 

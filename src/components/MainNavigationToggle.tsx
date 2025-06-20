@@ -27,8 +27,10 @@ export function MainNavigationToggle({
         size="sm"
         onClick={onToggle}
         className="flex items-center justify-center"
-        title="Toggle navigation menu"
-        aria-label="Toggle navigation menu"
+        title={`${isOpen ? 'Close' : 'Open'} navigation menu (Ctrl+B)`}
+        aria-label={`${isOpen ? 'Close' : 'Open'} navigation menu`}
+        aria-expanded={isOpen}
+        aria-controls="main-navigation-sidebar"
       >
         <Menu className={cn(
           "h-4 w-4 transition-all duration-300",
