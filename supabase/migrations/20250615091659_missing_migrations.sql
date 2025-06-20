@@ -1,26 +1,76 @@
-create type "public"."claim_priority" as enum ('low', 'medium', 'high', 'urgent');
+-- Create types only if they don't exist
+DO $$ BEGIN
+    CREATE TYPE "public"."claim_priority" AS ENUM ('low', 'medium', 'high', 'urgent');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."claim_status" as enum ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'cancelled');
+DO $$ BEGIN
+    CREATE TYPE "public"."claim_status" AS ENUM ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'cancelled');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."email_delivery_status" as enum ('pending', 'sent', 'delivered', 'failed', 'bounced', 'complained');
+DO $$ BEGIN
+    CREATE TYPE "public"."email_delivery_status" AS ENUM ('pending', 'sent', 'delivered', 'failed', 'bounced', 'complained');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."invitation_status" as enum ('pending', 'accepted', 'declined', 'expired');
+DO $$ BEGIN
+    CREATE TYPE "public"."invitation_status" AS ENUM ('pending', 'accepted', 'declined', 'expired');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."notification_priority" as enum ('low', 'medium', 'high');
+DO $$ BEGIN
+    CREATE TYPE "public"."notification_priority" AS ENUM ('low', 'medium', 'high');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."notification_type" as enum ('team_invitation_sent', 'team_invitation_accepted', 'team_member_joined', 'team_member_left', 'team_member_role_changed', 'claim_submitted', 'claim_approved', 'claim_rejected', 'claim_review_requested', 'team_settings_updated');
+DO $$ BEGIN
+    CREATE TYPE "public"."notification_type" AS ENUM ('team_invitation_sent', 'team_invitation_accepted', 'team_member_joined', 'team_member_left', 'team_member_role_changed', 'claim_submitted', 'claim_approved', 'claim_rejected', 'claim_review_requested', 'team_settings_updated');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."team_member_role" as enum ('owner', 'admin', 'member', 'viewer');
+DO $$ BEGIN
+    CREATE TYPE "public"."team_member_role" AS ENUM ('owner', 'admin', 'member', 'viewer');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-create type "public"."team_status" as enum ('active', 'suspended', 'archived');
+DO $$ BEGIN
+    CREATE TYPE "public"."team_status" AS ENUM ('active', 'suspended', 'archived');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-drop policy "Users can delete their own receipts" on "public"."receipts";
+-- Drop policies only if they exist
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can delete their own receipts" ON "public"."receipts";
+EXCEPTION
+    WHEN undefined_object THEN null;
+END $$;
 
-drop policy "Users can insert their own receipts" on "public"."receipts";
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can insert their own receipts" ON "public"."receipts";
+EXCEPTION
+    WHEN undefined_object THEN null;
+END $$;
 
-drop policy "Users can update their own receipts" on "public"."receipts";
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can update their own receipts" ON "public"."receipts";
+EXCEPTION
+    WHEN undefined_object THEN null;
+END $$;
 
-drop policy "Users can view their own receipts" on "public"."receipts";
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can view their own receipts" ON "public"."receipts";
+EXCEPTION
+    WHEN undefined_object THEN null;
+END $$;
 
 create table "public"."claim_audit_trail" (
     "id" uuid not null default gen_random_uuid(),
