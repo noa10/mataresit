@@ -6,8 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, Users, AlertCircle, BookOpen } from "lucide-react";
+import { ShoppingBag, Users, AlertCircle, BookOpen, Database } from "lucide-react";
 import { BlogAnalytics } from "@/components/admin/BlogAnalytics";
+import { EmbeddingRepairTest } from "@/components/admin/EmbeddingRepairTest";
+import { EmbeddingSystemDiagnostics } from "@/components/admin/EmbeddingSystemDiagnostics";
 
 interface SystemStats {
   userCount: number;
@@ -119,6 +121,28 @@ export default function AdminDashboard() {
               Blog Analytics
             </h2>
             <BlogAnalytics />
+          </div>
+
+          <Separator className="my-8" />
+
+          {/* Embedding System Diagnostics */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Embedding System Diagnostics
+            </h2>
+            <EmbeddingSystemDiagnostics />
+          </div>
+
+          <Separator className="my-8" />
+
+          {/* Embedding Repair System Test */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Embedding Repair System (Advanced)
+            </h2>
+            <EmbeddingRepairTest />
           </div>
 
           <Separator className="my-8" />
