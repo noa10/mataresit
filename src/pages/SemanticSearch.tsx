@@ -1,17 +1,19 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
+import { useLocation } from 'react-router-dom';
 import { MessageSquare, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { semanticSearch, SearchParams, SearchResult } from '../lib/ai-search';
+import { semanticSearch, SearchParams, SearchResult, unifiedSearch } from '../lib/ai-search';
+import { UnifiedSearchParams, UnifiedSearchResponse } from '@/types/unified-search';
 import { generateIntelligentResponse, detectUserIntent } from '../lib/chat-response-generator';
 
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ChatMessage } from '../components/chat/ChatMessage';
-import { ConversationSidebar } from '../components/chat/ConversationSidebar';
 import { SidebarToggle } from '../components/chat/SidebarToggle';
 import { useChatControls } from '@/contexts/ChatControlsContext';
-import { useMainNav } from '../components/AppLayout';
+import { useAppSidebar } from '@/contexts/AppSidebarContext';
+import { SearchPageSidebarContent } from '../components/sidebar/SearchPageSidebarContent';
 
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -23,16 +25,14 @@ import {
 import { useConversationUpdater } from '../hooks/useConversationHistory';
 
 export default function SemanticSearchPage() {
+  const location = useLocation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastSearchParams, setLastSearchParams] = useState<SearchParams | null>(null);
   const [currentOffset, setCurrentOffset] = useState(0);
 
-  // Sidebar state
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Conversation state
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
 
   // URL state management for preserving chat state (optional)
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
@@ -43,13 +43,8 @@ export default function SemanticSearchPage() {
   // Chat controls context
   const { setChatControls } = useChatControls();
 
-  // Main navigation context
-  const { navSidebarOpen, isDesktop: isMainNavDesktop, navSidebarWidth } = useMainNav();
-
-  // Helper to compute left offset for main content and fixed input
-  const calcContentLeft = useCallback(() => {
-    return (navSidebarOpen ? navSidebarWidth : 0) + (sidebarOpen && isDesktop ? sidebarWidth : 0);
-  }, [navSidebarOpen, navSidebarWidth, sidebarOpen, isDesktop, sidebarWidth]);
+  // Unified sidebar context
+  const { isSidebarOpen, toggleSidebar, setSidebarContent, clearSidebarContent } = useAppSidebar();
 
   // Refs to prevent infinite loops
   const isUpdatingUrlRef = useRef(false);
@@ -124,43 +119,48 @@ export default function SemanticSearchPage() {
     }, 100);
   }, [messages, saveCurrentConversation, setUrlSearchParams]);
 
-  // Enhanced sidebar handlers with focus management
-  const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen(prev => {
-      const newState = !prev;
+  // Handle conversation selection
+  const handleSelectConversation = useCallback((conversationId: string) => {
+    // Save current conversation before switching
+    if (messages.length > 0 && currentConversationId !== conversationId) {
+      saveCurrentConversation();
+    }
 
-      // Focus management for accessibility
-      if (newState && isDesktop) {
-        // When opening sidebar on desktop, focus the first interactive element
-        setTimeout(() => {
-          const sidebar = document.querySelector('[role="complementary"]');
-          const firstFocusable = sidebar?.querySelector('button, input, [tabindex]:not([tabindex="-1"])') as HTMLElement;
-          firstFocusable?.focus();
-        }, 300);
-      } else if (!newState && !isDesktop) {
-        // When closing sidebar on mobile, return focus to toggle button
-        setTimeout(() => {
-          const toggleButton = document.querySelector('[aria-label*="sidebar"]') as HTMLElement;
-          toggleButton?.focus();
-        }, 100);
-      }
+    loadConversation(conversationId);
+  }, [messages, currentConversationId, saveCurrentConversation, loadConversation]);
 
-      // Lock body scroll when a sidebar is open on mobile
-      if (!isDesktop) {
-        document.body.classList.toggle('overflow-hidden', newState);
-      }
+  // Inject hybrid sidebar content (navigation + conversation) into the unified sidebar
+  // Only when we're actually on the search route
+  useEffect(() => {
+    // Only set sidebar content if we're on the search route
+    if (location.pathname.startsWith('/search')) {
+      const sidebarContent = (
+        <SearchPageSidebarContent
+          onNewChat={handleNewChat}
+          onSelectConversation={handleSelectConversation}
+          currentConversationId={currentConversationId}
+        />
+      );
 
-      return newState;
-    });
-  }, [isDesktop]);
+      setSidebarContent(sidebarContent, 'conversation');
+    } else {
+      // Clear sidebar content if we're not on the search route
+      clearSidebarContent();
+    }
+
+    // Cleanup when component unmounts or route changes
+    return () => {
+      clearSidebarContent();
+    };
+  }, [location.pathname, setSidebarContent, clearSidebarContent, handleNewChat, handleSelectConversation, currentConversationId]);
 
   // Set up chat controls for the navbar
   useEffect(() => {
     setChatControls({
       sidebarToggle: (
         <SidebarToggle
-          isOpen={sidebarOpen}
-          onToggle={handleToggleSidebar}
+          isOpen={isSidebarOpen}
+          onToggle={toggleSidebar}
           showKeyboardHint={true}
         />
       ),
@@ -172,56 +172,13 @@ export default function SemanticSearchPage() {
     return () => {
       setChatControls(null);
     };
-  }, [sidebarOpen, handleToggleSidebar, handleNewChat, setChatControls]);
+  }, [isSidebarOpen, toggleSidebar, handleNewChat, setChatControls]);
 
-  // Initialize sidebar state based on screen size and localStorage preference
-  useEffect(() => {
-    const handleResize = () => {
-      const isLargeScreen = window.innerWidth >= 1024;
-      setIsDesktop(isLargeScreen);
 
-      if (isLargeScreen) {
-        // On large screens, check localStorage preference or default to open
-        const savedState = localStorage.getItem('chat-sidebar-open');
-        setSidebarOpen(savedState !== null ? savedState === 'true' : true);
-      } else {
-        // On mobile/tablet, always start closed
-        setSidebarOpen(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Save sidebar state to localStorage when it changes (only on large screens)
-  useEffect(() => {
-    if (isDesktop) {
-      localStorage.setItem('chat-sidebar-open', sidebarOpen.toString());
-    }
-  }, [sidebarOpen, isDesktop]);
 
   // Enhanced keyboard shortcuts with visual feedback
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+B or Cmd+B to toggle chat sidebar (standard shortcut)
-      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'b') {
-        event.preventDefault();
-        handleToggleSidebar();
-
-        // Show visual feedback
-        const feedback = document.createElement('div');
-        feedback.className = 'fixed top-4 right-4 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium z-50 animate-in fade-in slide-in-from-top-2 duration-200';
-        feedback.textContent = `Sidebar ${!sidebarOpen ? 'opened' : 'closed'}`;
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          feedback.classList.add('animate-out', 'fade-out', 'slide-out-to-top-2');
-          setTimeout(() => document.body.removeChild(feedback), 200);
-        }, 1500);
-      }
-
       // F6 cycles focus between nav, chat container, chat input and chat sidebar
       if (event.key === 'F6') {
         event.preventDefault();
@@ -235,17 +192,11 @@ export default function SemanticSearchPage() {
         const next = order[(idx + 1) % order.length];
         (document.querySelector(next) as HTMLElement | null)?.focus();
       }
-
-      // Escape key to close sidebar on mobile
-      if (event.key === 'Escape' && sidebarOpen && !isDesktop) {
-        event.preventDefault();
-        handleToggleSidebar();
-      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sidebarOpen, isDesktop, handleToggleSidebar]);
+  }, []);
 
   // Auto-save conversation when messages change (more aggressive for real-time updates)
   useEffect(() => {
@@ -345,17 +296,65 @@ export default function SemanticSearchPage() {
           return;
         }
       } else {
-        // Regular new search
-        params = {
+        // Regular new search - use unified search
+        const unifiedParams: UnifiedSearchParams = {
           query: content,
-          isNaturalLanguage: true, // Default to natural language in chat
+          sources: ['receipts', 'business_directory'], // Default sources
+          limit: 10,
+          offset: 0,
+          filters: {},
+          similarityThreshold: 0.2,
+          includeMetadata: true,
+          aggregationMode: 'relevance'
+        };
+
+        try {
+          const unifiedResponse = await unifiedSearch(unifiedParams);
+
+          if (unifiedResponse.success) {
+            // Convert unified response to legacy format for chat display
+            results = {
+              results: unifiedResponse.results.map(result => ({
+                id: result.sourceId,
+                merchant: result.title,
+                date: result.createdAt,
+                total: result.metadata.total || 0,
+                similarity_score: result.similarity,
+                ...result.metadata
+              })),
+              count: unifiedResponse.results.length,
+              total: unifiedResponse.totalResults,
+              searchParams: {
+                query: content,
+                isNaturalLanguage: true,
+                limit: 10,
+                offset: 0,
+                searchTarget: 'all'
+              }
+            };
+          } else {
+            throw new Error(unifiedResponse.error || 'Unified search failed');
+          }
+        } catch (unifiedError) {
+          console.warn('Unified search failed, falling back to legacy search:', unifiedError);
+          // Fallback to legacy search
+          params = {
+            query: content,
+            isNaturalLanguage: true,
+            limit: 10,
+            offset: 0,
+            searchTarget: 'all'
+          };
+          results = await semanticSearch(params);
+        }
+
+        setLastSearchParams(params || {
+          query: content,
+          isNaturalLanguage: true,
           limit: 10,
           offset: 0,
           searchTarget: 'all'
-        };
-
-        results = await semanticSearch(params);
-        setLastSearchParams(params);
+        });
         setCurrentOffset(0);
       }
 
@@ -438,20 +437,6 @@ export default function SemanticSearchPage() {
     // TODO: Implement feedback storage/analytics
   };
 
-  // Handle sidebar width changes
-  const handleSidebarWidthChange = useCallback((width: number) => {
-    setSidebarWidth(width);
-  }, []);
-
-  const handleSelectConversation = (conversationId: string) => {
-    // Save current conversation before switching
-    if (messages.length > 0 && currentConversationId !== conversationId) {
-      saveCurrentConversation();
-    }
-
-    loadConversation(conversationId);
-  };
-
   // Initialize from URL if there's a query parameter (after all functions are defined)
   useEffect(() => {
     // Skip if this is a programmatic URL update from within the component
@@ -484,81 +469,60 @@ export default function SemanticSearchPage() {
     }
   }, [loadConversation, handleSendMessage, urlSearchParams, currentConversationId]);
 
-  // Sync CSS variable for chat sidebar width
-  useEffect(() => {
-    const value = sidebarOpen && isDesktop ? `${sidebarWidth}px` : '0px';
-    document.documentElement.style.setProperty('--chat-width', value);
-  }, [sidebarOpen, sidebarWidth, isDesktop]);
+
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
       <Helmet>
-        <title>AI Chat - ReceiptScan</title>
+        <title>AI Chat - Mataresit</title>
       </Helmet>
 
-      {/* Conversation Sidebar */}
-      <ConversationSidebar
-        isOpen={sidebarOpen}
-        onToggle={handleToggleSidebar}
-        onNewChat={handleNewChat}
-        onSelectConversation={handleSelectConversation}
-        currentConversationId={currentConversationId}
-        className={sidebarOpen ? "lg:relative" : ""}
-        onWidthChange={handleSidebarWidthChange}
-        mainNavWidth={navSidebarWidth}
-        mainNavOpen={navSidebarOpen}
-      />
 
-      {/* Main Content Area */}
-      <div
-        className="flex-1 flex flex-col min-w-0 relative transition-all duration-300 ease-in-out layout-shift"
-      >
 
-        {/* Chat Content Area - Optimized for fixed input */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
-          {/* Chat Container with dynamic centering and bottom padding for fixed input */}
-          <div className={`flex-1 overflow-hidden transition-all duration-300 ease-in-out ${
-            sidebarOpen
-              ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
-              : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed for better centering
+      {/* Chat Content Area - Optimized for fixed input */}
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Chat Container with dynamic centering and bottom padding for fixed input */}
+        <div className={`flex-1 overflow-hidden transition-all duration-300 ease-in-out ${
+          isSidebarOpen
+            ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
+            : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed for better centering
+        }`}>
+          <div className={`h-full mx-auto transition-all duration-300 ease-in-out ${
+            isSidebarOpen
+              ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
+              : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
           }`}>
-            <div className={`h-full mx-auto transition-all duration-300 ease-in-out ${
-              sidebarOpen
-                ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
-                : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
-            }`}>
-              <ChatContainer
-                messages={messages}
-                isLoading={isLoading}
-                onExampleClick={handleExampleClick}
-                onCopy={handleCopy}
-                onFeedback={handleFeedback}
-                sidebarOpen={sidebarOpen}
-              />
-            </div>
+            <ChatContainer
+              messages={messages}
+              isLoading={isLoading}
+              onExampleClick={handleExampleClick}
+              onCopy={handleCopy}
+              onFeedback={handleFeedback}
+              sidebarOpen={isSidebarOpen}
+            />
           </div>
         </div>
+      </div>
 
-        {/* Fixed Chat Input at bottom of viewport */}
-        <div
-          className="fixed bottom-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg fixed-chat-input"
-        >
-          <div className={`transition-all duration-300 ease-in-out ${
-            sidebarOpen
-              ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
-              : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed
+      {/* Fixed Chat Input at bottom of viewport */}
+      <div
+        className="fixed bottom-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-300 ease-in-out shadow-lg fixed-chat-input"
+      >
+        <div className={`transition-all duration-300 ease-in-out ${
+          isSidebarOpen
+            ? 'px-4 sm:px-6' // Responsive padding when sidebar is open
+            : 'px-4 sm:px-6 lg:px-8 xl:px-12' // Progressive padding when sidebar is closed
+        }`}>
+          <div className={`mx-auto py-4 transition-all duration-300 ease-in-out ${
+            isSidebarOpen
+              ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
+              : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
           }`}>
-            <div className={`mx-auto py-4 transition-all duration-300 ease-in-out ${
-              sidebarOpen
-                ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
-                : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
-            }`}>
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                placeholder="Ask about your receipts..."
-              />
-            </div>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              isLoading={isLoading}
+              placeholder="Ask about your receipts..."
+            />
           </div>
         </div>
       </div>

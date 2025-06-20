@@ -7,8 +7,8 @@ import { supabase } from '@/lib/supabase';
 // The Supabase anon key - hardcoded for reliability
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
 
-// The Supabase URL
-export const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+// The Supabase URL - for hybrid development setup (local frontend + production backend)
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://mpmkbtsufihzdelrlszs.supabase.co";
 
 /**
  * Call a Supabase Edge Function with proper error handling
@@ -276,7 +276,9 @@ export async function testAllEdgeFunctionsCORS() {
     'generate-thumbnails',
     'process-receipt',
     'enhance-receipt-data',
-    'generate-pdf-report'
+    'generate-pdf-report',
+    'audit-embeddings',
+    'unified-search'
   ];
 
   const results: Record<string, boolean> = {};
@@ -288,4 +290,112 @@ export async function testAllEdgeFunctionsCORS() {
   );
 
   return results;
+}
+
+// ===== EMBEDDING REPAIR FUNCTIONS =====
+
+/**
+ * Call the audit-embeddings function
+ */
+export async function auditEmbeddings(): Promise<any> {
+  return callEdgeFunction('audit-embeddings', 'POST', { action: 'audit' });
+}
+
+/**
+ * Migrate embeddings to unified format
+ */
+export async function migrateEmbeddings(): Promise<any> {
+  return callEdgeFunction('audit-embeddings', 'POST', { action: 'migrate' });
+}
+
+/**
+ * Fix embedding content issues
+ */
+export async function fixEmbeddingContent(): Promise<any> {
+  return callEdgeFunction('audit-embeddings', 'POST', { action: 'fix_content' });
+}
+
+/**
+ * Generate missing embeddings
+ */
+export async function generateMissingEmbeddings(): Promise<any> {
+  return callEdgeFunction('audit-embeddings', 'POST', { action: 'generate_missing' });
+}
+
+/**
+ * Process a batch of missing embeddings
+ */
+export async function processMissingEmbeddingsBatch(batchSize: number = 10): Promise<any> {
+  return callEdgeFunction('generate-embeddings', 'POST', {
+    processMissingBatch: true,
+    batchSize
+  }, undefined, 2, 60000); // Longer timeout for batch processing
+}
+
+/**
+ * Generate embeddings for a specific receipt
+ */
+export async function generateReceiptEmbeddings(
+  receiptId: string,
+  options?: {
+    processAllFields?: boolean;
+    forceRegenerate?: boolean;
+    contentTypes?: string[];
+  }
+): Promise<any> {
+  const { processAllFields = true, forceRegenerate = false, contentTypes } = options || {};
+
+  return callEdgeFunction('generate-embeddings', 'POST', {
+    receiptId,
+    processAllFields,
+    forceRegenerate,
+    contentTypes
+  }, undefined, 2, 30000);
+}
+
+/**
+ * Check embedding status for a receipt
+ */
+export async function checkEmbeddingStatus(receiptId: string): Promise<any> {
+  return callEdgeFunction('generate-embeddings', 'GET', undefined, { receiptId });
+}
+
+/**
+ * Perform unified search
+ */
+export async function performUnifiedSearch(
+  query: string,
+  options?: {
+    sourceTypes?: string[];
+    contentTypes?: string[];
+    similarityThreshold?: number;
+    matchCount?: number;
+    userFilter?: string;
+    teamFilter?: string;
+  }
+): Promise<any> {
+  return callEdgeFunction('unified-search', 'POST', {
+    query,
+    ...options
+  }, undefined, 2, 15000);
+}
+
+/**
+ * Perform semantic search (fallback)
+ */
+export async function performSemanticSearch(
+  query: string,
+  options?: {
+    startDate?: string;
+    endDate?: string;
+    minAmount?: number;
+    maxAmount?: number;
+    merchants?: string[];
+    categories?: string[];
+  }
+): Promise<any> {
+  return callEdgeFunction('semantic-search', 'POST', {
+    query,
+    ...options
+  }, undefined, 2, 15000);
 }

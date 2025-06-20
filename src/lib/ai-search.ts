@@ -1,5 +1,47 @@
 import { supabase } from './supabase';
 import { callEdgeFunction } from './edge-function-utils';
+import { UnifiedSearchParams, UnifiedSearchResponse, UnifiedSearchResult } from '@/types/unified-search';
+import { searchCache } from './searchCache';
+import { searchPerformanceMonitor } from './searchPerformanceMonitor';
+import { searchParameterOptimizer } from './searchParameterOptimizer';
+import { advancedSearchRanking } from './advancedSearchRanking';
+
+/**
+ * Normalize query to extract core search terms and remove numerical qualifiers
+ * This ensures semantically similar queries generate similar embeddings
+ */
+function normalizeSearchQuery(query: string): string {
+  console.log(`Normalizing query: "${query}"`);
+
+  let normalizedQuery = query.toLowerCase().trim();
+
+  // Remove numerical qualifiers that don't affect search content
+  const numericalQualifiers = [
+    /\b(top|first|latest|recent|show\s+me|find\s+me|get\s+me)\s+\d+\s*/gi,
+    /\b(show|find|get)\s+(me\s+)?(all|any)\s*/gi,
+    /\b(all|any)\s+(of\s+)?(the\s+)?/gi,
+    /\b(receipts?|purchases?|expenses?|transactions?)\s+(from|at|in)\s+/gi
+  ];
+
+  // Apply normalization patterns
+  for (const pattern of numericalQualifiers) {
+    normalizedQuery = normalizedQuery.replace(pattern, '');
+  }
+
+  // Clean up extra spaces and common words
+  normalizedQuery = normalizedQuery
+    .replace(/\s+/g, ' ')
+    .replace(/\b(receipts?|purchases?|expenses?|transactions?)\b/gi, '')
+    .trim();
+
+  // If the normalized query is too short, fall back to original
+  if (normalizedQuery.length < 3) {
+    normalizedQuery = query.toLowerCase().trim();
+  }
+
+  console.log(`Normalized query result: "${normalizedQuery}"`);
+  return normalizedQuery;
+}
 
 /**
  * Type definitions for semantic search
@@ -245,18 +287,111 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
     try {
       console.log('Performing semantic search using utility function...', params);
 
-      // Try the edge function approach first
+      // Try the unified search approach first (using the working unified-search Edge Function)
       try {
-        // Use the utility function to call the semantic-search edge function
-        const data = await callEdgeFunction('semantic-search', 'POST', params);
-        console.log('Semantic search response:', data);
+        // Normalize the query for consistent search results
+        const normalizedQuery = normalizeSearchQuery(params.query);
+        console.log(`Using normalized query for unified search: "${normalizedQuery}"`);
+
+        // Convert legacy params to unified params
+        const unifiedParams: UnifiedSearchParams = {
+          query: normalizedQuery,
+          sources: params.searchTarget === 'all'
+            ? ['receipt', 'business_directory']
+            : params.searchTarget === 'line_items'
+            ? ['receipt'] // Line items are part of receipts
+            : ['receipt'],
+          contentTypes: params.contentType ? [params.contentType] : undefined,
+          limit: params.limit || 10,
+          offset: params.offset || 0,
+          filters: {
+            dateRange: params.startDate && params.endDate ? {
+              start: params.startDate,
+              end: params.endDate
+            } : undefined,
+            amountRange: params.minAmount && params.maxAmount ? {
+              min: params.minAmount,
+              max: params.maxAmount,
+              currency: 'MYR'
+            } : undefined,
+            categories: params.categories,
+            merchants: params.merchants
+          },
+          similarityThreshold: 0.2,
+          includeMetadata: true,
+          aggregationMode: 'relevance'
+        };
+
+        // Use the unified-search edge function instead of semantic-search
+        const data = await callEdgeFunction('unified-search', 'POST', unifiedParams);
+        console.log('Unified search response:', data);
 
         if (!data || !data.success) {
-          throw new Error(data?.error || 'Unknown error in semantic search');
+          throw new Error(data?.error || 'Unknown error in unified search');
         }
 
-        // Process results using our helper function
-        const results = handleSearchResults(data, params.searchTarget || 'receipts');
+        // Convert unified response to legacy format
+        const receipts: ReceiptWithSimilarity[] = [];
+        const lineItems: LineItemSearchResult[] = [];
+
+        if (data.results && Array.isArray(data.results)) {
+          data.results.forEach((result: any) => {
+            if (result.sourceType === 'receipt') {
+              receipts.push({
+                id: result.sourceId,
+                merchant: result.metadata?.merchant || result.title,
+                date: result.metadata?.date || result.createdAt,
+                total: result.metadata?.total || 0,
+                notes: result.metadata?.notes,
+                raw_text: result.metadata?.raw_text,
+                predicted_category: result.metadata?.predicted_category,
+                similarity_score: result.similarity
+              });
+            }
+            // Handle line items if they're in the results
+            else if (result.contentType === 'line_items') {
+              lineItems.push({
+                line_item_id: result.id,
+                receipt_id: result.sourceId,
+                line_item_description: result.description,
+                line_item_quantity: result.metadata?.quantity || 1,
+                line_item_price: result.metadata?.price || 0,
+                line_item_amount: result.metadata?.amount || 0,
+                parent_receipt_merchant: result.metadata?.parent_receipt_merchant || result.title,
+                parent_receipt_date: result.metadata?.parent_receipt_date || result.createdAt,
+                parent_receipt_id: result.sourceId,
+                similarity: result.similarity
+              });
+            }
+          });
+        }
+
+        // Combine results for 'all' search target
+        const combinedResults = params.searchTarget === 'all'
+          ? [...receipts, ...lineItems]
+          : params.searchTarget === 'line_items'
+          ? lineItems
+          : receipts;
+
+        const results: SearchResult = {
+          receipts,
+          lineItems,
+          results: combinedResults,
+          count: combinedResults.length,
+          total: data.totalResults || combinedResults.length,
+          searchParams: params
+        };
+
+        console.log('Converted unified search results:', {
+          receipts: receipts.length,
+          lineItems: lineItems.length,
+          total: results.total
+        });
+
+        // If we got results, return them
+        if (results.results && results.results.length > 0) {
+          return results;
+        }
 
         // If no results found, try fallback search (only for receipts)
         // Note: We previously skipped fallback for merchant similarity searches,
@@ -277,11 +412,55 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         }
 
         return results;
-      } catch (edgeFunctionError) {
-        console.warn('Edge function approach failed, trying fallback search:', edgeFunctionError);
+      } catch (unifiedSearchError) {
+        console.warn('Unified search failed, checking if it\'s a CORS error:', unifiedSearchError);
 
-        // Skip the database function altogether and go straight to the JavaScript fallback
-        return await fallbackBasicSearch(params);
+        // Check if this is a CORS error (common in hybrid development)
+        const isCorsError = unifiedSearchError instanceof Error &&
+          (unifiedSearchError.message.includes('Failed to fetch') ||
+           unifiedSearchError.message.includes('CORS') ||
+           unifiedSearchError.message.includes('Network error'));
+
+        if (isCorsError) {
+          console.log('CORS error detected, skipping Edge Functions and using direct database search');
+          console.log('Calling fallbackBasicSearch with params:', params);
+          const fallbackResult = await fallbackBasicSearch(params);
+          console.log('Fallback search completed with result:', fallbackResult);
+          return fallbackResult;
+        }
+
+        // For non-CORS errors, try the legacy semantic-search Edge Function
+        try {
+          // Apply query normalization to legacy search as well
+          const normalizedParams = {
+            ...params,
+            query: normalizeSearchQuery(params.query)
+          };
+          console.log(`Using normalized query for legacy search: "${normalizedParams.query}"`);
+
+          const legacyData = await callEdgeFunction('semantic-search', 'POST', normalizedParams);
+          console.log('Legacy semantic search response:', legacyData);
+
+          if (!legacyData || !legacyData.success) {
+            throw new Error(legacyData?.error || 'Unknown error in legacy semantic search');
+          }
+
+          // Process results using our helper function
+          const legacyResults = handleSearchResults(legacyData, params.searchTarget || 'receipts');
+
+          // If we got results from legacy search, return them
+          if (legacyResults.results && legacyResults.results.length > 0) {
+            return legacyResults;
+          }
+
+          // If still no results, fall back to basic search
+          throw new Error('No results from legacy search');
+        } catch (legacyError) {
+          console.warn('Legacy semantic search also failed, trying basic fallback search:', legacyError);
+
+          // Skip the database function altogether and go straight to the JavaScript fallback
+          return await fallbackBasicSearch(params);
+        }
       }
     } catch (vectorError) {
       console.warn('All vector search methods failed, falling back to basic search:', vectorError);
@@ -310,7 +489,14 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
   // We'll always search receipts, and optionally line items based on search target
 
   // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
+  console.log('Checking authentication for fallback search...');
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  console.log('Session check result:', {
+    hasSession: !!session,
+    userId: session?.user?.id,
+    error: sessionError?.message
+  });
+
   if (!session) {
     console.error('User is not authenticated for fallback search');
     return {
@@ -326,31 +512,112 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
   console.log('Starting fallback search with query:', query);
 
   try {
+    // Apply query normalization for consistent fallback search
+    const normalizedQuery = normalizeSearchQuery(query);
+    console.log(`Using normalized query for fallback search: "${normalizedQuery}"`);
+
+    // Parse natural language queries for date ranges
+    const lowerQuery = query.toLowerCase();
+    let dateFilter: { start?: string; end?: string } | null = null;
+
+    // Check for time-based queries
+    if (lowerQuery.includes('last week') || lowerQuery.includes('this week')) {
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dateFilter = {
+        start: oneWeekAgo.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0]
+      };
+      console.log('Detected date filter for last week:', dateFilter);
+    } else if (lowerQuery.includes('today')) {
+      const today = new Date().toISOString().split('T')[0];
+      dateFilter = { start: today, end: today };
+      console.log('Detected date filter for today:', dateFilter);
+    } else if (lowerQuery.includes('yesterday')) {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      dateFilter = { start: yesterday, end: yesterday };
+      console.log('Detected date filter for yesterday:', dateFilter);
+    }
+
     // Build a basic text search query
-    // First, try to get at least some results by using a very simple query
     let textQuery = supabase
       .from('receipts')
       .select('*')
       .limit(limit)
       .order('date', { ascending: false });
 
-    // If we have a specific query, use it to filter
-    if (query && query.trim() !== '') {
-      console.log('Performing text search with query:', query);
+    // Apply date filters if detected
+    if (dateFilter) {
+      if (dateFilter.start) {
+        textQuery = textQuery.gte('date', dateFilter.start);
+      }
+      if (dateFilter.end) {
+        textQuery = textQuery.lte('date', dateFilter.end);
+      }
+    }
+
+    // If we have a specific query and it's not just a time-based query, use it to filter
+    const isTimeOnlyQuery = lowerQuery.includes('all receipts') ||
+                           lowerQuery.includes('receipts from') ||
+                           lowerQuery.match(/^(last week|this week|today|yesterday)$/);
+
+    // For time-only queries or "all receipts" queries, just execute the base query with date filters
+    if (isTimeOnlyQuery || !query || query.trim() === '') {
+      console.log('Executing query for all receipts with date filters:', { dateFilter, query });
+
+      // Execute the query with any date filters applied
+      console.log('Executing all receipts query with date filters...');
+      const { data, error, count } = await textQuery;
+      console.log('All receipts query results:', {
+        count: data?.length || 0,
+        totalCount: count,
+        error: error?.message || 'none',
+        sampleData: data?.slice(0, 2)?.map(r => ({ id: r.id, merchant: r.merchant, date: r.date }))
+      });
+
+      if (error) {
+        console.error('All receipts query error:', error);
+        throw error;
+      }
+
+      // Add similarity_score to make receipts compatible with ReceiptWithSimilarity type
+      const receiptsWithScores = (data || []).map(receipt => ({
+        ...receipt,
+        similarity_score: 0 // No meaningful similarity score in fallback search
+      }));
+
+      const results: SearchResult = {
+        receipts: receiptsWithScores,
+        lineItems: [],
+        results: receiptsWithScores,
+        count: receiptsWithScores.length,
+        total: count || data?.length || 0,
+        searchParams: {
+          ...params,
+          isVectorSearch: false,
+        },
+      };
+
+      console.log('Returning all receipts results:', results.count);
+      return results;
+    }
+
+    if (normalizedQuery && normalizedQuery.trim() !== '' && !isTimeOnlyQuery) {
+      console.log('Performing text search with normalized query:', normalizedQuery);
 
       try {
         // Try individual filter approach (more reliable but potentially slower)
         const { data: merchantData, error: merchantError } = await supabase
           .from('receipts')
           .select('*')
-          .ilike('merchant', `%${query}%`)
+          .ilike('merchant', `%${normalizedQuery}%`)
           .order('date', { ascending: false })
           .limit(limit);
 
         const { data: categoryData, error: categoryError } = await supabase
           .from('receipts')
           .select('*')
-          .ilike('predicted_category', `%${query}%`)
+          .ilike('predicted_category', `%${normalizedQuery}%`)
           .order('date', { ascending: false })
           .limit(limit);
 
@@ -358,7 +625,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
         const { data: fullTextData, error: fullTextError } = await supabase
           .from('receipts')
           .select('*')
-          .ilike('fullText', `%${query}%`)
+          .ilike('fullText', `%${normalizedQuery}%`)
           .order('date', { ascending: false })
           .limit(limit);
 
@@ -405,12 +672,12 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
       textQuery = supabase
         .from('receipts')
         .select('*')
-        .ilike('merchant', `%${query}%`)
+        .ilike('merchant', `%${normalizedQuery}%`)
         .order('date', { ascending: false })
         .range(offset, offset + limit - 1);
     }
 
-    console.log('Fallback to simple merchant search query:', query);
+    console.log('Fallback to simple merchant search with normalized query:', normalizedQuery);
 
     // Apply date filters if present
     if (params.startDate) {
@@ -441,14 +708,14 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
     if (isLineItemSearch || isUnifiedSearch) {
       try {
-        console.log('Performing fallback line item search with query:', query);
+        console.log('Performing fallback line item search with normalized query:', normalizedQuery);
 
         // Search line items by description
         // Use a simpler query to avoid relationship issues
         const { data: lineItemData, error: lineItemError } = await supabase
           .from('line_items')
           .select('id, receipt_id, description, amount, created_at')
-          .ilike('description', `%${query}%`)
+          .ilike('description', `%${normalizedQuery}%`)
           .order('created_at', { ascending: false })
           .limit(limit);
 
@@ -1396,5 +1663,303 @@ export async function generateEmbeddingsForReceipt(receiptId: string): Promise<v
       console.error(`Error updating receipt status after failure: ${updateError}`);
     }
     throw error;
+  }
+}
+
+/**
+ * Unified Search Function - Calls the unified-search Edge Function with caching and performance monitoring
+ * This is the new search interface that supports multiple data sources
+ */
+export async function unifiedSearch(params: UnifiedSearchParams): Promise<UnifiedSearchResponse> {
+  const startTime = performance.now();
+  let cacheHit = false;
+  let errorOccurred = false;
+  let errorMessage: string | undefined;
+
+  try {
+    console.log('Performing unified search...', params);
+
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('User is not authenticated');
+    }
+
+    const userId = session.user.id;
+
+    // Validate required parameters
+    if (!params.query || params.query.trim() === '') {
+      throw new Error('Search query is required');
+    }
+
+    // Set defaults
+    const baseParams: UnifiedSearchParams = {
+      query: params.query.trim(),
+      sources: params.sources || ['receipts', 'business_directory'],
+      contentTypes: params.contentTypes,
+      limit: Math.min(params.limit || 20, 100), // Cap at 100 results
+      offset: params.offset || 0,
+      filters: params.filters || {},
+      similarityThreshold: params.similarityThreshold || 0.2,
+      includeMetadata: params.includeMetadata !== false, // Default to true
+      aggregationMode: params.aggregationMode || 'relevance'
+    };
+
+    // Optimize search parameters based on quality validation findings
+    const optimizationResult = searchParameterOptimizer.optimizeParameters(baseParams);
+    const searchParams = optimizationResult.optimizedParams;
+
+    console.log('🎯 Parameter optimization applied:', {
+      original: {
+        similarityThreshold: baseParams.similarityThreshold,
+        limit: baseParams.limit,
+        aggregationMode: baseParams.aggregationMode
+      },
+      optimized: {
+        similarityThreshold: searchParams.similarityThreshold,
+        limit: searchParams.limit,
+        aggregationMode: searchParams.aggregationMode
+      },
+      reason: optimizationResult.optimizationReason,
+      confidence: optimizationResult.confidenceScore,
+      expectedImprovements: optimizationResult.expectedImprovements
+    });
+
+    // Check cache first (only for non-paginated searches to avoid stale results)
+    if (searchParams.offset === 0) {
+      const cachedResult = await searchCache.get(searchParams, userId);
+      if (cachedResult) {
+        cacheHit = true;
+        const queryTime = performance.now() - startTime;
+
+        // Log performance metrics
+        await searchPerformanceMonitor.logSearchMetric(
+          searchParams,
+          cachedResult,
+          {
+            queryTime,
+            resultCount: cachedResult.totalResults,
+            cacheHit: true,
+            sources: searchParams.sources || [],
+            similarityThreshold: searchParams.similarityThreshold || 0.2,
+            errorOccurred: false
+          },
+          userId
+        );
+
+        console.log(`🎯 Cache hit for unified search: "${searchParams.query}" (${queryTime.toFixed(2)}ms)`);
+        return cachedResult;
+      }
+    }
+
+    // Call the unified-search Edge Function
+    const response = await callEdgeFunction('unified-search', 'POST', searchParams);
+
+    if (!response || !response.success) {
+      errorOccurred = true;
+      errorMessage = response?.error || 'Unified search failed';
+      throw new Error(errorMessage);
+    }
+
+    let searchResponse = response as UnifiedSearchResponse;
+
+    // Apply advanced ranking algorithm to optimize result ordering
+    if (searchResponse.results && searchResponse.results.length > 0) {
+      console.log(`🎯 Applying advanced ranking to ${searchResponse.results.length} results...`);
+
+      const rankingContext = advancedSearchRanking.analyzeSearchContext(searchParams.query, searchParams);
+      const rankedResults = advancedSearchRanking.rankSearchResults(
+        searchResponse.results,
+        rankingContext,
+        searchParams
+      );
+
+      // Update response with ranked results
+      searchResponse = {
+        ...searchResponse,
+        results: rankedResults
+      };
+
+      console.log(`✅ Advanced ranking applied. Top result: "${rankedResults[0]?.title}" (score: ${rankedResults[0]?.similarity.toFixed(3)})`);
+    }
+
+    const queryTime = performance.now() - startTime;
+
+    // Cache the results (only for successful, non-paginated searches)
+    if (searchParams.offset === 0 && searchResponse.success) {
+      await searchCache.set(searchParams, userId, searchResponse);
+    }
+
+    // Log performance metrics
+    await searchPerformanceMonitor.logSearchMetric(
+      searchParams,
+      searchResponse,
+      {
+        queryTime,
+        resultCount: searchResponse.totalResults,
+        cacheHit: false,
+        sources: searchParams.sources || [],
+        similarityThreshold: searchParams.similarityThreshold || 0.2,
+        errorOccurred: false
+      },
+      userId
+    );
+
+    console.log('Unified search response:', {
+      totalResults: searchResponse.totalResults,
+      sourcesSearched: searchResponse.searchMetadata?.sourcesSearched,
+      searchDuration: searchResponse.searchMetadata?.searchDuration,
+      queryTime: queryTime.toFixed(2) + 'ms',
+      cacheHit: false
+    });
+
+    return searchResponse;
+
+  } catch (error) {
+    console.error('Error in unifiedSearch:', error);
+    errorOccurred = true;
+    errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+    const queryTime = performance.now() - startTime;
+
+    // Log error metrics
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await searchPerformanceMonitor.logSearchMetric(
+          params,
+          null,
+          {
+            queryTime,
+            resultCount: 0,
+            cacheHit,
+            sources: params.sources || [],
+            similarityThreshold: params.similarityThreshold || 0.2,
+            errorOccurred: true,
+            errorMessage
+          },
+          session.user.id
+        );
+      }
+    } catch (metricError) {
+      console.warn('Failed to log error metrics:', metricError);
+    }
+
+    // Return error response in expected format
+    return {
+      success: false,
+      results: [],
+      totalResults: 0,
+      searchMetadata: {
+        sourcesSearched: params.sources || [],
+        searchDuration: queryTime,
+        subscriptionLimitsApplied: false,
+        fallbacksUsed: []
+      },
+      pagination: {
+        hasMore: false,
+        totalPages: 0
+      },
+      error: errorMessage
+    };
+  }
+}
+
+/**
+ * Legacy search function wrapper for backward compatibility
+ * Converts old SearchParams to new UnifiedSearchParams and calls unifiedSearch
+ */
+export async function legacySemanticSearch(params: SearchParams): Promise<SearchResult> {
+  try {
+    // Convert legacy params to unified params
+    const unifiedParams: UnifiedSearchParams = {
+      query: params.query,
+      sources: params.searchTarget === 'all'
+        ? ['receipts', 'business_directory']
+        : params.searchTarget === 'line_items'
+        ? ['receipts'] // Line items are part of receipts
+        : ['receipts'],
+      contentTypes: params.contentType ? [params.contentType] : undefined,
+      limit: params.limit,
+      offset: params.offset,
+      filters: {
+        dateRange: params.startDate && params.endDate ? {
+          start: params.startDate,
+          end: params.endDate
+        } : undefined,
+        amountRange: params.minAmount && params.maxAmount ? {
+          min: params.minAmount,
+          max: params.maxAmount,
+          currency: 'MYR'
+        } : undefined,
+        categories: params.categories,
+        merchants: params.merchants
+      },
+      similarityThreshold: 0.2,
+      includeMetadata: true,
+      aggregationMode: 'relevance'
+    };
+
+    // Call unified search
+    const unifiedResponse = await unifiedSearch(unifiedParams);
+
+    if (!unifiedResponse.success) {
+      throw new Error(unifiedResponse.error || 'Search failed');
+    }
+
+    // Convert unified response back to legacy format
+    const receipts: ReceiptWithSimilarity[] = [];
+    const lineItems: LineItemSearchResult[] = [];
+
+    unifiedResponse.results.forEach(result => {
+      if (result.sourceType === 'receipt') {
+        receipts.push({
+          id: result.sourceId,
+          merchant: result.metadata.merchant || result.title,
+          date: result.metadata.date || result.createdAt,
+          total: result.metadata.total || 0,
+          notes: result.metadata.notes,
+          raw_text: result.metadata.raw_text,
+          predicted_category: result.metadata.predicted_category,
+          similarity_score: result.similarity
+        });
+      }
+      // Handle line items if they're in the results
+      else if (result.contentType === 'line_items') {
+        lineItems.push({
+          line_item_id: result.id,
+          receipt_id: result.sourceId,
+          line_item_description: result.description,
+          line_item_quantity: result.metadata.quantity || 1,
+          line_item_price: result.metadata.price || 0,
+          line_item_amount: result.metadata.amount || 0,
+          parent_receipt_merchant: result.metadata.parent_receipt_merchant || result.title,
+          parent_receipt_date: result.metadata.parent_receipt_date || result.createdAt,
+          parent_receipt_id: result.sourceId,
+          similarity: result.similarity
+        });
+      }
+    });
+
+    // Combine results for 'all' search target
+    const combinedResults = params.searchTarget === 'all'
+      ? [...receipts, ...lineItems]
+      : params.searchTarget === 'line_items'
+      ? lineItems
+      : receipts;
+
+    return {
+      receipts,
+      lineItems,
+      results: combinedResults,
+      count: combinedResults.length,
+      total: unifiedResponse.totalResults,
+      searchParams: params
+    };
+
+  } catch (error) {
+    console.error('Error in legacySemanticSearch:', error);
+    // Fall back to original semantic search if unified search fails
+    return await semanticSearch(params);
   }
 }
