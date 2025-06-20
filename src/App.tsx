@@ -42,6 +42,7 @@ const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
+const UnifiedSearchPage = lazy(() => import("./pages/UnifiedSearchPage"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
@@ -59,6 +60,7 @@ const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptInt
 const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
 const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
+const DebugSearch = lazy(() => import("./pages/DebugSearch"));
 
 
 // Create a loading component for suspense
@@ -173,6 +175,11 @@ const App = () => (
                     <SemanticSearch />
                   </Suspense>
                 } />
+                <Route path="/unified-search" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <UnifiedSearchPage />
+                  </Suspense>
+                } />
                 <Route path="/features" element={
                   <Suspense fallback={<PageLoading />}>
                     <FeaturesPage />
@@ -216,6 +223,11 @@ const App = () => (
                 <Route path="/test/production-invitation-debug" element={
                   <Suspense fallback={<PageLoading />}>
                     <ProductionInvitationDebug />
+                  </Suspense>
+                } />
+                <Route path="/debug/search" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <DebugSearch />
                   </Suspense>
                 } />
               </Route>
