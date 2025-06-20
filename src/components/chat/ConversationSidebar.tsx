@@ -350,6 +350,7 @@ export function ConversationSidebar({
 
       {/* Enhanced Sidebar with improved animations */}
       <div
+        id="conversation-sidebar"
         className={cn(
           "h-full bg-background border-r border-border",
           "transition-all duration-300 ease-in-out",
