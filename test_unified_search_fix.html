@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Unified Search Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { border-color: #4CAF50; background-color: #f1f8e9; }
+        .error { border-color: #f44336; background-color: #ffebee; }
+        .info { border-color: #2196F3; background-color: #e3f2fd; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #45a049; }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .log {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Unified Search Fix Test</h1>
+        <p>This page tests whether the AI search interface now uses the unified-search Edge Function instead of semantic-search.</p>
+        
+        <div class="test-section info">
+            <h3>📋 Test Instructions</h3>
+            <ol>
+                <li>Make sure you're logged into the app in another tab</li>
+                <li>Click "Test Search" below</li>
+                <li>Check the console logs to see which Edge Function is being called</li>
+                <li>Verify that results are returned for "receipt over $100"</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Search Test</h3>
+            <button onclick="testSearch()">Test Search: "receipt over $100"</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+            
+            <div id="results"></div>
+            <div id="logs" class="log"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>✅ Expected Results</h3>
+            <ul>
+                <li><strong>Before Fix:</strong> Console shows "semantic-search" Edge Function calls, returns 0 results</li>
+                <li><strong>After Fix:</strong> Console shows "unified-search" Edge Function calls, returns actual receipts over $100</li>
+                <li><strong>Fallback:</strong> If unified-search fails, should fall back to semantic-search, then basic search</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let logContainer = document.getElementById('logs');
+        let resultsContainer = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logEntry.style.color = type === 'error' ? '#d32f2f' : type === 'success' ? '#388e3c' : '#1976d2';
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLogs() {
+            logContainer.innerHTML = '';
+            resultsContainer.innerHTML = '';
+        }
+
+        async function testSearch() {
+            log('🚀 Starting unified search test...', 'info');
+            resultsContainer.innerHTML = '<p>Testing...</p>';
+
+            try {
+                // Check if we're on the right domain
+                if (!window.location.hostname.includes('localhost')) {
+                    log('⚠️ This test should be run on localhost for development testing', 'error');
+                    return;
+                }
+
+                // Test if we can access the app's search functionality
+                // This simulates what the AI search interface does
+                const testQuery = 'receipt over $100';
+                
+                log(`🔍 Testing search query: "${testQuery}"`, 'info');
+                
+                // Simulate the search call that would happen in the AI interface
+                // Note: This is a simplified test - the actual implementation is more complex
+                
+                log('📡 This test simulates the search flow. Check the actual app for real results.', 'info');
+                log('🎯 Key things to verify in the actual app:', 'info');
+                log('   1. Open browser console in the AI search page', 'info');
+                log('   2. Search for "receipt over $100"', 'info');
+                log('   3. Look for "unified-search" in console logs instead of "semantic-search"', 'info');
+                log('   4. Verify that results are returned', 'info');
+                
+                resultsContainer.innerHTML = `
+                    <div class="test-section success">
+                        <h4>✅ Test Setup Complete</h4>
+                        <p>Now test the actual search in your app:</p>
+                        <ol>
+                            <li>Go to <a href="http://localhost:5001/search" target="_blank">http://localhost:5001/search</a></li>
+                            <li>Open browser console (F12)</li>
+                            <li>Search for "receipt over $100"</li>
+                            <li>Check console for "unified-search" calls</li>
+                        </ol>
+                    </div>
+                `;
+
+            } catch (error) {
+                log(`❌ Test error: ${error.message}`, 'error');
+                resultsContainer.innerHTML = `<div class="test-section error"><h4>❌ Test Failed</h4><p>${error.message}</p></div>`;
+            }
+        }
+
+        // Log initial state
+        log('🔧 Unified Search Fix Test Page Loaded', 'success');
+        log('📍 Make sure to test on localhost:5001 for development', 'info');
+    </script>
+</body>
+</html>

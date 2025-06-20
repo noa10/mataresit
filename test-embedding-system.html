@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedding System Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .test-result {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Mataresit Embedding System Test</h1>
+        <p>This page tests the embedding repair system functionality to ensure everything is working correctly.</p>
+        
+        <div class="test-section">
+            <h2>🗄️ Database Readiness Test</h2>
+            <p>Check if database functions and tables are properly set up.</p>
+            <button onclick="runDatabaseTest()" id="dbTestBtn">Run Database Test</button>
+            <div id="dbTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Embedding Audit Test</h2>
+            <p>Analyze current embedding state and identify issues.</p>
+            <button onclick="runAuditTest()" id="auditTestBtn">Run Audit Test</button>
+            <div id="auditTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 Migration Test</h2>
+            <p>Test migration of old embeddings to unified format.</p>
+            <button onclick="runMigrationTest()" id="migrationTestBtn">Run Migration Test</button>
+            <div id="migrationTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🛠️ Content Fix Test</h2>
+            <p>Test repair of embeddings with missing content.</p>
+            <button onclick="runContentFixTest()" id="contentFixTestBtn">Run Content Fix Test</button>
+            <div id="contentFixTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>⚡ Batch Generation Test</h2>
+            <p>Test batch processing of missing embeddings.</p>
+            <button onclick="runBatchTest()" id="batchTestBtn">Run Batch Test</button>
+            <div id="batchTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Search Test</h2>
+            <p>Test the unified search functionality.</p>
+            <button onclick="runSearchTest()" id="searchTestBtn">Run Search Test</button>
+            <div id="searchTestResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Full System Test</h2>
+            <p>Run all tests in sequence to verify complete system functionality.</p>
+            <button onclick="runFullTest()" id="fullTestBtn">Run Full Test Suite</button>
+            <div id="fullTestResults"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+
+        function showLoading(buttonId) {
+            const btn = document.getElementById(buttonId);
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Running...';
+        }
+
+        function hideLoading(buttonId, originalText) {
+            const btn = document.getElementById(buttonId);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+
+        function displayResult(containerId, result, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            
+            if (typeof result === 'object') {
+                div.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            } else {
+                div.textContent = result;
+            }
+            
+            container.appendChild(div);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        async function callEdgeFunction(functionName, method = 'POST', body = null) {
+            const url = `${SUPABASE_URL}/functions/v1/${functionName}`;
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                },
+            };
+
+            if (body && method === 'POST') {
+                options.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function runDatabaseTest() {
+            showLoading('dbTestBtn');
+            clearResults('dbTestResults');
+            
+            try {
+                displayResult('dbTestResults', 'Testing database readiness...', 'info');
+                
+                // Test if we can connect to Supabase
+                const testResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                
+                if (testResponse.ok) {
+                    displayResult('dbTestResults', '✅ Supabase connection successful', 'success');
+                } else {
+                    displayResult('dbTestResults', '❌ Supabase connection failed', 'error');
+                }
+                
+                // Test unified_embeddings table
+                const tableResponse = await fetch(`${SUPABASE_URL}/rest/v1/unified_embeddings?select=count&limit=1`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Prefer': 'count=exact'
+                    }
+                });
+                
+                if (tableResponse.ok) {
+                    displayResult('dbTestResults', '✅ unified_embeddings table exists', 'success');
+                } else {
+                    displayResult('dbTestResults', '❌ unified_embeddings table missing - migrations needed', 'error');
+                }
+                
+            } catch (error) {
+                displayResult('dbTestResults', `❌ Database test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('dbTestBtn', 'Run Database Test');
+        }
+
+        async function runAuditTest() {
+            showLoading('auditTestBtn');
+            clearResults('auditTestResults');
+            
+            try {
+                displayResult('auditTestResults', 'Running embedding audit...', 'info');
+                
+                const result = await callEdgeFunction('audit-embeddings', 'POST', {
+                    action: 'audit'
+                });
+                
+                if (result.success) {
+                    displayResult('auditTestResults', '✅ Audit completed successfully', 'success');
+                    
+                    if (result.audit) {
+                        const stats = `
+                        📊 Audit Results:
+                        • Total Receipts: ${result.audit.totalReceipts}
+                        • With Unified Embeddings: ${result.audit.receiptsWithUnifiedEmbeddings}
+                        • Missing Embeddings: ${result.audit.receiptsMissingEmbeddings}
+                        • Migration Needed: ${result.audit.migrationNeeded ? 'Yes' : 'No'}
+                        `;
+                        displayResult('auditTestResults', stats, 'info');
+                    }
+                    
+                    displayResult('auditTestResults', result, 'success');
+                } else {
+                    displayResult('auditTestResults', `❌ Audit failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                displayResult('auditTestResults', `❌ Audit test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('auditTestBtn', 'Run Audit Test');
+        }
+
+        async function runMigrationTest() {
+            showLoading('migrationTestBtn');
+            clearResults('migrationTestResults');
+            
+            try {
+                displayResult('migrationTestResults', 'Testing embedding migration...', 'info');
+                
+                const result = await callEdgeFunction('audit-embeddings', 'POST', {
+                    action: 'migrate'
+                });
+                
+                if (result.success) {
+                    displayResult('migrationTestResults', '✅ Migration test completed', 'success');
+                    displayResult('migrationTestResults', result, 'success');
+                } else {
+                    displayResult('migrationTestResults', `❌ Migration failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                displayResult('migrationTestResults', `❌ Migration test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('migrationTestBtn', 'Run Migration Test');
+        }
+
+        async function runContentFixTest() {
+            showLoading('contentFixTestBtn');
+            clearResults('contentFixTestResults');
+            
+            try {
+                displayResult('contentFixTestResults', 'Testing content fix...', 'info');
+                
+                const result = await callEdgeFunction('audit-embeddings', 'POST', {
+                    action: 'fix_content'
+                });
+                
+                if (result.success) {
+                    displayResult('contentFixTestResults', '✅ Content fix test completed', 'success');
+                    displayResult('contentFixTestResults', result, 'success');
+                } else {
+                    displayResult('contentFixTestResults', `❌ Content fix failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                displayResult('contentFixTestResults', `❌ Content fix test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('contentFixTestBtn', 'Run Content Fix Test');
+        }
+
+        async function runBatchTest() {
+            showLoading('batchTestBtn');
+            clearResults('batchTestResults');
+            
+            try {
+                displayResult('batchTestResults', 'Testing batch generation...', 'info');
+                
+                const result = await callEdgeFunction('generate-embeddings', 'POST', {
+                    processMissingBatch: true,
+                    batchSize: 3
+                });
+                
+                if (result.success) {
+                    displayResult('batchTestResults', '✅ Batch generation test completed', 'success');
+                    displayResult('batchTestResults', result, 'success');
+                } else {
+                    displayResult('batchTestResults', `❌ Batch generation failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                displayResult('batchTestResults', `❌ Batch test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('batchTestBtn', 'Run Batch Test');
+        }
+
+        async function runSearchTest() {
+            showLoading('searchTestBtn');
+            clearResults('searchTestResults');
+            
+            try {
+                displayResult('searchTestResults', 'Testing unified search...', 'info');
+                
+                const result = await callEdgeFunction('unified-search', 'POST', {
+                    query: 'recent receipts test'
+                });
+                
+                if (result.success) {
+                    displayResult('searchTestResults', '✅ Search test completed', 'success');
+                    displayResult('searchTestResults', result, 'success');
+                } else {
+                    displayResult('searchTestResults', `❌ Search failed: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                displayResult('searchTestResults', `❌ Search test failed: ${error.message}`, 'error');
+            }
+            
+            hideLoading('searchTestBtn', 'Run Search Test');
+        }
+
+        async function runFullTest() {
+            showLoading('fullTestBtn');
+            clearResults('fullTestResults');
+            
+            displayResult('fullTestResults', '🚀 Starting full system test...', 'info');
+            
+            const tests = [
+                { name: 'Database', func: runDatabaseTest },
+                { name: 'Audit', func: runAuditTest },
+                { name: 'Migration', func: runMigrationTest },
+                { name: 'Content Fix', func: runContentFixTest },
+                { name: 'Batch Generation', func: runBatchTest },
+                { name: 'Search', func: runSearchTest }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    displayResult('fullTestResults', `Running ${test.name} test...`, 'info');
+                    await test.func();
+                    displayResult('fullTestResults', `✅ ${test.name} test completed`, 'success');
+                } catch (error) {
+                    displayResult('fullTestResults', `❌ ${test.name} test failed: ${error.message}`, 'error');
+                }
+                
+                // Brief pause between tests
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            displayResult('fullTestResults', '🎉 Full test suite completed!', 'success');
+            hideLoading('fullTestBtn', 'Run Full Test Suite');
+        }
+    </script>
+</body>
+</html>
