@@ -212,33 +212,42 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
   let searchResults;
   let error;
 
-  // For receipts, use search_receipts function
+  // For receipts, use unified_search function
   if (searchTarget === 'receipts') {
-    console.log(`Using search_receipts function`);
+    console.log(`Using unified_search function for receipts`);
 
     const { data, error: searchError } = await client.rpc(
-      'search_receipts',
+      'unified_search',
       {
         query_embedding: queryEmbedding,
+        source_types: ['receipt'],
+        content_types: null,
         similarity_threshold: similarityThreshold,
         match_count: limit + offset,
-        content_type_filter: contentType || 'all'
+        user_filter: null, // Will be set by RLS policies
+        team_filter: null,
+        language_filter: null
       }
     );
 
     searchResults = data;
     error = searchError;
   }
-  // For line items, use search_line_items function
+  // For line items, use unified_search function
   else if (searchTarget === 'line_items') {
-    console.log(`Using search_line_items function`);
+    console.log(`Using unified_search function for line_items`);
 
     const { data, error: searchError } = await client.rpc(
-      'search_line_items',
+      'unified_search',
       {
         query_embedding: queryEmbedding,
+        source_types: ['line_item'],
+        content_types: null,
         similarity_threshold: similarityThreshold,
-        match_count: limit + offset
+        match_count: limit + offset,
+        user_filter: null, // Will be set by RLS policies
+        team_filter: null,
+        language_filter: null
       }
     );
 
@@ -267,10 +276,14 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
     return await processLineItemSearchResults(client, paginatedResults, params);
   }
 
-  // For receipt searches, continue with the existing flow
-  const extractedIds = paginatedResults.map((r: any) => r.receipt_id);
+  // For receipt searches, extract IDs from unified_search results
+  const extractedIds = paginatedResults.map((r: any) => {
+    // unified_search returns source_id for the actual receipt/line_item ID
+    return r.source_id || r.receipt_id;
+  });
   const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
-    acc[r.receipt_id] = r.similarity || r.score || 0;
+    const id = r.source_id || r.receipt_id;
+    acc[id] = r.similarity || r.score || 0;
     return acc;
   }, {});
 
@@ -423,6 +436,43 @@ async function processLineItemSearchResults(client: any, results: any[], params:
 }
 
 /**
+ * Normalize query to extract core search terms and remove numerical qualifiers
+ * This ensures semantically similar queries generate similar embeddings
+ */
+function normalizeSearchQuery(query: string): string {
+  console.log(`Normalizing query: "${query}"`);
+
+  let normalizedQuery = query.toLowerCase().trim();
+
+  // Remove numerical qualifiers that don't affect search content
+  const numericalQualifiers = [
+    /\b(top|first|latest|recent|show\s+me|find\s+me|get\s+me)\s+\d+\s*/gi,
+    /\b(show|find|get)\s+(me\s+)?(all|any)\s*/gi,
+    /\b(all|any)\s+(of\s+)?(the\s+)?/gi,
+    /\b(receipts?|purchases?|expenses?|transactions?)\s+(from|at|in)\s+/gi
+  ];
+
+  // Apply normalization patterns
+  for (const pattern of numericalQualifiers) {
+    normalizedQuery = normalizedQuery.replace(pattern, '');
+  }
+
+  // Clean up extra spaces and common words
+  normalizedQuery = normalizedQuery
+    .replace(/\s+/g, ' ')
+    .replace(/\b(receipts?|purchases?|expenses?|transactions?)\b/gi, '')
+    .trim();
+
+  // If the normalized query is too short, fall back to original
+  if (normalizedQuery.length < 3) {
+    normalizedQuery = query.toLowerCase().trim();
+  }
+
+  console.log(`Normalized query result: "${normalizedQuery}"`);
+  return normalizedQuery;
+}
+
+/**
  * Parse natural language query to extract search parameters with improved prompt and error handling
  */
 async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
@@ -442,13 +492,16 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
     const currentMonth = now.getMonth() + 1; // JS months are 0-indexed
 
     // Construct an improved prompt to help the model understand how to parse the query
-    // Enhanced to support both English and Malay queries
+    // Enhanced to support both English and Malay queries with better numerical qualifier handling
     const prompt = `
       Parse the following search query for a receipt tracking app and extract structured parameters.
       You can extract dates, amounts, categories, merchants, and other relevant filters.
       The query may be in English, Malay (Bahasa Malaysia), or a mix of both languages.
 
       Today's date is ${now.toISOString().split('T')[0]}.
+
+      CRITICAL: Focus on extracting the core search terms regardless of query structure.
+      Numerical qualifiers like "top 10", "first 5", "latest", "recent" should be treated as search modifiers, not core search terms.
 
       Guidelines for parsing:
       1. For dates, convert to ISO format (YYYY-MM-DD).
@@ -458,11 +511,22 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       5. For categories, map to common shopping categories (groceries, dining, entertainment, etc.)
       6. If a field is not mentioned, return null for that field.
       7. For search target, determine if the user is looking for receipts or line items (individual items on receipts).
+      8. **IMPORTANT**: Ignore numerical qualifiers when extracting core search terms:
+         - "top 10 pasar borong receipts" → extract "pasar borong" as merchant/location
+         - "first 5 coffee purchases" → extract "coffee" as category/item
+         - "latest receipts from Tesco" → extract "Tesco" as merchant
+         - "recent expenses at mamak" → extract "mamak" as merchant/category
+
+      Numerical Qualifier Patterns to Ignore:
+      - "top [number]", "first [number]", "latest [number]", "recent [number]"
+      - "show me [number]", "find [number]", "get [number]"
+      - These are search modifiers, not search content
 
       Malaysian Business Recognition:
       - Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer
-      - Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC
+      - Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC, Pasar Borong, Pasar Malam
       - Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB, Syabas
+      - Markets: Pasar Borong (wholesale market), Pasar Malam (night market), Pasar Pagi (morning market)
 
       Malay Language Terms:
       - 'resit' = receipt
@@ -475,6 +539,8 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       - 'semalam' = yesterday
       - 'tunai' = cash
       - 'kad kredit' = credit card
+      - 'pasar borong' = wholesale market
+      - 'pasar malam' = night market
 
       Examples:
       Query: "Show me all receipts from last month over $50"
@@ -488,6 +554,50 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         "searchTarget": "receipts"
       }
 
+      Query: "top 10 pasar borong receipts"
+      {
+        "startDate": null,
+        "endDate": null,
+        "minAmount": null,
+        "maxAmount": null,
+        "categories": [],
+        "merchants": ["pasar borong"],
+        "searchTarget": "receipts"
+      }
+
+      Query: "all receipts from pasar borong"
+      {
+        "startDate": null,
+        "endDate": null,
+        "minAmount": null,
+        "maxAmount": null,
+        "categories": [],
+        "merchants": ["pasar borong"],
+        "searchTarget": "receipts"
+      }
+
+      Query: "first 5 coffee purchases"
+      {
+        "startDate": null,
+        "endDate": null,
+        "minAmount": null,
+        "maxAmount": null,
+        "categories": ["beverages"],
+        "merchants": [],
+        "searchTarget": "line_items"
+      }
+
+      Query: "latest receipts from Tesco"
+      {
+        "startDate": null,
+        "endDate": null,
+        "minAmount": null,
+        "maxAmount": null,
+        "categories": [],
+        "merchants": ["Tesco"],
+        "searchTarget": "receipts"
+      }
+
       Query: "receipts from Target between $10 and $50 in January"
       {
         "startDate": "${currentYear}-01-01",
@@ -497,17 +607,6 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
         "categories": [],
         "merchants": ["Target"],
         "searchTarget": "receipts"
-      }
-
-      Query: "milk purchases from last week"
-      {
-        "startDate": "${new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}",
-        "endDate": "${now.toISOString().split('T')[0]}",
-        "minAmount": null,
-        "maxAmount": null,
-        "categories": ["groceries"],
-        "merchants": [],
-        "searchTarget": "line_items"
       }
 
       Now parse this search query:
@@ -609,16 +708,19 @@ async function parseNaturalLanguageQuery(query: string): Promise<SearchParams> {
       return validatedParams;
     } else if (jsonError) {
       console.error(`Error parsing JSON from NLU response: ${jsonError}`);
-      // Fallback to just the query if parsing fails
-      return { query };
+      console.log('Falling back to enhanced rule-based parsing...');
+      // Use enhanced fallback parser
+      return parseNaturalLanguageQueryFallback(query);
     }
 
     // Final fallback
-    return { query };
+    console.log('Using enhanced rule-based parsing as final fallback...');
+    return parseNaturalLanguageQueryFallback(query);
   } catch (error) {
     console.error(`Error in natural language parsing: ${error}`);
-    // Return basic params with just the query on error
-    return { query };
+    console.log('AI parsing failed, using enhanced rule-based parsing...');
+    // Use enhanced fallback parser instead of just returning query
+    return parseNaturalLanguageQueryFallback(query);
   }
 }
 
@@ -629,6 +731,270 @@ function isValidDateString(dateStr: string): boolean {
   // Try to parse as ISO date string
   const date = new Date(dateStr);
   return !isNaN(date.getTime());
+}
+
+/**
+ * Enhanced fallback parser for natural language queries
+ * This provides a more reliable parsing when AI parsing fails
+ * Improved with better pattern matching, scoring, and semantic understanding
+ */
+function parseNaturalLanguageQueryFallback(query: string): SearchParams {
+  console.log(`Enhanced fallback parser processing query: "${query}"`);
+
+  // Apply query normalization for consistent processing
+  const normalizedQuery = normalizeSearchQuery(query);
+  const lowerQuery = normalizedQuery.toLowerCase().trim();
+  const originalLower = query.toLowerCase().trim();
+
+  console.log(`Normalized query for fallback parsing: "${normalizedQuery}"`);
+
+  const result: SearchParams = {
+    query: query
+  };
+
+  // Enhanced temporal expression patterns with priority scoring
+  const temporalPatterns = [
+    // High priority - specific time references
+    { pattern: /\b(today|today's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getTodayRange(), priority: 1 },
+    { pattern: /\b(yesterday|yesterday's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getYesterdayRange(), priority: 1 },
+
+    // Medium priority - relative time references
+    { pattern: /\b(recent|latest|last)\s+(receipts?|purchases?|expenses?)\b/i, handler: () => getRecentDateRange(7), priority: 2 },
+    { pattern: /\b(this\s+week|current\s+week)\b/i, handler: () => getThisWeekRange(), priority: 2 },
+    { pattern: /\b(last\s+week|previous\s+week)\b/i, handler: () => getLastWeekRange(), priority: 2 },
+    { pattern: /\b(this\s+month|current\s+month)\b/i, handler: () => getThisMonthRange(), priority: 2 },
+    { pattern: /\b(last\s+month|previous\s+month)\b/i, handler: () => getLastMonthRange(), priority: 2 },
+
+    // Lower priority - numeric relative dates
+    { pattern: /\b(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]), priority: 3 },
+
+    // Additional patterns for better coverage
+    { pattern: /\b(within|in)\s+the\s+(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[3]), match[4]), priority: 3 },
+    { pattern: /\b(from|since)\s+(last|this)\s+(week|month)\b/i, handler: (match: RegExpMatchArray) => match[2] === 'last' ? (match[3] === 'week' ? getLastWeekRange() : getLastMonthRange()) : (match[3] === 'week' ? getThisWeekRange() : getThisMonthRange()), priority: 2 },
+  ];
+
+  // Enhanced amount patterns with better coverage and validation
+  const amountPatterns = [
+    // Range patterns (highest priority)
+    { pattern: /\bbetween\s+[rm$€£¥]?(\d+(?:\.\d{2})?)\s+(?:and|to|[-–])\s+[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ minAmount: parseFloat(match[1]), maxAmount: parseFloat(match[2]) }), priority: 1 },
+    { pattern: /\b[rm$€£¥]?(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ minAmount: parseFloat(match[1]), maxAmount: parseFloat(match[2]) }), priority: 1 },
+
+    // Minimum amount patterns
+    { pattern: /\b(over|above|more\s+than|greater\s+than|at\s+least)\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ minAmount: parseFloat(match[2]) }), priority: 2 },
+    { pattern: /\b[rm$€£¥]?(\d+(?:\.\d{2})?)\s+(or\s+)?(more|above|plus)\b/i, handler: (match: RegExpMatchArray) => ({ minAmount: parseFloat(match[1]) }), priority: 2 },
+
+    // Maximum amount patterns
+    { pattern: /\b(under|below|less\s+than|cheaper\s+than|at\s+most|maximum)\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ maxAmount: parseFloat(match[2]) }), priority: 2 },
+    { pattern: /\b[rm$€£¥]?(\d+(?:\.\d{2})?)\s+(or\s+)?(less|below|under)\b/i, handler: (match: RegExpMatchArray) => ({ maxAmount: parseFloat(match[1]) }), priority: 2 },
+
+    // Malaysian specific amount patterns
+    { pattern: /\b(lebih\s+dari|melebihi)\s*rm?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ minAmount: parseFloat(match[2]) }), priority: 2 },
+    { pattern: /\b(kurang\s+dari|di\s+bawah)\s*rm?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ maxAmount: parseFloat(match[2]) }), priority: 2 },
+  ];
+
+  // Enhanced merchant/location patterns with better coverage
+  const merchantPatterns = [
+    // Malaysian markets and common locations (exact matches first)
+    { pattern: /\b(pasar\s+borong|pasar\s+malam|pasar\s+pagi)\b/i, merchant: 'pasar borong', priority: 1 },
+
+    // Major Malaysian retail chains (exact matches)
+    { pattern: /\b(99\s*speedmart|kk\s*super\s*mart|tesco|aeon|mydin|giant|village\s*grocer)\b/i, merchant: null, priority: 1 },
+
+    // Food establishments (exact matches)
+    { pattern: /\b(mamak|kopitiam|restoran|kedai\s+kopi|warung|gerai)\b/i, merchant: null, priority: 1 },
+    { pattern: /\b(mcdonald'?s|kfc|burger\s+king|pizza\s+hut|subway|starbucks)\b/i, merchant: null, priority: 1 },
+
+    // Petrol stations and services
+    { pattern: /\b(petronas|shell|bhp|caltex|esso)\b/i, merchant: null, priority: 1 },
+
+    // Shopping malls and centers
+    { pattern: /\b(mid\s*valley|klcc|pavilion|sunway\s*pyramid|1\s*utama|the\s*curve)\b/i, merchant: null, priority: 1 },
+
+    // Generic patterns with prepositions (lower priority)
+    { pattern: /\b(?:from|at|in|to)\s+([a-zA-Z][a-zA-Z0-9\s&'-]{2,25}?)(?:\s+(?:receipts?|purchases?|expenses?|transactions?|store|shop|mall|center|centre)|\s*$)/i, merchant: null, priority: 2 },
+
+    // Quoted merchant names
+    { pattern: /"([^"]{2,30})"/i, merchant: null, priority: 1 },
+    { pattern: /'([^']{2,30})'/i, merchant: null, priority: 1 },
+
+    // Merchant names with common business suffixes
+    { pattern: /\b([a-zA-Z][a-zA-Z0-9\s&'-]{2,20}?)\s+(sdn\s*bhd|pte\s*ltd|enterprise|trading|store|shop|mart|market)\b/i, merchant: null, priority: 2 },
+
+    // Standalone merchant names (last resort, very low priority)
+    { pattern: /\b([A-Z][a-zA-Z0-9\s&'-]{3,20}?)(?:\s+(?:receipts?|purchases?|expenses?|transactions?)|\s*$)/i, merchant: null, priority: 3 },
+  ];
+
+  // Enhanced category patterns with better coverage
+  const categoryPatterns = [
+    // Food and beverages
+    { pattern: /\b(coffee|tea|beverages?|drinks?|minuman|kopi|teh)\b/i, category: 'beverages' },
+    { pattern: /\b(food|meals?|dining|restaurant|mamak|makanan|makan|lunch|dinner|breakfast)\b/i, category: 'dining' },
+    { pattern: /\b(groceries|grocery|supermarket|market|pasar|kedai\s+runcit)\b/i, category: 'groceries' },
+
+    // Transportation
+    { pattern: /\b(fuel|gas|petrol|minyak|diesel)\b/i, category: 'fuel' },
+    { pattern: /\b(transport|transportation|grab|taxi|uber|bus|lrt|mrt|komuter)\b/i, category: 'transport' },
+    { pattern: /\b(parking|toll|tol|lebuhraya)\b/i, category: 'transport' },
+
+    // Shopping categories
+    { pattern: /\b(clothing|clothes|fashion|pakaian|baju)\b/i, category: 'clothing' },
+    { pattern: /\b(electronics|gadget|phone|laptop|computer|elektronik)\b/i, category: 'electronics' },
+    { pattern: /\b(books?|stationery|alat\s+tulis)\b/i, category: 'books_stationery' },
+    { pattern: /\b(pharmacy|medicine|ubat|farmasi|health)\b/i, category: 'health' },
+
+    // Services
+    { pattern: /\b(utilities|electric|water|internet|phone\s+bill|bil|astro|unifi)\b/i, category: 'utilities' },
+    { pattern: /\b(entertainment|movie|cinema|wayang|game)\b/i, category: 'entertainment' },
+    { pattern: /\b(beauty|salon|spa|kecantikan)\b/i, category: 'beauty' },
+
+    // Malaysian specific
+    { pattern: /\b(nasi|roti|mee|laksa|rendang|satay|cendol)\b/i, category: 'dining' },
+    { pattern: /\b(pasar\s+malam|night\s+market|bazar\s+ramadan)\b/i, category: 'groceries' },
+  ];
+
+  // Parse temporal expressions
+  for (const { pattern, handler } of temporalPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      const dateRange = handler(match);
+      result.startDate = dateRange.start;
+      result.endDate = dateRange.end;
+      break;
+    }
+  }
+
+  // Parse amount expressions
+  for (const { pattern, handler } of amountPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      const amountRange = handler(match);
+      Object.assign(result, amountRange);
+      break;
+    }
+  }
+
+  // Parse merchant patterns
+  for (const { pattern, merchant } of merchantPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      const extractedMerchant = merchant || match[1] || match[0];
+      result.merchants = [extractedMerchant.trim()];
+      console.log(`Fallback parser extracted merchant: "${extractedMerchant}"`);
+      break;
+    }
+  }
+
+  // Parse category patterns
+  for (const { pattern, category } of categoryPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      result.categories = [category];
+      console.log(`Fallback parser extracted category: "${category}"`);
+      break;
+    }
+  }
+
+  // Determine search target based on query content
+  if (normalizedQuery.includes('line item') || normalizedQuery.includes('item') ||
+      normalizedQuery.includes('product') || result.categories?.length > 0) {
+    result.searchTarget = 'line_items';
+  } else {
+    result.searchTarget = 'receipts';
+  }
+
+  console.log('Fallback parser result:', result);
+  return result;
+}
+
+// Helper functions for date range calculations
+function getRecentDateRange(days: number = 7) {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  };
+}
+
+function getTodayRange() {
+  const today = new Date().toISOString().split('T')[0];
+  return { start: today, end: today };
+}
+
+function getYesterdayRange() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+  return { start: dateStr, end: dateStr };
+}
+
+function getThisWeekRange() {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  return {
+    start: startOfWeek.toISOString().split('T')[0],
+    end: now.toISOString().split('T')[0]
+  };
+}
+
+function getLastWeekRange() {
+  const now = new Date();
+  const endOfLastWeek = new Date(now);
+  endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
+  const startOfLastWeek = new Date(endOfLastWeek);
+  startOfLastWeek.setDate(endOfLastWeek.getDate() - 6);
+  return {
+    start: startOfLastWeek.toISOString().split('T')[0],
+    end: endOfLastWeek.toISOString().split('T')[0]
+  };
+}
+
+function getThisMonthRange() {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  return {
+    start: startOfMonth.toISOString().split('T')[0],
+    end: now.toISOString().split('T')[0]
+  };
+}
+
+function getLastMonthRange() {
+  const now = new Date();
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  return {
+    start: startOfLastMonth.toISOString().split('T')[0],
+    end: endOfLastMonth.toISOString().split('T')[0]
+  };
+}
+
+function getRelativeDateRange(amount: number, unit: string) {
+  const now = new Date();
+  const start = new Date();
+
+  switch (unit.toLowerCase()) {
+    case 'day':
+    case 'days':
+      start.setDate(start.getDate() - amount);
+      break;
+    case 'week':
+    case 'weeks':
+      start.setDate(start.getDate() - (amount * 7));
+      break;
+    case 'month':
+    case 'months':
+      start.setMonth(start.getMonth() - amount);
+      break;
+    default:
+      start.setDate(start.getDate() - amount);
+  }
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: now.toISOString().split('T')[0]
+  };
 }
 
 /**
@@ -910,8 +1276,10 @@ serve(async (req) => {
       // Process natural language query if needed
       if (isNaturalLanguage) {
         console.log("Processing as natural language query");
+        console.log("Original query:", query);
         searchParams = await parseNaturalLanguageQuery(query);
         console.log("Extracted parameters:", JSON.stringify(searchParams));
+        console.log("Query normalization will be applied during embedding generation");
       } else {
         // Extract other parameters from the request body
         const {
@@ -947,9 +1315,10 @@ serve(async (req) => {
         };
       }
 
-      // Generate embedding for the search query
-      console.log('Generating embedding for query:', searchParams.query);
-      const queryEmbedding = await generateEmbedding({ text: searchParams.query });
+      // Generate embedding for the search query using normalized version for consistency
+      const normalizedQuery = normalizeSearchQuery(searchParams.query);
+      console.log('Generating embedding for normalized query:', normalizedQuery);
+      const queryEmbedding = await generateEmbedding({ text: normalizedQuery });
       console.log('Embedding generated with dimensions:', queryEmbedding.length);
 
       // Determine which search function to use based on searchTarget

@@ -43,3 +43,7 @@ verify_jwt = true
 [stripe-webhook]
 verify_jwt = false
 # Stripe webhook doesn't use JWT auth, it uses webhook signatures
+
+[audit-embeddings]
+verify_jwt = true
+# Embedding audit and repair functions require authentication

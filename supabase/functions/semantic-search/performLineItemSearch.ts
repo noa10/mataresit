@@ -1,5 +1,5 @@
 /**
- * Perform semantic search on line items using vector embeddings
+ * Perform semantic search on line items using unified_search function
  */
 export async function performLineItemSearch(client: any, queryEmbedding: number[], params: any) {
   const {
@@ -30,209 +30,89 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   console.log(`Query Embedding (first 5 elements): [${queryEmbedding.slice(0,5).join(', ')}, ...] (length: ${queryEmbedding.length})`);
 
   try {
-    // Get all line items with their details first
-    // Use separate queries to avoid relationship conflicts
-    const { data: lineItems, error: lineItemsError } = await client
-      .from('line_items')
-      .select('id, receipt_id, description, amount')
-      .order('id', { ascending: false })
-      .limit(100); // Limit to a reasonable number to avoid processing too many
+    // Use unified_search function for line items
+    console.log('Calling unified_search for line items...');
+    const { data: searchResults, error: searchError } = await client.rpc(
+      'unified_search',
+      {
+        query_embedding: queryEmbedding,
+        source_types: ['line_item'],
+        content_types: null,
+        similarity_threshold: similarityThreshold,
+        match_count: limit + offset,
+        user_filter: null, // Will be set by RLS policies
+        team_filter: null,
+        language_filter: null
+      }
+    );
 
-    if (lineItemsError) {
-      console.error('Error fetching line items:', lineItemsError);
-      throw new Error(`Error fetching line items: ${lineItemsError.message}`);
+    if (searchError) {
+      console.error('Error in unified_search for line items:', searchError);
+      throw new Error(`Error in line item search: ${searchError.message}`);
     }
 
-    if (!lineItems || lineItems.length === 0) {
-      console.log('No line items found');
+    if (!searchResults || searchResults.length === 0) {
+      console.log('No line item search results found');
       return { lineItems: [], count: 0, total: 0 };
     }
 
-    console.log(`Found ${lineItems.length} line items to process`);
+    console.log(`Found ${searchResults.length} line item search results`);
 
-    // Get receipt IDs from line items
-    const receiptIds = [...new Set(lineItems.map(item => item.receipt_id))];
+    // Apply offset and limit for pagination
+    const paginatedResults = searchResults.slice(offset, offset + limit);
+
+    // Extract line item IDs from the search results
+    const lineItemIds = paginatedResults.map(r => r.source_id).filter(id => id !== null);
+
+    if (lineItemIds.length === 0) {
+      console.log('No valid line item IDs found in search results');
+      return { lineItems: [], count: 0, total: 0 };
+    }
+
+    // Create a map of similarity scores
+    const similarityScores = paginatedResults.reduce((acc: Record<string, number>, r: any) => {
+      if (r.source_id) {
+        acc[r.source_id] = r.similarity || r.score || 0;
+      }
+      return acc;
+    }, {});
+
+    // Fetch the actual line item data
+    const { data: lineItems, error: lineItemsError } = await client
+      .from('line_items')
+      .select('id, receipt_id, description, amount')
+      .in('id', lineItemIds);
+
+    if (lineItemsError) {
+      console.error('Error fetching line item details:', lineItemsError);
+      throw new Error(`Error fetching line item details: ${lineItemsError.message}`);
+    }
+
+    if (!lineItems || lineItems.length === 0) {
+      console.log('No line items found for the given IDs');
+      return { lineItems: [], count: 0, total: 0 };
+    }
 
     // Fetch receipt data separately to avoid relationship conflicts
-    const { data: receipts, error: receiptsError } = await client
+    const receiptIds = [...new Set(lineItems.map(item => item.receipt_id))];
+    const { data: receipts, error: receiptError } = await client
       .from('receipts')
       .select('id, merchant, date')
       .in('id', receiptIds);
 
-    if (receiptsError) {
-      console.error('Error fetching receipts:', receiptsError);
+    let receiptData = {};
+    if (receiptError) {
+      console.error('Error fetching receipt details:', receiptError);
       // Continue without receipt data rather than failing completely
+    } else if (receipts) {
+      receiptData = receipts.reduce((acc, receipt) => {
+        acc[receipt.id] = receipt;
+        return acc;
+      }, {});
     }
-
-    // Create a lookup map for receipts
-    const receiptLookup = {};
-    if (receipts) {
-      receipts.forEach(receipt => {
-        receiptLookup[receipt.id] = receipt;
-      });
-    }
-
-    // Get embeddings for those receipts, focusing on line item content type
-    // Use the unified embedding model where all embeddings are in receipt_embeddings
-    const { data: embeddings, error: embeddingsError } = await client
-      .from('receipt_embeddings')
-      .select(`
-        id,
-        receipt_id,
-        content_type,
-        embedding,
-        metadata
-      `)
-      .in('receipt_id', receiptIds)
-      .eq('content_type', 'line_item'); // Look for embeddings that are specifically for line items
-
-    if (embeddingsError) {
-      console.error('Error fetching embeddings:', embeddingsError);
-      throw new Error(`Error fetching embeddings: ${embeddingsError.message}`);
-    }
-
-    if (!embeddings || embeddings.length === 0) {
-      console.log('No embeddings found for line items');
-      return { lineItems: [], count: 0, total: 0 };
-    }
-
-    console.log(`Found ${embeddings.length} embeddings for line items`);
-
-    // Calculate similarity for each embedding
-    const scoredEmbeddings = embeddings.map(embeddingRecord => {
-      // Vector embedding is stored as string in some cases, handle both
-      let embedding;
-      try {
-        embedding = typeof embeddingRecord.embedding === 'string'
-          ? JSON.parse(embeddingRecord.embedding)
-          : embeddingRecord.embedding;
-      } catch (error) {
-        console.error('Error parsing embedding:', error);
-        // Return a default similarity of 0 if we can't parse the embedding
-        return {
-          ...embeddingRecord,
-          similarity: 0,
-          lineItemId: embeddingRecord.metadata?.line_item_id || null
-        };
-      }
-
-      // Check if embedding is null or undefined
-      if (!embedding || !Array.isArray(embedding)) {
-        console.warn('Invalid embedding found:', embedding);
-        // Return a default similarity of 0 if the embedding is invalid
-        return {
-          ...embeddingRecord,
-          similarity: 0,
-          lineItemId: embeddingRecord.metadata?.line_item_id || null
-        };
-      }
-
-      // Calculate cosine similarity
-      let dotProduct = 0;
-      let embedMagnitude = 0;
-      let queryMagnitude = 0;
-
-      // We might have different vector dimensions, use the minimum
-      const minDimension = Math.min(embedding.length, queryEmbedding.length);
-
-      for (let i = 0; i < minDimension; i++) {
-        dotProduct += embedding[i] * queryEmbedding[i];
-        embedMagnitude += embedding[i] * embedding[i];
-        queryMagnitude += queryEmbedding[i] * queryEmbedding[i];
-      }
-
-      embedMagnitude = Math.sqrt(embedMagnitude);
-      queryMagnitude = Math.sqrt(queryMagnitude);
-
-      // Calculate cosine similarity (1 = exactly the same, 0 = completely different)
-      let similarity = 0;
-      if (embedMagnitude > 0 && queryMagnitude > 0) {
-        similarity = dotProduct / (embedMagnitude * queryMagnitude);
-      } else {
-        console.warn('Zero magnitude detected in similarity calculation');
-      }
-
-      // Ensure similarity is a valid number between 0 and 1
-      if (isNaN(similarity) || similarity < 0) {
-        similarity = 0;
-      } else if (similarity > 1) {
-        similarity = 1;
-      }
-
-      // Extract the line item ID from metadata
-      let lineItemId = null;
-
-      // Get line item ID from metadata
-      if (embeddingRecord.metadata) {
-        const metadata = typeof embeddingRecord.metadata === 'string'
-          ? JSON.parse(embeddingRecord.metadata)
-          : embeddingRecord.metadata;
-
-        lineItemId = metadata.line_item_id;
-      }
-
-      return {
-        ...embeddingRecord,
-        similarity,
-        lineItemId
-      };
-    });
-
-    // Filter by similarity threshold
-    const filteredEmbeddings = scoredEmbeddings
-      .filter(record => record.similarity > similarityThreshold)
-      .sort((a, b) => b.similarity - a.similarity);
-
-    if (filteredEmbeddings.length === 0) {
-      console.log('No embeddings found above threshold');
-      return { lineItems: [], count: 0, total: 0 };
-    }
-
-    // Match embeddings to line items
-    // We need to be careful as each receipt can have multiple line items
-    // and the embedding metadata should contain the specific line item ID
-    const lineItemsWithSimilarity = [];
-
-    for (const embedding of filteredEmbeddings) {
-      // If we have the line item ID in metadata, use it
-      if (embedding.lineItemId) {
-        const matchingLineItem = lineItems.find(item => item.id === embedding.lineItemId);
-        if (matchingLineItem) {
-          lineItemsWithSimilarity.push({
-            ...matchingLineItem,
-            similarity: embedding.similarity
-          });
-        }
-      } else {
-        // If no specific line item ID in metadata, match by receipt ID and add all line items
-        // This is a fallback approach
-        const matchingLineItems = lineItems.filter(item => item.receipt_id === embedding.receipt_id);
-        for (const lineItem of matchingLineItems) {
-          lineItemsWithSimilarity.push({
-            ...lineItem,
-            similarity: embedding.similarity
-          });
-        }
-      }
-    }
-
-    // Remove duplicates in case a line item appears multiple times
-    const uniqueLineItems = [];
-    const seenIds = new Set();
-    for (const item of lineItemsWithSimilarity) {
-      if (!seenIds.has(item.id)) {
-        seenIds.add(item.id);
-        uniqueLineItems.push(item);
-      }
-    }
-
-    // Sort by similarity and apply pagination
-    uniqueLineItems.sort((a, b) => b.similarity - a.similarity);
-    const paginatedItems = uniqueLineItems.slice(offset, offset + limit);
-
-    // Format the results for the frontend
-    const formattedLineItems = paginatedItems.map(item => {
-      const receipt = receiptLookup[item.receipt_id] || {};
+    // Format the line items with the structure expected by the frontend
+    const formattedLineItems = lineItems.map(item => {
+      const receipt = receiptData[item.receipt_id] || {};
       return {
         line_item_id: item.id,
         receipt_id: item.receipt_id,
@@ -241,15 +121,20 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
         line_item_quantity: 1, // Default quantity since column doesn't exist
         parent_receipt_merchant: receipt.merchant || 'Unknown merchant',
         parent_receipt_date: receipt.date || '',
-        parent_receipt_id: item.receipt_id, // Explicitly add parent_receipt_id field
-        similarity: item.similarity || 0
+        parent_receipt_id: item.receipt_id,
+        similarity: similarityScores[item.id] || 0
       };
     });
+
+    // Sort by similarity score (highest first)
+    formattedLineItems.sort((a: any, b: any) => b.similarity - a.similarity);
+
+    console.log(`Returning ${formattedLineItems.length} formatted line items`);
 
     return {
       lineItems: formattedLineItems,
       count: formattedLineItems.length,
-      total: uniqueLineItems.length
+      total: searchResults.length
     };
   } catch (error) {
     console.error('Error performing line item search:', error);

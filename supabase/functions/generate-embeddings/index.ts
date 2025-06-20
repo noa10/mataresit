@@ -4,6 +4,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.2.0';
+import { ContentExtractor } from './contentExtractors.ts';
+import { BatchProcessor } from './batchProcessor.ts';
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -55,6 +57,21 @@ interface BatchEmbeddingRequest extends BaseEmbeddingRequest {
   processLineItems?: boolean;
   contentTypes?: string[];
   lineItemIds?: string[]; // Optional specific line item IDs to process
+}
+
+// Phase 4: New interfaces for unified embedding system
+interface UnifiedEmbeddingRequest extends BaseEmbeddingRequest {
+  mode: 'realtime' | 'batch' | 'maintenance';
+  sourceType?: string; // 'receipts', 'claims', 'team_members', 'custom_categories', 'malaysian_business_directory'
+  sourceId?: string;
+  batchSize?: number;
+  priority?: 'high' | 'medium' | 'low';
+}
+
+interface QueueProcessingRequest extends BaseEmbeddingRequest {
+  mode: 'queue';
+  limit?: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 // Default embedding model configuration
@@ -494,6 +511,351 @@ async function generateLineItemEmbeddings(supabaseClient: any, receiptId: string
   };
 }
 
+/**
+ * Enhanced batch processing for missing embeddings
+ */
+async function processMissingEmbeddingsBatch(supabaseClient: any, batchSize: number = 10): Promise<any> {
+  console.log(`Processing batch of missing embeddings, batch size: ${batchSize}`);
+
+  try {
+    // Get receipts missing embeddings
+    const { data: missingReceipts, error: missingError } = await supabaseClient
+      .rpc('find_receipts_missing_embeddings', { limit_count: batchSize });
+
+    if (missingError) {
+      throw new Error(`Error finding missing embeddings: ${missingError.message}`);
+    }
+
+    if (!missingReceipts || missingReceipts.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        message: 'No receipts missing embeddings found'
+      };
+    }
+
+    console.log(`Found ${missingReceipts.length} receipts missing embeddings`);
+
+    let processed = 0;
+    let errors = 0;
+    const results = [];
+
+    // Process each receipt
+    for (const receipt of missingReceipts) {
+      try {
+        console.log(`Processing receipt ${receipt.receipt_id} with missing types: ${receipt.missing_content_types.join(', ')}`);
+
+        // Generate embeddings for this receipt
+        const result = await processReceiptEmbeddingsUnified({
+          receiptId: receipt.receipt_id,
+          forceRegenerate: false,
+          processAllFields: true,
+          contentTypes: receipt.missing_content_types
+        }, supabaseClient);
+
+        if (result.success) {
+          processed++;
+          results.push({
+            receiptId: receipt.receipt_id,
+            success: true,
+            contentTypes: receipt.missing_content_types
+          });
+        } else {
+          errors++;
+          results.push({
+            receiptId: receipt.receipt_id,
+            success: false,
+            error: result.error || 'Unknown error'
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error processing receipt ${receipt.receipt_id}:`, error);
+        errors++;
+        results.push({
+          receiptId: receipt.receipt_id,
+          success: false,
+          error: error.message
+        });
+      }
+
+      // Small delay to avoid overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return {
+      success: true,
+      processed,
+      errors,
+      total: missingReceipts.length,
+      results
+    };
+
+  } catch (error) {
+    console.error('Batch processing error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Enhanced receipt embedding processing for unified system
+ */
+async function processReceiptEmbeddingsUnified(
+  request: { receiptId: string; forceRegenerate?: boolean; processAllFields?: boolean; contentTypes?: string[] },
+  supabaseClient: any
+): Promise<any> {
+  const { receiptId, forceRegenerate = false, processAllFields = true, contentTypes } = request;
+
+  console.log(`Processing unified embeddings for receipt ${receiptId}`);
+
+  try {
+    // Get receipt data
+    const { data: receipt, error: receiptError } = await supabaseClient
+      .from('receipts')
+      .select('*')
+      .eq('id', receiptId)
+      .single();
+
+    if (receiptError || !receipt) {
+      throw new Error(`Receipt not found: ${receiptError?.message || 'Unknown error'}`);
+    }
+
+    const results = [];
+    const contentTypesToProcess = contentTypes || ['full_text', 'merchant'];
+
+    // Process each content type
+    for (const contentType of contentTypesToProcess) {
+      try {
+        let content = '';
+        let metadata = {
+          receipt_date: receipt.date,
+          total: receipt.total,
+          currency: receipt.currency
+        };
+
+        // Extract content based on type
+        switch (contentType) {
+          case 'full_text':
+            content = receipt.fullText || '';
+            break;
+          case 'merchant':
+            content = receipt.merchant || '';
+            break;
+
+          default:
+            console.log(`Skipping unknown content type: ${contentType}`);
+            continue;
+        }
+
+        // Skip if no content
+        if (!content || content.trim() === '') {
+          console.log(`Skipping ${contentType} for receipt ${receiptId} - no content`);
+          continue;
+        }
+
+        // Generate embedding
+        const embedding = await generateEmbedding({ text: content });
+
+        // Store in unified_embeddings table
+        const { data: embeddingData, error: embeddingError } = await supabaseClient
+          .rpc('add_unified_embedding', {
+            p_source_type: 'receipt',
+            p_source_id: receiptId,
+            p_content_type: contentType,
+            p_content_text: content,
+            p_embedding: embedding,
+            p_metadata: metadata,
+            p_user_id: receipt.user_id,
+            p_language: 'en'
+          });
+
+        if (embeddingError) {
+          console.error(`Error storing ${contentType} embedding for receipt ${receiptId}:`, embeddingError);
+          results.push({
+            contentType,
+            success: false,
+            error: embeddingError.message
+          });
+        } else {
+          console.log(`Successfully stored ${contentType} embedding for receipt ${receiptId}`);
+          results.push({
+            contentType,
+            success: true,
+            embeddingId: embeddingData
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error processing ${contentType} for receipt ${receiptId}:`, error);
+        results.push({
+          contentType,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+
+    return {
+      success: successCount > 0,
+      receiptId,
+      processed: successCount,
+      errors: errorCount,
+      results
+    };
+
+  } catch (error) {
+    console.error(`Error processing receipt ${receiptId}:`, error);
+    return {
+      success: false,
+      receiptId,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Phase 4: Process unified embedding request for any data source
+ */
+async function processUnifiedEmbeddingRequest(request: UnifiedEmbeddingRequest, supabaseClient: any) {
+  const { mode, sourceType, sourceId, batchSize = 5, priority = 'medium' } = request;
+
+  console.log(`Processing unified embedding request: mode=${mode}, sourceType=${sourceType}, sourceId=${sourceId}`);
+
+  const batchProcessor = new BatchProcessor(supabaseClient, generateEmbedding);
+
+  switch (mode) {
+    case 'realtime':
+      if (!sourceType || !sourceId) {
+        throw new Error('sourceType and sourceId are required for realtime mode');
+      }
+
+      // Process single item immediately
+      const queueItem = {
+        id: 'realtime-' + Date.now(),
+        source_type: sourceType,
+        source_id: sourceId,
+        operation: 'INSERT',
+        priority,
+        metadata: { realtime: true }
+      };
+
+      const realtimeResult = await batchProcessor.processBatch([queueItem], 1);
+      return {
+        success: realtimeResult.success,
+        mode: 'realtime',
+        sourceType,
+        sourceId,
+        processed: realtimeResult.processed,
+        errors: realtimeResult.errors
+      };
+
+    case 'batch':
+      if (!sourceType) {
+        throw new Error('sourceType is required for batch mode');
+      }
+
+      // Find missing embeddings and process them
+      const { data: missingRecords } = await supabaseClient.rpc('find_missing_embeddings', {
+        source_table: sourceType,
+        limit_count: batchSize
+      });
+
+      if (!missingRecords || missingRecords.length === 0) {
+        return {
+          success: true,
+          mode: 'batch',
+          sourceType,
+          processed: 0,
+          message: 'No missing embeddings found'
+        };
+      }
+
+      const batchItems = missingRecords.map((record: any) => ({
+        id: 'batch-' + record.id,
+        source_type: sourceType,
+        source_id: record.id,
+        operation: 'INSERT',
+        priority,
+        metadata: { batch: true, missing_content_types: record.missing_content_types }
+      }));
+
+      const batchResult = await batchProcessor.processBatch(batchItems, batchSize);
+      return {
+        success: batchResult.success,
+        mode: 'batch',
+        sourceType,
+        processed: batchResult.processed,
+        failed: batchResult.failed,
+        errors: batchResult.errors
+      };
+
+    case 'maintenance':
+      // Process maintenance tasks (find and queue missing embeddings)
+      const maintenanceResult = await batchProcessor.processMaintenanceTasks();
+      return {
+        success: true,
+        mode: 'maintenance',
+        ...maintenanceResult
+      };
+
+    default:
+      throw new Error(`Unknown mode: ${mode}`);
+  }
+}
+
+/**
+ * Phase 4: Process embedding queue
+ */
+async function processEmbeddingQueue(request: QueueProcessingRequest, supabaseClient: any) {
+  const { limit = 50, priority } = request;
+
+  console.log(`Processing embedding queue: limit=${limit}, priority=${priority}`);
+
+  const batchProcessor = new BatchProcessor(supabaseClient, generateEmbedding);
+
+  // Get pending queue items
+  const queueItems = await batchProcessor.getPendingQueueItems(limit);
+
+  if (queueItems.length === 0) {
+    return {
+      success: true,
+      mode: 'queue',
+      processed: 0,
+      message: 'No pending queue items found'
+    };
+  }
+
+  // Filter by priority if specified
+  const filteredItems = priority
+    ? queueItems.filter(item => item.priority === priority)
+    : queueItems;
+
+  if (filteredItems.length === 0) {
+    return {
+      success: true,
+      mode: 'queue',
+      processed: 0,
+      message: `No pending queue items found with priority: ${priority}`
+    };
+  }
+
+  // Process the queue items
+  const result = await batchProcessor.processBatch(filteredItems);
+
+  return {
+    success: result.success,
+    mode: 'queue',
+    processed: result.processed,
+    failed: result.failed,
+    errors: result.errors,
+    totalQueueItems: queueItems.length,
+    filteredItems: filteredItems.length
+  };
+}
+
 serve(async (req: Request) => {
   // Log request details for debugging
   console.log('Request received:', {
@@ -558,7 +920,16 @@ serve(async (req: Request) => {
         processAllFields,
         lineItemId,
         processLineItems,
-        forceRegenerate = false // Add support for forced regeneration
+        forceRegenerate = false, // Add support for forced regeneration
+        // Enhanced: Batch processing parameter
+        processMissingBatch,
+        // Phase 4: New unified embedding parameters
+        mode,
+        sourceType,
+        sourceId,
+        batchSize,
+        priority,
+        limit
       } = requestBody;
 
       console.log('Parsed generate-embeddings parameters:', {
@@ -579,8 +950,94 @@ serve(async (req: Request) => {
         lineItemId,
         processLineItems,
         hasContent: !!content,
-        hasMetadata: !!metadata
+        hasMetadata: !!metadata,
+        // Phase 4: New parameters
+        mode,
+        sourceType,
+        sourceId,
+        batchSize,
+        priority
       });
+
+      // Enhanced: Handle batch processing of missing embeddings
+      if (processMissingBatch) {
+        try {
+          const batchSize = requestBody.batchSize || 10;
+          const result = await processMissingEmbeddingsBatch(supabaseClient, batchSize);
+
+          return new Response(
+            JSON.stringify(result),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Error processing missing embeddings batch:', error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+              action: 'processMissingBatch'
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // Phase 4: Handle unified embedding requests
+      if (mode === 'queue') {
+        try {
+          const result = await processEmbeddingQueue({
+            mode: 'queue',
+            limit,
+            priority,
+            model
+          }, supabaseClient);
+
+          return new Response(
+            JSON.stringify(result),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Error processing embedding queue:', error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+              mode: 'queue'
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      if (mode && ['realtime', 'batch', 'maintenance'].includes(mode)) {
+        try {
+          const result = await processUnifiedEmbeddingRequest({
+            mode,
+            sourceType,
+            sourceId,
+            batchSize,
+            priority,
+            model
+          }, supabaseClient);
+
+          return new Response(
+            JSON.stringify(result),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error(`Error processing unified embedding request (mode: ${mode}):`, error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+              mode,
+              sourceType,
+              sourceId
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
 
       // Process line items for a receipt
       if (processLineItems && receiptId) {
