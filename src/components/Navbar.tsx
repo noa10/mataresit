@@ -47,7 +47,7 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
   const isSearchPage = location.pathname === '/search';
 
   // Check if we're on a public page (outside AppLayout)
-  const isPublicPage = ['/', '/pricing', '/help', '/docs', '/status', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success'].includes(location.pathname);
+  const isPublicPage = ['/', '/pricing', '/help', '/docs', '/status', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success', '/features'].includes(location.pathname);
 
   useEffect(() => {
     setIsDarkMode(document.documentElement.classList.contains("dark"));

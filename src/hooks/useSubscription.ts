@@ -31,6 +31,9 @@ export const useSubscription = () => {
     if (user && subscriptionData) {
       fetchSubscriptionLimits();
       fetchUsageData();
+    } else {
+      // For non-authenticated users, set loading to false immediately
+      setIsLoading(false);
     }
   }, [user, subscriptionData]);
 

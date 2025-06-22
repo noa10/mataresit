@@ -61,6 +61,8 @@ const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
 const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
 const DebugSearch = lazy(() => import("./pages/DebugSearch"));
+const ChatTestingPage = lazy(() => import("./pages/ChatTestingPage"));
+const SearchTestPage = lazy(() => import("./pages/SearchTestPage"));
 
 
 // Create a loading component for suspense
@@ -133,6 +135,11 @@ const App = () => (
                   <PaymentSuccessPage />
                 </Suspense>
               } />
+              <Route path="/features" element={
+                <Suspense fallback={<PageLoading />}>
+                  <FeaturesPage />
+                </Suspense>
+              } />
             </Route>
 
             {/* Auth Routes (no layout) */}
@@ -180,11 +187,6 @@ const App = () => (
                     <UnifiedSearchPage />
                   </Suspense>
                 } />
-                <Route path="/features" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <FeaturesPage />
-                  </Suspense>
-                } />
                 <Route path="/teams" element={
                   <Suspense fallback={<PageLoading />}>
                     <TeamManagement />
@@ -228,6 +230,16 @@ const App = () => (
                 <Route path="/debug/search" element={
                   <Suspense fallback={<PageLoading />}>
                     <DebugSearch />
+                  </Suspense>
+                } />
+                <Route path="/test/chat-enhancement" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ChatTestingPage />
+                  </Suspense>
+                } />
+                <Route path="/test/search" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <SearchTestPage />
                   </Suspense>
                 } />
               </Route>

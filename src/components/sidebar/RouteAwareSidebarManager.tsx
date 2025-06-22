@@ -57,7 +57,6 @@ export const SIDEBAR_ROUTE_CONFIG = {
     '/settings',
     '/profile',
     '/analysis',
-    '/features',
     '/teams',
     '/claims',
     '/receipt'
