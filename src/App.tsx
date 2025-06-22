@@ -61,8 +61,6 @@ const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
 const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
 const DebugSearch = lazy(() => import("./pages/DebugSearch"));
-const ChatTestingPage = lazy(() => import("./pages/ChatTestingPage"));
-const SearchTestPage = lazy(() => import("./pages/SearchTestPage"));
 
 
 // Create a loading component for suspense
@@ -232,16 +230,7 @@ const App = () => (
                     <DebugSearch />
                   </Suspense>
                 } />
-                <Route path="/test/chat-enhancement" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ChatTestingPage />
-                  </Suspense>
-                } />
-                <Route path="/test/search" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <SearchTestPage />
-                  </Suspense>
-                } />
+
               </Route>
             </Route>
 

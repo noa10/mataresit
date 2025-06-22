@@ -536,14 +536,14 @@ export default function BatchUploadZone({
             damping: 20,
             rotate: { duration: 0.5, ease: "easeInOut" }
           }}
-          className={`relative rounded-full p-3 sm:p-4 ${
+          className={`relative rounded-full p-2 sm:p-3 ${
             isDragging ? "bg-primary/10" : "bg-secondary"
           }`}
         >
           {isDragging ? (
-            <Upload size={24} className="sm:w-8 sm:h-8 text-primary" />
+            <Upload size={20} className="sm:w-6 sm:h-6 text-primary" />
           ) : (
-            <FileUp size={24} className="sm:w-8 sm:h-8 text-primary" />
+            <FileUp size={20} className="sm:w-6 sm:h-6 text-primary" />
           )}
         </motion.div>
 
@@ -569,7 +569,7 @@ export default function BatchUploadZone({
       </div>
 
       {/* Main Content Section - Flexible height with proper scrolling */}
-      <div className="flex flex-col items-center gap-4 min-h-0 overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col items-center gap-6 min-h-0 overflow-y-auto overflow-x-hidden">
 
         {/* Illustration when empty */}
         <AnimatePresence>
@@ -589,10 +589,10 @@ export default function BatchUploadZone({
           )}
         </AnimatePresence>
 
-        {/* Processing controls */}
+        {/* 1. Batch upload status indicator (Processing controls) */}
         <AnimatePresence>
           {batchUploads.length > 0 && (
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 w-full">
               <BatchProcessingControls
                 totalFiles={batchUploads.length}
                 pendingFiles={queuedUploads.length}
@@ -615,18 +615,109 @@ export default function BatchUploadZone({
           )}
         </AnimatePresence>
 
-        {/* File queue - Enhanced scrolling with proper height management */}
+        {/* 2. Category selection options */}
+        <AnimatePresence>
+          {batchUploads.length > 0 && !isProcessing && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full max-w-md mx-auto space-y-2 flex-shrink-0 p-4 bg-muted/30 rounded-lg border"
+            >
+              <Label htmlFor="batch-category-selector" className="text-sm font-medium">
+                Category (Optional)
+              </Label>
+              <CategorySelector
+                value={selectedCategoryId}
+                onChange={setSelectedCategoryId}
+                placeholder="Select a category for all receipts..."
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground text-center">
+                This category will be applied to all receipts in this batch
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 3. Add files button */}
+        <AnimatePresence>
+          {batchUploads.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex-shrink-0"
+            >
+              <Button
+                onClick={() => {
+                  console.log('Select Files button clicked');
+                  handleFileSelection();
+                }}
+                variant="default"
+                className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-shrink-0 flex-col sm:flex-row gap-1 sm:gap-0"
+                size="default"
+              >
+                <span className="sm:mr-2">Select Files</span>
+                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
+                  JPG, PNG, PDF
+                </span>
+              </Button>
+            </motion.div>
+          )}
+          {batchUploads.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex flex-col sm:flex-row gap-3 flex-shrink-0 w-full sm:w-auto justify-center"
+            >
+              <Button
+                onClick={() => {
+                  console.log('Add More Files button clicked');
+                  handleFileSelection();
+                }}
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto min-w-[140px]"
+              >
+                <FileUp className="h-3 w-3 mr-2" />
+                Add More Files
+              </Button>
+
+              {/* Manual review button when all processing is complete */}
+              {allProcessingComplete && (
+                <Button
+                  onClick={() => {
+                    console.log('Review Results button clicked');
+                    setShowReview(true);
+                  }}
+                  variant="default"
+                  size="sm"
+                  className="w-full sm:w-auto min-w-[140px]"
+                >
+                  <ClipboardList className="h-3 w-3 mr-2" />
+                  Review Results
+                </Button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. Files list section with improved scrolling */}
         <AnimatePresence>
           {batchUploads.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="w-full flex-1 min-h-0 flex flex-col max-h-[400px] sm:max-h-[450px] md:max-h-[500px]"
+              className="w-full flex-1 min-h-0 flex flex-col"
               ref={fileQueueRef}
             >
-              <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                <h4 className="text-sm font-medium">Files ({batchUploads.length})</h4>
+              <div className="flex justify-between items-center mb-3 flex-shrink-0">
+                <h4 className="text-sm font-medium text-muted-foreground">
+                  Files ({batchUploads.length})
+                </h4>
                 {failedUploads.length > 0 && (
                   <Button
                     variant="outline"
@@ -640,8 +731,8 @@ export default function BatchUploadZone({
                 )}
               </div>
               <EnhancedScrollArea
-                className="flex-1 w-full rounded-md border min-h-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                maxHeight="min(350px, 60vh)"
+                className="flex-1 w-full rounded-md border min-h-[200px] max-h-[450px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                maxHeight="min(450px, 70vh)"
                 showScrollIndicator={true}
                 fadeEdges={true}
                 ref={scrollAreaRef}
@@ -650,7 +741,7 @@ export default function BatchUploadZone({
                 role="region"
                 aria-label="File upload queue"
               >
-                <div className="p-4 space-y-2">
+                <div className="p-3 space-y-2">
                   {batchUploads.map((upload, index) => (
                     <motion.div
                       key={upload.id}
@@ -675,73 +766,7 @@ export default function BatchUploadZone({
           )}
         </AnimatePresence>
 
-        {/* Action buttons when no files */}
-        {batchUploads.length === 0 && (
-          <Button
-            onClick={() => {
-              console.log('Select Files button clicked');
-              handleFileSelection();
-            }}
-            variant="default"
-            className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-shrink-0 flex-col sm:flex-row gap-1 sm:gap-0"
-            size="default"
-          >
-            <span className="sm:mr-2">Select Files</span>
-            <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
-              JPG, PNG, PDF
-            </span>
-          </Button>
-        )}
 
-        {/* Category Selection */}
-        {batchUploads.length > 0 && !isProcessing && (
-          <div className="w-full max-w-md mx-auto space-y-2 flex-shrink-0">
-            <Label htmlFor="batch-category-selector">Category (Optional)</Label>
-            <CategorySelector
-              value={selectedCategoryId}
-              onChange={setSelectedCategoryId}
-              placeholder="Select a category for all receipts..."
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground text-center">
-              This category will be applied to all receipts in this batch
-            </p>
-          </div>
-        )}
-
-        {/* Action buttons when files exist */}
-        {batchUploads.length > 0 && (
-          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
-            <Button
-              onClick={() => {
-                console.log('Add More Files button clicked');
-                handleFileSelection();
-              }}
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <FileUp className="h-4 w-4 mr-2" />
-              Add More Files
-            </Button>
-
-            {/* Manual review button when all processing is complete */}
-            {allProcessingComplete && (
-              <Button
-                onClick={() => {
-                  console.log('Review Results button clicked');
-                  setShowReview(true);
-                }}
-                variant="default"
-                size="sm"
-                className="w-full sm:w-auto"
-              >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Review Results
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Footer Section - Auto height */}

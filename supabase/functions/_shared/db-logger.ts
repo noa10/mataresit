@@ -1,10 +1,12 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Interface for log entries
+// Interface for log entries - matches database schema
 export interface ProcessingLog {
+  id: string;
   receipt_id: string;
+  created_at: string;
   status_message: string;
-  step_name?: string;
+  step_name: string | null;
 }
 
 export type LogStep = 'START' | 'FETCH' | 'OPTIMIZE' | 'OCR' | 'AI' | 'THUMBNAIL' | 'SAVE' | 'EMBEDDING' | 'COMPLETE' | 'ERROR' | 'WARNING' | 'DEBUG' | 'METHOD';

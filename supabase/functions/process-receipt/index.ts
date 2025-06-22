@@ -74,9 +74,23 @@ async function processReceiptImage(
     console.log(`🔍 Model ID: ${modelId}`);
 
       try {
+        // Validate image bytes before encoding
+        if (!imageBytes || imageBytes.length === 0) {
+          await logger.log(`Invalid image bytes: length=${imageBytes?.length || 0}`, "ERROR");
+          throw new Error("No image data available for processing");
+        }
+
         // Ensure image is optimized for AI Vision to reduce resource usage
+        console.log(`🔍 Encoding image bytes: ${imageBytes.length} bytes`);
         const encodedImage = encodeBase64(imageBytes);
-        console.log(`🔍 Encoded image size: ${encodedImage.length} bytes`);
+
+        // Validate encoding result
+        if (!encodedImage || typeof encodedImage !== 'string') {
+          await logger.log(`Base64 encoding failed: result type=${typeof encodedImage}`, "ERROR");
+          throw new Error("Failed to encode image as base64");
+        }
+
+        console.log(`🔍 Encoded image size: ${encodedImage.length} characters`);
         const imageSize = encodedImage.length;
 
         // Log image size for debugging
@@ -86,6 +100,12 @@ async function processReceiptImage(
         if (imageSize > 1.5 * 1024 * 1024) { // 1.5MB limit for base64 encoded image
           await logger.log(`Image too large for AI Vision (${imageSize} bytes)`, "ERROR");
           throw new Error(`Image too large for processing. Please use a smaller image (max 1.5MB when encoded).`);
+        }
+
+        // Validate encoded image before creating payload
+        if (!encodedImage || typeof encodedImage !== 'string' || encodedImage.length === 0) {
+          await logger.log(`Invalid encoded image: type=${typeof encodedImage}, length=${encodedImage?.length || 0}`, "ERROR");
+          throw new Error(`Failed to encode image properly for AI processing`);
         }
 
         // Proceed with AI Vision if image is not too large
@@ -98,6 +118,20 @@ async function processReceiptImage(
           receiptId: receiptId,
           modelId: modelId
         };
+
+        // Enhanced payload validation before sending
+        console.log(`🔍 PROCESS-RECEIPT PAYLOAD VALIDATION:`);
+        console.log(`🔍 receiptId: ${receiptId} (type: ${typeof receiptId})`);
+        console.log(`🔍 modelId: ${modelId} (type: ${typeof modelId})`);
+        console.log(`🔍 imageData.data: ${encodedImage ? 'present' : 'missing'} (type: ${typeof encodedImage}, length: ${encodedImage?.length || 0})`);
+        console.log(`🔍 imageData.mimeType: ${enhanceRequestPayload.imageData.mimeType}`);
+        console.log(`🔍 imageData.isBase64: ${enhanceRequestPayload.imageData.isBase64}`);
+
+        // Validate payload structure
+        if (!enhanceRequestPayload.imageData || !enhanceRequestPayload.imageData.data) {
+          await logger.log("Payload validation failed: imageData.data is missing", "ERROR");
+          throw new Error("Failed to construct valid payload for AI processing");
+        }
 
         console.log(`🔍 Calling enhance-receipt-data with payload:`, {
           receiptId,

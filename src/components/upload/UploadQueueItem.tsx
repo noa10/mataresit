@@ -51,16 +51,16 @@ export function UploadQueueItem({
   const getStatusIcon = () => {
     switch (upload.status) {
       case 'pending':
-        return <FileText className="w-5 h-5 text-muted-foreground" />;
+        return <FileText className="w-4 h-4 text-muted-foreground" />;
       case 'uploading':
       case 'processing':
-        return <Loader2 className="w-5 h-5 text-primary animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
       case 'completed':
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'error':
-        return <XCircle className="w-5 h-5 text-destructive" />;
+        return <XCircle className="w-4 h-4 text-destructive" />;
       default:
-        return <FileText className="w-5 h-5 text-muted-foreground" />;
+        return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -92,10 +92,10 @@ export function UploadQueueItem({
           variant="ghost"
           size="icon"
           onClick={() => onRemove(upload.id)}
-          className="h-8 w-8"
+          className="h-7 w-7"
           aria-label="Remove from queue"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3 w-3" />
         </Button>
       );
     }
@@ -106,10 +106,10 @@ export function UploadQueueItem({
           variant="ghost"
           size="icon"
           onClick={() => onCancel(upload.id)}
-          className="h-8 w-8"
+          className="h-7 w-7"
           aria-label="Cancel upload"
         >
-          <XCircle className="h-4 w-4" />
+          <XCircle className="h-3 w-3" />
         </Button>
       );
     }
@@ -120,10 +120,10 @@ export function UploadQueueItem({
           variant="ghost"
           size="icon"
           onClick={() => onRetry(upload.id)}
-          className="h-8 w-8"
+          className="h-7 w-7"
           aria-label="Retry upload"
         >
-          <RotateCcw className="h-4 w-4" />
+          <RotateCcw className="h-3 w-3" />
         </Button>
       );
     }
@@ -133,11 +133,11 @@ export function UploadQueueItem({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-7 w-7"
           aria-label="View receipt"
           onClick={() => onViewReceipt && onViewReceipt(receiptId)}
         >
-          <ExternalLink className="h-4 w-4" />
+          <ExternalLink className="h-3 w-3" />
         </Button>
       );
     }
@@ -165,9 +165,9 @@ export function UploadQueueItem({
       {/* File icon or preview */}
       <div className="flex-shrink-0">
         {upload.file.type === 'application/pdf' ? (
-          <FileText className="w-10 h-10 text-muted-foreground" />
+          <FileText className="w-8 h-8 text-muted-foreground" />
         ) : (
-          <FileImage className="w-10 h-10 text-muted-foreground" />
+          <FileImage className="w-8 h-8 text-muted-foreground" />
         )}
       </div>
 

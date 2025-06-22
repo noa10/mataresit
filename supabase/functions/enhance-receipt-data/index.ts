@@ -850,12 +850,30 @@ serve(async (req) => {
     // Parse request body
     const requestData = await req.json();
 
+    // Enhanced debugging for request validation
+    console.log("🔍 ENHANCE-RECEIPT-DATA REQUEST DEBUG:");
+    console.log("🔍 Request keys:", Object.keys(requestData));
+    console.log("🔍 Has textractData:", !!requestData.textractData);
+    console.log("🔍 Has fullText:", !!requestData.fullText);
+    console.log("🔍 Has imageData:", !!requestData.imageData);
+    if (requestData.imageData) {
+      console.log("🔍 imageData keys:", Object.keys(requestData.imageData));
+      console.log("🔍 imageData.data exists:", !!requestData.imageData.data);
+      console.log("🔍 imageData.data type:", typeof requestData.imageData.data);
+      console.log("🔍 imageData.data length:", requestData.imageData.data?.length || 'N/A');
+      console.log("🔍 imageData.mimeType:", requestData.imageData.mimeType);
+      console.log("🔍 imageData.isBase64:", requestData.imageData.isBase64);
+    }
+
     // Extract and validate required parameters
     const { textractData, fullText, imageData, receiptId, modelId } = requestData;
 
     if (!receiptId) {
       return new Response(
-        JSON.stringify({ error: 'Missing required parameter: receiptId' }),
+        JSON.stringify({
+          error: 'Missing required parameter: receiptId',
+          timestamp: new Date().toISOString()
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -871,18 +889,73 @@ serve(async (req) => {
       };
       console.log("Processing with text input (OCR data)");
     } else if (imageData && imageData.data) {
-      input = {
-        type: 'image',
-        imageData: {
-          data: imageData.isBase64 ? decodeBase64(imageData.data) : new Uint8Array(Object.values(imageData.data)),
-          mimeType: imageData.mimeType || 'image/jpeg'
-        }
-      };
-      console.log("Processing with image input (direct vision)");
+      // Additional validation for imageData.data
+      if (typeof imageData.data !== 'string' && !Array.isArray(imageData.data) && !(imageData.data instanceof Uint8Array)) {
+        console.error("🔍 Invalid imageData.data type:", typeof imageData.data);
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid imageData.data format: expected string (base64) or array',
+            received_type: typeof imageData.data,
+            timestamp: new Date().toISOString()
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (imageData.isBase64 && typeof imageData.data !== 'string') {
+        console.error("🔍 Base64 flag set but data is not string:", typeof imageData.data);
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid imageData: isBase64=true but data is not a string',
+            received_type: typeof imageData.data,
+            timestamp: new Date().toISOString()
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        input = {
+          type: 'image',
+          imageData: {
+            data: imageData.isBase64 ? decodeBase64(imageData.data) : new Uint8Array(Object.values(imageData.data)),
+            mimeType: imageData.mimeType || 'image/jpeg'
+          }
+        };
+        console.log("Processing with image input (direct vision)");
+        console.log("🔍 Successfully processed imageData, final size:", input.imageData.data.length, "bytes");
+      } catch (decodeError) {
+        console.error("🔍 Error processing imageData:", decodeError);
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to process imageData: ' + decodeError.message,
+            timestamp: new Date().toISOString()
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     } else {
+      // Enhanced error message with specific details
+      const missingDetails = [];
+      if (!textractData && !fullText) {
+        missingDetails.push('textractData and fullText for OCR processing');
+      }
+      if (!imageData) {
+        missingDetails.push('imageData for vision processing');
+      } else if (!imageData.data) {
+        missingDetails.push('imageData.data (image data is present but data field is missing/empty)');
+      }
+
+      console.error("🔍 Input validation failed. Missing:", missingDetails.join(', '));
+
       return new Response(
         JSON.stringify({
-          error: 'Missing required parameters: either (textractData + fullText) or imageData must be provided'
+          error: 'Input data is required',
+          details: 'Missing required parameters: ' + missingDetails.join(' OR '),
+          received_keys: Object.keys(requestData),
+          imageData_present: !!imageData,
+          imageData_data_present: !!(imageData && imageData.data),
+          timestamp: new Date().toISOString()
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

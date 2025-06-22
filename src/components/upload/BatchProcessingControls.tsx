@@ -281,7 +281,7 @@ export function BatchProcessingControls({
                   onClick={onShowReview}
                   className="h-8"
                 >
-                  <ClipboardList className="h-4 w-4 mr-2" />
+                  <ClipboardList className="h-3 w-3 mr-2" />
                   Review Results
                 </Button>
               </>
@@ -295,7 +295,7 @@ export function BatchProcessingControls({
                   disabled={activeFiles === 0 && pendingFiles === 0}
                   className="h-8"
                 >
-                  <Pause className="h-4 w-4 mr-2" />
+                  <Pause className="h-3 w-3 mr-2" />
                   Pause
                 </Button>
               ) : (
@@ -309,7 +309,7 @@ export function BatchProcessingControls({
                   disabled={pendingFiles === 0}
                   className="h-8"
                 >
-                  <Play className="h-4 w-4 mr-2" />
+                  <Play className="h-3 w-3 mr-2" />
                   {isPaused ? "Resume" : "Start Processing"}
                 </Button>
               )
@@ -323,7 +323,7 @@ export function BatchProcessingControls({
                 onClick={onRetryAllFailed}
                 className="h-8"
               >
-                <XCircle className="h-4 w-4 mr-2 text-destructive" />
+                <XCircle className="h-3 w-3 mr-2 text-destructive" />
                 Retry Failed ({failedFiles})
               </Button>
             )}
@@ -338,7 +338,7 @@ export function BatchProcessingControls({
               disabled={pendingFiles === 0 || allComplete}
               className="h-8"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="h-3 w-3 mr-2" />
               Clear Queue
             </Button>
 
@@ -350,7 +350,7 @@ export function BatchProcessingControls({
               disabled={(isProcessing && !isPaused) && !allComplete}
               className="h-8"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="h-3 w-3 mr-2" />
               Clear All
             </Button>
           </div>

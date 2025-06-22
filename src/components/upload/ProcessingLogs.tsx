@@ -200,7 +200,7 @@ export function ProcessingLogs({
                 <AnimatePresence mode="popLayout">
                   {displayedLogs.map((log, index) => (
                     <motion.div
-                      key={log.id || `${log.created_at}-${index}`}
+                      key={log.id || `fallback-${log.created_at}-${index}-${log.status_message.slice(0, 10)}`}
                       initial={{
                         opacity: 0,
                         y: 20,
