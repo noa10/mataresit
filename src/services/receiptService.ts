@@ -5,7 +5,89 @@ import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supab
 import { normalizeMerchant } from '../lib/receipts/validation';
 import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
 import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
-import { OpenRouterService, ProcessingInput } from '@/services/openRouterService';
+import { OpenRouterService, ProcessingInput, ProgressCallback } from '@/services/openRouterService';
+
+/**
+ * Client-side processing logger for OpenRouter models
+ * Writes logs to the processing_logs table similar to server-side ProcessingLogger
+ */
+class ClientProcessingLogger {
+  private receiptId: string;
+  private loggingEnabled = true;
+
+  constructor(receiptId: string) {
+    this.receiptId = receiptId;
+    console.log('🔧 ClientProcessingLogger: Initialized for receipt:', receiptId);
+  }
+
+  /**
+   * Log a processing step to the database
+   */
+  async log(message: string, step?: string): Promise<void> {
+    const logMessage = `[${step || 'LOG'}] (Receipt: ${this.receiptId}) ${message}`;
+    console.log(logMessage);
+
+    if (!this.loggingEnabled) {
+      console.warn('🚫 ClientProcessingLogger: Logging disabled for this instance');
+      return;
+    }
+
+    try {
+      console.log('📝 ClientProcessingLogger: Attempting to insert log:', {
+        receipt_id: this.receiptId,
+        status_message: message,
+        step_name: step || null
+      });
+
+      const { data, error } = await supabase
+        .from('processing_logs')
+        .insert({
+          receipt_id: this.receiptId,
+          status_message: message,
+          step_name: step || null
+        })
+        .select();
+
+      if (error) {
+        console.error('❌ ClientProcessingLogger: DB insert failed:', {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        this.loggingEnabled = false; // Disable DB logging for subsequent calls on this instance
+      } else {
+        console.log('✅ ClientProcessingLogger: Successfully inserted log:', data);
+      }
+    } catch (e) {
+      console.error('💥 ClientProcessingLogger: Critical error:', e);
+      this.loggingEnabled = false;
+    }
+  }
+
+  /**
+   * Convenience methods for common logging scenarios
+   */
+  async start(): Promise<void> {
+    await this.log("Starting OpenRouter receipt processing", "START");
+  }
+
+  async complete(): Promise<void> {
+    await this.log("OpenRouter receipt processing completed", "COMPLETE");
+  }
+
+  async error(message: string): Promise<void> {
+    await this.log(message, "ERROR");
+  }
+
+  async ai(message: string): Promise<void> {
+    await this.log(message, "AI");
+  }
+
+  async processing(message: string): Promise<void> {
+    await this.log(message, "PROCESSING");
+  }
+}
 import { SubscriptionEnforcementService, handleActionResult } from '@/services/subscriptionEnforcementService';
 
 // Ensure status is of type ReceiptStatus
@@ -561,30 +643,56 @@ const getOpenRouterApiKey = (): string | null => {
 const processReceiptWithOpenRouter = async (
   receiptId: string,
   imageUrl: string,
-  options: ProcessingOptions
+  options: ProcessingOptions,
+  onProgress?: ProgressCallback
 ): Promise<AIResult> => {
+  // Initialize client-side logger for database logging
+  const logger = new ClientProcessingLogger(receiptId);
+
+  // Start logging
+  await logger.start();
+  onProgress?.('START', 'Initializing OpenRouter processing');
+
   const modelConfig = getModelConfig(options.modelId!);
   if (!modelConfig) {
-    throw new Error(`Model configuration not found for ${options.modelId}`);
+    const errorMsg = `Model configuration not found for ${options.modelId}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
+  await logger.log(`🤖 MODEL SELECTED: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`📊 Provider: ${modelConfig.provider.toUpperCase()}`, "AI");
+
+  onProgress?.('START', 'Validating API key');
+  await logger.log('🔑 Validating OpenRouter API key', "START");
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
-    throw new Error('OpenRouter API key not configured. Please set it in the settings.');
+    const errorMsg = 'OpenRouter API key not configured. Please set it in the settings.';
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
   }
+  await logger.log('✅ API key validated for OpenRouter', "START");
 
   const openRouterService = new OpenRouterService(apiKey);
 
   // Fetch the image data
+  onProgress?.('START', 'Fetching image data');
+  await logger.log('📥 Fetching image data from storage', "START");
   console.log('Fetching image for OpenRouter processing:', imageUrl);
   const imageResponse = await fetch(imageUrl);
   if (!imageResponse.ok) {
-    throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    const errorMsg = `Failed to fetch image: ${imageResponse.status}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
+  onProgress?.('START', 'Preparing image data');
+  await logger.log('🔧 Preparing image data for processing', "START");
   const imageArrayBuffer = await imageResponse.arrayBuffer();
   const imageData = new Uint8Array(imageArrayBuffer);
   const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+  await logger.log(`🖼️ Image size: ${imageData.length} bytes (${mimeType})`, "AI");
 
   // Prepare input for AI vision processing
   const input: ProcessingInput = {
@@ -595,33 +703,71 @@ const processReceiptWithOpenRouter = async (
     }
   };
 
-  // Call OpenRouter service
+  // Enhanced progress callback that also logs to database
+  const enhancedProgressCallback: ProgressCallback = async (step, message) => {
+    // Call original progress callback for UI updates
+    onProgress?.(step, message);
+
+    // Also log to database
+    await logger.log(message, step);
+  };
+
+  // Call OpenRouter service with enhanced progress callback
   console.log(`Processing receipt ${receiptId} with OpenRouter model ${modelConfig.name}`);
-  const result = await openRouterService.callModel(modelConfig, input, receiptId);
+  await logger.log(`🚀 OPENROUTER API REQUEST: Initiating call to ${modelConfig.name}`, "AI");
+
+  const result = await openRouterService.callModel(modelConfig, input, receiptId, enhancedProgressCallback);
+
+  console.log('🔍 OpenRouter service result:', {
+    resultType: typeof result,
+    resultKeys: Object.keys(result || {}),
+    hasRawContent: !!result?.raw_content,
+    result: result
+  });
+
+  // Handle case where result contains raw_content (unparsed response)
+  if (result?.raw_content && !result.merchant) {
+    const errorMsg = `OpenRouter model returned unparsed response: ${result.raw_content.substring(0, 200)}...`;
+    console.warn('⚠️ OpenRouter returned raw content, attempting to extract data');
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  // Emit data processing progress
+  onProgress?.('PROCESSING', 'Validating extracted fields');
+  await logger.processing('✅ OpenRouter API response received successfully');
+  await logger.processing('🔍 Validating extracted fields');
 
   // Transform the result to match AIResult interface
+  onProgress?.('PROCESSING', 'Formatting receipt information');
+  await logger.processing('📋 Formatting receipt information');
   const aiResult: AIResult = {
-    merchant: result.merchant || '',
-    date: result.date || new Date().toISOString().split('T')[0], // Use today's date as fallback
-    total: parseFloat(result.total) || 0,
-    tax: parseFloat(result.tax) || 0,
+    merchant: result.merchant || result.store_name || '',
+    date: result.date || result.purchase_date || new Date().toISOString().split('T')[0],
+    total: parseFloat(result.total || result.total_amount || result.amount || '0') || 0,
+    tax: parseFloat(result.tax || result.tax_amount || '0') || 0,
     currency: result.currency || 'MYR',
-    payment_method: result.payment_method || '',
-    fullText: result.fullText || '',
-    line_items: result.line_items || [],
-    confidence_scores: result.confidence || {},
-    ai_suggestions: result.suggestions || {},
-    predicted_category: result.predicted_category || null,
+    payment_method: result.payment_method || result.payment_type || '',
+    fullText: result.fullText || result.raw_text || '',
+    line_items: result.line_items || result.items || [],
+    confidence_scores: result.confidence || result.confidence_score || {},
+    ai_suggestions: result.suggestions || result.ai_suggestions || {},
+    predicted_category: result.predicted_category || result.category || null,
     modelUsed: modelConfig.id
   };
 
+  onProgress?.('PROCESSING', 'Calculating confidence scores');
+  await logger.processing('📊 Calculating confidence scores');
+  console.log('✅ Transformed OpenRouter result to AIResult:', aiResult);
+
+  await logger.complete();
   return aiResult;
 };
 
 // Process a receipt with AI Vision
 export const processReceiptWithAI = async (
   receiptId: string,
-  options?: ProcessingOptions & { uploadContext?: string }
+  options?: ProcessingOptions & { uploadContext?: string; onProgress?: ProgressCallback }
 ): Promise<AIResult | null> => {
   try {
     // Use AI Vision as the processing method
@@ -649,8 +795,19 @@ export const processReceiptWithAI = async (
         throw new Error(errorMsg);
       }
 
-      // Process with OpenRouter client-side
-      const result = await processReceiptWithOpenRouter(receiptId, receipt.image_url, processingOptions);
+      let result: AIResult;
+      try {
+        // Process with OpenRouter client-side
+        result = await processReceiptWithOpenRouter(receiptId, receipt.image_url, processingOptions, options?.onProgress);
+      } catch (processingError) {
+        // Log error to database using client logger
+        const logger = new ClientProcessingLogger(receiptId);
+        await logger.error(`OpenRouter processing failed: ${processingError.message}`);
+
+        // Update status to failed
+        await updateReceiptProcessingStatus(receiptId, 'failed', processingError.message);
+        throw processingError;
+      }
 
       // Update status to complete
       await updateReceiptProcessingStatus(receiptId, 'complete');
@@ -810,6 +967,17 @@ export const processReceiptWithAI = async (
       'Authorization': `Bearer ${supabaseKey || supabaseAnonKey}`,
       'apikey': supabaseAnonKey,
     };
+
+    // 🔍 ENHANCED DEBUG LOGGING FOR MODEL SELECTION
+    console.log('🚀 RECEIPT SERVICE DEBUG - processReceiptWithAI called with:', {
+      receiptId,
+      imageUrl: imageUrl.substring(0, 50) + '...',
+      'options?.modelId': options?.modelId,
+      'processingOptions.modelId': processingOptions.modelId,
+      'requestPayload.modelId': requestPayload.modelId,
+      uploadContext,
+      timestamp: new Date().toISOString()
+    });
 
     console.log(`🔍 DETAILED REQUEST DEBUG [${uploadContext.toUpperCase()}]:`);
     console.log("Receipt ID:", receiptId);

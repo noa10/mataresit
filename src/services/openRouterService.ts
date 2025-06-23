@@ -60,6 +60,10 @@ export interface ProcessingInput {
   };
 }
 
+export interface ProgressCallback {
+  (stepName: string, message: string, progress?: number): void;
+}
+
 /**
  * OpenRouter API service class
  */
@@ -77,11 +81,22 @@ export class OpenRouterService {
   async callModel(
     modelConfig: ModelConfig,
     input: ProcessingInput,
-    receiptId: string
+    receiptId: string,
+    onProgress?: ProgressCallback
   ): Promise<any> {
     console.log(`Calling OpenRouter model: ${modelConfig.name} for receipt ${receiptId}`);
 
+    // Emit initialization progress
+    onProgress?.('START', 'Initializing OpenRouter processing');
+
+    // Validate API key
+    onProgress?.('START', 'Validating API key');
+    if (!this.apiKey) {
+      throw new Error('OpenRouter API key not configured');
+    }
+
     // Prepare the messages based on input type
+    onProgress?.('START', 'Preparing image data');
     const messages = this.prepareMessages(input, modelConfig);
 
     // Prepare the request
@@ -96,6 +111,11 @@ export class OpenRouterService {
     };
 
     try {
+      // Emit API connection progress
+      onProgress?.('AI', 'Connecting to OpenRouter API');
+
+      // Send request to API
+      onProgress?.('AI', 'Sending image to AI model');
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -112,6 +132,11 @@ export class OpenRouterService {
         throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
       }
 
+      // Emit processing progress
+      onProgress?.('AI', 'Processing with AI model');
+
+      // Get response
+      onProgress?.('AI', 'Receiving AI response');
       const result: OpenRouterResponse = await response.json();
       console.log(`OpenRouter API response for ${receiptId}:`, {
         model: result.model,
@@ -125,11 +150,50 @@ export class OpenRouterService {
         throw new Error('No content in OpenRouter response');
       }
 
+      console.log('🔍 OpenRouter raw response content:', {
+        contentType: typeof content,
+        contentLength: content.length,
+        contentPreview: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
+        fullContent: content
+      });
+
+      // Emit parsing progress
+      onProgress?.('AI', 'Parsing AI response');
+
       // Try to parse as JSON (expected format for receipt data)
       try {
-        return JSON.parse(content);
+        const parsedResult = JSON.parse(content);
+        console.log('✅ Successfully parsed OpenRouter response as JSON:', parsedResult);
+
+        // Emit processing completion for this stage
+        onProgress?.('PROCESSING', 'Extracting receipt data');
+
+        return parsedResult;
       } catch (parseError) {
-        console.warn('Failed to parse OpenRouter response as JSON, returning raw content');
+        console.warn('❌ Failed to parse OpenRouter response as JSON:', {
+          error: parseError.message,
+          content: content,
+          contentLength: content.length
+        });
+
+        // Try to extract JSON from the content if it's wrapped in text
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const extractedJson = JSON.parse(jsonMatch[0]);
+            console.log('✅ Successfully extracted JSON from response:', extractedJson);
+
+            // Emit processing completion for this stage
+            onProgress?.('PROCESSING', 'Extracting receipt data');
+
+            return extractedJson;
+          } catch (extractError) {
+            console.warn('❌ Failed to parse extracted JSON:', extractError.message);
+          }
+        }
+
+        // Return raw content as fallback
+        console.warn('⚠️ Returning raw content as fallback');
         return { raw_content: content };
       }
 
@@ -190,17 +254,23 @@ export class OpenRouterService {
   private getSystemPrompt(): string {
     return `You are an AI assistant specialized in analyzing receipt data. Your task is to extract structured information from receipts and return it in a specific JSON format.
 
-IMPORTANT: You must respond with valid JSON only. Do not include any explanatory text before or after the JSON.
+CRITICAL INSTRUCTIONS:
+1. You MUST respond with valid JSON only
+2. Do NOT include any explanatory text, markdown formatting, or code blocks
+3. Do NOT wrap the JSON in backticks or any other formatting
+4. Return only the raw JSON object
 
-The JSON response must include these fields:
-- merchant: string (store/restaurant name)
-- total_amount: number (total amount paid)
-- tax_amount: number (tax amount, 0 if not found)
-- date: string (date in YYYY-MM-DD format)
-- payment_method: string (cash, card, etc.)
-- predicted_category: string (food, shopping, gas, etc.)
-- line_items: array of objects with name, quantity, price
-- confidence_score: number (0-1, your confidence in the extraction)
+Required JSON format:
+{
+  "merchant": "string - store/restaurant name",
+  "total": "number - total amount paid",
+  "tax": "number - tax amount, 0 if not found",
+  "date": "string - date in YYYY-MM-DD format",
+  "payment_method": "string - cash, card, etc.",
+  "predicted_category": "string - food, shopping, gas, etc.",
+  "line_items": [{"description": "string", "amount": "number"}],
+  "confidence": {"merchant": "number 0-1", "total": "number 0-1", "date": "number 0-1"}
+}
 
 Be accurate and conservative with your confidence scores.`;
   }
@@ -223,17 +293,19 @@ Extract the information and return it as JSON with the required fields.`;
    * Get prompt for vision-based processing
    */
   private getVisionPrompt(): string {
-    return `Please analyze this receipt image and extract the structured data. Look for:
+    return `Analyze this receipt image and extract the data. Return ONLY valid JSON with no additional text or formatting.
 
-1. Merchant/store name (usually at the top)
-2. Total amount (the final amount paid)
-3. Tax amount (if shown separately)
-4. Date of purchase
-5. Payment method (cash, card, etc.)
-6. Individual line items with names, quantities, and prices
-7. Category (food, shopping, gas, etc.)
+Extract these fields:
+1. merchant: Store/restaurant name (usually at the top)
+2. total: Final amount paid (as number)
+3. tax: Tax amount if shown (as number, 0 if not found)
+4. date: Purchase date (YYYY-MM-DD format)
+5. payment_method: How payment was made (cash, card, etc.)
+6. predicted_category: Type of purchase (food, shopping, gas, etc.)
+7. line_items: Array of items with description and amount
+8. confidence: Object with confidence scores (0-1) for each field
 
-Return the extracted information as JSON with the required fields.`;
+Return only the JSON object, no explanations or formatting.`;
   }
 
   /**
@@ -260,8 +332,10 @@ Return the extracted information as JSON with the required fields.`;
   /**
    * Test API connection and model availability
    */
-  async testConnection(modelId: string): Promise<boolean> {
+  async testConnection(modelId: string, onProgress?: ProgressCallback): Promise<boolean> {
     try {
+      onProgress?.('START', 'Testing OpenRouter connection');
+
       const testRequest: OpenRouterRequest = {
         model: this.extractModelName(modelId),
         messages: [
@@ -277,6 +351,8 @@ Return the extracted information as JSON with the required fields.`;
         hasApiKey: !!this.apiKey,
         apiKeyLength: this.apiKey?.length || 0
       });
+
+      onProgress?.('AI', 'Connecting to OpenRouter API');
 
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',

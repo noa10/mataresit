@@ -148,15 +148,19 @@ export class FallbackProcessingService {
    * Get alternative model for retry attempts
    */
   private getAlternativeModel(currentModel: string, fallbackStrategy: FallbackStrategy): string {
-    // Model fallback hierarchy - updated to remove deprecated models
+    // Model fallback hierarchy - updated to use current models
     const modelFallbacks: Record<string, string> = {
       // Gemini models
-      'gemini-2.0-flash-lite': 'gemini-2.5-flash-preview-05-20',
-      'gemini-2.5-flash-preview-05-20': 'openrouter/google/gemini-2.0-flash-exp:free',
+      'gemini-2.0-flash-lite': 'gemini-2.0-flash',
+      'gemini-2.0-flash': 'gemini-2.5-flash',
+      'gemini-2.5-flash': 'gemini-2.5-pro',
+      'gemini-2.5-pro': 'openrouter/google/gemini-2.0-flash-exp:free',
 
       // OpenRouter free models
-      'openrouter/google/gemini-2.0-flash-exp:free': 'openrouter/meta-llama/llama-4-maverick:free',
-      'openrouter/meta-llama/llama-4-maverick:free': 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
+      'openrouter/google/gemini-2.0-flash-exp:free': 'openrouter/google/gemma-3-27b-it:free',
+      'openrouter/google/gemma-3-27b-it:free': 'openrouter/qwen/qwen2.5-vl-72b-instruct:free',
+      'openrouter/qwen/qwen2.5-vl-72b-instruct:free': 'openrouter/meta-llama/llama-4-scout:free',
+      'openrouter/meta-llama/llama-4-scout:free': 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
       'openrouter/moonshotai/kimi-vl-a3b-thinking:free': 'gemini-2.0-flash-lite'
     };
 
