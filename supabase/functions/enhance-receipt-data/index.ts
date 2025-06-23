@@ -19,7 +19,7 @@ const corsHeaders = {
 }
 
 /**
- * Model configuration interface for AI models
+ * Model configuration interface for AI models with performance and capability tracking
  */
 interface ModelConfig {
   id: string;
@@ -31,6 +31,21 @@ interface ModelConfig {
   maxTokens: number;
   supportsText: boolean;  // Indicates if the model can process text input
   supportsVision: boolean; // Indicates if the model can process image input
+  description?: string;
+  pricing?: {
+    inputTokens: number;  // Cost per 1M input tokens
+    outputTokens: number; // Cost per 1M output tokens
+  };
+  performance?: {
+    speed: 'fast' | 'medium' | 'slow';
+    accuracy: 'good' | 'very-good' | 'excellent';
+    reliability: number; // 0-1 scale
+  };
+  capabilities?: {
+    maxImageSize: number; // in bytes
+    supportedFormats: string[];
+    contextWindow: number; // in tokens
+  };
 }
 
 /**
@@ -47,20 +62,127 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     temperature: 0.3,
     maxTokens: 2048,
     supportsText: true,
-    supportsVision: true
+    supportsVision: true,
+    description: 'Latest fast model with improved efficiency',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.95
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1000000
+    }
   },
-  'gemini-2.5-flash-preview-05-20': {
-    id: 'gemini-2.5-flash-preview-05-20',
-    name: 'Gemini 2.5 Flash Preview',
+  'gemini-2.0-flash': {
+    id: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash',
     provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-preview-05-20:generateContent',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.3,
+    maxTokens: 8192,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Latest Gemini 2.0 Flash model with enhanced speed and capabilities',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.96
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1048576
+    }
+  },
+  'gemini-2.5-flash': {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.2,
-    maxTokens: 2048,
+    maxTokens: 65536,
     supportsText: true,
-    supportsVision: true
+    supportsVision: true,
+    description: 'Advanced Gemini 2.5 Flash with thinking capabilities and balanced performance',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'excellent',
+      reliability: 0.95
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1048576
+    }
   },
-
+  'gemini-2.5-flash-lite-preview-06-17': {
+    id: 'gemini-2.5-flash-lite-preview-06-17',
+    name: 'Gemini 2.5 Flash Lite Preview',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite-preview-06-17:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.3,
+    maxTokens: 64000,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Preview version of Gemini 2.5 Flash Lite optimized for cost-effectiveness',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.92
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1000000
+    }
+  },
+  'gemini-2.5-pro': {
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.1,
+    maxTokens: 65536,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Most advanced Gemini model with superior reasoning and thinking capabilities',
+    pricing: {
+      inputTokens: 1.25,
+      outputTokens: 5.00
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.98
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1048576
+    }
+  },
   // OpenRouter Free Models
   'openrouter/google/gemini-2.0-flash-exp:free': {
     id: 'openrouter/google/gemini-2.0-flash-exp:free',
@@ -71,7 +193,22 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     temperature: 0.2,
     maxTokens: 1024,
     supportsText: true,
-    supportsVision: true
+    supportsVision: true,
+    description: 'Google\'s experimental Gemini 2.0 Flash model with vision (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 1000000
+    }
   },
   'openrouter/meta-llama/llama-4-maverick:free': {
     id: 'openrouter/meta-llama/llama-4-maverick:free',
@@ -82,9 +219,179 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     temperature: 0.2,
     maxTokens: 1024,
     supportsText: true,
-    supportsVision: true
+    supportsVision: true,
+    description: 'Meta\'s latest Llama 4 Maverick model with multimodal capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.92
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
   },
-
+  'openrouter/google/gemma-3-27b-it:free': {
+    id: 'openrouter/google/gemma-3-27b-it:free',
+    name: 'Gemma 3 27B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google\'s Gemma 3 27B Instruct model with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.89
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
+  'openrouter/qwen/qwen2.5-vl-72b-instruct:free': {
+    id: 'openrouter/qwen/qwen2.5-vl-72b-instruct:free',
+    name: 'Qwen 2.5 VL 72B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Qwen 2.5 Vision-Language 72B model with advanced multimodal capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.91
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 32768
+    }
+  },
+  'openrouter/mistralai/mistral-small-3.1-24b-instruct:free': {
+    id: 'openrouter/mistralai/mistral-small-3.1-24b-instruct:free',
+    name: 'Mistral Small 3.1 24B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Mistral Small 3.1 24B model with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 32768
+    }
+  },
+  'openrouter/mistralai/mistral-small-3.2-24b-instruct:free': {
+    id: 'openrouter/mistralai/mistral-small-3.2-24b-instruct:free',
+    name: 'Mistral Small 3.2 24B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Mistral Small 3.2 24B model with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 32768
+    }
+  },
+  'openrouter/meta-llama/llama-4-scout:free': {
+    id: 'openrouter/meta-llama/llama-4-scout:free',
+    name: 'Llama 4 Scout',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Meta\'s Llama 4 Scout model with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.87
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
+  'openrouter/opengvlab/internvl3-14b:free': {
+    id: 'openrouter/opengvlab/internvl3-14b:free',
+    name: 'InternVL3 14B',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'InternVL3 14B vision-language model with strong multimodal understanding (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.85
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
   'openrouter/moonshotai/kimi-vl-a3b-thinking:free': {
     id: 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
     name: 'Kimi VL A3B Thinking',
@@ -94,7 +401,22 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     temperature: 0.2,
     maxTokens: 1024,
     supportsText: true,
-    supportsVision: true
+    supportsVision: true,
+    description: 'Moonshot AI\'s vision-language model with reasoning capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.86
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 200000
+    }
   }
 };
 
@@ -209,8 +531,83 @@ async function processMalaysianTax(
 
   } catch (error) {
     console.error('Error processing Malaysian tax:', error);
-    await logger.log(`Error processing tax: ${error.message}`, "ERROR");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`Error processing tax: ${errorMessage}`, "ERROR");
     return null;
+  }
+}
+
+/**
+ * Log comprehensive model information for debugging and tracking with performance and capability data
+ */
+async function logModelInfo(
+  modelConfig: ModelConfig,
+  inputType: 'text' | 'image',
+  logger: ProcessingLogger
+): Promise<void> {
+  try {
+    // Log basic model identification
+    await logger.log(`🤖 MODEL SELECTED: ${modelConfig.name} (${modelConfig.id})`, "AI");
+    await logger.log(`📊 Provider: ${modelConfig.provider.toUpperCase()}`, "AI");
+
+    // Log model description if available
+    if (modelConfig.description) {
+      await logger.log(`📝 Description: ${modelConfig.description}`, "AI");
+    }
+
+    // Log capabilities
+    const capabilities: string[] = [];
+    if (modelConfig.supportsText) capabilities.push('Text');
+    if (modelConfig.supportsVision) capabilities.push('Vision');
+    await logger.log(`🔧 Capabilities: ${capabilities.join(', ')}`, "AI");
+
+    // Log input compatibility
+    const isCompatible = inputType === 'text' ? modelConfig.supportsText : modelConfig.supportsVision;
+    await logger.log(`✅ Input Compatibility: ${inputType} processing ${isCompatible ? 'SUPPORTED' : 'NOT SUPPORTED'}`, "AI");
+
+    // Log configuration settings
+    await logger.log(`⚙️ Temperature: ${modelConfig.temperature}, Max Tokens: ${modelConfig.maxTokens}`, "AI");
+    await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
+    await logger.log(`🔑 API Key Variable: ${modelConfig.apiKeyEnvVar}`, "AI");
+
+    // Log performance characteristics
+    if (modelConfig.performance) {
+      const perf = modelConfig.performance;
+      await logger.log(`🚀 PERFORMANCE PROFILE:`, "AI");
+      await logger.log(`   ⚡ Speed: ${perf.speed.toUpperCase()}`, "AI");
+      await logger.log(`   🎯 Accuracy: ${perf.accuracy.toUpperCase()}`, "AI");
+      await logger.log(`   🛡️ Reliability: ${(perf.reliability * 100).toFixed(1)}%`, "AI");
+    }
+
+    // Log capability specifications
+    if (modelConfig.capabilities) {
+      const caps = modelConfig.capabilities;
+      await logger.log(`🔧 CAPABILITY SPECIFICATIONS:`, "AI");
+      await logger.log(`   📏 Max Image Size: ${(caps.maxImageSize / (1024 * 1024)).toFixed(1)}MB`, "AI");
+      await logger.log(`   📄 Supported Formats: ${caps.supportedFormats.join(', ')}`, "AI");
+      await logger.log(`   🧠 Context Window: ${caps.contextWindow.toLocaleString()} tokens`, "AI");
+    }
+
+    // Log pricing information
+    if (modelConfig.pricing) {
+      const pricing = modelConfig.pricing;
+      if (pricing.inputTokens === 0 && pricing.outputTokens === 0) {
+        await logger.log(`💰 PRICING: FREE MODEL`, "AI");
+      } else {
+        await logger.log(`💰 PRICING (per 1M tokens):`, "AI");
+        await logger.log(`   📥 Input: $${pricing.inputTokens.toFixed(3)}`, "AI");
+        await logger.log(`   📤 Output: $${pricing.outputTokens.toFixed(3)}`, "AI");
+      }
+    }
+
+    // Log model selection timestamp
+    await logger.log(`⏰ Model selected at: ${new Date().toISOString()}`, "AI");
+
+  } catch (error) {
+    // Don't let logging errors break the main flow
+    console.warn('Error in logModelInfo:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`Warning: Error logging model info: ${errorMessage}`, "WARNING");
   }
 }
 
@@ -223,43 +620,120 @@ async function callAIModel(
   receiptId: string,
   logger: ProcessingLogger
 ): Promise<any> {
-  // Log the requested model ID for debugging
-  await logger.log(`Requested model ID: ${modelId}`, "AI");
+  const modelSelectionStart = Date.now();
 
-  // Check if the requested model exists
-  if (modelId && !AVAILABLE_MODELS[modelId]) {
-    await logger.log(`Model ${modelId} not found in AVAILABLE_MODELS. Available models: ${Object.keys(AVAILABLE_MODELS).join(', ')}`, "ERROR");
-    throw new Error(`Model ${modelId} is not available in this edge function`);
+  // Enhanced model selection logging with timing
+  await logger.log(`🎯 MODEL SELECTION STARTED: Receipt ${receiptId}`, "AI");
+  await logger.log(`📝 Requested model ID: ${modelId || 'DEFAULT'}`, "AI");
+  await logger.log(`📊 Input type: ${input.type}`, "AI");
+
+  let modelConfig: ModelConfig;
+  let wasDefaultUsed = false;
+  let fallbackReason = '';
+
+  // Enhanced model validation and fallback logic
+  if (modelId && AVAILABLE_MODELS[modelId]) {
+    // Requested model exists
+    modelConfig = AVAILABLE_MODELS[modelId];
+    await logger.log(`✅ Requested model found: ${modelConfig.name}`, "AI");
+  } else if (modelId) {
+    // Requested model doesn't exist - log detailed error and use fallback
+    const availableModels = Object.keys(AVAILABLE_MODELS);
+    await logger.log(`❌ Model '${modelId}' not found in registry`, "ERROR");
+    await logger.log(`📋 Available models: ${availableModels.join(', ')}`, "ERROR");
+
+    // Use default fallback
+    const defaultModelId = input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL;
+    modelConfig = AVAILABLE_MODELS[defaultModelId];
+    wasDefaultUsed = true;
+    fallbackReason = `Model '${modelId}' not found`;
+
+    await logger.log(`🔄 FALLBACK: Using default ${input.type} model: ${modelConfig.name}`, "AI");
+  } else {
+    // No model specified - use default
+    const defaultModelId = input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL;
+    modelConfig = AVAILABLE_MODELS[defaultModelId];
+    wasDefaultUsed = true;
+    fallbackReason = 'No model specified';
+
+    await logger.log(`🔄 DEFAULT: Using default ${input.type} model: ${modelConfig.name}`, "AI");
   }
 
-  // Get the model config or use default if not found
-  const modelConfig = AVAILABLE_MODELS[modelId] ||
-    AVAILABLE_MODELS[input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL];
+  // Log model selection timing
+  const modelSelectionEnd = Date.now();
+  const modelSelectionDuration = (modelSelectionEnd - modelSelectionStart) / 1000;
+  await logger.log(`⏱️ Model selection completed in ${modelSelectionDuration.toFixed(3)} seconds`, "AI");
 
-  await logger.log(`Using ${modelConfig.name} (${modelConfig.id}) for analysis`, "AI");
+  // Log comprehensive model information
+  await logModelInfo(modelConfig, input.type, logger);
 
-  // Validate input type is supported by the model
+  // Enhanced input compatibility validation
+  const compatibilityCheckStart = Date.now();
+  await logger.log(`🔍 COMPATIBILITY CHECK: Validating ${input.type} input with ${modelConfig.name}`, "AI");
+
+  if (input.type === 'text' && !modelConfig.supportsText) {
+    await logger.log(`❌ COMPATIBILITY ERROR: Model ${modelConfig.id} does not support text input`, "ERROR");
+    await logger.log(`💡 SUGGESTION: Use a text-capable model like ${DEFAULT_TEXT_MODEL}`, "ERROR");
+    throw new Error(`Model ${modelConfig.id} does not support text input`);
+  }
+
   if (input.type === 'image' && !modelConfig.supportsVision) {
-    await logger.log(`Model ${modelConfig.id} does not support vision input`, "ERROR");
+    await logger.log(`❌ COMPATIBILITY ERROR: Model ${modelConfig.id} does not support vision input`, "ERROR");
+    await logger.log(`💡 SUGGESTION: Use a vision-capable model like ${DEFAULT_VISION_MODEL}`, "ERROR");
     throw new Error(`Model ${modelConfig.id} does not support vision input`);
   }
 
-  // Get API key for the model
+  const compatibilityCheckEnd = Date.now();
+  const compatibilityCheckDuration = (compatibilityCheckEnd - compatibilityCheckStart) / 1000;
+  await logger.log(`✅ Compatibility check passed in ${compatibilityCheckDuration.toFixed(3)} seconds`, "AI");
+
+  // Enhanced API key validation
+  await logger.log(`🔑 API KEY VALIDATION: Checking ${modelConfig.apiKeyEnvVar}`, "AI");
   const apiKey = Deno.env.get(modelConfig.apiKeyEnvVar);
   if (!apiKey) {
-    await logger.log(`${modelConfig.apiKeyEnvVar} not found in environment variables. Please ensure this secret is set in the Supabase dashboard.`, "ERROR");
-    return new Response(JSON.stringify({ error: `${modelConfig.apiKeyEnvVar} not found in environment variables` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    await logger.log(`❌ API KEY ERROR: ${modelConfig.apiKeyEnvVar} not found in environment variables`, "ERROR");
+    await logger.log(`💡 SOLUTION: Set ${modelConfig.apiKeyEnvVar} in Supabase dashboard secrets`, "ERROR");
+    throw new Error(`${modelConfig.apiKeyEnvVar} not found in environment variables`);
+  }
+  await logger.log(`✅ API key validated for ${modelConfig.provider.toUpperCase()}`, "AI");
+
+  // Log final model selection summary
+  if (wasDefaultUsed) {
+    await logger.log(`📋 SELECTION SUMMARY: Using ${modelConfig.name} (${fallbackReason})`, "AI");
+  } else {
+    await logger.log(`📋 SELECTION SUMMARY: Using requested ${modelConfig.name}`, "AI");
   }
 
-  // Handle model-specific API calls based on provider
-  switch (modelConfig.provider) {
-    case 'gemini':
-      return await callGeminiAPI(input, modelConfig, apiKey, logger);
-    case 'openrouter':
-      return await callOpenRouterAPI(input, modelConfig, apiKey, logger);
-    default:
-      await logger.log(`Unsupported model provider: ${modelConfig.provider}`, "ERROR");
-      throw new Error(`Unsupported model provider: ${modelConfig.provider}`);
+  // Enhanced provider routing with validation
+  await logger.log(`🚀 PROVIDER ROUTING: Calling ${modelConfig.provider.toUpperCase()} API`, "AI");
+  const providerCallStart = Date.now();
+
+  try {
+    let result: any;
+    switch (modelConfig.provider) {
+      case 'gemini':
+        result = await callGeminiAPI(input, modelConfig, apiKey, logger);
+        break;
+      case 'openrouter':
+        result = await callOpenRouterAPI(input, modelConfig, apiKey, logger);
+        break;
+      default:
+        await logger.log(`❌ PROVIDER ERROR: Unsupported provider '${modelConfig.provider}'`, "ERROR");
+        await logger.log(`💡 SUPPORTED: gemini, openrouter`, "ERROR");
+        throw new Error(`Unsupported model provider: ${modelConfig.provider}`);
+    }
+
+    const providerCallEnd = Date.now();
+    const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ Provider call completed in ${providerCallDuration.toFixed(2)} seconds`, "AI");
+
+    return result;
+  } catch (error) {
+    const providerCallEnd = Date.now();
+    const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ Provider call failed after ${providerCallDuration.toFixed(2)} seconds: ${errorMessage}`, "ERROR");
+    throw error;
   }
 }
 
@@ -272,7 +746,17 @@ async function callGeminiAPI(
   apiKey: string,
   logger: ProcessingLogger
 ): Promise<any> {
-  await logger.log("Constructing prompt for Gemini AI", "AI");
+  const providerCallStart = Date.now();
+
+  // Standardized provider logging
+  await logger.log(`🔵 GEMINI API CALL INITIATED`, "AI");
+  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
+  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
+
+  // Log payload construction
+  const payloadConstructionStart = Date.now();
+  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} prompt`, "AI");
 
   // Construct the payload based on input type
   let payload: any;
@@ -437,21 +921,26 @@ Return your findings in the following JSON format:
     maxOutputTokens: modelConfig.maxTokens,
   };
 
-  // Call Gemini API
-  console.log(`🔍 GEMINI API CALL DEBUG:`);
-  console.log(`🔍 Model: ${modelConfig.id}`);
-  console.log(`🔍 Endpoint: ${modelConfig.endpoint}`);
-  console.log(`🔍 Payload contents:`, {
-    model: payload.model,
-    generationConfig: payload.generationConfig,
-    contents_length: payload.contents?.length,
-    contents_parts: payload.contents?.[0]?.parts?.map(part => ({
-      text_length: part.text?.length,
-      inline_data_mime_type: part.inline_data?.mime_type
-    }))
-  });
+  // Log payload construction completion
+  const payloadConstructionEnd = Date.now();
+  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
+  await logger.log(`✅ Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
 
-  await logger.log("Calling Gemini API", "AI");
+  // Log payload metadata
+  const payloadSize = JSON.stringify(payload).length;
+  await logger.log(`📊 Payload size: ${payloadSize} bytes`, "AI");
+  await logger.log(`⚙️ Generation config: temp=${modelConfig.temperature}, maxTokens=${modelConfig.maxTokens}`, "AI");
+
+  if (input.type === 'text') {
+    const textLength = input.fullText?.length || 0;
+    await logger.log(`📝 Text input length: ${textLength} characters`, "AI");
+  } else {
+    const imageSize = input.imageData.data.length;
+    await logger.log(`🖼️ Image size: ${imageSize} bytes (${input.imageData.mimeType})`, "AI");
+  }
+
+  // Enhanced API call logging
+  await logger.log(`🚀 GEMINI API REQUEST: Initiating call to ${modelConfig.name}`, "AI");
   const geminiCallStart = Date.now();
   const response = await fetch(
     `${modelConfig.endpoint}?key=${apiKey}`,
@@ -466,27 +955,45 @@ Return your findings in the following JSON format:
   const geminiCallEnd = Date.now();
   const geminiCallDuration = (geminiCallEnd - geminiCallStart) / 1000;
 
-  console.log(`🔍 Gemini API call completed in ${geminiCallDuration.toFixed(2)} seconds`);
+  // Enhanced response logging
+  await logger.log(`⏱️ API call completed in ${geminiCallDuration.toFixed(2)} seconds`, "AI");
+  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', errorText);
-    await logger.log(`Gemini API error: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`❌ GEMINI API ERROR: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
 
-    // If we get a 429 rate limit error, suggest using a different model
+    // Enhanced error handling with specific suggestions
     if (response.status === 429) {
-      await logger.log("Rate limit detected - consider using gemini-2.0-flash-lite for better reliability", "ERROR");
+      await logger.log(`🚫 RATE LIMIT: Consider using gemini-2.0-flash-lite for better reliability`, "ERROR");
+      await logger.log(`💡 SUGGESTION: Implement exponential backoff or switch to a different model`, "ERROR");
+    } else if (response.status === 401) {
+      await logger.log(`🔑 AUTH ERROR: Check GEMINI_API_KEY in environment variables`, "ERROR");
+    } else if (response.status === 400) {
+      await logger.log(`📝 REQUEST ERROR: Invalid payload or model configuration`, "ERROR");
     }
 
     throw new Error(`Failed to process with Gemini API: ${response.status} ${response.statusText}`);
   }
 
+  // Enhanced response parsing
+  const responseParsingStart = Date.now();
   const geminiResponse = await response.json();
-  console.log(`🔍 Gemini API response received:`, {
-    candidates_length: geminiResponse.candidates?.length,
-    first_candidate_content: geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text?.substring(0, 200) + '...'
-  });
-  await logger.log("Received response from Gemini API", "AI");
+  const responseParsingEnd = Date.now();
+  const responseParsingDuration = (responseParsingEnd - responseParsingStart) / 1000;
+
+  await logger.log(`✅ Response received and parsed in ${responseParsingDuration.toFixed(3)} seconds`, "AI");
+
+  // Log response metadata
+  const candidatesCount = geminiResponse.candidates?.length || 0;
+  await logger.log(`📊 Response metadata: ${candidatesCount} candidate(s)`, "AI");
+
+  if (candidatesCount > 0) {
+    const firstCandidate = geminiResponse.candidates[0];
+    const contentLength = firstCandidate?.content?.parts?.[0]?.text?.length || 0;
+    await logger.log(`📝 Content length: ${contentLength} characters`, "AI");
+  }
 
   // Parse the response
   try {
@@ -518,11 +1025,29 @@ Return your findings in the following JSON format:
       await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
     }
 
-    await logger.log("AI processing complete", "AI");
+    // Log final processing results
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ GEMINI PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+    // Log extracted data summary
+    const dataFields = Object.keys(enhancedData);
+    await logger.log(`📋 Extracted fields: ${dataFields.join(', ')}`, "AI");
+
+    if (enhancedData.confidence) {
+      const avgConfidence = Object.values(enhancedData.confidence)
+        .filter(val => typeof val === 'number')
+        .reduce((sum: number, val: any) => sum + val, 0) /
+        Object.values(enhancedData.confidence).filter(val => typeof val === 'number').length;
+      await logger.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%`, "AI");
+    }
+
     return enhancedData;
   } catch (error) {
-    console.error('Error parsing Gemini response:', error);
-    await logger.log(`Error parsing Gemini response: ${error.message}`, "ERROR");
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ GEMINI PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
     return {};
   }
 }
@@ -536,10 +1061,21 @@ async function callOpenRouterAPI(
   apiKey: string,
   logger: ProcessingLogger
 ): Promise<any> {
-  await logger.log("Constructing prompt for OpenRouter API", "AI");
+  const providerCallStart = Date.now();
+
+  // Standardized provider logging
+  await logger.log(`🟠 OPENROUTER API CALL INITIATED`, "AI");
+  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
+  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
 
   // Extract model name from OpenRouter model ID
   const modelName = modelConfig.id.replace(/^openrouter\//, '');
+  await logger.log(`🔧 OpenRouter model name: ${modelName}`, "AI");
+
+  // Log payload construction
+  const payloadConstructionStart = Date.now();
+  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
 
   // Prepare messages based on input type
   let messages: any[];
@@ -673,8 +1209,28 @@ Return your findings in JSON format:
     presence_penalty: 0
   };
 
-  // Call OpenRouter API
-  await logger.log(`Calling OpenRouter API with model: ${modelName}`, "AI");
+  // Log payload construction completion
+  const payloadConstructionEnd = Date.now();
+  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
+  await logger.log(`✅ Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
+
+  // Log payload metadata
+  const payloadSize = JSON.stringify(payload).length;
+  await logger.log(`📊 Payload size: ${payloadSize} bytes`, "AI");
+  await logger.log(`⚙️ Model config: temp=${modelConfig.temperature}, maxTokens=${modelConfig.maxTokens}`, "AI");
+  await logger.log(`📝 Messages count: ${messages.length}`, "AI");
+
+  if (input.type === 'text') {
+    const textLength = input.fullText?.length || 0;
+    await logger.log(`📝 Text input length: ${textLength} characters`, "AI");
+  } else {
+    const imageSize = input.imageData.data.length;
+    await logger.log(`🖼️ Image size: ${imageSize} bytes (${input.imageData.mimeType})`, "AI");
+  }
+
+  // Enhanced API call logging
+  await logger.log(`🚀 OPENROUTER API REQUEST: Initiating call to ${modelName}`, "AI");
+  const openRouterCallStart = Date.now();
   const response = await fetch(modelConfig.endpoint, {
     method: 'POST',
     headers: {
@@ -686,15 +1242,55 @@ Return your findings in JSON format:
     body: JSON.stringify(payload),
   });
 
+  const openRouterCallEnd = Date.now();
+  const openRouterCallDuration = (openRouterCallEnd - openRouterCallStart) / 1000;
+
+  // Enhanced response logging
+  await logger.log(`⏱️ API call completed in ${openRouterCallDuration.toFixed(2)} seconds`, "AI");
+  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('OpenRouter API error:', errorText);
-    await logger.log(`OpenRouter API error: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`❌ OPENROUTER API ERROR: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
+
+    // Enhanced error handling with specific suggestions
+    if (response.status === 429) {
+      await logger.log(`🚫 RATE LIMIT: Consider switching to a different OpenRouter model`, "ERROR");
+      await logger.log(`💡 SUGGESTION: Implement exponential backoff or use a paid model`, "ERROR");
+    } else if (response.status === 401) {
+      await logger.log(`🔑 AUTH ERROR: Check OPENROUTER_API_KEY in environment variables`, "ERROR");
+    } else if (response.status === 400) {
+      await logger.log(`📝 REQUEST ERROR: Invalid payload or unsupported model`, "ERROR");
+    } else if (response.status === 402) {
+      await logger.log(`💳 PAYMENT ERROR: Insufficient credits or billing issue`, "ERROR");
+    }
+
     throw new Error(`Failed to process with OpenRouter API: ${response.status} ${response.statusText}`);
   }
 
+  // Enhanced response parsing
+  const responseParsingStart = Date.now();
   const openRouterResponse = await response.json();
-  await logger.log("Received response from OpenRouter API", "AI");
+  const responseParsingEnd = Date.now();
+  const responseParsingDuration = (responseParsingEnd - responseParsingStart) / 1000;
+
+  await logger.log(`✅ Response received and parsed in ${responseParsingDuration.toFixed(3)} seconds`, "AI");
+
+  // Log response metadata
+  const choicesCount = openRouterResponse.choices?.length || 0;
+  await logger.log(`📊 Response metadata: ${choicesCount} choice(s)`, "AI");
+
+  if (choicesCount > 0) {
+    const firstChoice = openRouterResponse.choices[0];
+    const contentLength = firstChoice?.message?.content?.length || 0;
+    await logger.log(`📝 Content length: ${contentLength} characters`, "AI");
+
+    if (openRouterResponse.usage) {
+      const { prompt_tokens, completion_tokens, total_tokens } = openRouterResponse.usage;
+      await logger.log(`🔢 Token usage: ${prompt_tokens} prompt + ${completion_tokens} completion = ${total_tokens} total`, "AI");
+    }
+  }
 
   // Parse the response
   try {
@@ -729,11 +1325,29 @@ Return your findings in JSON format:
       await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
     }
 
-    await logger.log("OpenRouter AI processing complete", "AI");
+    // Log final processing results
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ OPENROUTER PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+    // Log extracted data summary
+    const dataFields = Object.keys(enhancedData);
+    await logger.log(`📋 Extracted fields: ${dataFields.join(', ')}`, "AI");
+
+    if (enhancedData.confidence) {
+      const avgConfidence = Object.values(enhancedData.confidence)
+        .filter(val => typeof val === 'number')
+        .reduce((sum: number, val: any) => sum + val, 0) /
+        Object.values(enhancedData.confidence).filter(val => typeof val === 'number').length;
+      await logger.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%`, "AI");
+    }
+
     return enhancedData;
   } catch (error) {
-    console.error('Error parsing OpenRouter response:', error);
-    await logger.log(`Error parsing OpenRouter response: ${error.message}`, "ERROR");
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ OPENROUTER PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
     return {};
   }
 }
@@ -825,7 +1439,8 @@ async function enhanceReceiptData(
     return enhancedData;
   } catch (error) {
     console.error("Error in enhanceReceiptData:", error);
-    await logger.log(`Error in AI enhancement: ${error.message}`, "ERROR");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`Error in AI enhancement: ${errorMessage}`, "ERROR");
     return {}; // Return empty object on error to avoid breaking the flow
   }
 }
@@ -926,9 +1541,10 @@ serve(async (req) => {
         console.log("🔍 Successfully processed imageData, final size:", input.imageData.data.length, "bytes");
       } catch (decodeError) {
         console.error("🔍 Error processing imageData:", decodeError);
+        const errorMessage = decodeError instanceof Error ? decodeError.message : String(decodeError);
         return new Response(
           JSON.stringify({
-            error: 'Failed to process imageData: ' + decodeError.message,
+            error: 'Failed to process imageData: ' + errorMessage,
             timestamp: new Date().toISOString()
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -936,7 +1552,7 @@ serve(async (req) => {
       }
     } else {
       // Enhanced error message with specific details
-      const missingDetails = [];
+      const missingDetails: string[] = [];
       if (!textractData && !fullText) {
         missingDetails.push('textractData and fullText for OCR processing');
       }
@@ -982,7 +1598,8 @@ serve(async (req) => {
       const { receiptId } = await req.json();
       if (receiptId) {
         const logger = new ProcessingLogger(receiptId);
-        await logger.log(`Server error: ${error.message}`, "ERROR");
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await logger.log(`Server error: ${errorMessage}`, "ERROR");
       }
     } catch (logError) {
       // Ignore errors during error logging
@@ -990,7 +1607,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: error.message || 'Internal server error',
+        error: (error instanceof Error ? error.message : String(error)) || 'Internal server error',
         success: false
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
