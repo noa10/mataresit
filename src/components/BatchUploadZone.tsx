@@ -481,7 +481,7 @@ export default function BatchUploadZone({
       />
 
       <div
-        className={`relative w-full h-full grid grid-rows-[auto_1fr_auto] gap-2 sm:gap-4 rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        className={`relative w-full h-full flex flex-col gap-2 sm:gap-4 rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -521,55 +521,64 @@ export default function BatchUploadZone({
             : 'Ready to upload multiple receipt files'}
       </div>
 
-      {/* Header Section - Auto height */}
-      <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
-        <motion.div
-          initial={{ scale: 0.8 }}
-          animate={{
-            scale: isDragging ? 1.1 : 1,
-            rotate: isDragging ? [0, -5, 5, -5, 0] : 0
-          }}
-          whileHover={{ scale: 1.05 }}
-          transition={{
-            type: "spring",
-            stiffness: 260,
-            damping: 20,
-            rotate: { duration: 0.5, ease: "easeInOut" }
-          }}
-          className={`relative rounded-full p-2 sm:p-3 ${
-            isDragging ? "bg-primary/10" : "bg-secondary"
-          }`}
-        >
-          {isDragging ? (
-            <Upload size={20} className="sm:w-6 sm:h-6 text-primary" />
-          ) : (
-            <FileUp size={20} className="sm:w-6 sm:h-6 text-primary" />
-          )}
-        </motion.div>
-
-        <div className="space-y-1">
-          <h3 className="text-base sm:text-lg font-medium">
-            {isDragging
-              ? "Drop Files Here"
-              : "Batch Upload Receipts"}
-          </h3>
-          <p
-            id="batch-upload-zone-description"
-            className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
+      {/* Header Section - Only show when no files are present */}
+      <AnimatePresence>
+        {batchUploads.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex flex-col items-center text-center gap-2 sm:gap-3"
           >
-            {isCompressing
-              ? "Compressing selected images..."
-              : isInvalidFile
-                ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
-                : isDragging
-                  ? "Release to add files to the queue"
-                  : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
-          </p>
-        </div>
-      </div>
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{
+                scale: isDragging ? 1.1 : 1,
+                rotate: isDragging ? [0, -5, 5, -5, 0] : 0
+              }}
+              whileHover={{ scale: 1.05 }}
+              transition={{
+                type: "spring",
+                stiffness: 260,
+                damping: 20,
+                rotate: { duration: 0.5, ease: "easeInOut" }
+              }}
+              className={`relative rounded-full p-2 sm:p-3 ${
+                isDragging ? "bg-primary/10" : "bg-secondary"
+              }`}
+            >
+              {isDragging ? (
+                <Upload size={20} className="sm:w-6 sm:h-6 text-primary" />
+              ) : (
+                <FileUp size={20} className="sm:w-6 sm:h-6 text-primary" />
+              )}
+            </motion.div>
 
-      {/* Main Content Section - Flexible height with proper scrolling */}
-      <div className="flex flex-col items-center gap-6 min-h-0 overflow-y-auto overflow-x-hidden">
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-medium">
+                {isDragging
+                  ? "Drop Files Here"
+                  : "Batch Upload Receipts"}
+              </h3>
+              <p
+                id="batch-upload-zone-description"
+                className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
+              >
+                {isCompressing
+                  ? "Compressing selected images..."
+                  : isInvalidFile
+                    ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
+                    : isDragging
+                      ? "Release to add files to the queue"
+                      : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Content Section - Flexible height with proper spacing */}
+      <div className="flex flex-col items-center gap-6 flex-1 min-h-0 overflow-x-hidden">
 
         {/* Illustration when empty */}
         <AnimatePresence>
@@ -708,9 +717,9 @@ export default function BatchUploadZone({
         <AnimatePresence>
           {batchUploads.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="w-full flex-1 min-h-0 flex flex-col"
               ref={fileQueueRef}
             >
@@ -731,8 +740,7 @@ export default function BatchUploadZone({
                 )}
               </div>
               <EnhancedScrollArea
-                className="flex-1 w-full rounded-md border min-h-[200px] max-h-[450px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                maxHeight="min(450px, 70vh)"
+                className="flex-1 w-full rounded-md border focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 showScrollIndicator={true}
                 fadeEdges={true}
                 ref={scrollAreaRef}
@@ -770,7 +778,7 @@ export default function BatchUploadZone({
       </div>
 
       {/* Footer Section - Auto height */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-2 flex-shrink-0">
         <div className="flex flex-wrap gap-2 justify-center">
           <div className="text-xs px-2 py-1 bg-muted rounded-full">
             Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
