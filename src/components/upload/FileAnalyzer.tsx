@@ -4,33 +4,36 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  FileText, 
-  Zap, 
-  Brain, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
+import {
+  FileText,
+  Zap,
+  Brain,
+  AlertTriangle,
+  CheckCircle,
   Settings,
-  TrendingUp,
-  Shield,
   Info
 } from "lucide-react";
 import { analyzeFile, getProcessingRecommendation, ProcessingRecommendation, FileAnalysis } from "@/utils/processingOptimizer";
-import { formatDuration } from "@/utils/timeEstimation";
 
 interface FileAnalyzerProps {
   file: File;
   onRecommendationChange?: (recommendation: ProcessingRecommendation) => void;
   showDetails?: boolean;
   compact?: boolean;
+  userPreferences?: {
+    preferredMethod?: 'ocr-ai' | 'ai-vision';
+    preferredModel?: string;
+    prioritizeSpeed?: boolean;
+    prioritizeAccuracy?: boolean;
+  };
 }
 
-export function FileAnalyzer({ 
-  file, 
-  onRecommendationChange, 
+export function FileAnalyzer({
+  file,
+  onRecommendationChange,
   showDetails = true,
-  compact = false 
+  compact = false,
+  userPreferences
 }: FileAnalyzerProps) {
   const [analysis, setAnalysis] = useState<FileAnalysis | null>(null);
   const [recommendation, setRecommendation] = useState<ProcessingRecommendation | null>(null);
@@ -57,16 +60,23 @@ export function FileAnalyzer({
       const fileAnalysis = analyzeFile(file, imageDimensions);
       setAnalysis(fileAnalysis);
 
-      // Get processing recommendation
-      const processingRecommendation = getProcessingRecommendation(fileAnalysis);
+      // Get processing recommendation with user preferences
+      const processingRecommendation = getProcessingRecommendation(fileAnalysis, userPreferences);
       setRecommendation(processingRecommendation);
-      
+
+      // Log the recommendation for debugging
+      console.log('FileAnalyzer processing recommendation:', {
+        recommendedModel: processingRecommendation.recommendedModel,
+        userPreferences,
+        reasoning: processingRecommendation.reasoning
+      });
+
       // Notify parent component
       onRecommendationChange?.(processingRecommendation);
     };
 
     analyzeFileAsync();
-  }, [file, onRecommendationChange]);
+  }, [file, onRecommendationChange, userPreferences]);
 
   // Helper function to get image dimensions
   const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
@@ -221,63 +231,6 @@ export function FileAnalyzer({
               </Tooltip>
             </TooltipProvider>
           </div>
-
-          {/* Recommendation */}
-          <div className="p-3 bg-muted/50 rounded-md">
-            <div className="flex items-center gap-2 mb-2">
-              {getMethodIcon(recommendation.recommendedMethod)}
-              <span className="font-medium">
-                Recommended: {recommendation.recommendedMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'}
-              </span>
-              <Badge variant="secondary">{recommendation.recommendedModel}</Badge>
-            </div>
-            
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>~{formatDuration(recommendation.estimatedProcessingTime)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                <span>Optimized for this file</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Reasoning */}
-          {showDetails && recommendation.reasoning.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Analysis Details
-              </h4>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                {recommendation.reasoning.map((reason, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>{reason}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Fallback Strategy */}
-          {showDetails && (
-            <div className="p-2 bg-blue-50 rounded-md border border-blue-200">
-              <div className="flex items-center gap-2 mb-1">
-                <Shield className="h-3 w-3 text-blue-600" />
-                <span className="text-xs font-medium text-blue-800">Fallback Strategy</span>
-              </div>
-              <div className="text-xs text-blue-700">
-                If primary method fails, will automatically switch to{' '}
-                <span className="font-medium">
-                  {recommendation.fallbackStrategy.fallbackMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'}
-                </span>
-                {' '}with {recommendation.fallbackStrategy.maxRetries} retry attempts.
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </motion.div>

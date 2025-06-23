@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -30,17 +30,17 @@ import { useFileUpload } from "@/hooks/useFileUpload";
 import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
-import { ProcessingRecommendation } from "@/utils/processingOptimizer";
+import { ProcessingRecommendation, analyzeFile, getProcessingRecommendation } from "@/utils/processingOptimizer";
 import { CategorySelector } from "./categories/CategorySelector";
 import { Label } from "@/components/ui/label";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
+import { useOpenRouterProgress } from "@/hooks/useOpenRouterProgress";
 
 interface UploadZoneProps {
   onUploadComplete?: () => void;
 }
 
 export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
-  const { t } = useReceiptsTranslation();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +59,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
   // Use settings hook instead of local state
   const { settings, updateSettings } = useSettings();
+  const { t } = useReceiptsTranslation();
+
+  // OpenRouter progress tracking
+  const [openRouterProgress, openRouterActions] = useOpenRouterProgress();
 
   const {
     isDragging,
@@ -80,6 +84,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Memoize userPreferences to prevent infinite re-renders in FileAnalyzer
+  const userPreferences = useMemo(() => ({
+    preferredModel: settings.selectedModel,
+    preferredMethod: 'ai-vision' as const,
+  }), [settings.selectedModel]);
 
   // Map processing status to UI stages
   const mapStatusToStage = (status: ProcessingStatus): string | null => {
@@ -356,6 +366,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setIsProgressUpdating(false);
     setStartTime(Date.now());
 
+    // Reset OpenRouter progress for new upload
+    openRouterActions.reset();
+
     try {
       const file = files[0];
 
@@ -372,6 +385,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         addLocalLog('START', `Detected image file: ${file.type}`);
       } else if (file.type === 'application/pdf') {
         addLocalLog('START', `Detected PDF file: ${file.name}`);
+      }
+
+      // Generate processing recommendation with user preferences
+      try {
+        const fileAnalysis = analyzeFile(file);
+        const userPreferences = {
+          preferredModel: settings.selectedModel,
+          preferredMethod: 'ai-vision' as const, // Always use AI Vision
+        };
+
+        const recommendation = getProcessingRecommendation(fileAnalysis, userPreferences);
+        setProcessingRecommendation(recommendation);
+
+        console.log('Generated processing recommendation with user preferences:', {
+          recommendedModel: recommendation.recommendedModel,
+          userSelectedModel: settings.selectedModel,
+          reasoning: recommendation.reasoning
+        });
+
+        addLocalLog('START', `Using AI model: ${recommendation.recommendedModel}`);
+      } catch (error) {
+        console.error('Failed to generate processing recommendation:', error);
+        addLocalLog('START', `Using default AI model: ${settings.selectedModel}`);
+        // Continue without recommendation - will fall back to user's selected model
       }
 
       // Using the directly imported optimizeImageForUpload function
@@ -564,11 +601,94 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             throw new Error('Enhanced processing failed after all fallback attempts');
           }
         } else {
-          // Fallback to AI processing method
-          await processReceiptWithAI(newReceiptId, {
-            modelId: processingRecommendation?.recommendedModel || settings.selectedModel,
-            uploadContext: 'single'
+          // ENHANCED MODEL SELECTION DEBUG - Track exact values
+          console.log('🔍 MODEL SELECTION DEBUG - Raw values:', {
+            'settings.selectedModel': settings.selectedModel,
+            'settings.selectedModel type': typeof settings.selectedModel,
+            'settings.selectedModel length': settings.selectedModel?.length,
+            'processingRecommendation?.recommendedModel': processingRecommendation?.recommendedModel,
+            'localStorage raw': localStorage.getItem('receiptProcessingSettings'),
+            'settings object': settings
           });
+
+          // Determine which model to use - prioritize user's explicit selection with enhanced validation
+          let modelToUse: string;
+          let prioritySource: string;
+
+          // PRIORITY 1: User's explicit selection (must be non-empty string)
+          if (settings.selectedModel && settings.selectedModel.trim().length > 0) {
+            modelToUse = settings.selectedModel.trim();
+            prioritySource = 'user_selection';
+            console.log('✅ Using user selected model:', modelToUse);
+          }
+          // PRIORITY 2: Processing recommendation
+          else if (processingRecommendation?.recommendedModel && processingRecommendation.recommendedModel.trim().length > 0) {
+            modelToUse = processingRecommendation.recommendedModel.trim();
+            prioritySource = 'recommendation';
+            console.log('📋 Using recommended model:', modelToUse);
+          }
+          // PRIORITY 3: Default fallback
+          else {
+            modelToUse = 'gemini-2.0-flash-lite';
+            prioritySource = 'default';
+            console.log('⚠️ Using default model:', modelToUse);
+          }
+
+          console.log('🎯 FINAL MODEL SELECTION:', {
+            userSelectedModel: settings.selectedModel,
+            recommendedModel: processingRecommendation?.recommendedModel,
+            finalModelUsed: modelToUse,
+            prioritySource: prioritySource,
+            isOpenRouterModel: modelToUse.startsWith('openrouter/'),
+            modelLength: modelToUse.length
+          });
+
+          addLocalLog('PROCESSING', `Using AI model: ${modelToUse} (${prioritySource})`);
+
+          // Check if this is an OpenRouter model for local progress tracking
+          const isOpenRouterModel = modelToUse.startsWith('openrouter/');
+
+          if (isOpenRouterModel) {
+            console.log('🔄 Using OpenRouter model - enabling local progress tracking');
+
+            // Start OpenRouter progress tracking
+            openRouterActions.startProcessing(newReceiptId);
+
+            // Process with OpenRouter progress tracking
+            try {
+              await processReceiptWithAI(newReceiptId, {
+                modelId: modelToUse,
+                uploadContext: 'single',
+                onProgress: (stepName: string, message: string, progress?: number) => {
+                  console.log(`OpenRouter Progress: ${stepName} - ${message}${progress ? ` (${progress}%)` : ''}`);
+                  openRouterActions.addLog(stepName, message, progress);
+
+                  // Also add to local logs for UI consistency
+                  addLocalLog(stepName, message, progress);
+
+                  // Update ARIA live region
+                  if (ariaLiveRegion) {
+                    ariaLiveRegion.textContent = message;
+                  }
+                }
+              });
+
+              // Complete OpenRouter progress tracking
+              openRouterActions.completeProcessing();
+              addLocalLog('COMPLETE', 'OpenRouter processing completed successfully');
+            } catch (openRouterError: any) {
+              console.error('OpenRouter processing failed:', openRouterError);
+              openRouterActions.failProcessing(openRouterError.message || 'Unknown error');
+              throw openRouterError; // Re-throw to be handled by outer catch
+            }
+          } else {
+            // Standard Edge Function processing
+            console.log('🚀 Calling processReceiptWithAI with Edge Function model:', modelToUse);
+            await processReceiptWithAI(newReceiptId, {
+              modelId: modelToUse,
+              uploadContext: 'single'
+            });
+          }
         }
 
         addLocalLog('COMPLETE', 'Processing complete - receipt ready for review');
@@ -649,6 +769,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     setProcessingStatus(null);
     setReceiptId(null);
     setStartTime(null);
+
+    // Reset OpenRouter progress
+    openRouterActions.reset();
+
     resetUpload();
   };
 
@@ -778,6 +902,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                     onRecommendationChange={setProcessingRecommendation}
                     showDetails={true}
                     compact={false}
+                    userPreferences={userPreferences}
                   />
                 </motion.div>
               )}
@@ -843,10 +968,10 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             {isUploading && (
               <div className="w-full max-w-2xl flex-1 min-h-0 overflow-y-auto">
                 <ProcessingLogs
-                  processLogs={processLogs}
-                  currentStage={currentStage}
+                  processLogs={openRouterProgress.isProcessing ? openRouterProgress.logs : processLogs}
+                  currentStage={openRouterProgress.isProcessing ? openRouterProgress.currentStage : currentStage}
                   showDetailedLogs={true}
-                  startTime={startTime}
+                  startTime={openRouterProgress.isProcessing ? openRouterProgress.startTime : startTime}
                 />
               </div>
             )}

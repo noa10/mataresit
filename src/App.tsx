@@ -41,6 +41,7 @@ import BlogManagement from "./pages/admin/BlogManagement";
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
+const ModelSelectionTest = lazy(() => import("./pages/ModelSelectionTest").then(m => ({ default: m.ModelSelectionTest })));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 const UnifiedSearchPage = lazy(() => import("./pages/UnifiedSearchPage"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
@@ -160,6 +161,11 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/model-test" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ModelSelectionTest />
+                  </Suspense>
+                } />
                 <Route path="/receipt/:id" element={
                   <Suspense fallback={<PageLoading />}>
                     <ViewReceipt />

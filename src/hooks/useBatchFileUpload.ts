@@ -532,9 +532,17 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       console.log(`Valid file ${index + 1}: ${file.name}, type: ${file.type}, size: ${file.size}`);
     });
 
-    // Get intelligent batch processing optimization
-    const batchOptimization = getBatchProcessingOptimization(validFiles);
-    console.log('Batch optimization:', batchOptimization);
+    // Get intelligent batch processing optimization with user preferences
+    const userPreferences = {
+      preferredModel: settings.selectedModel,
+      preferredMethod: 'ai-vision' as const, // Always use AI Vision
+    };
+
+    const batchOptimization = getBatchProcessingOptimization(validFiles, userPreferences);
+    console.log('Batch optimization with user preferences:', {
+      ...batchOptimization,
+      userPreferences
+    });
 
     // Create recommendations map for the reducer
     const recommendations: Record<string, ProcessingRecommendation> = {};
