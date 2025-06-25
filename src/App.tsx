@@ -62,6 +62,8 @@ const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
 const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
 const DebugSearch = lazy(() => import("./pages/DebugSearch"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 
 
 // Create a loading component for suspense
@@ -137,6 +139,16 @@ const App = () => (
               <Route path="/features" element={
                 <Suspense fallback={<PageLoading />}>
                   <FeaturesPage />
+                </Suspense>
+              } />
+              <Route path="/privacy-policy" element={
+                <Suspense fallback={<PageLoading />}>
+                  <PrivacyPolicyPage />
+                </Suspense>
+              } />
+              <Route path="/terms-conditions" element={
+                <Suspense fallback={<PageLoading />}>
+                  <TermsConditionsPage />
                 </Suspense>
               } />
             </Route>

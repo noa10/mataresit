@@ -467,8 +467,8 @@ export default function Index() {
               <h4 className="font-medium text-lg">Legal</h4>
               <ul className="space-y-2">
                  {/* Added hover:text-primary */}
-                <li><Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms-conditions" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
                 <li><Link to="/contact" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact Us</Link></li>
               </ul>
             </div>
