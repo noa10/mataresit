@@ -124,10 +124,99 @@
   @apply grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
 }
 
+/* Custom category badge styling - Simplified and Consistent */
+.category-badge {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium border-transparent bg-secondary text-secondary-foreground shrink-0;
+  border-radius: 0.375rem !important;
+  max-width: 120px;
+}
+
+.category-badge-sm {
+  @apply category-badge;
+  max-width: 100px;
+}
+
+.category-badge-md {
+  @apply category-badge;
+  max-width: 120px;
+}
+
+.category-badge-lg {
+  @apply category-badge text-sm px-2.5 py-1;
+  max-width: 140px;
+}
+
 /* Add this for theme script */
 @layer utilities {
   .dark-theme-toggle {
     @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  
+  /* This ensures the rules load AFTER Tailwind utilities and take precedence */
+
+  /* Base category badge oval shape - highest priority */
+  div[class*="category-badge-sm"],
+  div[class*="category-badge-md"],
+  div[class*="category-badge-lg"] {
+    border-radius: 0.375rem !important;
+  }
+
+  /* Ultra-specific selectors for uncategorized badges */
+  div.category-badge-sm.border.border-border.text-muted-foreground,
+  div.category-badge-md.border.border-border.text-muted-foreground,
+  div.category-badge-lg.border.border-border.text-muted-foreground,
+  div.category-badge-sm.border.text-muted-foreground,
+  div.category-badge-md.border.text-muted-foreground,
+  div.category-badge-lg.border.text-muted-foreground,
+  div.category-badge-sm.border,
+  div.category-badge-md.border,
+  div.category-badge-lg.border {
+    border-radius: 0.375rem !important;
+    background-color: hsl(var(--muted) / 0.5) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Responsive adjustments with consistent oval shape */
+  @media (max-width: 1024px) {
+    .category-badge-sm,
+    .category-badge-md,
+    .category-badge-lg {
+      max-width: 100px !important;
+      font-size: 0.75rem !important;
+      padding: 0.125rem 0.5rem !important;
+    }
+
+    /* Ensure uncategorized badges maintain oval shape on tablet */
+    div.category-badge-sm.border,
+    div.category-badge-md.border,
+    div.category-badge-lg.border {
+      border-radius: 0.375rem !important;
+      max-width: 100px !important;
+      font-size: 0.75rem !important;
+      padding: 0.125rem 0.5rem !important;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .category-badge-sm,
+    .category-badge-md,
+    .category-badge-lg {
+      max-width: 90px !important;
+      font-size: 0.7rem !important;
+      padding: 0.1rem 0.4rem !important;
+    }
+
+    /* Ensure uncategorized badges maintain oval shape on mobile */
+    div.category-badge-sm.border,
+    div.category-badge-md.border,
+    div.category-badge-lg.border {
+      border-radius: 0.375rem !important;
+      max-width: 90px !important;
+      font-size: 0.7rem !important;
+      padding: 0.1rem 0.4rem !important;
+    }
   }
 }
 
@@ -281,6 +370,11 @@
     padding-bottom: 8px;
   }
 
+  /* Ensure checkbox buttons are not affected by row min-height */
+  .list-view-container [role="checkbox"] {
+    min-height: 0 !important;
+  }
+
   /* Ensure list items maintain proper width on mobile */
   .list-view-container > div {
     min-width: max-content;
@@ -296,9 +390,9 @@
   }
 
   /* Improve touch interaction for list items on mobile */
-  .list-view-container .border {
+  .list-view-container > .border {
     /* Ensure proper touch targets */
-    min-height: 60px;
+    min-height: 60px; /* row height */
     /* Prevent content from being cut off */
     overflow: visible;
   }
@@ -504,35 +598,178 @@
     text-size-adjust: 100% !important;
   }
 
-  /* Handle landscape orientation - cross-browser */
-  @media (orientation: landscape) and (max-height: 500px) {
-    [data-radix-dialog-content] {
-      padding: 0.5rem !important;
-    }
+  /* REMOVED DUPLICATE RULES - These are already handled above at lines 202-219 */
+}
+
+
+
+/* Handle landscape orientation - cross-browser */
+@media (orientation: landscape) and (max-height: 500px) {
+  [data-radix-dialog-content] {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Firefox-specific fixes */
+@-moz-document url-prefix() {
+  [data-radix-dialog-content] {
+    /* Firefox doesn't support 100dvh, use 100vh */
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+/* Chrome/WebKit-specific optimizations */
+@supports (-webkit-appearance: none) {
+  [data-radix-dialog-content] {
+    /* Better scrolling on WebKit */
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+/* Edge-specific fixes */
+@supports (-ms-ime-align: auto) {
+  [data-radix-dialog-content] {
+    /* Edge legacy support */
+    -ms-overflow-style: -ms-autohiding-scrollbar !important;
+  }
+}
+
+
+/* This bypasses all Tailwind layers and applies directly with highest priority */
+
+/* Target all category badges with maximum specificity */
+html body div.category-badge-sm,
+html body div.category-badge-md,
+html body div.category-badge-lg,
+div[class*="category-badge-sm"],
+div[class*="category-badge-md"],
+div[class*="category-badge-lg"] {
+  border-radius: 0.375rem !important;
+}
+
+
+div[data-debug="uncategorized-badge"],
+div.category-badge-sm.border.border-border.text-muted-foreground.bg-muted\/50,
+div.category-badge-md.border.border-border.text-muted-foreground.bg-muted\/50,
+div.category-badge-lg.border.border-border.text-muted-foreground.bg-muted\/50,
+.uncategorized-badge-fix {
+  border-radius: 0.375rem !important;
+  background-color: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+
+html body div.uncategorized-badge-fix,
+html body div[data-debug="uncategorized-badge"] {
+  border-radius: 0.375rem !important;
+  background-color: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+
+html body div.category-badge-sm.border.border-border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-md.border.border-border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-lg.border.border-border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-sm.border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-md.border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-lg.border.text-muted-foreground.bg-muted\/50,
+html body div.category-badge-sm.border.border-border.text-muted-foreground,
+html body div.category-badge-md.border.border-border.text-muted-foreground,
+html body div.category-badge-lg.border.border-border.text-muted-foreground,
+html body div.category-badge-sm.border.text-muted-foreground,
+html body div.category-badge-md.border.text-muted-foreground,
+html body div.category-badge-lg.border.text-muted-foreground,
+html body div.category-badge-sm.border,
+html body div.category-badge-md.border,
+html body div.category-badge-lg.border {
+  border-radius: 0.375rem !important;
+  background-color: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+
+@media (max-width: 1024px) {
+  html body div.category-badge-sm,
+  html body div.category-badge-md,
+  html body div.category-badge-lg {
+    max-width: 100px !important;
+    font-size: 0.75rem !important;
+    padding: 0.125rem 0.5rem !important;
+    border-radius: 0.375rem !important;
   }
 
-  /* Firefox-specific fixes */
-  @-moz-document url-prefix() {
-    [data-radix-dialog-content] {
-      /* Firefox doesn't support 100dvh, use 100vh */
-      height: 100vh !important;
-      max-height: 100vh !important;
-    }
+  html body div.category-badge-sm.border,
+  html body div.category-badge-md.border,
+  html body div.category-badge-lg.border {
+    border-radius: 0.375rem !important;
+    max-width: 100px !important;
+    font-size: 0.75rem !important;
+    padding: 0.125rem 0.5rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Receipt selection UI improvements for mobile */
+  /* Apply only to the receipt row container (has cursor-pointer) */
+  .list-view-container .flex.items-center.cursor-pointer {
+    padding: 0.5rem !important; /* Tighter padding on mobile */
+    gap: 0.5rem !important; /* Smaller gap on mobile */
   }
 
-  /* Chrome/WebKit-specific optimizations */
-  @supports (-webkit-appearance: none) {
-    [data-radix-dialog-content] {
-      /* Better scrolling on WebKit */
-      -webkit-overflow-scrolling: touch !important;
-    }
+  /* Ensure the small square checkbox wrapper keeps zero padding */
+  .list-view-container .flex.items-center.flex-shrink-0 {
+    padding: 0 !important;
   }
 
-  /* Edge-specific fixes */
-  @supports (-ms-ime-align: auto) {
-    [data-radix-dialog-content] {
-      /* Edge legacy support */
-      -ms-overflow-style: -ms-autohiding-scrollbar !important;
-    }
+
+
+  /* Additional mobile list view optimizations */
+  .list-view-container {
+    font-size: 0.75rem !important; /* Smaller base font size on mobile */
+  }
+
+  /* Make receipt images smaller on mobile */
+  .list-view-container img {
+    width: 2rem !important; /* 32px */
+    height: 2rem !important; /* 32px */
+  }
+
+  html body div.category-badge-sm,
+  html body div.category-badge-md,
+  html body div.category-badge-lg {
+    max-width: 90px !important;
+    font-size: 0.7rem !important;
+    padding: 0.1rem 0.4rem !important;
+    border-radius: 0.375rem !important;
+  }
+
+  html body div.category-badge-sm.border,
+  html body div.category-badge-md.border,
+  html body div.category-badge-lg.border {
+    border-radius: 0.375rem !important;
+    max-width: 90px !important;
+    font-size: 0.7rem !important;
+    padding: 0.1rem 0.4rem !important;
+  }
+
+  
+  div[data-debug="uncategorized-badge"],
+  div.category-badge-sm.border.border-border.text-muted-foreground.bg-muted\/50,
+  div.category-badge-md.border.border-border.text-muted-foreground.bg-muted\/50,
+  div.category-badge-lg.border.border-border.text-muted-foreground.bg-muted\/50,
+  .uncategorized-badge-fix,
+  html body div.uncategorized-badge-fix,
+  html body div[data-debug="uncategorized-badge"] {
+    border-radius: 0.375rem !important;
+    max-width: 90px !important;
+    font-size: 0.7rem !important;
+    padding: 0.1rem 0.4rem !important;
+    background-color: hsl(var(--muted) / 0.5) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-color: hsl(var(--border)) !important;
   }
 }

@@ -33,7 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
 import { fetchUserCategories, bulkAssignCategory } from "@/services/categoryService";
-import { CategorySelector } from "@/components/categories/CategorySelector";
+import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
 
 import {
   Table,
@@ -442,7 +442,7 @@ export default function Dashboard() {
     // Grid view (original card layout)
     if (viewMode === "grid") {
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
           {processedReceipts.map((receipt, index) => {
             const confidenceScore = calculateAggregateConfidence(receipt);
             const isSelected = selectedReceiptIds.includes(receipt.id);
@@ -472,7 +472,7 @@ export default function Dashboard() {
                 )}
 
                 <div
-                  className={`${selectionMode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                  className={`${selectionMode ? 'cursor-pointer' : ''} m-1 overflow-visible relative z-10 ${isSelected ? 'ring-2 ring-primary' : ''} h-full`}
                   onClick={(e) => {
                     if (selectionMode) {
                       e.preventDefault();
@@ -525,27 +525,26 @@ export default function Dashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
-                className={`border rounded-lg overflow-visible bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''} min-w-0`}
+                className={`m-1 border rounded-lg overflow-visible relative z-10 bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''} min-w-0`}
               >
                 {selectionMode ? (
                   <div
-                    className="flex items-center p-4 gap-4 cursor-pointer min-w-max"
+                    className="flex items-center p-2 md:p-4 gap-2 md:gap-4 cursor-pointer w-full md:min-w-max"
                     onClick={() => handleSelectReceipt(receipt.id, !isSelected)}
                   >
-                    {selectionMode && (
-                      <div className="flex-shrink-0 mr-1">
-                        <Checkbox
-                          checked={isSelected}
-                          className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectReceipt(receipt.id, !isSelected);
-                          }}
-                        />
-                      </div>
-                    )}
+                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                      <Checkbox
+                        checked={isSelected}
+                        size="sm"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectReceipt(receipt.id, !isSelected);
+                        }}
+                      />
+                    </div>
 
-                    <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
                       <img
                         src={receipt.image_url || "/placeholder.svg"}
                         alt={receipt.merchant}
@@ -557,27 +556,19 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start gap-4 min-w-max">
-                        <h3 className="font-medium whitespace-nowrap">{receipt.merchant}</h3>
-                        <span className="font-semibold whitespace-nowrap">
+                      <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
+                        <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                        <span className="font-semibold text-xs md:text-base whitespace-nowrap">
                           {receipt.currency} {receipt.total.toFixed(2)}
                         </span>
                       </div>
 
-                      <div className="flex justify-between text-sm text-muted-foreground mt-1 gap-4 min-w-max">
+                      <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
                             const category = categories.find(cat => cat.id === receipt.custom_category_id);
-                            return category ? (
-                              <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 shrink-0">
-                                <div
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span className="truncate">{category.name}</span>
-                              </Badge>
-                            ) : null;
+                            return <CategoryDisplay category={category} size="sm" />;
                           })()}
                         </div>
                         <div className="flex items-center gap-2 whitespace-nowrap">
@@ -602,9 +593,9 @@ export default function Dashboard() {
                 ) : (
                   <Link
                     to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
-                    className="flex items-center p-4 gap-4 min-w-max"
+                    className="flex items-center p-2 md:p-4 gap-2 md:gap-4 min-w-max"
                   >
-                    <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
                       <img
                         src={receipt.image_url || "/placeholder.svg"}
                         alt={receipt.merchant}
@@ -616,27 +607,19 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start gap-4 min-w-max">
-                        <h3 className="font-medium whitespace-nowrap">{receipt.merchant}</h3>
-                        <span className="font-semibold whitespace-nowrap">
+                      <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
+                        <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                        <span className="font-semibold text-xs md:text-base whitespace-nowrap">
                           {receipt.currency} {receipt.total.toFixed(2)}
                         </span>
                       </div>
 
-                      <div className="flex justify-between text-sm text-muted-foreground mt-1 gap-4 min-w-max">
+                      <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
                             const category = categories.find(cat => cat.id === receipt.custom_category_id);
-                            return category ? (
-                              <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 shrink-0">
-                                <div
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span className="truncate">{category.name}</span>
-                              </Badge>
-                            ) : null;
+                            return <CategoryDisplay category={category} size="sm" />;
                           })()}
                         </div>
                         <div className="flex items-center gap-2 whitespace-nowrap">
@@ -726,17 +709,7 @@ export default function Dashboard() {
                     <TableCell>
                       {(() => {
                         const category = categories.find(cat => cat.id === receipt.custom_category_id);
-                        return category ? (
-                          <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 max-w-[120px]">
-                            <div
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            <span className="truncate">{category.name}</span>
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Uncategorized</span>
-                        );
+                        return <CategoryDisplay category={category} size="sm" />;
                       })()}
                     </TableCell>
                     <TableCell>

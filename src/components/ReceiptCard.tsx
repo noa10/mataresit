@@ -11,6 +11,7 @@ import { getFormattedImageUrlSync } from "@/utils/imageUtils";
 import { formatCurrencySafe } from "@/utils/currency";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
+import { CategoryDisplay } from "@/components/categories/CategorySelector";
 
 interface ReceiptCardProps {
   id: string;
@@ -113,7 +114,7 @@ export default function ReceiptCard({
       whileHover={{ y: -5 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="glass-card overflow-hidden group"
+      className="glass-card overflow-hidden group flex flex-col h-full"
     >
       <div className="relative h-48 overflow-hidden">
         <img 
@@ -175,7 +176,7 @@ export default function ReceiptCard({
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Store size={16} className="text-muted-foreground" />
-            <span className="text-sm font-medium">{merchant}</span>
+            <span className="text-sm font-medium truncate">{merchant}</span>
           </div>
           <div className="flex items-center gap-1">
             {getProcessingInfo() ? (
@@ -198,17 +199,9 @@ export default function ReceiptCard({
         </div>
 
         {/* Category display */}
-        {category && (
-          <div className="mt-2 flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs gap-1 px-2 py-0.5 max-w-[140px]">
-              <div
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: category.color }}
-              />
-              <span className="truncate">{category.name}</span>
-            </Badge>
-          </div>
-        )}
+        <div className="mt-2 flex items-center gap-2">
+          <CategoryDisplay category={category} size="sm" />
+        </div>
         
         <div className="mt-4 space-y-2">
           {disableInternalLink ? (

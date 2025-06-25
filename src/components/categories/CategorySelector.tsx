@@ -186,23 +186,27 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   showCount = false,
   size = "md",
 }) => {
+  const sizeClass = `category-badge-${size}`;
+
   if (!category) {
+    // ULTIMATE FIX: Use the same base class as categorized badges but with explicit styling
+    // This ensures consistent rounded corners across all devices
+
     return (
-      <Badge variant="outline" className="gap-1">
+      <div
+        className={`${sizeClass} uncategorized-badge-fix`}
+        data-debug="uncategorized-badge"
+        data-size={size}
+        data-size-class={sizeClass}
+      >
         <Tag size={12} />
-        Uncategorized
-      </Badge>
+        <span className="truncate">Uncategorized</span>
+      </div>
     );
   }
 
-  const sizeClasses = {
-    sm: "text-xs px-2 py-0.5 max-w-[100px]",
-    md: "text-sm px-2 py-0.5 max-w-[120px]",
-    lg: "text-base px-2.5 py-1 max-w-[140px]",
-  };
-
   return (
-    <Badge variant="secondary" className={`gap-1 ${sizeClasses[size]}`}>
+    <div className={`${sizeClass} rounded-md`}>
       <div
         className="w-2 h-2 rounded-full shrink-0"
         style={{ backgroundColor: category.color }}
@@ -211,6 +215,6 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
       {showCount && category.receipt_count !== undefined && (
         <span className="ml-1 opacity-70 shrink-0">({category.receipt_count})</span>
       )}
-    </Badge>
+    </div>
   );
 };
