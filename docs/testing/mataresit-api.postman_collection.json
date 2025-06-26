@@ -1,0 +1,786 @@
+{
+  "info": {
+    "name": "Mataresit API Collection",
+    "description": "Complete collection for testing the Mataresit External API. This collection includes all endpoints with examples, tests, and environment variables.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "mk_live_your_api_key_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check API health and verify authentication"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', true);",
+                  "});",
+                  "",
+                  "pm.test('API is healthy', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.status).to.eql('healthy');",
+                  "});",
+                  "",
+                  "pm.test('User has scopes', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.user.scopes).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Performance Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/performance",
+              "host": ["{{base_url}}"],
+              "path": ["performance"]
+            },
+            "description": "Get performance metrics (requires admin scope)"
+          },
+          "response": []
+        }
+      ],
+      "description": "System health and monitoring endpoints"
+    },
+    {
+      "name": "Receipts",
+      "item": [
+        {
+          "name": "List Receipts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/receipts?page=1&limit=10&sort_by=created_at&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["receipts"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "sort_order",
+                  "value": "desc"
+                },
+                {
+                  "key": "start_date",
+                  "value": "2025-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "end_date",
+                  "value": "2025-01-31",
+                  "disabled": true
+                },
+                {
+                  "key": "merchant",
+                  "value": "Starbucks",
+                  "disabled": true
+                },
+                {
+                  "key": "min_amount",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "max_amount",
+                  "value": "100",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get paginated list of receipts with optional filtering"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has receipts array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.receipts).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.pagination).to.be.an('object');",
+                  "    pm.expect(jsonData.data.pagination).to.have.property('page');",
+                  "    pm.expect(jsonData.data.pagination).to.have.property('total');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Receipt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant\": \"Starbucks Coffee\",\n  \"date\": \"2025-01-15\",\n  \"total\": 15.50,\n  \"currency\": \"USD\",\n  \"paymentMethod\": \"Credit Card\",\n  \"category\": \"Food & Dining\",\n  \"fullText\": \"Starbucks Coffee\\n123 Main St\\nGrande Latte $4.50\\nTax $0.45\\nTotal $4.95\",\n  \"lineItems\": [\n    {\n      \"description\": \"Grande Latte\",\n      \"quantity\": 1,\n      \"unitPrice\": 4.50,\n      \"totalPrice\": 4.50,\n      \"category\": \"Beverages\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/receipts",
+              "host": ["{{base_url}}"],
+              "path": ["receipts"]
+            },
+            "description": "Create a new receipt"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Receipt created successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data.merchant).to.eql('Starbucks Coffee');",
+                  "});",
+                  "",
+                  "// Store receipt ID for other tests",
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('receipt_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Receipt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/receipts/{{receipt_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "{{receipt_id}}"]
+            },
+            "description": "Get specific receipt by ID"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Receipt data is complete', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data).to.have.property('merchant');",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Receipt",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Business Meals\",\n  \"status\": \"reviewed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/receipts/{{receipt_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "{{receipt_id}}"]
+            },
+            "description": "Update receipt fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Batch Create Receipts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receipts\": [\n    {\n      \"merchant\": \"Office Depot\",\n      \"date\": \"2025-01-15\",\n      \"total\": 89.99,\n      \"currency\": \"USD\",\n      \"category\": \"Office Supplies\"\n    },\n    {\n      \"merchant\": \"Gas Station\",\n      \"date\": \"2025-01-15\",\n      \"total\": 45.00,\n      \"currency\": \"USD\",\n      \"category\": \"Transportation\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/receipts/batch",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "batch"]
+            },
+            "description": "Create multiple receipts in a single request"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Batch creation summary', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('created');",
+                  "    pm.expect(jsonData.data).to.have.property('errors');",
+                  "    pm.expect(jsonData.data).to.have.property('summary');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Receipt Image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/receipts/{{receipt_id}}/image",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "{{receipt_id}}", "image"]
+            },
+            "description": "Get receipt image URLs"
+          },
+          "response": []
+        }
+      ],
+      "description": "Receipt management endpoints"
+    },
+    {
+      "name": "Claims",
+      "item": [
+        {
+          "name": "List Claims",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/claims?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["claims"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "submitted",
+                  "disabled": true
+                },
+                {
+                  "key": "priority",
+                  "value": "high",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get paginated list of claims"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"title\": \"Business lunch with client\",\n  \"description\": \"Lunch meeting with potential client to discuss project requirements\",\n  \"amount\": 85.50,\n  \"currency\": \"USD\",\n  \"category\": \"Meals & Entertainment\",\n  \"priority\": \"medium\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims",
+              "host": ["{{base_url}}"],
+              "path": ["claims"]
+            },
+            "description": "Create a new expense claim"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('claim_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attach Receipts to Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiptIds\": [\"{{receipt_id}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/claims/{{claim_id}}/receipts",
+              "host": ["{{base_url}}"],
+              "path": ["claims", "{{claim_id}}", "receipts"]
+            },
+            "description": "Attach receipts to an existing claim"
+          },
+          "response": []
+        }
+      ],
+      "description": "Claims management endpoints"
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Semantic Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"coffee and food expenses\",\n  \"sources\": [\"receipts\", \"claims\"],\n  \"limit\": 10,\n  \"filters\": {\n    \"dateRange\": {\n      \"start\": \"2025-01-01\",\n      \"end\": \"2025-01-31\"\n    },\n    \"amountRange\": {\n      \"min\": 5,\n      \"max\": 100\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/search",
+              "host": ["{{base_url}}"],
+              "path": ["search"]
+            },
+            "description": "Perform semantic search across receipts and claims"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Search results structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('results');",
+                  "    pm.expect(jsonData.data).to.have.property('total');",
+                  "    pm.expect(jsonData.data).to.have.property('executionTime');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"coff\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/search/suggestions",
+              "host": ["{{base_url}}"],
+              "path": ["search", "suggestions"]
+            },
+            "description": "Get search suggestions based on partial query"
+          },
+          "response": []
+        },
+        {
+          "name": "Available Search Sources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/search/sources",
+              "host": ["{{base_url}}"],
+              "path": ["search", "sources"]
+            },
+            "description": "Get available search sources for the user"
+          },
+          "response": []
+        }
+      ],
+      "description": "Semantic search endpoints"
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Comprehensive Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics?start_date=2025-01-01&end_date=2025-01-31&group_by=day&currency=USD",
+              "host": ["{{base_url}}"],
+              "path": ["analytics"],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2025-01-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2025-01-31"
+                },
+                {
+                  "key": "group_by",
+                  "value": "day"
+                },
+                {
+                  "key": "currency",
+                  "value": "USD"
+                }
+              ]
+            },
+            "description": "Get comprehensive analytics report"
+          },
+          "response": []
+        },
+        {
+          "name": "Spending Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/summary?start_date=2025-01-01&end_date=2025-01-31&currency=USD",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "summary"],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2025-01-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2025-01-31"
+                },
+                {
+                  "key": "currency",
+                  "value": "USD"
+                }
+              ]
+            },
+            "description": "Get spending summary with period comparison"
+          },
+          "response": []
+        },
+        {
+          "name": "Category Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/categories?start_date=2025-01-01&end_date=2025-01-31",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "categories"],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2025-01-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2025-01-31"
+                }
+              ]
+            },
+            "description": "Get category breakdown analytics"
+          },
+          "response": []
+        },
+        {
+          "name": "API Usage Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/analytics/api-usage",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "api-usage"]
+            },
+            "description": "Get API usage statistics"
+          },
+          "response": []
+        }
+      ],
+      "description": "Analytics and reporting endpoints"
+    },
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams",
+              "host": ["{{base_url}}"],
+              "path": ["teams"]
+            },
+            "description": "Get user's teams"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data.teams && jsonData.data.teams.length > 0) {",
+                  "        pm.environment.set('team_id', jsonData.data.teams[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Team Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}"]
+            },
+            "description": "Get detailed team information"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}", "stats"]
+            },
+            "description": "Get team statistics and analytics"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}/members",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}", "members"]
+            },
+            "description": "Get team members list"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Receipts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}/receipts?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}", "receipts"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get receipts for a specific team"
+          },
+          "response": []
+        }
+      ],
+      "description": "Team management endpoints"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set current timestamp for requests that need it",
+          "pm.environment.set('timestamp', new Date().toISOString());",
+          "",
+          "// Validate API key is set",
+          "if (!pm.environment.get('api_key') || pm.environment.get('api_key') === 'mk_live_your_api_key_here') {",
+          "    console.warn('⚠️ Please set your API key in the environment variables');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global tests for all requests",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Response has timestamp', function () {",
+          "    const jsonData = pm.response.json();",
+          "    pm.expect(jsonData).to.have.property('timestamp');",
+          "});",
+          "",
+          "// Check rate limit headers",
+          "pm.test('Rate limit headers present', function () {",
+          "    pm.expect(pm.response.headers.get('X-RateLimit-Limit')).to.exist;",
+          "    pm.expect(pm.response.headers.get('X-RateLimit-Remaining')).to.exist;",
+          "});"
+        ]
+      }
+    }
+  ]
+}

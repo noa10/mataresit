@@ -1,0 +1,840 @@
+openapi: 3.0.3
+info:
+  title: Mataresit External API
+  description: |
+    # Mataresit External API
+
+    The Mataresit External API provides comprehensive access to receipt management, expense claims, analytics, and team collaboration features. Built for developers who need to integrate receipt processing and expense management into their applications.
+
+    ## Features
+
+    - **Receipt Management**: Upload, process, and manage receipts with AI-powered data extraction
+    - **Claims Processing**: Create and manage expense claims with receipt attachments
+    - **Semantic Search**: Advanced search across receipts, claims, and business directory
+    - **Analytics & Reporting**: Comprehensive spending analytics and custom reports
+    - **Team Collaboration**: Multi-user teams with role-based access control
+    - **Real-time Processing**: Instant receipt processing with AI vision models
+
+    ## Authentication
+
+    All API requests require authentication using API keys. Include your API key in the `X-API-Key` header:
+
+    ```
+    X-API-Key: mk_live_your_api_key_here
+    ```
+
+    ## Rate Limiting
+
+    API requests are rate-limited based on your subscription tier:
+
+    - **Free**: 100 requests/hour
+    - **Pro**: 1,000 requests/hour  
+    - **Max**: 5,000 requests/hour
+
+    Rate limit headers are included in all responses:
+
+    - `X-RateLimit-Limit`: Your rate limit
+    - `X-RateLimit-Remaining`: Remaining requests
+    - `X-RateLimit-Reset`: Reset time (Unix timestamp)
+
+    ## Error Handling
+
+    The API uses conventional HTTP response codes and returns detailed error information:
+
+    ```json
+    {
+      "error": true,
+      "code": "VALIDATION_ERROR",
+      "message": "Validation failed",
+      "details": {
+        "validationErrors": [
+          {
+            "field": "merchant",
+            "message": "merchant is required"
+          }
+        ]
+      },
+      "timestamp": "2025-01-15T10:30:00Z"
+    }
+    ```
+
+    ## Pagination
+
+    List endpoints support pagination with the following parameters:
+
+    - `page`: Page number (default: 1)
+    - `limit`: Items per page (default: 50, max: 100)
+
+    Pagination metadata is included in responses:
+
+    ```json
+    {
+      "data": {
+        "receipts": [...],
+        "pagination": {
+          "page": 1,
+          "limit": 50,
+          "total": 150,
+          "totalPages": 3,
+          "hasNextPage": true,
+          "hasPrevPage": false
+        }
+      }
+    }
+    ```
+
+  version: 1.0.0
+  contact:
+    name: Mataresit API Support
+    url: https://mataresit.com/support
+    email: api-support@mataresit.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://mataresit.com/terms
+
+servers:
+  - url: https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1
+    description: Production server
+  - url: http://127.0.0.1:54321/functions/v1/external-api/api/v1
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Get your API key from the Mataresit dashboard.
+        
+        Format: `mk_live_` followed by 64 characters for production keys, or `mk_test_` for test keys.
+
+  schemas:
+    Receipt:
+      type: object
+      required:
+        - id
+        - merchant
+        - date
+        - total
+        - currency
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique receipt identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        merchant:
+          type: string
+          description: Merchant or vendor name
+          example: "Starbucks Coffee"
+          maxLength: 255
+        normalizedMerchant:
+          type: string
+          description: Normalized merchant name for consistency
+          example: "Starbucks"
+        date:
+          type: string
+          format: date
+          description: Receipt date
+          example: "2025-01-15"
+        total:
+          type: number
+          format: float
+          description: Total amount
+          example: 15.50
+          minimum: 0
+        tax:
+          type: number
+          format: float
+          description: Tax amount
+          example: 1.50
+          minimum: 0
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "USD"
+          pattern: "^[A-Z]{3}$"
+        paymentMethod:
+          type: string
+          description: Payment method used
+          example: "Credit Card"
+        predictedCategory:
+          type: string
+          description: AI-predicted expense category
+          example: "Food & Dining"
+        status:
+          type: string
+          enum: [unreviewed, reviewed, synced, archived]
+          description: Receipt processing status
+          example: "reviewed"
+        processingStatus:
+          type: string
+          enum: [pending, processing, complete, failed]
+          description: AI processing status
+          example: "complete"
+        imageUrl:
+          type: string
+          format: uri
+          description: URL to receipt image
+          example: "https://storage.supabase.co/receipts/image.jpg"
+        thumbnailUrl:
+          type: string
+          format: uri
+          description: URL to receipt thumbnail
+          example: "https://storage.supabase.co/receipts/thumb.jpg"
+        fullText:
+          type: string
+          description: Extracted text from receipt
+          example: "Starbucks Coffee\n123 Main St\nLatte $4.50\nTax $0.45\nTotal $4.95"
+        teamId:
+          type: string
+          format: uuid
+          description: Team ID if receipt belongs to a team
+          example: "456e7890-e89b-12d3-a456-426614174001"
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T10:35:00Z"
+
+    ReceiptCreate:
+      type: object
+      required:
+        - merchant
+        - date
+        - total
+      properties:
+        merchant:
+          type: string
+          description: Merchant or vendor name
+          example: "Starbucks Coffee"
+          maxLength: 255
+          minLength: 1
+        date:
+          type: string
+          format: date
+          description: Receipt date
+          example: "2025-01-15"
+        total:
+          type: number
+          format: float
+          description: Total amount
+          example: 15.50
+          minimum: 0
+        tax:
+          type: number
+          format: float
+          description: Tax amount
+          example: 1.50
+          minimum: 0
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "USD"
+          default: "USD"
+          pattern: "^[A-Z]{3}$"
+        paymentMethod:
+          type: string
+          description: Payment method used
+          example: "Credit Card"
+        category:
+          type: string
+          description: Expense category
+          example: "Food & Dining"
+        status:
+          type: string
+          enum: [unreviewed, reviewed, synced, archived]
+          description: Receipt status
+          default: "unreviewed"
+        imageUrl:
+          type: string
+          format: uri
+          description: URL to receipt image
+          example: "https://storage.supabase.co/receipts/image.jpg"
+        fullText:
+          type: string
+          description: Extracted text from receipt
+          example: "Receipt text content"
+        teamId:
+          type: string
+          format: uuid
+          description: Team ID if receipt belongs to a team
+          example: "456e7890-e89b-12d3-a456-426614174001"
+        lineItems:
+          type: array
+          description: Individual line items from the receipt
+          items:
+            $ref: '#/components/schemas/LineItem'
+
+    LineItem:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Item description
+          example: "Grande Latte"
+        quantity:
+          type: integer
+          description: Item quantity
+          example: 1
+          minimum: 1
+        unitPrice:
+          type: number
+          format: float
+          description: Price per unit
+          example: 4.50
+          minimum: 0
+        totalPrice:
+          type: number
+          format: float
+          description: Total price for this line item
+          example: 4.50
+          minimum: 0
+        category:
+          type: string
+          description: Item category
+          example: "Beverages"
+
+    Claim:
+      type: object
+      required:
+        - id
+        - title
+        - amount
+        - currency
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique claim identifier
+          example: "789e0123-e89b-12d3-a456-426614174002"
+        teamId:
+          type: string
+          format: uuid
+          description: Team ID
+          example: "456e7890-e89b-12d3-a456-426614174001"
+        title:
+          type: string
+          description: Claim title
+          example: "Business lunch with client"
+          maxLength: 255
+        description:
+          type: string
+          description: Detailed claim description
+          example: "Lunch meeting with potential client to discuss project requirements"
+        amount:
+          type: number
+          format: float
+          description: Claim amount
+          example: 85.50
+          minimum: 0
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "USD"
+          pattern: "^[A-Z]{3}$"
+        category:
+          type: string
+          description: Expense category
+          example: "Meals & Entertainment"
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+          description: Claim priority
+          example: "medium"
+        status:
+          type: string
+          enum: [draft, submitted, under_review, approved, rejected, paid]
+          description: Claim status
+          example: "submitted"
+        submittedAt:
+          type: string
+          format: date-time
+          description: Submission timestamp
+          example: "2025-01-15T10:30:00Z"
+        reviewedAt:
+          type: string
+          format: date-time
+          description: Review timestamp
+          example: "2025-01-15T14:30:00Z"
+        approvedAt:
+          type: string
+          format: date-time
+          description: Approval timestamp
+          example: "2025-01-15T16:30:00Z"
+        rejectionReason:
+          type: string
+          description: Reason for rejection if applicable
+          example: "Missing required documentation"
+        claimantId:
+          type: string
+          format: uuid
+          description: ID of the user who created the claim
+          example: "abc12345-e89b-12d3-a456-426614174003"
+        attachments:
+          type: array
+          description: Attached files and receipts
+          items:
+            $ref: '#/components/schemas/Attachment'
+        metadata:
+          type: object
+          description: Additional claim metadata
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T10:35:00Z"
+
+    Attachment:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [receipt, document, image]
+          description: Attachment type
+          example: "receipt"
+        receiptId:
+          type: string
+          format: uuid
+          description: Receipt ID if attachment is a receipt
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        url:
+          type: string
+          format: uri
+          description: Attachment URL
+          example: "https://storage.supabase.co/attachments/file.pdf"
+        metadata:
+          type: object
+          description: Attachment metadata
+          additionalProperties: true
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: boolean
+          description: Always true for error responses
+          example: true
+        code:
+          type: string
+          description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Validation failed"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: "2025-01-15T10:30:00Z"
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          description: Always true for success responses
+          example: true
+        data:
+          type: object
+          description: Response data
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+          example: "2025-01-15T10:30:00Z"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+          minimum: 1
+        limit:
+          type: integer
+          description: Items per page
+          example: 50
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          description: Total number of items
+          example: 150
+          minimum: 0
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 3
+          minimum: 0
+        hasNextPage:
+          type: boolean
+          description: Whether there is a next page
+          example: true
+        hasPrevPage:
+          type: boolean
+          description: Whether there is a previous page
+          example: false
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check API health and status
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: "healthy"
+                          version:
+                            type: string
+                            example: "v1"
+                          user:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              scopes:
+                                type: array
+                                items:
+                                  type: string
+                          performance:
+                            type: object
+                            properties:
+                              status:
+                                type: string
+                                enum: [healthy, degraded, unhealthy]
+                          features:
+                            type: object
+                            properties:
+                              receipts:
+                                type: boolean
+                              claims:
+                                type: boolean
+                              search:
+                                type: boolean
+                              analytics:
+                                type: boolean
+                              teams:
+                                type: boolean
+
+  /receipts:
+    get:
+      summary: List Receipts
+      description: |
+        Retrieve a paginated list of receipts with optional filtering.
+
+        ## Filtering Options
+
+        - **Date Range**: Filter by receipt date using `start_date` and `end_date`
+        - **Merchant**: Search by merchant name (partial match)
+        - **Category**: Filter by expense category
+        - **Amount Range**: Filter by amount using `min_amount` and `max_amount`
+        - **Status**: Filter by processing status
+        - **Currency**: Filter by currency code
+        - **Payment Method**: Filter by payment method
+        - **Team**: Filter by team ID (requires team access)
+
+        ## Sorting
+
+        Results can be sorted by any field using `sort_by` and `sort_order` parameters.
+        Default sorting is by `created_at` in descending order (newest first).
+      operationId: listReceipts
+      tags:
+        - Receipts
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: start_date
+          in: query
+          description: Filter receipts from this date (inclusive)
+          schema:
+            type: string
+            format: date
+            example: "2025-01-01"
+        - name: end_date
+          in: query
+          description: Filter receipts to this date (inclusive)
+          schema:
+            type: string
+            format: date
+            example: "2025-01-31"
+        - name: merchant
+          in: query
+          description: Filter by merchant name (partial match)
+          schema:
+            type: string
+            example: "Starbucks"
+        - name: category
+          in: query
+          description: Filter by expense category
+          schema:
+            type: string
+            example: "Food & Dining"
+        - name: status
+          in: query
+          description: Filter by receipt status
+          schema:
+            type: string
+            enum: [unreviewed, reviewed, synced, archived]
+        - name: min_amount
+          in: query
+          description: Minimum amount filter
+          schema:
+            type: number
+            format: float
+            minimum: 0
+        - name: max_amount
+          in: query
+          description: Maximum amount filter
+          schema:
+            type: number
+            format: float
+            minimum: 0
+        - name: currency
+          in: query
+          description: Filter by currency code
+          schema:
+            type: string
+            pattern: "^[A-Z]{3}$"
+            example: "USD"
+        - name: payment_method
+          in: query
+          description: Filter by payment method
+          schema:
+            type: string
+            example: "Credit Card"
+        - name: team_id
+          in: query
+          description: Filter by team ID (requires team access)
+          schema:
+            type: string
+            format: uuid
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [created_at, date, total, merchant, category]
+            default: "created_at"
+        - name: sort_order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: "desc"
+      responses:
+        '200':
+          description: List of receipts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          receipts:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Receipt'
+                          pagination:
+                            $ref: '#/components/schemas/PaginationMeta'
+                          filters:
+                            type: object
+                            description: Applied filters
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create Receipt
+      description: |
+        Create a new receipt with the provided data.
+
+        ## Required Fields
+
+        - `merchant`: The name of the merchant or vendor
+        - `date`: The date of the receipt (YYYY-MM-DD format)
+        - `total`: The total amount of the receipt
+
+        ## Optional Fields
+
+        - `tax`: Tax amount (if separate from total)
+        - `currency`: Currency code (defaults to USD)
+        - `paymentMethod`: How the payment was made
+        - `category`: Expense category
+        - `status`: Receipt status (defaults to unreviewed)
+        - `imageUrl`: URL to receipt image
+        - `fullText`: Extracted text from receipt
+        - `teamId`: Team ID if receipt belongs to a team
+        - `lineItems`: Array of individual line items
+
+        ## Subscription Limits
+
+        Receipt creation is subject to subscription limits:
+        - **Free**: 25 receipts per month
+        - **Pro**: 200 receipts per month
+        - **Max**: Unlimited receipts
+      operationId: createReceipt
+      tags:
+        - Receipts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptCreate'
+            examples:
+              basic_receipt:
+                summary: Basic Receipt
+                description: Minimal receipt with required fields only
+                value:
+                  merchant: "Starbucks Coffee"
+                  date: "2025-01-15"
+                  total: 15.50
+                  currency: "USD"
+              detailed_receipt:
+                summary: Detailed Receipt
+                description: Receipt with all optional fields
+                value:
+                  merchant: "Office Depot"
+                  date: "2025-01-15"
+                  total: 89.99
+                  tax: 7.20
+                  currency: "USD"
+                  paymentMethod: "Credit Card"
+                  category: "Office Supplies"
+                  status: "reviewed"
+                  fullText: "Office Depot\n123 Business Ave\nPaper $25.99\nPens $15.00\nBinders $49.00\nSubtotal $89.99\nTax $7.20\nTotal $97.19"
+                  lineItems:
+                    - description: "Copy Paper - 500 sheets"
+                      quantity: 1
+                      unitPrice: 25.99
+                      totalPrice: 25.99
+                      category: "Paper Products"
+                    - description: "Ballpoint Pens - Pack of 12"
+                      quantity: 1
+                      unitPrice: 15.00
+                      totalPrice: 15.00
+                      category: "Writing Supplies"
+      responses:
+        '201':
+          description: Receipt created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Receipt'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit or subscription limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

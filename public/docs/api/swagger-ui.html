@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mataresit API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="/mataresit-icon.png" sizes="32x32" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            margin: 0;
+            background: #fafafa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .swagger-ui .topbar {
+            background-color: #1f2937;
+            border-bottom: 1px solid #374151;
+        }
+
+        .swagger-ui .topbar .download-url-wrapper {
+            display: none;
+        }
+
+        .custom-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 0;
+        }
+
+        .custom-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .custom-header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .api-info-section {
+            background: white;
+            padding: 2rem;
+            margin: 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .api-info-section h2 {
+            color: #1f2937;
+            margin-top: 0;
+            font-size: 1.8rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .info-card h3 {
+            margin-top: 0;
+            color: #374151;
+            font-size: 1.2rem;
+        }
+
+        .quick-start {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .quick-start h3 {
+            margin-top: 0;
+            color: #0c4a6e;
+        }
+
+        .quick-start ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .quick-start li {
+            margin: 0.5rem 0;
+            color: #374151;
+        }
+
+        .code-example {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            white-space: pre;
+            margin: 1rem 0;
+        }
+
+        .endpoint-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .badge-get { background: #dcfce7; color: #166534; }
+        .badge-post { background: #dbeafe; color: #1e40af; }
+        .badge-put { background: #fef3c7; color: #92400e; }
+        .badge-delete { background: #fef2f2; color: #991b1b; }
+
+        .swagger-ui .scheme-container {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .swagger-ui .auth-btn-wrapper {
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .swagger-ui .btn.authorize {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+        }
+
+        .swagger-ui .btn.authorize:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+
+        @media (max-width: 768px) {
+            .custom-header {
+                padding: 1.5rem 1rem;
+            }
+            
+            .custom-header h1 {
+                font-size: 2rem;
+            }
+            
+            .api-info-section {
+                padding: 1.5rem 1rem;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-header">
+        <h1>🧾 Mataresit API</h1>
+        <p>Comprehensive Receipt Management & Expense Analytics API</p>
+    </div>
+
+    <div class="api-info-section">
+        <h2>Welcome to the Mataresit API</h2>
+        <p>The Mataresit API provides powerful tools for receipt management, expense tracking, and team collaboration. Built for developers who need to integrate receipt processing and expense management into their applications.</p>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>🔐 Authentication</h3>
+                <p>Secure API key authentication with dual-header requirement. Get your API key from the Mataresit dashboard and include it in the <code>X-API-Key</code> header.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>⚡ Rate Limits</h3>
+                <p>
+                    <strong>Free:</strong> 100 requests/hour<br>
+                    <strong>Pro:</strong> 1,000 requests/hour<br>
+                    <strong>Max:</strong> 5,000 requests/hour
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h3>📊 Key Features</h3>
+                <p>
+                    <span class="endpoint-badge badge-get">GET</span> Receipt Management<br>
+                    <span class="endpoint-badge badge-post">POST</span> Claims Processing<br>
+                    <span class="endpoint-badge badge-get">GET</span> Semantic Search<br>
+                    <span class="endpoint-badge badge-get">GET</span> Analytics & Reports<br>
+                    <span class="endpoint-badge badge-get">GET</span> Team Collaboration
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h3>🚀 Quick Start</h3>
+                <p>Ready to get started? Try creating your first receipt:</p>
+                <div class="code-example">curl -X POST \
+  'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1/receipts' \
+  -H 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
+  -H 'X-API-Key: mk_live_your_key' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "merchant": "Starbucks",
+    "date": "2025-01-15",
+    "total": 15.50,
+    "currency": "USD"
+  }'</div>
+            </div>
+        </div>
+
+        <div class="quick-start">
+            <h3>🔧 Getting Started</h3>
+            <ol>
+                <li><strong>Get an API Key:</strong> Sign up at <a href="https://mataresit.com" target="_blank">mataresit.com</a> and generate an API key</li>
+                <li><strong>Authenticate:</strong> Include your API key in the <code>X-API-Key</code> header and Supabase anonymous key in <code>Authorization</code> header</li>
+                <li><strong>Start Building:</strong> Use the interactive documentation below to explore endpoints</li>
+                <li><strong>Need Help?</strong> Check our <a href="/api-reference" target="_blank">comprehensive API reference</a> or contact support</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            // Build a system
+            const ui = SwaggerUIBundle({
+                url: './openapi.yaml',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                docExpansion: "list",
+                filter: true,
+                showExtensions: true,
+                showCommonExtensions: true,
+                tryItOutEnabled: true,
+                requestInterceptor: function(request) {
+                    // Add custom headers or modify requests here
+                    console.log('API Request:', request);
+                    return request;
+                },
+                responseInterceptor: function(response) {
+                    // Handle responses here
+                    console.log('API Response:', response);
+                    return response;
+                },
+                onComplete: function() {
+                    console.log('Swagger UI loaded successfully');
+                },
+                validatorUrl: null, // Disable validator
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                oauth2RedirectUrl: window.location.origin + '/oauth2-redirect.html'
+            });
+
+            // Custom styling and functionality
+            setTimeout(function() {
+                // Hide the Swagger UI topbar
+                const topbar = document.querySelector('.swagger-ui .topbar');
+                if (topbar) {
+                    topbar.style.display = 'none';
+                }
+
+                // Add custom authentication helper
+                const authSection = document.querySelector('.swagger-ui .auth-wrapper');
+                if (authSection) {
+                    const helpText = document.createElement('div');
+                    helpText.innerHTML = `
+                        <p style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
+                            <strong>💡 Tip:</strong> Get your API key from the 
+                            <a href="/dashboard/settings" target="_blank">Mataresit Dashboard</a>
+                        </p>
+                    `;
+                    authSection.appendChild(helpText);
+                }
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

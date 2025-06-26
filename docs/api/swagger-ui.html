@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mataresit API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="https://mataresit.com/favicon.png" sizes="32x32" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            margin: 0;
+            background: #fafafa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .swagger-ui .topbar {
+            background-color: #1f2937;
+            border-bottom: 1px solid #374151;
+        }
+
+        .swagger-ui .topbar .download-url-wrapper {
+            display: none;
+        }
+
+        .swagger-ui .info {
+            margin: 50px 0;
+        }
+
+        .swagger-ui .info .title {
+            color: #1f2937;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .swagger-ui .info .description {
+            color: #4b5563;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .swagger-ui .scheme-container {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .swagger-ui .auth-wrapper {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .swagger-ui .auth-wrapper .auth-container {
+            border: none;
+            padding: 0;
+        }
+
+        .swagger-ui .btn.authorize {
+            background-color: #059669;
+            border-color: #059669;
+            color: white;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .swagger-ui .btn.authorize:hover {
+            background-color: #047857;
+            border-color: #047857;
+        }
+
+        .swagger-ui .opblock.opblock-get {
+            border-color: #059669;
+            background: rgba(5, 150, 105, 0.1);
+        }
+
+        .swagger-ui .opblock.opblock-get .opblock-summary {
+            border-color: #059669;
+        }
+
+        .swagger-ui .opblock.opblock-post {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .swagger-ui .opblock.opblock-post .opblock-summary {
+            border-color: #dc2626;
+        }
+
+        .swagger-ui .opblock.opblock-put {
+            border-color: #d97706;
+            background: rgba(217, 119, 6, 0.1);
+        }
+
+        .swagger-ui .opblock.opblock-put .opblock-summary {
+            border-color: #d97706;
+        }
+
+        .swagger-ui .opblock.opblock-delete {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .swagger-ui .opblock.opblock-delete .opblock-summary {
+            border-color: #dc2626;
+        }
+
+        .custom-header {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .custom-header h1 {
+            margin: 0;
+            font-size: 48px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-header p {
+            margin: 10px 0 0 0;
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .api-info-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px auto;
+            max-width: 1200px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .info-card {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #059669;
+        }
+
+        .info-card h3 {
+            margin: 0 0 10px 0;
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .info-card p {
+            margin: 0;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .rate-limit-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .rate-limit-table th,
+        .rate-limit-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .rate-limit-table th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .tier-free { color: #6b7280; }
+        .tier-pro { color: #059669; }
+        .tier-max { color: #dc2626; }
+
+        .quick-start {
+            background: #eff6ff;
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .quick-start h3 {
+            margin: 0 0 15px 0;
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .code-example {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .endpoint-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .badge-get { background: #dcfce7; color: #166534; }
+        .badge-post { background: #fef2f2; color: #991b1b; }
+        .badge-put { background: #fef3c7; color: #92400e; }
+        .badge-delete { background: #fef2f2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="custom-header">
+        <h1>🧾 Mataresit API</h1>
+        <p>Comprehensive Receipt Management & Expense Analytics API</p>
+    </div>
+
+    <div class="api-info-section">
+        <h2>Welcome to the Mataresit API</h2>
+        <p>The Mataresit API provides powerful tools for receipt management, expense tracking, and team collaboration. Built for developers who need to integrate receipt processing and expense management into their applications.</p>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>🔐 Authentication</h3>
+                <p>All requests require an API key in the <code>X-API-Key</code> header. Get your API key from the Mataresit dashboard.</p>
+                <div class="code-example">X-API-Key: mk_live_your_api_key_here</div>
+            </div>
+
+            <div class="info-card">
+                <h3>⚡ Rate Limits</h3>
+                <p>API requests are rate-limited based on your subscription tier:</p>
+                <table class="rate-limit-table">
+                    <tr>
+                        <th>Tier</th>
+                        <th>Requests/Hour</th>
+                        <th>Features</th>
+                    </tr>
+                    <tr>
+                        <td class="tier-free">Free</td>
+                        <td>100</td>
+                        <td>Basic receipts</td>
+                    </tr>
+                    <tr>
+                        <td class="tier-pro">Pro</td>
+                        <td>1,000</td>
+                        <td>Claims, Analytics</td>
+                    </tr>
+                    <tr>
+                        <td class="tier-max">Max</td>
+                        <td>5,000</td>
+                        <td>All features</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="info-card">
+                <h3>📊 Key Features</h3>
+                <p>
+                    <span class="endpoint-badge badge-get">GET</span> Receipt Management<br>
+                    <span class="endpoint-badge badge-post">POST</span> Claims Processing<br>
+                    <span class="endpoint-badge badge-get">GET</span> Semantic Search<br>
+                    <span class="endpoint-badge badge-get">GET</span> Analytics & Reports<br>
+                    <span class="endpoint-badge badge-get">GET</span> Team Collaboration
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h3>🚀 Quick Start</h3>
+                <p>Ready to get started? Try creating your first receipt:</p>
+                <div class="code-example">curl -X POST \
+  'https://api.mataresit.com/v1/receipts' \
+  -H 'X-API-Key: mk_live_your_key' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "merchant": "Starbucks",
+    "date": "2025-01-15",
+    "total": 15.50,
+    "currency": "USD"
+  }'</div>
+            </div>
+        </div>
+
+        <div class="quick-start">
+            <h3>🔧 Getting Started</h3>
+            <ol>
+                <li><strong>Get an API Key:</strong> Sign up at <a href="https://mataresit.com" target="_blank">mataresit.com</a> and generate an API key</li>
+                <li><strong>Authenticate:</strong> Include your API key in the <code>X-API-Key</code> header</li>
+                <li><strong>Start Building:</strong> Use the interactive documentation below to explore endpoints</li>
+                <li><strong>Need Help?</strong> Check our <a href="https://docs.mataresit.com" target="_blank">developer guides</a> or contact support</li>
+            </ol>
+        </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            // Build a system
+            const ui = SwaggerUIBundle({
+                url: './openapi.yaml',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                docExpansion: "list",
+                filter: true,
+                showExtensions: true,
+                showCommonExtensions: true,
+                tryItOutEnabled: true,
+                requestInterceptor: function(request) {
+                    // Add custom headers or modify requests here
+                    console.log('API Request:', request);
+                    return request;
+                },
+                responseInterceptor: function(response) {
+                    // Handle responses here
+                    console.log('API Response:', response);
+                    return response;
+                },
+                onComplete: function() {
+                    console.log('Swagger UI loaded successfully');
+                },
+                validatorUrl: null, // Disable validator
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                oauth2RedirectUrl: window.location.origin + '/oauth2-redirect.html'
+            });
+
+            // Custom styling and functionality
+            setTimeout(function() {
+                // Hide the Swagger UI topbar
+                const topbar = document.querySelector('.swagger-ui .topbar');
+                if (topbar) {
+                    topbar.style.display = 'none';
+                }
+
+                // Add custom authentication helper
+                const authSection = document.querySelector('.swagger-ui .auth-wrapper');
+                if (authSection) {
+                    const helpText = document.createElement('div');
+                    helpText.innerHTML = `
+                        <p style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
+                            <strong>💡 Tip:</strong> Get your API key from the 
+                            <a href="https://mataresit.com/dashboard/api-keys" target="_blank">Mataresit Dashboard</a>
+                        </p>
+                    `;
+                    authSection.appendChild(helpText);
+                }
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

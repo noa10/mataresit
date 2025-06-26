@@ -1,0 +1,471 @@
+openapi: 3.0.3
+info:
+  title: Mataresit External API
+  description: |
+    # Mataresit External API
+
+    The Mataresit External API provides comprehensive access to receipt management, expense claims, analytics, and team collaboration features. Built for developers who need to integrate receipt processing and expense management into their applications.
+
+    ## Features
+
+    - **Receipt Management**: Upload, process, and manage receipts with AI-powered data extraction
+    - **Claims Processing**: Create and manage expense claims with receipt attachments
+    - **Semantic Search**: Advanced search across receipts, claims, and business directory
+    - **Analytics & Reporting**: Comprehensive spending analytics and custom reports
+    - **Team Collaboration**: Multi-user teams with role-based access control
+    - **Real-time Processing**: Instant receipt processing with AI vision models
+
+    ## Authentication
+
+    All API requests require authentication using API keys. Include your API key in the `X-API-Key` header:
+
+    ```
+    X-API-Key: mk_live_your_api_key_here
+    ```
+
+    ## Rate Limiting
+
+    API requests are rate-limited based on your subscription tier:
+
+    - **Free**: 100 requests/hour
+    - **Pro**: 1,000 requests/hour  
+    - **Max**: 5,000 requests/hour
+
+    Rate limit headers are included in all responses:
+
+    - `X-RateLimit-Limit`: Your rate limit
+    - `X-RateLimit-Remaining`: Remaining requests
+    - `X-RateLimit-Reset`: Reset time (Unix timestamp)
+
+    ## Error Handling
+
+    The API uses conventional HTTP response codes and returns detailed error information:
+
+    ```json
+    {
+      "error": true,
+      "code": "VALIDATION_ERROR",
+      "message": "Validation failed",
+      "details": {
+        "validationErrors": [
+          {
+            "field": "total",
+            "message": "Total must be a positive number"
+          }
+        ]
+      },
+      "timestamp": "2025-01-15T10:30:00Z"
+    }
+    ```
+
+    ## Support
+
+    - **Documentation**: [https://docs.mataresit.com](https://docs.mataresit.com)
+    - **Support**: [support@mataresit.com](mailto:support@mataresit.com)
+    - **Status Page**: [https://status.mataresit.com](https://status.mataresit.com)
+
+  version: 1.0.0
+  contact:
+    name: Mataresit API Support
+    url: https://docs.mataresit.com
+    email: support@mataresit.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://mataresit.com/terms
+
+externalDocs:
+  description: Find more info here
+  url: https://docs.mataresit.com
+
+servers:
+  - url: https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1
+    description: Production server
+  - url: http://127.0.0.1:54321/functions/v1/external-api/api/v1
+    description: Development server
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Get your API key from the Mataresit dashboard.
+        
+        Format: `mk_live_` followed by 64 characters for production keys, or `mk_test_` for test keys.
+
+  schemas:
+    Receipt:
+      type: object
+      required:
+        - id
+        - merchant
+        - date
+        - total
+        - currency
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique receipt identifier
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        merchant:
+          type: string
+          description: Merchant or vendor name
+          example: "Starbucks Coffee"
+          maxLength: 255
+        normalizedMerchant:
+          type: string
+          description: Normalized merchant name for consistency
+          example: "Starbucks"
+        date:
+          type: string
+          format: date
+          description: Receipt date
+          example: "2025-01-15"
+        total:
+          type: number
+          format: float
+          description: Total amount
+          example: 15.50
+          minimum: 0
+        tax:
+          type: number
+          format: float
+          description: Tax amount
+          example: 1.50
+          minimum: 0
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "USD"
+          pattern: "^[A-Z]{3}$"
+        paymentMethod:
+          type: string
+          description: Payment method used
+          example: "Credit Card"
+        predictedCategory:
+          type: string
+          description: AI-predicted expense category
+          example: "Food & Dining"
+        status:
+          type: string
+          enum: [unreviewed, reviewed, synced, archived]
+          description: Receipt processing status
+          example: "reviewed"
+        processingStatus:
+          type: string
+          enum: [pending, processing, complete, failed]
+          description: AI processing status
+          example: "complete"
+        imageUrl:
+          type: string
+          format: uri
+          description: URL to receipt image
+          example: "https://storage.supabase.co/receipts/image.jpg"
+        thumbnailUrl:
+          type: string
+          format: uri
+          description: URL to receipt thumbnail
+          example: "https://storage.supabase.co/receipts/thumb.jpg"
+        fullText:
+          type: string
+          description: Extracted text from receipt
+          example: "Starbucks Coffee\n123 Main St\nLatte $4.50\nTax $0.45\nTotal $4.95"
+        teamId:
+          type: string
+          format: uuid
+          description: Team ID if receipt belongs to a team
+          example: "456e7890-e89b-12d3-a456-426614174001"
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T10:30:00Z"
+
+    CreateReceiptRequest:
+      type: object
+      required:
+        - merchant
+        - date
+        - total
+        - currency
+      properties:
+        merchant:
+          type: string
+          description: Merchant or vendor name
+          example: "Starbucks Coffee"
+          maxLength: 255
+        date:
+          type: string
+          format: date
+          description: Receipt date
+          example: "2025-01-15"
+        total:
+          type: number
+          format: float
+          description: Total amount
+          example: 15.50
+          minimum: 0
+        tax:
+          type: number
+          format: float
+          description: Tax amount
+          example: 1.50
+          minimum: 0
+        currency:
+          type: string
+          description: Currency code (ISO 4217)
+          example: "USD"
+          pattern: "^[A-Z]{3}$"
+        paymentMethod:
+          type: string
+          description: Payment method used
+          example: "Credit Card"
+        category:
+          type: string
+          description: Expense category
+          example: "Food & Dining"
+        fullText:
+          type: string
+          description: Full receipt text content
+          example: "Starbucks Coffee\n123 Main St\nLatte $4.50\nTax $0.45\nTotal $4.95"
+        teamId:
+          type: string
+          format: uuid
+          description: Team ID to assign receipt to
+          example: "456e7890-e89b-12d3-a456-426614174001"
+
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "healthy"
+            version:
+              type: string
+              example: "v1"
+            timestamp:
+              type: string
+              format: date-time
+              example: "2025-01-15T10:30:00Z"
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "user-123"
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                  example: ["receipts:read", "receipts:write"]
+            limits:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  example: "pro"
+                requestsRemaining:
+                  type: integer
+                  example: 950
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: boolean
+          example: true
+        code:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "Validation failed"
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-01-15T10:30:00Z"
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Check API status and validate authentication
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /receipts:
+    get:
+      summary: List Receipts
+      description: Retrieve receipts with optional filtering and pagination
+      operationId: listReceipts
+      tags:
+        - Receipts
+      parameters:
+        - name: limit
+          in: query
+          description: Number of receipts to return (1-100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of receipts to skip for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: start_date
+          in: query
+          description: Filter receipts from this date (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Filter receipts to this date (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: merchant
+          in: query
+          description: Filter by merchant name
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of receipts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      receipts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Receipt'
+                      total:
+                        type: integer
+                        example: 150
+                      limit:
+                        type: integer
+                        example: 20
+                      offset:
+                        type: integer
+                        example: 0
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create Receipt
+      description: Create a new receipt
+      operationId: createReceipt
+      tags:
+        - Receipts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReceiptRequest'
+      responses:
+        '201':
+          description: Receipt created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Receipt'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Health
+    description: API health and status endpoints
+  - name: Receipts
+    description: Receipt management operations
+  - name: Claims
+    description: Expense claims management
+  - name: Search
+    description: Semantic search across data
+  - name: Teams
+    description: Team collaboration features
+  - name: Analytics
+    description: Analytics and reporting (Pro+ only)
