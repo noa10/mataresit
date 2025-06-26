@@ -457,6 +457,7 @@ export default function Index() {
               <ul className="space-y-2">
                 {/* Added hover:text-primary */}
                 <li><Link to="/docs" className="text-sm text-muted-foreground hover:text-primary transition-colors">Documentation</Link></li>
+                <li><Link to="/api-reference" className="text-sm text-muted-foreground hover:text-primary transition-colors">API Reference</Link></li>
                 <li><Link to="/help" className="text-sm text-muted-foreground hover:text-primary transition-colors">Help Center</Link></li>
                 <li><Link to="/status" className="text-sm text-muted-foreground hover:text-primary transition-colors">System Status</Link></li>
                 <li><Link to="/blog" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</Link></li>

@@ -5,7 +5,7 @@ import { useStripe } from "@/contexts/StripeContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
@@ -137,6 +137,12 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     <Link to="/docs" className="flex items-center gap-2 w-full">
                       <FileText className="h-4 w-4" />
                       {tNav('mainMenu.documentation')}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/api-reference" className="flex items-center gap-2 w-full">
+                      <Code className="h-4 w-4" />
+                      {tNav('mainMenu.apiReference')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>

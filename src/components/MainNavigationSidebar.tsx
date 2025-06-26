@@ -6,7 +6,7 @@ import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { useSidebarAccessibility } from "@/hooks/useSidebarAccessibility";
 import {
   BrainCircuit, BarChart3, Settings,
-  DollarSign, ChevronLeft, Menu, X, Users, Crown, FileText
+  DollarSign, ChevronLeft, Menu, X, Users, Crown, FileText, Code
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -218,6 +218,20 @@ export function MainNavigationSidebar({
               >
                 <DollarSign className="h-4 w-4 flex-shrink-0" />
                 {(isOpen || !isDesktop) && <span>{tNav('mainMenu.pricing')}</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/api-reference"
+                className={({ isActive }) =>
+                  cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
+                  isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
+                  !isOpen && isDesktop && "justify-center")}
+                onClick={handleItemClick}
+                title={!isOpen && isDesktop ? tNav('mainMenu.apiReference') : undefined}
+              >
+                <Code className="h-4 w-4 flex-shrink-0" />
+                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.apiReference')}</span>}
               </NavLink>
             </li>
 

@@ -64,6 +64,7 @@ const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitatio
 const DebugSearch = lazy(() => import("./pages/DebugSearch"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
+const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
 
 
 // Create a loading component for suspense
@@ -114,6 +115,11 @@ const App = () => (
               <Route path="/docs" element={
                 <Suspense fallback={<PageLoading />}>
                   <DocumentationPage />
+                </Suspense>
+              } />
+              <Route path="/api-reference" element={
+                <Suspense fallback={<PageLoading />}>
+                  <ApiReferencePage />
                 </Suspense>
               } />
               <Route path="/status" element={

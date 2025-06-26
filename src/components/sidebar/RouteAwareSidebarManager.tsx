@@ -59,7 +59,8 @@ export const SIDEBAR_ROUTE_CONFIG = {
     '/analysis',
     '/teams',
     '/claims',
-    '/receipt'
+    '/receipt',
+    '/api-reference'
   ],
   
   // Routes that should show conversation sidebar
