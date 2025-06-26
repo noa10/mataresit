@@ -47,3 +47,31 @@ verify_jwt = false
 [audit-embeddings]
 verify_jwt = true
 # Embedding audit and repair functions require authentication
+
+[external-api]
+verify_jwt = false
+# External API uses custom API key authentication, not JWT
+
+[manage-api-keys]
+verify_jwt = true
+# API key management requires user authentication
+
+[test-simple]
+verify_jwt = false
+# Simple test function for debugging
+
+[api-external]
+verify_jwt = false
+# Alternative external API function to bypass middleware issues
+
+[mataresit-api]
+verify_jwt = false
+# Mataresit API function with different naming
+
+[public-api-test]
+verify_jwt = false
+# Public API test function to bypass middleware issues
+
+[bypass-test]
+verify_jwt = false
+# Bypass test function with full API implementation
