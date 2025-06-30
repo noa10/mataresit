@@ -49,6 +49,9 @@
       "popular": "Pertanyaan popular",
       "categories": "Cari mengikut kategori",
       "dateRanges": "Cari mengikut tarikh"
+    },
+    "helper": {
+      "shortcuts": "Tekan Enter untuk hantar, Shift+Enter untuk baris baru"
     }
   },
   "messages": {
@@ -74,6 +77,14 @@
     "dateRange": "Dari {{startDate}} hingga {{endDate}}",
     "categories": "Kategori: {{categories}}",
     "merchants": "Pedagang: {{merchants}}",
+    "date": "Tarikh",
+    "total": "Jumlah",
+    "amount": "Amaun",
+    "match": "padanan",
+    "notes": "Nota",
+    "from": "Dari",
+    "unknownMerchant": "Peniaga Tidak Diketahui",
+    "unknownItem": "Item Tidak Diketahui",
     "summary": {
       "title": "Ringkasan",
       "totalReceipts": "Jumlah resit",

@@ -1,16 +1,23 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { useLocation } from 'react-router-dom';
 import { MessageSquare, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { semanticSearch, SearchParams, SearchResult, unifiedSearch } from '../lib/ai-search';
 import { UnifiedSearchParams, UnifiedSearchResponse } from '@/types/unified-search';
 import { generateIntelligentResponse, detectUserIntent } from '../lib/chat-response-generator';
+import { parseNaturalLanguageQuery } from '../lib/enhanced-query-parser';
+import { formatCurrencyAmount } from '../lib/currency-converter';
+import { usePersonalizationContext } from '@/contexts/PersonalizationContext';
+import { personalizedChatService } from '@/services/personalizedChatService';
+import { conversationMemoryService } from '@/services/conversationMemoryService';
 
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { SidebarToggle } from '../components/chat/SidebarToggle';
+import { ConversationManager } from '../components/chat/ConversationManager';
+import { StatusIndicator, useStatusIndicator } from '../components/chat/StatusIndicator';
 import { useChatControls } from '@/contexts/ChatControlsContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { SearchPageSidebarContent } from '../components/sidebar/SearchPageSidebarContent';
@@ -34,6 +41,9 @@ export default function SemanticSearchPage() {
   // Conversation state
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
+  // Status indicator for real-time feedback
+  const { status, updateStatus, resetStatus } = useStatusIndicator();
+
   // URL state management for preserving chat state (optional)
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
 
@@ -45,6 +55,14 @@ export default function SemanticSearchPage() {
 
   // Unified sidebar context
   const { isSidebarOpen, toggleSidebar, setSidebarContent, clearSidebarContent } = useAppSidebar();
+
+  // Personalization context
+  const {
+    trackChatMessage,
+    trackSearchQuery,
+    getAdaptiveResponseConfig,
+    profile
+  } = usePersonalizationContext();
 
   // Refs to prevent infinite loops
   const isUpdatingUrlRef = useRef(false);
@@ -236,6 +254,17 @@ export default function SemanticSearchPage() {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+    // Track chat message for personalization
+    const startTime = Date.now();
+    try {
+      await trackChatMessage(content, currentConversationId);
+    } catch (error) {
+      console.error('Error tracking chat message:', error);
+    }
+
+    // Update status to show we're starting to process
+    updateStatus('preprocessing', 'Understanding your question...');
+
     try {
       // First check for special intents (help, greetings, etc.)
       const intentCheck = detectUserIntent(content);
@@ -249,14 +278,37 @@ export default function SemanticSearchPage() {
 
         setMessages(prev => [...prev, aiMessage]);
         setIsLoading(false);
+        resetStatus();
         return;
       }
 
       // Check if this is a "show more" request
       const isShowMoreRequest = /\b(show\s+more|more\s+results|load\s+more|see\s+more|additional\s+results)\b/i.test(content);
 
+      // 🔍 DEBUG: Add comprehensive logging for monetary queries
+      console.log('🔍 DEBUG: Chat message received:', {
+        content,
+        isShowMoreRequest,
+        timestamp: new Date().toISOString()
+      });
+
+      // Check if this looks like a monetary query
+      const monetaryPatterns = [
+        /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+        /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+        /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i
+      ];
+
+      const isMonetaryQuery = monetaryPatterns.some(pattern => pattern.test(content));
+      console.log('💰 DEBUG: Monetary query detection:', {
+        isMonetaryQuery,
+        content,
+        patterns: monetaryPatterns.map(p => p.source)
+      });
+
       let params: SearchParams;
       let results: SearchResult;
+      let parsedQuery: any = null;
 
       if (isShowMoreRequest && lastSearchParams) {
         // Use previous search parameters with increased offset
@@ -296,31 +348,129 @@ export default function SemanticSearchPage() {
           return;
         }
       } else {
-        // Regular new search - use unified search
+        // Regular new search - use unified search with enhanced query parsing
+        console.log('🔍 Parsing natural language query:', content);
+
+        // Parse the natural language query to extract filters
+        parsedQuery = parseNaturalLanguageQuery(content);
+        console.log('📊 Parsed query result:', parsedQuery);
+
+        // Convert parsed amount range to unified search filters
+        const filters: any = {};
+
+        if (parsedQuery.amountRange) {
+          console.log('💰 DEBUG: Amount range detected in SemanticSearch:', {
+            amountRange: parsedQuery.amountRange,
+            min: parsedQuery.amountRange.min,
+            max: parsedQuery.amountRange.max,
+            minType: typeof parsedQuery.amountRange.min,
+            maxType: typeof parsedQuery.amountRange.max
+          });
+
+          // The enhanced query parser now handles currency conversion automatically
+          const { min, max, currency, conversionInfo } = parsedQuery.amountRange;
+
+          // Log conversion details if available
+          if (conversionInfo && conversionInfo.conversionApplied) {
+            console.log(`💱 Currency conversion applied: ${conversionInfo.reasoning}`);
+            console.log(`💱 Exchange rate: ${conversionInfo.exchangeRate}`);
+          }
+
+          filters.amountRange = {
+            min: min || 0,
+            max: max || Number.MAX_SAFE_INTEGER,
+            currency: currency || 'MYR'
+          };
+
+          console.log('💰 DEBUG: Applied amount range to unified search filters:', {
+            filters: filters.amountRange,
+            minType: typeof filters.amountRange.min,
+            maxType: typeof filters.amountRange.max
+          });
+        }
+
+        if (parsedQuery.dateRange) {
+          filters.dateRange = parsedQuery.dateRange;
+        }
+
+        if (parsedQuery.merchants && parsedQuery.merchants.length > 0) {
+          filters.merchants = parsedQuery.merchants;
+        }
+
+        if (parsedQuery.categories && parsedQuery.categories.length > 0) {
+          filters.categories = parsedQuery.categories;
+        }
+
         const unifiedParams: UnifiedSearchParams = {
           query: content,
           sources: ['receipts', 'business_directory'], // Default sources
           limit: 10,
           offset: 0,
-          filters: {},
+          filters,
           similarityThreshold: 0.2,
           includeMetadata: true,
           aggregationMode: 'relevance'
         };
 
+        console.log('🚀 Unified search params with filters:', unifiedParams);
+
         try {
-          const unifiedResponse = await unifiedSearch(unifiedParams);
+          // Update status to show we're searching
+          updateStatus('searching', 'Searching through your data...');
+
+          // Add enhanced prompting for better LLM preprocessing
+          const enhancedParams = {
+            ...unifiedParams,
+            useEnhancedPrompting: true,
+            conversationHistory: messages.slice(-5).map(m => m.content), // Last 5 messages for context
+          };
+
+          console.log('🚀 CHAT: Calling unified-search Edge Function with enhanced params:', {
+            enhancedParams,
+            hasAmountRange: !!enhancedParams.filters?.amountRange,
+            amountRangeDetails: enhancedParams.filters?.amountRange
+          });
+
+          console.log('🔍 CHAT: About to call unifiedSearch function...');
+          console.log('🔍 CHAT: Enhanced params being sent:', JSON.stringify(enhancedParams, null, 2));
+
+          const unifiedResponse = await unifiedSearch(enhancedParams);
+
+          console.log('🔍 CHAT: unifiedSearch function returned:', {
+            success: unifiedResponse?.success,
+            hasResults: !!unifiedResponse?.results,
+            resultCount: unifiedResponse?.results?.length || 0,
+            error: unifiedResponse?.error,
+            fullResponse: unifiedResponse
+          });
+
+          console.log('📊 CHAT: Unified-search response received:', {
+            success: unifiedResponse.success,
+            resultsCount: unifiedResponse.results?.length || 0,
+            totalResults: unifiedResponse.totalResults,
+            searchMetadata: unifiedResponse.searchMetadata,
+            sampleResults: unifiedResponse.results?.slice(0, 3).map(r => ({
+              id: r.sourceId,
+              title: r.title,
+              total: r.metadata?.total,
+              source: r.source
+            }))
+          });
 
           if (unifiedResponse.success) {
-            // Convert unified response to legacy format for chat display
+            // 🔧 IMPROVED: Better conversion from unified response to chat display format
             results = {
               results: unifiedResponse.results.map(result => ({
                 id: result.sourceId,
                 merchant: result.title,
-                date: result.createdAt,
-                total: result.metadata.total || 0,
+                date: result.metadata?.date || result.createdAt,
+                total: result.metadata?.total || 0,
+                total_amount: result.metadata?.total || 0,
+                currency: result.metadata?.currency || 'MYR',
                 similarity_score: result.similarity,
-                ...result.metadata
+                predicted_category: result.metadata?.predicted_category,
+                fullText: result.content,
+                ...(result.metadata || {})
               })),
               count: unifiedResponse.results.length,
               total: unifiedResponse.totalResults,
@@ -330,22 +480,97 @@ export default function SemanticSearchPage() {
                 limit: 10,
                 offset: 0,
                 searchTarget: 'all'
-              }
+              },
+              searchMetadata: unifiedResponse.searchMetadata
             };
+
+            console.log('✅ CHAT: Successfully processed unified-search results:', {
+              resultsCount: results.count,
+              totalResults: results.total,
+              hasMetadata: !!results.searchMetadata
+            });
           } else {
             throw new Error(unifiedResponse.error || 'Unified search failed');
           }
         } catch (unifiedError) {
-          console.warn('Unified search failed, falling back to legacy search:', unifiedError);
-          // Fallback to legacy search
-          params = {
-            query: content,
-            isNaturalLanguage: true,
-            limit: 10,
-            offset: 0,
-            searchTarget: 'all'
-          };
+          console.error('❌ CHAT: Unified-search failed:', unifiedError);
+          console.error('❌ CHAT: Error details:', {
+            message: unifiedError?.message || 'No message',
+            stack: unifiedError?.stack || 'No stack',
+            name: unifiedError?.name || 'No name',
+            cause: unifiedError?.cause || 'No cause',
+            toString: unifiedError?.toString() || 'No toString',
+            errorType: typeof unifiedError,
+            errorConstructor: unifiedError?.constructor?.name || 'Unknown'
+          });
+
+          // 🔄 SELECTIVE FALLBACK: Only fall back to ai-search.ts for specific error types
+          const errorMessage = unifiedError?.message || unifiedError?.toString() || 'Unknown error';
+          const isAuthError = errorMessage.includes('authentication') ||
+                             errorMessage.includes('Invalid authentication token') ||
+                             errorMessage.includes('401');
+          const isCorsError = errorMessage.includes('CORS') ||
+                             errorMessage.includes('Failed to fetch') ||
+                             errorMessage.includes('Network error');
+
+          console.log('🔍 CHAT: Error type analysis:', {
+            isAuthError,
+            isCorsError,
+            errorMessage,
+            willFallback: isAuthError || isCorsError,
+            errorStringified: JSON.stringify(unifiedError, null, 2)
+          });
+
+          if (isAuthError || isCorsError) {
+            console.log('🔄 CHAT: Falling back to ai-search.ts due to:', isAuthError ? 'auth error' : 'CORS error');
+
+            // Fallback to legacy search with parsed query filters applied
+            params = {
+              query: content,
+              isNaturalLanguage: true,
+              limit: 10,
+              offset: 0,
+              searchTarget: 'all'
+            };
+
+          // Apply parsed query filters to legacy search if available
+          if (parsedQuery?.amountRange) {
+            console.log('💰 DEBUG: Parsed amount range for legacy search:', {
+              amountRange: parsedQuery.amountRange,
+              min: parsedQuery.amountRange.min,
+              max: parsedQuery.amountRange.max,
+              minType: typeof parsedQuery.amountRange.min,
+              maxType: typeof parsedQuery.amountRange.max
+            });
+            params.minAmount = parsedQuery.amountRange.min;
+            params.maxAmount = parsedQuery.amountRange.max;
+            console.log('💰 Applied amount range to legacy search params:', {
+              minAmount: params.minAmount,
+              maxAmount: params.maxAmount
+            });
+          }
+
+          if (parsedQuery?.dateRange) {
+            console.log('📅 Applying date range to legacy search:', parsedQuery.dateRange);
+            params.startDate = parsedQuery.dateRange.start;
+            params.endDate = parsedQuery.dateRange.end;
+          }
+
+          if (parsedQuery?.merchants && parsedQuery.merchants.length > 0) {
+            console.log('🏪 Applying merchants to legacy search:', parsedQuery.merchants);
+            params.merchants = parsedQuery.merchants;
+          }
+
+          if (parsedQuery?.categories && parsedQuery.categories.length > 0) {
+            console.log('📂 CHAT: Applying categories to fallback search:', parsedQuery.categories);
+            params.categories = parsedQuery.categories;
+          }
+
           results = await semanticSearch(params);
+          } else {
+            // For other errors, don't fall back - let the user know there's an issue
+            throw unifiedError;
+          }
         }
 
         setLastSearchParams(params || {
@@ -358,16 +583,134 @@ export default function SemanticSearchPage() {
         setCurrentOffset(0);
       }
 
-      // Create AI response message with intelligent response generation
+      // Update status to show we're generating response
+      updateStatus('generating', 'Generating personalized response...');
+
+      // Generate personalized response using the personalization service
+      let responseContent: string;
+      try {
+        responseContent = await personalizedChatService.generatePersonalizedResponse(
+          content,
+          results,
+          currentConversationId
+        );
+
+        // Enhance response with filter information if amount filtering was applied
+        // Check both parsedQuery (from unified search) and searchMetadata (from fallback search)
+        const amountRange = parsedQuery?.amountRange || results.searchMetadata?.monetaryFilter;
+
+        if (amountRange) {
+          const { min, max, originalAmount, originalCurrency, conversionInfo } = amountRange;
+          const filterInfo = [];
+
+          // Use original currency for user-friendly display
+          const displayCurrency = originalCurrency || 'MYR';
+          const displayMin = originalAmount || min;
+          const displayMax = amountRange.originalMaxAmount || max;
+
+          if (min !== undefined && min > 0) {
+            const displayAmount = formatCurrencyAmount({ amount: displayMin, currency: displayCurrency });
+            filterInfo.push(`over ${displayAmount}`);
+          }
+          if (max !== undefined && max < Number.MAX_SAFE_INTEGER) {
+            const displayAmount = formatCurrencyAmount({ amount: displayMax, currency: displayCurrency });
+            filterInfo.push(`under ${displayAmount}`);
+          }
+
+          if (filterInfo.length > 0) {
+            const filterText = filterInfo.join(' and ');
+            let enhancedResponse = responseContent.replace(
+              /I found (\d+) receipts?/i,
+              `I found $1 receipts ${filterText}`
+            );
+
+            // Also enhance "couldn't find" responses
+            enhancedResponse = enhancedResponse.replace(
+              /I couldn't find any receipts matching/i,
+              `I couldn't find any receipts ${filterText} matching`
+            );
+
+            // Add conversion note if currency conversion was applied
+            if (conversionInfo && conversionInfo.conversionApplied) {
+              enhancedResponse += `\n\n*Note: Converted to ${formatCurrencyAmount(conversionInfo.convertedAmount)} for database search.*`;
+            }
+
+            responseContent = enhancedResponse;
+            console.log('💰 Enhanced response with monetary filter information:', { filterText, amountRange });
+          }
+        }
+
+      } catch (error) {
+        console.error('Error generating personalized response:', error);
+        // Fallback to standard response generation with monetary filter support
+        // Check both parsedQuery and searchMetadata for monetary filter information
+        const amountRange = parsedQuery?.amountRange || results.searchMetadata?.monetaryFilter;
+        const monetaryFilter = amountRange ? {
+          min: amountRange.min,
+          max: amountRange.max,
+          currency: amountRange.currency,
+          originalAmount: amountRange.originalAmount,
+          originalMaxAmount: amountRange.originalMaxAmount,
+          originalCurrency: amountRange.originalCurrency,
+          conversionInfo: amountRange.conversionInfo
+        } : undefined;
+
+        responseContent = generateIntelligentResponse(results, content, monetaryFilter);
+        console.log('💰 Using fallback response generation with monetary filter:', monetaryFilter);
+      }
+
+      // Add UI components from search metadata if available
+      if (results.searchMetadata?.uiComponents && results.searchMetadata.uiComponents.length > 0) {
+        // Append UI component JSON blocks to the response content
+        for (const component of results.searchMetadata.uiComponents) {
+          responseContent += `\n\n\`\`\`ui_component\n${JSON.stringify(component, null, 2)}\n\`\`\``;
+        }
+      }
+
       const aiMessage: ChatMessage = {
         id: generateMessageId(),
         type: 'ai',
-        content: generateIntelligentResponse(results, content),
+        content: responseContent,
         timestamp: new Date(),
         searchResults: results,
       };
 
       setMessages(prev => [...prev, aiMessage]);
+
+      // Save conversation memory for personalization
+      try {
+        await conversationMemoryService.saveMemory(
+          'conversation_turn',
+          `${userMessage.id}_${aiMessage.id}`,
+          {
+            user_message: content,
+            ai_response: responseContent,
+            search_results_count: results.results?.length || 0,
+            timestamp: new Date().toISOString()
+          },
+          0.8, // High confidence for actual conversations
+          currentConversationId
+        );
+      } catch (error) {
+        console.error('Error saving conversation memory:', error);
+      }
+
+      // Track search query for analytics
+      try {
+        await trackSearchQuery(
+          content,
+          'semantic',
+          results.results?.length || 0
+        );
+      } catch (error) {
+        console.error('Error tracking search query:', error);
+      }
+
+      // Calculate response time for analytics
+      const responseTime = Date.now() - startTime;
+
+      // Update status to complete
+      updateStatus('complete', 'Response generated successfully');
 
       // If there are more results available, add a system message about it
       if (results.results && results.total && results.results.length < results.total) {
@@ -394,6 +737,9 @@ export default function SemanticSearchPage() {
     } catch (error) {
       console.error('Search error:', error);
 
+      // Update status to show error
+      updateStatus('error', 'Something went wrong', 'Please try again or rephrase your question');
+
       // Generate contextual error message
       let errorContent = "I'm sorry, I encountered an error while searching your receipts.";
 
@@ -419,6 +765,11 @@ export default function SemanticSearchPage() {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+
+      // Reset status after a brief delay to show completion
+      setTimeout(() => {
+        resetStatus();
+      }, 2000);
     }
   };
 
@@ -495,6 +846,8 @@ export default function SemanticSearchPage() {
             <ChatContainer
               messages={messages}
               isLoading={isLoading}
+              status={status}
+              conversationId={currentConversationId || undefined}
               onExampleClick={handleExampleClick}
               onCopy={handleCopy}
               onFeedback={handleFeedback}

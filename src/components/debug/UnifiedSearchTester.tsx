@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { callEdgeFunction } from '@/lib/edge-function-utils';
+import { callEdgeFunction, performUnifiedSearch } from '@/lib/edge-function-utils';
 
 interface TestResult {
   method: string;
@@ -30,12 +30,11 @@ export function UnifiedSearchTester() {
     try {
       const startTime = Date.now();
       
-      // Test the unified-search Edge Function directly
-      const response = await callEdgeFunction('unified-search', 'POST', {
-        query,
-        sources: ['receipt'],
+      // Test the unified-search Edge Function using the performUnifiedSearch wrapper
+      // This ensures proper parameter mapping and consistency
+      const response = await performUnifiedSearch(query, {
+        sources: ['receipts'], // Use frontend naming (plural) - will be mapped to backend naming
         limit: 10,
-        offset: 0,
         similarityThreshold: 0.2
       });
       

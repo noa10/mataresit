@@ -11,6 +11,7 @@ import { StripeProvider } from "@/contexts/StripeContext";
 import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 // Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";
@@ -62,6 +63,15 @@ const TestInvitation = lazy(() => import("./pages/TestInvitation"));
 const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
 const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
 const DebugSearch = lazy(() => import("./pages/DebugSearch"));
+const TestReRanking = lazy(() => import("./pages/TestReRanking"));
+const TestStructuredData = lazy(() => import("./pages/TestStructuredData"));
+const TestFinancialAnalysis = lazy(() => import("./pages/TestFinancialAnalysis"));
+const UIComponentTest = lazy(() => import("./components/test/UIComponentTest"));
+const CacheTest = lazy(() => import("./components/test/CacheTest"));
+const TestPersonalization = lazy(() => import("./pages/TestPersonalization"));
+const TestAnalytics = lazy(() => import("./pages/TestAnalytics"));
+const PersonalizationIntegrationTest = lazy(() => import("./components/test/PersonalizationIntegrationTest").then(m => ({ default: m.PersonalizationIntegrationTest })));
+const TestPersonalizationIntegration = lazy(() => import("./pages/TestPersonalizationIntegration"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
@@ -92,8 +102,9 @@ const App = () => (
         <LanguageProvider>
           <TeamProvider>
             <StripeProvider>
-              <ChatControlsProvider>
-                <TooltipProvider>
+              <PersonalizationProvider>
+                <ChatControlsProvider>
+                  <TooltipProvider>
             <Toaster />
             <Sonner />
             {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
@@ -254,6 +265,51 @@ const App = () => (
                     <DebugSearch />
                   </Suspense>
                 } />
+                <Route path="/test/re-ranking" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestReRanking />
+                  </Suspense>
+                } />
+                <Route path="/test/structured-data" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestStructuredData />
+                  </Suspense>
+                } />
+                <Route path="/test/financial-analysis" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestFinancialAnalysis />
+                  </Suspense>
+                } />
+                <Route path="/test/ui-components" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <UIComponentTest />
+                  </Suspense>
+                } />
+                <Route path="/test/cache" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <CacheTest />
+                  </Suspense>
+                } />
+                <Route path="/test/personalization" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestPersonalization />
+                  </Suspense>
+                } />
+                <Route path="/test/analytics" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestAnalytics />
+                  </Suspense>
+                } />
+                <Route path="/test/personalization-integration" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <PersonalizationIntegrationTest />
+                  </Suspense>
+                } />
+                <Route path="/test/integration" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestPersonalizationIntegration />
+                  </Suspense>
+                } />
 
               </Route>
             </Route>
@@ -271,8 +327,9 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-                </TooltipProvider>
-              </ChatControlsProvider>
+                  </TooltipProvider>
+                </ChatControlsProvider>
+              </PersonalizationProvider>
             </StripeProvider>
           </TeamProvider>
         </LanguageProvider>

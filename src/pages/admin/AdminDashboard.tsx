@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { ShoppingBag, Users, AlertCircle, BookOpen, Database } from "lucide-react";
 import { BlogAnalytics } from "@/components/admin/BlogAnalytics";
 import { EmbeddingRepairTest } from "@/components/admin/EmbeddingRepairTest";
+import { CacheMonitor } from "@/components/admin/CacheMonitor";
+import { FeedbackAnalytics } from "@/components/admin/FeedbackAnalytics";
 import { EmbeddingSystemDiagnostics } from "@/components/admin/EmbeddingSystemDiagnostics";
 
 interface SystemStats {
@@ -132,6 +134,28 @@ export default function AdminDashboard() {
               Embedding System Diagnostics
             </h2>
             <EmbeddingSystemDiagnostics />
+          </div>
+
+          <Separator className="my-8" />
+
+          {/* Feedback Analytics */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              User Feedback Analytics
+            </h2>
+            <FeedbackAnalytics />
+          </div>
+
+          <Separator className="my-8" />
+
+          {/* Cache Performance Monitor */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Cache Performance Monitor
+            </h2>
+            <CacheMonitor />
           </div>
 
           <Separator className="my-8" />

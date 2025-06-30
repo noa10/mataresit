@@ -49,6 +49,9 @@
       "popular": "Popular queries",
       "categories": "Search by category",
       "dateRanges": "Search by date"
+    },
+    "helper": {
+      "shortcuts": "Press Enter to send, Shift+Enter for new line"
     }
   },
   "messages": {
@@ -74,6 +77,14 @@
     "dateRange": "From {{startDate}} to {{endDate}}",
     "categories": "Categories: {{categories}}",
     "merchants": "Merchants: {{merchants}}",
+    "date": "Date",
+    "total": "Total",
+    "amount": "Amount",
+    "match": "match",
+    "notes": "Notes",
+    "from": "From",
+    "unknownMerchant": "Unknown Merchant",
+    "unknownItem": "Unknown Item",
     "summary": {
       "title": "Summary",
       "totalReceipts": "Total receipts",

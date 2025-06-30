@@ -169,8 +169,16 @@ export function SearchResults({
                   </div>
                   <CardDescription className="text-xs sm:text-sm">
                     {date ? (
-                      <span title={date.toLocaleDateString()}>
-                        {date.toLocaleDateString()}
+                      <span title={date.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}>
+                        {date.toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
                         <span className="hidden sm:inline">
                           ({formatDistanceToNow(date, { addSuffix: true })})
                         </span>
@@ -275,8 +283,16 @@ export function SearchResults({
                   <CardDescription className="text-xs sm:text-sm">
                     From: {item.parent_receipt_merchant || 'Unknown Merchant'}
                     {receiptDate && (
-                      <span className="ml-2" title={receiptDate.toLocaleDateString()}>
-                        on {receiptDate.toLocaleDateString()}
+                      <span className="ml-2" title={receiptDate.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}>
+                        on {receiptDate.toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
                       </span>
                     )}
                   </CardDescription>
