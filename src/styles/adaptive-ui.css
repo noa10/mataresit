@@ -1,0 +1,440 @@
+/* Adaptive UI Component Styles */
+/* Phase 5: Personalization & Memory System - Task 4 */
+
+/* ============================================================================
+   ADAPTIVE CONTAINER STYLES
+   ============================================================================ */
+
+.adaptive-container {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Visibility Adaptations */
+.adaptive-container.hidden {
+  display: none !important;
+}
+
+.adaptive-container.collapsed {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.adaptive-container.minimized {
+  transform: scale(0.8);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Size Adaptations */
+.adaptive-size-enabled .adaptive-size-sm {
+  --adaptive-scale: 0.875;
+  transform: scale(var(--adaptive-scale));
+  transform-origin: top left;
+}
+
+.adaptive-size-enabled .adaptive-size-md {
+  --adaptive-scale: 1;
+  transform: scale(var(--adaptive-scale));
+}
+
+.adaptive-size-enabled .adaptive-size-lg {
+  --adaptive-scale: 1.125;
+  transform: scale(var(--adaptive-scale));
+  transform-origin: top left;
+}
+
+/* Style Adaptations */
+.adaptive-style-enabled .adaptive-style-compact {
+  --adaptive-spacing: 0.5rem;
+  --adaptive-font-size: 0.875rem;
+  --adaptive-line-height: 1.25;
+}
+
+.adaptive-style-enabled .adaptive-style-minimal {
+  --adaptive-spacing: 0.25rem;
+  --adaptive-font-size: 0.75rem;
+  --adaptive-line-height: 1.2;
+  --adaptive-border: none;
+  --adaptive-shadow: none;
+}
+
+.adaptive-style-enabled .adaptive-style-detailed {
+  --adaptive-spacing: 1.5rem;
+  --adaptive-font-size: 1rem;
+  --adaptive-line-height: 1.6;
+  --adaptive-border: 1px solid hsl(var(--border));
+  --adaptive-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.adaptive-style-enabled .adaptive-style-spacious {
+  --adaptive-spacing: 1rem;
+  --adaptive-font-size: 1rem;
+  --adaptive-line-height: 1.5;
+}
+
+/* Apply adaptive variables */
+.adaptive-style-enabled {
+  padding: var(--adaptive-spacing, 1rem);
+  font-size: var(--adaptive-font-size, 1rem);
+  line-height: var(--adaptive-line-height, 1.5);
+  border: var(--adaptive-border, initial);
+  box-shadow: var(--adaptive-shadow, initial);
+}
+
+/* Priority Adaptations */
+.adaptive-priority-high {
+  --adaptive-priority-color: hsl(var(--primary));
+  --adaptive-priority-bg: hsl(var(--primary) / 0.05);
+  --adaptive-priority-border: hsl(var(--primary) / 0.2);
+  z-index: 30;
+}
+
+.adaptive-priority-medium {
+  --adaptive-priority-color: hsl(var(--muted-foreground));
+  --adaptive-priority-bg: hsl(var(--muted) / 0.5);
+  --adaptive-priority-border: hsl(var(--border));
+  z-index: 20;
+}
+
+.adaptive-priority-low {
+  --adaptive-priority-color: hsl(var(--muted-foreground) / 0.7);
+  --adaptive-priority-bg: transparent;
+  --adaptive-priority-border: hsl(var(--border) / 0.5);
+  z-index: 10;
+}
+
+/* ============================================================================
+   ADAPTIVE LAYOUT STYLES
+   ============================================================================ */
+
+.adaptive-layout {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+
+.adaptive-layout .adaptive-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.adaptive-layout .adaptive-sidebar {
+  position: relative;
+  overflow-y: auto;
+  border-right: 1px solid hsl(var(--border));
+}
+
+.adaptive-layout .adaptive-main-content {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.adaptive-layout .adaptive-footer {
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Responsive Layout Adaptations */
+@media (max-width: 768px) {
+  .adaptive-layout {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .adaptive-layout .adaptive-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    height: 100vh;
+    width: 280px;
+    z-index: 40;
+    background: hsl(var(--background));
+    transition: left 0.3s ease-in-out;
+  }
+  
+  .adaptive-layout .adaptive-sidebar.open {
+    left: 0;
+  }
+}
+
+/* ============================================================================
+   ADAPTIVE NAVIGATION STYLES
+   ============================================================================ */
+
+.adaptive-navigation {
+  --nav-item-spacing: 0.5rem;
+  --nav-item-padding: 0.75rem;
+  --nav-item-radius: 0.5rem;
+}
+
+.adaptive-navigation .primary-navigation {
+  position: relative;
+}
+
+.adaptive-navigation .primary-navigation::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: hsl(var(--border));
+}
+
+.adaptive-navigation .secondary-navigation {
+  opacity: 0.8;
+}
+
+.adaptive-navigation .separator {
+  margin: 0.5rem 0;
+  height: 1px;
+  background: hsl(var(--border));
+}
+
+/* Navigation Item States */
+.adaptive-navigation .nav-item {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+
+.adaptive-navigation .nav-item:hover {
+  background: hsl(var(--accent));
+  transform: translateX(2px);
+}
+
+.adaptive-navigation .nav-item.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.adaptive-navigation .nav-item.primary {
+  font-weight: 600;
+  background: hsl(var(--primary) / 0.1);
+  border-left: 3px solid hsl(var(--primary));
+}
+
+/* Navigation Styles */
+.adaptive-navigation.style-full .nav-item {
+  padding: var(--nav-item-padding);
+  border-radius: var(--nav-item-radius);
+}
+
+.adaptive-navigation.style-icons .nav-item {
+  padding: 0.5rem;
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+
+.adaptive-navigation.style-minimal .nav-item {
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.adaptive-navigation.style-contextual .nav-item {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+}
+
+/* ============================================================================
+   ADAPTIVE FEATURE PANEL STYLES
+   ============================================================================ */
+
+.adaptive-feature-panel {
+  --feature-card-spacing: 1rem;
+  --feature-card-padding: 1.5rem;
+  --feature-card-radius: 0.75rem;
+}
+
+.adaptive-feature-panel .feature-card {
+  position: relative;
+  transition: all 0.2s ease-in-out;
+  border-radius: var(--feature-card-radius);
+  padding: var(--feature-card-padding);
+}
+
+.adaptive-feature-panel .feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.1);
+}
+
+.adaptive-feature-panel .feature-card.primary {
+  border: 2px solid hsl(var(--primary) / 0.2);
+  background: hsl(var(--primary) / 0.05);
+}
+
+.adaptive-feature-panel .feature-card.primary::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--primary) / 0.5));
+  border-radius: var(--feature-card-radius);
+  z-index: -1;
+  opacity: 0.1;
+}
+
+.adaptive-feature-panel .feature-card.secondary {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+}
+
+.adaptive-feature-panel .feature-card.advanced {
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--muted) / 0.3);
+  opacity: 0.8;
+}
+
+/* Feature Usage Indicators */
+.adaptive-feature-panel .usage-indicator {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.adaptive-feature-panel .feature-card.high-usage .usage-indicator {
+  opacity: 1;
+  background: hsl(var(--primary));
+}
+
+.adaptive-feature-panel .feature-card.medium-usage .usage-indicator {
+  opacity: 0.7;
+  background: hsl(var(--secondary));
+}
+
+.adaptive-feature-panel .feature-card.low-usage .usage-indicator {
+  opacity: 0.4;
+  background: hsl(var(--muted-foreground));
+}
+
+/* ============================================================================
+   RESPONSIVE ADAPTATIONS
+   ============================================================================ */
+
+/* Mobile Adaptations */
+@media (max-width: 768px) {
+  .adaptive-container {
+    --adaptive-spacing: 0.75rem;
+    --adaptive-font-size: 0.875rem;
+  }
+  
+  .adaptive-navigation {
+    --nav-item-spacing: 0.25rem;
+    --nav-item-padding: 0.5rem;
+  }
+  
+  .adaptive-feature-panel {
+    --feature-card-spacing: 0.75rem;
+    --feature-card-padding: 1rem;
+  }
+}
+
+/* Tablet Adaptations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .adaptive-container {
+    --adaptive-spacing: 0.875rem;
+    --adaptive-font-size: 0.9375rem;
+  }
+  
+  .adaptive-navigation {
+    --nav-item-spacing: 0.375rem;
+    --nav-item-padding: 0.625rem;
+  }
+  
+  .adaptive-feature-panel {
+    --feature-card-spacing: 0.875rem;
+    --feature-card-padding: 1.25rem;
+  }
+}
+
+/* Desktop Adaptations */
+@media (min-width: 1025px) {
+  .adaptive-container {
+    --adaptive-spacing: 1rem;
+    --adaptive-font-size: 1rem;
+  }
+  
+  .adaptive-navigation {
+    --nav-item-spacing: 0.5rem;
+    --nav-item-padding: 0.75rem;
+  }
+  
+  .adaptive-feature-panel {
+    --feature-card-spacing: 1rem;
+    --feature-card-padding: 1.5rem;
+  }
+}
+
+/* ============================================================================
+   ANIMATION AND TRANSITIONS
+   ============================================================================ */
+
+/* Smooth transitions for all adaptive changes */
+.adaptive-container,
+.adaptive-layout,
+.adaptive-navigation,
+.adaptive-feature-panel {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Stagger animations for multiple elements */
+.adaptive-navigation .nav-item:nth-child(1) { transition-delay: 0ms; }
+.adaptive-navigation .nav-item:nth-child(2) { transition-delay: 50ms; }
+.adaptive-navigation .nav-item:nth-child(3) { transition-delay: 100ms; }
+.adaptive-navigation .nav-item:nth-child(4) { transition-delay: 150ms; }
+.adaptive-navigation .nav-item:nth-child(5) { transition-delay: 200ms; }
+
+.adaptive-feature-panel .feature-card:nth-child(1) { transition-delay: 0ms; }
+.adaptive-feature-panel .feature-card:nth-child(2) { transition-delay: 100ms; }
+.adaptive-feature-panel .feature-card:nth-child(3) { transition-delay: 200ms; }
+.adaptive-feature-panel .feature-card:nth-child(4) { transition-delay: 300ms; }
+
+/* ============================================================================
+   ACCESSIBILITY ADAPTATIONS
+   ============================================================================ */
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .adaptive-container,
+  .adaptive-layout,
+  .adaptive-navigation,
+  .adaptive-feature-panel,
+  .adaptive-navigation .nav-item,
+  .adaptive-feature-panel .feature-card {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* High contrast mode adaptations */
+@media (prefers-contrast: high) {
+  .adaptive-container {
+    --adaptive-border: 2px solid;
+    --adaptive-shadow: none;
+  }
+  
+  .adaptive-navigation .nav-item.primary {
+    border-left-width: 5px;
+  }
+  
+  .adaptive-feature-panel .feature-card.primary {
+    border-width: 3px;
+  }
+}
+
+/* Focus adaptations for keyboard navigation */
+.adaptive-container:focus-within,
+.adaptive-navigation .nav-item:focus-within,
+.adaptive-feature-panel .feature-card:focus-within {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}

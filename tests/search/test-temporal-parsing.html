@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Temporal Parsing</title>
+</head>
+<body>
+    <h1>Temporal Parsing Test</h1>
+    
+    <div>
+        <h2>Cache Management</h2>
+        <button onclick="clearSearchCache()">Clear Search Cache</button>
+        <button onclick="showCacheInfo()">Show Cache Info</button>
+        <div id="cache-info"></div>
+    </div>
+    
+    <div>
+        <h2>Test Temporal Queries</h2>
+        <input type="text" id="query-input" placeholder="Enter temporal query (e.g., receipts from June 26)" style="width: 400px;">
+        <button onclick="testTemporalQuery()">Test Query</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Clear search cache from localStorage
+        function clearSearchCache() {
+            const keys = Object.keys(localStorage).filter(key => key.startsWith('search_cache_'));
+            keys.forEach(key => localStorage.removeItem(key));
+            
+            document.getElementById('cache-info').innerHTML = `
+                <p style="color: green;">Cleared ${keys.length} cache entries</p>
+            `;
+            
+            console.log('🗑️ Cleared search cache:', keys);
+        }
+        
+        // Show cache information
+        function showCacheInfo() {
+            const keys = Object.keys(localStorage).filter(key => key.startsWith('search_cache_'));
+            const cacheInfo = keys.map(key => {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    return {
+                        key: key.replace('search_cache_', ''),
+                        timestamp: new Date(data.timestamp).toLocaleString(),
+                        size: JSON.stringify(data).length
+                    };
+                } catch (e) {
+                    return { key, error: 'Invalid JSON' };
+                }
+            });
+            
+            document.getElementById('cache-info').innerHTML = `
+                <h3>Cache Entries (${keys.length})</h3>
+                <pre>${JSON.stringify(cacheInfo, null, 2)}</pre>
+            `;
+        }
+        
+        // Test temporal query by calling the unified-search Edge Function directly
+        async function testTemporalQuery() {
+            const query = document.getElementById('query-input').value.trim();
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing query...</p>';
+            
+            try {
+                // Get auth token (this assumes user is logged in)
+                const response = await fetch('https://mpmkbtsufihzdelrlszs.supabase.co/auth/v1/user', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('sb-mpmkbtsufihzdelrlszs-auth-token')?.split('.')[1] || 'no-token'}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Not authenticated');
+                }
+                
+                // Call unified-search Edge Function
+                const searchResponse = await fetch('https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/unified-search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('sb-mpmkbtsufihzdelrlszs-auth-token')?.split('.')[1] || 'no-token'}`
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        sources: ['receipt'],
+                        limit: 10,
+                        similarityThreshold: 0.2,
+                        useEnhancedPrompting: true
+                    })
+                });
+                
+                const searchResult = await searchResponse.json();
+                
+                resultsDiv.innerHTML = `
+                    <h3>Query: "${query}"</h3>
+                    <h4>Response:</h4>
+                    <pre>${JSON.stringify(searchResult, null, 2)}</pre>
+                `;
+                
+                console.log('Search result:', searchResult);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h3>Error:</h3>
+                    <p style="color: red;">${error.message}</p>
+                `;
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Show initial cache info
+        showCacheInfo();
+    </script>
+</body>
+</html>

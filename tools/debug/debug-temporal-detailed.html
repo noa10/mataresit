@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Temporal Search - Detailed Analysis</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .result-item { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 3px; }
+        .june27 { background-color: #d4edda; }
+        .not-june27 { background-color: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Debug Temporal Search - Detailed Analysis</h1>
+    
+    <div class="test-section info">
+        <h3>Expected Result</h3>
+        <p><strong>Query:</strong> "receipts from June 27"</p>
+        <p><strong>Expected:</strong> 1 receipt (TOH 15B PASAR BORONG, 2025-06-27, MYR 41.00)</p>
+        <p><strong>Current Issue:</strong> Returning 30 results instead of 1</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Temporal Search</h3>
+        <button onclick="testTemporalSearch()">Test "receipts from June 27"</button>
+        <div id="searchResult"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NzI4NzQsImV4cCI6MjA1ODU0ODg3NH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        window.testTemporalSearch = async function() {
+            const resultDiv = document.getElementById('searchResult');
+            resultDiv.innerHTML = '<p>Testing temporal search...</p>';
+            
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (!session) {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>No Session Found</h4>
+                            <p>Please sign in to the application first.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                console.log('🔍 Testing temporal search with session:', session.user.email);
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: 'receipts from June 27',
+                        limit: 50, // Increase limit to see all results
+                        sources: ['receipt'],
+                        contentTypes: ['full_text', 'extracted_text']
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>Search Request Failed</h4>
+                            <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                            <pre>${errorText}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('📊 Full search response:', data);
+                
+                // Analyze results
+                const results = data.results || [];
+                const june27Results = results.filter(result => {
+                    const resultDate = result.metadata?.date || result.date;
+                    return resultDate && resultDate.includes('2025-06-27');
+                });
+                
+                const nonJune27Results = results.filter(result => {
+                    const resultDate = result.metadata?.date || result.date;
+                    return !resultDate || !resultDate.includes('2025-06-27');
+                });
+                
+                let html = `
+                    <div class="${results.length === 1 && june27Results.length === 1 ? 'success' : 'warning'}">
+                        <h4>Search Results Analysis</h4>
+                        <p><strong>Total Results:</strong> ${results.length}</p>
+                        <p><strong>June 27 Results:</strong> ${june27Results.length}</p>
+                        <p><strong>Non-June 27 Results:</strong> ${nonJune27Results.length}</p>
+                        <p><strong>Processing Time:</strong> ${data.processing_time || 'N/A'}ms</p>
+                        <p><strong>Strategy:</strong> ${data.strategy || 'N/A'}</p>
+                        <p><strong>Temporal Query Detected:</strong> ${data.temporal_query_detected || false}</p>
+                        <p><strong>Model Used:</strong> ${data.model_used || 'N/A'}</p>
+                    </div>
+                `;
+                
+                if (june27Results.length > 0) {
+                    html += `
+                        <div class="success">
+                            <h4>✅ Correct Results (June 27, 2025)</h4>
+                    `;
+                    june27Results.forEach((result, index) => {
+                        const merchant = result.metadata?.merchant || result.title || 'Unknown';
+                        const total = result.metadata?.total || 'N/A';
+                        const currency = result.metadata?.currency || '';
+                        const date = result.metadata?.date || result.date || 'N/A';
+                        
+                        html += `
+                            <div class="result-item june27">
+                                <strong>${index + 1}. ${merchant}</strong><br>
+                                Date: ${date}<br>
+                                Total: ${currency} ${total}<br>
+                                Similarity: ${result.similarity?.toFixed(3) || 'N/A'}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                if (nonJune27Results.length > 0) {
+                    html += `
+                        <div class="error">
+                            <h4>❌ Incorrect Results (Not June 27, 2025)</h4>
+                            <p>These results should NOT be returned for "receipts from June 27":</p>
+                    `;
+                    nonJune27Results.slice(0, 10).forEach((result, index) => {
+                        const merchant = result.metadata?.merchant || result.title || 'Unknown';
+                        const total = result.metadata?.total || 'N/A';
+                        const currency = result.metadata?.currency || '';
+                        const date = result.metadata?.date || result.date || 'N/A';
+                        
+                        html += `
+                            <div class="result-item not-june27">
+                                <strong>${index + 1}. ${merchant}</strong><br>
+                                Date: ${date}<br>
+                                Total: ${currency} ${total}<br>
+                                Similarity: ${result.similarity?.toFixed(3) || 'N/A'}
+                            </div>
+                        `;
+                    });
+                    
+                    if (nonJune27Results.length > 10) {
+                        html += `<p><em>... and ${nonJune27Results.length - 10} more incorrect results</em></p>`;
+                    }
+                    html += '</div>';
+                }
+                
+                // Show debug information
+                html += `
+                    <div class="info">
+                        <h4>Debug Information</h4>
+                        <pre>${JSON.stringify({
+                            query: data.query || 'N/A',
+                            strategy: data.strategy || 'N/A',
+                            temporal_query_detected: data.temporal_query_detected || false,
+                            processing_time: data.processing_time || 'N/A',
+                            sources_searched: data.sources_searched || [],
+                            total_results: results.length,
+                            metadata: data.metadata || {}
+                        }, null, 2)}</pre>
+                    </div>
+                `;
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('❌ Search error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>Search Error</h4>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

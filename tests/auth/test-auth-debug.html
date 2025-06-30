@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Debug Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .info { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Debug Test</h1>
+    <button onclick="testAuthentication()">Test Authentication Flow</button>
+    <button onclick="clearLogs()">Clear Logs</button>
+    
+    <div id="logs"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logsDiv.appendChild(logDiv);
+            console.log(message);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        window.testAuthentication = async function() {
+            log('🔍 Starting authentication debug test...', 'info');
+            
+            try {
+                // Step 1: Check current session
+                log('1️⃣ Checking current session...', 'info');
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    log(`❌ Session error: ${sessionError.message}`, 'error');
+                    return;
+                }
+                
+                if (!session) {
+                    log('❌ No active session found. Please sign in first.', 'error');
+                    return;
+                }
+                
+                log(`✅ Session found for user: ${session.user.email}`, 'success');
+                log(`📝 Access token length: ${session.access_token.length}`, 'info');
+                log(`📝 Token type: ${typeof session.access_token}`, 'info');
+                log(`📝 Token starts with: ${session.access_token.substring(0, 20)}...`, 'info');
+                
+                // Step 2: Test token validation with Supabase
+                log('2️⃣ Testing token validation with Supabase client...', 'info');
+                
+                const testClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    global: {
+                        headers: {
+                            Authorization: `Bearer ${session.access_token}`,
+                        },
+                    },
+                });
+                
+                const { data: { user }, error: userError } = await testClient.auth.getUser();
+                
+                if (userError) {
+                    log(`❌ User validation error: ${userError.message}`, 'error');
+                    log(`📝 Error details: ${JSON.stringify(userError, null, 2)}`, 'error');
+                } else if (user) {
+                    log(`✅ User validation successful: ${user.email}`, 'success');
+                    log(`📝 User ID: ${user.id}`, 'info');
+                } else {
+                    log('❌ No user returned from validation', 'error');
+                }
+                
+                // Step 3: Test edge function call
+                log('3️⃣ Testing unified-search edge function call...', 'info');
+                
+                const searchPayload = {
+                    query: 'test authentication',
+                    sources: ['receipt'],
+                    limit: 1,
+                    similarityThreshold: 0.2
+                };
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify(searchPayload)
+                });
+                
+                log(`📝 Response status: ${response.status}`, 'info');
+                log(`📝 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}`, 'info');
+                
+                const responseText = await response.text();
+                log(`📝 Response body: ${responseText}`, 'info');
+                
+                if (response.ok) {
+                    log('✅ Edge function call successful', 'success');
+                    try {
+                        const responseData = JSON.parse(responseText);
+                        log(`📝 Parsed response: ${JSON.stringify(responseData, null, 2)}`, 'info');
+                    } catch (parseError) {
+                        log(`⚠️ Could not parse response as JSON: ${parseError.message}`, 'error');
+                    }
+                } else {
+                    log(`❌ Edge function call failed with status ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                log(`📝 Error stack: ${error.stack}`, 'error');
+            }
+        };
+
+        // Auto-run test if user is already signed in
+        window.addEventListener('load', async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                log('🔄 User already signed in, running auto-test...', 'info');
+                setTimeout(testAuthentication, 1000);
+            } else {
+                log('ℹ️ No active session. Please sign in to test authentication.', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Unified Search Deployment</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test Unified Search Deployment</h1>
+    
+    <div class="test-section info">
+        <h3>Test Configuration</h3>
+        <p><strong>Function URL:</strong> <span id="functionUrl"></span></p>
+        <p><strong>Test Query:</strong> "receipts from June 27"</p>
+        <p><strong>Expected Result:</strong> 1 receipt (TOH 15B PASAR BORONG)</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Authentication Test</h3>
+        <button onclick="testAuth()">Test Authentication</button>
+        <div id="authResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Unified Search Test</h3>
+        <button onclick="testUnifiedSearch()">Test Unified Search</button>
+        <div id="searchResult"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+        // Supabase configuration
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NzI4NzQsImV4cCI6MjA1ODU0ODg3NH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Set function URL
+        document.getElementById('functionUrl').textContent = `${SUPABASE_URL}/functions/v1/unified-search`;
+
+        window.testAuth = async function() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.innerHTML = '<p>Testing authentication...</p>';
+            
+            try {
+                // Get current user
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error || !user) {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>Authentication Failed</h4>
+                            <p>Error: ${error?.message || 'No user found'}</p>
+                            <p>Please sign in to the application first.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>Authentication Successful</h4>
+                        <p><strong>User ID:</strong> ${user.id}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                        <p><strong>Token Length:</strong> ${user.access_token?.length || 'N/A'}</p>
+                    </div>
+                `;
+                
+                // Store user for search test
+                window.currentUser = user;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>Authentication Error</h4>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        window.testUnifiedSearch = async function() {
+            const resultDiv = document.getElementById('searchResult');
+            resultDiv.innerHTML = '<p>Testing unified search...</p>';
+            
+            if (!window.currentUser) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>Authentication Required</h4>
+                        <p>Please run the authentication test first.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (!session) {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>No Session Found</h4>
+                            <p>Please sign in to the application first.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: 'receipts from June 27',
+                        limit: 10
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>Search Request Failed</h4>
+                            <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                            <p><strong>Error:</strong></p>
+                            <pre>${errorText}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Search response:', data);
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>Search Successful</h4>
+                        <p><strong>Results Found:</strong> ${data.results?.length || 0}</p>
+                        <p><strong>Response Time:</strong> ${data.processing_time || 'N/A'}ms</p>
+                        <p><strong>Model Used:</strong> ${data.model_used || 'N/A'}</p>
+                        <h5>Results:</h5>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>Search Error</h4>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        // Auto-test auth on page load
+        window.addEventListener('load', () => {
+            setTimeout(testAuth, 1000);
+        });
+    </script>
+</body>
+</html>

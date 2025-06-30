@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Temporal Query Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { margin: 5px 0; padding: 5px; border-radius: 3px; }
+        .info { background-color: #e3f2fd; }
+        .success { background-color: #e8f5e8; }
+        .error { background-color: #ffebee; }
+        .warning { background-color: #fff3e0; }
+        pre { background-color: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; max-height: 400px; }
+        button { padding: 10px 20px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #logs { max-height: 600px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; width: 300px; }
+    </style>
+</head>
+<body>
+    <h1>🕐 Direct Temporal Query Test</h1>
+    <p>This test calls the unified-search Edge Function directly, bypassing frontend caching.</p>
+    
+    <div>
+        <input type="text" id="queryInput" value="receipts from June 27" placeholder="Enter temporal query">
+        <button onclick="testDirectCall()">🚀 Test Direct Call</button>
+        <button onclick="clearLogs()">🧹 Clear Logs</button>
+    </div>
+    
+    <div id="logs"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function logPre(content, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const preDiv = document.createElement('pre');
+            preDiv.className = `log ${type}`;
+            preDiv.textContent = content;
+            logsDiv.appendChild(preDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        async function testDirectCall() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                log('Please enter a query', 'error');
+                return;
+            }
+
+            log(`🚀 Testing direct call with query: "${query}"`, 'info');
+            
+            try {
+                // Get auth token from localStorage (if user is signed in)
+                let authToken = null;
+                try {
+                    const authData = localStorage.getItem('sb-mpmkbtsufihzdelrlszs-auth-token');
+                    if (authData) {
+                        const parsed = JSON.parse(authData);
+                        authToken = parsed.access_token;
+                    }
+                } catch (e) {
+                    log('No auth token found in localStorage', 'warning');
+                }
+
+                if (!authToken) {
+                    log('❌ No authentication token found. Please sign in to the app first.', 'error');
+                    return;
+                }
+
+                log('✅ Found auth token, making direct call to Edge Function', 'success');
+
+                const payload = {
+                    query: query,
+                    sources: ['receipt'],
+                    limit: 10,
+                    similarityThreshold: 0.2,
+                    includeMetadata: true,
+                    useEnhancedPrompting: true,
+                    // Add timestamp to bypass any caching
+                    _timestamp: Date.now()
+                };
+
+                log('📤 Sending request to unified-search Edge Function...', 'info');
+                logPre(`Payload: ${JSON.stringify(payload, null, 2)}`, 'info');
+
+                const startTime = Date.now();
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        // Add cache-busting headers
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const duration = Date.now() - startTime;
+                log(`📝 Response status: ${response.status} (${duration}ms)`, response.ok ? 'success' : 'error');
+
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    log('✅ Edge Function call successful!', 'success');
+                    try {
+                        const responseData = JSON.parse(responseText);
+                        log(`📊 Results found: ${responseData.results?.length || 0}`, 'success');
+                        log(`📊 Total results: ${responseData.totalResults || 0}`, 'success');
+                        
+                        // Check for temporal routing metadata
+                        if (responseData.searchMetadata) {
+                            log('🔍 Search metadata:', 'info');
+                            logPre(JSON.stringify(responseData.searchMetadata, null, 2), 'info');
+                        }
+                        
+                        // Show first few results with dates
+                        if (responseData.results && responseData.results.length > 0) {
+                            log('📄 First few results with dates:', 'info');
+                            responseData.results.slice(0, 5).forEach((result, index) => {
+                                const dateInfo = result.metadata?.date || result.metadata?.created_at || 'No date';
+                                logPre(`Result ${index + 1}: ${result.title} (${result.sourceType}) - Date: ${dateInfo} - Similarity: ${result.similarity?.toFixed(3)}`, 'success');
+                            });
+                        }
+                        
+                        // Full response for debugging
+                        log('📋 Full response:', 'info');
+                        logPre(JSON.stringify(responseData, null, 2), 'info');
+                        
+                    } catch (parseError) {
+                        log(`⚠️ Could not parse response as JSON: ${parseError.message}`, 'error');
+                        logPre(responseText, 'error');
+                    }
+                } else {
+                    log(`❌ Edge Function call failed with status ${response.status}`, 'error');
+                    logPre(responseText, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+        };
+
+        // Auto-focus on input
+        document.getElementById('queryInput').focus();
+    </script>
+</body>
+</html>

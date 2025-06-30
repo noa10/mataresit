@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS and Authentication Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>CORS and Authentication Test</h1>
+    <div id="results"></div>
+    <button onclick="testCorsAndAuth()">Test CORS and Authentication</button>
+    
+    <script>
+        // Initialize Supabase client
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message) {
+            const results = document.getElementById('results');
+            results.innerHTML += '<div>' + message + '</div>';
+            console.log(message);
+        }
+        
+        async function testCorsAndAuth() {
+            log('🚀 Starting CORS and Authentication test...');
+            
+            try {
+                // Test 1: Check current session
+                log('\n1️⃣ Checking current session...');
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    log('❌ Session error: ' + sessionError.message);
+                    return;
+                }
+                
+                if (!session) {
+                    log('❌ No active session found');
+                    log('ℹ️ Please log in to the application first');
+                    return;
+                }
+                
+                log('✅ Session found for user: ' + session.user.email);
+                log('✅ Access token available: ' + (session.access_token ? 'Yes' : 'No'));
+                
+                // Test 2: Test CORS preflight
+                log('\n2️⃣ Testing CORS preflight...');
+                const preflightResponse = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'authorization, content-type, apikey'
+                    }
+                });
+                
+                log('✅ Preflight status: ' + preflightResponse.status);
+                
+                // Test 3: Test actual request with user token
+                log('\n3️⃣ Testing unified-search with user token...');
+                const searchPayload = {
+                    query: 'test search',
+                    sources: ['receipt', 'business_directory'],
+                    limit: 5,
+                    offset: 0,
+                    similarityThreshold: 0.2,
+                    includeMetadata: true,
+                    aggregationMode: 'relevance'
+                };
+                
+                const searchResponse = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Origin': window.location.origin
+                    },
+                    body: JSON.stringify(searchPayload)
+                });
+                
+                log('📊 Search response status: ' + searchResponse.status);
+                
+                const responseText = await searchResponse.text();
+                log('📄 Search response body: ' + responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+                
+                if (searchResponse.status === 200) {
+                    log('🎉 SUCCESS: unified-search Edge Function is working!');
+                } else if (searchResponse.status === 400) {
+                    log('⚠️ Bad request - check payload format');
+                } else if (searchResponse.status === 401) {
+                    log('⚠️ Authentication failed - check token');
+                } else {
+                    log('⚠️ Unexpected status: ' + searchResponse.status);
+                }
+                
+            } catch (error) {
+                log('❌ Test failed: ' + error.message);
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Auto-run test when page loads
+        window.addEventListener('load', () => {
+            setTimeout(testCorsAndAuth, 1000);
+        });
+    </script>
+</body>
+</html>

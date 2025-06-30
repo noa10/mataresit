@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Auth Token Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .info { background-color: #e3f2fd; }
+        .success { background-color: #e8f5e8; }
+        .error { background-color: #ffebee; }
+        .warning { background-color: #fff3e0; }
+        pre { background-color: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .primary { background-color: #2196f3; color: white; }
+        .secondary { background-color: #757575; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Frontend Auth Token Test</h1>
+    <p>This test checks what authentication token is being sent from the frontend to Edge Functions.</p>
+    
+    <div>
+        <button class="primary" onclick="testAuthToken()">Test Auth Token</button>
+        <button class="secondary" onclick="clearLogs()">Clear Logs</button>
+    </div>
+    
+    <div id="logs"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+        
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        function logPre(content, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong><pre>${content}</pre>`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        window.testAuthToken = async function() {
+            try {
+                log('🔍 Testing frontend authentication token...', 'info');
+
+                // Step 1: Try to get session from localStorage first (for localhost testing)
+                log('1️⃣ Checking localStorage for session...', 'info');
+                const authKey = 'sb-mpmkbtsufihzdelrlszs-auth-token';
+                const authData = localStorage.getItem(authKey);
+
+                let session = null;
+
+                if (authData) {
+                    try {
+                        const parsed = JSON.parse(authData);
+                        if (parsed.access_token && parsed.user) {
+                            session = parsed;
+                            log('✅ Found session in localStorage', 'success');
+                        }
+                    } catch (e) {
+                        log('⚠️ Failed to parse localStorage auth data', 'warning');
+                    }
+                }
+
+                // Step 2: If no localStorage session, try Supabase auth
+                if (!session) {
+                    log('2️⃣ Checking Supabase session...', 'info');
+                    const { data: { session: supabaseSession }, error: sessionError } = await supabase.auth.getSession();
+
+                    if (sessionError) {
+                        log(`❌ Session error: ${sessionError.message}`, 'error');
+                        return;
+                    }
+
+                    if (!supabaseSession) {
+                        log('⚠️ No active session found. Please sign in through the main app first.', 'warning');
+                        return;
+                    }
+
+                    session = supabaseSession;
+                }
+                
+                log(`✅ Session found for user: ${session.user.email}`, 'success');
+                log(`📝 Access token length: ${session.access_token.length}`, 'info');
+                log(`📝 Token preview: ${session.access_token.substring(0, 50)}...`, 'info');
+                
+                // Step 2: Test the token with test-auth-validation
+                log('2️⃣ Testing token with test-auth-validation Edge Function...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/test-auth-validation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                log(`📝 Response status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                    logPre(JSON.stringify(responseData, null, 2), response.ok ? 'success' : 'error');
+                } catch (e) {
+                    log(`📝 Raw response: ${responseText}`, 'error');
+                }
+                
+                // Step 3: Test with unified-search Edge Function
+                if (response.ok && responseData?.success) {
+                    log('3️⃣ Testing token with unified-search Edge Function...', 'info');
+                    
+                    const searchResponse = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`,
+                            'apikey': SUPABASE_ANON_KEY,
+                        },
+                        body: JSON.stringify({
+                            query: 'test query',
+                            sources: ['receipt'],
+                            limit: 1
+                        })
+                    });
+                    
+                    log(`📝 Unified-search response status: ${searchResponse.status}`, searchResponse.ok ? 'success' : 'error');
+                    
+                    const searchResponseText = await searchResponse.text();
+                    try {
+                        const searchData = JSON.parse(searchResponseText);
+                        logPre(JSON.stringify(searchData, null, 2), searchResponse.ok ? 'success' : 'error');
+                    } catch (e) {
+                        log(`📝 Unified-search raw response: ${searchResponseText}`, 'error');
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Test error: ${error.message}`, 'error');
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Auto-run test if user is already signed in
+        window.addEventListener('load', async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                log('🚀 User already signed in, running test automatically...', 'info');
+                setTimeout(testAuthToken, 1000);
+            } else {
+                log('ℹ️ No active session. Click "Test Auth Token" to sign in and test.', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
