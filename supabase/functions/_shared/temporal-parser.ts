@@ -674,17 +674,124 @@ export function parseTemporalQuery(query: string, timezone: string = 'Asia/Kuala
     }
   }
 
+  // Parse monetary expressions (add monetary parsing logic)
+  console.log('💰 DEBUG: Starting monetary parsing for query:', normalizedQuery);
+
+  // Enhanced amount patterns with better currency detection
+  const amountPatterns = [
+    // "over $100", "above RM50", "more than $25", "over $100 USD"
+    {
+      pattern: /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(usd|myr|rm|dollars?|ringgit)?\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const amount = parseFloat(match[3]);
+        // Parsed "over" amount
+        return {
+          min: amount,
+          currency: 'MYR', // Default to MYR for Malaysian context
+          originalAmount: amount,
+          originalCurrency: 'MYR'
+        };
+      }
+    },
+    // "under $50", "below RM100", "less than $30 USD"
+    {
+      pattern: /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(usd|myr|rm|dollars?|ringgit)?\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const amount = parseFloat(match[3]);
+        // Parsed "under" amount
+        return {
+          max: amount,
+          currency: 'MYR', // Default to MYR for Malaysian context
+          originalAmount: amount,
+          originalCurrency: 'MYR'
+        };
+      }
+    },
+    // "$20 to $50", "RM100-RM200"
+    {
+      pattern: /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const minAmount = parseFloat(match[2]);
+        const maxAmount = parseFloat(match[4]);
+        // Parsed range amounts
+        return {
+          min: minAmount,
+          max: maxAmount,
+          currency: 'MYR', // Default to MYR for Malaysian context
+          originalAmount: minAmount,
+          originalCurrency: 'MYR'
+        };
+      }
+    },
+    // "between $20 and $50"
+    {
+      pattern: /\bbetween\s+(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s+and\s+(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const minAmount = parseFloat(match[2]);
+        const maxAmount = parseFloat(match[4]);
+        console.log('💰 DEBUG: Parsed "between" amounts:', { minAmount, maxAmount });
+        return {
+          min: minAmount,
+          max: maxAmount,
+          currency: 'MYR', // Default to MYR for Malaysian context
+          originalAmount: minAmount,
+          originalCurrency: 'MYR'
+        };
+      }
+    }
+  ];
+
+  // Parse amount expressions
+  for (const { pattern, handler } of amountPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      console.log('💰 DEBUG: Amount pattern matched:', {
+        pattern: pattern.source,
+        match: match[0],
+        fullMatch: match,
+        groups: match.slice(1)
+      });
+
+      const amountRange = handler(match);
+      result.amountRange = amountRange;
+      result.queryType = result.queryType === 'general' ? 'amount' : 'mixed';
+      result.confidence += 0.3;
+
+      console.log('💰 DEBUG: Amount range set:', amountRange);
+      break; // Use first match
+    }
+  }
+
   // Extract search terms (excluding temporal expressions)
   result.searchTerms = extractSemanticTermsFromQuery(normalizedQuery, temporalMatch);
+
+  // 🔧 FIX: Enable enhanced search routing for monetary queries
+  // Monetary queries need enhanced search path for threshold adjustment
+  if (result.amountRange && !result.temporalIntent) {
+    console.log('💰 DEBUG: Enabling enhanced search routing for monetary query');
+    const hasSemanticContent = result.searchTerms.length > 0;
+
+    result.temporalIntent = {
+      isTemporalQuery: true, // Enable enhanced search path
+      hasSemanticContent,
+      routingStrategy: hasSemanticContent ? 'semantic_only' : 'date_filter_only',
+      temporalConfidence: 0.8,
+      semanticTerms: result.searchTerms
+    };
+
+    console.log('💰 DEBUG: Set temporal intent for monetary query:', result.temporalIntent);
+  }
 
   console.log('✅ Temporal parsing complete:', {
     queryType: result.queryType,
     confidence: result.confidence,
     hasDateRange: !!result.dateRange,
+    hasAmountRange: !!result.amountRange,
     hasTemporalIntent: !!result.temporalIntent,
     isTemporalQuery: result.temporalIntent?.isTemporalQuery || false,
     routingStrategy: result.temporalIntent?.routingStrategy || 'none',
     dateRange: result.dateRange || 'none',
+    amountRange: result.amountRange || 'none',
     searchTermsCount: result.searchTerms.length
   });
 

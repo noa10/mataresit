@@ -168,7 +168,6 @@ BEGIN
 
     -- Apply amount filtering for receipts and claims
     AND (
-      amount_min IS NULL OR amount_max IS NULL OR
       cr.source_type NOT IN ('receipt', 'claim') OR
       (
         (amount_min IS NULL OR (cr.metadata->>'total')::FLOAT >= amount_min OR (cr.metadata->>'amount')::FLOAT >= amount_min) AND

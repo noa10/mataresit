@@ -68,7 +68,17 @@ export class RAGPipeline {
   private context: RAGPipelineContext;
 
   constructor(context: RAGPipelineContext) {
+    console.log('🔧 RAG Pipeline constructor called');
+    console.log('🔍 DEBUG: Constructor context check:', {
+      hasContext: !!context,
+      originalQuery: context?.originalQuery,
+      hasUser: !!context?.user,
+      hasParams: !!context?.params,
+      hasStartTime: !!context?.startTime,
+      hasMetadata: !!context?.metadata
+    });
     this.context = context;
+    console.log('🔧 RAG Pipeline constructor completed');
   }
 
   /**
@@ -76,11 +86,31 @@ export class RAGPipeline {
    */
   async execute(): Promise<RAGPipelineResult> {
     console.log('🚀 Starting RAG Pipeline execution');
-    
+    console.log('🔍 DEBUG: Execute function called - checking context...');
+    console.log('🔍 DEBUG: RAG Pipeline context check:', {
+      hasContext: !!this.context,
+      originalQuery: this.context?.originalQuery,
+      hasUser: !!this.context?.user,
+      hasParams: !!this.context?.params,
+      hasStartTime: !!this.context?.startTime,
+      hasMetadata: !!this.context?.metadata
+    });
+    console.log('🔍 DEBUG: About to enter try block...');
+
     try {
+      console.log('🔍 DEBUG: About to start Stage 1 - Query Preprocessing');
       // Stage 1: Query Understanding & Preprocessing
-      const preprocessingResult = await this.stage1_QueryPreprocessing();
+      let preprocessingResult;
+      try {
+        preprocessingResult = await this.stage1_QueryPreprocessing();
+        console.log('🔍 DEBUG: Stage 1 completed successfully');
+      } catch (stage1Error) {
+        console.error('❌ ERROR in Stage 1:', stage1Error);
+        return this.createErrorResult('Query preprocessing failed with exception', stage1Error);
+      }
+
       if (!preprocessingResult.success) {
+        console.log('🔍 DEBUG: Stage 1 returned failure:', preprocessingResult.error);
         return this.createErrorResult('Query preprocessing failed', preprocessingResult.error);
       }
 
@@ -278,6 +308,10 @@ export class RAGPipeline {
         semanticTerms: temporalRouting?.semanticTerms
       });
 
+      console.log('🔍 DEBUG: About to check temporal routing condition...');
+      console.log('🔍 DEBUG: temporalRouting?.isTemporalQuery =', temporalRouting?.isTemporalQuery);
+      console.log('🔍 DEBUG: temporalRouting?.routingStrategy =', temporalRouting?.routingStrategy);
+
       if (temporalRouting?.isTemporalQuery) {
         console.log('⏰ Detected temporal query - routing strategy:', temporalRouting.routingStrategy);
         console.log('🔍 DEBUG: Temporal routing details:', {
@@ -292,13 +326,29 @@ export class RAGPipeline {
           endDate: this.context.params.filters?.endDate,
           allFilters: this.context.params.filters
         });
-        const temporalResult = await this.executeTemporalSearch(queryEmbedding, temporalRouting);
-        console.log('🔍 DEBUG: Temporal search returned to stage3:', {
-          success: temporalResult.success,
-          dataLength: temporalResult.data?.length || 0,
-          error: temporalResult.error
-        });
-        return temporalResult;
+
+        try {
+          console.log('🔍 DEBUG: About to use existing query embedding for temporal search...');
+          // Use the query embedding that was already generated in Stage 2
+          const queryEmbedding = this.context.metadata.queryEmbedding;
+          if (!queryEmbedding) {
+            throw new Error('Query embedding not found in metadata - Stage 2 may have failed');
+          }
+          console.log('🔍 DEBUG: Using existing query embedding with', queryEmbedding.length, 'dimensions');
+
+          console.log('🔍 DEBUG: About to execute temporal search...');
+          const temporalResult = await this.executeTemporalSearch(queryEmbedding, temporalRouting);
+          console.log('🔍 DEBUG: Temporal search returned to stage3:', {
+            success: temporalResult.success,
+            dataLength: temporalResult.data?.length || 0,
+            error: temporalResult.error
+          });
+          return temporalResult;
+        } catch (temporalError) {
+          console.error('❌ ERROR in temporal search execution:', temporalError);
+          console.log('🔍 DEBUG: Temporal search failed, falling back to regular search');
+          // Continue to regular search below
+        }
       } else {
         console.log('❌ No temporal routing detected, falling back to regular search');
         console.log('🔍 DEBUG: Why no temporal routing?', {
@@ -314,27 +364,38 @@ export class RAGPipeline {
       // Try enhanced hybrid search first with amount filtering support
       let searchResults, error;
       try {
-        // Prepare amount filtering parameters
-        const amountRange = this.context.params.filters?.amountRange;
-        const amountParams = amountRange ? {
-          amount_min: amountRange.min || null,
-          amount_max: amountRange.max || null,
-          amount_currency: amountRange.currency || null
-        } : {
-          amount_min: null,
-          amount_max: null,
-          amount_currency: null
+        // Prepare amount filtering parameters (FIXED: access correct property names)
+        const filters = this.context.params.filters || {};
+        const amountParams = {
+          amount_min: filters.minAmount || null,
+          amount_max: filters.maxAmount || null,
+          amount_currency: filters.currency || null
         };
 
         console.log('💰 Amount filtering params:', amountParams);
+
+        // MONETARY QUERY FIX: Bypass semantic similarity for monetary queries
+        const isMonetaryQuery = amountParams.amount_min !== null || amountParams.amount_max !== null;
+        const adjustedSimilarityThreshold = isMonetaryQuery ? 0.0 : (this.context.params.similarityThreshold || 0.2); // 0.0 = bypass semantic similarity
+        const adjustedTrigramThreshold = isMonetaryQuery ? 0.0 : 0.3; // 0.0 = bypass trigram similarity
+
+        console.log('💰 DEBUG: Monetary query threshold adjustment (BYPASS SEMANTIC):', {
+          isMonetaryQuery,
+          originalThreshold: this.context.params.similarityThreshold || 0.2,
+          adjustedSimilarityThreshold,
+          adjustedTrigramThreshold,
+          hasAmountMin: amountParams.amount_min !== null,
+          hasAmountMax: amountParams.amount_max !== null,
+          bypassingSemantic: isMonetaryQuery
+        });
 
         const enhancedResult = await this.context.supabase.rpc('enhanced_hybrid_search', {
           query_embedding: queryEmbedding,
           query_text: this.context.originalQuery,
           source_types: this.context.params.sources,
           content_types: this.context.params.contentTypes,
-          similarity_threshold: this.context.params.similarityThreshold || 0.2,
-          trigram_threshold: 0.3,
+          similarity_threshold: adjustedSimilarityThreshold,
+          trigram_threshold: adjustedTrigramThreshold,
           semantic_weight: 0.6,
           keyword_weight: 0.25,
           trigram_weight: 0.15,
@@ -363,11 +424,24 @@ export class RAGPipeline {
           dateRange, amountRange
         });
 
+        // 🔧 FIX: Apply monetary query threshold adjustment to fallback path too (BYPASS SEMANTIC)
+        const isMonetaryQueryFallback = (amountRange?.min !== null && amountRange?.min !== undefined) ||
+                                       (amountRange?.max !== null && amountRange?.max !== undefined);
+        const fallbackSimilarityThreshold = isMonetaryQueryFallback ? 0.0 : this.context.params.similarityThreshold; // 0.0 = bypass semantic
+
+        console.log('💰 DEBUG: Fallback monetary query threshold adjustment (BYPASS SEMANTIC):', {
+          isMonetaryQueryFallback,
+          originalThreshold: this.context.params.similarityThreshold,
+          fallbackSimilarityThreshold,
+          amountRange,
+          bypassingSemantic: isMonetaryQueryFallback
+        });
+
         const fallbackResult = await this.context.supabase.rpc('unified_search', {
           query_embedding: queryEmbedding,
           source_types: this.context.params.sources,
           content_types: this.context.params.contentTypes,
-          similarity_threshold: this.context.params.similarityThreshold,
+          similarity_threshold: fallbackSimilarityThreshold,
           match_count: candidateLimit,
           user_filter: this.context.user.id,
           team_filter: this.context.params.filters?.teamId,
@@ -772,27 +846,35 @@ export class RAGPipeline {
       // Continue with the existing hybrid search logic from the original method
       const candidateLimit = Math.max(50, (this.context.params.limit || 20) * 3);
 
-      // Prepare amount filtering parameters
-      const amountRange = this.context.params.filters?.amountRange;
-      const amountParams = amountRange ? {
-        amount_min: amountRange.min || null,
-        amount_max: amountRange.max || null,
-        amount_currency: amountRange.currency || null
-      } : {
-        amount_min: null,
-        amount_max: null,
-        amount_currency: null
+      // Prepare amount filtering parameters (FIXED: access correct property names)
+      const filters = this.context.params.filters || {};
+      const amountParams = {
+        amount_min: filters.minAmount || null,
+        amount_max: filters.maxAmount || null,
+        amount_currency: filters.currency || null
       };
 
       console.log('💰 Amount filtering params:', amountParams);
+
+      // MONETARY QUERY FIX: Bypass semantic similarity for monetary queries (second location)
+      const isMonetaryQuery = amountParams.amount_min !== null || amountParams.amount_max !== null;
+      const adjustedSimilarityThreshold = isMonetaryQuery ? 0.0 : (this.context.params.similarityThreshold || 0.2); // 0.0 = bypass semantic
+      const adjustedTrigramThreshold = isMonetaryQuery ? 0.0 : 0.3; // 0.0 = bypass trigram
+
+      console.log('💰 DEBUG: Monetary query threshold adjustment (location 2, BYPASS SEMANTIC):', {
+        isMonetaryQuery,
+        adjustedSimilarityThreshold,
+        adjustedTrigramThreshold,
+        bypassingSemantic: isMonetaryQuery
+      });
 
       const enhancedResult = await this.context.supabase.rpc('enhanced_hybrid_search', {
         query_embedding: queryEmbedding,
         query_text: this.context.originalQuery,
         source_types: this.context.params.sources,
         content_types: this.context.params.contentTypes,
-        similarity_threshold: this.context.params.similarityThreshold || 0.2,
-        trigram_threshold: 0.3,
+        similarity_threshold: adjustedSimilarityThreshold,
+        trigram_threshold: adjustedTrigramThreshold,
         semantic_weight: 0.6,
         keyword_weight: 0.25,
         trigram_weight: 0.15,
@@ -1048,11 +1130,16 @@ export class RAGPipeline {
 
   // Transform methods for different source types (simplified for space)
   private async transformReceiptResult(baseResult: any, result: any): Promise<UnifiedSearchResult> {
-    const { data: receipt } = await this.context.supabase
+    const { data: receipt, error } = await this.context.supabase
       .from('receipts')
       .select('merchant, total, currency, date, status, predicted_category')
       .eq('id', result.source_id)
       .single();
+
+    if (error) {
+      console.error(`Error fetching receipt ${result.source_id}:`, error);
+      throw error;
+    }
 
     return {
       ...baseResult,
@@ -1467,14 +1554,20 @@ export class RAGPipeline {
         });
 
         if (typeof amount === 'number') {
-          const passes = amount >= min && amount <= max;
-          console.log('💰 DEBUG: Amount filter result:', { amount, min, max, passes });
+          // FIXED: Handle min-only and max-only filtering correctly
+          const passesMin = min === undefined || min === null || amount >= min;
+          const passesMax = max === undefined || max === null || amount <= max;
+          const passes = passesMin && passesMax;
+          console.log('💰 DEBUG: Amount filter result:', { amount, min, max, passesMin, passesMax, passes });
           return passes;
         } else if (typeof amount === 'string' && !isNaN(Number(amount))) {
           // Handle string amounts by converting to number
           const numericAmount = Number(amount);
-          const passes = numericAmount >= min && numericAmount <= max;
-          console.log('💰 DEBUG: String amount converted and filtered:', { amount, numericAmount, min, max, passes });
+          // FIXED: Handle min-only and max-only filtering correctly
+          const passesMin = min === undefined || min === null || numericAmount >= min;
+          const passesMax = max === undefined || max === null || numericAmount <= max;
+          const passes = passesMin && passesMax;
+          console.log('💰 DEBUG: String amount converted and filtered:', { amount, numericAmount, min, max, passesMin, passesMax, passes });
           return passes;
         }
         console.log('💰 DEBUG: Keeping result without valid amount data:', { amount });

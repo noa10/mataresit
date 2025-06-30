@@ -434,6 +434,14 @@ export default function SemanticSearchPage() {
           console.log('🔍 CHAT: About to call unifiedSearch function...');
           console.log('🔍 CHAT: Enhanced params being sent:', JSON.stringify(enhancedParams, null, 2));
 
+          // Add detailed debugging before the call
+          console.log('🔧 DEBUG: unifiedSearch function details:', {
+            functionExists: typeof unifiedSearch === 'function',
+            paramsValid: !!enhancedParams,
+            queryLength: enhancedParams.query?.length || 0,
+            sourcesCount: enhancedParams.sources?.length || 0
+          });
+
           const unifiedResponse = await unifiedSearch(enhancedParams);
 
           console.log('🔍 CHAT: unifiedSearch function returned:', {

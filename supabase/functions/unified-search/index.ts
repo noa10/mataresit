@@ -624,6 +624,16 @@ async function handleRegularSearch(
 
     // Execute RAG Pipeline
     console.log('🔄 Initializing RAG Pipeline...');
+    console.log('🔍 DEBUG: Pipeline context data:', {
+      hasQuery: !!params.query,
+      query: params.query,
+      hasUser: !!userForLimits,
+      userId: userForLimits?.id,
+      hasSupabase: !!supabase,
+      hasFilteredParams: !!filteredParams,
+      hasStartTime: !!startTime,
+      hasMetadata: !!searchMetadata
+    });
 
     const pipelineContext: RAGPipelineContext = {
       originalQuery: params.query,
@@ -634,7 +644,9 @@ async function handleRegularSearch(
       metadata: searchMetadata
     };
 
+    console.log('🔍 DEBUG: About to create RAG Pipeline instance...');
     const ragPipeline = new RAGPipeline(pipelineContext);
+    console.log('🔍 DEBUG: RAG Pipeline instance created, about to execute...');
     const pipelineResult = await ragPipeline.execute();
 
     if (!pipelineResult.success) {

@@ -83,8 +83,8 @@ BEGIN
       (max_amount IS NULL OR r.total <= max_amount)
     )
     
-    -- Similarity threshold
-    AND (1 - (ue.embedding <=> query_embedding)) > similarity_threshold
+    -- Similarity threshold (bypass if threshold is 0.0 for monetary queries)
+    AND (similarity_threshold <= 0.0 OR (1 - (ue.embedding <=> query_embedding)) > similarity_threshold)
     
     -- Ensure we have valid content
     AND ue.content_text IS NOT NULL 
