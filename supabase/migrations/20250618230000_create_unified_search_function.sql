@@ -59,7 +59,7 @@ BEGIN
   );
 END $$;
 
--- Create the core unified_search function
+-- Create the core unified_search function with temporal filtering support
 CREATE OR REPLACE FUNCTION unified_search(
   query_embedding VECTOR(1536),
   source_types TEXT[] DEFAULT ARRAY['receipt', 'claim', 'team_member', 'custom_category', 'business_directory'],
@@ -68,7 +68,13 @@ CREATE OR REPLACE FUNCTION unified_search(
   match_count INT DEFAULT 20,
   user_filter UUID DEFAULT NULL,
   team_filter UUID DEFAULT NULL,
-  language_filter TEXT DEFAULT NULL
+  language_filter TEXT DEFAULT NULL,
+  -- NEW: Date filtering parameters for temporal search
+  start_date DATE DEFAULT NULL,
+  end_date DATE DEFAULT NULL,
+  -- NEW: Amount filtering parameters
+  min_amount NUMERIC DEFAULT NULL,
+  max_amount NUMERIC DEFAULT NULL
 ) RETURNS TABLE (
   id UUID,
   source_type TEXT,
@@ -84,7 +90,7 @@ SET search_path = public
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     ue.id,
     ue.source_type,
     ue.source_id,
@@ -93,27 +99,43 @@ BEGIN
     1 - (ue.embedding <=> query_embedding) as similarity,
     ue.metadata
   FROM unified_embeddings ue
-  WHERE 
+  -- NEW: Join with receipts table for date/amount filtering when searching receipts
+  LEFT JOIN receipts r ON (ue.source_type = 'receipt' AND ue.source_id = r.id)
+  WHERE
     -- Source type filtering
     (source_types IS NULL OR ue.source_type = ANY(source_types))
-    
+
     -- Content type filtering
     AND (content_types IS NULL OR ue.content_type = ANY(content_types))
-    
+
     -- User filtering (if specified)
     AND (user_filter IS NULL OR ue.user_id = user_filter)
-    
+
     -- Team filtering (if specified)
     AND (team_filter IS NULL OR ue.team_id = team_filter)
-    
+
     -- Language filtering (if specified)
     AND (language_filter IS NULL OR ue.language = language_filter)
-    
+
+    -- NEW: Date range filtering for receipts
+    AND (
+      ue.source_type != 'receipt' OR
+      (start_date IS NULL OR r.date >= start_date) AND
+      (end_date IS NULL OR r.date <= end_date)
+    )
+
+    -- NEW: Amount range filtering for receipts
+    AND (
+      ue.source_type != 'receipt' OR
+      (min_amount IS NULL OR r.total >= min_amount) AND
+      (max_amount IS NULL OR r.total <= max_amount)
+    )
+
     -- Similarity threshold
     AND (1 - (ue.embedding <=> query_embedding)) > similarity_threshold
-    
+
     -- Ensure we have valid content
-    AND ue.content_text IS NOT NULL 
+    AND ue.content_text IS NOT NULL
     AND TRIM(ue.content_text) != ''
     AND ue.embedding IS NOT NULL
   ORDER BY similarity DESC
@@ -152,7 +174,7 @@ END;
 $$;
 
 -- Add comments for documentation
-COMMENT ON FUNCTION unified_search IS 'Core unified search function that performs vector similarity search across all embedding sources';
+COMMENT ON FUNCTION unified_search IS 'Core unified search function that performs vector similarity search across all embedding sources with temporal and amount filtering support';
 COMMENT ON FUNCTION get_unified_search_stats IS 'Helper function to get statistics about embeddings for debugging and monitoring';
 
 -- Grant necessary permissions
