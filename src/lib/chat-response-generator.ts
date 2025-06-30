@@ -1,10 +1,26 @@
 import { SearchResult, ReceiptWithSimilarity, LineItemSearchResult } from './ai-search';
+import { formatCurrencyAmount } from './currency-converter';
 
 export interface ExtractedKeywords {
   primaryTerms: string[];
   originalQuery: string;
   queryType: 'item' | 'merchant' | 'category' | 'amount' | 'date' | 'general';
   confidence: 'high' | 'medium' | 'low';
+}
+
+export interface MonetaryFilterInfo {
+  min?: number;
+  max?: number;
+  currency?: string;
+  originalAmount?: number;
+  originalMaxAmount?: number;
+  originalCurrency?: string;
+  conversionInfo?: {
+    conversionApplied: boolean;
+    reasoning: string;
+    exchangeRate?: number;
+    convertedAmount?: { amount: number; currency: string };
+  };
 }
 
 /**
@@ -90,12 +106,20 @@ export function extractKeywords(query: string): ExtractedKeywords {
 }
 
 /**
- * Generate contextual "not found" responses
+ * Generate contextual "not found" responses with monetary filter support
  */
-export function generateNotFoundResponse(keywords: ExtractedKeywords): string {
+export function generateNotFoundResponse(
+  keywords: ExtractedKeywords,
+  monetaryFilter?: MonetaryFilterInfo
+): string {
   const { primaryTerms, queryType, confidence } = keywords;
   const mainTerm = primaryTerms.length > 0 ? primaryTerms.join(' ') : keywords.originalQuery;
-  
+
+  // Special handling for monetary queries
+  if (queryType === 'amount' && monetaryFilter) {
+    return generateMonetaryNotFoundResponse(monetaryFilter);
+  }
+
   // Base responses for different scenarios
   const responses = {
     highConfidenceItem: [
@@ -103,47 +127,47 @@ export function generateNotFoundResponse(keywords: ExtractedKeywords): string {
       `No luck finding "${mainTerm}" this time. Perhaps try checking the spelling or using a different product name?`,
       `I didn't find any results for "${mainTerm}". You could try searching for a broader category or the store name where you might have bought it.`
     ],
-    
+
     mediumConfidenceItem: [
       `I looked for "${mainTerm}" but came up empty. If you're looking for a specific product, try using just the main product name.`,
       `Hmm, I didn't find anything for "${mainTerm}". You might want to try a more specific product name or check the spelling.`
     ],
-    
+
     merchant: [
       `I couldn't find any receipts from "${mainTerm}". Double-check the store name spelling, or try searching for items you bought there instead.`,
       `No receipts found for "${mainTerm}". Perhaps try the full store name or search by what you purchased there?`
     ],
-    
+
     category: [
       `I didn't find any ${mainTerm} purchases in your receipts. Try being more specific about the item or store name.`,
       `No ${mainTerm} items found. You could search for specific products in this category or the stores where you shop for these items.`
     ],
-    
+
     amount: [
       `I couldn't find any receipts matching that amount criteria. Try adjusting the price range or combining it with other search terms.`,
       `No results for that price range. You might want to try a broader amount range or add item or store details.`
     ],
-    
+
     date: [
       `I didn't find any receipts for that time period. Try expanding the date range or adding specific items or stores to search for.`,
       `No receipts found for those dates. Perhaps try a different time period or combine with item or store names.`
     ],
-    
+
     general: [
       `I tried searching for "${keywords.originalQuery}" but didn't find any results. For better results, try using specific item names, store names, or dates.`,
       `I couldn't find anything matching "${keywords.originalQuery}". Try rephrasing with more specific terms like product names or store names.`,
       `No matches found for "${keywords.originalQuery}". Remember, I can search by item name, store, date, or even amounts. How about trying one of those?`
     ],
-    
+
     lowConfidence: [
       `I tried searching for "${keywords.originalQuery}" but didn't find any results. For more precise results, try using just the key terms, like "${mainTerm}".`,
       `I couldn't find anything for "${keywords.originalQuery}". Try simplifying your search to just the main product or store name.`
     ]
   };
-  
+
   // Select appropriate response category
   let responseCategory: keyof typeof responses;
-  
+
   if (confidence === 'low') {
     responseCategory = 'lowConfidence';
   } else if (queryType === 'item' && confidence === 'high') {
@@ -153,34 +177,80 @@ export function generateNotFoundResponse(keywords: ExtractedKeywords): string {
   } else {
     responseCategory = queryType;
   }
-  
+
   // Get random response from the appropriate category
   const categoryResponses = responses[responseCategory] || responses.general;
   const randomIndex = Math.floor(Math.random() * categoryResponses.length);
-  
+
   return categoryResponses[randomIndex];
 }
 
 /**
- * Generate contextual success responses
+ * Generate specialized "not found" response for monetary queries
+ */
+function generateMonetaryNotFoundResponse(monetaryFilter: MonetaryFilterInfo): string {
+  const { min, max, originalAmount, originalMaxAmount, originalCurrency } = monetaryFilter;
+  const displayCurrency = originalCurrency || 'MYR';
+
+  // Build filter description
+  const filterParts: string[] = [];
+
+  if (min !== undefined && min > 0) {
+    const displayAmount = originalAmount || min;
+    const formattedAmount = formatCurrencyAmount({ amount: displayAmount, currency: displayCurrency });
+    filterParts.push(`over ${formattedAmount}`);
+  }
+
+  if (max !== undefined && max < Number.MAX_SAFE_INTEGER) {
+    const displayAmount = originalMaxAmount || max;
+    const formattedAmount = formatCurrencyAmount({ amount: displayAmount, currency: displayCurrency });
+    filterParts.push(`under ${formattedAmount}`);
+  }
+
+  const filterDescription = filterParts.length > 0 ? ` ${filterParts.join(' and ')}` : '';
+
+  let response = `I couldn't find any receipts${filterDescription}.`;
+
+  // Add helpful suggestions
+  const suggestions = [
+    'Try adjusting your amount range',
+    'Check if you have receipts in that price range',
+    'Consider using a broader price range'
+  ];
+
+  response += ` ${suggestions[Math.floor(Math.random() * suggestions.length)]}.`;
+
+  // Add conversion note if applicable
+  if (monetaryFilter.conversionInfo?.conversionApplied) {
+    response += `\n\n*Note: ${monetaryFilter.conversionInfo.reasoning}*`;
+  }
+
+  return response;
+}
+
+/**
+ * Generate contextual success responses with monetary filter information
  */
 export function generateSuccessResponse(
-  results: SearchResult, 
-  keywords: ExtractedKeywords
+  results: SearchResult,
+  keywords: ExtractedKeywords,
+  monetaryFilter?: MonetaryFilterInfo
 ): string {
   const { primaryTerms, queryType } = keywords;
   const mainTerm = primaryTerms.length > 0 ? primaryTerms.join(' ') : keywords.originalQuery;
   const totalResults = results.total || 0;
   const displayedResults = results.results?.length || 0;
-  
+
   // Analyze result types
   const receipts = results.results?.filter(r => 'merchant' in r) || [];
   const lineItems = results.results?.filter(r => 'line_item_description' in r) || [];
-  
+
   let baseResponse = '';
-  
+
   // Generate contextual opening based on query type and results
-  if (queryType === 'item' && lineItems.length > 0) {
+  if (queryType === 'amount' && monetaryFilter) {
+    baseResponse = generateMonetaryFilterResponse(totalResults, monetaryFilter, receipts, lineItems);
+  } else if (queryType === 'item' && lineItems.length > 0) {
     baseResponse = `Great! I found ${totalResults} result${totalResults !== 1 ? 's' : ''} for "${mainTerm}".`;
   } else if (queryType === 'merchant' && receipts.length > 0) {
     baseResponse = `I found ${totalResults} receipt${totalResults !== 1 ? 's' : ''} from "${mainTerm}".`;
@@ -189,7 +259,7 @@ export function generateSuccessResponse(
   } else {
     baseResponse = `I found ${totalResults} result${totalResults !== 1 ? 's' : ''} for "${mainTerm}".`;
   }
-  
+
   // Add details about result composition
   if (receipts.length > 0 && lineItems.length > 0) {
     baseResponse += ` This includes ${receipts.length} receipt${receipts.length !== 1 ? 's' : ''} and ${lineItems.length} individual item${lineItems.length !== 1 ? 's' : ''}.`;
@@ -198,13 +268,72 @@ export function generateSuccessResponse(
   } else if (lineItems.length > 0) {
     baseResponse += ` Found ${lineItems.length} matching item${lineItems.length !== 1 ? 's' : ''}.`;
   }
-  
+
   // Add pagination info if needed
   if (displayedResults < totalResults) {
     baseResponse += ` Showing the top ${displayedResults} most relevant matches.`;
   }
-  
+
+  // Add currency conversion note if applicable
+  if (monetaryFilter?.conversionInfo?.conversionApplied) {
+    baseResponse += `\n\n*Note: ${monetaryFilter.conversionInfo.reasoning}*`;
+  }
+
   return baseResponse;
+}
+
+/**
+ * Generate specialized response for monetary filter queries
+ */
+function generateMonetaryFilterResponse(
+  totalResults: number,
+  monetaryFilter: MonetaryFilterInfo,
+  receipts: any[],
+  lineItems: any[]
+): string {
+  const { min, max, originalAmount, originalMaxAmount, originalCurrency } = monetaryFilter;
+  const displayCurrency = originalCurrency || 'MYR';
+
+  // Build filter description
+  const filterParts: string[] = [];
+
+  if (min !== undefined && min > 0) {
+    const displayAmount = originalAmount || min;
+    const formattedAmount = formatCurrencyAmount({ amount: displayAmount, currency: displayCurrency });
+    filterParts.push(`over ${formattedAmount}`);
+  }
+
+  if (max !== undefined && max < Number.MAX_SAFE_INTEGER) {
+    const displayAmount = originalMaxAmount || max;
+    const formattedAmount = formatCurrencyAmount({ amount: displayAmount, currency: displayCurrency });
+    filterParts.push(`under ${formattedAmount}`);
+  }
+
+  const filterDescription = filterParts.length > 0 ? ` ${filterParts.join(' and ')}` : '';
+
+  // Generate response based on results
+  if (totalResults === 0) {
+    return `I couldn't find any receipts${filterDescription}. You might want to try a different amount range or check if you have receipts in that price range.`;
+  }
+
+  let response = `I found ${totalResults} receipt${totalResults !== 1 ? 's' : ''}${filterDescription}.`;
+
+  // Add summary statistics if we have receipts
+  if (receipts.length > 0) {
+    const amounts = receipts
+      .map(r => r.total_amount || r.total)
+      .filter(amount => typeof amount === 'number');
+
+    if (amounts.length > 0) {
+      const minAmount = Math.min(...amounts);
+      const maxAmount = Math.max(...amounts);
+      const avgAmount = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
+
+      response += ` The amounts range from ${formatCurrencyAmount({ amount: minAmount, currency: displayCurrency })} to ${formatCurrencyAmount({ amount: maxAmount, currency: displayCurrency })}, with an average of ${formatCurrencyAmount({ amount: avgAmount, currency: displayCurrency })}.`;
+    }
+  }
+
+  return response;
 }
 
 /**
@@ -303,12 +432,26 @@ export function generateSearchSuggestions(keywords: ExtractedKeywords): string[]
 }
 
 /**
- * Main function to generate intelligent chat responses
+ * Main function to generate intelligent chat responses with monetary filter support
  */
 export function generateIntelligentResponse(
   results: SearchResult,
-  originalQuery: string
+  originalQuery: string,
+  monetaryFilter?: MonetaryFilterInfo
 ): string {
+  console.log('💰 DEBUG: Generating response for monetary query:', {
+    originalQuery,
+    monetaryFilter,
+    resultsCount: results.count,
+    totalResults: results.total,
+    hasResults: results.results && results.results.length > 0,
+    sampleResults: results.results?.slice(0, 2).map(r => ({
+      merchant: r.merchant,
+      total: r.total,
+      totalType: typeof r.total
+    }))
+  });
+
   // First check for special intents
   const intentCheck = detectUserIntent(originalQuery);
   if (intentCheck.intent !== 'search' && intentCheck.response) {
@@ -318,8 +461,8 @@ export function generateIntelligentResponse(
   const keywords = extractKeywords(originalQuery);
 
   if (!results.results || results.results.length === 0) {
-    return generateNotFoundResponse(keywords);
+    return generateNotFoundResponse(keywords, monetaryFilter);
   } else {
-    return generateSuccessResponse(results, keywords);
+    return generateSuccessResponse(results, keywords, monetaryFilter);
   }
 }

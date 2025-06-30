@@ -2,11 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { WelcomeScreen } from './WelcomeScreen';
 import { TypingIndicator } from './TypingIndicator';
+import { StatusIndicator, StatusUpdate } from './StatusIndicator';
 import { ChatMessage as ChatMessageType } from './ChatMessage';
 
 interface ChatContainerProps {
   messages: ChatMessageType[];
   isLoading?: boolean;
+  status?: StatusUpdate;
+  conversationId?: string;
   onExampleClick: (example: string) => void;
   onCopy?: (content: string) => void;
   onFeedback?: (messageId: string, feedback: 'positive' | 'negative') => void;
@@ -16,6 +19,8 @@ interface ChatContainerProps {
 export function ChatContainer({
   messages,
   isLoading = false,
+  status,
+  conversationId,
   onExampleClick,
   onCopy,
   onFeedback,
@@ -63,10 +68,18 @@ export function ChatContainer({
           <ChatMessage
             key={message.id}
             message={message}
+            conversationId={conversationId}
             onCopy={onCopy}
             onFeedback={onFeedback}
           />
         ))}
+
+        {/* Status indicator for real-time feedback */}
+        {status && status.stage !== 'idle' && status.stage !== 'complete' && (
+          <div className="px-4 py-2">
+            <StatusIndicator status={status} compact={true} />
+          </div>
+        )}
 
         {/* Loading indicator */}
         {isLoading && <TypingIndicator />}

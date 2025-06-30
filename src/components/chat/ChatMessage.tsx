@@ -8,6 +8,10 @@ import { SearchResult, ReceiptWithSimilarity, LineItemSearchResult } from '@/lib
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useChatTranslation } from '@/contexts/LanguageContext';
+import { UIComponent } from '@/types/ui-components';
+import { parseUIComponents } from '@/lib/ui-component-parser';
+import { UIComponentRenderer } from './ui-components/UIComponentRenderer';
+import { FeedbackButtons } from './FeedbackButtons';
 
 export interface ChatMessage {
   id: string;
@@ -16,32 +20,43 @@ export interface ChatMessage {
   timestamp: Date;
   searchResults?: SearchResult;
   isLoading?: boolean;
+  uiComponents?: UIComponent[];
 }
 
 interface ChatMessageProps {
   message: ChatMessage;
+  conversationId?: string;
   onCopy?: (content: string) => void;
   onFeedback?: (messageId: string, feedback: 'positive' | 'negative') => void;
 }
 
-export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
+export function ChatMessage({ message, conversationId, onCopy, onFeedback }: ChatMessageProps) {
   const navigate = useNavigate();
   const { t } = useChatTranslation();
   const [displayedText, setDisplayedText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [parsedComponents, setParsedComponents] = useState<UIComponent[]>([]);
+  const [cleanedContent, setCleanedContent] = useState('');
 
-  // Streaming effect for AI messages
+  // Parse UI components and handle streaming for AI messages
   useEffect(() => {
     if (message.type === 'ai' && message.content) {
+      // Parse UI components from message content
+      const parseResult = parseUIComponents(message.content);
+      setParsedComponents(parseResult.components);
+      setCleanedContent(parseResult.cleanedContent);
+
+      // Use cleaned content for streaming (without JSON blocks)
+      const textToStream = parseResult.cleanedContent;
+
       setIsStreaming(true);
       setDisplayedText('');
 
-      const text = message.content;
       let currentIndex = 0;
 
       const streamInterval = setInterval(() => {
-        if (currentIndex < text.length) {
-          setDisplayedText(text.slice(0, currentIndex + 1));
+        if (currentIndex < textToStream.length) {
+          setDisplayedText(textToStream.slice(0, currentIndex + 1));
           currentIndex++;
         } else {
           setIsStreaming(false);
@@ -51,15 +66,45 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
 
       return () => clearInterval(streamInterval);
     } else {
+      // For non-AI messages, just set the content directly
       setDisplayedText(message.content);
+      setCleanedContent(message.content);
+      setParsedComponents([]);
       setIsStreaming(false);
     }
   }, [message.content, message.type]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
+    // Copy the cleaned content (without JSON blocks) for better user experience
+    const contentToCopy = cleanedContent || message.content;
+    navigator.clipboard.writeText(contentToCopy);
     toast.success(t('messages.actions.copied'));
-    onCopy?.(message.content);
+    onCopy?.(contentToCopy);
+  };
+
+  // Handle UI component actions
+  const handleComponentAction = (action: string, data?: any) => {
+    console.log('🔧 Chat UI Component Action:', action, data);
+
+    // Track specific actions for analytics and user feedback
+    switch (action) {
+      case 'view_receipt':
+        console.log(`📄 Viewing receipt ${data?.receipt_id} from chat interface`);
+        break;
+      case 'edit_receipt':
+        console.log(`✏️ Editing receipt ${data?.receipt_id} from chat interface`);
+        break;
+      case 'categorize_receipt':
+        console.log(`🏷️ Categorizing receipt ${data?.receipt_id} from chat interface`);
+        break;
+      default:
+        console.log(`🔧 Unknown action: ${action}`);
+    }
+
+    // You can add more specific handling here:
+    // - Analytics tracking
+    // - State updates
+    // - User behavior logging
   };
 
   const handleViewReceipt = (receiptId: string, itemType?: string) => {
@@ -88,22 +133,65 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
     }
   };
 
+  // Helper function to clean and format dates (similar to ReceiptCardComponent)
+  const formatReceiptDate = (dateString: string) => {
+    try {
+      // Handle various date formats and clean up any template placeholders
+      let cleanDateString = dateString;
+
+      // Remove any template placeholders like "{{date}}"
+      cleanDateString = cleanDateString.replace(/\{\{date\}\}:?\s*/g, '').trim();
+
+      // If the string is empty after cleanup, return null
+      if (!cleanDateString) {
+        return null;
+      }
+
+      const date = new Date(cleanDateString);
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        // Try to parse DD/MM/YYYY or DD-MM-YYYY format
+        const ddmmyyyyMatch = cleanDateString.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (ddmmyyyyMatch) {
+          const [, day, month, year] = ddmmyyyyMatch;
+          const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate;
+          }
+        }
+        return null; // Return null if can't parse
+      }
+
+      return date;
+    } catch {
+      return null;
+    }
+  };
+
   const renderSearchResults = () => {
     if (!message.searchResults?.results) return null;
+
+    // Don't render traditional search results if UI components are present
+    // This prevents duplicate receipt cards from being displayed
+    const hasReceiptUIComponents = parsedComponents.some(c => c.component === 'receipt_card');
+    if (hasReceiptUIComponents) {
+      return null;
+    }
 
     return (
       <div className="mt-4 space-y-3">
         <div className="text-sm text-muted-foreground">
           Found {message.searchResults.total} results:
         </div>
-        
+
         {message.searchResults.results.map((result, index) => {
           // Check if it's a receipt or line item result
           const isReceipt = 'merchant' in result;
-          
+
           if (isReceipt) {
             const receipt = result as ReceiptWithSimilarity;
-            const receiptDate = receipt.date ? new Date(receipt.date) : null;
+            const receiptDate = receipt.date ? formatReceiptDate(receipt.date) : null;
             const similarityScore = receipt.similarity_score || 0;
             const formattedScore = Math.round(similarityScore * 100);
 
@@ -121,10 +209,18 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
                   
                   <div className="text-sm text-muted-foreground space-y-1">
                     {receiptDate && (
-                      <div>{t('results.date')}: {receiptDate.toLocaleDateString()}</div>
+                      <div>{t('results.date')}: {receiptDate.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}</div>
                     )}
-                    {receipt.total_amount && (
-                      <div>{t('results.total')}: ${receipt.total_amount.toFixed(2)}</div>
+                    {(receipt.total_amount || receipt.total) && (
+                      <div>{t('results.total')}: {receipt.currency || 'MYR'} {
+                        (receipt.total_amount || receipt.total || 0).toFixed ?
+                        (receipt.total_amount || receipt.total).toFixed(2) :
+                        (receipt.total_amount || receipt.total)
+                      }</div>
                     )}
                     {receipt.notes && (
                       <div className="text-xs">{t('results.notes')}: {receipt.notes}</div>
@@ -145,7 +241,7 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
             );
           } else {
             const lineItem = result as LineItemSearchResult;
-            const receiptDate = lineItem.parent_receipt_date ? new Date(lineItem.parent_receipt_date) : null;
+            const receiptDate = lineItem.parent_receipt_date ? formatReceiptDate(lineItem.parent_receipt_date) : null;
             const similarityScore = lineItem.similarity_score || 0;
             const formattedScore = Math.round(similarityScore * 100);
 
@@ -164,10 +260,14 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
                   <div className="text-sm text-muted-foreground space-y-1">
                     <div>{t('results.from')}: {lineItem.parent_receipt_merchant || t('results.unknownMerchant')}</div>
                     {receiptDate && (
-                      <div>{t('results.date')}: {receiptDate.toLocaleDateString()}</div>
+                      <div>{t('results.date')}: {receiptDate.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}</div>
                     )}
                     {lineItem.line_item_amount && (
-                      <div>{t('results.amount')}: ${lineItem.line_item_amount.toFixed(2)}</div>
+                      <div>{t('results.amount')}: {lineItem.currency || 'MYR'} {lineItem.line_item_amount.toFixed(2)}</div>
                     )}
                   </div>
                   
@@ -217,6 +317,17 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
               {isStreaming && <span className="animate-pulse">|</span>}
             </p>
             {!isStreaming && renderSearchResults()}
+
+            {/* Render UI Components after streaming is complete */}
+            {!isStreaming && parsedComponents.length > 0 && (
+              <div className="mt-4">
+                <UIComponentRenderer
+                  components={parsedComponents}
+                  onAction={handleComponentAction}
+                  compact={false}
+                />
+              </div>
+            )}
             
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
               <div className="text-xs text-muted-foreground">
@@ -231,26 +342,13 @@ export function ChatMessage({ message, onCopy, onFeedback }: ChatMessageProps) {
                 >
                   <Copy className="h-3 w-3" />
                 </Button>
-                {onFeedback && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onFeedback(message.id, 'positive')}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ThumbsUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onFeedback(message.id, 'negative')}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ThumbsDown className="h-3 w-3" />
-                    </Button>
-                  </>
-                )}
+                <FeedbackButtons
+                  messageId={message.id}
+                  conversationId={conversationId}
+                  onFeedback={onFeedback}
+                  size="sm"
+                  variant="ghost"
+                />
               </div>
             </div>
           </div>
