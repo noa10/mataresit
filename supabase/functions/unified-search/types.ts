@@ -13,6 +13,14 @@ export interface UnifiedSearchParams {
   similarityThreshold?: number; // Vector similarity threshold
   includeMetadata?: boolean; // Include rich metadata in results
   aggregationMode?: 'relevance' | 'diversity' | 'recency'; // Result ranking strategy
+  // Enhanced temporal routing support
+  temporalRouting?: {
+    isTemporalQuery: boolean;
+    hasSemanticContent: boolean;
+    routingStrategy: 'date_filter_only' | 'semantic_only' | 'hybrid_temporal_semantic';
+    temporalConfidence: number;
+    semanticTerms: string[];
+  };
 }
 
 export interface SearchFilters {
@@ -63,6 +71,30 @@ export interface SearchMetadata {
   fallbacksUsed: string[];
   modelUsed?: string;
   embeddingDimensions?: number;
+  llmPreprocessing?: LLMPreprocessResult;
+  reRanking?: {
+    applied: boolean;
+    modelUsed: string;
+    processingTime: number;
+    candidatesCount: number;
+    confidenceLevel: 'high' | 'medium' | 'low';
+  };
+  uiComponents?: UIComponent[];
+  uiComponentsGenerated?: boolean;
+}
+
+// UI Component types for actionable chat interface
+export interface UIComponent {
+  type: 'ui_component';
+  component: string;
+  data: Record<string, any>;
+  metadata: {
+    title: string;
+    description?: string;
+    interactive: boolean;
+    actions?: string[];
+    priority?: 'high' | 'medium' | 'low';
+  };
 }
 
 export interface PaginationInfo {
@@ -270,6 +302,52 @@ export interface CachedSearchResult {
   cachedAt: string;
   expiresAt: string;
   hitCount: number;
+}
+
+// LLM Preprocessing types
+export interface LLMPreprocessResult {
+  expandedQuery: string;
+  intent: 'document_retrieval' | 'data_analysis' | 'general_search' | 'financial_analysis';
+  entities: {
+    merchants?: string[];
+    dates?: string[];
+    categories?: string[];
+    amounts?: number[];
+    locations?: string[];
+  };
+  confidence: number;
+  queryType: 'specific' | 'broad' | 'analytical' | 'conversational';
+  suggestedSources?: string[];
+  processingTime: number;
+}
+
+// Re-ranking types
+export interface ReRankingCandidate {
+  result: UnifiedSearchResult;
+  originalRank: number;
+  contextualRelevance?: number;
+}
+
+export interface ReRankingResult {
+  rerankedResults: UnifiedSearchResult[];
+  reRankingMetadata: {
+    modelUsed: string;
+    processingTime: number;
+    candidatesCount: number;
+    reRankingScore: number;
+    confidenceLevel: 'high' | 'medium' | 'low';
+  };
+}
+
+export interface ReRankingParams {
+  originalQuery: string;
+  candidates: ReRankingCandidate[];
+  maxResults?: number;
+  contextualFactors?: {
+    userPreferences?: Record<string, any>;
+    searchHistory?: string[];
+    currentSession?: Record<string, any>;
+  };
 }
 
 // Export utility type for source type checking

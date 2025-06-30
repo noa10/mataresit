@@ -103,9 +103,25 @@ export interface SearchResult {
 
 /**
  * Perform semantic search on receipts
+ * 🚨 DEPRECATED: This function is being phased out in favor of unified-search Edge Function
+ * Only use this for fallback scenarios (CORS errors, authentication issues)
  */
 export async function semanticSearch(params: SearchParams): Promise<SearchResult> {
   try {
+    console.log('🔍 FALLBACK: Starting ai-search.ts semantic search with params:', params);
+    console.log('⚠️  NOTE: Consider using unified-search Edge Function instead for better performance');
+
+    // Log monetary query parameters specifically
+    if (params.minAmount !== undefined || params.maxAmount !== undefined) {
+      console.log('💰 FALLBACK: Monetary search detected in semanticSearch:', {
+        minAmount: params.minAmount,
+        maxAmount: params.maxAmount,
+        minAmountType: typeof params.minAmount,
+        maxAmountType: typeof params.maxAmount,
+        query: params.query
+      });
+    }
+
     // Check if query is empty
     if (!params.query || params.query.trim() === '') {
       console.error('Empty search query');
@@ -293,14 +309,14 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         const normalizedQuery = normalizeSearchQuery(params.query);
         console.log(`Using normalized query for unified search: "${normalizedQuery}"`);
 
-        // Convert legacy params to unified params
+        // Convert legacy params to unified params (using frontend naming)
         const unifiedParams: UnifiedSearchParams = {
           query: normalizedQuery,
           sources: params.searchTarget === 'all'
-            ? ['receipt', 'business_directory']
+            ? ['receipts', 'business_directory']
             : params.searchTarget === 'line_items'
-            ? ['receipt'] // Line items are part of receipts
-            : ['receipt'],
+            ? ['receipts'] // Line items are part of receipts
+            : ['receipts'],
           contentTypes: params.contentType ? [params.contentType] : undefined,
           limit: params.limit || 10,
           offset: params.offset || 0,
@@ -322,8 +338,8 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
           aggregationMode: 'relevance'
         };
 
-        // Use the unified-search edge function instead of semantic-search
-        const data = await callEdgeFunction('unified-search', 'POST', unifiedParams);
+        // Use the unified search function which handles proper parameter mapping
+        const data = await unifiedSearch(unifiedParams);
         console.log('Unified search response:', data);
 
         if (!data || !data.success) {
@@ -512,16 +528,125 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
   console.log('Starting fallback search with query:', query);
 
   try {
+    // Enhanced query parsing for monetary queries in fallback search
+    let enhancedParams = { ...params };
+
+    // Check if this looks like a monetary query
+    const monetaryPatterns = [
+      /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+      /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+      /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i
+    ];
+
+    const isMonetaryQuery = monetaryPatterns.some(pattern => pattern.test(query));
+
+    if (isMonetaryQuery) {
+      console.log('💰 Detected monetary query in fallback search, applying enhanced parsing');
+
+      // Import the enhanced query parser dynamically to avoid circular dependencies
+      try {
+        const { parseNaturalLanguageQuery } = await import('./enhanced-query-parser');
+        const parsedQuery = parseNaturalLanguageQuery(query);
+        console.log('📊 Parsed query result in fallback:', parsedQuery);
+
+        // Apply parsed filters to search parameters
+        if (parsedQuery.amountRange) {
+          console.log('💰 Applying amount range to fallback search:', parsedQuery.amountRange);
+          enhancedParams.minAmount = parsedQuery.amountRange.min;
+          enhancedParams.maxAmount = parsedQuery.amountRange.max;
+        }
+
+        if (parsedQuery.dateRange) {
+          console.log('📅 Applying date range to fallback search:', parsedQuery.dateRange);
+          enhancedParams.startDate = parsedQuery.dateRange.start;
+          enhancedParams.endDate = parsedQuery.dateRange.end;
+        }
+
+        if (parsedQuery.merchants && parsedQuery.merchants.length > 0) {
+          console.log('🏪 Applying merchants to fallback search:', parsedQuery.merchants);
+          enhancedParams.merchants = parsedQuery.merchants;
+        }
+
+        if (parsedQuery.categories && parsedQuery.categories.length > 0) {
+          console.log('📂 Applying categories to fallback search:', parsedQuery.categories);
+          enhancedParams.categories = parsedQuery.categories;
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse monetary query in fallback, using basic search:', parseError);
+      }
+    }
+
     // Apply query normalization for consistent fallback search
-    const normalizedQuery = normalizeSearchQuery(query);
-    console.log(`Using normalized query for fallback search: "${normalizedQuery}"`);
+    // For monetary queries, skip text matching and rely on amount filtering
+    let normalizedQuery = normalizeSearchQuery(query);
+    let skipTextSearch = false;
+
+    if (isMonetaryQuery && (enhancedParams.minAmount !== undefined || enhancedParams.maxAmount !== undefined)) {
+      // For monetary queries with amount filters, skip text search and get all receipts
+      // then rely on amount filtering to narrow down results
+      skipTextSearch = true;
+      console.log(`💰 Skipping text search for monetary query, will use amount filtering only`);
+    } else {
+      console.log(`Using normalized query for fallback search: "${normalizedQuery}"`);
+    }
 
     // Parse natural language queries for date ranges
     const lowerQuery = query.toLowerCase();
     let dateFilter: { start?: string; end?: string } | null = null;
 
-    // Check for time-based queries
-    if (lowerQuery.includes('last week') || lowerQuery.includes('this week')) {
+    // 🚨 EMERGENCY FIX: Add support for "from June 27" patterns
+    console.log('🔍 DEBUG: Checking for temporal patterns in query:', lowerQuery);
+
+    // Check for specific date patterns like "from June 27", "May 15", etc.
+    const monthPatterns = [
+      { pattern: /\b(?:from\s+)?(?:january|jan)\s+(\d{1,2})\b/i, month: 0 },
+      { pattern: /\b(?:from\s+)?(?:february|feb)\s+(\d{1,2})\b/i, month: 1 },
+      { pattern: /\b(?:from\s+)?(?:march|mar)\s+(\d{1,2})\b/i, month: 2 },
+      { pattern: /\b(?:from\s+)?(?:april|apr)\s+(\d{1,2})\b/i, month: 3 },
+      { pattern: /\b(?:from\s+)?(?:may)\s+(\d{1,2})\b/i, month: 4 },
+      { pattern: /\b(?:from\s+)?(?:june|jun)\s+(\d{1,2})\b/i, month: 5 },
+      { pattern: /\b(?:from\s+)?(?:july|jul)\s+(\d{1,2})\b/i, month: 6 },
+      { pattern: /\b(?:from\s+)?(?:august|aug)\s+(\d{1,2})\b/i, month: 7 },
+      { pattern: /\b(?:from\s+)?(?:september|sep)\s+(\d{1,2})\b/i, month: 8 },
+      { pattern: /\b(?:from\s+)?(?:october|oct)\s+(\d{1,2})\b/i, month: 9 },
+      { pattern: /\b(?:from\s+)?(?:november|nov)\s+(\d{1,2})\b/i, month: 10 },
+      { pattern: /\b(?:from\s+)?(?:december|dec)\s+(\d{1,2})\b/i, month: 11 }
+    ];
+
+    let monthMatch = null;
+    let matchedMonth = -1;
+
+    for (const { pattern, month } of monthPatterns) {
+      const match = lowerQuery.match(pattern);
+      if (match) {
+        monthMatch = match;
+        matchedMonth = month;
+        break;
+      }
+    }
+
+    if (monthMatch && matchedMonth >= 0) {
+      const day = parseInt(monthMatch[1]);
+      const currentYear = new Date().getFullYear();
+      const targetDate = new Date(currentYear, matchedMonth, day);
+
+      // If the target date is in the future, use previous year
+      if (targetDate > new Date()) {
+        targetDate.setFullYear(currentYear - 1);
+      }
+
+      const dateStr = targetDate.toISOString().split('T')[0];
+      dateFilter = { start: dateStr, end: dateStr };
+      console.log('🎯 EMERGENCY FIX: Detected month/day pattern:', {
+        match: monthMatch[0],
+        month: matchedMonth,
+        day,
+        calculatedDate: dateStr,
+        dateFilter
+      });
+    }
+    // Check for other time-based queries
+    else if (lowerQuery.includes('last week') || lowerQuery.includes('this week')) {
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       dateFilter = {
@@ -546,20 +671,30 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
       .limit(limit)
       .order('date', { ascending: false });
 
-    // Apply date filters if detected
-    if (dateFilter) {
-      if (dateFilter.start) {
-        textQuery = textQuery.gte('date', dateFilter.start);
-      }
-      if (dateFilter.end) {
-        textQuery = textQuery.lte('date', dateFilter.end);
-      }
-    }
+    // Store filters to apply later (after textQuery is finalized)
+    const finalDateFilter = dateFilter || (enhancedParams.startDate && enhancedParams.endDate ? {
+      start: enhancedParams.startDate,
+      end: enhancedParams.endDate
+    } : null);
+
+    // Store amount filters to apply after textQuery is built
+    const amountFilters = {
+      minAmount: enhancedParams.minAmount,
+      maxAmount: enhancedParams.maxAmount
+    };
+
+    // Store other filters to apply later
+    const otherFilters = {
+      merchants: enhancedParams.merchants,
+      categories: enhancedParams.categories
+    };
 
     // If we have a specific query and it's not just a time-based query, use it to filter
     const isTimeOnlyQuery = lowerQuery.includes('all receipts') ||
                            lowerQuery.includes('receipts from') ||
-                           lowerQuery.match(/^(last week|this week|today|yesterday)$/);
+                           lowerQuery.match(/^(last week|this week|today|yesterday)$/) ||
+                           // 🎯 EMERGENCY FIX: Include month/day patterns as time-only queries
+                           /\b(?:from\s+)?(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\s+\d{1,2}\b/i.test(lowerQuery);
 
     // For time-only queries or "all receipts" queries, just execute the base query with date filters
     if (isTimeOnlyQuery || !query || query.trim() === '') {
@@ -602,7 +737,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
       return results;
     }
 
-    if (normalizedQuery && normalizedQuery.trim() !== '' && !isTimeOnlyQuery) {
+    if (normalizedQuery && normalizedQuery.trim() !== '' && !isTimeOnlyQuery && !skipTextSearch) {
       console.log('Performing text search with normalized query:', normalizedQuery);
 
       try {
@@ -675,9 +810,21 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
         .ilike('merchant', `%${normalizedQuery}%`)
         .order('date', { ascending: false })
         .range(offset, offset + limit - 1);
+    } else if (skipTextSearch) {
+      // For monetary queries, get all receipts and rely on amount filtering
+      console.log('💰 Performing monetary-only search (no text filtering)');
+      textQuery = supabase
+        .from('receipts')
+        .select('*')
+        .order('date', { ascending: false })
+        .range(offset, offset + limit - 1);
     }
 
-    console.log('Fallback to simple merchant search with normalized query:', normalizedQuery);
+    if (skipTextSearch) {
+      console.log('💰 Monetary search - applying amount filters only');
+    } else {
+      console.log('Fallback to simple merchant search with normalized query:', normalizedQuery);
+    }
 
     // Apply date filters if present
     if (params.startDate) {
@@ -686,6 +833,60 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
     if (params.endDate) {
       textQuery = textQuery.lte('date', params.endDate);
+    }
+
+    // Apply date filters from enhanced parsing
+    if (finalDateFilter) {
+      if (finalDateFilter.start) {
+        textQuery = textQuery.gte('date', finalDateFilter.start);
+      }
+      if (finalDateFilter.end) {
+        textQuery = textQuery.lte('date', finalDateFilter.end);
+      }
+      console.log('Applied date filter to fallback search:', finalDateFilter);
+    }
+
+    // Apply amount filters from enhanced parsing (CRITICAL: Apply after textQuery is finalized)
+    if (amountFilters.minAmount !== undefined && amountFilters.minAmount > 0) {
+      console.log('💰 DEBUG: Applying minimum amount filter to final query:', {
+        minAmount: amountFilters.minAmount,
+        type: typeof amountFilters.minAmount,
+        isNumber: !isNaN(Number(amountFilters.minAmount))
+      });
+
+      // Ensure the amount is a number for proper comparison
+      const numericAmount = Number(amountFilters.minAmount);
+      textQuery = textQuery.gte('total', numericAmount);
+      console.log('💰 Applied minimum amount filter to final query:', numericAmount);
+    }
+
+    if (amountFilters.maxAmount !== undefined && amountFilters.maxAmount < Number.MAX_SAFE_INTEGER) {
+      console.log('💰 DEBUG: Applying maximum amount filter to final query:', {
+        maxAmount: amountFilters.maxAmount,
+        type: typeof amountFilters.maxAmount,
+        isNumber: !isNaN(Number(amountFilters.maxAmount))
+      });
+
+      // Ensure the amount is a number for proper comparison
+      const numericAmount = Number(amountFilters.maxAmount);
+      textQuery = textQuery.lte('total', numericAmount);
+      console.log('💰 Applied maximum amount filter to final query:', numericAmount);
+    }
+
+    // Apply merchant filters from enhanced parsing
+    if (otherFilters.merchants && otherFilters.merchants.length > 0) {
+      // Use ilike for case-insensitive partial matching
+      const merchantConditions = otherFilters.merchants.map(merchant =>
+        `merchant.ilike.%${merchant}%`
+      ).join(',');
+      textQuery = textQuery.or(merchantConditions);
+      console.log('Applied merchant filters to final query:', otherFilters.merchants);
+    }
+
+    // Apply category filters from enhanced parsing
+    if (otherFilters.categories && otherFilters.categories.length > 0) {
+      textQuery = textQuery.in('predicted_category', otherFilters.categories);
+      console.log('Applied category filters to final query:', otherFilters.categories);
     }
 
     // Execute the query
@@ -766,6 +967,22 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
                          isUnifiedSearch ? [...receiptsWithScores, ...lineItems] :
                          receiptsWithScores;
 
+    // Add monetary filter metadata if enhanced parsing was applied
+    const searchMetadata: any = {};
+    if (enhancedParams.minAmount !== undefined || enhancedParams.maxAmount !== undefined) {
+      searchMetadata.monetaryFilter = {
+        min: enhancedParams.minAmount,
+        max: enhancedParams.maxAmount,
+        originalAmount: enhancedParams.minAmount, // For display purposes
+        originalCurrency: 'MYR', // Default currency
+        conversionInfo: {
+          conversionApplied: false,
+          reasoning: 'No conversion needed - same currency'
+        }
+      };
+      console.log('💰 Added monetary filter metadata to fallback search results:', searchMetadata.monetaryFilter);
+    }
+
     const results: SearchResult = {
       receipts: isLineItemSearch ? [] : receiptsWithScores,
       lineItems: isLineItemSearch || isUnifiedSearch ? lineItems : [],
@@ -777,6 +994,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
         ...params,
         isVectorSearch: false,
       },
+      searchMetadata
     };
 
     console.log('Formatted simple fallback results:', results.count);
@@ -1667,10 +1885,51 @@ export async function generateEmbeddingsForReceipt(receiptId: string): Promise<v
 }
 
 /**
+ * Map frontend source names (plural) to backend source names (singular)
+ */
+function mapFrontendSourcesToBackend(frontendSources: string[]): string[] {
+  const sourceMapping: Record<string, string> = {
+    'receipts': 'receipt',
+    'claims': 'claim',
+    'team_members': 'team_member',
+    'custom_categories': 'custom_category',
+    'business_directory': 'business_directory', // Same
+    'conversations': 'conversation'
+  };
+
+  return frontendSources.map(source => sourceMapping[source] || source);
+}
+
+/**
  * Unified Search Function - Calls the unified-search Edge Function with caching and performance monitoring
- * This is the new search interface that supports multiple data sources
+ * This is the PREFERRED search interface that supports multiple data sources
+ * 🚀 Use this instead of semanticSearch for new implementations
  */
 export async function unifiedSearch(params: UnifiedSearchParams): Promise<UnifiedSearchResponse> {
+  console.log('🚀 UNIFIED-SEARCH: Starting unified search with params:', params);
+
+  // Log monetary query parameters specifically
+  if (params.filters?.amountRange) {
+    console.log('💰 DEBUG: Monetary search detected in unifiedSearch:', {
+      amountRange: params.filters.amountRange,
+      min: params.filters.amountRange.min,
+      max: params.filters.amountRange.max,
+      minType: typeof params.filters.amountRange.min,
+      maxType: typeof params.filters.amountRange.max,
+      currency: params.filters.amountRange.currency,
+      query: params.query
+    });
+  }
+
+  // 🔍 DEBUG: Log the complete search flow path
+  console.log('🔍 DEBUG: UnifiedSearch function entry point:', {
+    query: params.query,
+    sources: params.sources,
+    useEnhancedPrompting: params.useEnhancedPrompting,
+    hasFilters: !!params.filters,
+    filterKeys: params.filters ? Object.keys(params.filters) : []
+  });
+
   const startTime = performance.now();
   let cacheHit = false;
   let errorOccurred = false;
@@ -1709,6 +1968,12 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
     const optimizationResult = searchParameterOptimizer.optimizeParameters(baseParams);
     const searchParams = optimizationResult.optimizedParams;
 
+    // Map frontend source names to backend source names
+    if (searchParams.sources) {
+      searchParams.sources = mapFrontendSourcesToBackend(searchParams.sources);
+      console.log('🔄 Mapped frontend sources to backend sources:', searchParams.sources);
+    }
+
     console.log('🎯 Parameter optimization applied:', {
       original: {
         similarityThreshold: baseParams.similarityThreshold,
@@ -1725,8 +1990,9 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
       expectedImprovements: optimizationResult.expectedImprovements
     });
 
+    // TEMPORARILY DISABLE CACHE FOR TESTING TEMPORAL PARSING CHANGES
     // Check cache first (only for non-paginated searches to avoid stale results)
-    if (searchParams.offset === 0) {
+    if (false && searchParams.offset === 0) { // Disabled cache for testing
       const cachedResult = await searchCache.get(searchParams, userId);
       if (cachedResult) {
         cacheHit = true;
@@ -1752,13 +2018,72 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
       }
     }
 
-    // Call the unified-search Edge Function
-    const response = await callEdgeFunction('unified-search', 'POST', searchParams);
+    // Call the unified-search Edge Function with fallback handling
+    let response;
+    try {
+      response = await callEdgeFunction('unified-search', 'POST', searchParams);
 
-    if (!response || !response.success) {
-      errorOccurred = true;
-      errorMessage = response?.error || 'Unified search failed';
-      throw new Error(errorMessage);
+      if (!response || !response.success) {
+        errorOccurred = true;
+        errorMessage = response?.error || 'Unified search failed';
+        throw new Error(errorMessage);
+      }
+    } catch (edgeFunctionError) {
+      // 🔧 IMPROVED: Check for specific error types that warrant fallback
+      const isNetworkError = edgeFunctionError instanceof Error &&
+        (edgeFunctionError.message.includes('Failed to fetch') ||
+         edgeFunctionError.message.includes('CORS') ||
+         edgeFunctionError.message.includes('Network error'));
+
+      const isAuthError = edgeFunctionError instanceof Error &&
+        (edgeFunctionError.message.includes('authentication') ||
+         edgeFunctionError.message.includes('Invalid authentication token') ||
+         edgeFunctionError.message.includes('401'));
+
+      if (isNetworkError || isAuthError) {
+        console.log(`🔄 UNIFIED-SEARCH: ${isNetworkError ? 'Network' : 'Authentication'} error detected, using fallback search`);
+
+        // Convert unified params to legacy format for fallback
+        const legacyParams: SearchParams = {
+          query: params.query,
+          searchTarget: params.sources?.includes('business_directory') ? 'all' : 'receipts',
+          limit: params.limit || 20,
+          offset: params.offset || 0,
+          isNaturalLanguage: true,
+          startDate: params.filters?.dateRange?.start,
+          endDate: params.filters?.dateRange?.end,
+          minAmount: params.filters?.amountRange?.min,
+          maxAmount: params.filters?.amountRange?.max,
+          categories: params.filters?.categories,
+          merchants: params.filters?.merchants
+        };
+
+        const fallbackResult = await fallbackBasicSearch(legacyParams);
+
+        // Convert fallback result to unified format
+        return {
+          success: true,
+          results: fallbackResult.results || [],
+          totalResults: fallbackResult.total || 0,
+          pagination: {
+            hasMore: (fallbackResult.total || 0) > (params.offset || 0) + (params.limit || 20),
+            nextOffset: (params.offset || 0) + (params.limit || 20),
+            totalPages: Math.ceil((fallbackResult.total || 0) / (params.limit || 20))
+          },
+          searchMetadata: {
+            queryTime: performance.now() - startTime,
+            sourcesSearched: params.sources || ['receipts'],
+            fallbackUsed: true,
+            searchMethod: 'database_fallback',
+            fallbackReason: isNetworkError ? 'network_error' : 'auth_error'
+          }
+        };
+      } else {
+        // 🚨 For other errors (validation, server errors, etc.), don't fall back
+        // Let the caller handle these errors appropriately
+        console.error('🚨 UNIFIED-SEARCH: Non-recoverable error, not using fallback:', edgeFunctionError.message);
+        throw edgeFunctionError;
+      }
     }
 
     let searchResponse = response as UnifiedSearchResponse;

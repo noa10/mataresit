@@ -86,14 +86,53 @@ async function fallbackReceiptSearch(
 ): Promise<UnifiedSearchResult[]> {
   const query = params.query.toLowerCase();
   const results: UnifiedSearchResult[] = [];
-  
+
   try {
-    // Search receipts by merchant name and full text
-    const { data: receipts, error } = await supabase
+    // Safety check for user authentication
+    if (!user || !user.id) {
+      console.error('❌ fallbackReceiptSearch: User not authenticated');
+      return results;
+    }
+
+    // Build query with amount filtering
+    let receiptQuery = supabase
       .from('receipts')
       .select('id, merchant, total, currency, date, status, predicted_category, "fullText", created_at')
       .eq('user_id', user.id)
-      .or(`merchant.ilike.%${query}%,"fullText".ilike.%${query}%`)
+      .or(`merchant.ilike.%${query}%,"fullText".ilike.%${query}%`);
+
+    // Apply amount filtering if specified
+    if (params.filters?.amountRange) {
+      const { min, max } = params.filters.amountRange;
+      console.log('💰 Applying fallback amount filtering:', { min, max });
+
+      if (min !== undefined && min > 0) {
+        console.log('💰 DEBUG: Applying min amount filter:', {
+          min,
+          type: typeof min,
+          isNumber: !isNaN(Number(min))
+        });
+
+        // Ensure the amount is a number for proper comparison
+        const numericMin = Number(min);
+        receiptQuery = receiptQuery.gte('total', numericMin);
+        console.log('Applied minimum amount filter:', numericMin);
+      }
+      if (max !== undefined && max < Number.MAX_SAFE_INTEGER) {
+        console.log('💰 DEBUG: Applying max amount filter:', {
+          max,
+          type: typeof max,
+          isNumber: !isNaN(Number(max))
+        });
+
+        // Ensure the amount is a number for proper comparison
+        const numericMax = Number(max);
+        receiptQuery = receiptQuery.lte('total', numericMax);
+        console.log('Applied maximum amount filter:', numericMax);
+      }
+    }
+
+    const { data: receipts, error } = await receiptQuery
       .order('created_at', { ascending: false })
       .limit(params.limit! * 2); // Get extra for filtering
     
@@ -101,7 +140,20 @@ async function fallbackReceiptSearch(
       console.error('Fallback receipt search error:', error);
       return results;
     }
-    
+
+    console.log(`💰 DEBUG: Fallback search results:`, {
+      totalFound: receipts?.length || 0,
+      query,
+      amountFilters: params.filters?.amountRange,
+      sampleResults: receipts?.slice(0, 3).map(r => ({
+        id: r.id,
+        merchant: r.merchant,
+        total: r.total,
+        totalType: typeof r.total,
+        currency: r.currency
+      }))
+    });
+
     receipts?.forEach((receipt: any) => {
       const similarity = calculateTextSimilarity(query, [
         receipt.merchant,
@@ -153,7 +205,7 @@ async function fallbackBusinessDirectorySearch(
   try {
     const { data: businesses, error } = await supabase
       .from('malaysian_business_directory')
-      .select('id, business_name, business_name_malay, business_type, state, city, address, is_active, keywords')
+      .select('id, business_name, business_name_malay, business_type, state, city, address_line1, address_line2, postcode, is_active, keywords')
       .eq('is_active', true)
       .or(`business_name.ilike.%${query}%,business_name_malay.ilike.%${query}%,business_type.ilike.%${query}%`)
       .order('business_name')
@@ -189,7 +241,10 @@ async function fallbackBusinessDirectorySearch(
             business_type: business.business_type,
             state: business.state,
             city: business.city,
-            address: business.address,
+            address_line1: business.address_line1,
+            address_line2: business.address_line2,
+            postcode: business.postcode,
+            full_address: [business.address_line1, business.address_line2, business.city, business.state, business.postcode].filter(Boolean).join(', '),
             is_active: business.is_active,
             keywords: business.keywords
           },
@@ -281,8 +336,14 @@ async function fallbackCustomCategorySearch(
 ): Promise<UnifiedSearchResult[]> {
   const query = params.query.toLowerCase();
   const results: UnifiedSearchResult[] = [];
-  
+
   try {
+    // Safety check for user authentication
+    if (!user || !user.id) {
+      console.error('❌ fallbackCustomCategorySearch: User not authenticated');
+      return results;
+    }
+
     const { data: categories, error } = await supabase
       .from('custom_categories')
       .select('id, name, color, icon, user_id, created_at')

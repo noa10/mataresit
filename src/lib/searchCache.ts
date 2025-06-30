@@ -43,6 +43,7 @@ interface SearchCacheKey {
   similarityThreshold: number;
   limit: number;
   offset: number;
+  temporalTimestamp?: number; // Added for temporal queries to ensure fresh results
 }
 
 class SearchCache {
@@ -68,6 +69,21 @@ class SearchCache {
   private currentMemoryUsage = 0;
 
   /**
+   * Check if a query is temporal (contains date/time references)
+   */
+  private isTemporalQuery(query: string): boolean {
+    const temporalPatterns = [
+      /\b(from|since|after|before|during|in|on)\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
+      /\b(yesterday|today|tomorrow|last\s+week|this\s+week|next\s+week|last\s+month|this\s+month|next\s+month)\b/i,
+      /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/, // Date formats like 12/25/2024
+      /\b\d{1,2}-\d{1,2}-\d{2,4}\b/, // Date formats like 12-25-2024
+      /\b(from|since|after|before)\s+\d{1,2}\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i
+    ];
+
+    return temporalPatterns.some(pattern => pattern.test(query));
+  }
+
+  /**
    * Generate a cache key from search parameters
    */
   private generateCacheKey(params: UnifiedSearchParams, userId: string): string {
@@ -81,6 +97,13 @@ class SearchCache {
       limit: params.limit || 20,
       offset: params.offset || 0
     };
+
+    // For temporal queries, add a timestamp to make cache key unique
+    // This ensures temporal queries always hit the Edge Function for fresh results
+    if (this.isTemporalQuery(params.query)) {
+      keyData.temporalTimestamp = Date.now();
+      console.log('🕐 Temporal query detected, adding timestamp to cache key for fresh results');
+    }
 
     // Create a hash-like key for consistent caching
     return btoa(JSON.stringify(keyData)).replace(/[+/=]/g, '');
@@ -136,6 +159,12 @@ class SearchCache {
   async get(params: UnifiedSearchParams, userId: string): Promise<UnifiedSearchResponse | null> {
     const startTime = performance.now();
     this.metrics.totalRequests++;
+
+    // Check if this is a temporal query
+    const isTemporalQuery = this.isTemporalQuery(params.query);
+    if (isTemporalQuery) {
+      console.log('🕐 Temporal query detected, cache will be bypassed for fresh results');
+    }
 
     try {
       const cacheKey = this.generateCacheKey(params, userId);

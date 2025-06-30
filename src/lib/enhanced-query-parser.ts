@@ -4,6 +4,7 @@
  */
 
 import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { detectCurrencyFromInput, normalizeMonetaryQuery } from './currency-converter';
 
 export interface ParsedQuery {
   originalQuery: string;
@@ -20,10 +21,18 @@ export interface ParsedQuery {
   };
   merchants?: string[];
   categories?: string[];
-  queryType: 'temporal' | 'merchant' | 'category' | 'amount' | 'general' | 'mixed';
+  queryType: 'temporal' | 'merchant' | 'category' | 'amount' | 'general' | 'mixed' | 'hybrid_temporal';
   confidence: number;
   filters: {
     [key: string]: any;
+  };
+  // Enhanced temporal query routing
+  temporalIntent?: {
+    isTemporalQuery: boolean;
+    hasSemanticContent: boolean;
+    routingStrategy: 'date_filter_only' | 'semantic_only' | 'hybrid_temporal_semantic';
+    temporalConfidence: number;
+    semanticTerms: string[];
   };
 }
 
@@ -42,31 +51,114 @@ export function parseNaturalLanguageQuery(query: string, userTimezone: string = 
     filters: {}
   };
 
-  // Temporal expression patterns
+  // Enhanced temporal expression patterns with hybrid detection
   const temporalPatterns = [
     // Recent/Last patterns
-    { pattern: /\b(recent|latest|last)\s+(receipts?|purchases?|expenses?)\b/i, handler: () => getRecentDateRange(7) },
-    { pattern: /\b(today|today's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getTodayRange() },
-    { pattern: /\b(yesterday|yesterday's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getYesterdayRange() },
-    { pattern: /\b(this\s+week|current\s+week)\b/i, handler: () => getThisWeekRange() },
-    { pattern: /\b(last\s+week|previous\s+week)\b/i, handler: () => getLastWeekRange() },
-    { pattern: /\b(this\s+month|current\s+month)\b/i, handler: () => getThisMonthRange() },
-    { pattern: /\b(last\s+month|previous\s+month)\b/i, handler: () => getLastMonthRange() },
-    { pattern: /\b(this\s+year|current\s+year)\b/i, handler: () => getThisYearRange() },
-    { pattern: /\b(last\s+year|previous\s+year)\b/i, handler: () => getLastYearRange() },
-    
+    { pattern: /\b(recent|latest|last)\s+(receipts?|purchases?|expenses?)\b/i, handler: () => getRecentDateRange(7), isHybridCapable: false },
+    { pattern: /\b(today|today's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getTodayRange(), isHybridCapable: false },
+    { pattern: /\b(yesterday|yesterday's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getYesterdayRange(), isHybridCapable: false },
+    { pattern: /\b(this\s+week|current\s+week)\b/i, handler: () => getThisWeekRange(), isHybridCapable: true },
+    { pattern: /\b(last\s+week|previous\s+week)\b/i, handler: () => getLastWeekRange(), isHybridCapable: true },
+    { pattern: /\b(this\s+month|current\s+month)\b/i, handler: () => getThisMonthRange(), isHybridCapable: true },
+    { pattern: /\b(last\s+month|previous\s+month)\b/i, handler: () => getLastMonthRange(), isHybridCapable: true },
+    { pattern: /\b(this\s+year|current\s+year)\b/i, handler: () => getThisYearRange(), isHybridCapable: true },
+    { pattern: /\b(last\s+year|previous\s+year)\b/i, handler: () => getLastYearRange(), isHybridCapable: true },
+
     // Specific time periods
-    { pattern: /\b(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]) },
-    { pattern: /\b(in\s+the\s+last|within\s+the\s+last|over\s+the\s+last)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]) },
+    { pattern: /\b(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]), isHybridCapable: true },
+    { pattern: /\b(in\s+the\s+last|within\s+the\s+last|over\s+the\s+last)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]), isHybridCapable: true },
+
+    // Enhanced hybrid patterns that combine temporal + semantic
+    { pattern: /\b(recent|latest)\s+([a-zA-Z\s]+)\s+(receipts?|purchases?|expenses?)\b/i, handler: () => getRecentDateRange(7), isHybridCapable: true },
+    { pattern: /\b([a-zA-Z\s]+)\s+(from|in|during)\s+(last\s+week|this\s+week|last\s+month|this\s+month)\b/i, handler: (match: RegExpMatchArray) => detectTemporalFromContext(match[3]), isHybridCapable: true },
+    { pattern: /\b(last\s+week|this\s+week|last\s+month|this\s+month)\s+([a-zA-Z\s]+)\s+(receipts?|purchases?|expenses?)\b/i, handler: (match: RegExpMatchArray) => detectTemporalFromContext(match[1]), isHybridCapable: true },
   ];
 
-  // Amount patterns
+  // Enhanced amount patterns with better currency detection
   const amountPatterns = [
-    { pattern: /\b(over|above|more\s+than|greater\s+than)\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ min: parseFloat(match[2]) }) },
-    { pattern: /\b(under|below|less\s+than|cheaper\s+than)\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ max: parseFloat(match[2]) }) },
-    { pattern: /\b[rm$€£¥]?(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ min: parseFloat(match[1]), max: parseFloat(match[2]) }) },
-    { pattern: /\bbetween\s+[rm$€£¥]?(\d+(?:\.\d{2})?)\s+and\s+[rm$€£¥]?(\d+(?:\.\d{2})?)\b/i, handler: (match: RegExpMatchArray) => ({ min: parseFloat(match[1]), max: parseFloat(match[2]) }) },
+    // "over $100", "above RM50", "more than $25", "over $100 USD"
+    {
+      pattern: /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(usd|myr|rm|dollars?|ringgit)?\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const amount = parseFloat(match[3]);
+        // Use the full match to get better currency context
+        const fullMatch = match[0] + (match[4] ? ` ${match[4]}` : '');
+        const currencyDetection = detectCurrencyFromInput(fullMatch);
+        const normalized = normalizeMonetaryQuery(fullMatch, amount, currencyDetection.currency);
+
+        return {
+          min: normalized.normalizedAmount,
+          currency: normalized.targetCurrency,
+          originalAmount: amount,
+          originalCurrency: currencyDetection.currency,
+          conversionInfo: normalized.conversionInfo
+        };
+      }
+    },
+    // "under $50", "below RM100", "less than $30 USD"
+    {
+      pattern: /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(usd|myr|rm|dollars?|ringgit)?\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const amount = parseFloat(match[3]);
+        // Use the full match to get better currency context
+        const fullMatch = match[0] + (match[4] ? ` ${match[4]}` : '');
+        const currencyDetection = detectCurrencyFromInput(fullMatch);
+        const normalized = normalizeMonetaryQuery(fullMatch, amount, currencyDetection.currency);
+
+        return {
+          max: normalized.normalizedAmount,
+          currency: normalized.targetCurrency,
+          originalAmount: amount,
+          originalCurrency: currencyDetection.currency,
+          conversionInfo: normalized.conversionInfo
+        };
+      }
+    },
+    // "$20 to $50", "RM100-RM200"
+    {
+      pattern: /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const minAmount = parseFloat(match[2]);
+        const maxAmount = parseFloat(match[4]);
+        const currencyDetection = detectCurrencyFromInput(match[0]);
+        const normalizedMin = normalizeMonetaryQuery(match[0], minAmount, currencyDetection.currency);
+        const normalizedMax = normalizeMonetaryQuery(match[0], maxAmount, currencyDetection.currency);
+
+        return {
+          min: normalizedMin.normalizedAmount,
+          max: normalizedMax.normalizedAmount,
+          currency: normalizedMin.targetCurrency,
+          originalMinAmount: minAmount,
+          originalMaxAmount: maxAmount,
+          originalCurrency: currencyDetection.currency,
+          conversionInfo: normalizedMin.conversionInfo
+        };
+      }
+    },
+    // "between $20 and $50"
+    {
+      pattern: /\bbetween\s+(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s+and\s+(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\b/i,
+      handler: (match: RegExpMatchArray) => {
+        const minAmount = parseFloat(match[2]);
+        const maxAmount = parseFloat(match[4]);
+        const currencyDetection = detectCurrencyFromInput(match[0]);
+        const normalizedMin = normalizeMonetaryQuery(match[0], minAmount, currencyDetection.currency);
+        const normalizedMax = normalizeMonetaryQuery(match[0], maxAmount, currencyDetection.currency);
+
+        return {
+          min: normalizedMin.normalizedAmount,
+          max: normalizedMax.normalizedAmount,
+          currency: normalizedMin.targetCurrency,
+          originalMinAmount: minAmount,
+          originalMaxAmount: maxAmount,
+          originalCurrency: currencyDetection.currency,
+          conversionInfo: normalizedMin.conversionInfo
+        };
+      }
+    },
   ];
+
+
 
   // Merchant patterns (common Malaysian businesses)
   const merchantPatterns = [
@@ -91,26 +183,83 @@ export function parseNaturalLanguageQuery(query: string, userTimezone: string = 
     { pattern: /\b(entertainment|movie|cinema|game|leisure)\b/i, category: 'Entertainment' },
   ];
 
-  // Parse temporal expressions
-  for (const { pattern, handler } of temporalPatterns) {
+  // Enhanced temporal expression parsing with hybrid detection
+  let temporalMatch = null;
+  let isHybridCapable = false;
+
+  for (const { pattern, handler, isHybridCapable: hybridCapable } of temporalPatterns) {
     const match = normalizedQuery.match(pattern);
     if (match) {
       result.dateRange = handler(match);
+      temporalMatch = match;
+      isHybridCapable = hybridCapable;
       result.queryType = result.queryType === 'general' ? 'temporal' : 'mixed';
       result.confidence += 0.3;
       break;
     }
   }
 
+  // Detect if this is a hybrid temporal query (has both temporal and semantic content)
+  if (temporalMatch) {
+    const semanticTerms = extractSemanticTermsFromQuery(normalizedQuery, temporalMatch);
+    const hasSemanticContent = semanticTerms.length > 0;
+
+    result.temporalIntent = {
+      isTemporalQuery: true,
+      hasSemanticContent,
+      routingStrategy: hasSemanticContent && isHybridCapable ? 'hybrid_temporal_semantic' :
+                      hasSemanticContent ? 'semantic_only' : 'date_filter_only',
+      temporalConfidence: 0.8,
+      semanticTerms
+    };
+
+    // Update query type for hybrid queries
+    if (hasSemanticContent && isHybridCapable) {
+      result.queryType = 'hybrid_temporal';
+      result.confidence += 0.2; // Bonus for hybrid understanding
+    }
+  } else {
+    result.temporalIntent = {
+      isTemporalQuery: false,
+      hasSemanticContent: true,
+      routingStrategy: 'semantic_only',
+      temporalConfidence: 0.0,
+      semanticTerms: []
+    };
+  }
+
   // Parse amount expressions
+  console.log('💰 DEBUG: Starting amount pattern matching for query:', normalizedQuery);
   for (const { pattern, handler } of amountPatterns) {
     const match = normalizedQuery.match(pattern);
     if (match) {
+      console.log('💰 DEBUG: Amount pattern matched:', {
+        pattern: pattern.source,
+        match: match[0],
+        fullMatch: match,
+        groups: match.slice(1)
+      });
+
       result.amountRange = handler(match);
       result.queryType = result.queryType === 'general' ? 'amount' : 'mixed';
       result.confidence += 0.2;
+
+      console.log('💰 DEBUG: Amount range extracted by parser:', {
+        amountRange: result.amountRange,
+        min: result.amountRange?.min,
+        max: result.amountRange?.max,
+        minType: typeof result.amountRange?.min,
+        maxType: typeof result.amountRange?.max,
+        currency: result.amountRange?.currency,
+        originalAmount: result.amountRange?.originalAmount,
+        originalCurrency: result.amountRange?.originalCurrency
+      });
       break;
     }
+  }
+
+  if (!result.amountRange) {
+    console.log('💰 DEBUG: No amount patterns matched for query:', normalizedQuery);
   }
 
   // Parse merchant names
@@ -173,6 +322,25 @@ export function parseNaturalLanguageQuery(query: string, userTimezone: string = 
   result.confidence = Math.min(result.confidence, 1.0);
 
   return result;
+}
+
+// Test function for debugging (can be removed in production)
+export function testQueryParsing() {
+  const testQueries = [
+    "receipts over $100",
+    "receipts under RM50",
+    "receipts between $20 and $50",
+    "all receipts over $100",
+    "show me receipts above RM200"
+  ];
+
+  console.log('🧪 Testing query parsing:');
+  testQueries.forEach(query => {
+    const result = parseNaturalLanguageQuery(query);
+    console.log(`Query: "${query}"`);
+    console.log(`Result:`, result);
+    console.log('---');
+  });
 }
 
 // Helper functions for date range calculations
@@ -261,7 +429,7 @@ function getLastYearRange() {
 function getRelativeDateRange(amount: number, unit: string) {
   const now = new Date();
   let start: Date;
-  
+
   switch (unit.toLowerCase()) {
     case 'day':
     case 'days':
@@ -278,10 +446,48 @@ function getRelativeDateRange(amount: number, unit: string) {
     default:
       start = startOfDay(subDays(now, amount));
   }
-  
+
   return {
     start: format(start, 'yyyy-MM-dd'),
     end: format(endOfDay(now), 'yyyy-MM-dd'),
     preset: `last_${amount}_${unit}`
   };
+}
+
+/**
+ * Helper function to detect temporal context from matched patterns
+ */
+function detectTemporalFromContext(temporalPhrase: string) {
+  const phrase = temporalPhrase.toLowerCase().trim();
+
+  if (phrase.includes('last week')) return getLastWeekRange();
+  if (phrase.includes('this week')) return getThisWeekRange();
+  if (phrase.includes('last month')) return getLastMonthRange();
+  if (phrase.includes('this month')) return getThisMonthRange();
+
+  // Default to recent if unclear
+  return getRecentDateRange(7);
+}
+
+/**
+ * Extract semantic terms from query after removing temporal expressions
+ */
+function extractSemanticTermsFromQuery(query: string, temporalMatch: RegExpMatchArray): string[] {
+  let cleanQuery = query;
+
+  // Remove the temporal expression that was matched
+  cleanQuery = cleanQuery.replace(temporalMatch[0], '');
+
+  // Remove common temporal words
+  cleanQuery = cleanQuery.replace(/\b(recent|latest|last|today|yesterday|this|current|previous|past|within|over|in\s+the|from|during|receipts?|purchases?|expenses?)\b/gi, '');
+
+  // Remove extra whitespace and split into terms
+  const terms = cleanQuery
+    .trim()
+    .split(/\s+/)
+    .filter(term => term.length > 2) // Filter out short words
+    .filter(term => !/^\d+$/.test(term)) // Filter out pure numbers
+    .filter(term => !['and', 'or', 'the', 'for', 'with', 'from', 'all'].includes(term.toLowerCase()));
+
+  return terms;
 }

@@ -2,7 +2,17 @@
  * Utility functions for unified search functionality
  */
 
-import { UnifiedSearchParams, SearchFilters, ValidationResult, UnifiedSearchResult } from './types.ts';
+import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.1.3';
+import {
+  UnifiedSearchParams,
+  SearchFilters,
+  ValidationResult,
+  UnifiedSearchResult,
+  LLMPreprocessResult,
+  ReRankingParams,
+  ReRankingResult,
+  ReRankingCandidate
+} from './types.ts';
 
 /**
  * Validate search parameters
@@ -260,7 +270,7 @@ export function calculateRelevanceScore(
   }
 
   // Category exact match boost (perfect category performance)
-  if (result.sourceType === 'custom_categories' && titleLower === queryLower) {
+  if (result.sourceType === 'custom_category' && titleLower === queryLower) {
     score *= 2.8;
   }
 
@@ -273,7 +283,7 @@ export function calculateRelevanceScore(
   // 5. Cross-language boost (excellent 0.7597 avg performance)
   const malayWords = ['sdn', 'bhd', 'kedai', 'restoran', 'pasar', 'mamak'];
   const hasMalay = malayWords.some(word => queryLower.includes(word));
-  if (hasMalay && (result.sourceType === 'business_directory' || result.sourceType === 'custom_categories')) {
+  if (hasMalay && (result.sourceType === 'business_directory' || result.sourceType === 'custom_category')) {
     score *= 1.8;
   }
 
@@ -446,4 +456,420 @@ export function generateSearchSuggestions(query: string, results: UnifiedSearchR
   });
   
   return Array.from(suggestions).slice(0, 5);
+}
+
+/**
+ * LLM-powered query preprocessing to understand intent and expand queries
+ */
+export async function llmPreprocessQuery(query: string): Promise<LLMPreprocessResult> {
+  const startTime = Date.now();
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+
+  if (!geminiApiKey) {
+    console.warn('GEMINI_API_KEY not available, using basic preprocessing');
+    return {
+      expandedQuery: query,
+      intent: 'general_search',
+      entities: {},
+      confidence: 0.5,
+      queryType: 'conversational',
+      processingTime: Date.now() - startTime
+    };
+  }
+
+  let result: any = null;
+  let responseText: string = '';
+
+  try {
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `
+Analyze this search query for a receipt management system and extract structured information.
+
+Query: "${query}"
+
+Please provide a JSON response with the following structure:
+{
+  "expandedQuery": "Enhanced version of the query with synonyms and related terms",
+  "intent": "document_retrieval|data_analysis|general_search|financial_analysis",
+  "entities": {
+    "merchants": ["extracted merchant names"],
+    "dates": ["extracted dates in YYYY-MM-DD format"],
+    "categories": ["extracted categories"],
+    "amounts": [extracted numerical amounts],
+    "locations": ["extracted locations"]
+  },
+  "confidence": 0.0-1.0,
+  "queryType": "specific|broad|analytical|conversational",
+  "suggestedSources": ["receipt", "claim", "business_directory", "custom_category", "team_member"]
+}
+
+Guidelines for Intent Detection:
+- Set intent to "financial_analysis" for queries about:
+  * Spending patterns, trends, or analysis
+  * Category breakdowns or comparisons
+  * Monthly/yearly spending summaries
+  * Merchant analysis or frequency
+  * Budget analysis or expense tracking
+  * Anomalies, unusual transactions, or outliers
+  * Time-based spending patterns
+  * Payment method analysis
+  * Business vs personal expense ratios
+  * Examples: "how much did I spend on food", "monthly spending trends", "top merchants", "unusual transactions"
+
+- Set intent to "document_retrieval" for queries about:
+  * Finding specific receipts or documents
+  * Searching for particular transactions
+  * Looking up receipt details
+  * Examples: "McDonald's receipt from last week", "receipt for laptop purchase"
+
+- Set intent to "data_analysis" for queries about:
+  * General data exploration
+  * Non-financial analysis
+  * Team collaboration insights
+  * Examples: "team expense reports", "claim status analysis"
+
+- For merchant searches, include "receipt" and "business_directory" in suggestedSources
+- For team/collaboration queries, include "team_member" and "claim"
+- Expand the query with relevant synonyms and Malaysian business terms
+- Extract Malaysian business entities (Sdn Bhd, Pte Ltd, etc.)
+- Handle both English and Malay terms
+
+Return only valid JSON, no explanation.`;
+
+    result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 1000,
+      },
+    });
+
+    responseText = result.response.text();
+
+    // Extract JSON from markdown code blocks if present
+    let jsonText = responseText.trim();
+
+    // Check if response is wrapped in markdown code blocks
+    const jsonBlockMatch = jsonText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (jsonBlockMatch) {
+      jsonText = jsonBlockMatch[1].trim();
+    }
+
+    // Remove any leading/trailing non-JSON content
+    const jsonStartIndex = jsonText.indexOf('{');
+    const jsonEndIndex = jsonText.lastIndexOf('}');
+
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      jsonText = jsonText.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+
+    const parsed = JSON.parse(jsonText);
+
+    return {
+      expandedQuery: parsed.expandedQuery || query,
+      intent: parsed.intent || 'general_search',
+      entities: parsed.entities || {},
+      confidence: Math.max(0, Math.min(1, parsed.confidence || 0.7)),
+      queryType: parsed.queryType || 'conversational',
+      suggestedSources: parsed.suggestedSources,
+      processingTime: Date.now() - startTime
+    };
+
+  } catch (error) {
+    console.error('LLM preprocessing error:', error);
+
+    // Log the raw response for debugging if it's a JSON parsing error
+    if (error instanceof SyntaxError && error.message.includes('JSON') && responseText) {
+      console.error('Raw LLM response that failed to parse:', responseText);
+    }
+
+    return {
+      expandedQuery: query,
+      intent: 'general_search',
+      entities: {},
+      confidence: 0.3,
+      queryType: 'conversational',
+      processingTime: Date.now() - startTime
+    };
+  }
+}
+
+/**
+ * Re-rank search results using a more powerful LLM for contextual relevance
+ */
+export async function reRankSearchResults(params: ReRankingParams): Promise<ReRankingResult> {
+  const startTime = Date.now();
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+
+  // Validate inputs and provide fallback
+  if (!geminiApiKey) {
+    console.warn('Cannot perform re-ranking: missing GEMINI_API_KEY');
+    return {
+      rerankedResults: params.candidates.map(c => c.result),
+      reRankingMetadata: {
+        modelUsed: 'none-no-api-key',
+        processingTime: Date.now() - startTime,
+        candidatesCount: params.candidates.length,
+        reRankingScore: 0,
+        confidenceLevel: 'low'
+      }
+    };
+  }
+
+  console.log('🔑 DEBUG: GEMINI_API_KEY present:', !!geminiApiKey);
+  console.log('🔑 DEBUG: API key length:', geminiApiKey.length);
+  console.log('🔑 DEBUG: API key prefix:', geminiApiKey.substring(0, 10) + '...');
+
+  if (params.candidates.length === 0) {
+    console.warn('Cannot perform re-ranking: no candidates provided');
+    return {
+      rerankedResults: [],
+      reRankingMetadata: {
+        modelUsed: 'none-no-candidates',
+        processingTime: Date.now() - startTime,
+        candidatesCount: 0,
+        reRankingScore: 0,
+        confidenceLevel: 'low'
+      }
+    };
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    // Use Gemini 1.5 Flash for re-ranking (stable model)
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    // Validate candidates before processing
+    const invalidSimilarities = params.candidates.filter(c =>
+      typeof c.result.similarity !== 'number' || isNaN(c.result.similarity)
+    );
+
+    if (invalidSimilarities.length > 0) {
+      console.warn(`⚠️ Found ${invalidSimilarities.length} candidates with invalid similarity scores, using fallback values`);
+    }
+
+    // Prepare candidates for re-ranking
+    const candidateDescriptions = params.candidates.map((candidate, index) => {
+      const result = candidate.result;
+      // Ensure similarity is a valid number before calling toFixed
+      const similarity = typeof result.similarity === 'number' && !isNaN(result.similarity)
+        ? result.similarity
+        : 0;
+
+      return `${index + 1}. [${result.sourceType}] ${result.title}
+   Description: ${result.description}
+   Similarity: ${similarity.toFixed(3)}
+   Metadata: ${JSON.stringify(result.metadata)}`;
+    }).join('\n\n');
+
+    const prompt = `
+You are an expert search result ranker for a receipt management system. Re-rank these search results based on contextual relevance to the user's query.
+
+Original Query: "${params.originalQuery}"
+
+Search Results to Re-rank:
+${candidateDescriptions}
+
+Please analyze each result's relevance to the query considering:
+1. Direct relevance to the search intent
+2. Quality and completeness of information
+3. Practical usefulness to the user
+4. Contextual appropriateness
+
+Provide a JSON response with the re-ranked order:
+{
+  "rankedOrder": [1, 3, 2, 4, 5, ...],
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation of ranking decisions"
+}
+
+The rankedOrder should list the result numbers (1-${params.candidates.length}) in order of relevance (most relevant first).
+Return only valid JSON, no explanation outside the JSON.`;
+
+    console.log('🤖 Sending re-ranking request to Gemini with', params.candidates.length, 'candidates');
+    console.log('📝 DEBUG: Prompt length:', prompt.length);
+    console.log('📝 DEBUG: Prompt preview:', prompt.substring(0, 200) + '...');
+
+    // Retry logic for Gemini API calls
+    let result;
+    let lastError;
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2000,
+            // responseMimeType removed - not supported in older API versions
+          },
+        });
+        break; // Success, exit retry loop
+      } catch (error) {
+        lastError = error;
+        console.warn(`🔄 Gemini API attempt ${attempt}/${maxRetries} failed:`, error.message);
+
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`⏳ Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    if (!result) {
+      throw new Error(`Gemini API failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+    }
+
+    const responseText = result.response.text();
+    console.log('🤖 Raw Gemini response for re-ranking:', responseText);
+
+    // Enhanced response validation
+    if (!responseText || responseText.trim().length === 0) {
+      console.log('📄 Raw response text: ', responseText);
+      console.warn('⚠️ Gemini returned empty response, using original order');
+      throw new Error('Empty response from Gemini API');
+    }
+
+    // Check for API error messages
+    if (responseText.includes('RATE_LIMIT_EXCEEDED') ||
+        responseText.includes('QUOTA_EXCEEDED') ||
+        responseText.includes('API_KEY_INVALID') ||
+        responseText.includes('PERMISSION_DENIED')) {
+      console.warn('⚠️ Gemini API error detected:', responseText);
+      throw new Error(`Gemini API error: ${responseText}`);
+    }
+
+    // Check for model overload or temporary unavailability
+    if (responseText.includes('OVERLOADED') ||
+        responseText.includes('UNAVAILABLE') ||
+        responseText.includes('INTERNAL_ERROR')) {
+      console.warn('⚠️ Gemini API temporarily unavailable:', responseText);
+      throw new Error(`Gemini API temporarily unavailable: ${responseText}`);
+    }
+
+    // Robust JSON parsing with fallback
+    let parsed;
+    try {
+      // Clean the response text to handle potential formatting issues
+      const cleanedResponse = responseText.trim();
+
+      // Try to extract JSON if it's wrapped in markdown or other text
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : cleanedResponse;
+
+      parsed = JSON.parse(jsonText);
+
+      // Validate the parsed response has required fields
+      if (!parsed.rankedOrder || !Array.isArray(parsed.rankedOrder)) {
+        throw new Error('Invalid response structure: missing or invalid rankedOrder');
+      }
+
+    } catch (parseError) {
+      console.error('❌ Failed to parse Gemini re-ranking response:', parseError);
+      console.error('📄 Raw response text:', responseText);
+
+      // Fallback to original order
+      parsed = {
+        rankedOrder: params.candidates.map((_, i) => i + 1),
+        confidence: 0.3,
+        reasoning: 'Fallback to original order due to parsing error'
+      };
+    }
+
+    // Apply the re-ranking
+    const rankedOrder = parsed.rankedOrder || params.candidates.map((_, i) => i + 1);
+    const rerankedResults: UnifiedSearchResult[] = [];
+
+    for (const rank of rankedOrder) {
+      const candidateIndex = rank - 1;
+      if (candidateIndex >= 0 && candidateIndex < params.candidates.length) {
+        const candidate = params.candidates[candidateIndex];
+        // Ensure similarity is a valid number before calculations
+        const baseSimilarity = typeof candidate.result.similarity === 'number' && !isNaN(candidate.result.similarity)
+          ? candidate.result.similarity
+          : 0;
+
+        // Boost similarity score based on re-ranking position
+        const positionBoost = 1 + (rankedOrder.length - rankedOrder.indexOf(rank)) * 0.05;
+        rerankedResults.push({
+          ...candidate.result,
+          similarity: Math.min(1.0, baseSimilarity * positionBoost)
+        });
+      }
+    }
+
+    // Limit results if specified
+    const finalResults = params.maxResults
+      ? rerankedResults.slice(0, params.maxResults)
+      : rerankedResults;
+
+    const confidence = Math.max(0, Math.min(1, parsed.confidence || 0.8));
+    const confidenceLevel = confidence > 0.8 ? 'high' : confidence > 0.6 ? 'medium' : 'low';
+
+    return {
+      rerankedResults: finalResults,
+      reRankingMetadata: {
+        modelUsed: 'gemini-1.5-flash',
+        processingTime: Date.now() - startTime,
+        candidatesCount: params.candidates.length,
+        reRankingScore: confidence,
+        confidenceLevel
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Re-ranking error:', error);
+    console.error('🔍 Error details:', {
+      message: error?.message || 'Unknown error',
+      stack: error?.stack || 'No stack trace',
+      candidatesCount: params.candidates?.length || 0,
+      originalQuery: params.originalQuery || 'No query',
+      errorType: typeof error,
+      errorConstructor: error?.constructor?.name || 'Unknown'
+    });
+
+    // Ensure we have valid candidates array
+    const validCandidates = Array.isArray(params.candidates) ? params.candidates : [];
+
+    // Fallback to original order with proper similarity handling
+    const fallbackResults = validCandidates.map(c => {
+      // Ensure candidate has proper structure
+      if (!c || !c.result) {
+        console.warn('Invalid candidate structure, creating minimal result');
+        return {
+          id: 'error-result',
+          title: 'Error in search result',
+          description: 'An error occurred processing this result',
+          sourceType: 'error',
+          similarity: 0,
+          metadata: {}
+        };
+      }
+
+      const baseSimilarity = typeof c.result.similarity === 'number' && !isNaN(c.result.similarity)
+        ? c.result.similarity
+        : 0;
+
+      return {
+        ...c.result,
+        similarity: baseSimilarity
+      };
+    });
+
+    return {
+      rerankedResults: fallbackResults,
+      reRankingMetadata: {
+        modelUsed: 'fallback-error',
+        processingTime: Date.now() - startTime,
+        candidatesCount: validCandidates.length,
+        reRankingScore: 0.3,
+        confidenceLevel: 'low'
+      }
+    };
+  }
 }

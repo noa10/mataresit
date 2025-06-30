@@ -29,12 +29,19 @@ export async function callEdgeFunction<T = any>(
 ): Promise<T> {
   try {
     // Get the session for the current user to include the auth token
-    const { data: { session } } = await supabase.auth.getSession();
-    const authToken = session?.access_token || SUPABASE_ANON_KEY;
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    // Ensure we have a valid auth token
+    if (sessionError) {
+      console.warn('Session error:', sessionError);
+    }
+
+    const authToken = session?.access_token;
+
     if (!authToken || typeof authToken !== 'string' || authToken.trim() === '') {
-      console.warn('No valid auth token available, falling back to anon key');
+      console.warn('No valid access token in session, this may cause authentication issues');
+      // Don't throw an error, let the Edge Function handle the authentication
+    } else {
+      console.log('Using user access token for Edge Function call');
     }
 
     // Build the query string
@@ -63,15 +70,24 @@ export async function callEdgeFunction<T = any>(
 
     try {
       // Make the request with timeout
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      };
+
+      // Add authorization header if we have a valid token
+      if (authToken && typeof authToken === 'string' && authToken.trim() !== '') {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      } else {
+        // Fallback to anon key if no user token available
+        headers['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`, // Use the user's auth token when available
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
+        headers,
         credentials: 'omit', // Don't send credentials with the request to avoid CORS issues
         signal: controller.signal,
         mode: 'cors', // Explicitly set CORS mode
@@ -361,23 +377,59 @@ export async function checkEmbeddingStatus(receiptId: string): Promise<any> {
 }
 
 /**
+ * Map frontend source names (plural) to backend source names (singular)
+ */
+function mapFrontendSourcesToBackend(frontendSources: string[]): string[] {
+  const sourceMapping: Record<string, string> = {
+    'receipts': 'receipt',
+    'claims': 'claim',
+    'team_members': 'team_member',
+    'custom_categories': 'custom_category',
+    'business_directory': 'business_directory', // Same
+    'conversations': 'conversation'
+  };
+
+  return frontendSources.map(source => sourceMapping[source] || source);
+}
+
+/**
  * Perform unified search
  */
 export async function performUnifiedSearch(
   query: string,
   options?: {
-    sourceTypes?: string[];
+    sources?: string[]; // Changed from sourceTypes to sources for consistency
     contentTypes?: string[];
     similarityThreshold?: number;
-    matchCount?: number;
+    limit?: number; // Changed from matchCount to limit for consistency
     userFilter?: string;
     teamFilter?: string;
   }
 ): Promise<any> {
-  return callEdgeFunction('unified-search', 'POST', {
+  // Map frontend source names to backend source names if sources are provided
+  const mappedSources = options?.sources ? mapFrontendSourcesToBackend(options.sources) : undefined;
+
+  // Build the request payload with proper parameter names
+  const requestPayload = {
     query,
-    ...options
-  }, undefined, 2, 15000);
+    sources: mappedSources, // Use mapped sources
+    contentTypes: options?.contentTypes,
+    similarityThreshold: options?.similarityThreshold,
+    limit: options?.limit, // Use limit instead of matchCount
+    filters: {
+      userFilter: options?.userFilter,
+      teamFilter: options?.teamFilter
+    }
+  };
+
+  // Remove undefined values to avoid sending them to the edge function
+  Object.keys(requestPayload).forEach(key => {
+    if (requestPayload[key as keyof typeof requestPayload] === undefined) {
+      delete requestPayload[key as keyof typeof requestPayload];
+    }
+  });
+
+  return callEdgeFunction('unified-search', 'POST', requestPayload, undefined, 2, 15000);
 }
 
 /**

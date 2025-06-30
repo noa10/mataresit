@@ -177,10 +177,28 @@ async function listReceipts(req: Request, context: ApiContext): Promise<Response
       query = query.eq('status', filters.status);
     }
     if (filters.minAmount !== undefined) {
-      query = query.gte('total', filters.minAmount);
+      console.log('💰 DEBUG: Applying API min amount filter:', {
+        minAmount: filters.minAmount,
+        type: typeof filters.minAmount,
+        isNumber: !isNaN(Number(filters.minAmount))
+      });
+
+      // Ensure the amount is a number for proper comparison
+      const numericMinAmount = Number(filters.minAmount);
+      query = query.gte('total', numericMinAmount);
+      console.log('Applied minimum amount filter to API query:', numericMinAmount);
     }
     if (filters.maxAmount !== undefined) {
-      query = query.lte('total', filters.maxAmount);
+      console.log('💰 DEBUG: Applying API max amount filter:', {
+        maxAmount: filters.maxAmount,
+        type: typeof filters.maxAmount,
+        isNumber: !isNaN(Number(filters.maxAmount))
+      });
+
+      // Ensure the amount is a number for proper comparison
+      const numericMaxAmount = Number(filters.maxAmount);
+      query = query.lte('total', numericMaxAmount);
+      console.log('Applied maximum amount filter to API query:', numericMaxAmount);
     }
     if (filters.currency) {
       query = query.eq('currency', filters.currency);
