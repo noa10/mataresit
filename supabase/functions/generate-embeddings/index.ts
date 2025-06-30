@@ -313,7 +313,13 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       content: fullTextContent,
       metadata: {
         receipt_date: receipt.date,
-        total: receipt.total
+        total: receipt.total,
+        currency: receipt.currency,
+        merchant: receipt.merchant,
+        category: receipt.predicted_category,
+        payment_method: receipt.payment_method,
+        // Temporal metadata will be auto-enriched by add_unified_embedding function
+        source_metadata: 'full_text_content'
       },
       model
     }, supabaseClient);
@@ -334,7 +340,13 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       content: receipt.merchant,
       metadata: {
         receipt_date: receipt.date,
-        total: receipt.total
+        total: receipt.total,
+        currency: receipt.currency,
+        merchant: receipt.merchant,
+        category: receipt.predicted_category,
+        payment_method: receipt.payment_method,
+        // Temporal metadata will be auto-enriched by add_unified_embedding function
+        source_metadata: 'merchant_name'
       },
       model
     }, supabaseClient);
@@ -353,7 +365,13 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
       content: receipt.notes,
       metadata: {
         receipt_date: receipt.date,
-        total: receipt.total
+        total: receipt.total,
+        currency: receipt.currency,
+        merchant: receipt.merchant,
+        category: receipt.predicted_category,
+        payment_method: receipt.payment_method,
+        // Temporal metadata will be auto-enriched by add_unified_embedding function
+        source_metadata: 'receipt_notes'
       },
       model
     }, supabaseClient);
@@ -384,7 +402,13 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
         metadata: {
           receipt_date: receipt.date,
           total: receipt.total,
-          is_fallback: true
+          currency: receipt.currency,
+          merchant: receipt.merchant,
+          category: receipt.predicted_category,
+          payment_method: receipt.payment_method,
+          is_fallback: true,
+          // Temporal metadata will be auto-enriched by add_unified_embedding function
+          source_metadata: 'fallback_content'
         },
         model
       }, supabaseClient);
@@ -463,11 +487,28 @@ async function generateLineItemEmbeddings(supabaseClient: any, receiptId: string
 
   const processingPromises = lineItemsToProcess.map(async (lineItem) => {
     try {
+      // Get receipt data for temporal metadata
+      const { data: receipt } = await supabaseClient
+        .from('receipts')
+        .select('date, total, currency, merchant, predicted_category, payment_method')
+        .eq('id', receiptId)
+        .single();
+
       const result = await processLineItemEmbedding({
         lineItemId: lineItem.id,
         receiptId,
         content: lineItem.description,
-        metadata: { amount: lineItem.amount },
+        metadata: {
+          amount: lineItem.amount,
+          receipt_date: receipt?.date,
+          total: receipt?.total,
+          currency: receipt?.currency,
+          merchant: receipt?.merchant,
+          category: receipt?.predicted_category,
+          payment_method: receipt?.payment_method,
+          // Temporal metadata will be auto-enriched by add_unified_embedding function
+          source_metadata: 'line_item'
+        },
         model
       }, supabaseClient);
 
@@ -630,7 +671,12 @@ async function processReceiptEmbeddingsUnified(
         let metadata = {
           receipt_date: receipt.date,
           total: receipt.total,
-          currency: receipt.currency
+          currency: receipt.currency,
+          merchant: receipt.merchant,
+          category: receipt.predicted_category,
+          payment_method: receipt.payment_method,
+          // Temporal metadata will be auto-enriched by add_unified_embedding function
+          source_metadata: `unified_${contentType}`
         };
 
         // Extract content based on type

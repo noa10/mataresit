@@ -5,6 +5,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.2.0'
 import { performLineItemSearch } from './performLineItemSearch.ts'
+import { parseTemporalQuery } from '../_shared/temporal-parser.ts'
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -212,9 +213,11 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
   let searchResults;
   let error;
 
-  // For receipts, use unified_search function
+  // For receipts, use unified_search function with temporal filtering
   if (searchTarget === 'receipts') {
-    console.log(`Using unified_search function for receipts`);
+    console.log(`Using unified_search function for receipts with temporal filters:`, {
+      startDate, endDate, minAmount, maxAmount
+    });
 
     const { data, error: searchError } = await client.rpc(
       'unified_search',
@@ -226,7 +229,12 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
         match_count: limit + offset,
         user_filter: null, // Will be set by RLS policies
         team_filter: null,
-        language_filter: null
+        language_filter: null,
+        // CRITICAL FIX: Pass temporal filters to database function
+        start_date: startDate || null,
+        end_date: endDate || null,
+        min_amount: minAmount || null,
+        max_amount: maxAmount || null
       }
     );
 
@@ -306,11 +314,29 @@ async function performSemanticSearch(client: any, queryEmbedding: number[], para
   }
 
   if (minAmount !== undefined) {
-    queryBuilder = queryBuilder.gte('total', minAmount);
+    console.log('💰 DEBUG: Applying semantic search min amount filter:', {
+      minAmount,
+      type: typeof minAmount,
+      isNumber: !isNaN(Number(minAmount))
+    });
+
+    // Ensure the amount is a number for proper comparison
+    const numericMinAmount = Number(minAmount);
+    queryBuilder = queryBuilder.gte('total', numericMinAmount);
+    console.log('Applied minimum amount filter to semantic search:', numericMinAmount);
   }
 
   if (maxAmount !== undefined) {
-    queryBuilder = queryBuilder.lte('total', maxAmount);
+    console.log('💰 DEBUG: Applying semantic search max amount filter:', {
+      maxAmount,
+      type: typeof maxAmount,
+      isNumber: !isNaN(Number(maxAmount))
+    });
+
+    // Ensure the amount is a number for proper comparison
+    const numericMaxAmount = Number(maxAmount);
+    queryBuilder = queryBuilder.lte('total', numericMaxAmount);
+    console.log('Applied maximum amount filter to semantic search:', numericMaxAmount);
   }
 
   if (categories && categories.length > 0) {
@@ -735,43 +761,28 @@ function isValidDateString(dateStr: string): boolean {
 
 /**
  * Enhanced fallback parser for natural language queries
- * This provides a more reliable parsing when AI parsing fails
- * Improved with better pattern matching, scoring, and semantic understanding
+ * Now uses the consolidated temporal parser for consistent results
  */
 function parseNaturalLanguageQueryFallback(query: string): SearchParams {
-  console.log(`Enhanced fallback parser processing query: "${query}"`);
+  console.log(`🔄 Enhanced fallback parser processing query: "${query}"`);
 
-  // Apply query normalization for consistent processing
-  const normalizedQuery = normalizeSearchQuery(query);
-  const lowerQuery = normalizedQuery.toLowerCase().trim();
-  const originalLower = query.toLowerCase().trim();
+  // Use the consolidated temporal parser
+  const parsedQuery = parseTemporalQuery(query);
 
-  console.log(`Normalized query for fallback parsing: "${normalizedQuery}"`);
+  console.log(`✅ Consolidated temporal parsing result:`, {
+    queryType: parsedQuery.queryType,
+    hasDateRange: !!parsedQuery.dateRange,
+    confidence: parsedQuery.confidence
+  });
 
   const result: SearchParams = {
-    query: query
+    query: query,
+    startDate: parsedQuery.dateRange?.start,
+    endDate: parsedQuery.dateRange?.end
   };
 
-  // Enhanced temporal expression patterns with priority scoring
-  const temporalPatterns = [
-    // High priority - specific time references
-    { pattern: /\b(today|today's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getTodayRange(), priority: 1 },
-    { pattern: /\b(yesterday|yesterday's)\s*(receipts?|purchases?|expenses?)?\b/i, handler: () => getYesterdayRange(), priority: 1 },
-
-    // Medium priority - relative time references
-    { pattern: /\b(recent|latest|last)\s+(receipts?|purchases?|expenses?)\b/i, handler: () => getRecentDateRange(7), priority: 2 },
-    { pattern: /\b(this\s+week|current\s+week)\b/i, handler: () => getThisWeekRange(), priority: 2 },
-    { pattern: /\b(last\s+week|previous\s+week)\b/i, handler: () => getLastWeekRange(), priority: 2 },
-    { pattern: /\b(this\s+month|current\s+month)\b/i, handler: () => getThisMonthRange(), priority: 2 },
-    { pattern: /\b(last\s+month|previous\s+month)\b/i, handler: () => getLastMonthRange(), priority: 2 },
-
-    // Lower priority - numeric relative dates
-    { pattern: /\b(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]), priority: 3 },
-
-    // Additional patterns for better coverage
-    { pattern: /\b(within|in)\s+the\s+(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i, handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[3]), match[4]), priority: 3 },
-    { pattern: /\b(from|since)\s+(last|this)\s+(week|month)\b/i, handler: (match: RegExpMatchArray) => match[2] === 'last' ? (match[3] === 'week' ? getLastWeekRange() : getLastMonthRange()) : (match[3] === 'week' ? getThisWeekRange() : getThisMonthRange()), priority: 2 },
-  ];
+  // Temporal parsing is now handled by the consolidated parseTemporalQuery function above
+  // Extract additional filters from the parsed query
 
   // Enhanced amount patterns with better coverage and validation
   const amountPatterns = [
@@ -852,15 +863,11 @@ function parseNaturalLanguageQueryFallback(query: string): SearchParams {
     { pattern: /\b(pasar\s+malam|night\s+market|bazar\s+ramadan)\b/i, category: 'groceries' },
   ];
 
-  // Parse temporal expressions
-  for (const { pattern, handler } of temporalPatterns) {
-    const match = normalizedQuery.match(pattern);
-    if (match) {
-      const dateRange = handler(match);
-      result.startDate = dateRange.start;
-      result.endDate = dateRange.end;
-      break;
-    }
+  // Temporal expressions are now parsed by the consolidated parseTemporalQuery function
+  // Additional amount parsing from the parsed query
+  if (parsedQuery.amountRange) {
+    result.minAmount = parsedQuery.amountRange.min;
+    result.maxAmount = parsedQuery.amountRange.max;
   }
 
   // Parse amount expressions
@@ -906,96 +913,7 @@ function parseNaturalLanguageQueryFallback(query: string): SearchParams {
   return result;
 }
 
-// Helper functions for date range calculations
-function getRecentDateRange(days: number = 7) {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - days);
-  return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0]
-  };
-}
-
-function getTodayRange() {
-  const today = new Date().toISOString().split('T')[0];
-  return { start: today, end: today };
-}
-
-function getYesterdayRange() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = yesterday.toISOString().split('T')[0];
-  return { start: dateStr, end: dateStr };
-}
-
-function getThisWeekRange() {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  return {
-    start: startOfWeek.toISOString().split('T')[0],
-    end: now.toISOString().split('T')[0]
-  };
-}
-
-function getLastWeekRange() {
-  const now = new Date();
-  const endOfLastWeek = new Date(now);
-  endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
-  const startOfLastWeek = new Date(endOfLastWeek);
-  startOfLastWeek.setDate(endOfLastWeek.getDate() - 6);
-  return {
-    start: startOfLastWeek.toISOString().split('T')[0],
-    end: endOfLastWeek.toISOString().split('T')[0]
-  };
-}
-
-function getThisMonthRange() {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  return {
-    start: startOfMonth.toISOString().split('T')[0],
-    end: now.toISOString().split('T')[0]
-  };
-}
-
-function getLastMonthRange() {
-  const now = new Date();
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-  return {
-    start: startOfLastMonth.toISOString().split('T')[0],
-    end: endOfLastMonth.toISOString().split('T')[0]
-  };
-}
-
-function getRelativeDateRange(amount: number, unit: string) {
-  const now = new Date();
-  const start = new Date();
-
-  switch (unit.toLowerCase()) {
-    case 'day':
-    case 'days':
-      start.setDate(start.getDate() - amount);
-      break;
-    case 'week':
-    case 'weeks':
-      start.setDate(start.getDate() - (amount * 7));
-      break;
-    case 'month':
-    case 'months':
-      start.setMonth(start.getMonth() - amount);
-      break;
-    default:
-      start.setDate(start.getDate() - amount);
-  }
-
-  return {
-    start: start.toISOString().split('T')[0],
-    end: now.toISOString().split('T')[0]
-  };
-}
+// Date range helper functions are now consolidated in _shared/temporal-parser.ts
 
 /**
  * Main handler for the semantic search edge function

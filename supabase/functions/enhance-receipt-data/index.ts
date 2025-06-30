@@ -807,6 +807,43 @@ Return your findings in the following JSON format:
     "is_tax_inclusive": "true if tax is included in total, false if added separately",
     "business_category": "Detected Malaysian business category"
   },
+  "structured_data": {
+    "merchant_normalized": "Standardized merchant name for consistent querying",
+    "merchant_category": "Business category (grocery, restaurant, gas_station, pharmacy, etc.)",
+    "business_type": "Type of business (retail, service, restaurant, healthcare, etc.)",
+    "location_city": "City where transaction occurred",
+    "location_state": "State/province where transaction occurred",
+    "receipt_type": "Type of transaction (purchase, refund, exchange, service)",
+    "transaction_time": "Time of day in HH:MM format if available",
+    "item_count": "Number of distinct items purchased",
+    "discount_amount": "Total discount amount applied",
+    "service_charge": "Service charge amount",
+    "tip_amount": "Tip/gratuity amount",
+    "subtotal": "Subtotal before tax and charges",
+    "total_before_tax": "Total amount before tax",
+    "cashier_name": "Name of cashier if visible",
+    "receipt_number": "Receipt number from merchant system",
+    "transaction_id": "Unique transaction identifier",
+    "loyalty_program": "Loyalty program used (if any)",
+    "loyalty_points": "Loyalty points earned or redeemed",
+    "payment_card_last4": "Last 4 digits of payment card if visible",
+    "payment_approval_code": "Payment approval/authorization code",
+    "is_business_expense": "true/false - whether this appears to be a business expense",
+    "expense_type": "Type of expense (meal, travel, office_supplies, fuel, etc.)",
+    "vendor_registration_number": "Vendor business registration number if visible",
+    "invoice_number": "Invoice number for business receipts",
+    "purchase_order_number": "Purchase order number if visible"
+  },
+  "line_items_analysis": {
+    "categories": "Categorize line items by type (food, beverage, service, product, etc.)",
+    "patterns": "Identify patterns in purchases (bulk buying, premium items, etc.)",
+    "anomalies": "Flag unusual items or pricing"
+  },
+  "spending_patterns": {
+    "transaction_type": "regular, bulk_purchase, special_occasion, business_related",
+    "price_tier": "budget, mid_range, premium based on item prices",
+    "shopping_behavior": "planned, impulse, necessity based on items"
+  },
   "suggestions": {
     "merchant": "A suggested correction for merchant name if OCR made errors",
     "date": "A suggested date correction in YYYY-MM-DD format if needed",
@@ -818,6 +855,9 @@ Return your findings in the following JSON format:
     "payment_method": "Confidence score 0-100 for payment method",
     "predicted_category": "Confidence score 0-100 for category prediction",
     "malaysian_tax_info": "Confidence score 0-100 for tax detection",
+    "structured_data": "Confidence score 0-100 for structured data extraction",
+    "line_items_analysis": "Confidence score 0-100 for line items analysis",
+    "spending_patterns": "Confidence score 0-100 for spending pattern analysis",
     "suggestions": {
       "merchant": "Confidence score 0-100 for merchant suggestion",
       "date": "Confidence score 0-100 for date suggestion",
@@ -889,6 +929,43 @@ Return your findings in the following JSON format:
     { "description": "Item 1 description", "amount": "Item 1 price as a number" },
     { "description": "Item 2 description", "amount": "Item 2 price as a number" }
   ],
+  "structured_data": {
+    "merchant_normalized": "Standardized merchant name",
+    "merchant_category": "Business category (grocery, restaurant, gas_station, etc.)",
+    "business_type": "Type of business (retail, service, restaurant, etc.)",
+    "location_city": "City where transaction occurred",
+    "location_state": "State/province where transaction occurred",
+    "receipt_type": "purchase, refund, exchange, or service",
+    "transaction_time": "Time in HH:MM format if visible",
+    "item_count": "Number of distinct items purchased",
+    "discount_amount": "Total discount amount",
+    "service_charge": "Service charge amount",
+    "tip_amount": "Tip/gratuity amount",
+    "subtotal": "Subtotal before tax",
+    "total_before_tax": "Total before tax",
+    "cashier_name": "Cashier name if visible",
+    "receipt_number": "Receipt number",
+    "transaction_id": "Transaction ID",
+    "loyalty_program": "Loyalty program used",
+    "loyalty_points": "Points earned/redeemed",
+    "payment_card_last4": "Last 4 digits of card",
+    "payment_approval_code": "Approval code",
+    "is_business_expense": "true/false for business expense",
+    "expense_type": "meal, travel, office_supplies, etc.",
+    "vendor_registration_number": "Business registration number",
+    "invoice_number": "Invoice number",
+    "purchase_order_number": "PO number"
+  },
+  "line_items_analysis": {
+    "categories": "Categorize items by type",
+    "patterns": "Shopping patterns identified",
+    "anomalies": "Unusual items or pricing"
+  },
+  "spending_patterns": {
+    "transaction_type": "regular, bulk_purchase, special_occasion, business_related",
+    "price_tier": "budget, mid_range, premium",
+    "shopping_behavior": "planned, impulse, necessity"
+  },
   "confidence": {
     "merchant": "Confidence score 0-100",
     "date": "Confidence score 0-100",
@@ -898,6 +975,9 @@ Return your findings in the following JSON format:
     "payment_method": "Confidence score 0-100",
     "predicted_category": "Confidence score 0-100",
     "malaysian_tax_info": "Confidence score 0-100 for tax detection",
+    "structured_data": "Confidence score 0-100 for structured data",
+    "line_items_analysis": "Confidence score 0-100 for line items analysis",
+    "spending_patterns": "Confidence score 0-100 for spending patterns",
     "line_items": "Confidence score 0-100"
   }
 }`

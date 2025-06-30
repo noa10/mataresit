@@ -1135,6 +1135,68 @@ async function saveResultsToDatabase(
     thumbnail_url: thumbnailUrl
   };
 
+  // Add enhanced structured data fields if available
+  if (extractedData.structured_data) {
+    const structuredData = extractedData.structured_data;
+
+    // Map structured data to database columns
+    if (structuredData.merchant_normalized) updateData.merchant_normalized = structuredData.merchant_normalized;
+    if (structuredData.merchant_category) updateData.merchant_category = structuredData.merchant_category;
+    if (structuredData.business_type) updateData.business_type = structuredData.business_type;
+    if (structuredData.location_city) updateData.location_city = structuredData.location_city;
+    if (structuredData.location_state) updateData.location_state = structuredData.location_state;
+    if (structuredData.receipt_type) updateData.receipt_type = structuredData.receipt_type;
+    if (structuredData.transaction_time) updateData.transaction_time = structuredData.transaction_time;
+    if (structuredData.item_count) updateData.item_count = parseInt(structuredData.item_count) || 0;
+    if (structuredData.discount_amount) updateData.discount_amount = parseFloat(structuredData.discount_amount) || 0;
+    if (structuredData.service_charge) updateData.service_charge = parseFloat(structuredData.service_charge) || 0;
+    if (structuredData.tip_amount) updateData.tip_amount = parseFloat(structuredData.tip_amount) || 0;
+    if (structuredData.subtotal) updateData.subtotal = parseFloat(structuredData.subtotal) || 0;
+    if (structuredData.total_before_tax) updateData.total_before_tax = parseFloat(structuredData.total_before_tax) || 0;
+    if (structuredData.cashier_name) updateData.cashier_name = structuredData.cashier_name;
+    if (structuredData.receipt_number) updateData.receipt_number = structuredData.receipt_number;
+    if (structuredData.transaction_id) updateData.transaction_id = structuredData.transaction_id;
+    if (structuredData.loyalty_program) updateData.loyalty_program = structuredData.loyalty_program;
+    if (structuredData.loyalty_points) updateData.loyalty_points = parseInt(structuredData.loyalty_points) || 0;
+    if (structuredData.payment_card_last4) updateData.payment_card_last4 = structuredData.payment_card_last4;
+    if (structuredData.payment_approval_code) updateData.payment_approval_code = structuredData.payment_approval_code;
+    if (structuredData.is_business_expense) updateData.is_business_expense = structuredData.is_business_expense === 'true' || structuredData.is_business_expense === true;
+    if (structuredData.expense_type) updateData.expense_type = structuredData.expense_type;
+    if (structuredData.vendor_registration_number) updateData.vendor_registration_number = structuredData.vendor_registration_number;
+    if (structuredData.invoice_number) updateData.invoice_number = structuredData.invoice_number;
+    if (structuredData.purchase_order_number) updateData.purchase_order_number = structuredData.purchase_order_number;
+
+    await logger.log(`Enhanced structured data extracted: ${Object.keys(structuredData).length} fields`, "STRUCTURED");
+  }
+
+  // Add enhanced analysis fields
+  if (extractedData.line_items_analysis) {
+    updateData.line_items_analysis = extractedData.line_items_analysis;
+    await logger.log("Line items analysis data saved", "ANALYSIS");
+  }
+
+  if (extractedData.spending_patterns) {
+    updateData.spending_patterns = extractedData.spending_patterns;
+    await logger.log("Spending patterns analysis saved", "ANALYSIS");
+  }
+
+  // Add anomaly detection flags if present
+  if (extractedData.anomaly_flags) {
+    updateData.anomaly_flags = extractedData.anomaly_flags;
+    await logger.log("Anomaly flags detected and saved", "ANOMALY");
+  }
+
+  // Add extraction metadata for debugging and quality tracking
+  updateData.extraction_metadata = {
+    model_used: extractedData.modelUsed,
+    extraction_timestamp: new Date().toISOString(),
+    confidence_scores: extractedData.confidence,
+    structured_fields_count: extractedData.structured_data ? Object.keys(extractedData.structured_data).length : 0,
+    has_line_items_analysis: !!extractedData.line_items_analysis,
+    has_spending_patterns: !!extractedData.spending_patterns,
+    processing_version: '2.2' // Track which version of extraction was used
+  };
+
   // Feature flag to control whether to use the new columns
   const ENABLE_GEOMETRY_COLUMNS = true;
 
