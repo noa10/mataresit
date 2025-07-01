@@ -138,7 +138,33 @@ Return only valid JSON, no explanation.`;
     });
 
     const responseText = result.response.text();
-    const parsed = JSON.parse(responseText);
+
+    // 🔧 FIX: Handle markdown-wrapped JSON responses from LLM
+    let cleanedResponseText = responseText.trim();
+
+    // Remove markdown code block markers if present
+    if (cleanedResponseText.startsWith('```json')) {
+      cleanedResponseText = cleanedResponseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanedResponseText.startsWith('```')) {
+      cleanedResponseText = cleanedResponseText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    // Extract JSON from the response if it contains other text
+    const jsonStartIndex = cleanedResponseText.indexOf('{');
+    const jsonEndIndex = cleanedResponseText.lastIndexOf('}');
+
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      cleanedResponseText = cleanedResponseText.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+
+    console.log('🔧 DEBUG: Enhanced preprocessing JSON extraction:', {
+      originalLength: responseText.length,
+      cleanedLength: cleanedResponseText.length,
+      hasMarkdown: responseText.includes('```'),
+      preview: cleanedResponseText.substring(0, 100) + '...'
+    });
+
+    const parsed = JSON.parse(cleanedResponseText);
 
     return {
       expandedQuery: parsed.expandedQuery || query,
@@ -253,7 +279,33 @@ Return as a JSON array of strings:
     });
 
     const responseText = result.response.text();
-    const suggestions = JSON.parse(responseText);
+
+    // 🔧 FIX: Handle markdown-wrapped JSON responses from LLM
+    let cleanedResponseText = responseText.trim();
+
+    // Remove markdown code block markers if present
+    if (cleanedResponseText.startsWith('```json')) {
+      cleanedResponseText = cleanedResponseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanedResponseText.startsWith('```')) {
+      cleanedResponseText = cleanedResponseText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    // Extract JSON from the response if it contains other text
+    const jsonStartIndex = cleanedResponseText.indexOf('[');
+    const jsonEndIndex = cleanedResponseText.lastIndexOf(']');
+
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      cleanedResponseText = cleanedResponseText.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+
+    console.log('🔧 DEBUG: Contextual suggestions JSON extraction:', {
+      originalLength: responseText.length,
+      cleanedLength: cleanedResponseText.length,
+      hasMarkdown: responseText.includes('```'),
+      preview: cleanedResponseText.substring(0, 100) + '...'
+    });
+
+    const suggestions = JSON.parse(cleanedResponseText);
     
     return Array.isArray(suggestions) ? suggestions.slice(0, 3) : [];
 
