@@ -512,17 +512,19 @@ Guidelines for Intent Detection:
   * Monthly/yearly spending summaries
   * Merchant analysis or frequency
   * Budget analysis or expense tracking
-  * Anomalies, unusual transactions, or outliers
+  * Anomalies, unusual transactions, or outliers (but NOT simple amount filtering)
   * Time-based spending patterns
   * Payment method analysis
   * Business vs personal expense ratios
   * Examples: "how much did I spend on food", "monthly spending trends", "top merchants", "unusual transactions"
+  * NOTE: Simple monetary filtering queries like "receipts less than X" or "receipts over Y" should be classified as document_retrieval, not financial_analysis
 
 - Set intent to "document_retrieval" for queries about:
   * Finding specific receipts or documents
   * Searching for particular transactions
   * Looking up receipt details
-  * Examples: "McDonald's receipt from last week", "receipt for laptop purchase"
+  * Monetary filtering queries (receipts with specific amount criteria)
+  * Examples: "McDonald's receipt from last week", "receipt for laptop purchase", "receipts less than 5", "receipts over 100", "receipts between 10 and 50"
 
 - Set intent to "data_analysis" for queries about:
   * General data exploration

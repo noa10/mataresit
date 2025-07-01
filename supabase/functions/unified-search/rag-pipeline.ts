@@ -1660,20 +1660,20 @@ export class RAGPipeline {
         });
 
         if (typeof amount === 'number') {
-          // FIXED: Handle min-only and max-only filtering correctly
-          const passesMin = min === undefined || min === null || amount >= min;
-          const passesMax = max === undefined || max === null || amount <= max;
+          // CRITICAL FIX: Use strict inequalities for proper "less than" and "over" semantics
+          const passesMin = min === undefined || min === null || amount > min;  // "over X" means > X
+          const passesMax = max === undefined || max === null || amount < max;  // "less than X" means < X
           const passes = passesMin && passesMax;
-          console.log('💰 DEBUG: Amount filter result:', { amount, min, max, passesMin, passesMax, passes });
+          console.log('💰 DEBUG: Amount filter result (strict inequalities):', { amount, min, max, passesMin, passesMax, passes });
           return passes;
         } else if (typeof amount === 'string' && !isNaN(Number(amount))) {
           // Handle string amounts by converting to number
           const numericAmount = Number(amount);
-          // FIXED: Handle min-only and max-only filtering correctly
-          const passesMin = min === undefined || min === null || numericAmount >= min;
-          const passesMax = max === undefined || max === null || numericAmount <= max;
+          // CRITICAL FIX: Use strict inequalities for proper "less than" and "over" semantics
+          const passesMin = min === undefined || min === null || numericAmount > min;  // "over X" means > X
+          const passesMax = max === undefined || max === null || numericAmount < max;  // "less than X" means < X
           const passes = passesMin && passesMax;
-          console.log('💰 DEBUG: String amount converted and filtered:', { amount, numericAmount, min, max, passesMin, passesMax, passes });
+          console.log('💰 DEBUG: String amount converted and filtered (strict inequalities):', { amount, numericAmount, min, max, passesMin, passesMax, passes });
           return passes;
         }
         console.log('💰 DEBUG: Keeping result without valid amount data:', { amount });
@@ -1880,8 +1880,16 @@ export class RAGPipeline {
   /**
    * Detect if query is specifically looking for line items/food items
    * Enhanced with intelligent product name detection
+   * 🔧 FIX: Added monetary query detection to prevent misclassification
    */
   private isLineItemQuery(query: string): boolean {
+    const queryLower = query.toLowerCase().trim();
+
+    // 🔧 FIX: First check if this is a monetary query - if so, it's NOT a line item query
+    if (this.isMonetaryQuery(queryLower)) {
+      console.log('🔍 DEBUG: isLineItemQuery - MONETARY QUERY DETECTED, returning false:', queryLower);
+      return false;
+    }
     const lineItemIndicators = [
       // Food items
       'yee mee', 'mee', 'nasi', 'roti', 'teh', 'kopi', 'ayam', 'ikan', 'daging',
@@ -1901,7 +1909,6 @@ export class RAGPipeline {
       'milo', 'horlicks', 'ovaltine', 'kit kat', 'snickers', 'twix', 'oreo'
     ];
 
-    const queryLower = query.toLowerCase().trim();
     console.log('🔍 DEBUG: isLineItemQuery - checking query:', queryLower);
 
     // Step 1: Check for known indicators
@@ -1985,6 +1992,30 @@ export class RAGPipeline {
     }
 
     return false;
+  }
+
+  /**
+   * 🔧 FIX: Detect if query is a monetary query to prevent misclassification as line item
+   */
+  private isMonetaryQuery(query: string): boolean {
+    const monetaryPatterns = [
+      // "over $100", "above RM50", "more than $25", "receipts over 100"
+      /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+      // "under $50", "below RM25", "less than $100"
+      /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+      // "$50 to $100", "RM25-RM50", "between $10 and $20"
+      /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–]|and)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+      // "receipts over 100", "expenses above 50" (without currency symbols)
+      /\b(receipts?|expenses?|transactions?|purchases?|bills?)\s+(over|above|more\s+than|greater\s+than|under|below|less\s+than)\s+(\d+(?:\.\d{2})?)/i
+    ];
+
+    const isMonetary = monetaryPatterns.some(pattern => pattern.test(query));
+
+    if (isMonetary) {
+      console.log('💰 DEBUG: isMonetaryQuery - DETECTED monetary query:', query);
+    }
+
+    return isMonetary;
   }
 
   /**

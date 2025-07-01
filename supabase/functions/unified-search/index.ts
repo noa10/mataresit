@@ -40,8 +40,16 @@ const EMBEDDING_DIMENSIONS = 1536;
 /**
  * Detect if query is specifically looking for line items/food items
  * Enhanced with intelligent product name detection
+ * 🔧 FIX: Added monetary query detection to prevent misclassification
  */
 function isLineItemQueryDetection(query: string): boolean {
+  const queryLower = query.toLowerCase().trim();
+
+  // 🔧 FIX: First check if this is a monetary query - if so, it's NOT a line item query
+  if (isMonetaryQueryDetection(queryLower)) {
+    console.log('🔍 DEBUG: isLineItemQuery - MONETARY QUERY DETECTED, returning false:', queryLower);
+    return false;
+  }
   const lineItemIndicators = [
     // Food items
     'yee mee', 'mee', 'nasi', 'roti', 'teh', 'kopi', 'ayam', 'ikan', 'daging',
@@ -61,7 +69,6 @@ function isLineItemQueryDetection(query: string): boolean {
     'milo', 'horlicks', 'ovaltine', 'kit kat', 'snickers', 'twix', 'oreo'
   ];
 
-  const queryLower = query.toLowerCase().trim();
   console.log('🔍 DEBUG: isLineItemQuery - checking query:', queryLower);
 
   // Step 1: Check for known indicators
@@ -145,6 +152,30 @@ function isPotentialProductName(query: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * 🔧 FIX: Detect if query is a monetary query to prevent misclassification as line item
+ */
+function isMonetaryQueryDetection(query: string): boolean {
+  const monetaryPatterns = [
+    // "over $100", "above RM50", "more than $25", "receipts over 100"
+    /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+    // "under $50", "below RM25", "less than $100"
+    /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+    // "$50 to $100", "RM25-RM50", "between $10 and $20"
+    /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–]|and)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
+    // "receipts over 100", "expenses above 50" (without currency symbols)
+    /\b(receipts?|expenses?|transactions?|purchases?|bills?)\s+(over|above|more\s+than|greater\s+than|under|below|less\s+than)\s+(\d+(?:\.\d{2})?)/i
+  ];
+
+  const isMonetary = monetaryPatterns.some(pattern => pattern.test(query));
+
+  if (isMonetary) {
+    console.log('💰 DEBUG: isMonetaryQueryDetection - DETECTED monetary query:', query);
+  }
+
+  return isMonetary;
 }
 
 /**
@@ -278,7 +309,13 @@ async function validateRequest(req: Request, body?: any): Promise<{ params: Unif
       ...(temporalParsing.amountRange && {
         minAmount: temporalParsing.amountRange.min,
         maxAmount: temporalParsing.amountRange.max,
-        currency: temporalParsing.amountRange.currency
+        currency: temporalParsing.amountRange.currency,
+        // CRITICAL FIX: Add amountRange object for RAG pipeline compatibility
+        amountRange: {
+          min: temporalParsing.amountRange.min,
+          max: temporalParsing.amountRange.max,
+          currency: temporalParsing.amountRange.currency
+        }
       })
     }
   };
