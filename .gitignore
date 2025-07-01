@@ -17,6 +17,8 @@ dist-ssr
 tmp/
 temp/
 temp/logs.json
+logs.json
+supabase/.temp/
 
 # Lock files from other package managers (project uses npm)
 bun.lockb
