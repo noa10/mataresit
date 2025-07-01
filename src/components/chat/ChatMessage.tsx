@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { User, Bot, Copy, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
+import { User, Bot, Copy, ThumbsUp, ThumbsDown, ExternalLink, ExternalLinkIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
@@ -11,6 +11,7 @@ import { useChatTranslation } from '@/contexts/LanguageContext';
 import { UIComponent } from '@/types/ui-components';
 import { parseUIComponents } from '@/lib/ui-component-parser';
 import { UIComponentRenderer } from './ui-components/UIComponentRenderer';
+import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
 import { FeedbackButtons } from './FeedbackButtons';
 
 export interface ChatMessage {
@@ -107,7 +108,18 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
     // - User behavior logging
   };
 
-  const handleViewReceipt = (receiptId: string, itemType?: string) => {
+  const handleViewReceipt = (receiptId: string, itemType?: string, event?: React.MouseEvent) => {
+    const navigationOptions = {
+      from: 'chat',
+      itemType: itemType
+    };
+
+    // If event is provided, use the enhanced click handler
+    if (event) {
+      handleReceiptClick(event, receiptId, navigate, navigationOptions);
+      return;
+    }
+
     // Enhanced validation with better error messages
     if (!receiptId || receiptId.trim() === '') {
       console.error('Cannot navigate to receipt: ID is undefined or empty', { receiptId, itemType });
@@ -123,14 +135,18 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
     try {
       console.log(`Navigating to receipt: ${receiptId} (from chat ${itemType || 'unknown'})`);
       navigate(`/receipt/${receiptId}`, {
-        state: {
-          from: 'chat',
-          itemType: itemType
-        }
+        state: navigationOptions
       });
     } catch (error) {
       console.error('Error navigating to receipt from chat:', error);
     }
+  };
+
+  const handleViewReceiptNewWindow = (receiptId: string, itemType?: string) => {
+    openReceiptInNewWindow(receiptId, {
+      from: 'chat',
+      itemType: itemType
+    });
   };
 
   // Helper function to clean and format dates (similar to ReceiptCardComponent)
@@ -227,15 +243,34 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
                     )}
                   </div>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => handleViewReceipt(receipt.id, 'receipt')}
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View Receipt
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => handleViewReceipt(receipt.id, 'receipt', e)}
+                      onMouseDown={(e) => {
+                        // Handle middle click
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          handleViewReceipt(receipt.id, 'receipt', e);
+                        }
+                      }}
+                      title={`View receipt from ${receipt.merchant || 'Unknown'} (Ctrl/Cmd+click for new window)`}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View Receipt
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="px-2"
+                      onClick={() => handleViewReceiptNewWindow(receipt.id, 'receipt')}
+                      title={`Open ${receipt.merchant || 'Unknown'} receipt in new window`}
+                    >
+                      <ExternalLinkIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -271,15 +306,34 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
                     )}
                   </div>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => handleViewReceipt(lineItem.parent_receipt_id || lineItem.receipt_id, 'line_item')}
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View Parent Receipt
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => handleViewReceipt(lineItem.parent_receipt_id || lineItem.receipt_id, 'line_item', e)}
+                      onMouseDown={(e) => {
+                        // Handle middle click
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          handleViewReceipt(lineItem.parent_receipt_id || lineItem.receipt_id, 'line_item', e);
+                        }
+                      }}
+                      title={`View parent receipt from ${lineItem.parent_receipt_merchant || 'Unknown'} (Ctrl/Cmd+click for new window)`}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View Parent Receipt
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="px-2"
+                      onClick={() => handleViewReceiptNewWindow(lineItem.parent_receipt_id || lineItem.receipt_id, 'line_item')}
+                      title={`Open ${lineItem.parent_receipt_merchant || 'Unknown'} receipt in new window`}
+                    >
+                      <ExternalLinkIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );

@@ -171,7 +171,7 @@ export default function Index() {
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-                        <Link to="/semantic-search" className="flex items-center justify-center sm:justify-start">
+                        <Link to="/search" className="flex items-center justify-center sm:justify-start">
                           {t('hero.cta.trySmartSearch')}
                         </Link>
                       </Button>

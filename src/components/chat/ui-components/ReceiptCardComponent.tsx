@@ -4,24 +4,26 @@
  * Renders an interactive receipt card with actions for viewing, editing, and categorizing receipts.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ExternalLink, 
-  Edit, 
-  Tag, 
-  Calendar, 
-  DollarSign, 
+import {
+  ExternalLink,
+  Edit,
+  Tag,
+  Calendar,
+  DollarSign,
   Store,
   FileText,
-  Star
+  Star,
+  ExternalLinkIcon
 } from 'lucide-react';
 import { ReceiptCardData, UIComponentProps } from '@/types/ui-components';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrencySafe } from '@/utils/currency';
+import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
 
 interface ReceiptCardComponentProps extends Omit<UIComponentProps, 'component'> {
   data: ReceiptCardData;
@@ -30,13 +32,15 @@ interface ReceiptCardComponentProps extends Omit<UIComponentProps, 'component'> 
   compact?: boolean;
 }
 
-export function ReceiptCardComponent({ 
-  data, 
-  onAction, 
-  className = '', 
-  compact = false 
+export function ReceiptCardComponent({
+  data,
+  onAction,
+  className = '',
+  compact = false
 }: ReceiptCardComponentProps) {
   const navigate = useNavigate();
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 
   // Format the receipt date for Malaysian context (DD/MM/YYYY)
   const formatDate = (dateString: string) => {
@@ -88,37 +92,46 @@ export function ReceiptCardComponent({
     return formatCurrencySafe(amount, currency, 'en-US', 'MYR');
   };
 
-  // Handle action clicks
-  const handleAction = (action: string) => {
+  // Handle action clicks with support for new window opening
+  const handleAction = (action: string, event?: React.MouseEvent) => {
+    const navigationOptions = {
+      from: 'chat',
+      itemType: 'receipt_card'
+    };
+
     switch (action) {
       case 'view_receipt':
-        navigate(`/receipt/${data.receipt_id}`, {
-          state: {
-            from: 'chat',
-            itemType: 'receipt_card'
-          }
-        });
+        if (event) {
+          handleReceiptClick(event, data.receipt_id, navigate, navigationOptions);
+        } else {
+          navigate(`/receipt/${data.receipt_id}`, {
+            state: navigationOptions
+          });
+        }
+        break;
+      case 'view_receipt_new_window':
+        openReceiptInNewWindow(data.receipt_id, navigationOptions);
         break;
       case 'edit_receipt':
-        // Navigate to the receipt view page which has inline editing capabilities
-        navigate(`/receipt/${data.receipt_id}`, {
-          state: {
-            from: 'chat',
-            itemType: 'receipt_card',
-            openEditMode: true // Hint to open in edit mode
-          }
-        });
+        const editOptions = { ...navigationOptions, openEditMode: true };
+        if (event) {
+          handleReceiptClick(event, data.receipt_id, navigate, editOptions);
+        } else {
+          navigate(`/receipt/${data.receipt_id}`, {
+            state: editOptions
+          });
+        }
         toast.info('Opening receipt for editing...');
         break;
       case 'categorize_receipt':
-        // Navigate to receipt view with categorization focus
-        navigate(`/receipt/${data.receipt_id}`, {
-          state: {
-            from: 'chat',
-            itemType: 'receipt_card',
-            focusCategory: true
-          }
-        });
+        const categoryOptions = { ...navigationOptions, focusCategory: true };
+        if (event) {
+          handleReceiptClick(event, data.receipt_id, navigate, categoryOptions);
+        } else {
+          navigate(`/receipt/${data.receipt_id}`, {
+            state: categoryOptions
+          });
+        }
         toast.info('Opening receipt for categorization...');
         break;
       default:
@@ -128,6 +141,22 @@ export function ReceiptCardComponent({
     // Call the onAction callback if provided
     onAction?.(action, { receipt_id: data.receipt_id, merchant: data.merchant, action });
   };
+
+  // Handle right-click context menu
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenuPosition({ x: event.clientX, y: event.clientY });
+    setShowContextMenu(true);
+  };
+
+  // Close context menu when clicking elsewhere
+  React.useEffect(() => {
+    const handleClickOutside = () => setShowContextMenu(false);
+    if (showContextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showContextMenu]);
 
   // Get confidence color based on confidence score
   const getConfidenceColor = (confidence?: number) => {
@@ -145,62 +174,120 @@ export function ReceiptCardComponent({
 
   if (compact) {
     return (
-      <Card className={`border-l-4 border-l-primary/50 hover:shadow-md transition-shadow ${className}`}>
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <h4 className="font-medium text-sm truncate">{data.merchant}</h4>
-                {data.confidence && (
-                  <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
-                    {Math.round(data.confidence * 100)}%
-                  </Badge>
-                )}
+      <div className="relative">
+        <Card
+          className={`border-l-4 border-l-primary/50 hover:shadow-md transition-shadow ${className}`}
+          onContextMenu={handleContextMenu}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <h4 className="font-medium text-sm truncate">{data.merchant}</h4>
+                  {data.confidence && (
+                    <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
+                      {Math.round(data.confidence * 100)}%
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    {formatAmount(data.total, data.currency)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(data.date)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" />
-                  {formatAmount(data.total, data.currency)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(data.date)}
-                </span>
+              <div className="flex gap-1 ml-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => handleAction('view_receipt', e)}
+                  onMouseDown={(e) => {
+                    // Handle middle click
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      handleAction('view_receipt', e);
+                    }
+                  }}
+                  className="flex-shrink-0"
+                  title={`View receipt from ${data.merchant} (Ctrl/Cmd+click for new window)`}
+                  aria-label={`View receipt from ${data.merchant}`}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleAction('view_receipt_new_window')}
+                  className="flex-shrink-0 px-2"
+                  title={`Open ${data.merchant} receipt in new window`}
+                  aria-label={`Open ${data.merchant} receipt in new window`}
+                >
+                  <ExternalLinkIcon className="h-3 w-3" />
+                </Button>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleAction('view_receipt')}
-              className="ml-2 flex-shrink-0"
-              title={`View receipt from ${data.merchant}`}
-              aria-label={`View receipt from ${data.merchant}`}
+          </CardContent>
+        </Card>
+
+        {/* Context Menu */}
+        {showContextMenu && (
+          <div
+            className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+            style={{
+              left: contextMenuPosition.x,
+              top: contextMenuPosition.y,
+            }}
+          >
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              onClick={() => {
+                handleAction('view_receipt');
+                setShowContextMenu(false);
+              }}
             >
-              <ExternalLink className="h-3 w-3" />
-            </Button>
+              Open in Same Window
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              onClick={() => {
+                handleAction('view_receipt_new_window');
+                setShowContextMenu(false);
+              }}
+            >
+              Open in New Window
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     );
   }
 
   return (
-    <Card className={`border-l-4 border-l-primary/50 hover:shadow-lg transition-all duration-200 ${className}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Store className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-base">{data.merchant}</h3>
+    <div className="relative">
+      <Card
+        className={`border-l-4 border-l-primary/50 hover:shadow-lg transition-all duration-200 ${className}`}
+        onContextMenu={handleContextMenu}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <Store className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-base">{data.merchant}</h3>
+            </div>
+            {data.confidence && (
+              <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
+                <Star className="h-3 w-3 mr-1" />
+                {getConfidenceText(data.confidence)}
+              </Badge>
+            )}
           </div>
-          {data.confidence && (
-            <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
-              <Star className="h-3 w-3 mr-1" />
-              {getConfidenceText(data.confidence)}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
+        </CardHeader>
 
       <CardContent className="pt-0">
         <div className="space-y-3">
@@ -256,9 +343,16 @@ export function ReceiptCardComponent({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleAction('view_receipt')}
+              onClick={(e) => handleAction('view_receipt', e)}
+              onMouseDown={(e) => {
+                // Handle middle click
+                if (e.button === 1) {
+                  e.preventDefault();
+                  handleAction('view_receipt', e);
+                }
+              }}
               className="flex-1"
-              title={`View details for ${data.merchant} receipt`}
+              title={`View details for ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
               aria-label={`View details for ${data.merchant} receipt`}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -267,9 +361,16 @@ export function ReceiptCardComponent({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleAction('edit_receipt')}
+              onClick={(e) => handleAction('edit_receipt', e)}
+              onMouseDown={(e) => {
+                // Handle middle click
+                if (e.button === 1) {
+                  e.preventDefault();
+                  handleAction('edit_receipt', e);
+                }
+              }}
               className="flex-1"
-              title={`Edit ${data.merchant} receipt`}
+              title={`Edit ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
               aria-label={`Edit ${data.merchant} receipt`}
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -279,18 +380,87 @@ export function ReceiptCardComponent({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleAction('categorize_receipt')}
+                onClick={(e) => handleAction('categorize_receipt', e)}
+                onMouseDown={(e) => {
+                  // Handle middle click
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    handleAction('categorize_receipt', e);
+                  }
+                }}
                 className="flex-1"
-                title={`Categorize ${data.merchant} receipt`}
+                title={`Categorize ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
                 aria-label={`Categorize ${data.merchant} receipt`}
               >
                 <Tag className="h-4 w-4 mr-2" />
                 Categorize
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleAction('view_receipt_new_window')}
+              className="px-3"
+              title={`Open ${data.merchant} receipt in new window`}
+              aria-label={`Open ${data.merchant} receipt in new window`}
+            >
+              <ExternalLinkIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </CardContent>
     </Card>
+
+    {/* Context Menu */}
+    {showContextMenu && (
+      <div
+        className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+        style={{
+          left: contextMenuPosition.x,
+          top: contextMenuPosition.y,
+        }}
+      >
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+          onClick={() => {
+            handleAction('view_receipt');
+            setShowContextMenu(false);
+          }}
+        >
+          Open in Same Window
+        </button>
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+          onClick={() => {
+            handleAction('view_receipt_new_window');
+            setShowContextMenu(false);
+          }}
+        >
+          Open in New Window
+        </button>
+        <hr className="my-1 border-border" />
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+          onClick={() => {
+            handleAction('edit_receipt');
+            setShowContextMenu(false);
+          }}
+        >
+          Edit Receipt
+        </button>
+        {!data.category && (
+          <button
+            className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+            onClick={() => {
+              handleAction('categorize_receipt');
+              setShowContextMenu(false);
+            }}
+          >
+            Categorize Receipt
+          </button>
+        )}
+      </div>
+    )}
+  </div>
   );
 }
