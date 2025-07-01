@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.2.0';
 import { ContentExtractor } from './contentExtractors.ts';
 import { BatchProcessor } from './batchProcessor.ts';
+import { validateAndConvertEmbedding, EMBEDDING_DIMENSIONS } from '../_shared/vector-validation.ts';
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -99,49 +100,8 @@ async function generateEmbedding(text: string, retryCount = 0): Promise<number[]
     const result = await model.embedContent(trimmedText);
     let embedding = result.embedding.values;
 
-    // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536
-    if (embedding.length !== EMBEDDING_DIMENSIONS) {
-      console.log(`Converting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
-
-      if (embedding.length < EMBEDDING_DIMENSIONS) {
-        if (embedding.length * 2 === EMBEDDING_DIMENSIONS) {
-          // If exactly half the size, duplicate each value instead of zero-padding
-          // This preserves more semantic information than zero padding
-          embedding = embedding.flatMap((val: number) => [val, val]);
-        } else {
-          // Pad with zeros, but normalize the remaining values to maintain vector magnitude
-          const normalizationFactor = Math.sqrt(EMBEDDING_DIMENSIONS / embedding.length);
-          const normalizedEmbedding = embedding.map((val: number) => val * normalizationFactor);
-          const padding = new Array(EMBEDDING_DIMENSIONS - embedding.length).fill(0);
-          embedding = [...normalizedEmbedding, ...padding];
-        }
-      } else if (embedding.length > EMBEDDING_DIMENSIONS) {
-        // If too long, use a dimensionality reduction approach
-        // For simplicity, we're averaging adjacent pairs if it's exactly double
-        if (embedding.length === EMBEDDING_DIMENSIONS * 2) {
-          const reducedEmbedding: number[] = [];
-          for (let i = 0; i < embedding.length; i += 2) {
-            reducedEmbedding.push((embedding[i] + embedding[i+1]) / 2);
-          }
-          embedding = reducedEmbedding;
-        } else {
-          // Otherwise just truncate but normalize the remaining values
-          embedding = embedding.slice(0, EMBEDDING_DIMENSIONS);
-          // Normalize to maintain vector magnitude
-          const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
-          if (magnitude > 0) {
-            embedding = embedding.map((val: number) => val / magnitude * Math.sqrt(EMBEDDING_DIMENSIONS));
-          }
-        }
-      }
-    }
-
-    // Normalize the final embedding vector to unit length
-    const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
-    if (magnitude > 0) {
-      embedding = embedding.map((val: number) => val / magnitude);
-    }
-
+    // 🔧 CRITICAL FIX: Use shared validation utility to prevent corruption
+    embedding = validateAndConvertEmbedding(embedding, EMBEDDING_DIMENSIONS);
     return embedding;
   } catch (error) {
     console.error('Error calling Gemini API:', error);

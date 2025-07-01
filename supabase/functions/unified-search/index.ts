@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.1.3';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { validateAndConvertEmbedding, EMBEDDING_DIMENSIONS } from '../_shared/vector-validation.ts';
 import { supabaseClient } from '../_shared/supabase-client.ts';
 import { corsHeaders, addCorsHeaders, createCorsPreflightResponse } from '../_shared/cors.ts';
 import {
@@ -37,6 +38,116 @@ const DEFAULT_EMBEDDING_MODEL = 'text-embedding-004';
 const EMBEDDING_DIMENSIONS = 1536;
 
 /**
+ * Detect if query is specifically looking for line items/food items
+ * Enhanced with intelligent product name detection
+ */
+function isLineItemQueryDetection(query: string): boolean {
+  const lineItemIndicators = [
+    // Food items
+    'yee mee', 'mee', 'nasi', 'roti', 'teh', 'kopi', 'ayam', 'ikan', 'daging',
+    'sayur', 'buah', 'noodles', 'rice', 'chicken', 'fish', 'beef', 'vegetables',
+    'fruit', 'bread', 'cake', 'pizza', 'burger', 'sandwich', 'salad', 'soup',
+    // Line item specific terms
+    'item', 'items', 'line item', 'line items', 'product', 'products',
+    'bought', 'purchased', 'ordered', 'ate', 'food', 'drink', 'beverage',
+    // Malaysian food terms
+    'laksa', 'rendang', 'satay', 'char kway teow', 'hokkien mee', 'wan tan mee',
+    'bak kut teh', 'cendol', 'ais kacang', 'rojak', 'popiah', 'dim sum',
+    // Common grocery items
+    'minced', 'oil', 'egg', 'eggs', 'telur', 'minyak', 'garam', 'salt', 'sugar',
+    'gula', 'beras', 'flour', 'tepung', 'susu', 'milk', 'cheese', 'butter',
+    // Common product brands and items (for accuracy fix)
+    'powercat', 'coca cola', 'pepsi', 'sprite', 'fanta', 'nestle', 'maggi',
+    'milo', 'horlicks', 'ovaltine', 'kit kat', 'snickers', 'twix', 'oreo'
+  ];
+
+  const queryLower = query.toLowerCase().trim();
+  console.log('🔍 DEBUG: isLineItemQuery - checking query:', queryLower);
+
+  // Step 1: Check for known indicators
+  const knownIndicatorMatch = lineItemIndicators.some(indicator => {
+    const match = queryLower.includes(indicator.toLowerCase());
+    if (match) {
+      console.log('🔍 DEBUG: isLineItemQuery - FOUND KNOWN INDICATOR:', indicator);
+    }
+    return match;
+  });
+
+  if (knownIndicatorMatch) {
+    console.log('🔍 DEBUG: isLineItemQuery - result: true (known indicator)');
+    return true;
+  }
+
+  // Step 2: Enhanced heuristics for potential product names
+  const potentialProductMatch = isPotentialProductName(queryLower);
+  if (potentialProductMatch) {
+    console.log('🔍 DEBUG: isLineItemQuery - FOUND POTENTIAL PRODUCT:', queryLower);
+    console.log('🔍 DEBUG: isLineItemQuery - result: true (potential product)');
+    return true;
+  }
+
+  console.log('🔍 DEBUG: isLineItemQuery - result: false (no match)');
+  return false;
+}
+
+/**
+ * Enhanced heuristics to detect potential product names
+ */
+function isPotentialProductName(query: string): boolean {
+  // Common stop words that are unlikely to be product names
+  const stopWords = [
+    'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+    'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before',
+    'after', 'above', 'below', 'between', 'among', 'this', 'that', 'these',
+    'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
+    'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his',
+    'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself',
+    'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which',
+    'who', 'whom', 'whose', 'this', 'that', 'these', 'those', 'am', 'is',
+    'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+    'having', 'do', 'does', 'did', 'doing', 'will', 'would', 'could',
+    'should', 'may', 'might', 'must', 'can', 'shall', 'receipt', 'receipts',
+    'transaction', 'transactions', 'purchase', 'purchases', 'expense', 'expenses'
+  ];
+
+  // Clean the query
+  const cleanQuery = query.replace(/[^\w\s]/g, '').trim();
+
+  // Heuristic 1: Single word that's not a stop word (like "powercat")
+  const words = cleanQuery.split(/\s+/).filter(word => word.length > 0);
+  if (words.length === 1) {
+    const word = words[0].toLowerCase();
+    if (!stopWords.includes(word) && word.length >= 3 && word.length <= 20) {
+      console.log('🔍 DEBUG: isPotentialProduct - single word heuristic matched:', word);
+      return true;
+    }
+  }
+
+  // Heuristic 2: Two words that could be a brand + product (like "coca cola")
+  if (words.length === 2) {
+    const allWordsValid = words.every(word => {
+      const w = word.toLowerCase();
+      return !stopWords.includes(w) && w.length >= 2 && w.length <= 15;
+    });
+    if (allWordsValid) {
+      console.log('🔍 DEBUG: isPotentialProduct - two word brand heuristic matched:', words.join(' '));
+      return true;
+    }
+  }
+
+  // Heuristic 3: Contains numbers (like "7up", "100plus")
+  if (/\d/.test(cleanQuery) && cleanQuery.length <= 20) {
+    const hasLetters = /[a-zA-Z]/.test(cleanQuery);
+    if (hasLetters) {
+      console.log('🔍 DEBUG: isPotentialProduct - alphanumeric product heuristic matched:', cleanQuery);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Generate embedding for search query
  */
 async function generateEmbedding(text: string): Promise<number[]> {
@@ -61,22 +172,8 @@ async function generateEmbedding(text: string): Promise<number[]> {
       throw new Error('Empty embedding returned from Gemini API');
     }
 
-    // Handle dimension mismatch - Gemini returns 768 dimensions but we need 1536 for pgvector
-    if (embedding.length !== EMBEDDING_DIMENSIONS) {
-      console.log(`Converting embedding dimensions from ${embedding.length} to ${EMBEDDING_DIMENSIONS}`);
-      
-      if (embedding.length === 768) {
-        // Pad with zeros to reach 1536 dimensions
-        const paddedEmbedding = new Array(EMBEDDING_DIMENSIONS).fill(0);
-        for (let i = 0; i < embedding.length; i++) {
-          paddedEmbedding[i] = embedding[i];
-        }
-        embedding = paddedEmbedding;
-      } else {
-        throw new Error(`Unexpected embedding dimension: ${embedding.length}`);
-      }
-    }
-
+    // 🔧 CRITICAL FIX: Use shared validation utility to prevent corruption
+    embedding = validateAndConvertEmbedding(embedding, EMBEDDING_DIMENSIONS);
     return embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
@@ -361,6 +458,10 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
   try {
     const { query, useEnhancedPrompting = false, conversationHistory, userProfile, ...otherParams } = body;
 
+    // 🔧 FIX: Check if this is a forced enhanced search (e.g., line item query)
+    const isLineItemQuery = body.query && isLineItemQueryDetection(body.query);
+    const shouldUseEnhancedPipeline = useEnhancedPrompting || isLineItemQuery;
+
     // Validate parameters
     const validation = validateSearchParams({ query, ...otherParams });
     if (!validation.isValid) {
@@ -413,8 +514,21 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
       },
     });
 
-    // Validate user with their JWT token
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // 🔧 FIX: Use service role client to validate JWT token (same as validateRequest)
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseServiceKey) {
+      const configErrorResponse = new Response(
+        JSON.stringify({ success: false, error: 'Server configuration error - missing service key' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+      return addCorsHeaders(configErrorResponse);
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const token = authHeader.replace('Bearer ', '');
+
+    // Validate user with their JWT token using service role client
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
       console.error('Enhanced search: Authentication failed:', error);
@@ -427,9 +541,13 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
 
     console.log('Enhanced search: User authenticated successfully:', user.id);
 
-    if (useEnhancedPrompting) {
-      // Use enhanced prompt engineering system
-      console.log('🚀 Using Enhanced Prompt Engineering System');
+    if (shouldUseEnhancedPipeline) {
+      // Use enhanced prompt engineering system or enhanced line item search
+      console.log('🚀 Using Enhanced Pipeline System', {
+        useEnhancedPrompting,
+        isLineItemQuery,
+        shouldUseEnhancedPipeline
+      });
 
       // Enhanced query preprocessing
       const preprocessResult = await enhancedQueryPreprocessing(
@@ -456,8 +574,22 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
         }
       };
 
+      console.log('🔍 DEBUG: Creating RAG Pipeline with context:', {
+        hasOriginalQuery: !!ragContext.originalQuery,
+        hasParams: !!ragContext.params,
+        hasUser: !!ragContext.user,
+        hasSupabase: !!ragContext.supabase
+      });
+
       const ragPipeline = new RAGPipeline(ragContext);
+      console.log('🔍 DEBUG: RAG Pipeline created, about to execute...');
+
       const pipelineResult = await ragPipeline.execute();
+      console.log('🔍 DEBUG: RAG Pipeline execution completed:', {
+        success: pipelineResult.success,
+        resultsLength: pipelineResult.results?.length || 0,
+        error: pipelineResult.error
+      });
 
       if (pipelineResult.success) {
         // Generate enhanced response
@@ -778,9 +910,24 @@ serve(async (req: Request) => {
 
     const useEnhancedPrompting = body.useEnhancedPrompting || false;
 
-    if (useEnhancedPrompting) {
+    // ENHANCED FIX: Force enhanced search for line item queries
+    const isLineItemQuery = body.query && isLineItemQueryDetection(body.query);
+    const forceEnhanced = useEnhancedPrompting || isLineItemQuery;
+
+    console.log('🔍 DEBUG: Request routing decision:', {
+      useEnhancedPrompting: body.useEnhancedPrompting,
+      useEnhancedPromptingResolved: useEnhancedPrompting,
+      isLineItemQuery,
+      forceEnhanced,
+      bodyKeys: Object.keys(body),
+      query: body.query
+    });
+
+    if (forceEnhanced) {
+      console.log('🚀 ROUTING: Taking enhanced search path (forced for line item query)');
       return await handleEnhancedSearch(req, body);
     } else {
+      console.log('🚀 ROUTING: Taking regular search path');
       // Parse request for regular search
       const validation = validateSearchParams(body);
       if (!validation.isValid) {

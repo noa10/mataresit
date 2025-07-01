@@ -28,6 +28,7 @@ import {
   extractContextualSnippets,
   SnippetExtractionParams
 } from '../_shared/contextual-snippets.ts';
+import { performLineItemSearch } from '../semantic-search/performLineItemSearch.ts';
 import {
   llmCacheWrapper,
   searchCacheWrapper,
@@ -296,6 +297,18 @@ export class RAGPipeline {
       if (preprocessing && preprocessing.intent === 'financial_analysis') {
         console.log('💰 Detected financial analysis intent - routing to financial functions');
         return await this.executeFinancialAnalysis(preprocessing);
+      }
+
+      // Check if this is a line item query
+      console.log('🔍 DEBUG: Checking line item query for:', this.context.originalQuery);
+      const isLineItem = this.isLineItemQuery(this.context.originalQuery);
+      console.log('🔍 DEBUG: Line item detection result:', isLineItem);
+
+      if (isLineItem) {
+        console.log('🍜 Detected line item query - routing to enhanced line item search');
+        return await this.executeEnhancedLineItemSearch(queryEmbedding);
+      } else {
+        console.log('❌ NOT detected as line item query');
       }
 
       // Enhanced temporal query routing
@@ -1053,6 +1066,99 @@ export class RAGPipeline {
   }
 
   /**
+   * Execute enhanced line item search using the improved performLineItemSearch function
+   */
+  private async executeEnhancedLineItemSearch(queryEmbedding: number[]): Promise<PipelineStageResult<UnifiedSearchResult[]>> {
+    const stageStart = Date.now();
+    console.log('🍜 Executing Enhanced Line Item Search');
+
+    try {
+      // Prepare parameters for line item search
+      const searchParams = {
+        limit: this.context.params.limit || 20,
+        offset: this.context.params.offset || 0,
+        startDate: this.context.params.filters?.startDate,
+        endDate: this.context.params.filters?.endDate,
+        minAmount: this.context.params.filters?.minAmount,
+        maxAmount: this.context.params.filters?.maxAmount,
+        query: this.context.originalQuery,
+        useHybridSearch: true // Enable hybrid search by default
+      };
+
+      console.log('🔍 Line item search parameters:', searchParams);
+
+      // Call our enhanced line item search function
+      const lineItemResults = await performLineItemSearch(
+        this.context.supabase,
+        queryEmbedding,
+        searchParams
+      );
+
+      console.log(`✅ Enhanced line item search found ${lineItemResults.lineItems.length} results`);
+      this.context.metadata.sourcesSearched.push('enhanced_line_item_search');
+
+      // Transform line item results to unified format
+      const rawResults: UnifiedSearchResult[] = lineItemResults.lineItems.map((item: any) => ({
+        id: `line-item-${item.line_item_id}`,
+        sourceType: 'receipt',
+        sourceId: item.receipt_id,
+        contentType: 'line_item',
+        title: `${item.description} - ${item.merchant}`,
+        content: item.description,
+        similarity: item.similarity || 0.8,
+        metadata: {
+          merchant: item.merchant,
+          total: item.total, // 🔧 FIX: Use receipt total, not line item amount
+          currency: item.currency || 'MYR',
+          date: item.date,
+          line_item_id: item.line_item_id,
+          line_item_amount: item.amount, // Keep line item amount for reference
+          match_type: item.matchType || 'hybrid'
+        },
+        createdAt: item.date
+      }));
+
+      // 🔧 FIX: Deduplicate by receipt_id to ensure each receipt appears only once
+      const receiptMap = new Map<string, UnifiedSearchResult>();
+
+      for (const result of rawResults) {
+        const receiptId = result.sourceId;
+        const existingResult = receiptMap.get(receiptId);
+
+        // Keep the result with higher similarity score
+        if (!existingResult || (result.similarity > existingResult.similarity)) {
+          receiptMap.set(receiptId, result);
+        }
+      }
+
+      const transformedResults = Array.from(receiptMap.values());
+
+      console.log(`🔧 Line item deduplication: ${rawResults.length} raw results → ${transformedResults.length} unique receipts`);
+
+      return {
+        success: true,
+        data: transformedResults,
+        processingTime: Date.now() - stageStart,
+        metadata: {
+          searchMethod: 'enhanced_line_item_search',
+          resultsCount: transformedResults.length,
+          exactMatches: lineItemResults.metadata?.exactMatches || 0,
+          semanticMatches: lineItemResults.metadata?.semanticMatches || 0,
+          searchStrategy: lineItemResults.metadata?.searchStrategy || 'hybrid'
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Enhanced Line Item Search failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        processingTime: Date.now() - stageStart
+      };
+    }
+  }
+
+  /**
    * Transform database search results to unified format with deduplication
    */
   private async transformSearchResults(searchResults: any[]): Promise<UnifiedSearchResult[]> {
@@ -1769,6 +1875,116 @@ export class RAGPipeline {
 
       this.context.metadata.uiComponents.push(analyticsButton);
     }
+  }
+
+  /**
+   * Detect if query is specifically looking for line items/food items
+   * Enhanced with intelligent product name detection
+   */
+  private isLineItemQuery(query: string): boolean {
+    const lineItemIndicators = [
+      // Food items
+      'yee mee', 'mee', 'nasi', 'roti', 'teh', 'kopi', 'ayam', 'ikan', 'daging',
+      'sayur', 'buah', 'noodles', 'rice', 'chicken', 'fish', 'beef', 'vegetables',
+      'fruit', 'bread', 'cake', 'pizza', 'burger', 'sandwich', 'salad', 'soup',
+      // Line item specific terms
+      'item', 'items', 'line item', 'line items', 'product', 'products',
+      'bought', 'purchased', 'ordered', 'ate', 'food', 'drink', 'beverage',
+      // Malaysian food terms
+      'laksa', 'rendang', 'satay', 'char kway teow', 'hokkien mee', 'wan tan mee',
+      'bak kut teh', 'cendol', 'ais kacang', 'rojak', 'popiah', 'dim sum',
+      // Common grocery items
+      'minced', 'oil', 'egg', 'eggs', 'telur', 'minyak', 'garam', 'salt', 'sugar',
+      'gula', 'beras', 'flour', 'tepung', 'susu', 'milk', 'cheese', 'butter',
+      // Common product brands and items (for accuracy fix)
+      'powercat', 'coca cola', 'pepsi', 'sprite', 'fanta', 'nestle', 'maggi',
+      'milo', 'horlicks', 'ovaltine', 'kit kat', 'snickers', 'twix', 'oreo'
+    ];
+
+    const queryLower = query.toLowerCase().trim();
+    console.log('🔍 DEBUG: isLineItemQuery - checking query:', queryLower);
+
+    // Step 1: Check for known indicators
+    const knownIndicatorMatch = lineItemIndicators.some(indicator => {
+      const match = queryLower.includes(indicator.toLowerCase());
+      if (match) {
+        console.log('🔍 DEBUG: isLineItemQuery - FOUND KNOWN INDICATOR:', indicator);
+      }
+      return match;
+    });
+
+    if (knownIndicatorMatch) {
+      console.log('🔍 DEBUG: isLineItemQuery - result: true (known indicator)');
+      return true;
+    }
+
+    // Step 2: Enhanced heuristics for potential product names
+    const potentialProductMatch = this.isPotentialProductName(queryLower);
+    if (potentialProductMatch) {
+      console.log('🔍 DEBUG: isLineItemQuery - FOUND POTENTIAL PRODUCT:', queryLower);
+      console.log('🔍 DEBUG: isLineItemQuery - result: true (potential product)');
+      return true;
+    }
+
+    console.log('🔍 DEBUG: isLineItemQuery - result: false (no match)');
+    return false;
+  }
+
+  /**
+   * Enhanced heuristics to detect potential product names
+   */
+  private isPotentialProductName(query: string): boolean {
+    // Common stop words that are unlikely to be product names
+    const stopWords = [
+      'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+      'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before',
+      'after', 'above', 'below', 'between', 'among', 'this', 'that', 'these',
+      'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
+      'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his',
+      'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself',
+      'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which',
+      'who', 'whom', 'whose', 'this', 'that', 'these', 'those', 'am', 'is',
+      'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+      'having', 'do', 'does', 'did', 'doing', 'will', 'would', 'could',
+      'should', 'may', 'might', 'must', 'can', 'shall', 'receipt', 'receipts',
+      'transaction', 'transactions', 'purchase', 'purchases', 'expense', 'expenses'
+    ];
+
+    // Clean the query
+    const cleanQuery = query.replace(/[^\w\s]/g, '').trim();
+
+    // Heuristic 1: Single word that's not a stop word (like "powercat")
+    const words = cleanQuery.split(/\s+/).filter(word => word.length > 0);
+    if (words.length === 1) {
+      const word = words[0].toLowerCase();
+      if (!stopWords.includes(word) && word.length >= 3 && word.length <= 20) {
+        console.log('🔍 DEBUG: isPotentialProduct - single word heuristic matched:', word);
+        return true;
+      }
+    }
+
+    // Heuristic 2: Two words that could be a brand + product (like "coca cola")
+    if (words.length === 2) {
+      const allWordsValid = words.every(word => {
+        const w = word.toLowerCase();
+        return !stopWords.includes(w) && w.length >= 2 && w.length <= 15;
+      });
+      if (allWordsValid) {
+        console.log('🔍 DEBUG: isPotentialProduct - two word brand heuristic matched:', words.join(' '));
+        return true;
+      }
+    }
+
+    // Heuristic 3: Contains numbers (like "7up", "100plus")
+    if (/\d/.test(cleanQuery) && cleanQuery.length <= 20) {
+      const hasLetters = /[a-zA-Z]/.test(cleanQuery);
+      if (hasLetters) {
+        console.log('🔍 DEBUG: isPotentialProduct - alphanumeric product heuristic matched:', cleanQuery);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
