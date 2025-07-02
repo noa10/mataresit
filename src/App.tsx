@@ -42,7 +42,6 @@ import BlogManagement from "./pages/admin/BlogManagement";
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
-const ModelSelectionTest = lazy(() => import("./pages/ModelSelectionTest").then(m => ({ default: m.ModelSelectionTest })));
 const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
 const UnifiedSearchPage = lazy(() => import("./pages/UnifiedSearchPage"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
@@ -56,22 +55,10 @@ const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const TeamManagement = lazy(() => import("./pages/TeamManagement"));
 const ClaimsManagement = lazy(() => import("./pages/ClaimsManagement"));
 const ClaimDetailsPage = lazy(() => import("./pages/ClaimDetailsPage"));
-const TestClaimDetails = lazy(() => import("./pages/TestClaimDetails"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
-const ClaimsReceiptIntegrationTest = lazy(() => import("./pages/ClaimsReceiptIntegrationTest"));
-const TestInvitation = lazy(() => import("./pages/TestInvitation"));
-const TestInvitationAcceptance = lazy(() => import("./pages/TestInvitationAcceptance"));
-const ProductionInvitationDebug = lazy(() => import("./pages/ProductionInvitationDebug"));
-const DebugSearch = lazy(() => import("./pages/DebugSearch"));
-const TestReRanking = lazy(() => import("./pages/TestReRanking"));
-const TestStructuredData = lazy(() => import("./pages/TestStructuredData"));
-const TestFinancialAnalysis = lazy(() => import("./pages/TestFinancialAnalysis"));
 const UIComponentTest = lazy(() => import("./components/test/UIComponentTest"));
 const CacheTest = lazy(() => import("./components/test/CacheTest"));
-const TestPersonalization = lazy(() => import("./pages/TestPersonalization"));
-const TestAnalytics = lazy(() => import("./pages/TestAnalytics"));
 const PersonalizationIntegrationTest = lazy(() => import("./components/test/PersonalizationIntegrationTest").then(m => ({ default: m.PersonalizationIntegrationTest })));
-const TestPersonalizationIntegration = lazy(() => import("./pages/TestPersonalizationIntegration"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
@@ -190,11 +177,6 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/model-test" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ModelSelectionTest />
-                  </Suspense>
-                } />
                 <Route path="/receipt/:id" element={
                   <Suspense fallback={<PageLoading />}>
                     <ViewReceipt />
@@ -235,51 +217,6 @@ const App = () => (
                     <ClaimDetailsPage />
                   </Suspense>
                 } />
-                <Route path="/test/claim-details" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestClaimDetails />
-                  </Suspense>
-                } />
-                <Route path="/test/claims-receipt-integration" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ClaimsReceiptIntegrationTest />
-                  </Suspense>
-                } />
-                <Route path="/test/invitation" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestInvitation />
-                  </Suspense>
-                } />
-                <Route path="/test/invitation-acceptance" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestInvitationAcceptance />
-                  </Suspense>
-                } />
-                <Route path="/test/production-invitation-debug" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ProductionInvitationDebug />
-                  </Suspense>
-                } />
-                <Route path="/debug/search" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <DebugSearch />
-                  </Suspense>
-                } />
-                <Route path="/test/re-ranking" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestReRanking />
-                  </Suspense>
-                } />
-                <Route path="/test/structured-data" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestStructuredData />
-                  </Suspense>
-                } />
-                <Route path="/test/financial-analysis" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestFinancialAnalysis />
-                  </Suspense>
-                } />
                 <Route path="/test/ui-components" element={
                   <Suspense fallback={<PageLoading />}>
                     <UIComponentTest />
@@ -290,24 +227,9 @@ const App = () => (
                     <CacheTest />
                   </Suspense>
                 } />
-                <Route path="/test/personalization" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestPersonalization />
-                  </Suspense>
-                } />
-                <Route path="/test/analytics" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestAnalytics />
-                  </Suspense>
-                } />
-                <Route path="/test/personalization-integration" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <PersonalizationIntegrationTest />
-                  </Suspense>
-                } />
                 <Route path="/test/integration" element={
                   <Suspense fallback={<PageLoading />}>
-                    <TestPersonalizationIntegration />
+                    <PersonalizationIntegrationTest />
                   </Suspense>
                 } />
 
