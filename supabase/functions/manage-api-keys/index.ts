@@ -20,28 +20,52 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Authenticate user
+    // Get authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return createErrorResponse('Missing authorization header', 401);
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    console.log('Creating Supabase admin client for user validation...');
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Extract JWT token from Authorization header
+    const token = authHeader.replace('Bearer ', '');
+    console.log('JWT token preview:', token.substring(0, 50) + '...');
+
+    // Verify the JWT token using the admin client
+    console.log('Attempting to validate user with JWT token...');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    console.log('Auth result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      authError: authError?.message
+    });
+
+    if (authError || !user) {
+      console.error('Authentication failed:', authError);
+      return createErrorResponse(`Invalid authentication token: ${authError?.message || 'No user found'}`, 401);
+    }
+
+    // Create regular Supabase client for database operations
+    console.log('Creating Supabase client for database operations...');
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
           Authorization: authHeader
         }
+      },
+      auth: {
+        persistSession: false
       }
     });
-
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return createErrorResponse('Invalid authentication token', 401);
-    }
 
     // Route based on HTTP method and path
     const url = new URL(req.url);
@@ -64,7 +88,7 @@ serve(async (req: Request) => {
         return await updateApiKey(supabase, user.id, keyId, req);
       
       case 'DELETE':
-        return await deleteApiKey(supabase, user.id, keyId);
+        return await deleteApiKey(supabase, user.id, req);
       
       default:
         return createErrorResponse('Method not allowed', 405);
@@ -285,8 +309,24 @@ async function updateApiKey(supabase: any, userId: string, keyId: string, req: R
 /**
  * Deletes an API key
  */
-async function deleteApiKey(supabase: any, userId: string, keyId: string) {
+async function deleteApiKey(supabase: any, userId: string, req: Request) {
   try {
+    // Extract keyId from request body
+    const body = await req.json();
+    const { keyId } = body;
+
+    console.log('Delete API key request:', { userId, keyId });
+
+    if (!keyId) {
+      return createErrorResponse('API key ID is required for deletion', 400);
+    }
+
+    // Validate keyId format (should be a UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(keyId)) {
+      return createErrorResponse('Invalid API key ID format', 400);
+    }
+
     const { error } = await supabase
       .from('api_keys')
       .delete()
@@ -298,6 +338,7 @@ async function deleteApiKey(supabase: any, userId: string, keyId: string) {
       return createErrorResponse('Failed to delete API key', 500);
     }
 
+    console.log('API key deleted successfully:', keyId);
     return createSuccessResponse({ message: 'API key deleted successfully' });
 
   } catch (error) {

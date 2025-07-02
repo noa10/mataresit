@@ -6,6 +6,7 @@
     "processing": "Pemprosesan",
     "categories": "Kategori",
     "providers": "Pembekal AI",
+    "apiKeys": "Kunci API",
     "usage": "Statistik Penggunaan",
     "notifications": "Pemberitahuan",
     "billing": "Pengebilan",
@@ -42,28 +43,171 @@
     }
   },
   "apiKeys": {
-    "title": "Konfigurasi Kunci API",
-    "description": "Konfigurasi kunci API anda untuk membolehkan penyedia model AI tambahan",
-    "openrouter": {
-      "title": "Kunci API OpenRouter",
-      "description": "Akses pelbagai penyedia AI melalui API bersatu OpenRouter"
+    "title": "Pengurusan Kunci API",
+    "description": "Cipta dan urus kunci API untuk integrasi luaran dengan API Mataresit",
+    "header": {
+      "title": "Kunci API",
+      "description": "Urus kunci API anda untuk integrasi luaran",
+      "viewReference": "Lihat Rujukan API"
     },
-    "fields": {
-      "apiKey": "Kunci API"
+    "create": {
+      "button": "Cipta Kunci API",
+      "title": "Cipta Kunci API Baharu",
+      "description": "Cipta kunci API baharu untuk integrasi luaran. Pilih skop yang sesuai untuk kes penggunaan anda.",
+      "fields": {
+        "name": "Nama",
+        "nameRequired": "Nama *",
+        "namePlaceholder": "Integrasi Saya",
+        "description": "Penerangan",
+        "descriptionPlaceholder": "Terangkan kegunaan kunci API ini...",
+        "expires": "Tamat Tempoh (Pilihan)",
+        "accessLevel": "Tahap Akses",
+        "permissions": "Kebenaran"
+      },
+      "accessLevels": {
+        "readOnly": "Baca Sahaja",
+        "readWrite": "Baca & Tulis",
+        "admin": "Pentadbir"
+      },
+      "actions": {
+        "cancel": "Batal",
+        "create": "Cipta Kunci API"
+      }
+    },
+    "scopes": {
+      "receipts:read": {
+        "name": "Baca Resit",
+        "description": "Lihat dan senaraikan resit"
+      },
+      "receipts:write": {
+        "name": "Tulis Resit",
+        "description": "Cipta dan kemas kini resit"
+      },
+      "receipts:delete": {
+        "name": "Padam Resit",
+        "description": "Padam resit"
+      },
+      "claims:read": {
+        "name": "Baca Tuntutan",
+        "description": "Lihat dan senaraikan tuntutan"
+      },
+      "claims:write": {
+        "name": "Tulis Tuntutan",
+        "description": "Cipta dan kemas kini tuntutan"
+      },
+      "claims:delete": {
+        "name": "Padam Tuntutan",
+        "description": "Padam tuntutan"
+      },
+      "search:read": {
+        "name": "Carian",
+        "description": "Lakukan carian semantik"
+      },
+      "analytics:read": {
+        "name": "Analitik",
+        "description": "Akses analitik dan laporan"
+      },
+      "teams:read": {
+        "name": "Pasukan",
+        "description": "Akses maklumat pasukan"
+      },
+      "admin:all": {
+        "name": "Akses Pentadbir",
+        "description": "Akses pentadbiran penuh"
+      }
     },
     "status": {
-      "configured": "Dikonfigurasi"
+      "active": "Aktif",
+      "inactive": "Tidak Aktif",
+      "expired": "Tamat Tempoh"
     },
-    "actions": {
-      "getKey": "Dapatkan Kunci",
-      "save": "Simpan Kunci API",
-      "saving": "Menyimpan...",
-      "clear": "Kosongkan Kunci"
+    "list": {
+      "empty": {
+        "title": "Tiada Kunci API",
+        "description": "Cipta kunci API pertama anda untuk mula berintegrasi dengan API Mataresit.",
+        "action": "Cipta Kunci API"
+      },
+      "created": "Dicipta",
+      "lastUsed": "Terakhir digunakan",
+      "requests": "permintaan",
+      "team": "Pasukan"
+    },
+    "success": {
+      "title": "Kunci API Berjaya Dicipta",
+      "description": "Kunci API anda telah dicipta. Salin sekarang kerana ia tidak akan ditunjukkan lagi.",
+      "warning": {
+        "title": "Penting",
+        "description": "Simpan kunci API ini dengan selamat. Ia tidak akan dipaparkan lagi dan memberikan akses kepada data akaun anda."
+      },
+      "actions": {
+        "close": "Tutup"
+      }
+    },
+    "delete": {
+      "title": "Padam Kunci API",
+      "description": "Adakah anda pasti mahu memadam \"{{name}}\"? Tindakan ini tidak boleh dibuat asal dan akan segera membatalkan akses untuk mana-mana aplikasi yang menggunakan kunci ini.",
+      "actions": {
+        "cancel": "Batal",
+        "delete": "Padam"
+      }
+    },
+    "usage": {
+      "title": "Statistik Penggunaan Kunci API",
+      "description": "Statistik penggunaan untuk \"{{name}}\" dalam tempoh 30 hari yang lalu",
+      "loading": "Memuatkan statistik penggunaan...",
+      "stats": {
+        "totalRequests": "Jumlah Permintaan",
+        "successful": "Berjaya",
+        "errors": "Ralat",
+        "avgResponse": "Purata Respons"
+      },
+      "actions": {
+        "close": "Tutup"
+      }
     },
     "notifications": {
-      "saved": "Kunci API berjaya disimpan",
-      "saveFailed": "Gagal menyimpan kunci API",
-      "cleared": "Kunci API telah dikosongkan"
+      "loadFailed": "Gagal memuatkan kunci API",
+      "nameRequired": "Nama kunci API diperlukan",
+      "scopeRequired": "Sekurang-kurangnya satu skop diperlukan",
+      "createSuccess": "Kunci API berjaya dicipta",
+      "createFailed": "Gagal mencipta kunci API",
+      "updateSuccess": "Kunci API berjaya dikemas kini",
+      "updateFailed": "Gagal mengemas kini kunci API",
+      "deleteSuccess": "Kunci API berjaya dipadam",
+      "deleteFailed": "Gagal memadam kunci API",
+      "copied": "Disalin ke papan keratan"
+    },
+    "openrouter": {
+      "title": "Kunci API OpenRouter",
+      "description": "Akses pelbagai penyedia AI melalui API bersatu OpenRouter",
+      "configured": "Dikonfigurasi",
+      "actions": {
+        "getKey": "Dapatkan Kunci",
+        "save": "Simpan Kunci API",
+        "saving": "Menyimpan...",
+        "clear": "Kosongkan Kunci"
+      },
+      "notifications": {
+        "saved": "Kunci API berjaya disimpan",
+        "saveFailed": "Gagal menyimpan kunci API",
+        "cleared": "Kunci API telah dikosongkan"
+      }
+    },
+    "upgrade": {
+      "title": "Pelan Max Diperlukan",
+      "description": "Pengurusan kunci API tersedia secara eksklusif untuk pelanggan pelan Max. Cipta dan urus kunci API untuk berintegrasi dengan aplikasi dan perkhidmatan luaran.",
+      "currentPlan": "Pelan Semasa: {{tier}}",
+      "features": {
+        "unlimitedKeys": "Cipta kunci API tanpa had",
+        "fullAccess": "Akses API penuh ke semua endpoint",
+        "analytics": "Analitik penggunaan lanjutan",
+        "support": "Sokongan keutamaan untuk integrasi"
+      },
+      "actions": {
+        "upgrade": "Naik Taraf ke Pelan Max",
+        "viewDocs": "Lihat Dokumentasi API",
+        "compare": "Bandingkan Pelan"
+      }
     }
   },
   "usage": {

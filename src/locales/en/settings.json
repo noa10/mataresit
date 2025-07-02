@@ -6,6 +6,7 @@
     "processing": "Processing",
     "categories": "Categories",
     "providers": "AI Providers",
+    "apiKeys": "API Keys",
     "usage": "Usage Stats",
     "notifications": "Notifications",
     "billing": "Billing",
@@ -42,28 +43,171 @@
     }
   },
   "apiKeys": {
-    "title": "API Key Configuration",
-    "description": "Configure your API keys to enable additional AI model providers",
-    "openrouter": {
-      "title": "OpenRouter API Key",
-      "description": "Access multiple AI providers through OpenRouter's unified API"
+    "title": "API Key Management",
+    "description": "Create and manage API keys for external integrations with the Mataresit API",
+    "header": {
+      "title": "API Keys",
+      "description": "Manage your API keys for external integrations",
+      "viewReference": "View API Reference"
     },
-    "fields": {
-      "apiKey": "API Key"
+    "create": {
+      "button": "Create API Key",
+      "title": "Create New API Key",
+      "description": "Create a new API key for external integrations. Choose the appropriate scopes for your use case.",
+      "fields": {
+        "name": "Name",
+        "nameRequired": "Name *",
+        "namePlaceholder": "My Integration",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe what this API key will be used for...",
+        "expires": "Expires (Optional)",
+        "accessLevel": "Access Level",
+        "permissions": "Permissions"
+      },
+      "accessLevels": {
+        "readOnly": "Read Only",
+        "readWrite": "Read & Write",
+        "admin": "Admin"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "create": "Create API Key"
+      }
+    },
+    "scopes": {
+      "receipts:read": {
+        "name": "Read Receipts",
+        "description": "View and list receipts"
+      },
+      "receipts:write": {
+        "name": "Write Receipts",
+        "description": "Create and update receipts"
+      },
+      "receipts:delete": {
+        "name": "Delete Receipts",
+        "description": "Delete receipts"
+      },
+      "claims:read": {
+        "name": "Read Claims",
+        "description": "View and list claims"
+      },
+      "claims:write": {
+        "name": "Write Claims",
+        "description": "Create and update claims"
+      },
+      "claims:delete": {
+        "name": "Delete Claims",
+        "description": "Delete claims"
+      },
+      "search:read": {
+        "name": "Search",
+        "description": "Perform semantic searches"
+      },
+      "analytics:read": {
+        "name": "Analytics",
+        "description": "Access analytics and reports"
+      },
+      "teams:read": {
+        "name": "Teams",
+        "description": "Access team information"
+      },
+      "admin:all": {
+        "name": "Admin Access",
+        "description": "Full administrative access"
+      }
     },
     "status": {
-      "configured": "Configured"
+      "active": "Active",
+      "inactive": "Inactive",
+      "expired": "Expired"
     },
-    "actions": {
-      "getKey": "Get Key",
-      "save": "Save API Key",
-      "saving": "Saving...",
-      "clear": "Clear Key"
+    "list": {
+      "empty": {
+        "title": "No API Keys",
+        "description": "Create your first API key to start integrating with the Mataresit API.",
+        "action": "Create API Key"
+      },
+      "created": "Created",
+      "lastUsed": "Last used",
+      "requests": "requests",
+      "team": "Team"
+    },
+    "success": {
+      "title": "API Key Created Successfully",
+      "description": "Your API key has been created. Copy it now as it won't be shown again.",
+      "warning": {
+        "title": "Important",
+        "description": "Store this API key securely. It won't be displayed again and provides access to your account data."
+      },
+      "actions": {
+        "close": "Close"
+      }
+    },
+    "delete": {
+      "title": "Delete API Key",
+      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone and will immediately revoke access for any applications using this key.",
+      "actions": {
+        "cancel": "Cancel",
+        "delete": "Delete"
+      }
+    },
+    "usage": {
+      "title": "API Key Usage Statistics",
+      "description": "Usage statistics for \"{{name}}\" over the last 30 days",
+      "loading": "Loading usage statistics...",
+      "stats": {
+        "totalRequests": "Total Requests",
+        "successful": "Successful",
+        "errors": "Errors",
+        "avgResponse": "Avg Response"
+      },
+      "actions": {
+        "close": "Close"
+      }
     },
     "notifications": {
-      "saved": "API key saved successfully",
-      "saveFailed": "Failed to save API key",
-      "cleared": "API key cleared"
+      "loadFailed": "Failed to load API keys",
+      "nameRequired": "API key name is required",
+      "scopeRequired": "At least one scope is required",
+      "createSuccess": "API key created successfully",
+      "createFailed": "Failed to create API key",
+      "updateSuccess": "API key updated successfully",
+      "updateFailed": "Failed to update API key",
+      "deleteSuccess": "API key deleted successfully",
+      "deleteFailed": "Failed to delete API key",
+      "copied": "Copied to clipboard"
+    },
+    "openrouter": {
+      "title": "OpenRouter API Key",
+      "description": "Access multiple AI providers through OpenRouter's unified API",
+      "configured": "Configured",
+      "actions": {
+        "getKey": "Get Key",
+        "save": "Save API Key",
+        "saving": "Saving...",
+        "clear": "Clear Key"
+      },
+      "notifications": {
+        "saved": "API key saved successfully",
+        "saveFailed": "Failed to save API key",
+        "cleared": "API key cleared"
+      }
+    },
+    "upgrade": {
+      "title": "Max Plan Required",
+      "description": "API key management is available exclusively for Max plan subscribers. Create and manage API keys to integrate with external applications and services.",
+      "currentPlan": "Current Plan: {{tier}}",
+      "features": {
+        "unlimitedKeys": "Create unlimited API keys",
+        "fullAccess": "Full API access to all endpoints",
+        "analytics": "Advanced usage analytics",
+        "support": "Priority support for integrations"
+      },
+      "actions": {
+        "upgrade": "Upgrade to Max Plan",
+        "viewDocs": "View API Documentation",
+        "compare": "Compare Plans"
+      }
     }
   },
   "usage": {
