@@ -5,12 +5,17 @@ import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingO
 import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
 
 import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
+import ApiKeyManagement from "@/components/dashboard/ApiKeyManagement";
 import { useSettings } from "@/hooks/useSettings";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useSettingsTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { CategoryManager } from "@/components/categories/CategoryManager";
+import { CompactSubscriptionLimitError } from "@/components/SubscriptionLimitError";
+import { Link } from "react-router-dom";
+import { Crown, Key, Zap, ArrowRight } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -45,10 +50,113 @@ const UsageStatsPanel = () => {
   );
 };
 
+// API Access Upgrade Prompt Component
+const ApiAccessUpgradePrompt = () => {
+  const { t } = useSettingsTranslation();
+  const { getCurrentTier } = useSubscription();
+  const currentTier = getCurrentTier();
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Key className="h-5 w-5 text-purple-600" />
+          </div>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              {t('apiKeys.title')}
+              <Crown className="h-4 w-4 text-purple-500" />
+            </CardTitle>
+            <CardDescription>
+              {t('apiKeys.description')}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 relative overflow-hidden">
+          {/* Decorative background pattern */}
+          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-100 rounded-full -translate-y-10 translate-x-10 opacity-50"></div>
+          <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-100 rounded-full translate-y-8 -translate-x-8 opacity-50"></div>
+          <div className="flex items-start gap-3">
+            <Crown className="h-5 w-5 text-purple-600 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-medium text-purple-900 mb-2">
+                {t('apiKeys.upgrade.title', { defaultValue: 'Max Plan Required' })}
+              </h4>
+              <p className="text-sm text-purple-700 mb-3">
+                {t('apiKeys.upgrade.description', {
+                  defaultValue: 'API key management is available exclusively for Max plan subscribers. Create and manage API keys to integrate with external applications and services.'
+                })}
+              </p>
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center gap-2 text-sm text-purple-700">
+                  <ArrowRight className="h-3 w-3" />
+                  <span>{t('apiKeys.upgrade.features.unlimitedKeys', { defaultValue: 'Create unlimited API keys' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-purple-700">
+                  <ArrowRight className="h-3 w-3" />
+                  <span>{t('apiKeys.upgrade.features.fullAccess', { defaultValue: 'Full API access to all endpoints' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-purple-700">
+                  <ArrowRight className="h-3 w-3" />
+                  <span>{t('apiKeys.upgrade.features.analytics', { defaultValue: 'Advanced usage analytics' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-purple-700">
+                  <ArrowRight className="h-3 w-3" />
+                  <span>{t('apiKeys.upgrade.features.support', { defaultValue: 'Priority support for integrations' })}</span>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button asChild className="flex-1">
+                  <Link to="/pricing">
+                    <Crown className="h-4 w-4 mr-2" />
+                    {t('apiKeys.upgrade.actions.upgrade', { defaultValue: 'Upgrade to Max Plan' })}
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild className="flex-1">
+                  <Link to="/api-reference">
+                    {t('apiKeys.upgrade.actions.viewDocs', { defaultValue: 'View API Documentation' })}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Plan Info */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">
+                {t('apiKeys.upgrade.currentPlan', {
+                  defaultValue: 'Current Plan: {{tier}}',
+                  tier: currentTier.charAt(0).toUpperCase() + currentTier.slice(1)
+                })}
+              </span>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/pricing" className="text-purple-600 hover:text-purple-700">
+                {t('apiKeys.upgrade.actions.compare', { defaultValue: 'Compare Plans' })}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function SettingsPage() {
   const { settings, updateSettings, resetSettings } = useSettings();
+  const { isFeatureAvailable } = useSubscription();
   const { t } = useSettingsTranslation();
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+
+  // Check if user has access to API features
+  const hasApiAccess = isFeatureAvailable('api_access');
 
   const handleResetConfirm = () => {
     resetSettings();
@@ -68,10 +176,19 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="processing" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8 max-w-lg">
+            <TabsList className="grid w-full mb-8 max-w-2xl grid-cols-5">
               <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
               <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>
               <TabsTrigger value="providers">{t('tabs.providers')}</TabsTrigger>
+              <TabsTrigger
+                value="api-keys"
+                className={`relative ${!hasApiAccess ? 'text-purple-600 data-[state=active]:text-purple-700' : ''}`}
+              >
+                {t('tabs.apiKeys')}
+                {!hasApiAccess && (
+                  <Crown className="h-3 w-3 ml-1 text-purple-500" />
+                )}
+              </TabsTrigger>
               <TabsTrigger value="usage">{t('tabs.usage')}</TabsTrigger>
             </TabsList>
 
@@ -175,21 +292,19 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="categories">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('categories.title')}</CardTitle>
-                <CardDescription>
-                  {t('categories.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CategoryManager />
-              </CardContent>
-            </Card>
+            <CategoryManager />
           </TabsContent>
 
           <TabsContent value="providers" className="space-y-6">
             <ModelProviderStatus />
+          </TabsContent>
+
+          <TabsContent value="api-keys">
+            {hasApiAccess ? (
+              <ApiKeyManagement />
+            ) : (
+              <ApiAccessUpgradePrompt />
+            )}
           </TabsContent>
 
           <TabsContent value="usage">
