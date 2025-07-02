@@ -249,7 +249,22 @@ async function getApiKey(supabase: any, userId: string, keyId: string) {
 async function updateApiKey(supabase: any, userId: string, keyId: string, req: Request) {
   try {
     const body = await req.json();
-    const { name, description, scopes, isActive, expiresAt } = body;
+    const { keyId: bodyKeyId, name, description, scopes, isActive, expiresAt } = body;
+
+    // Use keyId from body if provided, otherwise use keyId from URL path
+    const actualKeyId = bodyKeyId || keyId;
+
+    console.log('Update API key request:', { userId, urlKeyId: keyId, bodyKeyId, actualKeyId });
+
+    if (!actualKeyId) {
+      return createErrorResponse('API key ID is required for update', 400);
+    }
+
+    // Validate keyId format (should be a UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(actualKeyId)) {
+      return createErrorResponse('Invalid API key ID format', 400);
+    }
 
     const updates: any = {};
 
@@ -286,18 +301,26 @@ async function updateApiKey(supabase: any, userId: string, keyId: string, req: R
       return createErrorResponse('No valid fields to update', 400);
     }
 
+    console.log('Updating API key with:', { actualKeyId, updates });
+
     const { data, error } = await supabase
       .from('api_keys')
       .update(updates)
-      .eq('id', keyId)
+      .eq('id', actualKeyId)
       .eq('user_id', userId)
       .select('id, name, description, scopes, is_active, expires_at')
       .single();
 
-    if (error || !data) {
-      return createErrorResponse('API key not found or update failed', 404);
+    if (error) {
+      console.error('Database error updating API key:', error);
+      return createErrorResponse('Failed to update API key', 500);
     }
 
+    if (!data) {
+      return createErrorResponse('API key not found', 404);
+    }
+
+    console.log('API key updated successfully:', data);
     return createSuccessResponse(data);
 
   } catch (error) {

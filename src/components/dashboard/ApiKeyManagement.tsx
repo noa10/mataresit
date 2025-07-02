@@ -204,14 +204,22 @@ export default function ApiKeyManagement() {
 
   const updateApiKey = async (keyId: string, updates: Partial<ApiKey>) => {
     try {
+      console.log('Updating API key:', { keyId, updates });
+
       const response = await supabase.functions.invoke('manage-api-keys', {
         method: 'PUT',
-        body: updates
+        body: {
+          keyId,
+          ...updates
+        }
       });
 
       if (response.error) {
+        console.error('API key update error:', response.error);
         throw new Error(response.error.message);
       }
+
+      console.log('API key update response:', response.data);
 
       setApiKeys(prev => prev.map(key =>
         key.id === keyId ? { ...key, ...updates } : key
