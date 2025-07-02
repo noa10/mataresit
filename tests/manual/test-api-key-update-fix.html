@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Update Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #17a2b8;
+            background: #d1ecf1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .loading {
+            color: #ffc107;
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .api-key-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .toggle-button {
+            background: #28a745;
+            margin-left: 10px;
+        }
+        .toggle-button.inactive {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 API Key Update Fix Test</h1>
+        <p>This test verifies that the API key update functionality (eye button) works correctly after the fix.</p>
+        
+        <div class="info">
+            <strong>Test Scenario:</strong> Load API keys and test the toggle active/inactive functionality (eye button).
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🔑 API Key Management Test</h2>
+        
+        <button class="button" onclick="loadApiKeys()">Load API Keys</button>
+        <button class="button" onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+        <div id="apiKeysList"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+
+        function showResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('apiKeysList').innerHTML = '';
+        }
+
+        async function callApiKeyFunction(method, path = '', body = null) {
+            const url = `${SUPABASE_URL}/functions/v1/manage-api-keys${path}?t=${Date.now()}`;
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                credentials: 'omit',
+                mode: 'cors'
+            };
+
+            if (body && method !== 'GET') {
+                options.body = JSON.stringify(body);
+            }
+
+            console.log('Calling API:', { url, method, body });
+
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function loadApiKeys() {
+            try {
+                showResult('🔄 Loading API keys...', 'loading');
+                
+                const result = await callApiKeyFunction('GET');
+                
+                if (result.success && result.data && result.data.apiKeys) {
+                    const apiKeys = result.data.apiKeys;
+                    showResult(`✅ Loaded ${apiKeys.length} API keys successfully`, 'success');
+                    
+                    displayApiKeys(apiKeys);
+                } else {
+                    showResult('❌ No API keys found or invalid response format', 'error');
+                    console.log('Full response:', result);
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error loading API keys: ${error.message}`, 'error');
+                console.error('Load error:', error);
+            }
+        }
+
+        function displayApiKeys(apiKeys) {
+            const listDiv = document.getElementById('apiKeysList');
+            listDiv.innerHTML = '<h3>📋 API Keys List</h3>';
+            
+            if (apiKeys.length === 0) {
+                listDiv.innerHTML += '<p>No API keys found.</p>';
+                return;
+            }
+            
+            apiKeys.forEach(key => {
+                const keyDiv = document.createElement('div');
+                keyDiv.className = 'api-key-item';
+                keyDiv.innerHTML = `
+                    <div>
+                        <strong>${key.name}</strong> 
+                        <span style="color: ${key.is_active ? '#28a745' : '#dc3545'};">
+                            ${key.is_active ? '🟢 Active' : '🔴 Inactive'}
+                        </span>
+                        <button class="button toggle-button ${key.is_active ? '' : 'inactive'}" 
+                                onclick="toggleApiKey('${key.id}', ${!key.is_active})">
+                            ${key.is_active ? '👁️ Deactivate' : '👁️‍🗨️ Activate'}
+                        </button>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <small>ID: ${key.id}</small><br>
+                        <small>Prefix: ${key.key_prefix}</small><br>
+                        <small>Scopes: ${key.scopes.join(', ')}</small><br>
+                        <small>Created: ${new Date(key.created_at).toLocaleString()}</small>
+                    </div>
+                `;
+                listDiv.appendChild(keyDiv);
+            });
+        }
+
+        async function toggleApiKey(keyId, newActiveState) {
+            try {
+                showResult(`🔄 ${newActiveState ? 'Activating' : 'Deactivating'} API key...`, 'loading');
+                
+                const result = await callApiKeyFunction('PUT', '', {
+                    keyId: keyId,
+                    isActive: newActiveState
+                });
+                
+                if (result.success) {
+                    showResult(`✅ API key ${newActiveState ? 'activated' : 'deactivated'} successfully`, 'success');
+                    
+                    // Reload the API keys to show updated status
+                    setTimeout(() => loadApiKeys(), 1000);
+                } else {
+                    showResult(`❌ Failed to update API key: ${result.error || 'Unknown error'}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult(`❌ Error updating API key: ${error.message}`, 'error');
+                console.error('Toggle error:', error);
+            }
+        }
+
+        // Auto-load API keys when page loads
+        window.addEventListener('load', () => {
+            showResult('🚀 API Key Update Fix Test loaded. Click "Load API Keys" to start testing.', 'info');
+        });
+    </script>
+</body>
+</html>
