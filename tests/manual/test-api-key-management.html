@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Management Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .loading {
+            color: #6c757d;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 API Key Management Test Suite</h1>
+        <p>Test the complete API key management workflow including Edge Function and UI integration.</p>
+        
+        <div class="test-section">
+            <h3>📋 1. List API Keys</h3>
+            <p>Test the GET endpoint to list all API keys for the authenticated user.</p>
+            <button onclick="testListApiKeys()">List API Keys</button>
+            <div id="listResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>➕ 2. Create API Key</h3>
+            <p>Test the POST endpoint to create a new API key.</p>
+            
+            <div class="form-group">
+                <label for="keyName">API Key Name:</label>
+                <input type="text" id="keyName" value="Test Integration Key" placeholder="Enter API key name">
+            </div>
+            
+            <div class="form-group">
+                <label for="keyDescription">Description:</label>
+                <textarea id="keyDescription" rows="3" placeholder="Describe what this API key will be used for...">Test API key created during integration testing</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="keyExpires">Expires At (Optional):</label>
+                <input type="datetime-local" id="keyExpires">
+            </div>
+            
+            <div class="form-group">
+                <label>Scopes:</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="scope-receipts-read" value="receipts:read" checked>
+                        <label for="scope-receipts-read">Read Receipts</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="scope-receipts-write" value="receipts:write">
+                        <label for="scope-receipts-write">Write Receipts</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="scope-claims-read" value="claims:read" checked>
+                        <label for="scope-claims-read">Read Claims</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="scope-search-read" value="search:read" checked>
+                        <label for="scope-search-read">Search</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="scope-analytics-read" value="analytics:read">
+                        <label for="scope-analytics-read">Analytics</label>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="testCreateApiKey()">Create API Key</button>
+            <div id="createResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>✏️ 3. Update API Key</h3>
+            <p>Test the PUT endpoint to update an existing API key.</p>
+            
+            <div class="form-group">
+                <label for="updateKeyId">API Key ID:</label>
+                <input type="text" id="updateKeyId" placeholder="Enter API key ID to update">
+            </div>
+            
+            <div class="form-group">
+                <label for="updateKeyName">New Name:</label>
+                <input type="text" id="updateKeyName" value="Updated Test Key" placeholder="Enter new name">
+            </div>
+            
+            <button onclick="testUpdateApiKey()">Update API Key</button>
+            <div id="updateResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🗑️ 4. Delete API Key</h3>
+            <p>Test the DELETE endpoint to remove an API key.</p>
+            
+            <div class="form-group">
+                <label for="deleteKeyId">API Key ID:</label>
+                <input type="text" id="deleteKeyId" placeholder="Enter API key ID to delete">
+            </div>
+            
+            <button onclick="testDeleteApiKey()" style="background: #dc3545;">Delete API Key</button>
+            <div id="deleteResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 5. Complete Workflow Test</h3>
+            <p>Run a complete test: Create → List → Update → Delete</p>
+            <button onclick="testCompleteWorkflow()">Run Complete Test</button>
+            <div id="workflowResults" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+
+        // Global variables to store test data
+        let createdApiKeyId = null;
+        let createdApiKey = null;
+
+        // Utility functions
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const colorClass = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            element.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function clearResults(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function callApiKeyFunction(method, path = '', body = null) {
+            const url = `${SUPABASE_URL}/functions/v1/manage-api-keys${path}?t=${Date.now()}`;
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                credentials: 'omit',
+                mode: 'cors'
+            };
+
+            if (body && method !== 'GET') {
+                options.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            return await response.json();
+        }
+
+        function getSelectedScopes() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="scope-"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // Test functions
+        async function testListApiKeys() {
+            clearResults('listResults');
+            log('listResults', '🔍 Testing List API Keys...', 'info');
+            
+            try {
+                const result = await callApiKeyFunction('GET');
+                log('listResults', `✅ Success! Found ${result.data.total} API keys`, 'success');
+                log('listResults', `Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                
+                // Store first API key ID for update/delete tests
+                if (result.data.apiKeys && result.data.apiKeys.length > 0) {
+                    const firstKey = result.data.apiKeys[0];
+                    document.getElementById('updateKeyId').value = firstKey.id;
+                    document.getElementById('deleteKeyId').value = firstKey.id;
+                    log('listResults', `💡 Auto-filled update/delete forms with first API key: ${firstKey.id}`, 'info');
+                }
+                
+            } catch (error) {
+                log('listResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateApiKey() {
+            clearResults('createResults');
+            log('createResults', '➕ Testing Create API Key...', 'info');
+            
+            try {
+                const name = document.getElementById('keyName').value;
+                const description = document.getElementById('keyDescription').value;
+                const expiresAt = document.getElementById('keyExpires').value;
+                const scopes = getSelectedScopes();
+                
+                if (!name.trim()) {
+                    throw new Error('API key name is required');
+                }
+                
+                if (scopes.length === 0) {
+                    throw new Error('At least one scope must be selected');
+                }
+                
+                const body = {
+                    name: name.trim(),
+                    description: description.trim() || null,
+                    scopes,
+                    expiresAt: expiresAt || null
+                };
+                
+                log('createResults', `📤 Request: ${JSON.stringify(body, null, 2)}`, 'info');
+                
+                const result = await callApiKeyFunction('POST', '', body);
+                
+                // Store created API key data
+                createdApiKeyId = result.data.id;
+                createdApiKey = result.data.apiKey;
+                
+                log('createResults', `✅ Success! Created API key: ${result.data.id}`, 'success');
+                log('createResults', `🔑 API Key: ${result.data.apiKey}`, 'warning');
+                log('createResults', `📋 Key Prefix: ${result.data.keyPrefix}`, 'info');
+                log('createResults', `Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                
+                // Auto-fill update/delete forms
+                document.getElementById('updateKeyId').value = result.data.id;
+                document.getElementById('deleteKeyId').value = result.data.id;
+                
+            } catch (error) {
+                log('createResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUpdateApiKey() {
+            clearResults('updateResults');
+            log('updateResults', '✏️ Testing Update API Key...', 'info');
+            
+            try {
+                const keyId = document.getElementById('updateKeyId').value;
+                const newName = document.getElementById('updateKeyName').value;
+                
+                if (!keyId.trim()) {
+                    throw new Error('API key ID is required');
+                }
+                
+                if (!newName.trim()) {
+                    throw new Error('New name is required');
+                }
+                
+                const body = {
+                    name: newName.trim(),
+                    description: 'Updated during integration testing'
+                };
+                
+                log('updateResults', `📤 Request: ${JSON.stringify(body, null, 2)}`, 'info');
+                
+                const result = await callApiKeyFunction('PUT', `/${keyId}`, body);
+                log('updateResults', `✅ Success! Updated API key: ${keyId}`, 'success');
+                log('updateResults', `Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                
+            } catch (error) {
+                log('updateResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDeleteApiKey() {
+            clearResults('deleteResults');
+            log('deleteResults', '🗑️ Testing Delete API Key...', 'info');
+            
+            try {
+                const keyId = document.getElementById('deleteKeyId').value;
+                
+                if (!keyId.trim()) {
+                    throw new Error('API key ID is required');
+                }
+                
+                const result = await callApiKeyFunction('DELETE', `/${keyId}`);
+                log('deleteResults', `✅ Success! Deleted API key: ${keyId}`, 'success');
+                log('deleteResults', `Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                
+            } catch (error) {
+                log('deleteResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCompleteWorkflow() {
+            clearResults('workflowResults');
+            log('workflowResults', '🔄 Starting Complete Workflow Test...', 'info');
+            
+            try {
+                // Step 1: Create API Key
+                log('workflowResults', '\n📝 Step 1: Creating API Key...', 'info');
+                const createBody = {
+                    name: 'Workflow Test Key',
+                    description: 'Created during complete workflow test',
+                    scopes: ['receipts:read', 'search:read']
+                };
+                
+                const createResult = await callApiKeyFunction('POST', '', createBody);
+                const testKeyId = createResult.data.id;
+                log('workflowResults', `✅ Created API key: ${testKeyId}`, 'success');
+                
+                // Step 2: List API Keys
+                log('workflowResults', '\n📋 Step 2: Listing API Keys...', 'info');
+                const listResult = await callApiKeyFunction('GET');
+                log('workflowResults', `✅ Listed ${listResult.data.total} API keys`, 'success');
+                
+                // Step 3: Update API Key
+                log('workflowResults', '\n✏️ Step 3: Updating API Key...', 'info');
+                const updateBody = {
+                    name: 'Updated Workflow Test Key',
+                    description: 'Updated during complete workflow test'
+                };
+                
+                const updateResult = await callApiKeyFunction('PUT', `/${testKeyId}`, updateBody);
+                log('workflowResults', `✅ Updated API key: ${testKeyId}`, 'success');
+                
+                // Step 4: Delete API Key
+                log('workflowResults', '\n🗑️ Step 4: Deleting API Key...', 'info');
+                const deleteResult = await callApiKeyFunction('DELETE', `/${testKeyId}`);
+                log('workflowResults', `✅ Deleted API key: ${testKeyId}`, 'success');
+                
+                log('workflowResults', '\n🎉 Complete workflow test successful!', 'success');
+                
+            } catch (error) {
+                log('workflowResults', `❌ Workflow test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔑 API Key Management Test Suite loaded');
+            
+            // Set default expiration to 1 hour from now
+            const oneHourFromNow = new Date();
+            oneHourFromNow.setHours(oneHourFromNow.getHours() + 1);
+            document.getElementById('keyExpires').value = oneHourFromNow.toISOString().slice(0, 16);
+        });
+    </script>
+</body>
+</html>

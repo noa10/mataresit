@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API Key Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test API Key Creation</h1>
+        <p>This tool tests the manage-api-keys Edge Function directly.</p>
+        
+        <div class="form-group">
+            <label for="name">API Key Name:</label>
+            <input type="text" id="name" value="test-key-" placeholder="Enter API key name">
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" placeholder="Enter description">Test API key for debugging</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="scopes">Scopes (comma-separated):</label>
+            <input type="text" id="scopes" value="receipts:read,receipts:write" placeholder="receipts:read,receipts:write">
+        </div>
+        
+        <button onclick="testCreateApiKey()">Create API Key</button>
+        <button onclick="testListApiKeys()">List API Keys</button>
+        <button onclick="testDeleteApiKey()">Delete Last API Key</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client
+        const SUPABASE_URL = 'https://mpmkbtsufihzdelrlszs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            
+            if (!resultDiv.textContent) {
+                resultDiv.className = `result ${type}`;
+                resultDiv.textContent = logEntry;
+            } else {
+                resultDiv.textContent += logEntry;
+            }
+            
+            console.log(message);
+        }
+        
+        function clearResults() {
+            document.getElementById('result').textContent = '';
+        }
+        
+        async function checkAuth() {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error || !session) {
+                log('❌ Not authenticated. Please log in first.', 'error');
+                return false;
+            }
+            log(`✅ Authenticated as: ${session.user.email}`, 'success');
+            return true;
+        }
+        
+        async function testCreateApiKey() {
+            clearResults();
+            log('🧪 Testing API Key Creation...', 'info');
+            
+            if (!(await checkAuth())) {
+                return;
+            }
+            
+            try {
+                const name = document.getElementById('name').value + Date.now();
+                const description = document.getElementById('description').value;
+                const scopesText = document.getElementById('scopes').value;
+                const scopes = scopesText.split(',').map(s => s.trim()).filter(s => s);
+                
+                log(`📝 Creating API key with name: ${name}`, 'info');
+                log(`📝 Scopes: ${scopes.join(', ')}`, 'info');
+                
+                const response = await supabase.functions.invoke('manage-api-keys', {
+                    body: {
+                        name,
+                        description,
+                        scopes,
+                        expiresAt: null,
+                        teamId: null
+                    }
+                });
+                
+                if (response.error) {
+                    log(`❌ Error: ${response.error.message}`, 'error');
+                    log(`📝 Full error: ${JSON.stringify(response.error, null, 2)}`, 'error');
+                } else {
+                    log('✅ API Key created successfully!', 'success');
+                    log(`📝 Response: ${JSON.stringify(response.data, null, 2)}`, 'success');
+                }
+                
+            } catch (error) {
+                log(`❌ Exception: ${error.message}`, 'error');
+                log(`📝 Stack: ${error.stack}`, 'error');
+            }
+        }
+        
+        async function testListApiKeys() {
+            clearResults();
+            log('🧪 Testing API Key Listing...', 'info');
+
+            if (!(await checkAuth())) {
+                return;
+            }
+
+            try {
+                const response = await supabase.functions.invoke('manage-api-keys', {
+                    body: null
+                });
+
+                if (response.error) {
+                    log(`❌ Error: ${response.error.message}`, 'error');
+                    log(`📝 Full error: ${JSON.stringify(response.error, null, 2)}`, 'error');
+                } else {
+                    log('✅ API Keys listed successfully!', 'success');
+                    log(`📝 Response: ${JSON.stringify(response.data, null, 2)}`, 'success');
+
+                    // Store the API keys for deletion testing
+                    window.lastApiKeys = response.data?.data?.apiKeys || [];
+                }
+
+            } catch (error) {
+                log(`❌ Exception: ${error.message}`, 'error');
+                log(`📝 Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        async function testDeleteApiKey() {
+            clearResults();
+            log('🧪 Testing API Key Deletion...', 'info');
+
+            if (!(await checkAuth())) {
+                return;
+            }
+
+            try {
+                // Get the last API key from the stored list
+                const apiKeys = window.lastApiKeys || [];
+                if (apiKeys.length === 0) {
+                    log('❌ No API keys found. Please list API keys first.', 'error');
+                    return;
+                }
+
+                const lastApiKey = apiKeys[apiKeys.length - 1];
+                log(`📝 Deleting API key: ${lastApiKey.name} (${lastApiKey.id})`, 'info');
+
+                const response = await supabase.functions.invoke('manage-api-keys', {
+                    method: 'DELETE',
+                    body: {
+                        keyId: lastApiKey.id
+                    }
+                });
+
+                if (response.error) {
+                    log(`❌ Error: ${response.error.message}`, 'error');
+                    log(`📝 Full error: ${JSON.stringify(response.error, null, 2)}`, 'error');
+                } else {
+                    log('✅ API Key deleted successfully!', 'success');
+                    log(`📝 Response: ${JSON.stringify(response.data, null, 2)}`, 'success');
+                }
+
+            } catch (error) {
+                log(`❌ Exception: ${error.message}`, 'error');
+                log(`📝 Stack: ${error.stack}`, 'error');
+            }
+        }
+        
+        // Auto-check auth on page load
+        window.addEventListener('load', async () => {
+            log('🔍 Checking authentication status...', 'info');
+            await checkAuth();
+        });
+    </script>
+</body>
+</html>
