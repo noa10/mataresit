@@ -432,9 +432,10 @@ async function createClaim(req: Request, context: ApiContext): Promise<Response>
       return createErrorResponse(`Priority must be one of: ${validPriorities.join(', ')}`, 400);
     }
 
-    // Use the database function to create claim
-    const { data: claimId, error } = await context.supabase.rpc('create_claim', {
+    // Use the database function to create claim with explicit user ID for API context
+    const { data: claimId, error } = await context.supabase.rpc('create_claim_with_user_id', {
       _team_id: teamId,
+      _user_id: context.userId,
       _title: title.trim(),
       _description: description?.trim() || null,
       _amount: amount,

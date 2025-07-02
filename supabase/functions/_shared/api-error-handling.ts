@@ -324,11 +324,14 @@ export const FieldValidators = {
   }
 };
 
+// Export alias for backward compatibility
+export const validators = FieldValidators;
+
 /**
  * Validates a UUID and returns an error response if invalid
  */
 export function validateUUID(value: string, fieldName: string): Response | null {
-  const error = validators.uuid(value);
+  const error = FieldValidators.uuid(value);
   if (error) {
     return new Response(
       JSON.stringify({
