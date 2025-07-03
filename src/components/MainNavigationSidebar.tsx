@@ -44,89 +44,42 @@ export function MainNavigationSidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Manage body scroll state for mobile sidebar
-  useEffect(() => {
-    if (!isDesktop) {
-      if (isOpen) {
-        document.body.classList.add('sidebar-open');
-      } else {
-        document.body.classList.remove('sidebar-open');
-      }
-    } else {
-      // Always remove the class on desktop
-      document.body.classList.remove('sidebar-open');
-    }
-
-    // Cleanup on unmount
-    return () => {
-      document.body.classList.remove('sidebar-open');
-    };
-  }, [isOpen, isDesktop]);
-
   const handleItemClick = () => {
-    // Close sidebar on mobile after clicking a link
-    if (!isDesktop) {
-      onToggle();
-    }
+    // No special mobile handling needed since sidebar is desktop-only
   };
 
-  // Enhanced focus management when sidebar opens/closes
-  useEffect(() => {
-    if (isOpen && !isDesktop) {
-      // When opening sidebar on mobile, focus the first interactive element
-      setTimeout(() => {
-        const sidebar = document.getElementById('main-navigation-sidebar');
-        const firstFocusable = sidebar?.querySelector('button, a, [tabindex]:not([tabindex="-1"])') as HTMLElement;
-        firstFocusable?.focus();
-      }, 300);
-    }
-  }, [isOpen, isDesktop]);
+  // Hide sidebar completely on mobile devices (< lg breakpoint)
+  if (!isDesktop) {
+    return null;
+  }
 
   return (
-    <>
-      {/* Mobile Overlay */}
-      {isOpen && !isDesktop && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 backdrop-blur-sm animate-in fade-in duration-300"
-          onClick={onToggle}
-          aria-label="Close sidebar overlay"
-        />
+    <div
+      id="main-navigation-sidebar"
+      role="navigation"
+      aria-label="Main navigation"
+      {...sidebarProps}
+      className={cn(
+        "h-full bg-background border-r border-border",
+        "transition-all duration-300 ease-in-out",
+        // Desktop behavior: always visible but can be collapsed
+        "relative flex-shrink-0",
+        isOpen ? "w-64" : "w-16",
+        className
       )}
-
-      {/* Sidebar */}
-      <div
-        id="main-navigation-sidebar"
-        role="navigation"
-        aria-label="Main navigation"
-        {...sidebarProps}
-        className={cn(
-          "h-full bg-background border-r border-border",
-          "transition-all duration-300 ease-in-out",
-          // Mobile behavior: fixed positioning with transform
-          !isDesktop && [
-            "fixed top-0 left-0 z-50 shadow-lg w-64",
-            isOpen ? "translate-x-0" : "-translate-x-full"
-          ],
-          // Desktop behavior: always visible but can be collapsed
-          isDesktop && [
-            "relative flex-shrink-0",
-            isOpen ? "w-64" : "w-16"
-          ],
-          className
-        )}
-      >
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          {(isOpen || !isDesktop) && (
+          {isOpen && (
             <h2 className="font-semibold">{tNav('sidebar.navigation')}</h2>
           )}
           <Button variant="ghost" size="sm" onClick={onToggle}>
-            {isDesktop ? <ChevronLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Team Selector */}
-        {(isOpen || !isDesktop) && (
+        {isOpen && (
           <div className="p-4 border-b">
             <TeamSelector showCreateButton={true} />
           </div>
@@ -141,12 +94,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.dashboard') : undefined}
+                title={!isOpen ? tNav('mainMenu.dashboard') : undefined}
               >
                 <BarChart3 className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.dashboard')}</span>}
+                {isOpen && <span>{tNav('mainMenu.dashboard')}</span>}
               </NavLink>
             </li>
             <li>
@@ -155,12 +108,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.search') : undefined}
+                title={!isOpen ? tNav('mainMenu.search') : undefined}
               >
                 <BrainCircuit className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.search')}</span>}
+                {isOpen && <span>{tNav('mainMenu.search')}</span>}
               </NavLink>
             </li>
             <li>
@@ -169,12 +122,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.analysis') : undefined}
+                title={!isOpen ? tNav('mainMenu.analysis') : undefined}
               >
                 <BarChart3 className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.analysis')}</span>}
+                {isOpen && <span>{tNav('mainMenu.analysis')}</span>}
               </NavLink>
             </li>
 
@@ -184,12 +137,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.teams') : undefined}
+                title={!isOpen ? tNav('mainMenu.teams') : undefined}
               >
                 <Users className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.teams')}</span>}
+                {isOpen && <span>{tNav('mainMenu.teams')}</span>}
               </NavLink>
             </li>
             <li>
@@ -198,12 +151,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.claims') : undefined}
+                title={!isOpen ? tNav('mainMenu.claims') : undefined}
               >
                 <FileText className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.claims')}</span>}
+                {isOpen && <span>{tNav('mainMenu.claims')}</span>}
               </NavLink>
             </li>
             <li>
@@ -212,12 +165,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.pricing') : undefined}
+                title={!isOpen ? tNav('mainMenu.pricing') : undefined}
               >
                 <DollarSign className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.pricing')}</span>}
+                {isOpen && <span>{tNav('mainMenu.pricing')}</span>}
               </NavLink>
             </li>
             <li>
@@ -226,12 +179,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.apiReference') : undefined}
+                title={!isOpen ? tNav('mainMenu.apiReference') : undefined}
               >
                 <Code className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.apiReference')}</span>}
+                {isOpen && <span>{tNav('mainMenu.apiReference')}</span>}
               </NavLink>
             </li>
 
@@ -241,12 +194,12 @@ export function MainNavigationSidebar({
                 className={({ isActive }) =>
                   cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                   isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && isDesktop && "justify-center")}
+                  !isOpen && "justify-center")}
                 onClick={handleItemClick}
-                title={!isOpen && isDesktop ? tNav('mainMenu.settings') : undefined}
+                title={!isOpen ? tNav('mainMenu.settings') : undefined}
               >
                 <Settings className="h-4 w-4 flex-shrink-0" />
-                {(isOpen || !isDesktop) && <span>{tNav('mainMenu.settings')}</span>}
+                {isOpen && <span>{tNav('mainMenu.settings')}</span>}
               </NavLink>
             </li>
             {isAdmin && (
@@ -256,18 +209,17 @@ export function MainNavigationSidebar({
                   className={({ isActive }) =>
                     cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
                     isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                    !isOpen && isDesktop && "justify-center")}
+                    !isOpen && "justify-center")}
                   onClick={handleItemClick}
-                  title={!isOpen && isDesktop ? tNav('mainMenu.admin') : undefined}
+                  title={!isOpen ? tNav('mainMenu.admin') : undefined}
                 >
                   <Crown className="h-4 w-4 flex-shrink-0" />
-                  {(isOpen || !isDesktop) && <span>{tNav('mainMenu.admin')}</span>}
+                  {isOpen && <span>{tNav('mainMenu.admin')}</span>}
                 </NavLink>
               </li>
             )}
           </ul>
         </nav>
       </div>
-    </>
   );
 }

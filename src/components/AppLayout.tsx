@@ -9,7 +9,7 @@ import { GlobalBackgroundSearchStatus } from "./search/BackgroundSearchIndicator
 
 // AppLayout content component that uses the sidebar context
 function AppLayoutContent() {
-  const { isSidebarOpen, toggleSidebar, sidebarContent, sidebarContentType } = useAppSidebar();
+  const { isSidebarOpen, toggleSidebar, sidebarContent, sidebarContentType, isDesktop } = useAppSidebar();
   const { chatControls } = useChatControls();
 
   return (
@@ -17,19 +17,21 @@ function AppLayoutContent() {
       {/* Route-aware sidebar manager for automatic content switching */}
       <RouteAwareSidebarManager />
 
-      {/* Dynamic Sidebar - shows either default navigation or route-specific content */}
-      <div className="flex-shrink-0">
-        {sidebarContent ? (
-          // Render custom sidebar content from context (e.g., ConversationSidebar)
-          sidebarContent
-        ) : (
-          // Render default main navigation sidebar
-          <MainNavigationSidebar
-            isOpen={isSidebarOpen}
-            onToggle={toggleSidebar}
-          />
-        )}
-      </div>
+      {/* Dynamic Sidebar - only render on desktop screens (>= lg breakpoint) */}
+      {isDesktop && (
+        <div className="flex-shrink-0">
+          {sidebarContent ? (
+            // Render custom sidebar content from context (e.g., ConversationSidebar)
+            sidebarContent
+          ) : (
+            // Render default main navigation sidebar
+            <MainNavigationSidebar
+              isOpen={isSidebarOpen}
+              onToggle={toggleSidebar}
+            />
+          )}
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
