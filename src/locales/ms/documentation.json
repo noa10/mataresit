@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "title": "Dokumentasi - Mataresit",
+    "description": "Panduan lengkap anda untuk menggunakan Mataresit."
+  },
+  "hero": {
+    "title": "Dokumentasi Aplikasi",
+    "subtitle": "Panduan lengkap anda untuk menggunakan Mataresit."
+  },
+  "navigation": {
+    "onThisPage": "Di halaman ini"
+  },
+  "sections": {
+    "overview": {
+      "id": "1-gambaran-keseluruhan",
+      "title": "Gambaran Keseluruhan",
+      "heading": "1. Gambaran Keseluruhan",
+      "whatIs": {
+        "title": "Apakah itu Mataresit?",
+        "description": "Mataresit ialah aplikasi pintar yang direka untuk menghapuskan kemasukan data manual yang berkaitan dengan pengurusan resit dan perbelanjaan. Dengan memanfaatkan Pengecaman Aksara Optik (OCR) dan model AI termaju seperti Gemini Google, ia secara automatik mengekstrak, mengkategorikan dan menormalkan data resit anda, menjimatkan masa kerja anda berjam-jam dan memastikan rekod kewangan anda tepat dan teratur."
+      },
+      "keyFeatures": {
+        "title": "Ciri-ciri Utama",
+        "features": {
+          "automatedExtraction": {
+            "title": "Pengekstrakan Data Automatik",
+            "description": "Muat naik imej resit (JPEG, PNG, PDF), dan sistem kami secara automatik menarik maklumat penting seperti pedagang, tarikh, jumlah dan item baris."
+          },
+          "aiPowered": {
+            "title": "Peningkatan Dikuasakan AI",
+            "description": "Melangkaui OCR mudah. AI kami menormalkan nama pedagang, menyeragamkan kaedah pembayaran, meramalkan kategori perbelanjaan, dan juga mencadangkan pembetulan untuk kemungkinan ralat OCR."
+          },
+          "confidenceScoring": {
+            "title": "Pemarkahan Keyakinan",
+            "description": "Setiap medan yang diekstrak diberikan skor keyakinan, jadi anda boleh melihat sepintas lalu data mana yang sangat tepat dan yang mungkin memerlukan semakan pantas."
+          },
+          "realTimeProcessing": {
+            "title": "Maklum Balas Pemprosesan Masa Nyata",
+            "description": "Tonton resit anda diproses dalam masa nyata dengan garis masa status terperinci, dari muat naik hingga selesai."
+          },
+          "semanticSearch": {
+            "title": "Carian Semantik Pintar",
+            "description": "Cari mana-mana resit atau item baris dengan bertanya soalan dalam bahasa semula jadi, seperti \"perbelanjaan kopi dari bulan lepas\" atau \"apa yang saya beli di Walmart?\"."
+          },
+          "batchProcessing": {
+            "title": "Pemprosesan Kelompok",
+            "description": "Muat naik berbilang resit serentak dan biarkan sistem memprosesnya secara selari, dengan kawalan penuh ke atas baris gilir."
+          },
+          "analysisReporting": {
+            "title": "Analisis & Pelaporan",
+            "description": "Visualisasikan tabiat perbelanjaan anda dengan papan pemuka analisis kami dan jana laporan PDF terperinci yang diringkaskan mengikut kategori atau pembayar."
+          },
+          "flexibleAI": {
+            "title": "Pemilihan Model AI yang Fleksibel",
+            "description": "Pilih antara kaedah pemprosesan AI yang berbeza (AI Vision lwn. OCR + AI) dan model untuk mengimbangi kelajuan, kos dan ketepatan."
+          }
+        }
+      }
+    },
+    "gettingStarted": {
+      "id": "2-bermula",
+      "title": "Bermula",
+      "heading": "2. Bermula",
+      "firstUpload": {
+        "title": "Muat Naik Pertama Anda",
+        "steps": {
+          "navigate": "Navigasi ke Papan Pemuka: Selepas log masuk, anda akan mendarat di papan pemuka utama anda.",
+          "openModal": "Buka Modal Muat Naik: Klik butang \"Muat Naik\". Ini akan membuka modal dengan dua tab: \"Muat Naik Tunggal\" dan \"Muat Naik Kelompok\".",
+          "selectFile": "Pilih Fail: Dalam tab \"Muat Naik Tunggal\", anda boleh sama ada seret dan lepas fail resit (JPG, PNG atau PDF) ke dalam kawasan yang ditetapkan atau klik untuk menyemak imbas komputer anda.",
+          "processing": "Pemprosesan Bermula: Sebaik sahaja fail dipilih, muat naik dan pemprosesan bermula secara automatik. Anda boleh memantau kemajuan dalam masa nyata melalui Garis Masa Pemprosesan.",
+          "reviewSave": "Semak dan Simpan: Selepas pemprosesan selesai, anda akan dihalakan secara automatik ke halaman Pemapar Resit untuk menyemak, mengedit dan menyimpan resit anda."
+        }
+      },
+      "understandingDashboard": {
+        "title": "Memahami Papan Pemuka",
+        "description": "Papan pemuka anda ialah hab pusat anda untuk mengurus resit.",
+        "features": {
+          "receiptCards": "Kad Resit: Setiap kad mewakili resit, menunjukkan pedagang, tarikh, jumlah dan imej kecil imej.",
+          "statusIndicators": "Penunjuk Status: \"Belum Disemak\" (Kuning) bermakna resit memerlukan kelulusan anda; \"Disemak\" (Biru) bermakna ia disahkan.",
+          "filteringSort": "Penapisan & Isih: Gunakan kawalan di bahagian atas untuk mencari, menapis dan mengisih resit anda.",
+          "viewMode": "Mod Paparan: Tukar antara paparan Grid, Senarai dan Jadual."
+        }
+      }
+    },
+    "coreFeatures": {
+      "id": "3-ciri-teras",
+      "title": "Ciri Teras",
+      "heading": "3. Ciri Teras secara Terperinci",
+      "uploading": {
+        "title": "Memuat Naik Resit (Tunggal & Kelompok)",
+        "description": "Mataresit menyokong kedua-dua muat naik fail tunggal dan berbilang. Ciri **Muat Naik Kelompok** membolehkan anda memproses berbilang resit secara selari, dengan kawalan untuk memulakan, menjeda dan mencuba semula muat naik yang gagal, menjadikannya sesuai untuk mengendalikan jumlah resit yang besar dengan cekap."
+      },
+      "aiSuggestions": {
+        "title": "Cadangan AI & Skor Keyakinan",
+        "description": "AI kami memberikan cerapan untuk memastikan ketepatan. Jika ia mengesan kemungkinan ralat OCR, ia akan menawarkan cadangan yang boleh anda terima dengan satu klik. Setiap medan utama juga mempunyai skor keyakinan, yang diwakili secara visual oleh bar berwarna:",
+        "confidenceLevels": {
+          "high": "Hijau (80-100%): Keyakinan tinggi.",
+          "medium": "Kuning (60-79%): Keyakinan sederhana, mungkin perlu dilihat sekilas.",
+          "low": "Merah (<60%): Keyakinan rendah, perlu disemak."
+        },
+        "editingNote": "Mengedit medan secara manual menetapkan keyakinannya kepada 100%."
+      },
+      "aiProcessing": {
+        "title": "Pemprosesan AI: Vision lwn. OCR",
+        "description": "Dalam **Tetapan → Pemprosesan**, anda boleh memilih kaedah pilihan anda:",
+        "methods": {
+          "aiVision": "AI Vision (Lalai): Model AI secara langsung menganalisis imej resit, menawarkan ketepatan yang unggul untuk resit yang kompleks atau tulisan tangan.",
+          "compare": "Bandingkan dengan Alternatif: Untuk ketepatan maksimum, sistem menjalankan kedua-dua AI Vision dan kaedah OCR + AI tradisional, menonjolkan sebarang perbezaan untuk semakan anda."
+        }
+      },
+      "aiSearch": {
+        "title": "Carian AI",
+        "description": "Navigasi ke halaman **Carian AI** untuk mencari mana-mana resit atau item baris menggunakan bahasa semula jadi. Contohnya, anda boleh bertanya: \"perbelanjaan kopi dari bulan lepas\" atau \"barangan runcit melebihi $20\"."
+      }
+    },
+    "troubleshooting": {
+      "id": "4-penyelesaian-masalah",
+      "title": "Penyelesaian Masalah & Soalan Lazim",
+      "heading": "4. Penyelesaian Masalah & Soalan Lazim",
+      "questions": {
+        "processingStuck": {
+          "question": "Mengapakah pemprosesan resit saya tersekat atau gagal?",
+          "answer": "`processing_status` pada kad resit atau dalam pemapar akan menunjukkan peringkat semasa. Jika ia `failed_ocr` atau `failed_ai`, ralat telah berlaku. Ini boleh berlaku dengan imej berkualiti rendah. Anda boleh sama ada cuba memproses semula resit atau memasukkan data secara manual."
+        },
+        "searchResults": {
+          "question": "Mengapakah hasil carian saya tidak seperti yang saya jangkakan?",
+          "answer": "Carian semantik kami bergantung pada \"embeddings\". Jika anda telah memuat naik resit sebelum ciri ini didayakan, anda mungkin perlu menjana embeddings untuknya. Pentadbir boleh melakukan ini dari halaman **Pentadbir → Tetapan**."
+        },
+        "subscription": {
+          "question": "Bagaimanakah cara saya menukar langganan saya?",
+          "answer": "Anda boleh mengurus langganan anda, melihat invois dan mengemas kini kaedah pembayaran dari **Portal Pengebilan Stripe**. Aksesnya dari halaman **Ciri** atau halaman **Kejayaan Pembayaran** selepas transaksi."
+        }
+      }
+    },
+    "glossary": {
+      "id": "5-glosari",
+      "title": "Glosari",
+      "heading": "5. Glosari",
+      "terms": {
+        "ocr": "OCR (Pengecaman Aksara Optik): Teknologi untuk menukar imej teks kepada teks yang boleh dibaca oleh mesin.",
+        "aiVision": "AI Vision: Kaedah pemprosesan di mana model AI secara langsung menganalisis imej untuk memahami kandungannya.",
+        "embedding": "Embedding: Perwakilan berangka teks yang menangkap makna semantiknya, menggerakkan Carian AI kami.",
+        "semanticSearch": "Carian Semantik: Teknik carian yang memahami niat pengguna dan makna kontekstual perkataan."
+      }
+    }
+  }
+}

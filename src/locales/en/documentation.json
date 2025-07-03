@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "title": "Documentation - Mataresit",
+    "description": "Your complete guide to using Mataresit."
+  },
+  "hero": {
+    "title": "Application Documentation",
+    "subtitle": "Your complete guide to using Mataresit."
+  },
+  "navigation": {
+    "onThisPage": "On this page"
+  },
+  "sections": {
+    "overview": {
+      "id": "1-overview",
+      "title": "Overview",
+      "heading": "1. Overview",
+      "whatIs": {
+        "title": "What is Mataresit?",
+        "description": "Mataresit is an intelligent application designed to eliminate the manual data entry associated with receipt and expense management. By leveraging Optical Character Recognition (OCR) and advanced AI models like Google's Gemini, it automatically extracts, categorizes, and normalizes your receipt data, saving you hours of work and ensuring your financial records are accurate and organized."
+      },
+      "keyFeatures": {
+        "title": "Key Features",
+        "features": {
+          "automatedExtraction": {
+            "title": "Automated Data Extraction",
+            "description": "Upload a receipt image (JPEG, PNG, PDF), and our system automatically pulls key information like merchant, date, total, and line items."
+          },
+          "aiPowered": {
+            "title": "AI-Powered Enhancement",
+            "description": "Goes beyond simple OCR. Our AI normalizes merchant names, standardizes payment methods, predicts expense categories, and even suggests corrections for potential OCR errors."
+          },
+          "confidenceScoring": {
+            "title": "Confidence Scoring",
+            "description": "Every extracted field is given a confidence score, so you can see at a glance which data points are highly accurate and which may need a quick review."
+          },
+          "realTimeProcessing": {
+            "title": "Real-time Processing Feedback",
+            "description": "Watch your receipts get processed in real-time with a detailed status timeline, from upload to completion."
+          },
+          "semanticSearch": {
+            "title": "Intelligent Semantic Search",
+            "description": "Find any receipt or line item by asking questions in natural language, like \"coffee expenses from last month\" or \"what did I buy at Walmart?\"."
+          },
+          "batchProcessing": {
+            "title": "Batch Processing",
+            "description": "Upload multiple receipts at once and let the system process them in parallel, with full control over the queue."
+          },
+          "analysisReporting": {
+            "title": "Analysis & Reporting",
+            "description": "Visualize your spending habits with our analysis dashboard and generate detailed PDF reports summarized by category or payer."
+          },
+          "flexibleAI": {
+            "title": "Flexible AI Model Selection",
+            "description": "Choose between different AI processing methods (AI Vision vs. OCR + AI) and models to balance speed, cost, and accuracy."
+          }
+        }
+      }
+    },
+    "gettingStarted": {
+      "id": "2-getting-started",
+      "title": "Getting Started",
+      "heading": "2. Getting Started",
+      "firstUpload": {
+        "title": "Your First Upload",
+        "steps": {
+          "navigate": "Navigate to the Dashboard: After signing in, you'll land on your main dashboard.",
+          "openModal": "Open the Upload Modal: Click the \"Upload\" button. This will open a modal with two tabs: \"Single Upload\" and \"Batch Upload\".",
+          "selectFile": "Select a File: In the \"Single Upload\" tab, you can either drag and drop a receipt file (JPG, PNG, or PDF) into the designated area or click to browse your computer.",
+          "processing": "Processing Begins: Once a file is selected, the upload and processing begin automatically. You can monitor the progress in real-time via the Processing Timeline.",
+          "reviewSave": "Review and Save: After processing is complete, you will be automatically redirected to the Receipt Viewer page to review, edit, and save your receipt."
+        }
+      },
+      "understandingDashboard": {
+        "title": "Understanding the Dashboard",
+        "description": "Your dashboard is your central hub for managing receipts.",
+        "features": {
+          "receiptCards": "Receipt Cards: Each card represents a receipt, showing the merchant, date, total, and a thumbnail of the image.",
+          "statusIndicators": "Status Indicators: \"Unreviewed\" (Yellow) means the receipt needs your approval; \"Reviewed\" (Blue) means it's confirmed.",
+          "filteringSort": "Filtering & Sorting: Use the controls at the top to search, filter, and sort your receipts.",
+          "viewMode": "View Mode: Switch between Grid, List, and Table views."
+        }
+      }
+    },
+    "coreFeatures": {
+      "id": "3-core-features",
+      "title": "Core Features",
+      "heading": "3. Core Features in Detail",
+      "uploading": {
+        "title": "Uploading Receipts (Single & Batch)",
+        "description": "Mataresit supports both single and multiple file uploads. The **Batch Upload** feature allows you to process multiple receipts in parallel, with controls to start, pause, and retry failed uploads, making it ideal for handling large volumes of receipts efficiently."
+      },
+      "aiSuggestions": {
+        "title": "AI Suggestions & Confidence Scores",
+        "description": "Our AI provides insights to ensure accuracy. If it detects a potential OCR error, it will offer a suggestion you can accept with one click. Every key field also has a confidence score, visually represented by a colored bar:",
+        "confidenceLevels": {
+          "high": "Green (80-100%): High confidence.",
+          "medium": "Yellow (60-79%): Medium confidence, may need a quick look.",
+          "low": "Red (<60%): Low confidence, should be reviewed."
+        },
+        "editingNote": "Editing a field manually sets its confidence to 100%."
+      },
+      "aiProcessing": {
+        "title": "AI Processing: Vision vs. OCR",
+        "description": "In **Settings → Processing**, you can choose your preferred method:",
+        "methods": {
+          "aiVision": "AI Vision (Default): The AI model directly analyzes the receipt image, offering superior accuracy for complex or handwritten receipts.",
+          "compare": "Compare with Alternative: For maximum accuracy, the system runs both AI Vision and a traditional OCR + AI method, highlighting any differences for your review."
+        }
+      },
+      "aiSearch": {
+        "title": "AI Search",
+        "description": "Navigate to the **AI Search** page to find any receipt or line item using natural language. For example, you can ask: \"coffee expenses from last month\" or \"grocery items over $20\"."
+      }
+    },
+    "troubleshooting": {
+      "id": "4-troubleshooting",
+      "title": "Troubleshooting & FAQ",
+      "heading": "4. Troubleshooting & FAQ",
+      "questions": {
+        "processingStuck": {
+          "question": "Why is my receipt processing stuck or has failed?",
+          "answer": "The `processing_status` on the receipt card or in the viewer will show the current stage. If it's `failed_ocr` or `failed_ai`, an error occurred. This can happen with low-quality images. You can either try reprocessing the receipt or manually enter the data."
+        },
+        "searchResults": {
+          "question": "Why are my search results not what I expected?",
+          "answer": "Our semantic search relies on \"embeddings\". If you've uploaded receipts before this feature was enabled, you may need to generate embeddings for them. Admins can do this from the **Admin → Settings** page."
+        },
+        "subscription": {
+          "question": "How do I change my subscription?",
+          "answer": "You can manage your subscription, view invoices, and update payment methods from the **Stripe Billing Portal**. Access it from the **Features** page or the **Payment Success** page after a transaction."
+        }
+      }
+    },
+    "glossary": {
+      "id": "5-glossary",
+      "title": "Glossary",
+      "heading": "5. Glossary",
+      "terms": {
+        "ocr": "OCR (Optical Character Recognition): Technology to convert images of text into machine-readable text.",
+        "aiVision": "AI Vision: A processing method where an AI model directly analyzes an image to understand its content.",
+        "embedding": "Embedding: A numerical representation of text that captures its semantic meaning, powering our AI Search.",
+        "semanticSearch": "Semantic Search: A search technique that understands the user's intent and the contextual meaning of words."
+      }
+    }
+  }
+}
