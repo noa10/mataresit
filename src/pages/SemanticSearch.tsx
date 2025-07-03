@@ -238,6 +238,8 @@ export default function SemanticSearchPage() {
         />
       ),
       onNewChat: handleNewChat,
+      onSelectConversation: handleSelectConversation,
+      currentConversationId: currentConversationId,
       showChatTitle: true
     });
 
@@ -245,7 +247,7 @@ export default function SemanticSearchPage() {
     return () => {
       setChatControls(null);
     };
-  }, [isSidebarOpen, toggleSidebar, handleNewChat, setChatControls]);
+  }, [isSidebarOpen, toggleSidebar, handleNewChat, handleSelectConversation, currentConversationId, setChatControls]);
 
 
 

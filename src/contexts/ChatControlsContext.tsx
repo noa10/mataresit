@@ -3,6 +3,8 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface ChatControls {
   sidebarToggle?: React.ReactNode;
   onNewChat?: () => void;
+  onSelectConversation?: (conversationId: string) => void;
+  currentConversationId?: string;
   showChatTitle?: boolean;
 }
 
