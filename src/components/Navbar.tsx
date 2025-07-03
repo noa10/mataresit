@@ -3,14 +3,17 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useTeam } from "@/contexts/TeamContext";
+import { useChatControls } from "@/contexts/ChatControlsContext";
 import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { TeamSelector } from "@/components/team/TeamSelector";
+import { CompactChatHistory } from "@/components/chat/CompactChatHistory";
 import { cn } from "@/lib/utils";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import {
@@ -23,24 +26,19 @@ import {
 } from "./ui/dropdown-menu";
 
 interface NavbarProps {
-  chatControls?: {
-    sidebarToggle?: React.ReactNode;
-    onNewChat?: () => void;
-    showChatTitle?: boolean;
-  };
   navControls?: {
     navSidebarToggle?: React.ReactNode;
   };
 }
 
-export default function Navbar({ chatControls, navControls }: NavbarProps = {}) {
+export default function Navbar({ navControls }: NavbarProps = {}) {
   const { user, signOut, isAdmin } = useAuth();
   const { subscriptionData } = useStripe();
   const { currentTeam } = useTeam();
+  const { chatControls } = useChatControls();
   const { t: tNav } = useNavigationTranslation();
   const { t: tCommon } = useCommonTranslation();
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   // Check if we're on the search/chat page
@@ -87,9 +85,9 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
       <div className="container mx-auto flex items-center justify-between py-4 px-6">
         {/* Left Side: Logo & Brand */}
         <div className="flex items-center space-x-3">
-          {/* Unified Sidebar Toggle (only show on protected pages) */}
+          {/* Unified Sidebar Toggle (only show on protected pages and desktop) */}
           {!isPublicPage && (
-            <div className="flex items-center space-x-2">
+            <div className="hidden lg:flex items-center space-x-2">
               {/* Show chat sidebar toggle on search page, otherwise show nav sidebar toggle */}
               {isSearchPage ? chatControls?.sidebarToggle : navControls?.navSidebarToggle}
             </div>
@@ -220,9 +218,90 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
             {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
-          {/* Primary CTA Button (Discord-style) */}
+          {/* Mobile Menu for Non-Authenticated Users on Public Pages */}
+          {!user && isPublicPage && (
+            <div className="lg:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-sm">
+                  {/* Public Navigation */}
+                  <DropdownMenuItem asChild>
+                    <Link to="/features" className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      {tNav('mainMenu.features')}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/pricing" className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      {tNav('mainMenu.pricing')}
+                    </Link>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Resources */}
+                  <div className="px-2 py-1">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                      {tNav('mainMenu.resources')}
+                    </div>
+                    <DropdownMenuItem asChild>
+                      <Link to="/docs" className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {tNav('mainMenu.documentation')}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/help" className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        {tNav('mainMenu.help')}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/status" className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4" />
+                        {tNav('mainMenu.status')}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/blog" className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {tNav('mainMenu.blog')}
+                      </Link>
+                    </DropdownMenuItem>
+                  </div>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Settings */}
+                  <div className="px-2 py-1">
+                    <LanguageSelector variant="default" className="w-full justify-start" />
+                  </div>
+                  <DropdownMenuItem onClick={toggleTheme}>
+                    {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                    {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  {/* Get Started CTA */}
+                  <div className="px-2 py-1">
+                    <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+                      <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+
+          {/* Primary CTA Button (Discord-style) - Desktop */}
           {!user ? (
-            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-4 py-2 rounded-full">
+            <Button asChild className="hidden lg:flex bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-4 py-2 rounded-full">
               <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
             </Button>
           ) : (
@@ -243,17 +322,244 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
-                      <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xs">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    {user.email}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] lg:w-56 max-w-sm lg:max-w-sm p-1 lg:max-h-none max-h-[80vh] lg:overflow-visible overflow-y-auto">
+                  {/* Content wrapper for mobile scrolling */}
+                      {/* User Info Header */}
+                      <DropdownMenuLabel className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
+                          <AvatarFallback className="bg-primary text-primary-foreground font-bold text-xs">
+                            {userInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                        {user.email}
+                      </DropdownMenuLabel>
+
+                  {/* Mobile Navigation - Only show on mobile screens */}
+                  <div className="lg:hidden">
+                    {isPublicPage ? (
+                      <>
+                        <DropdownMenuSeparator />
+
+                        {/* Public Page Navigation */}
+                        <div className="px-2 py-1">
+                          <DropdownMenuItem asChild>
+                            <Link to="/features" className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4" />
+                              {tNav('mainMenu.features')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/pricing" className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" />
+                              {tNav('mainMenu.pricing')}
+                            </Link>
+                          </DropdownMenuItem>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Resources Section */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            {tNav('mainMenu.resources')}
+                          </div>
+                          <DropdownMenuItem asChild>
+                            <Link to="/docs" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {tNav('mainMenu.documentation')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/help" className="flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              {tNav('mainMenu.help')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/status" className="flex items-center gap-2">
+                              <ShieldCheck className="h-4 w-4" />
+                              {tNav('mainMenu.status')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/blog" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {tNav('mainMenu.blog')}
+                            </Link>
+                          </DropdownMenuItem>
+                        </div>
+
+                        {user && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              <Link to="/dashboard" className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" />
+                                Dashboard
+                              </Link>
+                            </DropdownMenuItem>
+                          </>
+                        )}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Mobile Actions for Public Pages */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            Settings
+                          </div>
+                          <div className="px-2 py-1">
+                            <LanguageSelector variant="default" className="w-full justify-start" />
+                          </div>
+                          <DropdownMenuItem onClick={toggleTheme}>
+                            {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                            {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
+                          </DropdownMenuItem>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuSeparator />
+
+                        {/* Team Context Section */}
+                        <div className="px-2 py-2">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            Team Workspace
+                          </div>
+                          <div className="px-2">
+                            <TeamSelector showCreateButton={true} />
+                          </div>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Core Navigation */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            {tNav('sidebar.navigation')}
+                          </div>
+                          <DropdownMenuItem asChild>
+                            <Link to="/dashboard" className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4" />
+                              {tNav('mainMenu.dashboard')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/search" className="flex items-center gap-2">
+                              <BrainCircuit className="h-4 w-4" />
+                              {tNav('mainMenu.search')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/analysis" className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4" />
+                              {tNav('mainMenu.analysis')}
+                            </Link>
+                          </DropdownMenuItem>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Collaboration Section */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            Collaboration
+                          </div>
+                          <DropdownMenuItem asChild>
+                            <Link to="/teams" className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              {tNav('mainMenu.teams')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/claims" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {tNav('mainMenu.claims')}
+                            </Link>
+                          </DropdownMenuItem>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Tools & Settings Section */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            Tools & Settings
+                          </div>
+                          <DropdownMenuItem asChild>
+                            <Link to="/settings" className="flex items-center gap-2">
+                              <Settings className="h-4 w-4" />
+                              {tNav('mainMenu.settings')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/api-reference" className="flex items-center gap-2">
+                              <Code className="h-4 w-4" />
+                              {tNav('mainMenu.apiReference')}
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/pricing" className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" />
+                              {tNav('mainMenu.pricing')}
+                            </Link>
+                          </DropdownMenuItem>
+                        </div>
+
+                        <DropdownMenuSeparator />
+
+                        {/* Mobile Actions */}
+                        <div className="px-2 py-1">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                            Actions
+                          </div>
+                          {isSearchPage && chatControls?.onNewChat && (
+                            <DropdownMenuItem onClick={chatControls.onNewChat}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              {tCommon('buttons.newChat')}
+                            </DropdownMenuItem>
+                          )}
+                          <div className="px-2 py-1">
+                            <LanguageSelector variant="default" className="w-full justify-start" />
+                          </div>
+                          <DropdownMenuItem onClick={toggleTheme}>
+                            {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                            {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
+                          </DropdownMenuItem>
+                        </div>
+
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Chat History Section - Only show on search page */}
+                  {isSearchPage && chatControls && (
+                    <>
+                      <DropdownMenuSeparator />
+
+                      <div className="px-2 py-1">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                          Chat History
+                        </div>
+                        <div className="lg:max-h-48 max-h-32 overflow-hidden">
+                          <CompactChatHistory
+                            onNewChat={chatControls.onNewChat || (() => {})}
+                            onSelectConversation={chatControls.onSelectConversation || (() => {})}
+                            currentConversationId={chatControls.currentConversationId}
+                            maxItems={5}
+                            className="border-0"
+                            maxHeight="lg:12rem 8rem" // Responsive max height
+                          />
+                        </div>
+                      </div>
+
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
+                  {/* User Profile Section - Always visible */}
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
@@ -282,186 +588,11 @@ export default function Navbar({ chatControls, navControls }: NavbarProps = {}) 
             </div>
           )}
 
-          {/* Mobile Menu Toggle */}
-          <div className="lg:hidden">
-            <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
-          </div>
+
         </div>
       </div>
 
-      {/* Mobile Menu (Discord-style) */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-background border-b shadow-lg z-50">
-          <div className="container mx-auto py-6 px-6 space-y-6">
-            {/* Mobile Navigation */}
-            <nav className="space-y-1">
-              {isPublicPage ? (
-                <>
-                  <Link
-                    to="/features"
-                    className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {tNav('mainMenu.features')}
-                  </Link>
-                  <Link
-                    to="/pricing"
-                    className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {tNav('mainMenu.pricing')}
-                  </Link>
-                  <div className="py-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-2">
-                      {tNav('mainMenu.resources')}
-                    </div>
-                    <Link
-                      to="/docs"
-                      className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {tNav('mainMenu.documentation')}
-                    </Link>
-                    <Link
-                      to="/help"
-                      className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {tNav('mainMenu.help')}
-                    </Link>
-                    <Link
-                      to="/status"
-                      className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {tNav('mainMenu.status')}
-                    </Link>
-                    <Link
-                      to="/blog"
-                      className="block py-2 px-4 ml-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {tNav('mainMenu.blog')}
-                    </Link>
-                  </div>
-                  {user && (
-                    <Link
-                      to="/dashboard"
-                      className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className="block py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {tNav('mainMenu.dashboard')}
-                  </Link>
-                  <Link
-                    to="/search"
-                    className="flex items-center gap-2 py-3 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <BrainCircuit className="h-4 w-4" />
-                    {tNav('mainMenu.search')}
-                  </Link>
-                </>
-              )}
-            </nav>
 
-            {/* Mobile Actions */}
-            <div className="space-y-3 pt-4 border-t border-border">
-              {isSearchPage && chatControls?.onNewChat && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    chatControls.onNewChat();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full justify-start gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  {tCommon('buttons.newChat')}
-                </Button>
-              )}
-
-              <div className="w-full">
-                <LanguageSelector variant="default" className="w-full justify-start" />
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="w-full justify-start gap-2"
-              >
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
-              </Button>
-
-              {user ? (
-                <div className="space-y-2 pt-2 border-t border-border">
-                  <div className="flex items-center gap-3 px-4 py-2">
-                    <Avatar className="h-8 w-8">
-                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
-                      <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium">{user.email}</span>
-                  </div>
-                  <Link
-                    to="/profile"
-                    className="flex items-center gap-2 w-full py-2 px-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <User className="h-4 w-4" />
-                    {tNav('userMenu.profile')}
-                  </Link>
-
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      className="flex items-center gap-2 w-full py-2 px-4 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-secondary/50 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Crown className="h-4 w-4" />
-                      {tNav('mainMenu.admin')}
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => {
-                      signOut();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="flex items-center gap-2 w-full py-2 px-4 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {tNav('userMenu.logout')}
-                  </button>
-                </div>
-              ) : (
-                <Button
-                  asChild
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-full"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

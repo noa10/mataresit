@@ -132,7 +132,16 @@ export function CompactChatHistory({
         </div>
 
         {/* Conversation List - Enhanced styling and spacing with proper height management */}
-        <ScrollArea className="flex-1 min-h-0" role="region" aria-label="Recent conversations">
+        <ScrollArea
+          className={cn("flex-1 min-h-0", maxHeight && `max-h-[${maxHeight}]`)}
+          role="region"
+          aria-label="Recent conversations"
+          style={{
+            maxHeight: maxHeight ? maxHeight : undefined,
+            WebkitOverflowScrolling: 'touch', // iOS smooth scrolling
+            overscrollBehavior: 'contain' // Prevent scroll chaining
+          }}
+        >
           <div className="p-3 space-y-1">
             {error ? (
               <div className="text-center py-6 text-muted-foreground animate-in fade-in duration-300">

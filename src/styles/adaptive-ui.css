@@ -326,15 +326,56 @@
     --adaptive-spacing: 0.75rem;
     --adaptive-font-size: 0.875rem;
   }
-  
+
   .adaptive-navigation {
     --nav-item-spacing: 0.25rem;
     --nav-item-padding: 0.5rem;
   }
-  
+
   .adaptive-feature-panel {
     --feature-card-spacing: 0.75rem;
     --feature-card-padding: 1rem;
+  }
+
+  /* Mobile Dropdown Scrolling Enhancements */
+  [data-radix-dropdown-menu-content] {
+    /* Enable smooth momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent scroll chaining to parent elements */
+    overscroll-behavior: contain;
+    /* Smooth scrolling behavior */
+    scroll-behavior: smooth;
+    /* Ensure proper touch targets */
+    touch-action: manipulation;
+    /* Ensure proper height constraints for mobile */
+    max-height: 80vh;
+  }
+
+  /* Ensure scrollbar is visible on mobile when needed */
+  @media (max-width: 768px) {
+    [data-radix-dropdown-menu-content]::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    [data-radix-dropdown-menu-content]::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    [data-radix-dropdown-menu-content]::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+
+    [data-radix-dropdown-menu-content]::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  /* Ensure dropdown items have proper touch targets */
+  [data-radix-dropdown-menu-item] {
+    min-height: 44px; /* iOS recommended minimum touch target */
+    display: flex;
+    align-items: center;
   }
 }
 
