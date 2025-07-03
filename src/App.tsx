@@ -12,6 +12,8 @@ import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
+import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
+import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 // Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";
@@ -90,8 +92,9 @@ const App = () => (
           <TeamProvider>
             <StripeProvider>
               <PersonalizationProvider>
-                <ChatControlsProvider>
-                  <TooltipProvider>
+                <BackgroundSearchProvider>
+                  <ChatControlsProvider>
+                    <TooltipProvider>
             <Toaster />
             <Sonner />
             {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
@@ -249,8 +252,9 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-                  </TooltipProvider>
-                </ChatControlsProvider>
+                    </TooltipProvider>
+                  </ChatControlsProvider>
+                </BackgroundSearchProvider>
               </PersonalizationProvider>
             </StripeProvider>
           </TeamProvider>

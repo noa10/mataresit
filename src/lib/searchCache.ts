@@ -347,6 +347,118 @@ class SearchCache {
       }
     }
   }
+
+  /**
+   * Get cache key for conversation-specific caching
+   */
+  getConversationCacheKey(conversationId: string, searchParams: UnifiedSearchParams, userId: string): string {
+    const baseKey = this.generateCacheKey(searchParams, userId);
+    return `conv_${conversationId}_${baseKey}`;
+  }
+
+  /**
+   * Store search results with conversation association
+   */
+  async setForConversation(
+    conversationId: string,
+    searchParams: UnifiedSearchParams,
+    userId: string,
+    response: UnifiedSearchResponse
+  ): Promise<void> {
+    // Store in regular cache
+    await this.set(searchParams, userId, response);
+
+    // Store conversation-specific cache entry
+    try {
+      const conversationCacheKey = this.getConversationCacheKey(conversationId, searchParams, userId);
+      const entry = {
+        conversationId,
+        searchParams,
+        results: response,
+        cachedAt: Date.now(),
+        userId
+      };
+
+      localStorage.setItem(`conv_cache_${conversationCacheKey}`, JSON.stringify(entry));
+      console.log(`💾 Stored conversation-specific cache for ${conversationId}`);
+    } catch (error) {
+      console.warn('Failed to store conversation cache:', error);
+    }
+  }
+
+  /**
+   * Get search results for a specific conversation
+   */
+  async getForConversation(
+    conversationId: string,
+    searchParams: UnifiedSearchParams,
+    userId: string
+  ): Promise<UnifiedSearchResponse | null> {
+    try {
+      const conversationCacheKey = this.getConversationCacheKey(conversationId, searchParams, userId);
+      const cacheData = localStorage.getItem(`conv_cache_${conversationCacheKey}`);
+
+      if (cacheData) {
+        const entry = JSON.parse(cacheData);
+
+        // Check if cache is still valid (24 hours)
+        const maxAge = 24 * 60 * 60 * 1000;
+        const isExpired = Date.now() - entry.cachedAt > maxAge;
+
+        if (!isExpired && entry.userId === userId) {
+          console.log(`💾 Found conversation cache for ${conversationId}`);
+          return entry.results;
+        } else {
+          // Remove expired cache
+          localStorage.removeItem(`conv_cache_${conversationCacheKey}`);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get conversation cache:', error);
+    }
+
+    // Fallback to regular cache
+    return await this.get(searchParams, userId);
+  }
+
+  /**
+   * Clear cache for a specific conversation
+   */
+  clearConversationCache(conversationId: string): void {
+    try {
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith(`conv_cache_conv_${conversationId}_`)) {
+          localStorage.removeItem(key);
+        }
+      });
+      console.log(`🗑️ Cleared conversation cache for ${conversationId}`);
+    } catch (error) {
+      console.warn('Failed to clear conversation cache:', error);
+    }
+  }
+
+  /**
+   * Check if conversation has cached results
+   */
+  hasConversationCache(conversationId: string, searchParams: UnifiedSearchParams, userId: string): boolean {
+    try {
+      const conversationCacheKey = this.getConversationCacheKey(conversationId, searchParams, userId);
+      const cacheData = localStorage.getItem(`conv_cache_${conversationCacheKey}`);
+
+      if (cacheData) {
+        const entry = JSON.parse(cacheData);
+        const maxAge = 24 * 60 * 60 * 1000;
+        const isExpired = Date.now() - entry.cachedAt > maxAge;
+
+        return !isExpired && entry.userId === userId;
+      }
+    } catch (error) {
+      console.warn('Failed to check conversation cache:', error);
+    }
+
+    return false;
+  }
 }
 
 // Export singleton instance

@@ -11,6 +11,8 @@ import { formatCurrencyAmount } from '../lib/currency-converter';
 import { usePersonalizationContext } from '@/contexts/PersonalizationContext';
 import { personalizedChatService } from '@/services/personalizedChatService';
 import { conversationMemoryService } from '@/services/conversationMemoryService';
+import { useBackgroundSearch } from '@/contexts/BackgroundSearchContext';
+import { backgroundSearchService } from '@/services/backgroundSearchService';
 
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -21,6 +23,19 @@ import { StatusIndicator, useStatusIndicator } from '../components/chat/StatusIn
 import { useChatControls } from '@/contexts/ChatControlsContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { SearchPageSidebarContent } from '../components/sidebar/SearchPageSidebarContent';
+import { useAuth } from '@/contexts/AuthContext';
+import { BackgroundSearchIndicator, SearchProgressIndicator } from '../components/search/BackgroundSearchIndicator';
+import {
+  SearchStatusToastManager,
+  showCacheLoadedToast,
+  showBackgroundSearchToast,
+  showNavigationFreedomToast
+} from '../components/search/SearchStatusToast';
+import {
+  hasValidSearchCache,
+  getConversationSearchCache,
+  updateConversationSearchStatus
+} from '../lib/conversation-history';
 
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -55,6 +70,20 @@ export default function SemanticSearchPage() {
 
   // Unified sidebar context
   const { isSidebarOpen, toggleSidebar, setSidebarContent, clearSidebarContent } = useAppSidebar();
+
+  // Background search context
+  const {
+    startBackgroundSearch,
+    getSearchStatus,
+    getSearchResults,
+    isSearchActive,
+    isSearchCompleted,
+    loadCachedSearch,
+    hasActiveSearches
+  } = useBackgroundSearch();
+
+  // Auth context
+  const { user } = useAuth();
 
   // Personalization context
   const {
@@ -98,14 +127,40 @@ export default function SemanticSearchPage() {
     }
   }, [messages, currentConversationId, setUrlSearchParams, saveConversationWithEvents]);
 
-  // Load a conversation
-  const loadConversation = useCallback((conversationId: string) => {
+  // Load a conversation with background search integration
+  const loadConversation = useCallback(async (conversationId: string) => {
     const conversation = getConversation(conversationId);
     if (conversation) {
       setMessages(conversation.messages);
       setCurrentConversationId(conversationId);
       setLastSearchParams(null);
       setCurrentOffset(0);
+
+      // Check if this conversation has cached search results
+      if (user && conversation.messages.length > 0) {
+        const lastUserMessage = conversation.messages
+          .filter(m => m.type === 'user')
+          .pop();
+
+        if (lastUserMessage) {
+          const searchParams = backgroundSearchService.generateSearchParams(
+            lastUserMessage.content,
+            conversation.messages
+          );
+
+          // Try to load cached results
+          const hasCached = await loadCachedSearch(
+            conversationId,
+            lastUserMessage.content,
+            searchParams
+          );
+
+          if (hasCached) {
+            console.log(`💾 Loaded cached search results for conversation ${conversationId}`);
+          }
+        }
+      }
+
       // Set flag to indicate this is a programmatic URL update
       isUpdatingUrlRef.current = true;
       setUrlSearchParams({ c: conversationId });
@@ -114,7 +169,7 @@ export default function SemanticSearchPage() {
         isUpdatingUrlRef.current = false;
       }, 100);
     }
-  }, [setUrlSearchParams]);
+  }, [setUrlSearchParams, user, loadCachedSearch]);
 
   // Handle new chat
   const handleNewChat = useCallback(() => {
@@ -241,8 +296,13 @@ export default function SemanticSearchPage() {
     }
   }, [isLoading, messages, saveCurrentConversation]);
 
-  // Handle sending a new message
+  // Handle sending a new message with background search
   const handleSendMessage = async (content: string) => {
+    if (!user) {
+      console.error('Cannot send message: user not authenticated');
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: generateMessageId(),
       type: 'user',
@@ -252,12 +312,17 @@ export default function SemanticSearchPage() {
 
     // Add user message immediately
     setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
+
+    // Generate or use existing conversation ID
+    const conversationId = currentConversationId || generateConversationId();
+    if (!currentConversationId) {
+      setCurrentConversationId(conversationId);
+    }
 
     // Track chat message for personalization
     const startTime = Date.now();
     try {
-      await trackChatMessage(content, currentConversationId);
+      await trackChatMessage(content, conversationId);
     } catch (error) {
       console.error('Error tracking chat message:', error);
     }
@@ -415,60 +480,29 @@ export default function SemanticSearchPage() {
         console.log('🚀 Unified search params with filters:', unifiedParams);
 
         try {
-          // Update status to show we're searching
-          updateStatus('searching', 'Searching through your data...');
+          // Check if we already have cached results for this conversation
+          let cachedResults = getSearchResults(conversationId);
 
-          // Add enhanced prompting for better LLM preprocessing
-          const enhancedParams = {
-            ...unifiedParams,
-            useEnhancedPrompting: true,
-            conversationHistory: messages.slice(-5).map(m => m.content), // Last 5 messages for context
-          };
+          // If not in background search context, check conversation cache
+          if (!cachedResults && hasValidSearchCache(conversationId)) {
+            const conversationCache = getConversationSearchCache(conversationId);
+            if (conversationCache && conversationCache.isValid) {
+              cachedResults = conversationCache.results;
+              console.log(`💾 Using conversation cache for ${conversationId}`);
+            }
+          }
 
-          console.log('🚀 CHAT: Calling unified-search Edge Function with enhanced params:', {
-            enhancedParams,
-            hasAmountRange: !!enhancedParams.filters?.amountRange,
-            amountRangeDetails: enhancedParams.filters?.amountRange
-          });
+          if (cachedResults) {
+            console.log(`💾 Using cached search results for conversation ${conversationId}`);
+            updateStatus('cached', 'Loading cached results...');
+            updateConversationSearchStatus(conversationId, 'cached');
 
-          console.log('🔍 CHAT: About to call unifiedSearch function...');
-          console.log('🔍 CHAT: Enhanced params being sent:', JSON.stringify(enhancedParams, null, 2));
+            // Show cache loaded toast
+            showCacheLoadedToast(cachedResults.results.length, conversationId);
 
-          // Add detailed debugging before the call
-          console.log('🔧 DEBUG: unifiedSearch function details:', {
-            functionExists: typeof unifiedSearch === 'function',
-            paramsValid: !!enhancedParams,
-            queryLength: enhancedParams.query?.length || 0,
-            sourcesCount: enhancedParams.sources?.length || 0
-          });
-
-          const unifiedResponse = await unifiedSearch(enhancedParams);
-
-          console.log('🔍 CHAT: unifiedSearch function returned:', {
-            success: unifiedResponse?.success,
-            hasResults: !!unifiedResponse?.results,
-            resultCount: unifiedResponse?.results?.length || 0,
-            error: unifiedResponse?.error,
-            fullResponse: unifiedResponse
-          });
-
-          console.log('📊 CHAT: Unified-search response received:', {
-            success: unifiedResponse.success,
-            resultsCount: unifiedResponse.results?.length || 0,
-            totalResults: unifiedResponse.totalResults,
-            searchMetadata: unifiedResponse.searchMetadata,
-            sampleResults: unifiedResponse.results?.slice(0, 3).map(r => ({
-              id: r.sourceId,
-              title: r.title,
-              total: r.metadata?.total,
-              source: r.source
-            }))
-          });
-
-          if (unifiedResponse.success) {
-            // 🔧 IMPROVED: Better conversion from unified response to chat display format
-            results = {
-              results: unifiedResponse.results.map(result => ({
+            // Process cached results immediately
+            const results = {
+              results: cachedResults.results.map(result => ({
                 id: result.sourceId,
                 merchant: result.title,
                 date: result.metadata?.date || result.createdAt,
@@ -480,8 +514,8 @@ export default function SemanticSearchPage() {
                 fullText: result.content,
                 ...(result.metadata || {})
               })),
-              count: unifiedResponse.results.length,
-              total: unifiedResponse.totalResults,
+              count: cachedResults.results.length,
+              total: cachedResults.totalResults,
               searchParams: {
                 query: content,
                 isNaturalLanguage: true,
@@ -489,259 +523,120 @@ export default function SemanticSearchPage() {
                 offset: 0,
                 searchTarget: 'all'
               },
-              searchMetadata: unifiedResponse.searchMetadata
+              searchMetadata: cachedResults.searchMetadata
             };
 
-            console.log('✅ CHAT: Successfully processed unified-search results:', {
-              resultsCount: results.count,
-              totalResults: results.total,
-              hasMetadata: !!results.searchMetadata
-            });
-          } else {
-            throw new Error(unifiedResponse.error || 'Unified search failed');
-          }
-        } catch (unifiedError) {
-          console.error('❌ CHAT: Unified-search failed:', unifiedError);
-          console.error('❌ CHAT: Error details:', {
-            message: unifiedError?.message || 'No message',
-            stack: unifiedError?.stack || 'No stack',
-            name: unifiedError?.name || 'No name',
-            cause: unifiedError?.cause || 'No cause',
-            toString: unifiedError?.toString() || 'No toString',
-            errorType: typeof unifiedError,
-            errorConstructor: unifiedError?.constructor?.name || 'Unknown'
-          });
-
-          // 🔄 SELECTIVE FALLBACK: Only fall back to ai-search.ts for specific error types
-          const errorMessage = unifiedError?.message || unifiedError?.toString() || 'Unknown error';
-          const isAuthError = errorMessage.includes('authentication') ||
-                             errorMessage.includes('Invalid authentication token') ||
-                             errorMessage.includes('401');
-          const isCorsError = errorMessage.includes('CORS') ||
-                             errorMessage.includes('Failed to fetch') ||
-                             errorMessage.includes('Network error');
-
-          console.log('🔍 CHAT: Error type analysis:', {
-            isAuthError,
-            isCorsError,
-            errorMessage,
-            willFallback: isAuthError || isCorsError,
-            errorStringified: JSON.stringify(unifiedError, null, 2)
-          });
-
-          if (isAuthError || isCorsError) {
-            console.log('🔄 CHAT: Falling back to ai-search.ts due to:', isAuthError ? 'auth error' : 'CORS error');
-
-            // Fallback to legacy search with parsed query filters applied
-            params = {
-              query: content,
-              isNaturalLanguage: true,
-              limit: 10,
-              offset: 0,
-              searchTarget: 'all'
+            // Generate AI response immediately
+            const aiResponse = await generateIntelligentResponse(results, content, messages);
+            const aiMessage: ChatMessage = {
+              id: generateMessageId(),
+              type: 'ai',
+              content: aiResponse,
+              timestamp: new Date(),
+              searchResults: results,
             };
 
-          // Apply parsed query filters to legacy search if available
-          if (parsedQuery?.amountRange) {
-            console.log('💰 DEBUG: Parsed amount range for legacy search:', {
-              amountRange: parsedQuery.amountRange,
-              min: parsedQuery.amountRange.min,
-              max: parsedQuery.amountRange.max,
-              minType: typeof parsedQuery.amountRange.min,
-              maxType: typeof parsedQuery.amountRange.max
+            setMessages(prev => [...prev, aiMessage]);
+            updateStatus('complete', 'Cached results loaded successfully');
+            return;
+          }
+
+          // Add enhanced prompting for better LLM preprocessing
+          const enhancedParams = {
+            ...unifiedParams,
+            useEnhancedPrompting: true,
+            conversationHistory: messages.slice(-5).map(m => m.content), // Last 5 messages for context
+          };
+
+          // Start background search
+          console.log(`🚀 Starting background search for conversation ${conversationId}`);
+          updateConversationSearchStatus(conversationId, 'processing');
+
+          // Show background search toast
+          showBackgroundSearchToast(conversationId);
+          showNavigationFreedomToast();
+
+          // Start the background search (non-blocking)
+          startBackgroundSearch(conversationId, content, enhancedParams)
+            .then(async (searchResults) => {
+              // Process results when search completes
+              const results = {
+                results: searchResults.results.map(result => ({
+                  id: result.sourceId,
+                  merchant: result.title,
+                  date: result.metadata?.date || result.createdAt,
+                  total: result.metadata?.total || 0,
+                  total_amount: result.metadata?.total || 0,
+                  currency: result.metadata?.currency || 'MYR',
+                  similarity_score: result.similarity,
+                  predicted_category: result.metadata?.predicted_category,
+                  fullText: result.content,
+                  ...(result.metadata || {})
+                })),
+                count: searchResults.results.length,
+                total: searchResults.totalResults,
+                searchParams: {
+                  query: content,
+                  isNaturalLanguage: true,
+                  limit: 10,
+                  offset: 0,
+                  searchTarget: 'all'
+                },
+                searchMetadata: searchResults.searchMetadata
+              };
+
+              // Generate AI response
+              const aiResponse = await generateIntelligentResponse(results, content, messages);
+              const aiMessage: ChatMessage = {
+                id: generateMessageId(),
+                type: 'ai',
+                content: aiResponse,
+                timestamp: new Date(),
+                searchResults: results,
+              };
+
+              setMessages(prev => [...prev, aiMessage]);
+              updateStatus('complete', 'Search completed successfully');
+              updateConversationSearchStatus(conversationId, 'completed');
+            })
+            .catch((error) => {
+              console.error('Background search failed:', error);
+              updateStatus('error', 'Search failed', 'Please try again or rephrase your question');
+              updateConversationSearchStatus(conversationId, 'error');
+
+              // Generate error response
+              const errorMessage: ChatMessage = {
+                id: generateMessageId(),
+                type: 'ai',
+                content: "I'm sorry, I encountered an error while searching your receipts. Please try again or rephrase your question.",
+                timestamp: new Date(),
+              };
+
+              setMessages(prev => [...prev, errorMessage]);
             });
-            params.minAmount = parsedQuery.amountRange.min;
-            params.maxAmount = parsedQuery.amountRange.max;
-            console.log('💰 Applied amount range to legacy search params:', {
-              minAmount: params.minAmount,
-              maxAmount: params.maxAmount
-            });
-          }
 
-          if (parsedQuery?.dateRange) {
-            console.log('📅 Applying date range to legacy search:', parsedQuery.dateRange);
-            params.startDate = parsedQuery.dateRange.start;
-            params.endDate = parsedQuery.dateRange.end;
-          }
+          // Update status to show search is in progress
+          updateStatus('searching', 'Searching through your data...');
 
-          if (parsedQuery?.merchants && parsedQuery.merchants.length > 0) {
-            console.log('🏪 Applying merchants to legacy search:', parsedQuery.merchants);
-            params.merchants = parsedQuery.merchants;
-          }
+          // Don't block - user can navigate freely while search runs in background
+          console.log(`✅ Background search initiated for conversation ${conversationId}`);
 
-          if (parsedQuery?.categories && parsedQuery.categories.length > 0) {
-            console.log('📂 CHAT: Applying categories to fallback search:', parsedQuery.categories);
-            params.categories = parsedQuery.categories;
-          }
+          // Return early - background search is now handling everything
+          return;
+        } catch (error) {
+          console.error('Error in search setup:', error);
+          updateStatus('error', 'Failed to start search', 'Please try again');
 
-          results = await semanticSearch(params);
-          } else {
-            // For other errors, don't fall back - let the user know there's an issue
-            throw unifiedError;
-          }
+          // Generate error message for search setup failure
+          const errorMessage: ChatMessage = {
+            id: generateMessageId(),
+            type: 'ai',
+            content: "I'm sorry, I encountered an error while setting up the search. Please try again.",
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMessage]);
         }
-
-        setLastSearchParams(params || {
-          query: content,
-          isNaturalLanguage: true,
-          limit: 10,
-          offset: 0,
-          searchTarget: 'all'
-        });
-        setCurrentOffset(0);
-      }
-
-      // Update status to show we're generating response
-      updateStatus('generating', 'Generating personalized response...');
-
-      // Generate personalized response using the personalization service
-      let responseContent: string;
-      try {
-        responseContent = await personalizedChatService.generatePersonalizedResponse(
-          content,
-          results,
-          currentConversationId
-        );
-
-        // Enhance response with filter information if amount filtering was applied
-        // Check both parsedQuery (from unified search) and searchMetadata (from fallback search)
-        const amountRange = parsedQuery?.amountRange || results.searchMetadata?.monetaryFilter;
-
-        if (amountRange) {
-          const { min, max, originalAmount, originalCurrency, conversionInfo } = amountRange;
-          const filterInfo = [];
-
-          // Use original currency for user-friendly display
-          const displayCurrency = originalCurrency || 'MYR';
-          const displayMin = originalAmount || min;
-          const displayMax = amountRange.originalMaxAmount || max;
-
-          if (min !== undefined && min > 0) {
-            const displayAmount = formatCurrencyAmount({ amount: displayMin, currency: displayCurrency });
-            filterInfo.push(`over ${displayAmount}`);
-          }
-          if (max !== undefined && max < Number.MAX_SAFE_INTEGER) {
-            const displayAmount = formatCurrencyAmount({ amount: displayMax, currency: displayCurrency });
-            filterInfo.push(`under ${displayAmount}`);
-          }
-
-          if (filterInfo.length > 0) {
-            const filterText = filterInfo.join(' and ');
-            let enhancedResponse = responseContent.replace(
-              /I found (\d+) receipts?/i,
-              `I found $1 receipts ${filterText}`
-            );
-
-            // Also enhance "couldn't find" responses
-            enhancedResponse = enhancedResponse.replace(
-              /I couldn't find any receipts matching/i,
-              `I couldn't find any receipts ${filterText} matching`
-            );
-
-            // Add conversion note if currency conversion was applied
-            if (conversionInfo && conversionInfo.conversionApplied) {
-              enhancedResponse += `\n\n*Note: Converted to ${formatCurrencyAmount(conversionInfo.convertedAmount)} for database search.*`;
-            }
-
-            responseContent = enhancedResponse;
-            console.log('💰 Enhanced response with monetary filter information:', { filterText, amountRange });
-          }
-        }
-
-      } catch (error) {
-        console.error('Error generating personalized response:', error);
-        // Fallback to standard response generation with monetary filter support
-        // Check both parsedQuery and searchMetadata for monetary filter information
-        const amountRange = parsedQuery?.amountRange || results.searchMetadata?.monetaryFilter;
-        const monetaryFilter = amountRange ? {
-          min: amountRange.min,
-          max: amountRange.max,
-          currency: amountRange.currency,
-          originalAmount: amountRange.originalAmount,
-          originalMaxAmount: amountRange.originalMaxAmount,
-          originalCurrency: amountRange.originalCurrency,
-          conversionInfo: amountRange.conversionInfo
-        } : undefined;
-
-        responseContent = generateIntelligentResponse(results, content, monetaryFilter);
-        console.log('💰 Using fallback response generation with monetary filter:', monetaryFilter);
-      }
-
-      // Add UI components from search metadata if available
-      if (results.searchMetadata?.uiComponents && results.searchMetadata.uiComponents.length > 0) {
-        // Append UI component JSON blocks to the response content
-        for (const component of results.searchMetadata.uiComponents) {
-          responseContent += `\n\n\`\`\`ui_component\n${JSON.stringify(component, null, 2)}\n\`\`\``;
-        }
-      }
-
-      const aiMessage: ChatMessage = {
-        id: generateMessageId(),
-        type: 'ai',
-        content: responseContent,
-        timestamp: new Date(),
-        searchResults: results,
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-
-      // Save conversation memory for personalization
-      try {
-        await conversationMemoryService.saveMemory(
-          'conversation_turn',
-          `${userMessage.id}_${aiMessage.id}`,
-          {
-            user_message: content,
-            ai_response: responseContent,
-            search_results_count: results.results?.length || 0,
-            timestamp: new Date().toISOString()
-          },
-          0.8, // High confidence for actual conversations
-          currentConversationId
-        );
-      } catch (error) {
-        console.error('Error saving conversation memory:', error);
-      }
-
-      // Track search query for analytics
-      try {
-        await trackSearchQuery(
-          content,
-          'semantic',
-          results.results?.length || 0
-        );
-      } catch (error) {
-        console.error('Error tracking search query:', error);
-      }
-
-      // Calculate response time for analytics
-      const responseTime = Date.now() - startTime;
-
-      // Update status to complete
-      updateStatus('complete', 'Response generated successfully');
-
-      // If there are more results available, add a system message about it
-      if (results.results && results.total && results.results.length < results.total) {
-        const moreResultsMessage: ChatMessage = {
-          id: generateMessageId(),
-          type: 'system',
-          content: `Showing ${results.results.length} of ${results.total} results. Ask me to "show more results" to see additional matches.`,
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, moreResultsMessage]);
-      }
-
-      // Update URL to reflect current query
-      processedQueryRef.current = content;
-      // Set flag to indicate this is a programmatic URL update
-      isUpdatingUrlRef.current = true;
-      setUrlSearchParams({ q: content });
-      // Reset flag after a brief delay to allow URL update to complete
-      setTimeout(() => {
-        isUpdatingUrlRef.current = false;
-      }, 100);
-
+      } // Close the inner try block that started at line 482
     } catch (error) {
       console.error('Search error:', error);
 
@@ -797,6 +692,7 @@ export default function SemanticSearchPage() {
   };
 
   // Initialize from URL if there's a query parameter (after all functions are defined)
+  // Modified to prevent navigation locks during background search
   useEffect(() => {
     // Skip if this is a programmatic URL update from within the component
     if (isUpdatingUrlRef.current) {
@@ -806,7 +702,7 @@ export default function SemanticSearchPage() {
     const query = urlSearchParams.get('q');
     const conversationId = urlSearchParams.get('c');
 
-    // Only process on initial load or when URL changes externally
+    // Only process on initial load - don't re-trigger searches on navigation back
     if (!isInitializedRef.current) {
       isInitializedRef.current = true;
 
@@ -817,21 +713,21 @@ export default function SemanticSearchPage() {
         handleSendMessage(query);
       }
     } else {
-      // For subsequent URL changes, only process if it's a different query/conversation
-      // and not from our own URL updates
+      // For subsequent URL changes, only load conversations, don't re-trigger searches
       if (conversationId && conversationId !== currentConversationId) {
         loadConversation(conversationId);
-      } else if (query && query !== processedQueryRef.current && !conversationId) {
-        processedQueryRef.current = query;
-        handleSendMessage(query);
       }
+      // Removed automatic search re-triggering to prevent navigation locks
     }
-  }, [loadConversation, handleSendMessage, urlSearchParams, currentConversationId]);
+  }, [loadConversation, urlSearchParams, currentConversationId]); // Removed handleSendMessage dependency
 
 
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Search Status Toast Manager */}
+      <SearchStatusToastManager />
+
       <Helmet>
         <title>AI Chat - Mataresit</title>
       </Helmet>
@@ -851,6 +747,22 @@ export default function SemanticSearchPage() {
               ? 'max-w-6xl lg:max-w-5xl' // Responsive width when sidebar is open
               : 'max-w-4xl lg:max-w-3xl xl:max-w-4xl' // Optimal responsive width when sidebar is closed
           }`}>
+            {/* Enhanced search status indicators */}
+            {currentConversationId && (
+              <div className="mb-6 space-y-3">
+                <BackgroundSearchIndicator
+                  conversationId={currentConversationId}
+                  variant="detailed"
+                  showTimestamp={true}
+                  className="justify-center"
+                />
+                <SearchProgressIndicator
+                  conversationId={currentConversationId}
+                  className="max-w-md mx-auto"
+                />
+              </div>
+            )}
+
             <ChatContainer
               messages={messages}
               isLoading={isLoading}

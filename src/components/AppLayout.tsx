@@ -5,6 +5,7 @@ import { MainNavigationToggle } from "./MainNavigationToggle";
 import { useChatControls } from "@/contexts/ChatControlsContext";
 import { AppSidebarProvider, useAppSidebar } from "@/contexts/AppSidebarContext";
 import { RouteAwareSidebarManager } from "./sidebar/RouteAwareSidebarManager";
+import { GlobalBackgroundSearchStatus } from "./search/BackgroundSearchIndicator";
 
 // AppLayout content component that uses the sidebar context
 function AppLayoutContent() {
@@ -47,6 +48,9 @@ function AppLayoutContent() {
           <Outlet />
         </main>
       </div>
+
+      {/* Global background search status indicator */}
+      <GlobalBackgroundSearchStatus />
     </div>
   );
 }

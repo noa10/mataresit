@@ -58,6 +58,7 @@ import {
   importConversations
 } from '../../lib/conversation-history';
 import { useConversationHistory } from '../../hooks/useConversationHistory';
+import { BackgroundSearchIndicator } from '../search/BackgroundSearchIndicator';
 
 interface ConversationSidebarProps {
   isOpen: boolean;
@@ -723,6 +724,13 @@ const ConversationItem = React.memo(function ConversationItem({ conversation, is
           <span className="text-xs text-muted-foreground">
             {conversation.messageCount} message{conversation.messageCount !== 1 ? 's' : ''}
           </span>
+          {/* Search status indicator */}
+          {conversation.hasSearchResults && (
+            <BackgroundSearchIndicator
+              conversationId={conversation.id}
+              variant="compact"
+            />
+          )}
         </div>
       </div>
 

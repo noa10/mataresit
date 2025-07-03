@@ -1,4 +1,12 @@
 import { ChatMessage } from '../components/chat/ChatMessage';
+import { UnifiedSearchParams, UnifiedSearchResponse } from '@/types/search';
+
+export interface SearchResultCache {
+  searchParams: UnifiedSearchParams;
+  results: UnifiedSearchResponse;
+  cachedAt: number;
+  isValid: boolean;
+}
 
 export interface ConversationMetadata {
   id: string;
@@ -7,6 +15,11 @@ export interface ConversationMetadata {
   messageCount: number;
   lastMessage?: string;
   firstUserMessage?: string;
+  // Enhanced metadata for search result caching
+  hasSearchResults?: boolean;
+  lastSearchQuery?: string;
+  searchResultsCache?: SearchResultCache;
+  searchStatus?: 'idle' | 'processing' | 'completed' | 'cached' | 'error';
 }
 
 export interface StoredConversation {
@@ -100,21 +113,134 @@ export function saveConversation(conversation: StoredConversation): void {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     let conversations: StoredConversation[] = stored ? JSON.parse(stored) : [];
-    
+
     // Remove existing conversation with same ID
     conversations = conversations.filter(conv => conv.metadata.id !== conversation.metadata.id);
-    
+
     // Add the updated conversation
     conversations.unshift(conversation);
-    
+
     // Limit the number of stored conversations
     if (conversations.length > MAX_CONVERSATIONS) {
       conversations = conversations.slice(0, MAX_CONVERSATIONS);
     }
-    
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
   } catch (error) {
     console.error('Error saving conversation:', error);
+  }
+}
+
+/**
+ * Update conversation search result cache
+ */
+export function updateConversationSearchCache(
+  conversationId: string,
+  searchParams: UnifiedSearchParams,
+  results: UnifiedSearchResponse,
+  status: 'processing' | 'completed' | 'cached' | 'error' = 'completed'
+): void {
+  try {
+    const conversation = getConversation(conversationId);
+    if (!conversation) {
+      console.warn(`Conversation ${conversationId} not found for search cache update`);
+      return;
+    }
+
+    // Update metadata with search cache information
+    conversation.metadata.hasSearchResults = true;
+    conversation.metadata.lastSearchQuery = searchParams.query;
+    conversation.metadata.searchStatus = status;
+    conversation.metadata.searchResultsCache = {
+      searchParams,
+      results,
+      cachedAt: Date.now(),
+      isValid: true
+    };
+
+    // Save the updated conversation
+    saveConversation(conversation);
+
+    console.log(`💾 Updated search cache for conversation ${conversationId} with status: ${status}`);
+  } catch (error) {
+    console.error('Error updating conversation search cache:', error);
+  }
+}
+
+/**
+ * Get cached search results for a conversation
+ */
+export function getConversationSearchCache(conversationId: string): SearchResultCache | null {
+  try {
+    const conversation = getConversation(conversationId);
+    if (!conversation?.metadata.searchResultsCache) {
+      return null;
+    }
+
+    const cache = conversation.metadata.searchResultsCache;
+
+    // Check if cache is still valid (24 hours)
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    const isExpired = Date.now() - cache.cachedAt > maxAge;
+
+    if (isExpired || !cache.isValid) {
+      // Invalidate expired cache
+      invalidateConversationSearchCache(conversationId);
+      return null;
+    }
+
+    return cache;
+  } catch (error) {
+    console.error('Error getting conversation search cache:', error);
+    return null;
+  }
+}
+
+/**
+ * Invalidate search cache for a conversation
+ */
+export function invalidateConversationSearchCache(conversationId: string): void {
+  try {
+    const conversation = getConversation(conversationId);
+    if (!conversation) return;
+
+    // Clear search cache metadata
+    conversation.metadata.hasSearchResults = false;
+    conversation.metadata.searchResultsCache = undefined;
+    conversation.metadata.searchStatus = 'idle';
+
+    saveConversation(conversation);
+    console.log(`🗑️ Invalidated search cache for conversation ${conversationId}`);
+  } catch (error) {
+    console.error('Error invalidating conversation search cache:', error);
+  }
+}
+
+/**
+ * Check if conversation has valid cached search results
+ */
+export function hasValidSearchCache(conversationId: string): boolean {
+  const cache = getConversationSearchCache(conversationId);
+  return cache !== null && cache.isValid;
+}
+
+/**
+ * Update conversation search status
+ */
+export function updateConversationSearchStatus(
+  conversationId: string,
+  status: 'idle' | 'processing' | 'completed' | 'cached' | 'error'
+): void {
+  try {
+    const conversation = getConversation(conversationId);
+    if (!conversation) return;
+
+    conversation.metadata.searchStatus = status;
+    saveConversation(conversation);
+
+    console.log(`🔄 Updated search status for conversation ${conversationId}: ${status}`);
+  } catch (error) {
+    console.error('Error updating conversation search status:', error);
   }
 }
 
