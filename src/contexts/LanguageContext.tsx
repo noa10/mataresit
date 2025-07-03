@@ -273,3 +273,8 @@ export function useClaimsTranslation() {
 export function useChatTranslation() {
   return useTranslationWithNamespace('chat');
 }
+
+// Helper hook for documentation translations
+export function useDocumentationTranslation() {
+  return useTranslationWithNamespace('documentation');
+}
