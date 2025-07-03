@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,6 +29,7 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import SettingsPage from "./pages/SettingsPage";
+import PerformanceTestPage from "./pages/PerformanceTestPage";
 import AdminRoute from "./components/admin/AdminRoute";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminLayoutPage from "./pages/admin/AdminLayout";
@@ -180,6 +180,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/performance-test" element={<PerformanceTestPage />} />
                 <Route path="/receipt/:id" element={
                   <Suspense fallback={<PageLoading />}>
                     <ViewReceipt />
