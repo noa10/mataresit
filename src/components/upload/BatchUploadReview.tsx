@@ -112,7 +112,7 @@ export function BatchUploadReview({
           </CardDescription>
         </CardHeader>
 
-      <CardContent className="flex flex-col flex-1 min-h-0">
+      <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex border-b mb-4 flex-shrink-0">
           <button
             className={`pb-2 px-4 font-medium text-sm ${
@@ -137,9 +137,10 @@ export function BatchUploadReview({
         </div>
 
         <EnhancedScrollArea
-          className="flex-1 w-full"
+          className="flex-1 w-full min-h-0"
           showScrollIndicator={true}
           fadeEdges={true}
+          maxHeight="400px"
         >
           {selectedTab === 'completed' && completedUploads.length > 0 && (
             <Table>
@@ -245,7 +246,7 @@ export function BatchUploadReview({
         </EnhancedScrollArea>
       </CardContent>
 
-      <CardFooter className="flex justify-between border-t pt-4">
+      <CardFooter className="flex justify-between border-t pt-4 relative z-20 bg-card flex-shrink-0">
         <div>
           {failedUploads.length > 0 && (
             <Button variant="outline" onClick={onRetryAll}>
