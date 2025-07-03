@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSubscription } from '@/hooks/useSubscription';
 import { SubscriptionEnforcementService, type SubscriptionUsageInfo } from '@/services/subscriptionEnforcementService';
 import { Link } from 'react-router-dom';
@@ -12,7 +13,6 @@ import {
   Database,
   Calendar,
   AlertTriangle,
-  CheckCircle,
   Users,
   Layers,
   RefreshCw,
@@ -31,9 +31,11 @@ export default function SubscriptionLimitsDisplay({
   compact = false,
   className = ""
 }: SubscriptionLimitsDisplayProps) {
-  const { limits, usage, isLoading, getCurrentTier } = useSubscription();
+  const { limits, usage, isLoading, error, getCurrentTier, refreshUsage, lastFetchTime, dataUpdatedAt } = useSubscription();
   const [realTimeUsage, setRealTimeUsage] = useState<SubscriptionUsageInfo | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+
 
   const tier = getCurrentTier();
 
@@ -53,18 +55,23 @@ export default function SubscriptionLimitsDisplay({
     fetchRealTimeUsage();
   }, []);
 
-  const refreshUsage = async () => {
+
+
+  const handleRefreshUsage = async () => {
     if (isRefreshing) return;
-    
+
     setIsRefreshing(true);
     try {
+      // Use the optimized refresh from the hook
+      await refreshUsage();
+
+      // Also refresh real-time usage
       const usageInfo = await SubscriptionEnforcementService.getUsageInfo();
       if (usageInfo) {
         setRealTimeUsage(usageInfo);
-        toast.success("Usage information refreshed");
-      } else {
-        toast.warning("Unable to refresh usage information");
       }
+
+      toast.success("Usage information refreshed");
     } catch (error) {
       console.error('Error refreshing usage:', error);
       toast.error("Failed to refresh usage information");
@@ -97,14 +104,94 @@ export default function SubscriptionLimitsDisplay({
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
             Usage & Limits
+            <Loader2 className="h-4 w-4 animate-spin" />
           </CardTitle>
+          <CardDescription>
+            Loading your usage statistics...
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Skeleton for usage stats */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <Skeleton className="h-6 w-20" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <Skeleton className="h-6 w-24" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <Skeleton className="h-4 w-36" />
+              </div>
+              <Skeleton className="h-6 w-16" />
+            </div>
+
+            {!compact && (
+              <div className="pt-2 border-t">
+                <Skeleton className="h-4 w-48 mb-2" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Usage & Limits
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshUsage}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-            <div className="h-4 bg-muted rounded w-1/2"></div>
-            <div className="h-4 bg-muted rounded w-2/3"></div>
-          </div>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load usage statistics: {error}
+              <br />
+              <Button
+                variant="link"
+                className="p-0 h-auto font-normal"
+                onClick={handleRefreshUsage}
+                disabled={isRefreshing}
+              >
+                Try refreshing
+              </Button>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -168,7 +255,7 @@ export default function SubscriptionLimitsDisplay({
           <Button
             variant="outline"
             size="sm"
-            onClick={refreshUsage}
+            onClick={handleRefreshUsage}
             disabled={isRefreshing}
           >
             {isRefreshing ? (
@@ -180,6 +267,16 @@ export default function SubscriptionLimitsDisplay({
         </div>
         <CardDescription>
           Current usage for your {tier.charAt(0).toUpperCase() + tier.slice(1)} plan
+          {(dataUpdatedAt || lastFetchTime) && (
+            <span className="text-xs text-muted-foreground ml-2">
+              • Updated {new Date(dataUpdatedAt || lastFetchTime).toLocaleTimeString()}
+              {dataUpdatedAt && (
+                <span className="ml-1 text-green-600">
+                  (cached)
+                </span>
+              )}
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
