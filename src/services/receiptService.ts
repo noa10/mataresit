@@ -6,6 +6,7 @@ import { normalizeMerchant } from '../lib/receipts/validation';
 import { generateEmbeddingsForReceipt } from '@/lib/ai-search';
 import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
 import { OpenRouterService, ProcessingInput, ProgressCallback } from '@/services/openRouterService';
+import { CacheInvalidationService } from '@/services/cacheInvalidationService';
 
 /**
  * Client-side processing logger for OpenRouter models
@@ -461,6 +462,14 @@ export const createReceipt = async (
       // Feature disabled to avoid 404 errors
     }
 
+    // Invalidate caches after successful receipt creation
+    try {
+      await CacheInvalidationService.onReceiptUploaded(user.user.id);
+    } catch (cacheError) {
+      console.warn('Cache invalidation failed:', cacheError);
+      // Don't fail the receipt creation if cache invalidation fails
+    }
+
     return receiptId;
   } catch (error) {
     console.error("Error creating receipt:", error);
@@ -502,6 +511,14 @@ export const updateReceipt = async (
         console.error('Failed to generate embeddings:', embeddingError);
         // Continue with the update even if embedding fails
       }
+    }
+
+    // Invalidate caches after successful receipt update
+    try {
+      await CacheInvalidationService.onReceiptUpdated(receipt.user_id);
+    } catch (cacheError) {
+      console.warn('Cache invalidation failed:', cacheError);
+      // Don't fail the update if cache invalidation fails
     }
 
     return receipt;
@@ -1139,10 +1156,10 @@ export const processReceiptWithOCR = processReceiptWithAI;
 // Delete a receipt
 export const deleteReceipt = async (id: string): Promise<boolean> => {
   try {
-    // First get the receipt to get the image URL
+    // First get the receipt to get the image URL and user_id
     const { data: receipt, error: fetchError } = await supabase
       .from("receipts")
-      .select("image_url")
+      .select("image_url, user_id")
       .eq("id", id)
       .single();
 
@@ -1201,6 +1218,16 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
       } catch (extractError) {
         console.error("Error extracting image path:", extractError);
         // Continue with the operation
+      }
+    }
+
+    // Invalidate caches after successful receipt deletion
+    if (receipt?.user_id) {
+      try {
+        await CacheInvalidationService.onReceiptDeleted(receipt.user_id);
+      } catch (cacheError) {
+        console.warn('Cache invalidation failed:', cacheError);
+        // Don't fail the deletion if cache invalidation fails
       }
     }
 
