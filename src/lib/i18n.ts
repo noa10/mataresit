@@ -22,6 +22,7 @@ import enFeatures from '@/locales/en/features.json';
 import enTeam from '@/locales/en/team.json';
 import enClaims from '@/locales/en/claims.json';
 import enChat from '@/locales/en/chat.json';
+import enDocumentation from '@/locales/en/documentation.json';
 
 import msCommon from '@/locales/ms/common.json';
 import msNavigation from '@/locales/ms/navigation.json';
@@ -41,6 +42,7 @@ import msFeatures from '@/locales/ms/features.json';
 import msTeam from '@/locales/ms/team.json';
 import msClaims from '@/locales/ms/claims.json';
 import msChat from '@/locales/ms/chat.json';
+import msDocumentation from '@/locales/ms/documentation.json';
 
 // Define supported languages
 export const SUPPORTED_LANGUAGES = {
@@ -69,7 +71,8 @@ export const NAMESPACES = [
   'features',
   'team',
   'claims',
-  'chat'
+  'chat',
+  'documentation'
 ] as const;
 
 export type Namespace = typeof NAMESPACES[number];
@@ -95,6 +98,7 @@ const resources = {
     team: enTeam,
     claims: enClaims,
     chat: enChat,
+    documentation: enDocumentation,
   },
   ms: {
     common: msCommon,
@@ -115,6 +119,7 @@ const resources = {
     team: msTeam,
     claims: msClaims,
     chat: msChat,
+    documentation: msDocumentation,
   }
 };
 

@@ -19,6 +19,7 @@ import type enFeatures from '@/locales/en/features.json';
 import type enTeam from '@/locales/en/team.json';
 import type enClaims from '@/locales/en/claims.json';
 import type enChat from '@/locales/en/chat.json';
+import type enDocumentation from '@/locales/en/documentation.json';
 
 // Define the structure of our translation resources
 export interface TranslationResources {
@@ -40,6 +41,7 @@ export interface TranslationResources {
   team: typeof enTeam;
   claims: typeof enClaims;
   chat: typeof enChat;
+  documentation: typeof enDocumentation;
 }
 
 // Helper type to get nested keys from an object
@@ -68,6 +70,7 @@ export type FeaturesKeys = NestedKeyOf<typeof enFeatures>;
 export type TeamKeys = NestedKeyOf<typeof enTeam>;
 export type ClaimsKeys = NestedKeyOf<typeof enClaims>;
 export type ChatKeys = NestedKeyOf<typeof enChat>;
+export type DocumentationKeys = NestedKeyOf<typeof enDocumentation>;
 
 // Union type of all translation keys
 export type TranslationKey =
@@ -88,7 +91,8 @@ export type TranslationKey =
   | `features:${FeaturesKeys}`
   | `team:${TeamKeys}`
   | `claims:${ClaimsKeys}`
-  | `chat:${ChatKeys}`;
+  | `chat:${ChatKeys}`
+  | `documentation:${DocumentationKeys}`;
 
 // Supported languages
 export type SupportedLanguage = 'en' | 'ms';
