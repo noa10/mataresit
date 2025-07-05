@@ -133,7 +133,7 @@ export function createReceiptContextMenu(
     {
       label: 'Open in Same Window',
       action: () => {
-        navigate(`/receipt/${receiptId}`, {
+        navigate(`/receipts/${receiptId}`, {
           state: {
             from: options.from || 'chat',
             itemType: options.itemType

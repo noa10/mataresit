@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/utils/processingOptimizer";
 import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
+import { ReceiptNotificationService } from "@/services/receiptNotificationService";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
 
 interface BatchUploadOptions {
@@ -108,6 +109,7 @@ interface BatchUploadState {
   receiptIds: Record<string, string>;
   processingRecommendations: Record<string, ProcessingRecommendation>;
   progressUpdating: Record<string, boolean>; // Track which uploads are actively updating progress
+  batchId: string | null; // Unique identifier for the current batch
 }
 
 /**
@@ -122,7 +124,8 @@ const initialBatchState: BatchUploadState = {
   failedUploads: [],
   receiptIds: {},
   processingRecommendations: {},
-  progressUpdating: {}
+  progressUpdating: {},
+  batchId: null
 };
 
 /**
@@ -163,7 +166,9 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
         processingRecommendations: {
           ...state.processingRecommendations,
           ...action.recommendations
-        }
+        },
+        // Generate a new batch ID if this is the first batch or if starting a new batch
+        batchId: state.batchId || `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
     }
 
@@ -357,7 +362,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     failedUploads,
     receiptIds,
     processingRecommendations,
-    progressUpdating
+    progressUpdating,
+    batchId
   } = state;
 
   // Computed properties
@@ -894,8 +900,9 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       upload.status === 'pending' && !activeUploads.includes(upload.id)
     );
 
-    // If no more pending uploads, we're done
-    if (pendingUploads.length === 0) {
+    // If no more pending uploads AND no active uploads, we're done
+    if (pendingUploads.length === 0 && activeUploads.length === 0) {
+      console.log('🎉 Batch processing complete - all uploads finished');
       dispatch({ type: 'STOP_PROCESSING' });
       processingRef.current = false;
 
@@ -904,12 +911,43 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       const successCount = completedUploads.length;
       const failureCount = failedUploads.length;
 
+      console.log('📊 Batch completion stats:', {
+        total: totalCount,
+        successful: successCount,
+        failed: failureCount,
+        batchUploads: batchUploads.map(u => ({ id: u.id, status: u.status }))
+      });
+
       if (totalCount > 0) {
         if (failureCount === 0) {
           toast.success(`All ${successCount} receipts processed successfully!`);
         } else {
           toast.info(`Batch processing complete: ${successCount} succeeded, ${failureCount} failed`);
         }
+
+        // Send batch completion notification
+        try {
+          if (user?.id) {
+            console.log('📤 Sending batch completion notification...');
+            await ReceiptNotificationService.handleBatchProcessingComplete(
+              user.id,
+              {
+                totalReceipts: totalCount,
+                successfulReceipts: successCount,
+                failedReceipts: failureCount,
+                batchId: batchId || undefined
+              }
+            );
+            console.log("✅ Batch completion notification sent successfully");
+          } else {
+            console.warn("Cannot send batch completion notification: user ID not available");
+          }
+        } catch (notificationError) {
+          console.error("❌ Failed to send batch completion notification:", notificationError);
+          // Non-critical, continue
+        }
+      } else {
+        console.log('ℹ️ No uploads to report for batch completion');
       }
 
       return;

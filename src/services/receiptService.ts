@@ -1479,6 +1479,10 @@ export const updateReceiptProcessingStatus = async (
       // Non-critical, continue
     }
 
+    // Notifications are now handled by database trigger only
+    // This prevents duplicate notifications and ensures consistent titles
+    console.log(`📢 Notification will be handled by database trigger for receipt ${id} status: ${processingStatus}`);
+
     return true;
   } catch (error) {
     console.error("Error in updateReceiptProcessingStatus:", error);
