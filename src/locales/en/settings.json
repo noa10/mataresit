@@ -296,8 +296,12 @@
   },
   "notifications": {
     "title": "Notification Settings",
+    "description": "Configure how and when you receive notifications",
+    "saved": "Notification preferences saved successfully",
+    "saveError": "Failed to save notification preferences",
     "email": {
       "title": "Email Notifications",
+      "description": "Receive notifications via email",
       "processingComplete": "Receipt processing complete",
       "teamInvitations": "Team invitations",
       "billingUpdates": "Billing updates",
@@ -306,9 +310,24 @@
     },
     "push": {
       "title": "Push Notifications",
+      "description": "Get instant notifications in your browser",
       "enabled": "Enable push notifications",
       "processingUpdates": "Processing updates",
       "teamActivity": "Team activity"
+    },
+    "quietHours": {
+      "title": "Quiet Hours",
+      "description": "Disable notifications during specific hours",
+      "enabled": "Enable quiet hours",
+      "startTime": "Start time",
+      "endTime": "End time",
+      "timezone": "Timezone"
+    },
+    "categories": {
+      "receiptProcessing": "Receipt Processing",
+      "teamCollaboration": "Team Collaboration",
+      "claimsAndBilling": "Claims & Billing",
+      "system": "System"
     }
   },
   "billing": {

@@ -295,20 +295,39 @@
     }
   },
   "notifications": {
-    "title": "Notification Settings",
+    "title": "Tetapan Notifikasi",
+    "description": "Konfigurasi bagaimana dan bila anda menerima notifikasi",
+    "saved": "Keutamaan notifikasi berjaya disimpan",
+    "saveError": "Gagal menyimpan keutamaan notifikasi",
     "email": {
-      "title": "Email Notifications",
-      "processingComplete": "Receipt processing complete",
-      "teamInvitations": "Team invitations",
-      "billingUpdates": "Billing updates",
-      "securityAlerts": "Security alerts",
-      "weeklyReports": "Weekly reports"
+      "title": "Notifikasi E-mel",
+      "description": "Terima notifikasi melalui e-mel",
+      "processingComplete": "Pemprosesan resit selesai",
+      "teamInvitations": "Jemputan pasukan",
+      "billingUpdates": "Kemas kini bil",
+      "securityAlerts": "Amaran keselamatan",
+      "weeklyReports": "Laporan mingguan"
     },
     "push": {
-      "title": "Push Notifications",
-      "enabled": "Enable push notifications",
-      "processingUpdates": "Processing updates",
-      "teamActivity": "Team activity"
+      "title": "Notifikasi Tolak",
+      "description": "Dapatkan notifikasi segera dalam pelayar anda",
+      "enabled": "Aktifkan notifikasi tolak",
+      "processingUpdates": "Kemas kini pemprosesan",
+      "teamActivity": "Aktiviti pasukan"
+    },
+    "quietHours": {
+      "title": "Waktu Senyap",
+      "description": "Lumpuhkan notifikasi pada waktu tertentu",
+      "enabled": "Aktifkan waktu senyap",
+      "startTime": "Masa mula",
+      "endTime": "Masa tamat",
+      "timezone": "Zon masa"
+    },
+    "categories": {
+      "receiptProcessing": "Pemprosesan Resit",
+      "teamCollaboration": "Kerjasama Pasukan",
+      "claimsAndBilling": "Tuntutan & Bil",
+      "system": "Sistem"
     }
   },
   "billing": {

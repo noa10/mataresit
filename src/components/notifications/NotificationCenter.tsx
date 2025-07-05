@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Check, Archive, Trash2, X } from 'lucide-react';
+import { Bell, Check, Archive, Trash2, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,16 +11,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { notificationService } from '@/services/notificationService';
+import { toast } from 'sonner';
+import { useNotifications } from '@/contexts/NotificationContext';
 import {
   Notification,
+  NotificationPreferences,
   NOTIFICATION_TYPE_ICONS,
   NOTIFICATION_TYPE_COLORS,
   NOTIFICATION_PRIORITY_COLORS,
   formatNotificationTime,
-  shouldShowNotification,
+  shouldShowNotificationWithPreferences,
 } from '@/types/notifications';
+import { useNotificationPreferences } from '@/hooks/usePushNotifications';
 import { cn } from '@/lib/utils';
 
 interface NotificationCenterProps {
@@ -29,132 +31,52 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ teamId, className }: NotificationCenterProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Load notifications
-  const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      const data = await notificationService.getUserNotifications(
-        { team_id: teamId },
-        20,
-        0
-      );
-      setNotifications(data.filter(shouldShowNotification));
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load notifications',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use centralized notification context
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    isConnected,
+    error,
+    markAsRead,
+    markAllAsRead,
+    archiveNotification,
+    deleteNotification,
+    refreshNotifications,
+    reconnect,
+  } = useNotifications();
 
-  // Load unread count
-  const loadUnreadCount = async () => {
-    try {
-      const count = await notificationService.getUnreadNotificationCount(teamId);
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error loading unread count:', error);
-    }
-  };
+  // Load user notification preferences
+  const { preferences: notificationPreferences } = useNotificationPreferences();
 
-  // Mark notification as read
-  const markAsRead = async (notificationId: string) => {
-    try {
-      await notificationService.markNotificationAsRead(notificationId);
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === notificationId
-            ? { ...n, read_at: new Date().toISOString() }
-            : n
-        )
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to mark notification as read',
-        variant: 'destructive',
-      });
-    }
-  };
+  // Filter notifications by team if specified
+  const filteredNotifications = teamId
+    ? notifications.filter(n => !n.team_id || n.team_id === teamId)
+    : notifications;
 
-  // Mark all as read
-  const markAllAsRead = async () => {
-    try {
-      const updatedCount = await notificationService.markAllNotificationsAsRead(teamId);
-      setNotifications(prev =>
-        prev.map(n => ({ ...n, read_at: new Date().toISOString() }))
-      );
-      setUnreadCount(0);
-      toast({
-        title: 'Success',
-        description: `Marked ${updatedCount} notifications as read`,
-      });
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to mark all notifications as read',
-        variant: 'destructive',
-      });
-    }
-  };
+  // Filter notifications that should be shown based on user preferences
+  const visibleNotifications = filteredNotifications.filter(notification =>
+    shouldShowNotificationWithPreferences(notification, notificationPreferences)
+  );
 
-  // Archive notification
-  const archiveNotification = async (notificationId: string) => {
-    try {
-      await notificationService.archiveNotification(notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      if (!notifications.find(n => n.id === notificationId)?.read_at) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-      toast({
-        title: 'Success',
-        description: 'Notification archived',
-      });
-    } catch (error) {
-      console.error('Error archiving notification:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to archive notification',
-        variant: 'destructive',
-      });
-    }
-  };
+  // Calculate unread count based on visible notifications only
+  const filteredUnreadCount = visibleNotifications.filter(n => !n.read_at).length;
 
-  // Delete notification
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      await notificationService.deleteNotification(notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      if (!notifications.find(n => n.id === notificationId)?.read_at) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-      toast({
-        title: 'Success',
-        description: 'Notification deleted',
-      });
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete notification',
-        variant: 'destructive',
+  // Handle connection error display
+  useEffect(() => {
+    if (error) {
+      toast.error('Connection Error', {
+        description: error,
+        action: {
+          label: 'Reconnect',
+          onClick: reconnect,
+        },
       });
     }
-  };
+  }, [error, reconnect]);
 
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
@@ -170,34 +92,18 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
     setOpen(false);
   };
 
-  // Load data on mount and when teamId changes
-  useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
-  }, [teamId]);
+  // Handle refresh action
+  const handleRefresh = async () => {
+    await refreshNotifications();
+  };
 
-  // Set up real-time subscription
-  useEffect(() => {
-    const unsubscribe = notificationService.subscribeToUserNotifications(
-      (notification) => {
-        if (!teamId || notification.team_id === teamId) {
-          setNotifications(prev => [notification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          // Show toast for high priority notifications
-          if (notification.priority === 'high') {
-            toast({
-              title: notification.title,
-              description: notification.message,
-            });
-          }
-        }
-      },
-      teamId
-    );
-
-    return unsubscribe;
-  }, [teamId, toast]);
+  // Handle reconnect action
+  const handleReconnect = () => {
+    reconnect();
+    toast.info('Reconnecting...', {
+      description: 'Attempting to restore real-time connection',
+    });
+  };
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -208,17 +114,17 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
           className={cn("relative", className)}
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
+          {filteredUnreadCount > 0 && (
             <Badge
               variant="destructive"
               className={cn(
                 "absolute -top-1 -right-1 rounded-full p-0 flex items-center justify-center font-bold leading-none",
-                unreadCount > 99
+                filteredUnreadCount > 99
                   ? "h-5 min-w-6 px-1 text-[10px]"
                   : "h-5 w-5 text-[11px]"
               )}
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {filteredUnreadCount > 99 ? '99+' : filteredUnreadCount}
             </Badge>
           )}
         </Button>
@@ -226,33 +132,82 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
       
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <h3 className="font-semibold">Notifications</h3>
-          {unreadCount > 0 && (
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold">Notifications</h3>
+            {/* Connection status indicator */}
+            {isConnected ? (
+              <Wifi className="h-3 w-3 text-green-500" title="Connected" />
+            ) : (
+              <WifiOff className="h-3 w-3 text-red-500" title="Disconnected" />
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Refresh button */}
             <Button
               variant="ghost"
               size="sm"
-              onClick={markAllAsRead}
-              className="text-xs"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="h-6 w-6 p-0"
+              title="Refresh notifications"
             >
-              Mark all read
+              <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
             </Button>
-          )}
+            {/* Reconnect button (only show when disconnected) */}
+            {!isConnected && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReconnect}
+                className="text-xs"
+                title="Reconnect to real-time updates"
+              >
+                Reconnect
+              </Button>
+            )}
+            {/* Mark all read button */}
+            {filteredUnreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={markAllAsRead}
+                className="text-xs"
+              >
+                Mark all read
+              </Button>
+            )}
+          </div>
         </DropdownMenuLabel>
         
         <DropdownMenuSeparator />
         
         <ScrollArea className="h-96">
-          {loading ? (
+          {isLoading ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
               Loading notifications...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : error ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
+              <WifiOff className="h-4 w-4 mx-auto mb-2 text-red-500" />
+              <p>Connection error</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReconnect}
+                className="mt-2 text-xs"
+              >
+                Try reconnecting
+              </Button>
+            </div>
+          ) : visibleNotifications.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              <Bell className="h-4 w-4 mx-auto mb-2" />
               No notifications
             </div>
           ) : (
             <div className="space-y-1">
-              {notifications.map((notification) => (
+              {visibleNotifications.map((notification) => (
                 <NotificationItem
                   key={notification.id}
                   notification={notification}

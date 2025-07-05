@@ -12,6 +12,8 @@ import { TeamProvider } from "@/contexts/TeamContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
 import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
+import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
@@ -64,6 +66,8 @@ const PersonalizationIntegrationTest = lazy(() => import("./components/test/Pers
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
+const NotificationTestingPage = lazy(() => import("./pages/NotificationTestingPage").then(m => ({ default: m.NotificationTestingPage })));
+const NotificationFilteringTestPage = lazy(() => import("./pages/NotificationFilteringTestPage").then(m => ({ default: m.NotificationFilteringTestPage })));
 
 
 // Create a loading component for suspense
@@ -94,7 +98,9 @@ const App = () => (
               <PersonalizationProvider>
                 <BackgroundSearchProvider>
                   <ChatControlsProvider>
-                    <TooltipProvider>
+                    <NotificationProvider>
+                      <PushNotificationProvider>
+                      <TooltipProvider>
             <Toaster />
             <Sonner />
             {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
@@ -236,6 +242,16 @@ const App = () => (
                     <PersonalizationIntegrationTest />
                   </Suspense>
                 } />
+                <Route path="/test/notifications" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <NotificationTestingPage />
+                  </Suspense>
+                } />
+                <Route path="/test/notification-filtering" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <NotificationFilteringTestPage />
+                  </Suspense>
+                } />
 
               </Route>
             </Route>
@@ -253,8 +269,10 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-                    </TooltipProvider>
-                  </ChatControlsProvider>
+                      </TooltipProvider>
+                    </PushNotificationProvider>
+                  </NotificationProvider>
+                </ChatControlsProvider>
                 </BackgroundSearchProvider>
               </PersonalizationProvider>
             </StripeProvider>
