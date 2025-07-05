@@ -1,5 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import {
+  generateReceiptProcessingEmail,
+  generateBatchProcessingEmail,
+  generateTeamCollaborationEmail,
+  ReceiptProcessingEmailData,
+  BatchProcessingEmailData,
+  TeamCollaborationEmailData
+} from './templates.ts';
 
 // Initialize Supabase client for database operations
 const supabaseClient = createClient(
@@ -26,13 +34,55 @@ serve(async (req) => {
       html,
       text,
       template_name,
+      template_data,
       related_entity_type,
       related_entity_id,
       team_id,
       metadata
     } = requestBody;
 
-    if (!to || !subject || (!html && !text)) {
+    // Generate email content from template if template_name and template_data are provided
+    let emailSubject = subject;
+    let emailHtml = html;
+    let emailText = text;
+
+    if (template_name && template_data) {
+      try {
+        let generatedEmail;
+
+        switch (template_name) {
+          case 'receipt_processing':
+            generatedEmail = generateReceiptProcessingEmail(template_data as ReceiptProcessingEmailData);
+            break;
+          case 'batch_processing':
+            generatedEmail = generateBatchProcessingEmail(template_data as BatchProcessingEmailData);
+            break;
+          case 'team_collaboration':
+            generatedEmail = generateTeamCollaborationEmail(template_data as TeamCollaborationEmailData);
+            break;
+          default:
+            console.warn(`Unknown template: ${template_name}`);
+            break;
+        }
+
+        if (generatedEmail) {
+          emailSubject = generatedEmail.subject;
+          emailHtml = generatedEmail.html;
+          emailText = generatedEmail.text;
+        }
+      } catch (error) {
+        console.error('Error generating email from template:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate email from template' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+
+    if (!to || !emailSubject || (!emailHtml && !emailText)) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: to, subject, and html or text' }),
         {
@@ -44,10 +94,11 @@ serve(async (req) => {
 
     console.log('Processing email request:', {
       to,
-      subject,
+      subject: emailSubject,
       template_name,
-      html_length: html?.length || 0,
-      text_length: text?.length || 0
+      html_length: emailHtml?.length || 0,
+      text_length: emailText?.length || 0,
+      using_template: !!template_name
     });
 
     // Enhanced implementation with Resend and delivery tracking
@@ -65,12 +116,16 @@ serve(async (req) => {
     // Create email delivery record
     const { data: deliveryData, error: deliveryError } = await supabaseClient.rpc('create_email_delivery', {
       _recipient_email: to,
-      _subject: subject,
+      _subject: emailSubject,
       _template_name: template_name || null,
       _related_entity_type: related_entity_type || null,
       _related_entity_id: related_entity_id || null,
       _team_id: team_id || null,
-      _metadata: metadata || {}
+      _metadata: {
+        ...metadata,
+        template_data: template_data || null,
+        generated_from_template: !!template_name
+      }
     });
 
     if (deliveryError) {
@@ -92,9 +147,9 @@ serve(async (req) => {
           body: JSON.stringify({
             from: FROM_EMAIL,
             to: [to],
-            subject: subject,
-            html: html,
-            text: text,
+            subject: emailSubject,
+            html: emailHtml,
+            text: emailText,
           }),
         });
 
@@ -155,7 +210,7 @@ serve(async (req) => {
       result = {
         id: `mock_${Date.now()}`,
         to: [to],
-        subject: subject,
+        subject: emailSubject,
         status: 'sent',
         created_at: new Date().toISOString(),
       };

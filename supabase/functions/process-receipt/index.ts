@@ -7,6 +7,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encodeBase64 } from "jsr:@std/encoding/base64"
 // Import deno-image for resizing
 import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
+// Import notification helper for Edge Functions
+import { EdgeNotificationHelper } from '../_shared/notification-helper.ts';
 
 // Maximum image size for processing (in bytes)
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB - increased for AI Vision processing
@@ -1498,6 +1500,9 @@ serve(async (req: Request) => {
 
     await logger.log("Starting receipt processing", "START");
 
+    // 2.1. Skip processing started notification (filtered out for noise reduction)
+    await logger.log("Skipping processing started notification - filtered out for noise reduction", "NOTIFICATION");
+
     // 3. Fetch and optimize image
     const optimizedImageBytes = await fetchAndOptimizeImage(imageUrl, logger);
 
@@ -1556,6 +1561,9 @@ serve(async (req: Request) => {
       };
 
       await logger.log("Created fallback data structure due to processing error", "RECOVERY");
+
+      // Mark this receipt as needing review due to processing issues
+      // We'll send a "ready for review" notification instead of "completed" later
     }
 
     // 6. Save results to database
@@ -1563,6 +1571,10 @@ serve(async (req: Request) => {
 
     // 7. Trigger post-processing (embeddings) asynchronously
     await triggerPostProcessing(receiptId, supabase, logger);
+
+    // 7.1. Notifications are now handled by database trigger only
+    // This prevents duplicate notifications and ensures consistent titles
+    await logger.log("Notifications will be handled by database trigger when status changes", "NOTIFICATION");
 
     // 8. Return success response
     await logger.log("Receipt processing completed successfully", "COMPLETE");
@@ -1580,7 +1592,8 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in process-receipt function:', error);
 
-    // Try to log the error if possible
+    // Try to log the error and send failure notification
+    let receiptId: string | null = null;
     try {
       if (error.message && error.message.includes('Missing required parameter')) {
         // For validation errors, return 400
@@ -1592,9 +1605,14 @@ serve(async (req: Request) => {
 
       // For other errors, try to log and return 500
       const params = await req.json().catch(() => ({}));
-      if (params.receiptId) {
-        const logger = new ProcessingLogger(params.receiptId);
+      receiptId = params.receiptId;
+
+      if (receiptId) {
+        const logger = new ProcessingLogger(receiptId);
         await logger.log(`Server error: ${error.message}`, "ERROR");
+
+        // Processing failed notifications are now handled by database trigger only
+        await logger.log("Processing failed notification will be handled by database trigger", "NOTIFICATION");
       }
     } catch (logError) {
       // Ignore errors during error logging
