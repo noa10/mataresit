@@ -10,4 +10,48 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJh
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Create Supabase client with optimized real-time configuration
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+    // Heartbeat interval to keep connection alive (configurable, default: 30 seconds)
+    heartbeatIntervalMs: parseInt(import.meta.env.VITE_REALTIME_HEARTBEAT_INTERVAL || '30000', 10),
+    // Reconnect timeout settings with exponential backoff
+    reconnectAfterMs: (tries: number) => Math.min(1000 * Math.pow(2, tries), 30000),
+    // Logger for debugging - use proper logger function format
+    logger: (import.meta.env.DEV || import.meta.env.VITE_REALTIME_DEBUG === 'true')
+      ? (kind: string, msg: string, data?: any) => {
+          console.log(`[Supabase Realtime ${kind}]`, msg, data || '');
+        }
+      : undefined,
+  },
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    // Storage key for auth state
+    storageKey: 'mataresit-auth',
+  },
+  // Global configuration
+  global: {
+    headers: {
+      'X-Client-Info': 'mataresit-web',
+    },
+  },
+});
+
+// Initialize real-time connection when client is created
+// This helps ensure the connection is established early
+if (typeof window !== 'undefined') {
+  // Only in browser environment
+
+  // Connect to real-time service
+  // Note: Connection status will be logged through individual channel subscriptions
+  supabase.realtime.connect();
+
+  if (import.meta.env.DEV) {
+    console.log('🔄 Supabase real-time client initialized (v2)');
+  }
+}
