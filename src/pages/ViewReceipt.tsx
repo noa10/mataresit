@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trash2, Loader2, Search } from "lucide-react";
 import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeam } from "@/contexts/TeamContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrencySafe } from "@/utils/currency";
@@ -16,13 +17,14 @@ export default function ViewReceipt() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const queryClient = useQueryClient();
 
   // Check if we came from the search page
   const isFromSearch = location.state?.from === 'search' || searchParams.has('q');
 
   const { data: receipt, isLoading, error } = useQuery({
-    queryKey: ['receipt', id],
+    queryKey: ['receipt', id, currentTeam?.id], // Include team context in cache key
     queryFn: () => fetchReceiptById(id!),
     enabled: !!id && !!user,
     staleTime: 0, // Don't cache the data to ensure fresh data is loaded

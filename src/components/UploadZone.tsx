@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeam } from "@/contexts/TeamContext";
 import {
   createReceipt,
   uploadReceiptImage,
@@ -84,6 +85,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
 
   // Memoize userPreferences to prevent infinite re-renders in FileAnalyzer
   const userPreferences = useMemo(() => ({
@@ -494,7 +496,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         merchant: 0,
         date: 0,
         total: 0
-      });
+      }, { currentTeam });
 
       if (!newReceiptId) {
         throw new Error("Failed to create receipt record");

@@ -13,6 +13,7 @@ import {
   Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeam } from "@/contexts/TeamContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { ExportDropdown } from "@/components/export/ExportDropdown";
 import { ExportFilters } from "@/lib/export";
@@ -80,6 +81,7 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const { subscriptionData } = useStripe();
   const { t: tDash } = useDashboardTranslation();
   const { t: tCommon } = useCommonTranslation();
@@ -230,14 +232,15 @@ export default function Dashboard() {
   };
 
   const { data: receipts = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['receipts'],
-    queryFn: fetchReceipts,
+    queryKey: ['receipts', currentTeam?.id],
+    queryFn: () => fetchReceipts({ currentTeam }),
     enabled: !!user,
   });
 
+  // TEAM COLLABORATION FIX: Include team context in categories query
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchUserCategories,
+    queryKey: ['categories', currentTeam?.id],
+    queryFn: () => fetchUserCategories({ currentTeam }),
     enabled: !!user,
   });
 
