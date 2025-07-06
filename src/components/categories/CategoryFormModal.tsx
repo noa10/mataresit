@@ -23,6 +23,7 @@ import {
   DEFAULT_CATEGORY_ICONS,
 } from "@/services/categoryService";
 import { CustomCategory, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/receipt";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface CategoryFormModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   onSuccess,
   category,
 }) => {
+  const { currentTeam } = useTeam();
   const isEditing = !!category;
   const [formData, setFormData] = useState({
     name: "",
@@ -67,7 +69,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateCategoryRequest) => createCategory(data),
+    mutationFn: (data: CreateCategoryRequest) => createCategory(data, { currentTeam }),
     onSuccess: (result) => {
       if (result) {
         onSuccess();

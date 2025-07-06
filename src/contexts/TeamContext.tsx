@@ -3,6 +3,8 @@ import { UserTeam, Team, TeamMember, TeamMemberRole } from '@/types/team';
 import { teamService } from '@/services/teamService';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearReceiptCaches } from '@/services/receiptService';
 
 // =============================================
 // TYPES
@@ -175,6 +177,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(teamReducer, initialState);
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Load user teams on mount
   useEffect(() => {
@@ -182,6 +185,12 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       loadUserTeams();
     }
   }, [user]);
+
+  // TEAM COLLABORATION FIX: Clear receipt caches when team context changes
+  useEffect(() => {
+    console.log("🔄 Team context changed, clearing receipt caches for fresh data");
+    clearReceiptCaches(queryClient);
+  }, [state.currentTeam?.id, queryClient]);
 
   // =============================================
   // TEAM MANAGEMENT

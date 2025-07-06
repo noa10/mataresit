@@ -36,8 +36,8 @@ export function ReceiptClaimDashboard({
 
   // Fetch receipts
   const { data: receipts = [], isLoading: receiptsLoading } = useQuery({
-    queryKey: ['receipts'],
-    queryFn: fetchReceipts,
+    queryKey: ['receipts', currentTeam?.id],
+    queryFn: () => fetchReceipts({ currentTeam }),
   });
 
   // Fetch claims

@@ -30,32 +30,36 @@ import { CustomCategory } from "@/types/receipt";
 import { CategoryFormModal } from "./CategoryFormModal";
 import { DeleteCategoryModal } from "./DeleteCategoryModal";
 import { useCategoriesTranslation } from "@/contexts/LanguageContext";
+import { useTeam } from "@/contexts/TeamContext";
 
 export const CategoryManager: React.FC = () => {
   const { t } = useCategoriesTranslation();
   const queryClient = useQueryClient();
+  const { currentTeam } = useTeam();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CustomCategory | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<CustomCategory | null>(null);
 
-  // Fetch categories
+  // TEAM COLLABORATION FIX: Include team context in categories query
   const {
     data: categories = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchUserCategories,
+    queryKey: ["categories", currentTeam?.id],
+    queryFn: () => fetchUserCategories({ currentTeam }),
   });
 
   // Delete category mutation
   const deleteMutation = useMutation({
-    mutationFn: ({ categoryId, reassignToCategoryId }: { 
-      categoryId: string; 
-      reassignToCategoryId?: string | null 
+    mutationFn: ({ categoryId, reassignToCategoryId }: {
+      categoryId: string;
+      reassignToCategoryId?: string | null
     }) => deleteCategory(categoryId, reassignToCategoryId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      // TEAM COLLABORATION FIX: Invalidate team-aware caches
+      queryClient.invalidateQueries({ queryKey: ["categories", currentTeam?.id] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] }); // Fallback for safety
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
       setDeletingCategory(null);
     },
@@ -204,7 +208,9 @@ export const CategoryManager: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["categories"] });
+          // TEAM COLLABORATION FIX: Invalidate team-aware caches
+          queryClient.invalidateQueries({ queryKey: ["categories", currentTeam?.id] });
+          queryClient.invalidateQueries({ queryKey: ["categories"] }); // Fallback for safety
           setIsCreateModalOpen(false);
         }}
       />
@@ -214,7 +220,9 @@ export const CategoryManager: React.FC = () => {
         onClose={() => setEditingCategory(null)}
         category={editingCategory}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["categories"] });
+          // TEAM COLLABORATION FIX: Invalidate team-aware caches
+          queryClient.invalidateQueries({ queryKey: ["categories", currentTeam?.id] });
+          queryClient.invalidateQueries({ queryKey: ["categories"] }); // Fallback for safety
           setEditingCategory(null);
         }}
       />

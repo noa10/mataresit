@@ -16,6 +16,7 @@ import { CategorySelector } from "@/components/categories/CategorySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { useTeam } from "@/contexts/TeamContext";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   Select,
@@ -144,11 +145,12 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Get user settings for processing method
   const { settings } = useSettings();
   const { t } = useReceiptsTranslation();
+  const { currentTeam } = useTeam();
 
-  // Fetch user categories
+  // TEAM COLLABORATION FIX: Include team context in categories query
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: fetchUserCategories,
+    queryKey: ['categories', currentTeam?.id],
+    queryFn: () => fetchUserCategories({ currentTeam }),
   });
 
   // State for image manipulation
@@ -520,7 +522,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       // Show success message
       toast.success("Receipt updated successfully");
 
-      // Invalidate the receipt query to force a refresh
+      // Invalidate the receipt query to force a refresh (include all team contexts)
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
       queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
       queryClient.invalidateQueries({ queryKey: ['receipts'] });

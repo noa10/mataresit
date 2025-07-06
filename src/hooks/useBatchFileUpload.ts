@@ -9,6 +9,7 @@ import {
   markReceiptUploaded
 } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeam } from "@/contexts/TeamContext";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
@@ -350,6 +351,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const processingRef = useRef<boolean>(false);
 
   const { user } = useAuth();
+  const { currentTeam } = useTeam();
   const { settings } = useSettings();
 
   // Destructure state for easier access
@@ -750,7 +752,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         merchant: 0,
         date: 0,
         total: 0
-      });
+      }, { currentTeam });
 
       if (!newReceiptId) {
         throw new Error("Failed to create receipt record");

@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchUserCategories } from "@/services/categoryService";
 import { CustomCategory } from "@/types/receipt";
 import { CategoryFormModal } from "./CategoryFormModal";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface CategorySelectorProps {
   value?: string | null;
@@ -43,15 +44,16 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { currentTeam } = useTeam();
 
-  // Fetch categories
+  // TEAM COLLABORATION FIX: Include team context in categories query
   const {
     data: categories = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchUserCategories,
+    queryKey: ["categories", currentTeam?.id],
+    queryFn: () => fetchUserCategories({ currentTeam }),
   });
 
   const selectedCategory = categories.find((cat) => cat.id === value);
