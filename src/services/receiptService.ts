@@ -91,6 +91,57 @@ class ClientProcessingLogger {
 }
 import { SubscriptionEnforcementService, handleActionResult } from '@/services/subscriptionEnforcementService';
 
+// TEAM COLLABORATION FIX: Utility function to clear receipt caches
+export const clearReceiptCaches = (queryClient: any, receiptId?: string, teamId?: string | null) => {
+  console.log("🧹 Clearing receipt and category caches for team collaboration fix");
+
+  if (receiptId) {
+    // Clear specific receipt cache for all team contexts
+    queryClient.invalidateQueries({ queryKey: ['receipt', receiptId] });
+  } else {
+    // Clear all receipt-related caches
+    queryClient.invalidateQueries({ queryKey: ['receipt'] });
+  }
+
+  queryClient.invalidateQueries({ queryKey: ['receipts'] });
+  queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+
+  // TEAM COLLABORATION FIX: Clear team-aware categories cache
+  if (teamId) {
+    queryClient.invalidateQueries({ queryKey: ['categories', teamId] });
+  } else {
+    queryClient.invalidateQueries({ queryKey: ['categories', null] });
+  }
+  queryClient.invalidateQueries({ queryKey: ['categories'] }); // Fallback for safety
+};
+
+// TEAM COLLABORATION FIX: Test function to verify category access
+export const testCategoryAccess = async (receiptId: string = '3a7a81c1-a8ca-4e91-8aba-950f146d8cc6') => {
+  console.log("🧪 Testing category access for receipt:", receiptId);
+
+  const { data: user } = await supabase.auth.getUser();
+  console.log("Current user:", user.user?.email);
+
+  // Test direct category query
+  const { data: categoryData, error: categoryError } = await supabase
+    .from("custom_categories")
+    .select("id, name, color, icon")
+    .eq("id", "4d91794b-3de2-49fa-8f55-2ac5523153c0")
+    .single();
+
+  console.log("Direct category query result:", { categoryData, categoryError });
+
+  // Test receipt with category query
+  const receiptResult = await fetchReceiptById(receiptId);
+  console.log("Receipt with category result:", {
+    hasReceipt: !!receiptResult,
+    customCategoryId: receiptResult?.custom_category_id,
+    categoryData: receiptResult?.custom_categories
+  });
+
+  return { categoryData, receiptResult };
+};
+
 // Ensure status is of type ReceiptStatus
 const validateStatus = (status: string): ReceiptStatus => {
   if (status === "unreviewed" || status === "reviewed") {
@@ -99,15 +150,15 @@ const validateStatus = (status: string): ReceiptStatus => {
   return "unreviewed"; // Default fallback
 };
 
-// Fetch all receipts for the current user
-export const fetchReceipts = async (): Promise<Receipt[]> => {
+// Fetch all receipts for the current user or team
+export const fetchReceipts = async (teamContext?: { currentTeam: { id: string } | null }): Promise<Receipt[]> => {
   const { data: user } = await supabase.auth.getUser();
 
   if (!user.user) {
     return [];
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("receipts")
     .select(`
       *,
@@ -118,9 +169,21 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
         color,
         icon
       )
-    `)
-    .eq("user_id", user.user.id)
-    .order("created_at", { ascending: false });
+    `);
+
+  // Apply filtering based on team context
+  if (teamContext?.currentTeam?.id) {
+    // When in team context, fetch team receipts using RLS policies
+    // RLS will automatically filter based on team membership
+    console.log("🧾 Fetching team receipts for team:", teamContext.currentTeam.id, "user:", user.user.email);
+    query = query.eq("team_id", teamContext.currentTeam.id);
+  } else {
+    // When not in team context, fetch personal receipts (team_id is null)
+    console.log("🧾 Fetching personal receipts for user:", user.user.email);
+    query = query.eq("user_id", user.user.id).is("team_id", null);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching receipts:", error);
@@ -128,8 +191,15 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
     return [];
   }
 
+  const receipts = data || [];
+  console.log(`🧾 Successfully fetched ${receipts.length} receipts for ${teamContext?.currentTeam?.id ? 'team' : 'personal'} workspace`);
+
+  // TEAM COLLABORATION FIX: Log category information for debugging
+  const receiptsWithCategories = receipts.filter(r => r.custom_categories);
+  console.log(`🏷️ ${receiptsWithCategories.length} receipts have category information`);
+
   // Convert Supabase JSON to our TypeScript types and validate status
-  return (data || []).map(item => {
+  return receipts.map(item => {
     const receipt = item as unknown as Receipt;
     return {
       ...receipt,
@@ -140,6 +210,15 @@ export const fetchReceipts = async (): Promise<Receipt[]> => {
 
 // Fetch a single receipt by ID with line items
 export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails | null> => {
+  // Debug logging for team collaboration category access issue
+  const { data: user } = await supabase.auth.getUser();
+  console.log("🔍 fetchReceiptById debug:", {
+    receiptId: id,
+    userId: user.user?.id,
+    userEmail: user.user?.email,
+    timestamp: new Date().toISOString()
+  });
+
   // First get the receipt with category information
   const { data: receiptData, error: receiptError } = await supabase
     .from("receipts")
@@ -155,6 +234,17 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
     .eq("id", id)
     .single();
 
+  // Enhanced debug logging for category data
+  console.log("🔍 Receipt query result:", {
+    receiptId: id,
+    hasData: !!receiptData,
+    hasError: !!receiptError,
+    customCategoryId: receiptData?.custom_category_id,
+    categoryData: receiptData?.custom_categories,
+    teamId: receiptData?.team_id,
+    error: receiptError
+  });
+
   if (receiptError || !receiptData) {
     console.error("Error fetching receipt:", receiptError);
     toast.error("Failed to load receipt details");
@@ -163,6 +253,30 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
 
   // Explicitly cast to Receipt after error check
   const receipt = receiptData as unknown as Receipt;
+
+  // TEAM COLLABORATION FIX: If category data is missing but custom_category_id exists,
+  // try alternative query method using direct JOIN
+  if (receipt.custom_category_id && !receiptData.custom_categories) {
+    console.log("🔧 Category data missing, trying alternative query method...");
+
+    try {
+      const { data: categoryData, error: categoryError } = await supabase
+        .from("custom_categories")
+        .select("id, name, color, icon")
+        .eq("id", receipt.custom_category_id)
+        .single();
+
+      if (!categoryError && categoryData) {
+        console.log("✅ Alternative category query successful:", categoryData);
+        // Manually attach category data to receipt
+        (receipt as any).custom_categories = categoryData;
+      } else {
+        console.log("❌ Alternative category query failed:", categoryError);
+      }
+    } catch (error) {
+      console.log("❌ Alternative category query exception:", error);
+    }
+  }
 
   // Then get the line items
   const { data: lineItems, error: lineItemsError } = await supabase
@@ -394,7 +508,8 @@ const uploadWithProgress = async (
 export const createReceipt = async (
   receipt: Omit<Receipt, "id" | "created_at" | "updated_at">,
   lineItems: Omit<ReceiptLineItem, "id" | "created_at" | "updated_at">[],
-  confidenceScores: Omit<ConfidenceScore, "id" | "receipt_id" | "created_at" | "updated_at">
+  confidenceScores: Omit<ConfidenceScore, "id" | "receipt_id" | "created_at" | "updated_at">,
+  teamContext?: { currentTeam: { id: string } | null }
 ): Promise<string | null> => {
   try {
     // Get the current user
@@ -418,10 +533,20 @@ export const createReceipt = async (
 
     console.log("Subscription check passed, proceeding with receipt creation");
 
+    // Determine team_id based on team context
+    const teamId = teamContext?.currentTeam?.id || receipt.team_id || null;
+
+    console.log("Creating receipt with team context:", {
+      teamId,
+      hasTeamContext: !!teamContext?.currentTeam,
+      receiptTeamId: receipt.team_id
+    });
+
     // Ensure the processing status is set, defaulting to 'uploading' if not provided
     const receiptWithStatus = {
       ...receipt,
       user_id: user.user.id, // Add user_id here
+      team_id: teamId, // Add team_id based on context
       processing_status: receipt.processing_status || 'uploading' as ProcessingStatus
     };
 

@@ -12,10 +12,23 @@ import { toast } from "sonner";
  * Service for managing custom categories
  */
 
-// Fetch all categories for the current user with receipt counts
-export const fetchUserCategories = async (): Promise<CustomCategory[]> => {
+// Fetch all categories for the current user or team with receipt counts
+export const fetchUserCategories = async (teamContext?: { currentTeam: { id: string } | null }): Promise<CustomCategory[]> => {
   try {
-    const { data, error } = await supabase.rpc('get_user_categories_with_counts');
+    // TEAM COLLABORATION FIX: Add debug logging for category fetching
+    const { data: user } = await supabase.auth.getUser();
+
+    if (teamContext?.currentTeam?.id) {
+      console.log("🏷️ Fetching team categories for team:", teamContext.currentTeam.id, "user:", user.user?.email);
+    } else {
+      console.log("🏷️ Fetching personal categories for user:", user.user?.email);
+    }
+
+    // TEAM COLLABORATION FIX: Use team-aware RPC function
+    const { data, error } = await supabase.rpc('get_user_categories_with_counts', {
+      p_user_id: user.user?.id,
+      p_team_id: teamContext?.currentTeam?.id || null
+    });
 
     if (error) {
       console.error("Error fetching categories:", error);
@@ -27,9 +40,19 @@ export const fetchUserCategories = async (): Promise<CustomCategory[]> => {
 
     // If user has no categories, create default ones
     if (categories.length === 0) {
-      await createDefaultCategories();
+      if (teamContext?.currentTeam?.id) {
+        console.log("🏷️ No team categories found, creating defaults for team");
+        await createDefaultTeamCategories(teamContext.currentTeam.id);
+      } else {
+        console.log("🏷️ No personal categories found, creating defaults");
+        await createDefaultCategories();
+      }
+
       // Fetch again after creating defaults
-      const { data: newData, error: newError } = await supabase.rpc('get_user_categories_with_counts');
+      const { data: newData, error: newError } = await supabase.rpc('get_user_categories_with_counts', {
+        p_user_id: user.user?.id,
+        p_team_id: teamContext?.currentTeam?.id || null
+      });
       if (newError) {
         console.error("Error fetching categories after creating defaults:", newError);
         return [];
@@ -37,6 +60,7 @@ export const fetchUserCategories = async (): Promise<CustomCategory[]> => {
       return newData || [];
     }
 
+    console.log("🏷️ Categories fetched successfully:", categories.length, "categories");
     return categories;
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -45,13 +69,30 @@ export const fetchUserCategories = async (): Promise<CustomCategory[]> => {
   }
 };
 
+// Create default team categories
+export const createDefaultTeamCategories = async (teamId: string): Promise<void> => {
+  try {
+    await supabase.rpc('create_default_team_categories', {
+      p_team_id: teamId
+    });
+    console.log("🏷️ Default team categories created successfully");
+  } catch (error: any) {
+    console.error("Error creating default team categories:", error);
+    // Don't show toast error for this as it's called automatically
+  }
+};
+
 // Create a new category
-export const createCategory = async (categoryData: CreateCategoryRequest): Promise<string | null> => {
+export const createCategory = async (
+  categoryData: CreateCategoryRequest,
+  teamContext?: { currentTeam: { id: string } | null }
+): Promise<string | null> => {
   try {
     const { data, error } = await supabase.rpc('create_custom_category', {
       p_name: categoryData.name,
       p_color: categoryData.color || '#3B82F6',
-      p_icon: categoryData.icon || 'tag'
+      p_icon: categoryData.icon || 'tag',
+      p_team_id: teamContext?.currentTeam?.id || null
     });
 
     if (error) {

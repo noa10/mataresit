@@ -44,9 +44,9 @@ export class CacheInvalidationService {
    */
   static async invalidateReceipts(userId?: string) {
     const queryClient = this.getQueryClient();
-    
+
     console.log('🗑️ Invalidating receipts cache');
-    
+
     await queryClient.invalidateQueries({
       queryKey: ['receipts']
     });
@@ -55,6 +55,32 @@ export class CacheInvalidationService {
     if (userId) {
       await this.invalidateUsageStats(userId);
     }
+  }
+
+  /**
+   * Invalidate categories cache for both personal and team contexts
+   */
+  static async invalidateCategories(teamId?: string | null) {
+    const queryClient = this.getQueryClient();
+
+    console.log('🗑️ Invalidating categories cache', teamId ? `for team: ${teamId}` : 'for personal workspace');
+
+    if (teamId) {
+      // Invalidate specific team categories
+      await queryClient.invalidateQueries({
+        queryKey: ['categories', teamId]
+      });
+    } else {
+      // Invalidate personal categories
+      await queryClient.invalidateQueries({
+        queryKey: ['categories', null]
+      });
+    }
+
+    // Also invalidate the general categories cache for safety
+    await queryClient.invalidateQueries({
+      queryKey: ['categories']
+    });
   }
 
   /**

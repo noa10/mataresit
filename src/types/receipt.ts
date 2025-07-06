@@ -50,6 +50,8 @@ export interface Receipt {
   predicted_category?: string;
   // Custom category support
   custom_category_id?: string | null;
+  // Team collaboration support
+  team_id?: string | null;
   // New fields for real-time status updates
   processing_status?: ProcessingStatus;
   processing_error?: string | null;
@@ -238,6 +240,8 @@ export interface CustomCategory {
   created_at: string;
   updated_at: string;
   receipt_count?: number; // Optional, included when fetching with counts
+  team_id?: string | null; // Team ID for team-shared categories, null for personal
+  is_team_category?: boolean; // Whether this is a team category
 }
 
 // Interface for category creation/update
