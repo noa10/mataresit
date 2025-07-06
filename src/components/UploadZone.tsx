@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -145,7 +145,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
       }
     }
-  }, [processingStatus, currentStage, stageHistory]);
+  }, [processingStatus, currentStage, stageHistory, t, updateProgressSmooth, uploadProgress]);
 
   // Subscribe to receipt processing status updates
   useEffect(() => {
@@ -185,7 +185,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     return () => {
       statusChannel.unsubscribe();
     };
-  }, [receiptId]);
+  }, [receiptId, t]);
 
   // Effect to manage preview URL for the first file
   useEffect(() => {
@@ -299,7 +299,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   // Smooth progress update function
-  const updateProgressSmooth = (targetProgress: number) => {
+  const updateProgressSmooth = useCallback((targetProgress: number) => {
     const currentProgress = uploadProgress;
     const difference = targetProgress - currentProgress;
 
@@ -326,7 +326,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         setTimeout(() => setIsProgressUpdating(false), 200);
       }
     }, stepDuration);
-  };
+  }, [uploadProgress]);
 
   // Function to update progress based on log content
   const updateProgressFromLog = (stepName: string, message: string) => {
@@ -678,7 +678,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               // Complete OpenRouter progress tracking
               openRouterActions.completeProcessing();
               addLocalLog('COMPLETE', 'OpenRouter processing completed successfully');
-            } catch (openRouterError: any) {
+            } catch (openRouterError: Error) {
               console.error('OpenRouter processing failed:', openRouterError);
               openRouterActions.failProcessing(openRouterError.message || 'Unknown error');
               throw openRouterError; // Re-throw to be handled by outer catch
@@ -698,7 +698,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
         }
-      } catch (ocrError: any) {
+      } catch (ocrError: Error) {
         console.error("Processing error:", ocrError);
         toast.error("Processing failed. Please edit manually or try again.");
         addLocalLog('ERROR', `Processing failed: ${ocrError.message || 'Unknown error'}`);
@@ -723,7 +723,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       }
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error("Upload error:", error);
       setError(error.message || "There was an error uploading your receipt");
       toast.error(error.message || "There was an error uploading your receipt");

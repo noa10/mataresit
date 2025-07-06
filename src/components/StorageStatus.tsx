@@ -25,7 +25,7 @@ export function StorageStatus() {
         
         // If we get here, the bucket exists and is accessible
         setStatus("available");
-      } catch (error: any) {
+      } catch (error: Error) {
         console.error("Error checking storage:", error);
         setStatus("unavailable");
         setErrorMessage(error.message || "Unknown error accessing storage");

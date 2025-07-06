@@ -158,7 +158,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
         raw: data.results
       });
 
-      let results: SearchResult = {
+      const results: SearchResult = {
         receipts: [],
         lineItems: [],
         results: [],
@@ -208,7 +208,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
 
           results.lineItems = data.results.receipts.map((item: any) => {
             // Check for receipt_id from various sources
-            let effectiveReceiptId = item.receipt_id || item.id;
+            const effectiveReceiptId = item.receipt_id || item.id;
 
             // Check if receipt_id is missing and log it
             if (!effectiveReceiptId) {
@@ -529,7 +529,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
   try {
     // Enhanced query parsing for monetary queries in fallback search
-    let enhancedParams = { ...params };
+    const enhancedParams = { ...params };
 
     // Check if this looks like a monetary query
     const monetaryPatterns = [
@@ -578,7 +578,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
     // Apply query normalization for consistent fallback search
     // For monetary queries, skip text matching and rely on amount filtering
-    let normalizedQuery = normalizeSearchQuery(query);
+    const normalizedQuery = normalizeSearchQuery(query);
     let skipTextSearch = false;
 
     if (isMonetaryQuery && (enhancedParams.minAmount !== undefined || enhancedParams.maxAmount !== undefined)) {
@@ -963,7 +963,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     }
 
     // Combine results based on search target
-    let combinedResults = isLineItemSearch ? lineItems :
+    const combinedResults = isLineItemSearch ? lineItems :
                          isUnifiedSearch ? [...receiptsWithScores, ...lineItems] :
                          receiptsWithScores;
 

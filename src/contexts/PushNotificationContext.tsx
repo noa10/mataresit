@@ -3,6 +3,7 @@ import { usePushNotifications, PushNotificationState, PushNotificationActions } 
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { NotificationType } from '@/types/notifications';
+import { PushNotificationService } from '@/services/pushNotificationService';
 
 interface PushNotificationContextType extends PushNotificationState, PushNotificationActions {
   // Additional context-specific methods
@@ -136,7 +137,7 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
       }
 
       // Show the notification using the push service
-      const pushService = new (await import('@/services/pushNotificationService')).PushNotificationService();
+      const pushService = new PushNotificationService();
       await pushService.showLocalNotification(payload);
       
     } catch (error) {
@@ -155,7 +156,7 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
     }
   ) => {
     try {
-      const pushService = new (await import('@/services/pushNotificationService')).PushNotificationService();
+      const pushService = new PushNotificationService();
       await pushService.showReceiptProcessingNotification(type, receiptData);
     } catch (error) {
       console.error('Error sending receipt notification:', error);
@@ -171,7 +172,7 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
     }
   ) => {
     try {
-      const pushService = new (await import('@/services/pushNotificationService')).PushNotificationService();
+      const pushService = new PushNotificationService();
       await pushService.showBatchProcessingNotification(type, batchData);
     } catch (error) {
       console.error('Error sending batch notification:', error);

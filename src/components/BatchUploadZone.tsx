@@ -199,7 +199,7 @@ export default function BatchUploadZone({
       console.error('No processed files to add to batch queue');
     }
 
-  }, [addToBatchQueue]);
+  }, [addToBatchQueue, selectedCategoryId]);
 
   // Function to retry all failed uploads
   const retryAllFailed = useCallback(() => {
@@ -299,6 +299,7 @@ export default function BatchUploadZone({
     activeUploads.length,
     queuedUploads.length,
     completedUploads.length,
+    completedUploads,
     failedUploads.length,
     allProcessingComplete,
     onUploadComplete,

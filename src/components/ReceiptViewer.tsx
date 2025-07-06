@@ -11,7 +11,7 @@ import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, Proc
 import { updateReceipt, updateReceiptWithLineItems, processReceiptWithAI, logCorrections, fixProcessingStatus } from "@/services/receiptService";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchUserCategories } from "@/services/categoryService";
+import { fetchCategoriesForDisplay } from "@/services/categoryService";
 import { CategorySelector } from "@/components/categories/CategorySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -147,10 +147,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const { t } = useReceiptsTranslation();
   const { currentTeam } = useTeam();
 
-  // TEAM COLLABORATION FIX: Include team context in categories query
+  // TEAM COLLABORATION FIX: Include team context in categories query for display
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories', currentTeam?.id],
-    queryFn: () => fetchUserCategories({ currentTeam }),
+    queryKey: ['displayCategories', currentTeam?.id],
+    queryFn: () => fetchCategoriesForDisplay({ currentTeam }),
   });
 
   // State for image manipulation
@@ -192,7 +192,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         custom_category_id: receipt.custom_category_id || null
       });
     }
-  }, [receipt.id, receipt.merchant, receipt.date, receipt.total, receipt.tax, receipt.currency, receipt.payment_method, receipt.predicted_category, isSaving]);
+  }, [receipt, isSaving]);
 
   // State for tracking manual total override
   const [isManualTotal, setIsManualTotal] = useState(false);
@@ -330,7 +330,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
         // Only show the verification toast when the value has been debounced
         const fieldKey = field as keyof typeof t;
-        const fieldName = t(`fields.${field}` as any) || field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ');
+        const fieldName = t(`fields.${field}` as keyof typeof t) || field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ');
         toast.success(t('viewer.verified', { field: fieldName }), {
           duration: 1500,
           position: 'bottom-right',
@@ -338,7 +338,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         });
       }
     });
-  }, [debouncedInputValues, receipt]);
+  }, [debouncedInputValues, receipt, t]);
 
   // Subscribe to real-time updates for the receipt processing status
   useEffect(() => {
@@ -388,7 +388,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     return () => {
       statusChannel.unsubscribe();
     };
-  }, [receipt.id, queryClient]);
+  }, [receipt.id, queryClient, t]);
 
   // Add useEffect to check if image loads properly
   useEffect(() => {
@@ -452,7 +452,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         isMounted = false;
       };
     }
-  }, [receipt.image_url]);
+  }, [receipt.image_url, t]);
 
   const updateMutation = useMutation({
     // Update mutation only handles the 'receipts' table update
@@ -580,7 +580,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         fixProcessingStatus(receipt.id);
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       // Reset saving flag
       setIsSaving(false);
 
@@ -599,7 +599,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       }
 
       // Log additional details for debugging
-      const errorObj = error as Record<string, any>;
+      const errorObj = error as Record<string, unknown>;
       if (errorObj.details || errorObj.hint) {
         console.error("Additional error details:", {
           details: errorObj.details,

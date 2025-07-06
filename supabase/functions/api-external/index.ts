@@ -8,8 +8,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const API_BASE_PATH = '/api/v1';
 
 serve(async (req: Request) => {
-  let statusCode = 200;
-  let endpoint = '';
+  const statusCode = 200;
+  const endpoint = '';
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {

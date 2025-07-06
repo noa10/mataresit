@@ -93,7 +93,7 @@ class AdvancedSearchRanking {
     const explanation: string[] = [];
     
     // 1. Base similarity score
-    let baseScore = result.similarity;
+    const baseScore = result.similarity;
     explanation.push(`Base similarity: ${baseScore.toFixed(3)}`);
 
     // 2. Source quality multiplier (based on validation findings)

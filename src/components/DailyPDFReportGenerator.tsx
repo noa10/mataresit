@@ -10,7 +10,16 @@ import { toast } from '@/components/ui/use-toast';
 import 'react-day-picker/dist/style.css';
 
 // Define a completely custom day component
-function CustomDay(props: any) {
+interface CustomDayProps {
+  date: Date;
+  displayMonth?: Date;
+  receiptDates?: Date[];
+  selected?: Date;
+  disabled?: boolean;
+  onSelect?: (date: Date) => void;
+}
+
+function CustomDay(props: CustomDayProps) {
   const { date, displayMonth, receiptDates = [], selected, disabled, onSelect } = props;
   const isOutsideMonth = displayMonth && date.getMonth() !== displayMonth.getMonth();
   const hasReceipt = receiptDates.some((d: Date) => isSameDay(d, date));
@@ -164,7 +173,9 @@ export function DailyPDFReportGenerator() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-        } catch {}
+        } catch {
+          // Ignore JSON parsing errors for error response
+        }
         
         throw new Error(errorMessage);
       }

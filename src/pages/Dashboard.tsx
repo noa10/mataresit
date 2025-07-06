@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
-import { fetchUserCategories, bulkAssignCategory } from "@/services/categoryService";
+import { fetchUserCategories, fetchCategoriesForDisplay, bulkAssignCategory } from "@/services/categoryService";
 import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
 
 import {
@@ -241,6 +241,13 @@ export default function Dashboard() {
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', currentTeam?.id],
     queryFn: () => fetchUserCategories({ currentTeam }),
+    enabled: !!user,
+  });
+
+  // TEAM COLLABORATION FIX: Fetch categories for display (includes both team and personal for resolution)
+  const { data: displayCategories = [] } = useQuery({
+    queryKey: ['displayCategories', currentTeam?.id],
+    queryFn: () => fetchCategoriesForDisplay({ currentTeam }),
     enabled: !!user,
   });
 
@@ -502,7 +509,7 @@ export default function Dashboard() {
                       confidence={confidenceScore}
                       processingStatus={receipt.processing_status}
                       disableInternalLink={true} // Disable internal Link to prevent nesting
-                      category={categories.find(cat => cat.id === receipt.custom_category_id) || null}
+                      category={displayCategories.find(cat => cat.id === receipt.custom_category_id) || null}
                     />
                   </Link>
                 </div>
@@ -570,7 +577,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
-                            const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                            const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
                             return <CategoryDisplay category={category} size="sm" />;
                           })()}
                         </div>
@@ -621,7 +628,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span>{formatDate(receipt.date)}</span>
                           {(() => {
-                            const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                            const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
                             return <CategoryDisplay category={category} size="sm" />;
                           })()}
                         </div>
@@ -711,7 +718,7 @@ export default function Dashboard() {
                     <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
                     <TableCell>
                       {(() => {
-                        const category = categories.find(cat => cat.id === receipt.custom_category_id);
+                        const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
                         return <CategoryDisplay category={category} size="sm" />;
                       })()}
                     </TableCell>
