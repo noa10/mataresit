@@ -29,18 +29,20 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
-import Dashboard from "./pages/Dashboard";
-import SettingsPage from "./pages/SettingsPage";
-import PerformanceTestPage from "./pages/PerformanceTestPage";
 import AdminRoute from "./components/admin/AdminRoute";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-import AdminLayoutPage from "./pages/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import UsersManagement from "./pages/admin/UsersManagement";
-import ReceiptsManagement from "./pages/admin/ReceiptsManagement";
-import AnalyticsPage from "./pages/admin/AnalyticsPage";
-import AdminSettingsPage from "./pages/admin/SettingsPage";
-import BlogManagement from "./pages/admin/BlogManagement";
+
+// Lazy load heavy components for better performance
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const PerformanceTestPage = lazy(() => import("./pages/PerformanceTestPage"));
+const AdminLayoutPage = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
+const ReceiptsManagement = lazy(() => import("./pages/admin/ReceiptsManagement"));
+const AnalyticsPage = lazy(() => import("./pages/admin/AnalyticsPage"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
+const BlogManagement = lazy(() => import("./pages/admin/BlogManagement"));
 
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
@@ -183,10 +185,22 @@ const App = () => (
             {/* Protected Routes - Require Authentication */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <Dashboard />
+                  </Suspense>
+                } />
                 <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/performance-test" element={<PerformanceTestPage />} />
+                <Route path="/settings" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <SettingsPage />
+                  </Suspense>
+                } />
+                <Route path="/performance-test" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <PerformanceTestPage />
+                  </Suspense>
+                } />
                 <Route path="/receipt/:id" element={
                   <Suspense fallback={<PageLoading />}>
                     <ViewReceipt />
@@ -258,13 +272,41 @@ const App = () => (
 
             {/* Admin Routes - Require Admin Role */}
             <Route element={<AdminRoute />}>
-              <Route path="/admin" element={<AdminLayoutPage />}>
-                <Route index element={<AdminDashboard />} />
-                <Route path="users" element={<UsersManagement />} />
-                <Route path="receipts" element={<ReceiptsManagement />} />
-                <Route path="analytics" element={<AnalyticsPage />} />
-                <Route path="blog" element={<BlogManagement />} />
-                <Route path="settings" element={<AdminSettingsPage />} />
+              <Route path="/admin" element={
+                <Suspense fallback={<PageLoading />}>
+                  <AdminLayoutPage />
+                </Suspense>
+              }>
+                <Route index element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminDashboard />
+                  </Suspense>
+                } />
+                <Route path="users" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <UsersManagement />
+                  </Suspense>
+                } />
+                <Route path="receipts" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <ReceiptsManagement />
+                  </Suspense>
+                } />
+                <Route path="analytics" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AnalyticsPage />
+                  </Suspense>
+                } />
+                <Route path="blog" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <BlogManagement />
+                  </Suspense>
+                } />
+                <Route path="settings" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AdminSettingsPage />
+                  </Suspense>
+                } />
               </Route>
             </Route>
           </Routes>

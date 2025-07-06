@@ -20,10 +20,19 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Vendor chunks
+          // Core vendor chunks
           'vendor-react': ['react', 'react-dom'],
-          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-toast'
+          ],
           'vendor-utils': ['date-fns', 'clsx', 'class-variance-authority'],
+          'vendor-charts': ['recharts', 'd3-scale', 'd3-shape'],
+          'vendor-heavy': ['html2canvas', 'browser-image-compression', 'xlsx'],
 
           // Translation chunks - split by language for better caching
           'i18n-core': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
@@ -42,10 +51,29 @@ export default defineConfig({
             './src/locales/ms/auth.json'
           ],
 
-          // Feature-specific chunks
-          'feature-admin': ['./src/pages/admin/AdminDashboard.tsx'],
-          'feature-settings': ['./src/pages/SettingsPage.tsx'],
-          'feature-profile': ['./src/pages/Profile.tsx']
+          // Feature-specific chunks - more granular splitting
+          'feature-admin': [
+            './src/pages/admin/AdminDashboard.tsx',
+            './src/components/admin/BlogAnalytics.tsx',
+            './src/components/admin/EmbeddingRepairTest.tsx',
+            './src/components/admin/CacheMonitor.tsx',
+            './src/components/admin/FeedbackAnalytics.tsx'
+          ],
+          'feature-settings': [
+            './src/pages/SettingsPage.tsx',
+            './src/components/settings/NotificationPreferences.tsx',
+            './src/components/categories/CategoryManager.tsx'
+          ],
+          'feature-profile': ['./src/pages/Profile.tsx'],
+          'feature-analytics': [
+            './src/components/analytics/AnalyticsDashboard.tsx',
+            './src/components/analytics/InteractionTrendsChart.tsx',
+            './src/components/analytics/FeatureUsageChart.tsx'
+          ],
+          'feature-search': [
+            './src/pages/SemanticSearch.tsx',
+            './src/pages/UnifiedSearchPage.tsx'
+          ]
         },
 
         // Optimize chunk naming for better caching
@@ -101,8 +129,8 @@ export default defineConfig({
     // Enable source maps for production debugging
     sourcemap: false,
 
-    // Optimize chunk size warnings
-    chunkSizeWarningLimit: 1000,
+    // Optimize chunk size warnings - reduced from 1000 to 500 for better performance
+    chunkSizeWarningLimit: 500,
   },
 
   // Optimize dependencies
