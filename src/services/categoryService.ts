@@ -69,6 +69,49 @@ export const fetchUserCategories = async (teamContext?: { currentTeam: { id: str
   }
 };
 
+// TEAM COLLABORATION FIX: Fetch categories for display purposes (includes both team and personal for resolution)
+export const fetchCategoriesForDisplay = async (teamContext?: { currentTeam: { id: string } | null }): Promise<CustomCategory[]> => {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+
+    if (teamContext?.currentTeam?.id) {
+      // In team context, fetch both team categories AND personal categories for display resolution
+      console.log("🏷️ Fetching categories for display in team context");
+
+      const [teamCategoriesResult, personalCategoriesResult] = await Promise.all([
+        supabase.rpc('get_user_categories_with_counts', {
+          p_user_id: user.user?.id,
+          p_team_id: teamContext.currentTeam.id
+        }),
+        supabase.rpc('get_user_categories_with_counts', {
+          p_user_id: user.user?.id,
+          p_team_id: null
+        })
+      ]);
+
+      if (teamCategoriesResult.error || personalCategoriesResult.error) {
+        console.error("Error fetching categories for display:", teamCategoriesResult.error || personalCategoriesResult.error);
+        return [];
+      }
+
+      const teamCategories = teamCategoriesResult.data || [];
+      const personalCategories = personalCategoriesResult.data || [];
+
+      // Combine both, prioritizing team categories
+      const allCategories = [...teamCategories, ...personalCategories];
+      console.log(`🏷️ Display categories: ${teamCategories.length} team + ${personalCategories.length} personal = ${allCategories.length} total`);
+
+      return allCategories;
+    } else {
+      // In personal context, just fetch personal categories
+      return fetchUserCategories(teamContext);
+    }
+  } catch (error) {
+    console.error("Error fetching categories for display:", error);
+    return [];
+  }
+};
+
 // Create default team categories
 export const createDefaultTeamCategories = async (teamId: string): Promise<void> => {
   try {
