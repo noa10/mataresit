@@ -272,6 +272,21 @@ class SearchCache {
         localStorage.setItem(persistentKey, JSON.stringify(persistentEntry));
       } catch (error) {
         console.warn('Failed to store in persistent cache:', error);
+
+        // If quota exceeded, try to clear some old cache entries
+        if (error.name === 'QuotaExceededError') {
+          console.log('🗑️ Storage quota exceeded, clearing old cache entries...');
+          this.clearOldCacheEntries();
+
+          // Try storing again after cleanup
+          try {
+            const persistentKey = `search_cache_${cacheKey}`;
+            localStorage.setItem(persistentKey, JSON.stringify(persistentEntry));
+            console.log('✅ Successfully stored after cache cleanup');
+          } catch (retryError) {
+            console.error('❌ Still failed to store after cleanup:', retryError);
+          }
+        }
       }
 
       if (shouldCompress) {
@@ -292,18 +307,18 @@ class SearchCache {
       // Clear all cache
       this.memoryCache.clear();
       this.currentMemoryUsage = 0;
-      
+
       // Clear persistent cache
       const keys = Object.keys(localStorage).filter(key => key.startsWith('search_cache_'));
       keys.forEach(key => localStorage.removeItem(key));
-      
+
       console.log('🗑️ Cleared all search cache');
       return;
     }
 
     // Pattern-based invalidation
     const keysToDelete: string[] = [];
-    
+
     for (const [key, entry] of this.memoryCache.entries()) {
       if (key.includes(pattern)) {
         keysToDelete.push(key);
@@ -319,6 +334,114 @@ class SearchCache {
     persistentKeys.forEach(key => localStorage.removeItem(key));
 
     console.log(`🗑️ Invalidated ${keysToDelete.length} cache entries matching pattern: ${pattern}`);
+  }
+
+  /**
+   * Force clear all cache for a specific query (case-insensitive)
+   */
+  forceClearQuery(query: string): void {
+    const queryLower = query.toLowerCase();
+
+    // Clear memory cache
+    const memoryKeysToDelete: string[] = [];
+    for (const [key, entry] of this.memoryCache.entries()) {
+      if (key.toLowerCase().includes(queryLower)) {
+        memoryKeysToDelete.push(key);
+        this.currentMemoryUsage -= entry.size;
+      }
+    }
+    memoryKeysToDelete.forEach(key => this.memoryCache.delete(key));
+
+    // Clear persistent cache
+    const allKeys = Object.keys(localStorage);
+    const persistentKeysToDelete = allKeys.filter(key =>
+      (key.startsWith('search_cache_') || key.startsWith('conv_cache_')) &&
+      key.toLowerCase().includes(queryLower)
+    );
+    persistentKeysToDelete.forEach(key => localStorage.removeItem(key));
+
+    console.log(`🗑️ Force cleared ${memoryKeysToDelete.length + persistentKeysToDelete.length} cache entries for query: "${query}"`);
+  }
+
+  /**
+   * Clear old cache entries to free up storage space
+   */
+  private clearOldCacheEntries(): void {
+    try {
+      const allKeys = Object.keys(localStorage);
+      const cacheKeys = allKeys.filter(key =>
+        key.startsWith('search_cache_') ||
+        key.startsWith('conv_cache_') ||
+        key.includes('paperless_chat_conversations')
+      );
+
+      // Sort by timestamp (oldest first) and remove oldest entries
+      const keyTimestamps: Array<{key: string, timestamp: number}> = [];
+
+      cacheKeys.forEach(key => {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            const timestamp = parsed.timestamp || parsed.cachedAt || 0;
+            keyTimestamps.push({ key, timestamp });
+          }
+        } catch (e) {
+          // If we can't parse it, it's probably corrupted, so add it for removal
+          keyTimestamps.push({ key, timestamp: 0 });
+        }
+      });
+
+      // Sort by timestamp (oldest first)
+      keyTimestamps.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Remove oldest 25% of cache entries
+      const toRemove = Math.max(1, Math.floor(keyTimestamps.length * 0.25));
+      const keysToRemove = keyTimestamps.slice(0, toRemove);
+
+      keysToRemove.forEach(({ key }) => {
+        localStorage.removeItem(key);
+      });
+
+      console.log(`🗑️ Cleared ${keysToRemove.length} old cache entries to free up storage space`);
+    } catch (error) {
+      console.error('Error clearing old cache entries:', error);
+    }
+  }
+
+  /**
+   * Nuclear option: Clear ALL search-related cache
+   */
+  forceNuclearClear(): void {
+    console.log('💥 NUCLEAR CACHE CLEAR: Removing ALL search-related cache');
+
+    // Clear all memory cache
+    this.memoryCache.clear();
+    this.currentMemoryUsage = 0;
+
+    // Clear ALL localStorage entries related to search/cache/conversation
+    const allKeys = Object.keys(localStorage);
+    const cacheKeys = allKeys.filter(key =>
+      key.includes('search_cache_') ||
+      key.includes('conv_cache_') ||
+      key.includes('background_search_') ||
+      key.includes('conversation_') ||
+      key.includes('chat_') ||
+      key.includes('cache')
+    );
+
+    cacheKeys.forEach(key => localStorage.removeItem(key));
+
+    // Clear sessionStorage too
+    const sessionKeys = Object.keys(sessionStorage);
+    const sessionCacheKeys = sessionKeys.filter(key =>
+      key.includes('search') ||
+      key.includes('cache') ||
+      key.includes('conversation')
+    );
+    sessionCacheKeys.forEach(key => sessionStorage.removeItem(key));
+
+    console.log(`💥 Nuclear clear removed ${cacheKeys.length + sessionCacheKeys.length} cache entries`);
   }
 
   /**
@@ -463,4 +586,43 @@ class SearchCache {
 
 // Export singleton instance
 export const searchCache = new SearchCache();
+
+// Global utility for debugging - accessible from browser console
+if (typeof window !== 'undefined') {
+  (window as any).clearPowercatCache = () => {
+    console.log('🗑️ Clearing POWERCAT cache...');
+    searchCache.forceClearQuery('powercat');
+
+    // Also clear conversation caches
+    import('./conversation-history').then(({ forceInvalidateConversationsByQuery }) => {
+      forceInvalidateConversationsByQuery('powercat');
+    });
+
+    console.log('✅ POWERCAT cache cleared! Please refresh the page and try searching again.');
+  };
+
+  (window as any).clearAllSearchCache = () => {
+    console.log('🗑️ Clearing all search cache...');
+    searchCache.invalidate();
+
+    // Also clear all conversation caches
+    import('./conversation-history').then(({ forceInvalidateAllConversationCaches }) => {
+      forceInvalidateAllConversationCaches();
+    });
+
+    console.log('✅ All search cache cleared! Please refresh the page.');
+  };
+
+  (window as any).nuclearClearCache = () => {
+    console.log('💥 NUCLEAR CACHE CLEAR...');
+    searchCache.forceNuclearClear();
+
+    // Also clear all conversation caches
+    import('./conversation-history').then(({ forceInvalidateAllConversationCaches }) => {
+      forceInvalidateAllConversationCaches();
+    });
+
+    console.log('💥 Nuclear cache clear complete! Please refresh the page.');
+  };
+}
 export type { CacheMetrics, SearchCacheKey };

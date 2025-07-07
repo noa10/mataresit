@@ -665,6 +665,14 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
           }
         };
 
+        // 🔍 DEBUG: Log response structure
+        console.log('🔍 Enhanced search response structure:', {
+          success: response.success,
+          resultsLength: response.results?.length,
+          totalResults: response.totalResults,
+          hasEnhancedResponse: !!response.enhancedResponse
+        });
+
         const successResponse = new Response(
           JSON.stringify(response),
           { headers: { 'Content-Type': 'application/json' } }

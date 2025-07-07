@@ -13,6 +13,7 @@ import { personalizedChatService } from '@/services/personalizedChatService';
 import { conversationMemoryService } from '@/services/conversationMemoryService';
 import { useBackgroundSearch } from '@/contexts/BackgroundSearchContext';
 import { backgroundSearchService } from '@/services/backgroundSearchService';
+import { searchCache } from '@/lib/searchCache';
 
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -84,6 +85,21 @@ export default function SemanticSearchPage() {
 
   // Auth context
   const { user } = useAuth();
+
+  // 🔍 DEBUG: Log component mount and auth state changes
+  useEffect(() => {
+    console.log('🔍 DEBUG: SemanticSearch component mounted/auth changed:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      timestamp: new Date().toISOString()
+    });
+  }, [user]);
+
+  // 🔍 DEBUG: Log component mount
+  useEffect(() => {
+    console.log('🔍 DEBUG: SemanticSearch component mounted at:', new Date().toISOString());
+  }, []);
 
   // Personalization context
   const {
@@ -298,10 +314,35 @@ export default function SemanticSearchPage() {
     }
   }, [isLoading, messages, saveCurrentConversation]);
 
+  // Debug function to clear cache for specific queries
+  const handleClearCache = useCallback((query?: string) => {
+    if (query) {
+      searchCache.forceClearQuery(query);
+      console.log(`🗑️ Cleared cache for query: "${query}"`);
+    } else {
+      searchCache.invalidate();
+      console.log('🗑️ Cleared all search cache');
+    }
+  }, []);
+
+  // Make cache clearing available globally for debugging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).clearSearchCache = handleClearCache;
+    }
+  }, [handleClearCache]);
+
   // Handle sending a new message with background search
   const handleSendMessage = async (content: string) => {
+    console.log('🔍 DEBUG: handleSendMessage called with:', {
+      content,
+      hasUser: !!user,
+      userId: user?.id,
+      timestamp: new Date().toISOString()
+    });
+
     if (!user) {
-      console.error('Cannot send message: user not authenticated');
+      console.error('🔍 DEBUG: Cannot send message: user not authenticated');
       return;
     }
 
@@ -530,12 +571,20 @@ export default function SemanticSearchPage() {
 
             // Generate AI response immediately
             const aiResponse = await generateIntelligentResponse(results, content, messages);
+
+            // Extract UI components from cached search response if available
+            // Check both top-level and enhancedResponse locations for backward compatibility
+            const uiComponents = cachedResults.uiComponents ||
+                               cachedResults.enhancedResponse?.uiComponents ||
+                               [];
+
             const aiMessage: ChatMessage = {
               id: generateMessageId(),
               type: 'ai',
-              content: aiResponse,
+              content: cachedResults.enhancedResponse?.content || cachedResults.content || aiResponse,
               timestamp: new Date(),
               searchResults: results,
+              uiComponents: uiComponents,
             };
 
             setMessages(prev => [...prev, aiMessage]);
@@ -559,8 +608,39 @@ export default function SemanticSearchPage() {
           showNavigationFreedomToast();
 
           // Start the background search (non-blocking)
+          console.log('🔍 DEBUG: SemanticSearch calling startBackgroundSearch with:', {
+            conversationId,
+            content,
+            enhancedParams
+          });
+
           startBackgroundSearch(conversationId, content, enhancedParams)
             .then(async (searchResults) => {
+              // 🔧 FIX: Add defensive programming to handle undefined results
+              console.log('🔍 DEBUG: SemanticSearch received search results:', {
+                hasSearchResults: !!searchResults,
+                searchResultsType: typeof searchResults,
+                isNull: searchResults === null,
+                isUndefined: searchResults === undefined,
+                hasResults: !!searchResults?.results,
+                resultsLength: searchResults?.results?.length,
+                hasEnhancedResponse: !!searchResults?.enhancedResponse,
+                searchResultsKeys: searchResults ? Object.keys(searchResults) : [],
+                fullSearchResults: searchResults // Log the full object for debugging
+              });
+
+              // Check if searchResults is valid
+              if (!searchResults) {
+                console.error('🔍 DEBUG: Search results are undefined/null');
+                throw new Error('Search results are undefined');
+              }
+
+              // Check if results array exists
+              if (!searchResults.results || !Array.isArray(searchResults.results)) {
+                console.error('❌ Invalid search results structure:', searchResults);
+                throw new Error('Search results do not contain a valid results array');
+              }
+
               // Process results when search completes
               const results = {
                 results: searchResults.results.map(result => ({
@@ -576,7 +656,7 @@ export default function SemanticSearchPage() {
                   ...(result.metadata || {})
                 })),
                 count: searchResults.results.length,
-                total: searchResults.totalResults,
+                total: searchResults.totalResults || searchResults.results.length,
                 searchParams: {
                   query: content,
                   isNaturalLanguage: true,
@@ -584,17 +664,25 @@ export default function SemanticSearchPage() {
                   offset: 0,
                   searchTarget: 'all'
                 },
-                searchMetadata: searchResults.searchMetadata
+                searchMetadata: searchResults.searchMetadata || {}
               };
 
               // Generate AI response
               const aiResponse = await generateIntelligentResponse(results, content, messages);
+
+              // Extract UI components from search response if available
+              // Check both top-level and enhancedResponse locations for backward compatibility
+              const uiComponents = searchResults.uiComponents ||
+                                 searchResults.enhancedResponse?.uiComponents ||
+                                 [];
+
               const aiMessage: ChatMessage = {
                 id: generateMessageId(),
                 type: 'ai',
-                content: aiResponse,
+                content: searchResults.enhancedResponse?.content || searchResults.content || aiResponse,
                 timestamp: new Date(),
                 searchResults: results,
+                uiComponents: uiComponents,
               };
 
               setMessages(prev => [...prev, aiMessage]);

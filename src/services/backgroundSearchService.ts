@@ -194,7 +194,8 @@ export class BackgroundSearchService {
   generateSearchParams(query: string, conversationHistory?: ChatMessage[]): UnifiedSearchParams {
     return {
       query: query.trim(),
-      sources: ['receipts', 'business_directory'],
+      // 🔧 FIX: Use singular source names that match backend validation
+      sources: ['receipt', 'business_directory'],
       limit: 20,
       offset: 0,
       filters: {

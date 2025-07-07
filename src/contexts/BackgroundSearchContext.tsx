@@ -253,18 +253,27 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
     query: string,
     searchParams: UnifiedSearchParams
   ) => {
+    console.log('🔍 DEBUG: BackgroundSearchContext.startBackgroundSearch called:', {
+      conversationId,
+      query,
+      searchParams,
+      hasUser: !!user,
+      userId: user?.id
+    });
+
     if (!user) {
-      console.error('Cannot start search: user not authenticated');
+      console.error('🔍 DEBUG: Cannot start search: user not authenticated');
       return;
     }
 
     // Check if search is already active
     if (state.activeSearches.has(conversationId)) {
-      console.log(`Search already active for conversation ${conversationId}`);
+      console.log(`🔍 DEBUG: Search already active for conversation ${conversationId}`);
       return;
     }
 
     // Start the search
+    console.log('🔍 DEBUG: Dispatching START_SEARCH action');
     dispatch({
       type: 'START_SEARCH',
       payload: { conversationId, query, searchParams }
@@ -272,15 +281,27 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
 
     try {
       // Update status to searching
+      console.log('🔍 DEBUG: Updating search status to searching');
       dispatch({
         type: 'UPDATE_SEARCH_STATUS',
         payload: { conversationId, status: 'searching', progress: 'Searching through your data...' }
       });
 
       // Perform the actual search
+      console.log('🔍 DEBUG: Calling unifiedSearch with params:', searchParams);
       const results = await unifiedSearch(searchParams);
 
+      console.log('🔍 DEBUG: unifiedSearch returned:', {
+        hasResults: !!results,
+        resultType: typeof results,
+        success: results?.success,
+        resultsLength: results?.results?.length,
+        error: results?.error,
+        resultKeys: results && typeof results === 'object' ? Object.keys(results) : []
+      });
+
       if (results.success) {
+        console.log('🔍 DEBUG: Search successful, caching results');
         // Cache the results in both regular cache and conversation-specific cache
         await searchCache.setForConversation(conversationId, searchParams, user.id, results);
 
@@ -288,6 +309,7 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
         updateConversationSearchCache(conversationId, searchParams, results, 'completed');
 
         // Complete the search
+        console.log('🔍 DEBUG: Dispatching COMPLETE_SEARCH action');
         dispatch({
           type: 'COMPLETE_SEARCH',
           payload: { conversationId, results }
@@ -295,15 +317,20 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
 
         console.log(`✅ Background search completed for conversation ${conversationId}`);
       } else {
+        console.log('🔍 DEBUG: Search failed with error:', results.error);
         throw new Error(results.error || 'Search failed');
       }
     } catch (error) {
-      console.error(`❌ Background search failed for conversation ${conversationId}:`, error);
+      console.error(`🔍 DEBUG: Background search failed for conversation ${conversationId}:`, {
+        errorType: error?.constructor?.name,
+        errorMessage: error?.message,
+        errorStack: error?.stack
+      });
       dispatch({
         type: 'ERROR_SEARCH',
-        payload: { 
-          conversationId, 
-          error: error instanceof Error ? error.message : 'Search failed' 
+        payload: {
+          conversationId,
+          error: error instanceof Error ? error.message : 'Search failed'
         }
       });
     }

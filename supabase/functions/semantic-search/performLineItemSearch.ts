@@ -76,8 +76,8 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
   });
 
   try {
-    // CRITICAL FIX: Search receipt_embeddings instead of unified_embeddings
-    console.log('🔧 Calling enhanced line item search on receipt_embeddings...');
+    // UPDATED: Search unified_embeddings table for better data quality
+    console.log('🔧 Calling enhanced line item search on unified_embeddings...');
 
     if (useHybridSearch) {
       return await performHybridLineItemSearch(client, queryEmbedding, searchQuery, {
@@ -309,25 +309,17 @@ async function performSemanticLineItemSearch(client: any, queryEmbedding: number
 
   console.log('🧠 Performing semantic line item search with threshold:', similarityThreshold);
 
-  // CRITICAL FIX: Search receipt_embeddings instead of unified_embeddings
-  // Use explicit foreign key relationship to avoid PostgREST ambiguity
+  // UPDATED: Search unified_embeddings table for better data quality
   let query = client
-    .from('receipt_embeddings')
+    .from('unified_embeddings')
     .select(`
       id,
-      receipt_id,
+      source_id,
       content_type,
       embedding,
-      metadata,
-      receipts!receipt_embeddings_receipt_id_fkey(
-        id,
-        merchant,
-        date,
-        total,
-        currency,
-        user_id
-      )
+      metadata
     `)
+    .eq('source_type', 'receipt')
     .eq('content_type', 'line_item')
     .not('metadata->line_item_id', 'is', null);
 
@@ -396,7 +388,8 @@ async function performSemanticLineItemSearch(client: any, queryEmbedding: number
         ...embedding,
         embedding: validatedVector, // Use the properly parsed vector
         similarity,
-        line_item_id: embedding.metadata?.line_item_id
+        line_item_id: embedding.metadata?.line_item_id,
+        receipt_id: embedding.source_id // Map source_id to receipt_id for compatibility
       };
     })
     .filter(result => {
@@ -421,16 +414,31 @@ async function performSemanticLineItemSearch(client: any, queryEmbedding: number
   // Apply pagination
   const paginatedResults = resultsWithSimilarity.slice(offset, offset + limit);
 
-  // Fetch actual line item data
+  // Fetch actual line item data and receipt data
   const lineItemIds = paginatedResults.map(r => r.line_item_id).filter(id => id);
+  const receiptIds = paginatedResults.map(r => r.receipt_id).filter(id => id);
 
   if (lineItemIds.length === 0) {
     return { lineItems: [], count: 0, total: 0 };
   }
 
+  // Fetch line items with receipt data
   const { data: lineItems, error: lineItemsError } = await client
     .from('line_items')
-    .select('id, description, amount')
+    .select(`
+      id,
+      description,
+      amount,
+      receipt_id,
+      receipts!line_items_receipt_id_fkey(
+        id,
+        merchant,
+        date,
+        total,
+        currency,
+        user_id
+      )
+    `)
     .in('id', lineItemIds);
 
   if (lineItemsError) {
@@ -447,10 +455,10 @@ async function performSemanticLineItemSearch(client: any, queryEmbedding: number
       receipt_id: embeddingResult.receipt_id,
       description: lineItem?.description || 'Unknown',
       amount: lineItem?.amount || 0,
-      merchant: embeddingResult.receipts.merchant,
-      date: embeddingResult.receipts.date,
-      total: embeddingResult.receipts.total,
-      currency: embeddingResult.receipts.currency,
+      merchant: lineItem?.receipts?.merchant || 'Unknown',
+      date: lineItem?.receipts?.date || null,
+      total: lineItem?.receipts?.total || 0,
+      currency: lineItem?.receipts?.currency || 'MYR',
       similarity: embeddingResult.similarity,
       matchType: 'semantic'
     };

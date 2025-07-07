@@ -56,6 +56,20 @@ export interface UnifiedSearchResponse {
     totalPages: number;
   };
   error?: string;
+  // Enhanced response fields from Edge Function
+  content?: string;
+  uiComponents?: any[];
+  followUpSuggestions?: string[];
+  confidence?: number;
+  responseType?: 'success' | 'partial' | 'empty' | 'error';
+  // Enhanced response structure for advanced search features
+  enhancedResponse?: {
+    content: string;
+    uiComponents: any[];
+    followUpSuggestions: string[];
+    confidence: number;
+    responseType: 'success' | 'partial' | 'empty' | 'error';
+  };
 }
 
 export interface UnifiedSearchResult {

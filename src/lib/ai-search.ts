@@ -2021,14 +2021,59 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
     // Call the unified-search Edge Function with fallback handling
     let response;
     try {
+      console.log('🚀 Calling unified-search Edge Function with params:', searchParams);
       response = await callEdgeFunction('unified-search', 'POST', searchParams);
 
-      if (!response || !response.success) {
+      // 🔍 DEBUG: Log the actual response structure for debugging
+      console.log('🔍 Unified search response received:', {
+        hasResponse: !!response,
+        responseType: typeof response,
+        isNull: response === null,
+        isUndefined: response === undefined,
+        successField: response?.success,
+        resultsLength: response?.results?.length,
+        hasError: !!response?.error,
+        responseKeys: response && typeof response === 'object' ? Object.keys(response) : [],
+        fullResponse: response // Log the full response for debugging
+      });
+
+      // 🔧 IMPROVED: More robust response validation
+      // Check for various success indicators and response structures
+      const isValidResponse = response && (
+        response.success === true ||
+        (response.results && Array.isArray(response.results)) ||
+        (response.enhancedResponse && response.enhancedResponse.content)
+      );
+
+      if (!isValidResponse) {
         errorOccurred = true;
-        errorMessage = response?.error || 'Unified search failed';
+        errorMessage = response?.error || response?.message || 'Unified search failed';
+
+        // 🔍 DEBUG: Enhanced error logging
+        console.error('🔍 Unified search validation failed:', {
+          hasResponse: !!response,
+          successField: response?.success,
+          hasResults: !!(response?.results),
+          resultsLength: response?.results?.length,
+          errorField: response?.error
+        });
+
         throw new Error(errorMessage);
       }
+
+      // 🔧 NORMALIZE: Ensure response has success field set to true
+      if (response.success !== true && (response.results || response.enhancedResponse)) {
+        console.log('🔧 Normalizing response: setting success=true based on presence of results');
+        response.success = true;
+      }
     } catch (edgeFunctionError) {
+      // 🔍 DEBUG: Enhanced error logging
+      console.error('🔍 Edge Function call failed:', {
+        errorType: edgeFunctionError?.constructor?.name,
+        errorMessage: edgeFunctionError?.message,
+        query: searchParams.query
+      });
+
       // 🔧 IMPROVED: Check for specific error types that warrant fallback
       const isNetworkError = edgeFunctionError instanceof Error &&
         (edgeFunctionError.message.includes('Failed to fetch') ||
@@ -2088,6 +2133,13 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
 
     let searchResponse = response as UnifiedSearchResponse;
 
+    // 🔍 DEBUG: Log successful response processing
+    console.log('🔍 Processing successful unified search response:', {
+      resultsLength: searchResponse.results?.length,
+      totalResults: searchResponse.totalResults,
+      hasEnhancedResponse: !!(searchResponse.enhancedResponse)
+    });
+
     // Apply advanced ranking algorithm to optimize result ordering
     if (searchResponse.results && searchResponse.results.length > 0) {
       console.log(`🎯 Applying advanced ranking to ${searchResponse.results.length} results...`);
@@ -2136,6 +2188,13 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
       searchDuration: searchResponse.searchMetadata?.searchDuration,
       queryTime: queryTime.toFixed(2) + 'ms',
       cacheHit: false
+    });
+
+    // 🔍 DEBUG: Final response validation
+    console.log('🔍 Final unified search response:', {
+      success: searchResponse.success,
+      resultsLength: searchResponse.results?.length,
+      totalResults: searchResponse.totalResults
     });
 
     return searchResponse;

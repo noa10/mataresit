@@ -61,6 +61,20 @@ export interface UnifiedSearchResponse {
   searchMetadata: SearchMetadata;
   pagination: PaginationInfo;
   error?: string;
+  // Enhanced response fields for advanced search features
+  content?: string;
+  uiComponents?: any[];
+  followUpSuggestions?: string[];
+  confidence?: number;
+  responseType?: 'success' | 'partial' | 'empty' | 'error';
+  // Enhanced response structure for advanced search features
+  enhancedResponse?: {
+    content: string;
+    uiComponents: any[];
+    followUpSuggestions: string[];
+    confidence: number;
+    responseType: 'success' | 'partial' | 'empty' | 'error';
+  };
 }
 
 export interface SearchMetadata {
