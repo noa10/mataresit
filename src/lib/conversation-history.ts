@@ -225,6 +225,55 @@ export function hasValidSearchCache(conversationId: string): boolean {
 }
 
 /**
+ * Force clear all conversation caches containing a specific query
+ */
+export function forceInvalidateConversationsByQuery(query: string): void {
+  try {
+    const queryLower = query.toLowerCase();
+    const conversations = getAllConversations();
+    let clearedCount = 0;
+
+    conversations.forEach(conversation => {
+      // Check if conversation has search results for this query
+      const hasQueryInCache = conversation.metadata.lastSearchQuery?.toLowerCase().includes(queryLower);
+      const hasQueryInMessages = conversation.messages.some(msg =>
+        msg.content.toLowerCase().includes(queryLower)
+      );
+
+      if (hasQueryInCache || hasQueryInMessages) {
+        invalidateConversationSearchCache(conversation.id);
+        clearedCount++;
+      }
+    });
+
+    console.log(`🗑️ Force invalidated ${clearedCount} conversation caches for query: "${query}"`);
+  } catch (error) {
+    console.error('Error force invalidating conversation caches:', error);
+  }
+}
+
+/**
+ * Nuclear option: Clear ALL conversation search caches
+ */
+export function forceInvalidateAllConversationCaches(): void {
+  try {
+    const conversations = getAllConversations();
+    let clearedCount = 0;
+
+    conversations.forEach(conversation => {
+      if (conversation.metadata.hasSearchResults) {
+        invalidateConversationSearchCache(conversation.id);
+        clearedCount++;
+      }
+    });
+
+    console.log(`💥 Nuclear invalidated ${clearedCount} conversation search caches`);
+  } catch (error) {
+    console.error('Error nuclear invalidating conversation caches:', error);
+  }
+}
+
+/**
  * Update conversation search status
  */
 export function updateConversationSearchStatus(

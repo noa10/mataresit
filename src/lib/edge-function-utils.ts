@@ -29,19 +29,34 @@ export async function callEdgeFunction<T = any>(
 ): Promise<T> {
   try {
     // Get the session for the current user to include the auth token
+    console.log(`🔍 DEBUG: Getting auth session for ${functionName}...`);
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
+    console.log(`🔍 DEBUG: Auth session for ${functionName}:`, {
+      hasSession: !!session,
+      sessionError: sessionError?.message,
+      sessionKeys: session ? Object.keys(session) : []
+    });
+
     if (sessionError) {
-      console.warn('Session error:', sessionError);
+      console.warn(`🔍 DEBUG: Session error for ${functionName}:`, sessionError);
     }
 
     const authToken = session?.access_token;
 
+    console.log(`🔍 DEBUG: Auth token for ${functionName}:`, {
+      hasToken: !!authToken,
+      tokenType: typeof authToken,
+      tokenLength: authToken?.length,
+      tokenPreview: authToken ? authToken.substring(0, 20) + '...' : 'null',
+      isValidString: authToken && typeof authToken === 'string' && authToken.trim() !== ''
+    });
+
     if (!authToken || typeof authToken !== 'string' || authToken.trim() === '') {
-      console.warn('No valid access token in session, this may cause authentication issues');
+      console.warn(`🔍 DEBUG: No valid access token in session for ${functionName}, this may cause authentication issues`);
       // Don't throw an error, let the Edge Function handle the authentication
     } else {
-      console.log('Using user access token for Edge Function call');
+      console.log(`🔍 DEBUG: Using user access token for ${functionName} Edge Function call`);
     }
 
     // Build the query string
@@ -117,8 +132,39 @@ export async function callEdgeFunction<T = any>(
         throw new Error(errorMessage);
       }
 
-      // Parse the response
-      const data = await response.json();
+      // Parse the response with enhanced debugging
+      console.log(`🔍 DEBUG: Response status for ${functionName}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      // Get response text first for debugging
+      const responseText = await response.text();
+      console.log(`🔍 DEBUG: Raw response text for ${functionName}:`, {
+        length: responseText.length,
+        preview: responseText.substring(0, 200),
+        isEmpty: responseText.trim() === ''
+      });
+
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log(`🔍 DEBUG: Parsed JSON for ${functionName}:`, {
+          hasData: !!data,
+          dataType: typeof data,
+          keys: data && typeof data === 'object' ? Object.keys(data) : [],
+          success: data?.success,
+          resultsLength: data?.results?.length
+        });
+      } catch (parseError) {
+        console.error(`❌ JSON parse error for ${functionName}:`, parseError);
+        console.error(`❌ Raw response that failed to parse:`, responseText);
+        throw new Error(`Failed to parse JSON response from ${functionName}: ${parseError.message}`);
+      }
+
       return data as T;
     } finally {
       // Ensure timeout is cleared in all cases

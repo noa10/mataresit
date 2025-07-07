@@ -11,7 +11,8 @@ import {
   uploadReceiptImage,
   processReceiptWithAI,
   markReceiptUploaded,
-  fixProcessingStatus
+  fixProcessingStatus,
+  subscribeToReceiptAll
 } from "@/services/receiptService";
 import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,6 +94,36 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     preferredMethod: 'ai-vision' as const,
   }), [settings.selectedModel]);
 
+  // Smooth progress update function - moved here to avoid temporal dead zone
+  const updateProgressSmooth = useCallback((targetProgress: number) => {
+    const currentProgress = uploadProgress;
+    const difference = targetProgress - currentProgress;
+
+    if (difference <= 0) return; // Don't go backwards
+
+    setIsProgressUpdating(true);
+
+    // Animate progress in small increments for smooth transition
+    const steps = Math.max(1, Math.abs(difference));
+    const increment = difference / steps;
+    const duration = 400; // Total animation duration in ms
+    const stepDuration = duration / steps;
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      const newProgress = Math.min(100, currentProgress + (increment * step));
+      setUploadProgress(newProgress);
+
+      if (step >= steps || newProgress >= targetProgress) {
+        clearInterval(interval);
+        setUploadProgress(targetProgress);
+        // Stop the updating indicator after a short delay
+        setTimeout(() => setIsProgressUpdating(false), 200);
+      }
+    }, stepDuration);
+  }, [uploadProgress]);
+
   // Map processing status to UI stages
   const mapStatusToStage = (status: ProcessingStatus): string | null => {
     switch (status) {
@@ -147,21 +178,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     }
   }, [processingStatus, currentStage, stageHistory, t, updateProgressSmooth, uploadProgress]);
 
-  // Subscribe to receipt processing status updates
+  // OPTIMIZATION: Use unified subscription system for receipt status updates during upload
   useEffect(() => {
     if (!receiptId) return;
 
-    const statusChannel = supabase.channel(`receipt-status-${receiptId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'receipts',
-          filter: `id=eq.${receiptId}`
-        },
-        (payload) => {
-          console.log('Receipt status update:', payload.new);
+    const unsubscribe = subscribeToReceiptAll(
+      receiptId,
+      'upload-zone',
+      {
+        onReceiptUpdate: (payload) => {
+          console.log('📝 Receipt status update during upload:', payload.new);
           const newStatus = payload.new.processing_status as ProcessingStatus;
           const newError = payload.new.processing_error;
 
@@ -178,13 +204,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             toast.error(errorMsg);
           }
         }
-      )
-      .subscribe();
+      },
+      {
+        statusFilter: ['uploading', 'processing', 'complete', 'failed', 'failed_ocr', 'failed_ai']
+      }
+    );
 
-    // Clean up subscription when component unmounts or receiptId changes
-    return () => {
-      statusChannel.unsubscribe();
-    };
+    // Clean up unified subscription when component unmounts or receiptId changes
+    return unsubscribe;
   }, [receiptId, t]);
 
   // Effect to manage preview URL for the first file
@@ -297,36 +324,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       updateProgressFromLog(stepName, message);
     }
   };
-
-  // Smooth progress update function
-  const updateProgressSmooth = useCallback((targetProgress: number) => {
-    const currentProgress = uploadProgress;
-    const difference = targetProgress - currentProgress;
-
-    if (difference <= 0) return; // Don't go backwards
-
-    setIsProgressUpdating(true);
-
-    // Animate progress in small increments for smooth transition
-    const steps = Math.max(1, Math.abs(difference));
-    const increment = difference / steps;
-    const duration = 400; // Total animation duration in ms
-    const stepDuration = duration / steps;
-
-    let step = 0;
-    const interval = setInterval(() => {
-      step++;
-      const newProgress = Math.min(100, currentProgress + (increment * step));
-      setUploadProgress(newProgress);
-
-      if (step >= steps || newProgress >= targetProgress) {
-        clearInterval(interval);
-        setUploadProgress(targetProgress);
-        // Stop the updating indicator after a short delay
-        setTimeout(() => setIsProgressUpdating(false), 200);
-      }
-    }, stepDuration);
-  }, [uploadProgress]);
 
   // Function to update progress based on log content
   const updateProgressFromLog = (stepName: string, message: string) => {

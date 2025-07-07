@@ -42,13 +42,23 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
   // Parse UI components and handle streaming for AI messages
   useEffect(() => {
     if (message.type === 'ai' && message.content) {
-      // Parse UI components from message content
-      const parseResult = parseUIComponents(message.content);
-      setParsedComponents(parseResult.components);
-      setCleanedContent(parseResult.cleanedContent);
+      let contentToStream = message.content;
+
+      // Use UI components from message if available, otherwise parse from content
+      if (message.uiComponents && message.uiComponents.length > 0) {
+        setParsedComponents(message.uiComponents);
+        setCleanedContent(message.content);
+        contentToStream = message.content;
+      } else {
+        // Parse UI components from message content
+        const parseResult = parseUIComponents(message.content);
+        setParsedComponents(parseResult.components);
+        setCleanedContent(parseResult.cleanedContent);
+        contentToStream = parseResult.cleanedContent;
+      }
 
       // Use cleaned content for streaming (without JSON blocks)
-      const textToStream = parseResult.cleanedContent;
+      const textToStream = contentToStream;
 
       setIsStreaming(true);
       setDisplayedText('');
@@ -73,7 +83,7 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
       setParsedComponents([]);
       setIsStreaming(false);
     }
-  }, [message.content, message.type]);
+  }, [message.content, message.type, message.uiComponents]);
 
   const handleCopy = () => {
     // Copy the cleaned content (without JSON blocks) for better user experience
