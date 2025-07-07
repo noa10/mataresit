@@ -1,15 +1,61 @@
 import { supabase } from "@/integrations/supabase/client";
+import { imagePerformanceMonitor } from "@/utils/imagePerformance";
+
+// Performance tracking for image loading
+interface ImageLoadMetrics {
+  url: string;
+  loadTime: number;
+  success: boolean;
+  retryCount: number;
+  cacheHit: boolean;
+}
+
+// Cache for formatted URLs to avoid reprocessing
+const urlCache = new Map<string, { url: string; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Image optimization parameters for Supabase
+interface ImageOptimizationOptions {
+  width?: number;
+  height?: number;
+  quality?: number;
+  format?: 'webp' | 'jpeg' | 'png';
+  resize?: 'cover' | 'contain' | 'fill';
+}
 
 /**
- * Formats an image URL for consistent display across the application
+ * Enhanced image URL formatter with smart caching and optimization
  * Uses multiple strategies to ensure images can load in various environments
  * @param url The raw image URL or path
+ * @param options Image optimization options
+ * @param forceRefresh Whether to bypass cache and force refresh
  * @returns Formatted URL suitable for display
  */
-export const getFormattedImageUrl = async (url: string | undefined): Promise<string> => {
+export const getFormattedImageUrl = async (
+  url: string | undefined,
+  options: ImageOptimizationOptions = {},
+  forceRefresh: boolean = false
+): Promise<string> => {
   if (!url) return "/placeholder.svg";
 
-  console.log("Original URL:", url);
+  const startTime = performance.now();
+  console.log("🖼️ Processing image URL:", url, options);
+
+  // Check cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = urlCache.get(url);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+      console.log("📦 Cache hit for URL:", url);
+      logImageMetrics({
+        url,
+        loadTime: performance.now() - startTime,
+        success: true,
+        retryCount: 0,
+        cacheHit: true
+      });
+      return cached.url;
+    }
+  }
 
   // For local development or testing with placeholder
   if (url.startsWith('/')) {
@@ -18,53 +64,64 @@ export const getFormattedImageUrl = async (url: string | undefined): Promise<str
   }
 
   try {
-    // STRATEGY 1: Handle deeply nested paths with UUIDs by downloading and creating a data URL
+    let formattedUrl: string;
+
+    // STRATEGY 1: Check if the URL is already a complete Supabase URL (prioritize this)
+    if (url.includes('supabase.co') && url.includes('/storage/v1/object/')) {
+      // If it already has public/ in the path, optimize and conditionally cache bust
+      if (url.includes('/public/')) {
+        formattedUrl = addImageOptimizations(url, options);
+        // Only add cache buster if force refresh or image was recently updated
+        if (forceRefresh) {
+          formattedUrl += `${formattedUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        }
+        console.log("Complete Supabase URL with optimizations:", formattedUrl);
+      } else {
+        // Add 'public/' to the path if it's missing
+        const baseUrl = url.replace('/object/', '/object/public/');
+        formattedUrl = addImageOptimizations(baseUrl, options);
+        if (forceRefresh) {
+          formattedUrl += `${formattedUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        }
+        console.log("Added public/ to Supabase URL with optimizations:", formattedUrl);
+      }
+
+      // Cache the result
+      urlCache.set(url, { url: formattedUrl, timestamp: Date.now() });
+      logImageMetrics({
+        url,
+        loadTime: performance.now() - startTime,
+        success: true,
+        retryCount: 0,
+        cacheHit: false
+      });
+      return formattedUrl;
+    }
+
+    // STRATEGY 2: Handle deeply nested paths with UUIDs by using public URL (not download)
     // This matches patterns like: 14367916-d0f8-4cdd-a916-4ff1a3e11c8f/1745555124724_fybcrq5b5tv.jpg
     if (url.includes('/') && url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)) {
-      console.log("Detected complex nested UUID-based file path, attempting direct fetch");
+      console.log("Detected complex nested UUID-based file path, using public URL");
 
       // Remove any duplicate or unnecessary path prefixes
       const cleanPath = url.includes('receipt_images/')
         ? url.substring(url.indexOf('receipt_images/') + 'receipt_images/'.length)
         : url;
 
-      try {
-        // Directly download the file as an array buffer
-        const { data, error } = await supabase.storage
-          .from('receipt_images')
-          .download(cleanPath);
+      // Use public URL instead of download for better performance and reliability
+      const { data } = supabase.storage
+        .from('receipt_images')
+        .getPublicUrl(cleanPath);
 
-        if (error) {
-          console.error("Error downloading image:", error);
-          throw error;
-        }
-
-        if (data) {
-          // Convert the blob to a data URL
-          const dataUrl = URL.createObjectURL(data);
-          console.log("Created object URL from blob:", dataUrl);
-          return dataUrl;
-        }
-      } catch (e) {
-        console.error("Error with direct download approach:", e);
-        // Fall through to other strategies
-      }
-    }
-
-    // STRATEGY 2: Check if the URL is already a complete Supabase URL
-    if (url.includes('supabase.co') && url.includes('/storage/v1/object/')) {
-      // If it already has public/ in the path, return as is but add cache buster
-      if (url.includes('/public/')) {
+      if (data?.publicUrl) {
         const cacheBuster = `?t=${Date.now()}`;
-        const formatted = url + cacheBuster;
-        console.log("Complete Supabase URL with public path, adding cache buster:", formatted);
+        const formatted = data.publicUrl + cacheBuster;
+        console.log("Generated public URL for UUID path:", formatted);
         return formatted;
+      } else {
+        console.error("Failed to generate public URL for path:", cleanPath);
+        return "/placeholder.svg";
       }
-      // Add 'public/' to the path if it's missing
-      const cacheBuster = `?t=${Date.now()}`;
-      const formatted = url.replace('/object/', '/object/public/') + cacheBuster;
-      console.log("Added public/ to Supabase URL with cache buster:", formatted);
-      return formatted;
     }
 
     // STRATEGY 3: Special case: URL contains another Supabase URL inside it
@@ -101,24 +158,9 @@ export const getFormattedImageUrl = async (url: string | undefined): Promise<str
     if (!url.includes('supabase.co')) {
       // Check if this looks like a UUID-based path (simple pattern)
       if (url.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/.*$/i)) {
-        console.log("Detected UUID-based file path");
-        try {
-          // Try direct download first
-          const { data, error } = await supabase.storage
-            .from('receipt_images')
-            .download(url);
+        console.log("Detected UUID-based file path, using public URL");
 
-          if (!error && data) {
-            // Convert the blob to a data URL
-            const dataUrl = URL.createObjectURL(data);
-            console.log("Created object URL from blob for UUID path:", dataUrl);
-            return dataUrl;
-          }
-        } catch (e) {
-          console.error("Failed direct download for UUID path, falling back to public URL", e);
-        }
-
-        // Fall back to public URL if direct download fails
+        // Use public URL directly for better performance and reliability
         const { data } = supabase.storage
           .from('receipt_images')
           .getPublicUrl(url);
@@ -143,33 +185,143 @@ export const getFormattedImageUrl = async (url: string | undefined): Promise<str
     }
 
     console.log("URL didn't match any formatting rules, returning placeholder");
-    return "/placeholder.svg"; // Return placeholder as fallback
+    const fallbackUrl = "/placeholder.svg";
+    urlCache.set(url, { url: fallbackUrl, timestamp: Date.now() });
+    return fallbackUrl;
   } catch (error) {
     console.error("Error formatting image URL:", error);
+    logImageMetrics({
+      url,
+      loadTime: performance.now() - startTime,
+      success: false,
+      retryCount: 0,
+      cacheHit: false
+    });
     return "/placeholder.svg"; // Return placeholder on error
   }
 };
 
 /**
- * Simple synchronous version that returns the current URL immediately
- * while asynchronously updating the URL in the background
+ * Adds Supabase image optimization parameters to a URL
+ */
+function addImageOptimizations(url: string, options: ImageOptimizationOptions): string {
+  if (!options || Object.keys(options).length === 0) {
+    return url;
+  }
+
+  const params = new URLSearchParams();
+
+  if (options.width) params.append('width', options.width.toString());
+  if (options.height) params.append('height', options.height.toString());
+  if (options.quality) params.append('quality', options.quality.toString());
+  if (options.format) params.append('format', options.format);
+  if (options.resize) params.append('resize', options.resize);
+
+  const paramString = params.toString();
+  if (paramString) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}${paramString}`;
+  }
+
+  return url;
+}
+
+/**
+ * Logs image loading metrics for performance monitoring
+ */
+function logImageMetrics(metrics: ImageLoadMetrics): void {
+  // Use the performance monitor
+  imagePerformanceMonitor.recordMetric({
+    url: metrics.url,
+    loadTime: metrics.loadTime,
+    success: metrics.success,
+    retryCount: metrics.retryCount,
+    cacheHit: metrics.cacheHit,
+    optimizationUsed: true, // Since we're using optimized URLs
+    lazyLoaded: false // Will be set by the lazy loading hook
+  });
+}
+
+/**
+ * Retry logic with exponential backoff for image loading
+ */
+export async function retryImageLoad(
+  url: string,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<boolean> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      if (response.ok) {
+        return true;
+      }
+    } catch (error) {
+      console.warn(`Image load attempt ${attempt + 1} failed:`, error);
+    }
+
+    if (attempt < maxRetries - 1) {
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return false;
+}
+
+/**
+ * Preload critical images for better performance
+ */
+export function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+/**
+ * Enhanced synchronous version with retry logic and optimization options
  * @param url The original image URL
  * @param setImageUrl Callback to set the updated URL when ready
+ * @param options Image optimization options
+ * @param enableRetry Whether to enable retry logic for failed loads
  */
-export const getFormattedImageUrlSync = (url: string | undefined, setImageUrl: (url: string) => void): string => {
+export const getFormattedImageUrlSync = (
+  url: string | undefined,
+  setImageUrl: (url: string) => void,
+  options: ImageOptimizationOptions = {},
+  enableRetry: boolean = true
+): string => {
   if (!url) return "/placeholder.svg";
 
   // Return a placeholder or the original URL immediately
   const initialUrl = url.startsWith('/') ? url : "/placeholder.svg";
 
   // Asynchronously get the proper URL and update via callback when ready
-  getFormattedImageUrl(url).then(formattedUrl => {
-    setImageUrl(formattedUrl);
-  }).catch(err => {
-    console.error("Error in async URL formatting:", err);
-    setImageUrl("/placeholder.svg");
-  });
+  const processUrl = async () => {
+    try {
+      const formattedUrl = await getFormattedImageUrl(url, options);
 
+      // If retry is enabled and the URL is not a placeholder, test loading
+      if (enableRetry && formattedUrl !== "/placeholder.svg") {
+        const loadSuccess = await retryImageLoad(formattedUrl);
+        if (loadSuccess) {
+          setImageUrl(formattedUrl);
+        } else {
+          console.warn("Image failed to load after retries:", formattedUrl);
+          setImageUrl("/placeholder.svg");
+        }
+      } else {
+        setImageUrl(formattedUrl);
+      }
+    } catch (err) {
+      console.error("Error in async URL formatting:", err);
+      setImageUrl("/placeholder.svg");
+    }
+  };
+
+  processUrl();
   return initialUrl;
 };
 
