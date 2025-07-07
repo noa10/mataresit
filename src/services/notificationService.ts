@@ -20,6 +20,17 @@ export class NotificationService {
   private lastConnectionAttempt: number = 0;
   private connectionCooldown: number = 2000; // 2 seconds between attempts
 
+  // OPTIMIZATION: Enhanced connection management
+  private subscriptionRegistry: Map<string, {
+    channel: any;
+    userId: string;
+    teamId?: string;
+    createdAt: number;
+    lastActivity: number;
+  }> = new Map();
+  private pendingSubscriptions: Set<string> = new Set();
+  private cleanupTimers: Map<string, NodeJS.Timeout> = new Map();
+
   // =============================================
   // CONNECTION MANAGEMENT
   // =============================================
@@ -348,11 +359,12 @@ export class NotificationService {
   }
 
   async deleteNotification(notificationId: string): Promise<void> {
+    // Use RLS policy instead of explicit recipient_id check for better performance
+    // The RLS policy will automatically filter by auth.uid()
     const { error } = await supabase
       .from('notifications')
       .delete()
-      .eq('id', notificationId)
-      .eq('recipient_id', (await supabase.auth.getUser()).data.user?.id);
+      .eq('id', notificationId);
 
     if (error) {
       throw new Error(error.message);
@@ -378,16 +390,11 @@ export class NotificationService {
   async bulkMarkAsRead(notificationIds: string[]): Promise<void> {
     if (notificationIds.length === 0) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
+    // Use RLS policy instead of explicit recipient_id check for better performance
     const { error } = await supabase
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
       .in('id', notificationIds)
-      .eq('recipient_id', user.id)
       .is('read_at', null);
 
     if (error) {
@@ -398,17 +405,10 @@ export class NotificationService {
   async bulkArchiveNotifications(notificationIds: string[]): Promise<void> {
     if (notificationIds.length === 0) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { error } = await supabase
-      .from('notifications')
-      .update({ archived_at: new Date().toISOString() })
-      .in('id', notificationIds)
-      .eq('recipient_id', user.id)
-      .is('archived_at', null);
+    // Use optimized RPC function for better performance
+    const { error } = await supabase.rpc('bulk_archive_notifications', {
+      _notification_ids: notificationIds,
+    });
 
     if (error) {
       throw new Error(error.message);
@@ -418,16 +418,10 @@ export class NotificationService {
   async bulkDeleteNotifications(notificationIds: string[]): Promise<void> {
     if (notificationIds.length === 0) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .in('id', notificationIds)
-      .eq('recipient_id', user.id);
+    // Use optimized RPC function for better performance
+    const { error } = await supabase.rpc('bulk_delete_notifications', {
+      _notification_ids: notificationIds,
+    });
 
     if (error) {
       throw new Error(error.message);
@@ -443,11 +437,6 @@ export class NotificationService {
   ): Promise<void> {
     if (notificationIds.length === 0) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
     const updateData: any = {};
     const now = new Date().toISOString();
 
@@ -458,11 +447,11 @@ export class NotificationService {
       updateData.archived_at = updates.archived ? now : null;
     }
 
+    // Use RLS policy instead of explicit recipient_id check for better performance
     const { error } = await supabase
       .from('notifications')
       .update(updateData)
-      .in('id', notificationIds)
-      .eq('recipient_id', user.id);
+      .in('id', notificationIds);
 
     if (error) {
       throw new Error(error.message);
@@ -652,9 +641,15 @@ export class NotificationService {
   }
 
   // Subscribe to all notification changes for a user (INSERT, UPDATE, DELETE)
+  // OPTIMIZATION: Enhanced with selective event filtering and notification type filtering
   async subscribeToAllUserNotificationChanges(
     callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
-    teamId?: string
+    teamId?: string,
+    options?: {
+      events?: ('INSERT' | 'UPDATE' | 'DELETE')[];
+      notificationTypes?: NotificationType[];
+      priorities?: NotificationPriority[];
+    }
   ) {
     // Ensure connection before subscribing
     const connected = await this.ensureConnection();
@@ -670,52 +665,180 @@ export class NotificationService {
 
     const channelName = `user-all-changes-${user.id}`;
 
-    // Remove existing channel if it exists
-    if (this.activeChannels.has(channelName)) {
-      const existingChannel = this.activeChannels.get(channelName);
-      supabase.removeChannel(existingChannel);
-      this.activeChannels.delete(channelName);
+    // OPTIMIZATION: Check for duplicate subscriptions and prevent them
+    if (this.hasActiveSubscription(channelName, user.id, teamId)) {
+      console.log(`⚠️ Subscription already exists for ${channelName}, skipping duplicate`);
+      // Return existing subscription's unsubscribe function
+      const existing = this.subscriptionRegistry.get(channelName);
+      if (existing) {
+        existing.lastActivity = Date.now(); // Update activity timestamp
+        return () => this.cleanupSubscription(channelName);
+      }
     }
+
+    // Check if subscription is already pending
+    if (this.pendingSubscriptions.has(channelName)) {
+      console.log(`⏳ Subscription already pending for ${channelName}, skipping duplicate`);
+      return () => {}; // Return no-op function
+    }
+
+    this.pendingSubscriptions.add(channelName);
+
+    // OPTIMIZATION: Build selective event filter instead of using '*'
+    const events = options?.events || ['INSERT', 'UPDATE', 'DELETE'];
+    const eventFilter = events.length === 3 ? '*' : events.join(',');
+
+    // OPTIMIZATION: Build notification type filter to reduce data transfer
+    let typeFilter = '';
+    if (options?.notificationTypes && options.notificationTypes.length > 0) {
+      typeFilter = `&type=in.(${options.notificationTypes.join(',')})`;
+    }
+
+    // OPTIMIZATION: Build priority filter
+    let priorityFilter = '';
+    if (options?.priorities && options.priorities.length > 0) {
+      priorityFilter = `&priority=in.(${options.priorities.join(',')})`;
+    }
+
+    const filter = `recipient_id=eq.${user.id}${typeFilter}${priorityFilter}`;
 
     const channel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: eventFilter as any,
           schema: 'public',
           table: 'notifications',
-          filter: `recipient_id=eq.${user.id}`,
+          filter,
         },
         (payload) => {
           const notification = (payload.new || payload.old) as Notification;
+
+          // Additional client-side filtering for team and notification preferences
           if (!teamId || notification.team_id === teamId) {
+            // OPTIMIZATION: Apply client-side notification type filtering if specified
+            if (options?.notificationTypes && options.notificationTypes.length > 0) {
+              if (!options.notificationTypes.includes(notification.type)) {
+                console.log(`🚫 Filtered out notification type: ${notification.type}`);
+                return;
+              }
+            }
+
+            // OPTIMIZATION: Apply client-side priority filtering if specified
+            if (options?.priorities && options.priorities.length > 0) {
+              if (!options.priorities.includes(notification.priority)) {
+                console.log(`🚫 Filtered out notification priority: ${notification.priority}`);
+                return;
+              }
+            }
+
             callback(payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', notification);
           }
         }
       )
       .subscribe((status) => {
+        this.pendingSubscriptions.delete(channelName); // Remove from pending
+
         if (status === 'SUBSCRIBED') {
           console.log(`✅ Subscribed to all notification changes for user ${user.id}`);
+          this.registerSubscription(channelName, channel, user.id, teamId);
           this.notifyConnectionStatusChange('connected');
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Channel error for all notification changes: ${channelName}`);
+          this.cleanupSubscription(channelName);
           this.notifyConnectionStatusChange('disconnected');
           // Attempt reconnection
           this.reconnectWithBackoff();
+        } else if (status === 'CLOSED') {
+          console.log(`🔌 Channel closed for all notification changes: ${channelName}`);
+          this.cleanupSubscription(channelName);
+          this.notifyConnectionStatusChange('disconnected');
         }
       });
 
-    // Store the channel for management
-    this.activeChannels.set(channelName, channel);
-
+    // OPTIMIZATION: Enhanced cleanup with proper subscription management
     return () => {
-      supabase.removeChannel(channel);
-      this.activeChannels.delete(channelName);
+      this.cleanupSubscription(channelName);
     };
   }
 
-  // Clean up all active channels
+  // OPTIMIZATION: Enhanced connection management and cleanup
+
+  /**
+   * Check if a subscription already exists to prevent duplicates
+   */
+  private hasActiveSubscription(channelName: string, userId: string, teamId?: string): boolean {
+    const existing = this.subscriptionRegistry.get(channelName);
+    if (!existing) return false;
+
+    // Check if it's for the same user and team context
+    return existing.userId === userId && existing.teamId === teamId;
+  }
+
+  /**
+   * Register a new subscription with metadata
+   */
+  private registerSubscription(channelName: string, channel: any, userId: string, teamId?: string): void {
+    // Clean up any existing subscription with the same name
+    this.cleanupSubscription(channelName);
+
+    this.subscriptionRegistry.set(channelName, {
+      channel,
+      userId,
+      teamId,
+      createdAt: Date.now(),
+      lastActivity: Date.now()
+    });
+
+    this.activeChannels.set(channelName, channel);
+    console.log(`📝 Registered subscription: ${channelName} (user: ${userId}, team: ${teamId || 'none'})`);
+  }
+
+  /**
+   * Clean up a specific subscription
+   */
+  private cleanupSubscription(channelName: string): void {
+    const existing = this.subscriptionRegistry.get(channelName);
+    if (existing) {
+      try {
+        supabase.removeChannel(existing.channel);
+        console.log(`🧹 Cleaned up subscription: ${channelName}`);
+      } catch (error) {
+        console.error(`❌ Error cleaning up subscription ${channelName}:`, error);
+      }
+    }
+
+    this.subscriptionRegistry.delete(channelName);
+    this.activeChannels.delete(channelName);
+
+    // Clear any pending cleanup timers
+    const timer = this.cleanupTimers.get(channelName);
+    if (timer) {
+      clearTimeout(timer);
+      this.cleanupTimers.delete(channelName);
+    }
+  }
+
+  /**
+   * Clean up subscriptions for a specific user/team context
+   */
+  cleanupUserSubscriptions(userId: string, teamId?: string): void {
+    console.log(`🧹 Cleaning up subscriptions for user ${userId}, team: ${teamId || 'none'}`);
+
+    const toCleanup: string[] = [];
+    for (const [channelName, subscription] of this.subscriptionRegistry) {
+      if (subscription.userId === userId && subscription.teamId === teamId) {
+        toCleanup.push(channelName);
+      }
+    }
+
+    toCleanup.forEach(channelName => this.cleanupSubscription(channelName));
+  }
+
+  /**
+   * Clean up all active channels with enhanced logging
+   */
   disconnectAll(): void {
     console.log(`🔌 Disconnecting ${this.activeChannels.size} active channels`);
 
@@ -729,7 +852,49 @@ export class NotificationService {
     }
 
     this.activeChannels.clear();
+    this.subscriptionRegistry.clear();
+
+    // Clear all cleanup timers
+    for (const timer of this.cleanupTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.cleanupTimers.clear();
+
     this.notifyConnectionStatusChange('disconnected');
+  }
+
+  /**
+   * Get detailed connection state for debugging
+   */
+  getConnectionState(): {
+    status: string;
+    activeChannels: number;
+    registeredSubscriptions: number;
+    pendingSubscriptions: number;
+    reconnectAttempts: number;
+    subscriptions: Array<{
+      channelName: string;
+      userId: string;
+      teamId?: string;
+      age: number;
+      lastActivity: number;
+    }>;
+  } {
+    const now = Date.now();
+    return {
+      status: this.connectionStatus,
+      activeChannels: this.activeChannels.size,
+      registeredSubscriptions: this.subscriptionRegistry.size,
+      pendingSubscriptions: this.pendingSubscriptions.size,
+      reconnectAttempts: this.reconnectAttempts,
+      subscriptions: Array.from(this.subscriptionRegistry.entries()).map(([channelName, sub]) => ({
+        channelName,
+        userId: sub.userId,
+        teamId: sub.teamId,
+        age: now - sub.createdAt,
+        lastActivity: now - sub.lastActivity
+      }))
+    };
   }
 
   // Get active channel count for debugging
@@ -740,6 +905,59 @@ export class NotificationService {
   // Get active channel names for debugging
   getActiveChannelNames(): string[] {
     return Array.from(this.activeChannels.keys());
+  }
+
+  /**
+   * OPTIMIZATION: Connection health monitoring and automatic cleanup
+   */
+  startConnectionHealthMonitoring(): void {
+    // Clean up stale subscriptions every 5 minutes
+    setInterval(() => {
+      this.cleanupStaleSubscriptions();
+    }, 5 * 60 * 1000);
+
+    // Monitor connection health every minute
+    setInterval(() => {
+      this.monitorConnectionHealth();
+    }, 60 * 1000);
+  }
+
+  /**
+   * Clean up subscriptions that haven't been active for a while
+   */
+  private cleanupStaleSubscriptions(): void {
+    const now = Date.now();
+    const staleThreshold = 30 * 60 * 1000; // 30 minutes
+    const toCleanup: string[] = [];
+
+    for (const [channelName, subscription] of this.subscriptionRegistry) {
+      if (now - subscription.lastActivity > staleThreshold) {
+        console.log(`🧹 Cleaning up stale subscription: ${channelName} (inactive for ${Math.round((now - subscription.lastActivity) / 60000)} minutes)`);
+        toCleanup.push(channelName);
+      }
+    }
+
+    toCleanup.forEach(channelName => this.cleanupSubscription(channelName));
+  }
+
+  /**
+   * Monitor overall connection health
+   */
+  private monitorConnectionHealth(): void {
+    const state = this.getConnectionState();
+
+    // Log health metrics
+    console.log(`📊 Connection Health: ${state.activeChannels} channels, ${state.registeredSubscriptions} subscriptions, ${state.pendingSubscriptions} pending`);
+
+    // Alert if too many subscriptions (potential leak)
+    if (state.activeChannels > 10) {
+      console.warn(`⚠️ High number of active channels (${state.activeChannels}). Possible subscription leak.`);
+    }
+
+    // Alert if many pending subscriptions (potential issue)
+    if (state.pendingSubscriptions > 5) {
+      console.warn(`⚠️ High number of pending subscriptions (${state.pendingSubscriptions}). Possible connection issues.`);
+    }
   }
 
   // =============================================

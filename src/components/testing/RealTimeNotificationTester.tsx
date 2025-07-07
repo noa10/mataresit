@@ -23,6 +23,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { notificationService } from '@/services/notificationService';
+import { performanceMonitor } from '@/services/realTimePerformanceMonitor';
+import { getReceiptSubscriptionStats } from '@/services/receiptService';
 
 interface TestResult {
   id: string;
@@ -45,24 +47,28 @@ interface RealTimeTest {
 export function RealTimeNotificationTester() {
   const { user } = useAuth();
   const { currentTeam } = useTeam();
-  const { 
-    notifications, 
-    unreadCount, 
-    isLoading, 
-    isConnected, 
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    isConnected,
     error,
     markAsRead,
     markAllAsRead,
     archiveNotification,
     deleteNotification,
     refreshNotifications,
-    reconnect
+    reconnect,
+    getRateLimitingStats,
+    resetRateLimiting
   } = useNotifications();
 
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTest, setCurrentTest] = useState<string | null>(null);
   const [crossTabTestActive, setCrossTabTestActive] = useState(false);
+  const [performanceData, setPerformanceData] = useState<any>(null);
+  const [isMonitoring, setIsMonitoring] = useState(false);
   const initialNotificationCount = useRef<number>(0);
   const testStartTime = useRef<number>(0);
 
@@ -70,6 +76,48 @@ export function RealTimeNotificationTester() {
   useEffect(() => {
     initialNotificationCount.current = notifications.length;
   }, []);
+
+  // Update performance data periodically
+  useEffect(() => {
+    const updatePerformanceData = () => {
+      try {
+        const current = performanceMonitor.getCurrentMetrics();
+        const summary = performanceMonitor.getPerformanceSummary();
+        const alerts = performanceMonitor.getActiveAlerts();
+        const rateLimiting = getRateLimitingStats();
+        const receipts = getReceiptSubscriptionStats();
+        const notifications = notificationService.getConnectionState();
+
+        setPerformanceData({
+          current,
+          summary,
+          alerts,
+          rateLimiting,
+          receipts,
+          notifications
+        });
+      } catch (error) {
+        console.error('Error updating performance data:', error);
+      }
+    };
+
+    updatePerformanceData(); // Initial load
+
+    const interval = setInterval(updatePerformanceData, 2000);
+    return () => clearInterval(interval);
+  }, [getRateLimitingStats]);
+
+  const startPerformanceMonitoring = () => {
+    performanceMonitor.startMonitoring();
+    setIsMonitoring(true);
+    toast.success('Performance monitoring started');
+  };
+
+  const stopPerformanceMonitoring = () => {
+    performanceMonitor.stopMonitoring();
+    setIsMonitoring(false);
+    toast.info('Performance monitoring stopped');
+  };
 
   const realTimeTests: RealTimeTest[] = [
     {
