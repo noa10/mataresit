@@ -9,6 +9,7 @@ import { fetchReceiptsByIds } from '@/services/receiptService';
 import { supabase } from '@/integrations/supabase/client';
 import ReceiptViewer from '@/components/ReceiptViewer';
 import { formatCurrencySafe } from '@/utils/currency';
+import { useTeam } from '@/contexts/TeamContext';
 
 import './receipt-calendar.css';
 
@@ -32,11 +33,12 @@ interface DailyReceiptBrowserModalProps {
 
 const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted }) => {
   const queryClient = useQueryClient();
+  const { currentTeam } = useTeam();
 
   // Fetch all receipts for the given IDs
   const { data: receiptsData, isLoading, error } = useQuery<ReceiptWithDetails[], Error>({
-    queryKey: ['receiptsForDay', date, receiptIds],
-    queryFn: () => fetchReceiptsByIds(receiptIds),
+    queryKey: ['receiptsForDay', date, receiptIds, currentTeam?.id],
+    queryFn: () => fetchReceiptsByIds(receiptIds, { currentTeam }),
     enabled: isOpen && receiptIds.length > 0,
     staleTime: 1 * 60 * 1000, // Reduced cache time to 1 minute for fresher data
   });
@@ -84,22 +86,32 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
           event: 'UPDATE',
           schema: 'public',
           table: 'receipts',
-          filter: `id=in.(${receiptIds.join(',')})`
+          // OPTIMIZATION: Only listen for meaningful status changes and data updates
+          filter: `id=in.(${receiptIds.join(',')})&(processing_status=in.(complete,failed,failed_ocr,failed_ai)|merchant=not.is.null|total=not.is.null)`
         },
         (payload) => {
-          console.log('Receipt update in modal:', payload.new);
+          console.log('📝 Receipt update in modal:', payload.new);
           const updatedReceipt = payload.new as ReceiptWithDetails;
 
-          // Update local data immediately
-          setLocalReceiptsData(prev => {
-            if (!prev) return prev;
-            return prev.map(r =>
-              r.id === updatedReceipt.id ? { ...r, ...updatedReceipt } : r
-            );
-          });
+          // OPTIMIZATION: Only update if there are meaningful changes
+          const hasSignificantChange =
+            updatedReceipt.processing_status === 'complete' ||
+            updatedReceipt.processing_status?.includes('failed') ||
+            updatedReceipt.merchant ||
+            updatedReceipt.total;
 
-          // Also invalidate the query to ensure consistency
-          queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
+          if (hasSignificantChange) {
+            // Update local data immediately
+            setLocalReceiptsData(prev => {
+              if (!prev) return prev;
+              return prev.map(r =>
+                r.id === updatedReceipt.id ? { ...r, ...updatedReceipt } : r
+              );
+            });
+
+            // Also invalidate the query to ensure consistency
+            queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
+          }
         }
       )
       .subscribe();

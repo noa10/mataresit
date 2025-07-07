@@ -25,7 +25,7 @@ export default function ViewReceipt() {
 
   const { data: receipt, isLoading, error } = useQuery({
     queryKey: ['receipt', id, currentTeam?.id], // Include team context in cache key
-    queryFn: () => fetchReceiptById(id!),
+    queryFn: () => fetchReceiptById(id!, { currentTeam }),
     enabled: !!id && !!user,
     staleTime: 0, // Don't cache the data to ensure fresh data is loaded
     retry: 1,     // Only retry once to avoid excessive requests if there's a problem

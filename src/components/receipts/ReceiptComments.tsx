@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { subscribeToReceiptAll } from '@/services/receiptService';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Comment {
@@ -59,34 +60,33 @@ export function ReceiptComments({ receiptId, teamId, canComment = true, classNam
     loadComments();
   }, [receiptId]);
 
-  // Real-time subscription for new comments
+  // OPTIMIZATION: Use unified subscription system for receipt comments
   useEffect(() => {
-    const subscription = supabase
-      .channel(`receipt-comments-${receiptId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'receipt_comments',
-        filter: `receipt_id=eq.${receiptId}`,
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          loadComments(); // Reload to get user profile data
-        } else if (payload.eventType === 'UPDATE') {
-          setComments(prev => prev.map(comment => 
-            comment.id === payload.new.id 
-              ? { ...comment, ...payload.new }
-              : comment
-          ));
-        } else if (payload.eventType === 'DELETE') {
-          setComments(prev => prev.filter(comment => comment.id !== payload.old.id));
+    const unsubscribe = subscribeToReceiptAll(
+      receiptId,
+      'receipt-comments',
+      {
+        onCommentUpdate: (payload) => {
+          if (payload.eventType === 'INSERT') {
+            loadComments(); // Reload to get user profile data
+          } else if (payload.eventType === 'UPDATE') {
+            setComments(prev => prev.map(comment =>
+              comment.id === payload.new.id
+                ? { ...comment, ...payload.new }
+                : comment
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setComments(prev => prev.filter(comment => comment.id !== payload.old.id));
+          }
         }
-      })
-      .subscribe();
+      },
+      {
+        subscribeToComments: true
+      }
+    );
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [receiptId]);
+    return unsubscribe;
+  }, [receiptId, loadComments]);
 
   const loadComments = async () => {
     try {

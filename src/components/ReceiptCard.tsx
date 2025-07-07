@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle, Tag } from "lucide-react";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReceiptStatus, ProcessingStatus, CustomCategory, Receipt } from "@/types/receipt";
-import { getFormattedImageUrlSync } from "@/utils/imageUtils";
+import { ReceiptCardImage } from "@/components/ui/OptimizedImage";
 import { formatCurrencySafe } from "@/utils/currency";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
@@ -42,21 +42,6 @@ export default function ReceiptCard({
 }: ReceiptCardProps) {
   const { t } = useReceiptsTranslation();
   const [isHovered, setIsHovered] = useState(false);
-  const [imageSource, setImageSource] = useState<string>("/placeholder.svg");
-  
-  useEffect(() => {
-    function updateImageUrl() {
-      // Use the sync version that handles state updates internally
-      const initialUrl = getFormattedImageUrlSync(imageUrl, (updatedUrl) => {
-        setImageSource(updatedUrl);
-      });
-      
-      // Set initial URL immediately
-      setImageSource(initialUrl);
-    }
-    
-    updateImageUrl();
-  }, [imageUrl]);
   
   const formatCurrency = (amount: number) => {
     return formatCurrencySafe(amount, currency, 'en-US', 'MYR');
@@ -117,14 +102,13 @@ export default function ReceiptCard({
       className="glass-card overflow-hidden group flex flex-col h-full"
     >
       <div className="relative h-48 overflow-hidden">
-        <img 
-          src={imageSource} 
+        <ReceiptCardImage
+          src={imageUrl}
           alt={`Receipt from ${merchant}`}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-          onError={() => {
-            console.log("Image failed to load:", imageUrl);
-            setImageSource("/placeholder.svg");
-          }}
+          containerClassName="w-full h-full"
+          skeletonClassName="w-full h-full"
+          errorClassName="w-full h-full"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
         

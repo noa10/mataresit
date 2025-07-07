@@ -209,18 +209,24 @@ export const fetchReceipts = async (teamContext?: { currentTeam: { id: string } 
 };
 
 // Fetch a single receipt by ID with line items
-export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails | null> => {
+export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: { id: string } | null }): Promise<ReceiptWithDetails | null> => {
   // Debug logging for team collaboration category access issue
   const { data: user } = await supabase.auth.getUser();
   console.log("🔍 fetchReceiptById debug:", {
     receiptId: id,
     userId: user.user?.id,
     userEmail: user.user?.email,
+    teamContext: teamContext?.currentTeam?.id || 'personal',
     timestamp: new Date().toISOString()
   });
 
-  // First get the receipt with category information
-  const { data: receiptData, error: receiptError } = await supabase
+  if (!user.user) {
+    console.error("No authenticated user found");
+    return null;
+  }
+
+  // Build query with team context filtering (same logic as fetchReceipts)
+  let query = supabase
     .from("receipts")
     .select(`
       *,
@@ -231,8 +237,20 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
         icon
       )
     `)
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  // Apply filtering based on team context (same as fetchReceipts)
+  if (teamContext?.currentTeam?.id) {
+    // When in team context, fetch team receipts using RLS policies
+    console.log("🧾 Fetching team receipt for team:", teamContext.currentTeam.id, "user:", user.user.email);
+    query = query.eq("team_id", teamContext.currentTeam.id);
+  } else {
+    // When not in team context, fetch personal receipts (team_id is null)
+    console.log("🧾 Fetching personal receipt for user:", user.user.email);
+    query = query.eq("user_id", user.user.id).is("team_id", null);
+  }
+
+  const { data: receiptData, error: receiptError } = await query.single();
 
   // Enhanced debug logging for category data
   console.log("🔍 Receipt query result:", {
@@ -319,16 +337,33 @@ export const fetchReceiptById = async (id: string): Promise<ReceiptWithDetails |
 };
 
 // Fetch multiple receipts by their IDs with line items
-export const fetchReceiptsByIds = async (ids: string[]): Promise<ReceiptWithDetails[]> => {
+export const fetchReceiptsByIds = async (ids: string[], teamContext?: { currentTeam: { id: string } | null }): Promise<ReceiptWithDetails[]> => {
   if (!ids || ids.length === 0) {
     return [];
   }
 
-  // First get all the receipts
-  const { data: receiptsData, error: receiptsError } = await supabase
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) {
+    console.error("No authenticated user found");
+    return [];
+  }
+
+  // Build query with team context filtering (same logic as fetchReceipts)
+  let query = supabase
     .from("receipts")
     .select("*")
     .in("id", ids);
+
+  // Apply filtering based on team context (same as fetchReceipts)
+  if (teamContext?.currentTeam?.id) {
+    console.log("🧾 Fetching team receipts by IDs for team:", teamContext.currentTeam.id);
+    query = query.eq("team_id", teamContext.currentTeam.id);
+  } else {
+    console.log("🧾 Fetching personal receipts by IDs for user:", user.user.email);
+    query = query.eq("user_id", user.user.id).is("team_id", null);
+  }
+
+  const { data: receiptsData, error: receiptsError } = await query;
 
   if (receiptsError || !receiptsData) {
     console.error("Error fetching receipts by IDs:", receiptsError);
@@ -1528,33 +1563,539 @@ export const fetchCorrections = async (receiptId: string): Promise<Correction[]>
   }
 };
 
+// OPTIMIZATION: Rate limiting for receipt updates
+interface ReceiptUpdateRateLimiter {
+  lastUpdate: number;
+  updateCount: number;
+  windowStart: number;
+}
+
+const receiptRateLimiters = new Map<string, ReceiptUpdateRateLimiter>();
+
+const canProcessReceiptUpdate = (receiptId: string): boolean => {
+  const now = Date.now();
+  const limiter = receiptRateLimiters.get(receiptId) || {
+    lastUpdate: 0,
+    updateCount: 0,
+    windowStart: now
+  };
+
+  // Reset window every 5 seconds
+  if (now - limiter.windowStart > 5000) {
+    limiter.updateCount = 0;
+    limiter.windowStart = now;
+  }
+
+  // Prevent more than 10 updates per 5-second window per receipt
+  if (limiter.updateCount >= 10) {
+    console.warn(`🚫 Rate limit exceeded for receipt ${receiptId} (${limiter.updateCount}/10 updates in 5s)`);
+    return false;
+  }
+
+  // Prevent updates more frequent than every 100ms
+  if (now - limiter.lastUpdate < 100) {
+    console.warn(`🚫 Update too frequent for receipt ${receiptId} (${now - limiter.lastUpdate}ms < 100ms)`);
+    return false;
+  }
+
+  limiter.lastUpdate = now;
+  limiter.updateCount++;
+  receiptRateLimiters.set(receiptId, limiter);
+  return true;
+};
+
+// OPTIMIZATION: Unified receipt subscription system
+interface ReceiptSubscriptionCallbacks {
+  onReceiptUpdate?: (payload: RealtimePostgresChangesPayload<Receipt>) => void;
+  onLogUpdate?: (payload: RealtimePostgresChangesPayload<ProcessingLog>) => void;
+  onCommentUpdate?: (payload: RealtimePostgresChangesPayload<any>) => void;
+}
+
+interface UnifiedReceiptSubscription {
+  receiptChannel: RealtimeChannel;
+  logChannel?: RealtimeChannel;
+  commentChannel?: RealtimeChannel;
+  callbacks: Map<string, ReceiptSubscriptionCallbacks>;
+  createdAt: number;
+  lastActivity: number;
+  subscriptionTypes: Set<'receipt' | 'logs' | 'comments'>;
+}
+
+// OPTIMIZATION: Unified connection pooling for all receipt-related subscriptions
+const unifiedReceiptSubscriptions = new Map<string, UnifiedReceiptSubscription>();
+
+// Legacy connection pooling for backward compatibility
+const activeReceiptSubscriptions = new Map<string, {
+  channel: RealtimeChannel;
+  callbacks: Set<(payload: RealtimePostgresChangesPayload<Receipt>) => void>;
+  createdAt: number;
+  lastActivity: number;
+}>();
+
 // Subscribe to real-time updates for a receipt
+// OPTIMIZATION: Enhanced with selective event filtering and connection pooling
 export const subscribeToReceiptUpdates = (
   receiptId: string,
-  callback: (payload: RealtimePostgresChangesPayload<Receipt>) => void
+  callback: (payload: RealtimePostgresChangesPayload<Receipt>) => void,
+  options?: {
+    events?: ('INSERT' | 'UPDATE' | 'DELETE')[];
+    statusFilter?: string[];
+  }
 ): RealtimeChannel => {
+  // OPTIMIZATION: Check if we already have an active subscription for this receipt
+  const subscriptionKey = `receipt-${receiptId}`;
+  const existing = activeReceiptSubscriptions.get(subscriptionKey);
+
+  if (existing) {
+    console.log(`🔄 Reusing existing subscription for receipt ${receiptId}`);
+    existing.callbacks.add(callback);
+    existing.lastActivity = Date.now();
+
+    // Return a cleanup function that removes this callback
+    return {
+      unsubscribe: () => {
+        existing.callbacks.delete(callback);
+        // If no more callbacks, clean up the subscription
+        if (existing.callbacks.size === 0) {
+          console.log(`🧹 Cleaning up receipt subscription for ${receiptId} (no more callbacks)`);
+          existing.channel.unsubscribe();
+          activeReceiptSubscriptions.delete(subscriptionKey);
+        }
+      }
+    } as RealtimeChannel;
+  }
+
+  // OPTIMIZATION: Default to only UPDATE events since receipts are rarely inserted/deleted in real-time
+  const events = options?.events || ['UPDATE'];
+  const eventFilter = events.length === 1 ? events[0] : events.join(',');
+
+  // OPTIMIZATION: Add status filtering to reduce unnecessary updates
+  let filter = `id=eq.${receiptId}`;
+  if (options?.statusFilter && options.statusFilter.length > 0) {
+    filter += `&processing_status=in.(${options.statusFilter.join(',')})`;
+  }
+
+  const callbacks = new Set<(payload: RealtimePostgresChangesPayload<Receipt>) => void>();
+  callbacks.add(callback);
+
   const channel = supabase.channel(`receipt-updates-${receiptId}`)
     .on(
       'postgres_changes',
       {
-        event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+        event: eventFilter as any,
         schema: 'public',
         table: 'receipts',
-        filter: `id=eq.${receiptId}`
+        filter
       },
-      callback
+      (payload) => {
+        // OPTIMIZATION: Additional client-side filtering for status if specified
+        if (options?.statusFilter && options.statusFilter.length > 0) {
+          const receipt = payload.new as Receipt;
+          if (receipt && !options.statusFilter.includes(receipt.processing_status)) {
+            console.log(`🚫 Filtered out receipt status: ${receipt.processing_status}`);
+            return;
+          }
+        }
+
+        // OPTIMIZATION: Rate limiting for receipt updates
+        if (!canProcessReceiptUpdate(receiptId)) {
+          return; // Skip this update due to rate limiting
+        }
+
+        // OPTIMIZATION: Notify all callbacks for this receipt
+        const subscription = activeReceiptSubscriptions.get(subscriptionKey);
+        if (subscription) {
+          subscription.lastActivity = Date.now();
+          subscription.callbacks.forEach(cb => {
+            try {
+              cb(payload);
+            } catch (error) {
+              console.error('Error in receipt subscription callback:', error);
+            }
+          });
+        }
+      }
     )
     .subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to updates for receipt ${receiptId}`);
+        console.log(`✅ Subscribed to receipt updates for ${receiptId} (events: ${events.join(', ')}, pooled)`);
       }
       if (err) {
-        console.error('Error subscribing to receipt updates:', err);
+        console.error('❌ Error subscribing to receipt updates:', err);
         toast.error('Failed to subscribe to receipt status updates');
+        // Clean up on error
+        activeReceiptSubscriptions.delete(subscriptionKey);
       }
     });
 
-  return channel;
+  // Store the subscription with metadata
+  activeReceiptSubscriptions.set(subscriptionKey, {
+    channel,
+    callbacks,
+    createdAt: Date.now(),
+    lastActivity: Date.now()
+  });
+
+  // Return a channel-like object with cleanup
+  return {
+    unsubscribe: () => {
+      callbacks.delete(callback);
+      // If no more callbacks, clean up the subscription
+      if (callbacks.size === 0) {
+        console.log(`🧹 Cleaning up receipt subscription for ${receiptId} (no more callbacks)`);
+        channel.unsubscribe();
+        activeReceiptSubscriptions.delete(subscriptionKey);
+      }
+    }
+  } as RealtimeChannel;
+};
+
+// OPTIMIZATION: Unified receipt subscription function
+export const subscribeToReceiptAll = (
+  receiptId: string,
+  callbackId: string,
+  callbacks: ReceiptSubscriptionCallbacks,
+  options?: {
+    subscribeToLogs?: boolean;
+    subscribeToComments?: boolean;
+    statusFilter?: string[];
+  }
+): (() => void) => {
+  const subscriptionKey = `unified-receipt-${receiptId}`;
+  const existing = unifiedReceiptSubscriptions.get(subscriptionKey);
+
+  if (existing) {
+    console.log(`🔄 Adding callbacks to existing unified subscription for receipt ${receiptId}`);
+    existing.callbacks.set(callbackId, callbacks);
+    existing.lastActivity = Date.now();
+
+    // Add new subscription types if needed
+    if (options?.subscribeToLogs && !existing.subscriptionTypes.has('logs')) {
+      setupLogSubscription(receiptId, existing);
+    }
+    if (options?.subscribeToComments && !existing.subscriptionTypes.has('comments')) {
+      setupCommentSubscription(receiptId, existing);
+    }
+
+    return () => cleanupUnifiedCallback(receiptId, callbackId);
+  }
+
+  console.log(`✅ Creating new unified subscription for receipt ${receiptId}`);
+
+  // Create the unified subscription
+  const subscription: UnifiedReceiptSubscription = {
+    receiptChannel: null as any, // Will be set below
+    callbacks: new Map([[callbackId, callbacks]]),
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
+    subscriptionTypes: new Set(['receipt'])
+  };
+
+  // Set up receipt status subscription
+  setupReceiptSubscription(receiptId, subscription, options?.statusFilter);
+
+  // Set up optional subscriptions
+  if (options?.subscribeToLogs) {
+    setupLogSubscription(receiptId, subscription);
+  }
+  if (options?.subscribeToComments) {
+    setupCommentSubscription(receiptId, subscription);
+  }
+
+  unifiedReceiptSubscriptions.set(subscriptionKey, subscription);
+
+  return () => cleanupUnifiedCallback(receiptId, callbackId);
+};
+
+// Helper function to set up receipt status subscription
+const setupReceiptSubscription = (
+  receiptId: string,
+  subscription: UnifiedReceiptSubscription,
+  statusFilter?: string[]
+): void => {
+  let filter = `id=eq.${receiptId}`;
+  if (statusFilter && statusFilter.length > 0) {
+    filter += `&processing_status=in.(${statusFilter.join(',')})`;
+  }
+
+  subscription.receiptChannel = supabase.channel(`unified-receipt-${receiptId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'receipts',
+        filter
+      },
+      (payload) => {
+        if (!canProcessReceiptUpdate(receiptId)) {
+          return; // Rate limiting
+        }
+
+        subscription.lastActivity = Date.now();
+        subscription.callbacks.forEach(callbacks => {
+          if (callbacks.onReceiptUpdate) {
+            try {
+              callbacks.onReceiptUpdate(payload);
+            } catch (error) {
+              console.error('Error in unified receipt callback:', error);
+            }
+          }
+        });
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ Unified receipt subscription active for ${receiptId}`);
+      }
+      if (err) {
+        console.error('❌ Error in unified receipt subscription:', err);
+      }
+    });
+};
+
+// Helper function to set up processing logs subscription
+const setupLogSubscription = (
+  receiptId: string,
+  subscription: UnifiedReceiptSubscription
+): void => {
+  subscription.subscriptionTypes.add('logs');
+
+  subscription.logChannel = supabase.channel(`unified-logs-${receiptId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'processing_logs',
+        filter: `receipt_id=eq.${receiptId}`
+      },
+      (payload) => {
+        subscription.lastActivity = Date.now();
+        subscription.callbacks.forEach(callbacks => {
+          if (callbacks.onLogUpdate) {
+            try {
+              callbacks.onLogUpdate(payload);
+            } catch (error) {
+              console.error('Error in unified log callback:', error);
+            }
+          }
+        });
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ Unified log subscription active for ${receiptId}`);
+      }
+      if (err) {
+        console.error('❌ Error in unified log subscription:', err);
+      }
+    });
+};
+
+// Helper function to set up comments subscription
+const setupCommentSubscription = (
+  receiptId: string,
+  subscription: UnifiedReceiptSubscription
+): void => {
+  subscription.subscriptionTypes.add('comments');
+
+  subscription.commentChannel = supabase.channel(`unified-comments-${receiptId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'receipt_comments',
+        filter: `receipt_id=eq.${receiptId}`
+      },
+      (payload) => {
+        subscription.lastActivity = Date.now();
+        subscription.callbacks.forEach(callbacks => {
+          if (callbacks.onCommentUpdate) {
+            try {
+              callbacks.onCommentUpdate(payload);
+            } catch (error) {
+              console.error('Error in unified comment callback:', error);
+            }
+          }
+        });
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ Unified comment subscription active for ${receiptId}`);
+      }
+      if (err) {
+        console.error('❌ Error in unified comment subscription:', err);
+      }
+    });
+};
+
+// Helper function to clean up a specific callback
+const cleanupUnifiedCallback = (receiptId: string, callbackId: string): void => {
+  const subscriptionKey = `unified-receipt-${receiptId}`;
+  const subscription = unifiedReceiptSubscriptions.get(subscriptionKey);
+
+  if (!subscription) return;
+
+  subscription.callbacks.delete(callbackId);
+
+  // If no more callbacks, clean up the entire subscription
+  if (subscription.callbacks.size === 0) {
+    console.log(`🧹 Cleaning up unified subscription for receipt ${receiptId} (no more callbacks)`);
+
+    subscription.receiptChannel?.unsubscribe();
+    subscription.logChannel?.unsubscribe();
+    subscription.commentChannel?.unsubscribe();
+
+    unifiedReceiptSubscriptions.delete(subscriptionKey);
+  }
+};
+
+// OPTIMIZATION: Enhanced cleanup functions for all receipt subscriptions
+export const cleanupReceiptSubscriptions = (): void => {
+  console.log(`🧹 Cleaning up ${activeReceiptSubscriptions.size} legacy receipt subscriptions`);
+
+  for (const [key, subscription] of activeReceiptSubscriptions) {
+    try {
+      subscription.channel.unsubscribe();
+      console.log(`✅ Cleaned up legacy receipt subscription: ${key}`);
+    } catch (error) {
+      console.error(`❌ Error cleaning up legacy receipt subscription ${key}:`, error);
+    }
+  }
+
+  activeReceiptSubscriptions.clear();
+};
+
+export const cleanupUnifiedReceiptSubscriptions = (): void => {
+  console.log(`🧹 Cleaning up ${unifiedReceiptSubscriptions.size} unified receipt subscriptions`);
+
+  for (const [key, subscription] of unifiedReceiptSubscriptions) {
+    try {
+      subscription.receiptChannel?.unsubscribe();
+      subscription.logChannel?.unsubscribe();
+      subscription.commentChannel?.unsubscribe();
+      console.log(`✅ Cleaned up unified receipt subscription: ${key}`);
+    } catch (error) {
+      console.error(`❌ Error cleaning up unified receipt subscription ${key}:`, error);
+    }
+  }
+
+  unifiedReceiptSubscriptions.clear();
+};
+
+export const cleanupAllReceiptSubscriptions = (): void => {
+  cleanupReceiptSubscriptions();
+  cleanupUnifiedReceiptSubscriptions();
+};
+
+// OPTIMIZATION: Enhanced receipt subscription statistics
+export const getReceiptSubscriptionStats = (): {
+  legacy: {
+    activeSubscriptions: number;
+    subscriptions: Array<{
+      receiptId: string;
+      callbackCount: number;
+      age: number;
+      lastActivity: number;
+    }>;
+  };
+  unified: {
+    activeSubscriptions: number;
+    subscriptions: Array<{
+      receiptId: string;
+      callbackCount: number;
+      subscriptionTypes: string[];
+      age: number;
+      lastActivity: number;
+    }>;
+  };
+  total: {
+    activeSubscriptions: number;
+    totalCallbacks: number;
+  };
+} => {
+  const now = Date.now();
+
+  const legacyStats = {
+    activeSubscriptions: activeReceiptSubscriptions.size,
+    subscriptions: Array.from(activeReceiptSubscriptions.entries()).map(([key, sub]) => ({
+      receiptId: key.replace('receipt-', ''),
+      callbackCount: sub.callbacks.size,
+      age: now - sub.createdAt,
+      lastActivity: now - sub.lastActivity
+    }))
+  };
+
+  const unifiedStats = {
+    activeSubscriptions: unifiedReceiptSubscriptions.size,
+    subscriptions: Array.from(unifiedReceiptSubscriptions.entries()).map(([key, sub]) => ({
+      receiptId: key.replace('unified-receipt-', ''),
+      callbackCount: sub.callbacks.size,
+      subscriptionTypes: Array.from(sub.subscriptionTypes),
+      age: now - sub.createdAt,
+      lastActivity: now - sub.lastActivity
+    }))
+  };
+
+  const totalCallbacks = legacyStats.subscriptions.reduce((sum, sub) => sum + sub.callbackCount, 0) +
+                        unifiedStats.subscriptions.reduce((sum, sub) => sum + sub.callbackCount, 0);
+
+  return {
+    legacy: legacyStats,
+    unified: unifiedStats,
+    total: {
+      activeSubscriptions: legacyStats.activeSubscriptions + unifiedStats.activeSubscriptions,
+      totalCallbacks
+    }
+  };
+};
+
+// OPTIMIZATION: Get detailed subscription health metrics
+export const getReceiptSubscriptionHealth = (): {
+  healthScore: number;
+  issues: string[];
+  recommendations: string[];
+} => {
+  const stats = getReceiptSubscriptionStats();
+  const issues: string[] = [];
+  const recommendations: string[] = [];
+  let healthScore = 100;
+
+  // Check for too many subscriptions
+  if (stats.total.activeSubscriptions > 20) {
+    issues.push(`High number of active subscriptions: ${stats.total.activeSubscriptions}`);
+    recommendations.push('Consider implementing more aggressive cleanup or connection pooling');
+    healthScore -= 20;
+  }
+
+  // Check for stale subscriptions
+  const now = Date.now();
+  const staleThreshold = 30 * 60 * 1000; // 30 minutes
+
+  const staleUnified = stats.unified.subscriptions.filter(sub => now - sub.lastActivity > staleThreshold);
+  const staleLegacy = stats.legacy.subscriptions.filter(sub => now - sub.lastActivity > staleThreshold);
+
+  if (staleUnified.length > 0 || staleLegacy.length > 0) {
+    issues.push(`Stale subscriptions detected: ${staleUnified.length + staleLegacy.length}`);
+    recommendations.push('Implement automatic cleanup of inactive subscriptions');
+    healthScore -= 15;
+  }
+
+  // Check for legacy vs unified usage
+  if (stats.legacy.activeSubscriptions > stats.unified.activeSubscriptions) {
+    issues.push('More legacy subscriptions than unified subscriptions');
+    recommendations.push('Migrate components to use unified subscription system');
+    healthScore -= 10;
+  }
+
+  return {
+    healthScore: Math.max(0, healthScore),
+    issues,
+    recommendations
+  };
 };
 
 // Log processing status changes - completely disabled due to schema issues

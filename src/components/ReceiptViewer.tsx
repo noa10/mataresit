@@ -8,7 +8,7 @@ import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw,
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
-import { updateReceipt, updateReceiptWithLineItems, processReceiptWithAI, logCorrections, fixProcessingStatus } from "@/services/receiptService";
+import { updateReceipt, updateReceiptWithLineItems, processReceiptWithAI, logCorrections, fixProcessingStatus, subscribeToReceiptAll } from "@/services/receiptService";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCategoriesForDisplay } from "@/services/categoryService";
@@ -31,7 +31,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ReceiptHistoryModal } from "@/components/receipts/ReceiptHistoryModal";
-import { getFormattedImageUrl, getFormattedImageUrlSync } from "@/utils/imageUtils";
+import { ReceiptViewerImage } from "@/components/ui/OptimizedImage";
 import { formatCurrencySafe, normalizeCurrencyCode } from "@/utils/currency";
 import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
 import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
@@ -237,7 +237,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  const [imageSource, setImageSource] = useState("/placeholder.svg");
+
   const imageRef = useRef<HTMLImageElement>(null);
 
   // Define available expense categories
@@ -340,35 +340,20 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     });
   }, [debouncedInputValues, receipt, t]);
 
-  // Subscribe to real-time updates for the receipt processing status
+  // OPTIMIZATION: Use unified subscription system for receipt updates and logs
   useEffect(() => {
     if (!receipt.id) return;
 
-    const statusChannel = supabase.channel(`receipt-status-${receipt.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'receipts',
-          filter: `id=eq.${receipt.id}`
-        },
-        (payload) => {
-          console.log('Receipt status update in viewer:', payload.new);
+    const unsubscribe = subscribeToReceiptAll(
+      receipt.id,
+      'receipt-viewer',
+      {
+        onReceiptUpdate: (payload) => {
+          console.log('📝 Receipt status update in viewer:', payload.new);
           const newStatus = payload.new.processing_status as ProcessingStatus;
           const newError = payload.new.processing_error;
-          // Get potential confidence update from confidence_scores table via relation/trigger or separate fetch
-          // Assuming confidence is not directly on the receipts table payload
-          // const newConfidence = payload.new.confidence as ConfidenceScore;
 
           setProcessingStatus(newStatus);
-          // Update confidence if it changed (e.g., after reprocessing)
-          // This might require re-fetching the receipt data which includes confidence
-          // if (!newConfidence) {
-          //   // Potentially refetch to get latest confidence
-          // } else {
-          //   setEditedConfidence(prev => ({ ...defaultConfidence, ...newConfidence, receipt_id: receipt.id, id: newConfidence.id || prev.id }));
-          // }
 
           if (newError) {
             toast.error(t('viewer.processingError', { error: newError }));
@@ -380,79 +365,38 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
             queryClient.invalidateQueries({ queryKey: ['receipts'] });
           }
-        }
-      )
-      .subscribe();
+        },
+        onLogUpdate: (payload) => {
+          const newLog = payload.new as ProcessingLog;
+          console.log('📝 New log received in viewer:', newLog);
 
-    // Clean up the subscription when component unmounts
-    return () => {
-      statusChannel.unsubscribe();
-    };
+          // Add new log to the list
+          setProcessLogs((prev) => {
+            // Check if we already have this log (avoid duplicates)
+            if (prev.some(log => log.id === newLog.id)) {
+              return prev;
+            }
+            // Add and sort by created_at
+            return [...prev, newLog].sort((a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+        }
+      },
+      {
+        subscribeToLogs: true,
+        statusFilter: ['processing', 'complete', 'failed', 'failed_ocr', 'failed_ai']
+      }
+    );
+
+    // Clean up the unified subscription when component unmounts
+    return unsubscribe;
   }, [receipt.id, queryClient, t]);
 
-  // Add useEffect to check if image loads properly
+  // Reset image error state when receipt changes
   useEffect(() => {
-    // Reset image error state when receipt changes
     setImageError(false);
-
-    if (receipt.image_url) {
-      // Track if component is still mounted
-      let isMounted = true;
-
-      // Use a placeholder initially
-      setImageSource("/placeholder.svg");
-
-      // Start loading with better error handling
-      const loadImage = async () => {
-        try {
-          // Get properly formatted URL
-          const formattedUrl = await getFormattedImageUrl(receipt.image_url);
-
-          if (!isMounted) return;
-
-          // Create a new image to test loading
-          const img = new Image();
-
-          // Set up load/error handlers
-          img.onload = () => {
-            if (isMounted) {
-              setImageSource(formattedUrl);
-              setImageError(false);
-              // Update image dimensions for bounding box calculations
-              setImageDimensions({
-                width: img.width,
-                height: img.height
-              });
-            }
-          };
-
-          img.onerror = () => {
-            if (isMounted) {
-              console.error(t('viewer.errorLoadingImage'), receipt.image_url);
-              setImageError(true);
-              setImageSource("/placeholder.svg");
-            }
-          };
-
-          // Start loading
-          img.src = formattedUrl;
-        } catch (error) {
-          if (isMounted) {
-            console.error(t('viewer.exceptionDuringLoading'), error);
-            setImageError(true);
-            setImageSource("/placeholder.svg");
-          }
-        }
-      };
-
-      loadImage();
-
-      // Cleanup function
-      return () => {
-        isMounted = false;
-      };
-    }
-  }, [receipt.image_url, t]);
+  }, [receipt.image_url]);
 
   const updateMutation = useMutation({
     // Update mutation only handles the 'receipts' table update
@@ -818,7 +762,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     setShowProcessLogs(!showProcessLogs);
   };
 
-  // Subscribe to processing logs for this receipt
+  // OPTIMIZATION: Fetch initial processing logs (real-time updates handled by unified subscription above)
   useEffect(() => {
     if (!receipt?.id) return;
 
@@ -838,47 +782,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     };
 
     fetchInitialLogs();
-
-    // Set up realtime subscription
-    const channel = supabase.channel(`receipt-logs-${receipt.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'processing_logs',
-          filter: `receipt_id=eq.${receipt.id}`
-        },
-        (payload) => {
-          const newLog = payload.new as ProcessingLog;
-          console.log('New log received:', newLog);
-
-          // Add new log to the list
-          setProcessLogs((prev) => {
-            // Check if we already have this log (avoid duplicates)
-            if (prev.some(log => log.id === newLog.id)) {
-              return prev;
-            }
-            // Add and sort by created_at
-            return [...prev, newLog].sort((a, b) =>
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-          });
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Subscribed to processing logs');
-        }
-        if (err) {
-          console.error('Error subscribing to logs:', err);
-        }
-      });
-
-    // Clean up subscription on unmount
-    return () => {
-      channel.unsubscribe();
-    };
   }, [receipt?.id]);
 
   // Function to format log timestamp
@@ -1407,9 +1310,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                           contentClass="w-full h-full"
                         >
                           <div className="relative w-full h-full">
-                            <img
+                            <ReceiptViewerImage
                               ref={imageRef}
-                              src={imageSource}
+                              src={receipt.image_url}
                               alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
                               className="receipt-image w-full h-full object-contain transition-transform"
                               style={{ transform: `rotate(${rotation}deg)` }}
@@ -1421,6 +1324,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                                   height: img.naturalHeight
                                 });
                               }}
+                              showSkeleton={true}
+                              showErrorState={false} // We handle error state separately
                             />
                             {/* Bounding Box Overlay */}
                             {showBoundingBoxes && (
