@@ -269,19 +269,28 @@ export function ReceiptCardComponent({
   }
 
   return (
-    <div className="relative">
+    <div className="relative group">
       <Card
-        className={`border-l-4 border-l-primary/50 hover:shadow-lg transition-all duration-200 ${className}`}
+        className={`border-l-4 border-l-primary/60 hover:border-l-primary hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-gradient-to-r from-background to-background/95 ${className}`}
         onContextMenu={handleContextMenu}
       >
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-4">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <Store className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-base">{data.merchant}</h3>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors duration-200">
+                <Store className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors duration-200">
+                  {data.merchant}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receipt #{data.receipt_id?.slice(-8) || 'N/A'}
+                </p>
+              </div>
             </div>
             {data.confidence && (
-              <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
+              <Badge variant={getConfidenceColor(data.confidence)} className="text-xs shadow-sm">
                 <Star className="h-3 w-3 mr-1" />
                 {getConfidenceText(data.confidence)}
               </Badge>
@@ -290,38 +299,62 @@ export function ReceiptCardComponent({
         </CardHeader>
 
       <CardContent className="pt-0">
-        <div className="space-y-3">
-          {/* Receipt Details */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Total:</span>
-              <span className="font-medium">{formatAmount(data.total, data.currency)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Date:</span>
-              <span className="font-medium">{formatDate(data.date)}</span>
+        <div className="space-y-4">
+          {/* Receipt Details - Enhanced Layout */}
+          <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded-md">
+                  <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Total Amount</p>
+                  <p className="font-semibold text-green-600 dark:text-green-400">
+                    {formatAmount(data.total, data.currency)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md">
+                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Date</p>
+                  <p className="font-semibold text-blue-600 dark:text-blue-400">
+                    {formatDate(data.date)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Optional Details */}
+          {/* Optional Details - Enhanced Layout */}
           {(data.category || data.line_items_count) && (
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {data.category && (
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Category:</span>
-                  <Badge variant="outline" className="text-xs">
-                    {data.category}
-                  </Badge>
+                <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                  <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-md">
+                    <Tag className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Category</p>
+                    <Badge variant="outline" className="text-xs font-medium">
+                      {data.category}
+                    </Badge>
+                  </div>
                 </div>
               )}
               {data.line_items_count && (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Items:</span>
-                  <span className="font-medium">{data.line_items_count}</span>
+                <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                  <div className="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-md">
+                    <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Line Items</p>
+                    <p className="font-semibold text-orange-600 dark:text-orange-400">
+                      {data.line_items_count} items
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -338,10 +371,10 @@ export function ReceiptCardComponent({
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2 border-t border-border/50">
+          {/* Action Buttons - Enhanced Design */}
+          <div className="flex gap-2 pt-4 border-t border-border/50">
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={(e) => handleAction('view_receipt', e)}
               onMouseDown={(e) => {
@@ -351,7 +384,7 @@ export function ReceiptCardComponent({
                   handleAction('view_receipt', e);
                 }
               }}
-              className="flex-1"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
               title={`View details for ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
               aria-label={`View details for ${data.merchant} receipt`}
             >
@@ -369,7 +402,7 @@ export function ReceiptCardComponent({
                   handleAction('edit_receipt', e);
                 }
               }}
-              className="flex-1"
+              className="flex-1 hover:bg-muted/50"
               title={`Edit ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
               aria-label={`Edit ${data.merchant} receipt`}
             >

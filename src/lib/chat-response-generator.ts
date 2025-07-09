@@ -245,41 +245,124 @@ export function generateSuccessResponse(
   const receipts = results.results?.filter(r => 'merchant' in r) || [];
   const lineItems = results.results?.filter(r => 'line_item_description' in r) || [];
 
-  let baseResponse = '';
+  // Generate conversational, concise response
+  return generateConversationalResponse(
+    mainTerm,
+    totalResults,
+    receipts,
+    lineItems,
+    queryType,
+    monetaryFilter
+  );
+}
 
-  // Generate contextual opening based on query type and results
+/**
+ * Generate conversational, concise responses with smart summarization
+ */
+function generateConversationalResponse(
+  mainTerm: string,
+  totalResults: number,
+  receipts: any[],
+  lineItems: any[],
+  queryType: string,
+  monetaryFilter?: MonetaryFilterInfo
+): string {
+  // Handle monetary queries first
   if (queryType === 'amount' && monetaryFilter) {
-    baseResponse = generateMonetaryFilterResponse(totalResults, monetaryFilter, receipts, lineItems);
-  } else if (queryType === 'item' && lineItems.length > 0) {
-    baseResponse = `Great! I found ${totalResults} result${totalResults !== 1 ? 's' : ''} for "${mainTerm}".`;
-  } else if (queryType === 'merchant' && receipts.length > 0) {
-    baseResponse = `I found ${totalResults} receipt${totalResults !== 1 ? 's' : ''} from "${mainTerm}".`;
-  } else if (queryType === 'category') {
-    baseResponse = `Here are ${totalResults} ${mainTerm} result${totalResults !== 1 ? 's' : ''} I found.`;
-  } else {
-    baseResponse = `I found ${totalResults} result${totalResults !== 1 ? 's' : ''} for "${mainTerm}".`;
+    return generateMonetaryFilterResponse(totalResults, monetaryFilter, receipts, lineItems);
   }
 
-  // Add details about result composition
-  if (receipts.length > 0 && lineItems.length > 0) {
-    baseResponse += ` This includes ${receipts.length} receipt${receipts.length !== 1 ? 's' : ''} and ${lineItems.length} individual item${lineItems.length !== 1 ? 's' : ''}.`;
-  } else if (receipts.length > 0) {
-    baseResponse += ` Found ${receipts.length} matching receipt${receipts.length !== 1 ? 's' : ''}.`;
-  } else if (lineItems.length > 0) {
-    baseResponse += ` Found ${lineItems.length} matching item${lineItems.length !== 1 ? 's' : ''}.`;
+  // Analyze the results to create smart summaries
+  const summary = analyzeResultsForSummary(receipts, lineItems, mainTerm);
+
+  // Generate conversational opening
+  let response = `I found ${totalResults} ${totalResults === 1 ? 'receipt' : 'receipts'} matching "${mainTerm}"`;
+
+  // Add smart summary if available
+  if (summary.commonMerchant && summary.merchantCount === 1) {
+    response += `, all from ${summary.commonMerchant}`;
+  } else if (summary.commonMerchant && summary.merchantCount <= 3) {
+    response += `, mostly from ${summary.commonMerchant}`;
   }
 
-  // Add pagination info if needed
-  if (displayedResults < totalResults) {
-    baseResponse += ` Showing the top ${displayedResults} most relevant matches.`;
+  // Add common item/amount info if available
+  if (summary.commonItem && summary.itemCount <= 2) {
+    response += `.
+They are all for ${summary.commonItem}`;
+    if (summary.commonAmount) {
+      response += ` at ${summary.commonAmount}`;
+    }
+  } else if (summary.priceRange) {
+    response += `.
+${summary.priceRange}`;
   }
+
+  // Add simple call to action
+  response += `.
+What would you like to do?`;
 
   // Add currency conversion note if applicable
   if (monetaryFilter?.conversionInfo?.conversionApplied) {
-    baseResponse += `\n\n*Note: ${monetaryFilter.conversionInfo.reasoning}*`;
+    response += `\n\n*Note: ${monetaryFilter.conversionInfo.reasoning}*`;
   }
 
-  return baseResponse;
+  return response;
+}
+
+/**
+ * Analyze results to create smart summaries
+ */
+function analyzeResultsForSummary(receipts: any[], lineItems: any[], searchTerm: string) {
+  const merchants = receipts.map(r => r.merchant).filter(Boolean);
+  const amounts = receipts.map(r => r.total || r.total_amount).filter(Boolean);
+
+  // Find most common merchant
+  const merchantCounts = merchants.reduce((acc, merchant) => {
+    acc[merchant] = (acc[merchant] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedMerchants = Object.entries(merchantCounts)
+    .sort(([,a], [,b]) => b - a);
+
+  const commonMerchant = sortedMerchants[0]?.[0];
+  const merchantCount = Object.keys(merchantCounts).length;
+
+  // Analyze amounts
+  let commonAmount = '';
+  let priceRange = '';
+
+  if (amounts.length > 0) {
+    const uniqueAmounts = [...new Set(amounts)];
+    if (uniqueAmounts.length === 1) {
+      commonAmount = `MYR ${uniqueAmounts[0].toFixed(2)}`;
+    } else if (uniqueAmounts.length <= 3) {
+      const sortedAmounts = uniqueAmounts.sort((a, b) => a - b);
+      const min = sortedAmounts[0];
+      const max = sortedAmounts[sortedAmounts.length - 1];
+      priceRange = `Amounts range from MYR ${min.toFixed(2)} to MYR ${max.toFixed(2)}`;
+    }
+  }
+
+  // Try to identify common item from search term or receipt data
+  let commonItem = '';
+  if (searchTerm && searchTerm.length > 2) {
+    // Check if search term appears to be a product name
+    const isProductName = /^[a-zA-Z0-9\s\-\.]+$/i.test(searchTerm) &&
+                         searchTerm.split(' ').length <= 4;
+    if (isProductName) {
+      commonItem = searchTerm.toUpperCase();
+    }
+  }
+
+  return {
+    commonMerchant,
+    merchantCount,
+    commonItem,
+    itemCount: 1, // Simplified for now
+    commonAmount,
+    priceRange
+  };
 }
 
 /**

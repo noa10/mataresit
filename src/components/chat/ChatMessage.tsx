@@ -13,6 +13,7 @@ import { parseUIComponents } from '@/lib/ui-component-parser';
 import { UIComponentRenderer } from './ui-components/UIComponentRenderer';
 import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
 import { FeedbackButtons } from './FeedbackButtons';
+import { EnhancedSearchResults } from '../search/EnhancedSearchResults';
 
 export interface ChatMessage {
   id: string;
@@ -198,11 +199,23 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
   const renderSearchResults = () => {
     if (!message.searchResults?.results) return null;
 
-    // Don't render traditional search results if UI components are present
-    // This prevents duplicate receipt cards from being displayed
+    // Use enhanced search results if UI components are present
     const hasReceiptUIComponents = parsedComponents.some(c => c.component === 'receipt_card');
     if (hasReceiptUIComponents) {
-      return null;
+      // Extract search query from message content or use a default
+      const searchQuery = message.content.match(/search.*?["']([^"']+)["']/i)?.[1] ||
+                         message.content.match(/looking for\s+([^\s.!?]+)/i)?.[1] ||
+                         'search results';
+
+      return (
+        <EnhancedSearchResults
+          results={message.searchResults.results}
+          uiComponents={parsedComponents}
+          searchQuery={searchQuery}
+          totalResults={message.searchResults.total || message.searchResults.results.length}
+          className="mt-4"
+        />
+      );
     }
 
     return (
