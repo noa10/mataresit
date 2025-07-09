@@ -65,6 +65,7 @@ const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 const UIComponentTest = lazy(() => import("./components/test/UIComponentTest"));
 const CacheTest = lazy(() => import("./components/test/CacheTest"));
 const PersonalizationIntegrationTest = lazy(() => import("./components/test/PersonalizationIntegrationTest").then(m => ({ default: m.PersonalizationIntegrationTest })));
+const TestEnhancedSearch = lazy(() => import("./pages/TestEnhancedSearch").then(m => ({ default: m.TestEnhancedSearch })));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
@@ -264,6 +265,11 @@ const App = () => (
                 <Route path="/test/notification-filtering" element={
                   <Suspense fallback={<PageLoading />}>
                     <NotificationFilteringTestPage />
+                  </Suspense>
+                } />
+                <Route path="/test/enhanced-search" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TestEnhancedSearch />
                   </Suspense>
                 } />
 

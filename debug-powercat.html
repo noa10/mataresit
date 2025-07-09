@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POWERCAT Debug & Cache Clear</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .button { padding: 12px 24px; margin: 8px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .button:hover { background: #1565c0; }
+        .button.danger { background: #d32f2f; }
+        .button.danger:hover { background: #c62828; }
+        .button.success { background: #388e3c; }
+        .button.success:hover { background: #2e7d32; }
+        .log { background: #f5f5f5; padding: 12px; margin: 8px 0; border-radius: 4px; border-left: 4px solid #1976d2; }
+        .error { border-left-color: #d32f2f; background: #ffebee; }
+        .success { border-left-color: #388e3c; background: #e8f5e8; }
+        .warning { border-left-color: #f57c00; background: #fff3e0; }
+        pre { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; }
+        .status { padding: 8px 16px; border-radius: 4px; margin: 8px 0; font-weight: bold; }
+        .status.success { background: #e8f5e8; color: #2e7d32; }
+        .status.error { background: #ffebee; color: #c62828; }
+        .status.info { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 POWERCAT Debug & Cache Clear Utility</h1>
+        <p>This utility helps debug and fix the POWERCAT search issue by clearing cached results and testing the search functionality.</p>
+        
+        <div class="status info" id="status">Ready to debug POWERCAT search</div>
+        
+        <div style="margin: 20px 0;">
+            <button class="button danger" onclick="clearAllCache()">🗑️ Clear All Search Cache</button>
+            <button class="button danger" onclick="clearPowercatCache()">🗑️ Clear POWERCAT Cache Only</button>
+            <button class="button" onclick="testPowercatSearch()">🔍 Test POWERCAT Search</button>
+            <button class="button success" onclick="openSearchPage()">🚀 Open Search Page</button>
+        </div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function clearAllCache() {
+            log('🗑️ Clearing all search cache...', 'warning');
+            
+            const keys = Object.keys(localStorage);
+            const cacheKeys = keys.filter(key => 
+                key.includes('search_cache_') || 
+                key.includes('conv_cache_') || 
+                key.includes('background_search_') ||
+                key.includes('chat_')
+            );
+            
+            log(`Found ${cacheKeys.length} cache entries to clear`, 'info');
+            
+            cacheKeys.forEach(key => {
+                localStorage.removeItem(key);
+                log(`Removed: ${key}`, 'info');
+            });
+            
+            // Also clear sessionStorage
+            const sessionKeys = Object.keys(sessionStorage);
+            const sessionCacheKeys = sessionKeys.filter(key => 
+                key.includes('search') || key.includes('cache')
+            );
+            
+            sessionCacheKeys.forEach(key => {
+                sessionStorage.removeItem(key);
+                log(`Removed from session: ${key}`, 'info');
+            });
+            
+            log('✅ All cache cleared successfully!', 'success');
+            updateStatus('All cache cleared - please refresh the search page', 'success');
+        }
+
+        function clearPowercatCache() {
+            log('🗑️ Clearing POWERCAT-specific cache...', 'warning');
+            
+            const keys = Object.keys(localStorage);
+            const powercatKeys = keys.filter(key => 
+                key.toLowerCase().includes('powercat')
+            );
+            
+            log(`Found ${powercatKeys.length} POWERCAT cache entries`, 'info');
+            
+            powercatKeys.forEach(key => {
+                localStorage.removeItem(key);
+                log(`Removed: ${key}`, 'info');
+            });
+            
+            // Also check for any search cache that might contain powercat results
+            const searchKeys = keys.filter(key => key.startsWith('search_cache_'));
+            let clearedSearchEntries = 0;
+            
+            searchKeys.forEach(key => {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value && value.toLowerCase().includes('powercat')) {
+                        localStorage.removeItem(key);
+                        log(`Removed search cache containing POWERCAT: ${key}`, 'info');
+                        clearedSearchEntries++;
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            });
+            
+            log(`✅ Cleared ${powercatKeys.length + clearedSearchEntries} POWERCAT-related cache entries`, 'success');
+            updateStatus('POWERCAT cache cleared - please refresh and try searching', 'success');
+        }
+
+        function testPowercatSearch() {
+            log('🔍 Testing POWERCAT search functionality...', 'info');
+            updateStatus('Testing POWERCAT search...', 'info');
+            
+            // This will open the search page with powercat pre-filled
+            const searchUrl = `${window.location.origin}/search?q=powercat`;
+            window.open(searchUrl, '_blank');
+            
+            log('🚀 Opened search page with POWERCAT query', 'success');
+            updateStatus('Search page opened - check the new tab for results', 'success');
+        }
+
+        function openSearchPage() {
+            log('🚀 Opening search page...', 'info');
+            const searchUrl = `${window.location.origin}/search`;
+            window.open(searchUrl, '_blank');
+            log('✅ Search page opened in new tab', 'success');
+        }
+
+        // Auto-detect if we're on localhost and show appropriate message
+        window.addEventListener('load', () => {
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocalhost) {
+                log('✅ Running on localhost - cache clearing will work properly', 'success');
+            } else {
+                log('⚠️ Not on localhost - some cache clearing may not work', 'warning');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,802 @@
+[
+  {
+    "event_message": "✅ RAG Pipeline completed successfully\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fb55cac9-0e55-4b7e-a29c-351f646a3312",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "🎨 Generating UI components for results...\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ad5c4233-de93-48b0-be51-cceebb9f80f5",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "✅ Generated 1 UI components\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "2e0997ec-5ea3-4f52-8418-e08044403ea4",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "📤 Stage 6: Response Generation with UI Components\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e087bf71-e7ad-49cb-8faf-7e14c08906db",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "📋 Stage 5: Context Compilation\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e5e008c7-de52-420e-b7bd-8d934efa73f6",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "✅ Stage 5 completed in 0ms - Compiled 0 results\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "772d5323-1606-4f58-bc1d-04378b22083b",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "🔍 DEBUG: After date filtering (FIXED): { originalCount: 0, filteredCount: 0 }\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "83433f66-2aab-4a95-a08c-64fd752abd5f",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "✅ Stage 6 completed in 0ms - Generated response with 0 results and UI components\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "3c0b9131-c034-4a96-b5e4-2179153c68a5",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "🔍 DEBUG: Applying date range filter (FIXED): {\n  startDate: \"2025-06-01\",\n  endDate: \"2025-06-30\",\n  resultsCount: 0,\n  note: \"Using startDate/endDate from temporal parsing instead of dateRange object\"\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e7f7c289-c0b0-4ef6-83ec-377a4d40df33",
+    "level": "log",
+    "timestamp": 1752059032020000
+  },
+  {
+    "event_message": "🔍 DEBUG: No exact matches found for query: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "aafc21d9-cea7-4752-afcd-0548456166df",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "✅ Enhanced line item search found 0 results\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f796f61f-e278-4478-8e60-42a75aa91143",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🎯 Skipping semantic search for specific product query: \"last month\" to ensure 100% precision\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "951fc35a-11f7-41fd-bb08-1d936ae4f6d1",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "✅ Found 0 exact matches\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "eb3565d2-49cf-4c21-abd9-13332d4097ba",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🔍 DEBUG: Stage 4 returning results: { originalCount: 0, finalCount: 0, sampleResult: \"none\" }\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "422627cd-fcf2-4a5d-8b4e-ede7550900eb",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🔧 Line item deduplication: 0 raw results → 0 unique receipts\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "0ca3a740-c95f-42e2-ba42-82f2879a2bcc",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "⚠️ Skipping re-ranking - insufficient candidates\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "8c7144e0-4855-480a-a7c5-752cc67d51d8",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🎯 Hybrid search complete: 0 total results (0 exact, 0 semantic)\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "50dcba79-3770-4eca-8fba-10480066705a",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🔍 DEBUG: Stage 4 re-ranking bypass: { searchResultsLength: 0, limit: 30, sliceResult: 0 }\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "0111575b-f872-435c-96c9-5a90cc90fdf2",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🎯 Stage 4: Result Re-ranking\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fca100b1-9ab4-474d-8640-91adbf619fa5",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🔍 DEBUG: Exact search query result: {\n  hasError: false,\n  errorMessage: undefined,\n  hasResults: true,\n  resultsLength: 0,\n  firstResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "6169dad1-045a-4d45-9685-d6d96f6be1b2",
+    "level": "log",
+    "timestamp": 1752059032019000
+  },
+  {
+    "event_message": "🍜 Extracted food item: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a48612c0-9a90-4130-a20d-2eaad99f9168",
+    "level": "log",
+    "timestamp": 1752059031316000
+  },
+  {
+    "event_message": "🎯 Performing exact line item search for: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a8f7b40c-d8b8-4990-9a7b-316de9e997a6",
+    "level": "log",
+    "timestamp": 1752059031316000
+  },
+  {
+    "event_message": "🔍 DEBUG: Exact search parameters: {\n  originalQuery: \"last month\",\n  extractedFoodItem: \"last month\",\n  searchPattern: \"%last month%\",\n  limit: 21,\n  offset: 0,\n  hasDateFilters: true,\n  hasAmountFilters: true\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "aa4d8dc3-38f4-44cf-9980-aa55c6ff7545",
+    "level": "log",
+    "timestamp": 1752059031316000
+  },
+  {
+    "event_message": "🔧 Calling enhanced line item search on unified_embeddings...\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e06ea48b-7045-451a-8851-9436c1ea9ebe",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🔍 Line item search parameters: {\n  limit: 30,\n  offset: 0,\n  startDate: \"2025-06-01\",\n  endDate: \"2025-06-30\",\n  minAmount: undefined,\n  maxAmount: undefined,\n  query: \"last month\",\n  useHybridSearch: true\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fdafc6f2-6659-414b-898f-a1c4d70a73f8",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🎯 Using moderate precision threshold for exact food item: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "734aaf9c-90da-47df-b73a-f5a9b09e0839",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🔍 Extracting food item from query: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "b1f3d84c-c04f-49c7-a4f7-67726f94fd27",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🎯 Threshold decision for query \"last month\": {\n  adaptiveThreshold: 0.45,\n  isExactFoodItem: true,\n  queryLength: 10,\n  queryPattern: \"last month\"\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "6d22bd3a-c732-457a-a65f-0f7def2eb381",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🔍 Enhanced line item search parameters: {\n  limit: 30,\n  offset: 0,\n  startDate: \"2025-06-01\",\n  endDate: \"2025-06-30\",\n  minAmount: undefined,\n  maxAmount: undefined,\n  useHybridSearch: true,\n  queryEmbeddingLength: 1536,\n  originalThreshold: undefined,\n  adaptiveThreshold: 0.45,\n  query: \"last month\",\n  thresholdSource: \"adaptive\"\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "355ee951-9fa5-4234-999b-2bf650fc189f",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🔀 Starting hybrid line item search...\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a2842451-89ef-494e-81a6-1c6036a02c21",
+    "level": "log",
+    "timestamp": 1752059031315000
+  },
+  {
+    "event_message": "🔍 DEBUG: Checking line item query for: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "c68e58f6-d9f0-433f-b862-0a92ed0ffd83",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 DEBUG: isLineItemQuery - result: true (potential product)\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "53b9a4dd-71e9-4720-bff8-9c45543c87c7",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 DEBUG: isLineItemQuery - FOUND POTENTIAL PRODUCT: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a38c2382-c200-410e-8be3-758af7ea8aab",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🍜 Detected line item query - routing to enhanced line item search\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "acb1b332-5a1e-4bbc-94dc-8976914b94b5",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "✅ Stage 2 completed in 232ms\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "4a075f5b-63d5-42fa-839c-4bbb7c6a0911",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🍜 Executing Enhanced Line Item Search\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "c7a8e0ec-4279-4ba5-9c8e-db65e607502e",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 DEBUG: Line item detection result: true\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "3ab35309-88b5-4c75-9d36-9c1d593dfe2e",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 DEBUG: isLineItemQuery - checking query: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "388030a1-acf1-4283-aafc-f4e41e64dc45",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 DEBUG: isPotentialProduct - two word brand heuristic matched: last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "da160613-afe3-4486-8e28-d00a382e07b0",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "🔍 Stage 3: Enhanced Hybrid Search Execution with Temporal Routing\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "7b7381a0-90d0-4743-a8f9-033c920cf0dc",
+    "level": "log",
+    "timestamp": 1752059031314000
+  },
+  {
+    "event_message": "Converting embedding dimensions from 768 to 1536\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e685d03e-9476-4051-9bfd-a1a9d209e4b4",
+    "level": "log",
+    "timestamp": 1752059031313000
+  },
+  {
+    "event_message": "🔍 DEBUG: Stage 1 completed successfully\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "572104e6-8a48-400b-b46c-0b420ec6ce52",
+    "level": "log",
+    "timestamp": 1752059031081000
+  },
+  {
+    "event_message": "🔢 Stage 2: Embedding Generation\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "0e3cf250-88a8-44bd-a0d8-ed964529d363",
+    "level": "log",
+    "timestamp": 1752059031081000
+  },
+  {
+    "event_message": "✅ Stage 1 completed in 10008ms {\n  intent: \"document_retrieval\",\n  confidence: 0.6,\n  expandedQuery: \"last month\",\n  cached: false\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fc9b841b-c3d0-4bea-b08d-f2fcf6d53739",
+    "level": "log",
+    "timestamp": 1752059031080000
+  },
+  {
+    "event_message": "⚠️ LLM preprocessing timed out, using fallback\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "71e64911-c211-4d6d-8368-4b08f60d0f72",
+    "level": "error",
+    "timestamp": 1752059031080000
+  },
+  {
+    "event_message": "🔍 DEBUG: Full temporal parsing result: {\n  \"originalQuery\": \"Show me all receipts from last month\",\n  \"searchTerms\": [],\n  \"queryType\": \"temporal\",\n  \"confidence\": 0.8,\n  \"filters\": {},\n  \"dateRange\": {\n    \"start\": \"2025-06-01\",\n    \"end\": \"2025-06-30\",\n    \"preset\": \"last_month\"\n  },\n  \"temporalIntent\": {\n    \"isTemporalQuery\": true,\n    \"hasSemanticContent\": false,\n    \"routingStrategy\": \"date_filter_only\",\n    \"temporalConfidence\": 0.8,\n    \"semanticTerms\": []\n  }\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a141c8da-0915-48cb-882c-5b85a196542a",
+    "level": "log",
+    "timestamp": 1752059020864000
+  },
+  {
+    "event_message": "🔍 DEBUG: Temporal parsing result: {\n  \"originalQuery\": \"Show me all receipts from last month\",\n  \"searchTerms\": [],\n  \"queryType\": \"temporal\",\n  \"confidence\": 0.8,\n  \"filters\": {},\n  \"dateRange\": {\n    \"start\": \"2025-06-01\",\n    \"end\": \"2025-06-30\",\n    \"preset\": \"last_month\"\n  },\n  \"temporalIntent\": {\n    \"isTemporalQuery\": true,\n    \"hasSemanticContent\": false,\n    \"routingStrategy\": \"date_filter_only\",\n    \"temporalConfidence\": 0.8,\n    \"semanticTerms\": []\n  }\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "6898de13-54ad-4b75-8222-dee7ad7287eb",
+    "level": "log",
+    "timestamp": 1752059020864000
+  },
+  {
+    "event_message": "✅ Temporal parsing complete: {\n  queryType: \"temporal\",\n  confidence: 0.8,\n  hasDateRange: true,\n  hasAmountRange: false,\n  hasTemporalIntent: true,\n  isTemporalQuery: true,\n  routingStrategy: \"date_filter_only\",\n  dateRange: { start: \"2025-06-01\", end: \"2025-06-30\", preset: \"last_month\" },\n  amountRange: \"none\",\n  searchTermsCount: 0\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ef20f927-a311-46a3-a975-5b83a4cfd82b",
+    "level": "log",
+    "timestamp": 1752059020864000
+  },
+  {
+    "event_message": "🔀 Temporal routing strategy: date_filter_only\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fbfeda5f-a853-4c7a-b9b5-acfdc5621a79",
+    "level": "log",
+    "timestamp": 1752059020863000
+  },
+  {
+    "event_message": "💰 DEBUG: Starting monetary parsing for query: show me all receipts from last month\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f5cc85e7-d700-4b2e-94d5-530b8c5dfa74",
+    "level": "log",
+    "timestamp": 1752059020863000
+  },
+  {
+    "event_message": "📅 Date range calculated: { start: \"2025-06-01\", end: \"2025-06-30\", preset: \"last_month\" }\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "52d26f8f-aae3-4874-9bc6-a589408f19c3",
+    "level": "log",
+    "timestamp": 1752059020862000
+  },
+  {
+    "event_message": "🔍 DEBUG: Temporal handler result details: {\n  pattern: \"Last month references\",\n  match: \"last month\",\n  dateRangeStart: \"2025-06-01\",\n  dateRangeEnd: \"2025-06-30\",\n  queryType: \"temporal\",\n  confidence: 0.8\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "6c9c7a90-f515-4966-a8a9-be1bc0d736c3",
+    "level": "log",
+    "timestamp": 1752059020862000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Semantic content with temporal context\",\n  pattern: \"/\\\\b([a-zA-Z\\\\s]+)\\\\s+(from|in|during)\\\\s+(last\\\\s+week|this\\\\s+week|last\\\\s+month|this\\\\s+month)\\\\b/i\",\n  matched: true,\n  matchResult: \"show me all receipts from last month\"\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ee56970d-9ab1-4321-978e-8772226b9adc",
+    "level": "log",
+    "timestamp": 1752059020862000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Malay temporal expressions\",\n  pattern: \"/\\\\b(hari\\\\s+ini|semalam|minggu\\\\s+lepas|bulan\\\\s+lepas)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "2b9f111b-9820-4a15-b82a-475298350248",
+    "level": "log",
+    "timestamp": 1752059020862000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"From a/one unit back (range query from a day back to today)\",\n  pattern: \"/\\\\bfrom\\\\s+(a|one)\\\\s+(day|week|month)\\\\s+back\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f4f63bdf-4ade-468e-afa4-d49993a54a76",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Exact days ago (X days ago, X weeks ago, X months ago)\",\n  pattern: \"/\\\\b(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\s+ago\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "bd0d2a28-5a0c-4863-863c-34b357d1af87",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"From a/one unit ago (range query from a day ago to today)\",\n  pattern: \"/\\\\bfrom\\\\s+(a|one)\\\\s+(day|week|month)\\\\s+ago\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "dd9402b2-8f85-43d2-8a7a-43e7f31b403d",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Recent semantic content\",\n  pattern: \"/\\\\b(recent|latest)\\\\s+([a-zA-Z\\\\s]+)\\\\s+(receipts?|purchases?|expenses?)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "a71ddc25-8547-481c-b1b2-c07e1d6d2227",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Single unit ago (a day ago, one week ago, etc.)\",\n  pattern: \"/\\\\b(a|one)\\\\s+(day|week|month)\\\\s+ago\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "077db8c4-cb0f-43e9-9acc-21433d985f1c",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Single unit back (a day back, one week back, etc.)\",\n  pattern: \"/\\\\b(a|one)\\\\s+(day|week|month)\\\\s+back\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "619fbef3-2cd1-4760-b0d8-6b4faaf8be0b",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Exact days back (X days back, X weeks back, X months back)\",\n  pattern: \"/\\\\b(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\s+back\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f98ed869-8da9-4625-8ab1-4d63e6431036",
+    "level": "log",
+    "timestamp": 1752059020861000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Last month references\",\n  pattern: \"/\\\\b(last\\\\s+month|previous\\\\s+month)\\\\b/i\",\n  matched: true,\n  matchResult: \"last month\"\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f8ee322c-8021-4130-94c4-35e5dc15f38e",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"From X days back (range query from X days back to today)\",\n  pattern: \"/\\\\bfrom\\\\s+(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\s+back\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "16f6d7e5-85b9-4456-8518-deed764bff14",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🎯 Temporal pattern matched: {\n  pattern: \"Last month references\",\n  priority: 2,\n  match: \"last month\",\n  isHybridCapable: true,\n  fullMatch: [\n    \"last month\",\n    \"last month\",\n    index: 26,\n    input: \"show me all receipts from last month\",\n    groups: undefined\n  ]\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "768de47e-6714-4092-b1ef-e6b030047d25",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Within/in the last X period\",\n  pattern: \"/\\\\b(within|in)\\\\s+the\\\\s+(last|past)\\\\s+(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "73f77b50-6729-4f20-a7c9-c9dfdd8f80f8",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Numeric relative dates (last X days/weeks/months)\",\n  pattern: \"/\\\\b(last|past)\\\\s+(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "f889a265-3012-496c-b016-e43c97acac9d",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"From X days ago (range query from X days ago to today)\",\n  pattern: \"/\\\\bfrom\\\\s+(\\\\d+)\\\\s+(days?|weeks?|months?)\\\\s+ago\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "3352d712-5378-4f1e-a6e5-90373e3635ee",
+    "level": "log",
+    "timestamp": 1752059020860000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"August specific dates\",\n  pattern: \"/\\\\b(august|aug)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "547919f6-960c-4f32-9618-08fffcab3528",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"July specific dates\",\n  pattern: \"/\\\\b(july|jul)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "63012227-766c-442e-b4d4-989bac1f58f5",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"October specific dates\",\n  pattern: \"/\\\\b(october|oct)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e6851eb0-ac4e-4b42-ad4a-6487b7a4b4ca",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"This week references\",\n  pattern: \"/\\\\b(this\\\\s+week|current\\\\s+week)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "9b0d20a1-6692-4c27-9157-1d0e84b50f00",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Last week references\",\n  pattern: \"/\\\\b(last\\\\s+week|previous\\\\s+week)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "cf62dcfb-14a4-4613-9c5d-f90aa5c2f5fc",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"December specific dates\",\n  pattern: \"/\\\\b(december|dec)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "8dd1dd84-848d-40eb-ae80-ddd7e91a699c",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"September specific dates\",\n  pattern: \"/\\\\b(september|sep)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "cca7552e-3ea8-49c6-bc3a-f56169495be1",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"Recent/latest references\",\n  pattern: \"/\\\\b(recent|latest|last)\\\\s+(receipts?|purchases?|expenses?)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "9d998b1b-4ef2-4821-89bc-1bffd89d4afa",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"This month references\",\n  pattern: \"/\\\\b(this\\\\s+month|current\\\\s+month)\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "6f65089d-6480-4d31-a51d-554ae80276af",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"November specific dates\",\n  pattern: \"/\\\\b(november|nov)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "fb7de464-bf1f-4ea6-8945-fb8fd678d43b",
+    "level": "log",
+    "timestamp": 1752059020859000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"June specific dates\",\n  pattern: \"/\\\\b(june|jun)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "4ba12730-1c21-4fb0-9b61-8d310f52d320",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"April specific dates\",\n  pattern: \"/\\\\b(april|apr)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "75366933-ba4b-4340-aadb-51ae17e14f96",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On December day (e.g., \"on december 27\")',\n  pattern: \"/\\\\bon\\\\s+(december|dec)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "faea114f-cf9a-4364-bf8e-e3c72a291d83",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"May specific dates\",\n  pattern: \"/\\\\b(may)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "02a8242c-8cb7-48c7-a0f6-dee05e9b27e7",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On September day (e.g., \"on september 27\")',\n  pattern: \"/\\\\bon\\\\s+(september|sep)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "32474425-8e56-4673-83cc-053c9eaff933",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On November day (e.g., \"on november 27\")',\n  pattern: \"/\\\\bon\\\\s+(november|nov)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "180b8885-6745-4f5e-87aa-aa55158204be",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"January specific dates\",\n  pattern: \"/\\\\b(january|jan)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "7ddc3bf0-a170-4ce0-82fd-c514ebfb2475",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"March specific dates\",\n  pattern: \"/\\\\b(march|mar)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "1e872b70-26aa-48b9-8ea4-ca01ef7fa71b",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On October day (e.g., \"on october 27\")',\n  pattern: \"/\\\\bon\\\\s+(october|oct)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "00c796b6-dbf4-4251-ae1a-ff51edf0fd8f",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: \"February specific dates\",\n  pattern: \"/\\\\b(february|feb)\\\\s+(\\\\d{1,2})\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ddee2b32-e1ab-40ff-bc28-cd90d959a3af",
+    "level": "log",
+    "timestamp": 1752059020858000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On June day (e.g., \"on june 27\")',\n  pattern: \"/\\\\bon\\\\s+(june|jun)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "7dfa3eec-25c7-417c-8974-59dc64f9e50e",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On August day (e.g., \"on august 27\")',\n  pattern: \"/\\\\bon\\\\s+(august|aug)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "5ae837b3-3d3f-4bdf-b601-d7ce63817809",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On April day (e.g., \"on april 27\")',\n  pattern: \"/\\\\bon\\\\s+(april|apr)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "04c9682d-3c07-4cfb-ba8b-786dc178f183",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On May day (e.g., \"on may 27\")',\n  pattern: \"/\\\\bon\\\\s+(may)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "8c7111a3-8c9e-431c-8880-2603b93c4cf8",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On March day (e.g., \"on march 27\")',\n  pattern: \"/\\\\bon\\\\s+(march|mar)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "e66639ca-52b7-40bb-9d35-20c0250707da",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On July day (e.g., \"on july 27\")',\n  pattern: \"/\\\\bon\\\\s+(july|jul)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "2adfdb19-6028-4f57-9de3-7bf092473292",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On February day (e.g., \"on february 27\")',\n  pattern: \"/\\\\bon\\\\s+(february|feb)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "3f381da2-85ef-4f04-ae4d-fcaf1bb68580",
+    "level": "log",
+    "timestamp": 1752059020857000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On day June (e.g., \"on 27 june\")',\n  pattern: \"/\\\\bon\\\\s+(\\\\d{1,2})\\\\s+(june|jun)(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ae24f1d5-9ad1-4372-be54-d0ec28e578e3",
+    "level": "log",
+    "timestamp": 1752059020856000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On day September (e.g., \"on 27 september\")',\n  pattern: \"/\\\\bon\\\\s+(\\\\d{1,2})\\\\s+(september|sep)(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "075dc206-fdf2-4b27-9118-ea4ffa4a47e6",
+    "level": "log",
+    "timestamp": 1752059020856000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On day October (e.g., \"on 27 october\")',\n  pattern: \"/\\\\bon\\\\s+(\\\\d{1,2})\\\\s+(october|oct)(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "b19c85bf-b619-4414-9f2a-9c3455d11e42",
+    "level": "log",
+    "timestamp": 1752059020856000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On day July (e.g., \"on 27 july\")',\n  pattern: \"/\\\\bon\\\\s+(\\\\d{1,2})\\\\s+(july|jul)(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "172d8f35-a846-405a-8bcd-3952fe9b1583",
+    "level": "log",
+    "timestamp": 1752059020856000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On January day (e.g., \"on january 27\")',\n  pattern: \"/\\\\bon\\\\s+(january|jan)\\\\s+(\\\\d{1,2})(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "ea6c0902-ad67-49f6-8d62-cb3e4204aa03",
+    "level": "log",
+    "timestamp": 1752059020856000
+  },
+  {
+    "event_message": "🔍 DEBUG: Testing pattern: {\n  description: 'On day November (e.g., \"on 27 november\")',\n  pattern: \"/\\\\bon\\\\s+(\\\\d{1,2})\\\\s+(november|nov)(?:\\\\s+\\\\d{4})?\\\\b/i\",\n  matched: false,\n  matchResult: null\n}\n",
+    "event_type": "Log",
+    "function_id": "1f7a4a65-d7ed-4507-a115-bd6ca4cd29c8",
+    "id": "0ff67a35-d05b-4518-838e-41256c5f2a37",
+    "level": "log",
+    "timestamp": 1752059020856000
+  }
+]
