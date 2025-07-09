@@ -2022,7 +2022,8 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
     let response;
     try {
       console.log('🚀 Calling unified-search Edge Function with params:', searchParams);
-      response = await callEdgeFunction('unified-search', 'POST', searchParams);
+      // Use extended timeout for complex unified search operations
+      response = await callEdgeFunction('unified-search', 'POST', searchParams, undefined, 2, 90000); // 90 seconds timeout
 
       // 🔍 DEBUG: Log the actual response structure for debugging
       console.log('🔍 Unified search response received:', {
@@ -2085,8 +2086,14 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
          edgeFunctionError.message.includes('Invalid authentication token') ||
          edgeFunctionError.message.includes('401'));
 
-      if (isNetworkError || isAuthError) {
-        console.log(`🔄 UNIFIED-SEARCH: ${isNetworkError ? 'Network' : 'Authentication'} error detected, using fallback search`);
+      const isTimeoutError = edgeFunctionError instanceof Error &&
+        (edgeFunctionError.message.includes('timed out') ||
+         edgeFunctionError.message.includes('timeout') ||
+         edgeFunctionError.message.includes('AbortError'));
+
+      if (isNetworkError || isAuthError || isTimeoutError) {
+        const errorType = isNetworkError ? 'Network' : isAuthError ? 'Authentication' : 'Timeout';
+        console.log(`🔄 UNIFIED-SEARCH: ${errorType} error detected, using fallback search`);
 
         // Convert unified params to legacy format for fallback
         const legacyParams: SearchParams = {
@@ -2120,7 +2127,7 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
             sourcesSearched: params.sources || ['receipts'],
             fallbackUsed: true,
             searchMethod: 'database_fallback',
-            fallbackReason: isNetworkError ? 'network_error' : 'auth_error'
+            fallbackReason: isNetworkError ? 'network_error' : isAuthError ? 'auth_error' : 'timeout_error'
           }
         };
       } else {

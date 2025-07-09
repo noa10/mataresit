@@ -297,8 +297,20 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
         success: results?.success,
         resultsLength: results?.results?.length,
         error: results?.error,
-        resultKeys: results && typeof results === 'object' ? Object.keys(results) : []
+        resultKeys: results && typeof results === 'object' ? Object.keys(results) : [],
+        fullResults: results // Log full results for debugging
       });
+
+      // 🔧 DEBUG: Additional validation of results structure
+      if (!results) {
+        console.error('🔍 DEBUG: unifiedSearch returned null/undefined');
+        throw new Error('Search returned no response');
+      }
+
+      if (typeof results !== 'object') {
+        console.error('🔍 DEBUG: unifiedSearch returned non-object:', typeof results);
+        throw new Error('Search returned invalid response type');
+      }
 
       if (results.success) {
         console.log('🔍 DEBUG: Search successful, caching results');
@@ -315,7 +327,12 @@ export function BackgroundSearchProvider({ children }: { children: React.ReactNo
           payload: { conversationId, results }
         });
 
-        console.log(`✅ Background search completed for conversation ${conversationId}`);
+        console.log(`✅ Background search completed for conversation ${conversationId}:`, {
+          resultsCount: results.results?.length || 0,
+          totalResults: results.totalResults || 0,
+          hasEnhancedResponse: !!results.enhancedResponse,
+          searchMetadata: results.searchMetadata
+        });
       } else {
         console.log('🔍 DEBUG: Search failed with error:', results.error);
         throw new Error(results.error || 'Search failed');

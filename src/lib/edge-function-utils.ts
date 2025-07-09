@@ -25,7 +25,7 @@ export async function callEdgeFunction<T = any>(
   body?: any,
   queryParams?: Record<string, string>,
   retries: number = 2, // Add retries parameter with default of 2 retries
-  timeout: number = 30000 // Increased timeout to 30 seconds
+  timeout: number = 60000 // Increased timeout to 60 seconds for complex search operations
 ): Promise<T> {
   try {
     // Get the session for the current user to include the auth token

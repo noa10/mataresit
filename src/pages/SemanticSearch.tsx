@@ -536,7 +536,15 @@ export default function SemanticSearchPage() {
           }
 
           if (cachedResults) {
-            console.log(`💾 Using cached search results for conversation ${conversationId}`);
+            console.log(`💾 Using cached search results for conversation ${conversationId}:`, {
+              hasResults: !!cachedResults,
+              resultsType: typeof cachedResults,
+              hasResultsArray: !!cachedResults.results,
+              resultsLength: cachedResults.results?.length,
+              success: cachedResults.success,
+              totalResults: cachedResults.totalResults,
+              cachedResultsKeys: cachedResults && typeof cachedResults === 'object' ? Object.keys(cachedResults) : []
+            });
             updateStatus('cached', 'Loading cached results...');
             updateConversationSearchStatus(conversationId, 'cached');
 
@@ -614,116 +622,103 @@ export default function SemanticSearchPage() {
             enhancedParams
           });
 
-          startBackgroundSearch(conversationId, content, enhancedParams)
-            .then(async (searchResults) => {
-              // 🔧 FIX: Add defensive programming to handle undefined results
-              console.log('🔍 DEBUG: SemanticSearch received search results:', {
-                hasSearchResults: !!searchResults,
-                searchResultsType: typeof searchResults,
-                isNull: searchResults === null,
-                isUndefined: searchResults === undefined,
-                hasResults: !!searchResults?.results,
-                resultsLength: searchResults?.results?.length,
-                hasEnhancedResponse: !!searchResults?.enhancedResponse,
-                searchResultsKeys: searchResults ? Object.keys(searchResults) : [],
-                fullSearchResults: searchResults // Log the full object for debugging
-              });
+          // 🔧 FIX: Instead of relying on background search context,
+          // let's call the unified search directly and handle the results
+          console.log('🔍 DEBUG: Calling unifiedSearch directly with params:', enhancedParams);
 
-              // Check if searchResults is valid
-              if (!searchResults) {
-                console.error('🔍 DEBUG: Search results are undefined/null');
-                throw new Error('Search results are undefined');
-              }
+          const searchResults = await unifiedSearch(enhancedParams);
 
-              // Check if results array exists
-              if (!searchResults.results || !Array.isArray(searchResults.results)) {
-                console.error('❌ Invalid search results structure:', searchResults);
-                throw new Error('Search results do not contain a valid results array');
-              }
+          console.log('🔍 DEBUG: Direct unifiedSearch returned:', {
+            hasResults: !!searchResults,
+            resultType: typeof searchResults,
+            success: searchResults?.success,
+            resultsLength: searchResults?.results?.length,
+            error: searchResults?.error,
+            resultKeys: searchResults && typeof searchResults === 'object' ? Object.keys(searchResults) : [],
+            fullResults: searchResults // Log full results for debugging
+          });
 
-              // Process results when search completes
-              const results = {
-                results: searchResults.results.map(result => ({
-                  id: result.sourceId,
-                  merchant: result.title,
-                  date: result.metadata?.date || result.createdAt,
-                  total: result.metadata?.total || 0,
-                  total_amount: result.metadata?.total || 0,
-                  currency: result.metadata?.currency || 'MYR',
-                  similarity_score: result.similarity,
-                  predicted_category: result.metadata?.predicted_category,
-                  fullText: result.content,
-                  ...(result.metadata || {})
-                })),
-                count: searchResults.results.length,
-                total: searchResults.totalResults || searchResults.results.length,
-                searchParams: {
-                  query: content,
-                  isNaturalLanguage: true,
-                  limit: 10,
-                  offset: 0,
-                  searchTarget: 'all'
-                },
-                searchMetadata: searchResults.searchMetadata || {}
-              };
-
-              // Generate AI response
-              const aiResponse = await generateIntelligentResponse(results, content, messages);
-
-              // Extract UI components from search response if available
-              // Check both top-level and enhancedResponse locations for backward compatibility
-              const uiComponents = searchResults.uiComponents ||
-                                 searchResults.enhancedResponse?.uiComponents ||
-                                 [];
-
-              const aiMessage: ChatMessage = {
-                id: generateMessageId(),
-                type: 'ai',
-                content: searchResults.enhancedResponse?.content || searchResults.content || aiResponse,
-                timestamp: new Date(),
-                searchResults: results,
-                uiComponents: uiComponents,
-              };
-
-              setMessages(prev => [...prev, aiMessage]);
-              updateStatus('complete', 'Search completed successfully');
-              updateConversationSearchStatus(conversationId, 'completed');
-            })
-            .catch((error) => {
-              console.error('Background search failed:', error);
-              updateStatus('error', 'Search failed', 'Please try again or rephrase your question');
-              updateConversationSearchStatus(conversationId, 'error');
-
-              // Generate error response
-              const errorMessage: ChatMessage = {
-                id: generateMessageId(),
-                type: 'ai',
-                content: "I'm sorry, I encountered an error while searching your receipts. Please try again or rephrase your question.",
-                timestamp: new Date(),
-              };
-
-              setMessages(prev => [...prev, errorMessage]);
+          // Check if searchResults is valid
+          if (!searchResults || !searchResults.success) {
+            console.error('🔍 DEBUG: Search failed or returned invalid results:', {
+              hasResults: !!searchResults,
+              success: searchResults?.success,
+              error: searchResults?.error
             });
+            throw new Error(searchResults?.error || 'Search failed');
+          }
 
-          // Update status to show search is in progress
-          updateStatus('searching', 'Searching through your data...');
+          // Check if results array exists
+          if (!searchResults.results || !Array.isArray(searchResults.results)) {
+            console.error('❌ Invalid search results structure:', searchResults);
+            throw new Error('Search results do not contain a valid results array');
+          }
 
-          // Don't block - user can navigate freely while search runs in background
-          console.log(`✅ Background search initiated for conversation ${conversationId}`);
+          console.log('✅ Search completed successfully with', searchResults.results.length, 'results');
 
-          // Return early - background search is now handling everything
+          // Process results when search completes
+          const results = {
+            results: searchResults.results.map(result => ({
+              id: result.sourceId,
+              merchant: result.title,
+              date: result.metadata?.date || result.createdAt,
+              total: result.metadata?.total || 0,
+              total_amount: result.metadata?.total || 0,
+              currency: result.metadata?.currency || 'MYR',
+              similarity_score: result.similarity,
+              predicted_category: result.metadata?.predicted_category,
+              fullText: result.content,
+              ...(result.metadata || {})
+            })),
+            count: searchResults.results.length,
+            total: searchResults.totalResults || searchResults.results.length,
+            searchParams: {
+              query: content,
+              isNaturalLanguage: true,
+              limit: 10,
+              offset: 0,
+              searchTarget: 'all'
+            },
+            searchMetadata: searchResults.searchMetadata || {}
+          };
+
+          // Generate AI response
+          const aiResponse = await generateIntelligentResponse(results, content, messages);
+
+          // Extract UI components from search response if available
+          // Check both top-level and enhancedResponse locations for backward compatibility
+          const uiComponents = searchResults.uiComponents ||
+                             searchResults.enhancedResponse?.uiComponents ||
+                             [];
+
+          const aiMessage: ChatMessage = {
+            id: generateMessageId(),
+            type: 'ai',
+            content: searchResults.enhancedResponse?.content || searchResults.content || aiResponse,
+            timestamp: new Date(),
+            searchResults: results,
+            uiComponents: uiComponents,
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+          updateStatus('complete', 'Search completed successfully');
+          updateConversationSearchStatus(conversationId, 'completed');
+
+          console.log(`✅ Background search completed successfully for conversation ${conversationId}`);
           return;
         } catch (error) {
-          console.error('Error in search setup:', error);
-          updateStatus('error', 'Failed to start search', 'Please try again');
+          console.error('Background search failed:', error);
+          updateStatus('error', 'Search failed', 'Please try again or rephrase your question');
+          updateConversationSearchStatus(conversationId, 'error');
 
-          // Generate error message for search setup failure
+          // Generate error response
           const errorMessage: ChatMessage = {
             id: generateMessageId(),
             type: 'ai',
-            content: "I'm sorry, I encountered an error while setting up the search. Please try again.",
+            content: "I'm sorry, I encountered an error while searching your receipts. Please try again or rephrase your question.",
             timestamp: new Date(),
           };
+
           setMessages(prev => [...prev, errorMessage]);
         }
       } // Close the inner try block that started at line 482
