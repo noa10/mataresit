@@ -98,6 +98,14 @@ export class RAGPipeline {
     });
     console.log('🔍 DEBUG: About to enter try block...');
 
+    // Add timeout protection - if we're already close to timeout, fail fast
+    const MAX_PIPELINE_TIME = 75000; // 75 seconds max for pipeline execution
+    const timeElapsed = Date.now() - this.context.startTime;
+    if (timeElapsed > MAX_PIPELINE_TIME * 0.8) { // If 80% of time already used
+      console.warn('⚠️ RAG Pipeline: Approaching timeout, failing fast to allow fallback');
+      return this.createErrorResult('Pipeline timeout protection triggered', 'Insufficient time remaining for pipeline execution');
+    }
+
     try {
       console.log('🔍 DEBUG: About to start Stage 1 - Query Preprocessing');
       // Stage 1: Query Understanding & Preprocessing
@@ -115,10 +123,22 @@ export class RAGPipeline {
         return this.createErrorResult('Query preprocessing failed', preprocessingResult.error);
       }
 
+      // Check timeout before Stage 2
+      if (Date.now() - this.context.startTime > MAX_PIPELINE_TIME * 0.5) {
+        console.warn('⚠️ RAG Pipeline: Timeout check before Stage 2 - switching to fast path');
+        return this.createErrorResult('Pipeline timeout protection - Stage 2', 'Switching to fallback for performance');
+      }
+
       // Stage 2: Embedding Generation
       const embeddingResult = await this.stage2_EmbeddingGeneration(preprocessingResult.data!);
       if (!embeddingResult.success) {
         return this.createErrorResult('Embedding generation failed', embeddingResult.error);
+      }
+
+      // Check timeout before Stage 3 (most expensive stage)
+      if (Date.now() - this.context.startTime > MAX_PIPELINE_TIME * 0.6) {
+        console.warn('⚠️ RAG Pipeline: Timeout check before Stage 3 - switching to fast path');
+        return this.createErrorResult('Pipeline timeout protection - Stage 3', 'Switching to fallback for performance');
       }
 
       // Stage 3: Hybrid Search Execution
@@ -145,6 +165,10 @@ export class RAGPipeline {
       // Update final metadata
       this.context.metadata.searchDuration = Date.now() - this.context.startTime;
       
+      // Add temporal routing and filters to metadata for response generation
+      this.context.metadata.temporalRouting = this.context.params.temporalRouting;
+      this.context.metadata.filters = this.context.params.filters;
+
       return {
         success: true,
         results: responseResult.data!.results,
@@ -189,8 +213,48 @@ export class RAGPipeline {
 
       console.log('🔄 Cache MISS for LLM preprocessing - fetching fresh data');
 
-      // Fetch fresh preprocessing result
-      const preprocessingResult = await llmPreprocessQuery(this.context.originalQuery);
+      // Check if this is a simple query that doesn't need LLM preprocessing
+      const isSimpleQuery = this.context.originalQuery.trim().split(/\s+/).length === 1 &&
+                           this.context.originalQuery.length < 20 &&
+                           !/[?!@#$%^&*()+={}[\]|\\:";'<>,.\/]/.test(this.context.originalQuery);
+
+      let preprocessingResult;
+
+      if (isSimpleQuery) {
+        console.log('⚡ Using fast-path for simple query, skipping LLM preprocessing');
+        // Create a simple preprocessing result without LLM call
+        preprocessingResult = {
+          intent: 'document_retrieval',
+          confidence: 0.8,
+          expandedQuery: this.context.originalQuery,
+          entities: [],
+          queryType: 'simple_search',
+          processingTime: 0
+        };
+      } else {
+        // Add timeout protection for LLM preprocessing
+        const LLM_PREPROCESSING_TIMEOUT = 10000; // 10 seconds max
+        const preprocessingPromise = llmPreprocessQuery(this.context.originalQuery);
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('LLM preprocessing timeout')), LLM_PREPROCESSING_TIMEOUT);
+        });
+
+        try {
+          preprocessingResult = await Promise.race([preprocessingPromise, timeoutPromise]);
+        } catch (timeoutError) {
+          console.warn('⚠️ LLM preprocessing timed out, using fallback');
+          // Create a fallback preprocessing result
+          preprocessingResult = {
+            intent: 'document_retrieval',
+            confidence: 0.6,
+            expandedQuery: this.context.originalQuery,
+            entities: [],
+            queryType: 'timeout_fallback',
+            processingTime: LLM_PREPROCESSING_TIMEOUT
+          };
+        }
+      }
 
       // Cache the result for future use
       await llmCacheWrapper.set(cacheKey, preprocessingResult);
@@ -374,6 +438,16 @@ export class RAGPipeline {
       // Enhanced hybrid search execution with trigram support
       const candidateLimit = Math.max(50, (this.context.params.limit || 20) * 3);
 
+      // Check if we should use fast simple search for basic queries
+      const isSimpleQuery = this.context.originalQuery.trim().split(/\s+/).length === 1 &&
+                           this.context.originalQuery.length < 20 &&
+                           !/[?!@#$%^&*()+={}[\]|\\:";'<>,.\/]/.test(this.context.originalQuery);
+
+      if (isSimpleQuery) {
+        console.log('⚡ Using fast simple search for basic query');
+        return await this.executeSimpleSearch(queryEmbedding);
+      }
+
       // Try enhanced hybrid search first with amount filtering support
       let searchResults, error;
       try {
@@ -402,7 +476,9 @@ export class RAGPipeline {
           bypassingSemantic: isMonetaryQuery
         });
 
-        const enhancedResult = await this.context.supabase.rpc('enhanced_hybrid_search', {
+        // Add timeout protection for database query
+        const DB_QUERY_TIMEOUT = 30000; // 30 seconds for database query
+        const dbQueryPromise = this.context.supabase.rpc('enhanced_hybrid_search', {
           query_embedding: queryEmbedding,
           query_text: this.context.originalQuery,
           source_types: this.context.params.sources,
@@ -418,6 +494,12 @@ export class RAGPipeline {
           language_filter: this.context.params.filters?.language,
           ...amountParams
         });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Database query timeout')), DB_QUERY_TIMEOUT);
+        });
+
+        const enhancedResult = await Promise.race([dbQueryPromise, timeoutPromise]);
 
         searchResults = enhancedResult.data;
         error = enhancedResult.error;
@@ -664,6 +746,16 @@ export class RAGPipeline {
         sample_results: results.slice(0, 2).map(r => ({ id: r.id, title: r.title }))
       });
 
+      // If no results found, try fallback temporal search with broader date ranges
+      if (results.length === 0) {
+        console.log('🔄 No results found for temporal query, trying fallback search...');
+        const fallbackResult = await this.executeFallbackTemporalSearch(dateRange, stageStart);
+        if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
+          console.log(`✅ Fallback temporal search found ${fallbackResult.data.length} results`);
+          return fallbackResult;
+        }
+      }
+
       this.context.metadata.sourcesSearched.push('date_filter_receipts');
 
       return {
@@ -684,6 +776,140 @@ export class RAGPipeline {
         processingTime: Date.now() - stageStart
       };
     }
+  }
+
+  /**
+   * Execute fallback temporal search with broader date ranges
+   */
+  private async executeFallbackTemporalSearch(
+    originalDateRange: { start: string; end: string },
+    originalStageStart: number
+  ): Promise<PipelineStageResult<UnifiedSearchResult[]>> {
+    console.log('🔄 Executing fallback temporal search with broader date ranges');
+
+    // Define fallback strategies in order of preference
+    const fallbackStrategies = [
+      {
+        name: 'last_2_months',
+        getDateRange: () => {
+          const now = new Date();
+          const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+          const end = new Date(now.getFullYear(), now.getMonth(), 0);
+          return {
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0]
+          };
+        }
+      },
+      {
+        name: 'last_3_months',
+        getDateRange: () => {
+          const now = new Date();
+          const start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          const end = new Date(now.getFullYear(), now.getMonth(), 0);
+          return {
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0]
+          };
+        }
+      },
+      {
+        name: 'recent_receipts',
+        getDateRange: () => {
+          const now = new Date();
+          const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days ago
+          return {
+            start: start.toISOString().split('T')[0],
+            end: now.toISOString().split('T')[0]
+          };
+        }
+      }
+    ];
+
+    for (const strategy of fallbackStrategies) {
+      const fallbackDateRange = strategy.getDateRange();
+      console.log(`🔄 Trying fallback strategy: ${strategy.name}`, fallbackDateRange);
+
+      try {
+        const { data: receipts, error } = await this.context.supabase
+          .from('receipts')
+          .select(`
+            id, merchant, total, currency, date, created_at,
+            predicted_category, payment_method, status
+          `)
+          .eq('user_id', this.context.user.id)
+          .gte('date', fallbackDateRange.start)
+          .lte('date', fallbackDateRange.end)
+          .order('date', { ascending: false })
+          .limit(Math.min(this.context.params.limit || 20, 10)); // Limit fallback results
+
+        if (error) {
+          console.warn(`⚠️ Fallback strategy ${strategy.name} failed:`, error);
+          continue;
+        }
+
+        if (receipts && receipts.length > 0) {
+          console.log(`✅ Fallback strategy ${strategy.name} found ${receipts.length} results`);
+
+          // Transform receipts to UnifiedSearchResult format
+          const results: UnifiedSearchResult[] = receipts.map(receipt => ({
+            id: receipt.id,
+            sourceType: 'receipt' as const,
+            sourceId: receipt.id,
+            contentType: 'full_text',
+            title: `${receipt.merchant} - ${receipt.currency} ${receipt.total}`,
+            description: `Receipt from ${receipt.date}${receipt.predicted_category ? ` • ${receipt.predicted_category}` : ''}`,
+            similarity: 0.8, // Lower similarity to indicate fallback result
+            metadata: {
+              merchant: receipt.merchant,
+              total: receipt.total,
+              currency: receipt.currency,
+              date: receipt.date,
+              category: receipt.predicted_category,
+              payment_method: receipt.payment_method,
+              status: receipt.status,
+              fallbackStrategy: strategy.name,
+              originalDateRange,
+              expandedDateRange: fallbackDateRange
+            },
+            accessLevel: 'user' as const,
+            createdAt: receipt.created_at,
+            updatedAt: receipt.created_at
+          }));
+
+          this.context.metadata.sourcesSearched.push(`fallback_temporal_${strategy.name}`);
+
+          return {
+            success: true,
+            data: results,
+            processingTime: Date.now() - originalStageStart,
+            metadata: {
+              searchMethod: 'fallback_temporal',
+              fallbackStrategy: strategy.name,
+              originalDateRange,
+              expandedDateRange: fallbackDateRange,
+              resultsCount: results.length
+            }
+          };
+        }
+      } catch (error) {
+        console.warn(`⚠️ Fallback strategy ${strategy.name} error:`, error);
+        continue;
+      }
+    }
+
+    console.log('❌ All fallback temporal strategies failed to find results');
+    return {
+      success: true,
+      data: [],
+      processingTime: Date.now() - originalStageStart,
+      metadata: {
+        searchMethod: 'fallback_temporal_failed',
+        originalDateRange,
+        fallbackStrategiesTried: fallbackStrategies.map(s => s.name),
+        resultsCount: 0
+      }
+    };
   }
 
   /**
@@ -726,6 +952,19 @@ export class RAGPipeline {
       console.log('🔍 DEBUG: Receipt IDs in date range:', receiptIds);
 
       if (receiptIds.length === 0) {
+        console.log('🔄 No receipts found in date range for hybrid search, trying fallback...');
+        const fallbackResult = await this.executeFallbackTemporalSearch(dateRange, stageStart);
+        if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
+          console.log(`✅ Fallback temporal search found ${fallbackResult.data.length} results for hybrid query`);
+          // Update metadata to indicate this was a hybrid query with fallback
+          fallbackResult.metadata = {
+            ...fallbackResult.metadata,
+            searchMethod: 'hybrid_temporal_semantic_with_fallback',
+            originalSearchMethod: 'hybrid_temporal_semantic'
+          };
+          return fallbackResult;
+        }
+
         return {
           success: true,
           data: [],
@@ -734,7 +973,8 @@ export class RAGPipeline {
             searchMethod: 'hybrid_temporal_semantic',
             dateRange,
             receiptIdsInRange: 0,
-            semanticResults: 0
+            semanticResults: 0,
+            fallbackAttempted: true
           }
         };
       }
@@ -1376,6 +1616,51 @@ export class RAGPipeline {
     console.log('🎯 Stage 4: Result Re-ranking');
 
     try {
+      // Check if we're approaching timeout - skip re-ranking if so
+      const timeElapsed = Date.now() - this.context.startTime;
+      const MAX_PIPELINE_TIME = 75000; // 75 seconds max
+      if (timeElapsed > MAX_PIPELINE_TIME * 0.7) { // If 70% of time already used
+        console.warn('⚠️ Stage 4: Approaching timeout, skipping re-ranking for performance');
+        const fastResults = searchResults.slice(0, this.context.params.limit || 20);
+
+        this.context.metadata.reRanking = {
+          applied: false,
+          modelUsed: 'timeout-skip',
+          processingTime: 0,
+          candidatesCount: searchResults.length,
+          confidenceLevel: 'medium'
+        };
+
+        return {
+          success: true,
+          data: fastResults,
+          processingTime: Date.now() - stageStart
+        };
+      }
+
+      // Skip re-ranking for simple single-word queries to improve performance
+      const isSimpleQuery = this.context.originalQuery.trim().split(/\s+/).length === 1 &&
+                           this.context.originalQuery.length < 20;
+
+      if (isSimpleQuery && searchResults.length <= 10) {
+        console.log('⚡ Skipping re-ranking for simple query to improve performance');
+        const fastResults = searchResults.slice(0, this.context.params.limit || 20);
+
+        this.context.metadata.reRanking = {
+          applied: false,
+          modelUsed: 'simple-query-skip',
+          processingTime: 0,
+          candidatesCount: searchResults.length,
+          confidenceLevel: 'medium'
+        };
+
+        return {
+          success: true,
+          data: fastResults,
+          processingTime: Date.now() - stageStart
+        };
+      }
+
       if (searchResults.length <= 1) {
         console.log('⚠️ Skipping re-ranking - insufficient candidates');
         console.log('🔍 DEBUG: Stage 4 re-ranking bypass:', {
@@ -1414,11 +1699,19 @@ export class RAGPipeline {
 
       let reRankingResult;
       try {
-        reRankingResult = await reRankSearchResults({
+        // Add timeout protection for re-ranking
+        const RERANKING_TIMEOUT = 15000; // 15 seconds max for re-ranking
+        const reRankingPromise = reRankSearchResults({
           originalQuery: this.context.originalQuery,
           candidates: reRankingCandidates,
           maxResults: this.context.params.limit
         });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Re-ranking timeout')), RERANKING_TIMEOUT);
+        });
+
+        reRankingResult = await Promise.race([reRankingPromise, timeoutPromise]);
 
         // Validate that reRankingResult has the expected structure
         if (!reRankingResult || !reRankingResult.reRankingMetadata) {
@@ -1498,6 +1791,33 @@ export class RAGPipeline {
     try {
       // Apply additional filters if specified
       let filteredResults = this.applyAdditionalFilters(reRankedResults);
+
+      // Check if temporal filtering resulted in zero results and trigger fallback
+      const isTemporalQuery = this.context.params.temporalRouting?.isTemporalQuery;
+      const hasDateFilter = this.context.params.filters?.startDate && this.context.params.filters?.endDate;
+
+      if (isTemporalQuery && hasDateFilter && filteredResults.length === 0 && reRankedResults.length > 0) {
+        console.log('🔄 Temporal query resulted in 0 results after date filtering, triggering fallback...');
+
+        const originalDateRange = {
+          start: this.context.params.filters.startDate!,
+          end: this.context.params.filters.endDate!
+        };
+
+        const fallbackResult = await this.executeFallbackTemporalSearch(originalDateRange, stageStart);
+        if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
+          console.log(`✅ Temporal fallback found ${fallbackResult.data.length} results in Stage 5`);
+
+          // Mark this as a fallback result for response generation
+          this.context.metadata.isFallbackResult = true;
+          this.context.metadata.fallbackStrategy = fallbackResult.metadata?.fallbackStrategy;
+          this.context.metadata.originalDateRange = originalDateRange;
+          this.context.metadata.expandedDateRange = fallbackResult.metadata?.expandedDateRange;
+
+          // Use fallback results instead of empty filtered results
+          filteredResults = fallbackResult.data;
+        }
+      }
 
       // Apply final result enhancements
       const enhancedResults = await this.enhanceResults(filteredResults);
@@ -1941,6 +2261,20 @@ export class RAGPipeline {
    * Enhanced heuristics to detect potential product names
    */
   private isPotentialProductName(query: string): boolean {
+    // First check: Explicit temporal phrases that should never be considered products
+    const temporalPhrases = [
+      'last month', 'this month', 'next month', 'last week', 'this week', 'next week',
+      'last year', 'this year', 'next year', 'last quarter', 'this quarter',
+      'yesterday', 'today', 'tomorrow', 'recent', 'past month', 'past week',
+      'past year', 'current month', 'current week', 'current year'
+    ];
+
+    const queryLower = query.toLowerCase().trim();
+    if (temporalPhrases.some(phrase => queryLower.includes(phrase))) {
+      console.log('🔍 DEBUG: isPotentialProduct - TEMPORAL PHRASE DETECTED, returning false:', queryLower);
+      return false;
+    }
+
     // Common stop words that are unlikely to be product names
     const stopWords = [
       'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
@@ -1954,7 +2288,11 @@ export class RAGPipeline {
       'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
       'having', 'do', 'does', 'did', 'doing', 'will', 'would', 'could',
       'should', 'may', 'might', 'must', 'can', 'shall', 'receipt', 'receipts',
-      'transaction', 'transactions', 'purchase', 'purchases', 'expense', 'expenses'
+      'transaction', 'transactions', 'purchase', 'purchases', 'expense', 'expenses',
+      // Temporal keywords to prevent misclassification
+      'last', 'this', 'next', 'previous', 'current', 'recent', 'past', 'future',
+      'today', 'yesterday', 'tomorrow', 'week', 'month', 'year', 'day', 'time',
+      'ago', 'since', 'until', 'when', 'while', 'now', 'then', 'later', 'earlier'
     ];
 
     // Clean the query
@@ -2019,10 +2357,67 @@ export class RAGPipeline {
   }
 
   /**
+   * Execute simple search for basic queries - much faster than hybrid search
+   */
+  private async executeSimpleSearch(queryEmbedding: number[]): Promise<PipelineStageResult<UnifiedSearchResult[]>> {
+    const stageStart = Date.now();
+    console.log('⚡ Executing simple search for basic query');
+
+    try {
+      // Use a simple vector similarity search without complex CTEs
+      const { data: simpleResults, error } = await this.context.supabase
+        .from('unified_embeddings')
+        .select('*')
+        .eq('source_type', 'receipt')
+        .eq('user_id', this.context.user.id)
+        .ilike('content_text', `%${this.context.originalQuery}%`)
+        .limit(this.context.params.limit || 20);
+
+      if (error) {
+        throw new Error(`Simple search failed: ${error.message}`);
+      }
+
+      // Convert to UnifiedSearchResult format
+      const results: UnifiedSearchResult[] = (simpleResults || []).map(row => ({
+        id: row.id,
+        sourceId: row.source_id,
+        sourceType: row.source_type,
+        contentType: row.content_type,
+        title: row.metadata?.merchant || 'Unknown',
+        content: row.content_text,
+        similarity: 0.8, // Default similarity for simple search
+        metadata: row.metadata,
+        createdAt: row.created_at
+      }));
+
+      console.log(`✅ Simple search completed in ${Date.now() - stageStart}ms - Found ${results.length} results`);
+
+      return {
+        success: true,
+        data: results,
+        processingTime: Date.now() - stageStart,
+        metadata: { searchMethod: 'simple_search' }
+      };
+
+    } catch (error) {
+      console.error('❌ Simple search failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        processingTime: Date.now() - stageStart
+      };
+    }
+  }
+
+  /**
    * Create error result
    */
   private createErrorResult(message: string, error?: string): RAGPipelineResult {
     this.context.metadata.searchDuration = Date.now() - this.context.startTime;
+
+    // Add temporal routing and filters to metadata even for errors
+    this.context.metadata.temporalRouting = this.context.params.temporalRouting;
+    this.context.metadata.filters = this.context.params.filters;
 
     return {
       success: false,

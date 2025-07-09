@@ -10,10 +10,11 @@ import { VectorProcessingContext, EMBEDDING_DIMENSIONS } from '../_shared/vector
 function getAdaptiveLineItemThreshold(query: string): number {
   const trimmedQuery = query.trim().toLowerCase();
 
-  // Exact food item patterns (short, specific items)
+  // 🔧 FIX: Reduce threshold for exact food item patterns to improve recall
+  // Brand names and product names should have moderate threshold, not extremely high
   if (/^[a-zA-Z\s]{2,20}$/.test(trimmedQuery) && trimmedQuery.length <= 20) {
-    console.log('🎯 Using high precision threshold for exact food item:', trimmedQuery);
-    return 0.85; // 🔧 FIX: Much higher threshold for specific items like "yee mee" to avoid false positives
+    console.log('🎯 Using moderate precision threshold for exact food item:', trimmedQuery);
+    return 0.45; // 🔧 FIXED: Reduced from 0.85 to 0.45 for better recall on brand names like "powercat"
   }
 
   // Cross-language or mixed queries
@@ -72,7 +73,16 @@ export async function performLineItemSearch(client: any, queryEmbedding: number[
     useHybridSearch, queryEmbeddingLength: queryEmbedding.length,
     originalThreshold: similarityThreshold,
     adaptiveThreshold,
-    query: searchQuery
+    query: searchQuery,
+    thresholdSource: similarityThreshold ? 'provided' : 'adaptive'
+  });
+
+  // 🔧 DEBUG: Log threshold decision for debugging
+  console.log('🎯 Threshold decision for query "' + searchQuery + '":', {
+    adaptiveThreshold,
+    isExactFoodItem: /^[a-zA-Z\s]{2,20}$/.test(searchQuery.trim().toLowerCase()) && searchQuery.length <= 20,
+    queryLength: searchQuery.length,
+    queryPattern: searchQuery.trim().toLowerCase()
   });
 
   try {
@@ -219,6 +229,15 @@ async function performExactLineItemSearch(client: any, searchQuery: string, para
   const foodItem = extractFoodItemFromQuery(searchQuery);
 
   console.log('🎯 Performing exact line item search for:', foodItem);
+  console.log('🔍 DEBUG: Exact search parameters:', {
+    originalQuery: searchQuery,
+    extractedFoodItem: foodItem,
+    searchPattern: `%${foodItem}%`,
+    limit,
+    offset,
+    hasDateFilters: !!(startDate || endDate),
+    hasAmountFilters: !!(minAmount !== null || maxAmount !== null)
+  });
 
   // Build the SQL query for exact text matching
   let query = client
@@ -259,13 +278,26 @@ async function performExactLineItemSearch(client: any, searchQuery: string, para
 
   const { data: results, error } = await query;
 
+  console.log('🔍 DEBUG: Exact search query result:', {
+    hasError: !!error,
+    errorMessage: error?.message,
+    hasResults: !!results,
+    resultsLength: results?.length,
+    firstResult: results?.[0] ? {
+      id: results[0].id,
+      description: results[0].description,
+      amount: results[0].amount,
+      hasReceipt: !!results[0].receipts
+    } : null
+  });
+
   if (error) {
     console.error('Error in exact line item search:', error);
     throw new Error(`Exact line item search failed: ${error.message}`);
   }
 
   if (!results || results.length === 0) {
-    console.log('No exact matches found');
+    console.log('🔍 DEBUG: No exact matches found for query:', foodItem);
     return { lineItems: [], count: 0, total: 0 };
   }
 

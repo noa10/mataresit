@@ -207,6 +207,17 @@ function selectResponseStrategy(context: EnhancedResponseContext): ResponseStrat
   const hasResults = context.searchResults.length > 0;
   const resultCount = context.searchResults.length;
 
+  // Check if this is a temporal query with zero results
+  const isTemporalQuery = context.metadata?.temporalRouting?.isTemporalQuery || false;
+  const dateRange = context.metadata?.filters?.startDate && context.metadata?.filters?.endDate
+    ? { start: context.metadata.filters.startDate, end: context.metadata.filters.endDate }
+    : null;
+
+  // Check if this is a fallback temporal result
+  const isFallbackResult = hasResults && context.searchResults.some(result =>
+    result.metadata?.fallbackStrategy || result.metadata?.expandedDateRange
+  );
+
   // Base strategies for different intents
   const strategies: Record<string, ResponseStrategy> = {
     financial_analysis: {
@@ -242,9 +253,16 @@ IMPORTANT: When describing receipts in text, always use actual formatted data, n
 Search Results: {searchResults}
 Total Results: {resultCount}
 
-Present the results in an organized manner using receipt cards and data tables. When mentioning receipt details in your response text, use the actual formatted data from the search results, not template placeholders. Format dates as DD/MM/YYYY and include currency information. If no results, suggest alternative search approaches.`,
+Create a comprehensive response that includes:
+1. A concise summary highlighting key findings (total amount, date range, merchant count)
+2. Present results using receipt cards with enhanced visual design
+3. Use actual data from search results - format dates as DD/MM/YYYY and include currency
+4. If searching for specific items like "POWERCAT", mention the total count and aggregate amounts
+5. Suggest related searches or actions the user might want to take
+
+Focus on making the information scannable and actionable. Present results in an organized manner using receipt cards and data tables. If no results, provide helpful suggestions for refining the search.`,
       temperature: 0.2,
-      maxTokens: 1500,
+      maxTokens: 2000,
       includeUIComponents: true,
       includeFollowUps: true
     },
@@ -266,18 +284,103 @@ Provide executive summary, detailed breakdown, and key metrics using summary car
 
     conversational: {
       templateId: 'conversational',
-      systemPrompt: `You are Mataresit AI Assistant, engaging in natural conversation while maintaining professional expertise in financial management.
+      systemPrompt: `You are Mataresit AI Assistant. Provide conversational, concise responses that are friendly and direct.
 
-IMPORTANT: When describing receipts or financial data in text, always use actual formatted data, never use template placeholders like {{date}} or {{amount}}. Format dates as DD/MM/YYYY for Malaysian context and include proper currency symbols (MYR/USD).`,
-      userPromptTemplate: `Respond naturally to: "{query}"
+RESPONSE STYLE REQUIREMENTS:
+- Start with a friendly, direct confirmation (e.g., "I found X receipts matching...")
+- Keep initial message very short and scannable
+- Summarize common patterns (same merchant, same item, price range)
+- End with a simple question: "What would you like to do?"
+- Use actual data, never template placeholders like {{date}} or {{amount}}
+- Format dates as DD/MM/YYYY and currency as MYR
 
+EXAMPLE GOOD RESPONSE:
+"I found 7 receipts matching "powercat", all from SUPER SEVEN CASH & CARRY.
+They are all for POWERCAT 1.3KG at MYR 17.90.
+What would you like to do?"
+
+AVOID:
+- Long detailed explanations in the initial response
+- Repetitive information
+- Complex tables or lists in text
+- Template placeholders`,
+      userPromptTemplate: `Respond to: "{query}"
+
+Search Results: {searchResults}
 Context: {conversationHistory}
-Available data: {searchResults}
 
-Engage naturally while providing helpful information and suggestions. When mentioning specific receipts or amounts, use the actual formatted data from the search results, not template placeholders. Format dates as DD/MM/YYYY and include currency information.`,
-      temperature: 0.6,
-      maxTokens: 1200,
+Generate a conversational, concise response following the style requirements above.`,
+      temperature: 0.4,
+      maxTokens: 300,
       includeUIComponents: false,
+      includeFollowUps: true
+    },
+
+    temporal_empty: {
+      templateId: 'temporal_empty',
+      systemPrompt: `You are Mataresit AI Assistant. When temporal queries return no results, provide helpful guidance about the date range searched and suggest alternatives.
+
+RESPONSE STYLE REQUIREMENTS:
+- Acknowledge the specific time period searched (e.g., "No receipts found for June 2025")
+- Explain the exact date range that was searched (format dates as DD/MM/YYYY)
+- Provide context about why this might happen (e.g., "This was before you started using Mataresit" or "You might not have uploaded receipts for this period")
+- Suggest 3-4 specific alternative time periods that are likely to have data
+- Offer to search broader time ranges automatically
+- Keep the tone helpful, understanding, and solution-oriented
+- Be concise but comprehensive
+
+EXAMPLE GOOD RESPONSE:
+"No receipts found for June 2025 (01/06/2025 - 30/06/2025). This might be because you didn't upload receipts for this period or started using Mataresit later.
+
+Here are some alternatives to try:
+• "This month" - for July 2025 receipts
+• "Last 30 days" - for your most recent receipts
+• "Recent receipts" - for your latest uploads
+• "Last 3 months" - for a broader search
+
+Would you like me to automatically search a broader time period?"`,
+      userPromptTemplate: `The user searched for: "{query}"
+
+Date range searched: {dateRange}
+Search Results: {searchResults} (empty)
+
+Provide a helpful and understanding response explaining that no receipts were found for the specific time period. Include the exact date range searched and provide specific, actionable suggestions for alternative searches. Consider that the user might be new to the app or might not have receipts for that specific period.`,
+      temperature: 0.3,
+      maxTokens: 500,
+      includeUIComponents: false,
+      includeFollowUps: true
+    },
+
+    temporal_fallback: {
+      templateId: 'temporal_fallback',
+      systemPrompt: `You are Mataresit AI Assistant. When temporal queries use fallback search with expanded date ranges, inform the user about the expanded search and present the results clearly.
+
+RESPONSE STYLE REQUIREMENTS:
+- Start with a clear explanation of what happened: "No receipts found for [original period], so I expanded the search..."
+- Explain the fallback strategy used in user-friendly terms (e.g., "last 2 months" instead of "last_2_months")
+- Show both the original and expanded date ranges (format dates as DD/MM/YYYY)
+- Present the results clearly with receipt cards showing merchant, amount, and date
+- Mention the total count and date range of found results
+- Keep the tone helpful and transparent about the search expansion
+- Use actual data from search results, never template placeholders
+
+EXAMPLE GOOD RESPONSE:
+"No receipts found for June 2025 (01/06/2025 - 30/06/2025), so I expanded the search to the last 3 months and found 5 receipts from April-July 2025.
+
+Here are your receipts from the expanded search (01/04/2025 - 31/07/2025):"`,
+      userPromptTemplate: `The user searched for: "{query}"
+
+Original date range: {originalDateRange} (no results)
+Expanded search found results using: {expandedDateRange}
+Fallback strategy: {fallbackStrategy}
+Total results found: {resultCount}
+
+Search Results: {searchResults}
+
+Explain clearly that the original search was expanded, mention the fallback strategy in user-friendly terms, show both date ranges, and present the results with actual data. Be transparent about the search expansion while keeping the tone positive and helpful.`,
+      temperature: 0.3,
+      maxTokens: 700,
+      includeUIComponents: true,
       includeFollowUps: true
     }
   };
@@ -285,8 +388,18 @@ Engage naturally while providing helpful information and suggestions. When menti
   // Get base strategy or default to general
   let strategy = strategies[intent] || strategies.conversational;
 
+  // Special handling for temporal queries with fallback results
+  if (hasResults && isTemporalQuery && isFallbackResult) {
+    console.log('🕐 Using temporal_fallback strategy for fallback temporal results');
+    strategy = strategies.temporal_fallback;
+  }
+  // Special handling for temporal queries with no results
+  else if (!hasResults && isTemporalQuery && dateRange) {
+    console.log('🕐 Using temporal_empty strategy for zero results temporal query');
+    strategy = strategies.temporal_empty;
+  }
   // Adjust strategy based on results
-  if (!hasResults && intent === 'document_retrieval') {
+  else if (!hasResults && intent === 'document_retrieval') {
     strategy = {
       ...strategy,
       systemPrompt: strategy.systemPrompt + `\n\nIMPORTANT: No results found. Focus on helping the user refine their search and suggesting alternatives.`,
@@ -330,7 +443,43 @@ function buildEnhancedPrompt(
 
   // Build user prompt with context substitution
   let userPrompt = strategy.userPromptTemplate;
-  
+
+  // Format date range for temporal queries
+  let dateRangeText = '';
+  let originalDateRangeText = '';
+  let expandedDateRangeText = '';
+  let fallbackStrategy = '';
+
+  if (context.metadata?.filters?.startDate && context.metadata?.filters?.endDate) {
+    const startDate = new Date(context.metadata.filters.startDate);
+    const endDate = new Date(context.metadata.filters.endDate);
+    const formatDate = (date: Date) => date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+    dateRangeText = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  }
+
+  // Check for fallback information in search results
+  const fallbackResult = context.searchResults.find(result =>
+    result.metadata?.fallbackStrategy || result.metadata?.expandedDateRange
+  );
+
+  if (fallbackResult?.metadata) {
+    if (fallbackResult.metadata.originalDateRange) {
+      const origStart = new Date(fallbackResult.metadata.originalDateRange.start);
+      const origEnd = new Date(fallbackResult.metadata.originalDateRange.end);
+      const formatDate = (date: Date) => date.toLocaleDateString('en-GB');
+      originalDateRangeText = `${formatDate(origStart)} - ${formatDate(origEnd)}`;
+    }
+
+    if (fallbackResult.metadata.expandedDateRange) {
+      const expStart = new Date(fallbackResult.metadata.expandedDateRange.start);
+      const expEnd = new Date(fallbackResult.metadata.expandedDateRange.end);
+      const formatDate = (date: Date) => date.toLocaleDateString('en-GB');
+      expandedDateRangeText = `${formatDate(expStart)} - ${formatDate(expEnd)}`;
+    }
+
+    fallbackStrategy = fallbackResult.metadata.fallbackStrategy || '';
+  }
+
   const substitutions = {
     query: context.originalQuery,
     searchResults: JSON.stringify(context.searchResults.slice(0, 10), null, 2),
@@ -338,7 +487,11 @@ function buildEnhancedPrompt(
     queryClassification: JSON.stringify(context.preprocessResult.queryClassification),
     conversationHistory: context.conversationHistory?.slice(-3).join('\n') || '',
     intent: context.preprocessResult.intent,
-    extractedEntities: JSON.stringify(context.preprocessResult.extractedEntities)
+    extractedEntities: JSON.stringify(context.preprocessResult.extractedEntities),
+    dateRange: dateRangeText,
+    originalDateRange: originalDateRangeText,
+    expandedDateRange: expandedDateRangeText,
+    fallbackStrategy: fallbackStrategy
   };
 
   Object.entries(substitutions).forEach(([key, value]) => {
@@ -408,12 +561,14 @@ async function generateUIComponents(
         component: 'receipt_card',
         data: {
           receipt_id: result.sourceId,
-          merchant: result.metadata?.merchant || 'Unknown Merchant',
-          total: result.metadata?.total || 0,
+          merchant: result.metadata?.merchant || result.title || 'Unknown Merchant',
+          total: result.metadata?.total || result.metadata?.amount || 0,
           currency: result.metadata?.currency || 'MYR',
-          date: result.metadata?.date || new Date().toISOString().split('T')[0],
-          category: result.metadata?.category,
-          confidence: result.similarity || 0.8
+          date: result.metadata?.date || result.createdAt || new Date().toISOString().split('T')[0],
+          category: result.metadata?.category || result.metadata?.predicted_category,
+          confidence: result.similarity || 0.8,
+          line_items_count: result.metadata?.line_items_count,
+          tags: result.metadata?.tags || []
         },
         metadata: {
           title: 'Receipt Card',
@@ -424,6 +579,19 @@ async function generateUIComponents(
     });
 
     console.log(`🎯 Generated ${receiptResults.length} receipt cards for intent: ${intent}`);
+
+    // Add enhanced summary metadata for better presentation
+    if (receiptResults.length > 0) {
+      const summaryData = generateSearchSummary(receiptResults, context.originalQuery);
+
+      // Add summary as metadata to the first component for the frontend to use
+      if (components.length > 0) {
+        components[0].metadata = {
+          ...components[0].metadata,
+          searchSummary: summaryData
+        };
+      }
+    }
   }
 
   if (intent === 'financial_analysis' && searchResults.length > 0) {
@@ -453,6 +621,19 @@ async function generateUIComponents(
  * Generate follow-up suggestions
  */
 async function generateFollowUpSuggestions(context: EnhancedResponseContext): Promise<string[]> {
+  // Special suggestions for temporal queries with no results
+  const isTemporalQuery = context.metadata?.temporalRouting?.isTemporalQuery || false;
+  const hasResults = context.searchResults.length > 0;
+
+  if (isTemporalQuery && !hasResults) {
+    return [
+      "Show me this month's receipts",
+      "Find recent receipts",
+      "Search last 30 days",
+      "Show all my receipts"
+    ];
+  }
+
   // Use the contextual hints from preprocessing if available
   if (context.preprocessResult.contextualHints.length > 0) {
     return context.preprocessResult.contextualHints.slice(0, 3);
@@ -493,9 +674,10 @@ function determineResponseType(
 ): 'success' | 'partial' | 'empty' | 'error' {
   const hasResults = context.searchResults.length > 0;
   const hasContent = parsedResponse.content && parsedResponse.content.trim().length > 0;
+  const isTemporalQuery = context.metadata?.temporalRouting?.isTemporalQuery || false;
 
   if (!hasContent) return 'error';
-  if (!hasResults && context.preprocessResult.intent === 'document_retrieval') return 'empty';
+  if (!hasResults && (context.preprocessResult.intent === 'document_retrieval' || isTemporalQuery)) return 'empty';
   if (hasResults && context.searchResults.length < 3) return 'partial';
   return 'success';
 }
@@ -610,5 +792,35 @@ function generateFallbackResponse(context: EnhancedResponseContext): EnhancedRes
       processingTime: 0,
       modelUsed: 'fallback'
     }
+  };
+}
+
+/**
+ * Generate enhanced summary data for search results
+ */
+function generateSearchSummary(results: any[], query: string) {
+  const totalAmount = results.reduce((sum, r) => sum + (r.metadata?.total || 0), 0);
+  const merchants = new Set(results.map(r => r.metadata?.merchant || r.title).filter(Boolean));
+  const dates = results
+    .map(r => r.metadata?.date || r.createdAt)
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .filter(d => !isNaN(d.getTime()));
+
+  const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+  const latestDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+  return {
+    query,
+    totalResults: results.length,
+    totalAmount,
+    currency: results[0]?.metadata?.currency || 'MYR',
+    merchantCount: merchants.size,
+    topMerchants: Array.from(merchants).slice(0, 3),
+    dateRange: {
+      earliest: earliestDate?.toISOString(),
+      latest: latestDate?.toISOString()
+    },
+    avgAmount: results.length > 0 ? totalAmount / results.length : 0
   };
 }

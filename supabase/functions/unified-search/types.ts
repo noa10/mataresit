@@ -95,6 +95,11 @@ export interface SearchMetadata {
   };
   uiComponents?: UIComponent[];
   uiComponentsGenerated?: boolean;
+  // Temporal fallback metadata
+  isFallbackResult?: boolean;
+  fallbackStrategy?: string;
+  originalDateRange?: { start: string; end: string };
+  expandedDateRange?: { start: string; end: string };
 }
 
 // UI Component types for actionable chat interface

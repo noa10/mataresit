@@ -61,6 +61,10 @@ export async function enhancedQueryPreprocessing(
     const prompt = `
 You are an expert query analysis system for a Malaysian receipt management platform. Analyze the user's query and provide comprehensive preprocessing information.
 
+CRITICAL INTENT CLASSIFICATION RULE:
+- If the query asks for "receipts" or "transactions" (like "show me receipts", "find receipts", "get receipts"), classify as "document_retrieval"
+- If the query asks about spending amounts or analysis (like "how much", "spending trends", "analyze"), classify as "financial_analysis"
+
 Original Query: "${query}"${conversationContext}${profileContext}
 
 Provide a JSON response with this exact structure:
@@ -98,14 +102,21 @@ Provide a JSON response with this exact structure:
 }
 
 Intent Classification Guidelines:
-• financial_analysis: Spending patterns, trends, budgets, category analysis, merchant frequency, anomalies
-• document_retrieval: Finding specific receipts, transactions, documents by merchant/date/amount
+• financial_analysis: ONLY for spending analysis, trends, budgets, category analysis, merchant frequency, anomalies. Use when user wants to ANALYZE spending behavior or get INSIGHTS.
+• document_retrieval: Finding specific receipts, transactions, documents. Use when user asks for "receipts", "transactions", "show me", "find", "get", "list" with ANY filters including time periods.
 • summarization: Requesting summaries, overviews, reports, monthly/yearly breakdowns
 • comparison: Comparing periods, categories, merchants, or data sets side-by-side
 • help_guidance: How-to questions, feature explanations, getting started, tutorials
 • conversational: Greetings, casual chat, follow-up questions, clarifications
 • data_analysis: Statistical analysis, correlations, pattern detection, data exploration
 • general_search: Broad exploration, unclear intent, multiple possible interpretations
+
+CRITICAL RULE: ANY query asking for "receipts" or "transactions" (regardless of time period) = document_retrieval
+CRITICAL RULE: Questions about "how much", "spending", "analysis", "trends" = financial_analysis
+
+Examples:
+• document_retrieval: "Show me all receipts from last month", "Find receipts from this week", "Get my transactions from June", "receipts from last month", "all receipts last month"
+• financial_analysis: "How much did I spend last month?", "What are my spending trends?", "Analyze my monthly expenses", "spending patterns"
 
 Query Classification:
 • Complexity: simple (single concept), moderate (2-3 concepts), complex (multiple concepts/conditions)

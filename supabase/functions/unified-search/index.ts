@@ -955,21 +955,28 @@ serve(async (req: Request) => {
 
     const useEnhancedPrompting = body.useEnhancedPrompting || false;
 
-    // ENHANCED FIX: Force enhanced search for line item queries
+    // ENHANCED FIX: Force enhanced search for line item queries and temporal queries
     const isLineItemQuery = body.query && isLineItemQueryDetection(body.query);
-    const forceEnhanced = useEnhancedPrompting || isLineItemQuery;
+
+    // Check if this is a temporal query that needs enhanced search for fallback logic
+    // Simple check for temporal keywords to avoid async complexity
+    const isTemporalQuery = body.query && /\b(last|this|yesterday|today|ago|from|since|until|before|after|month|week|day|year)\b/i.test(body.query);
+
+    const forceEnhanced = useEnhancedPrompting || isLineItemQuery || isTemporalQuery;
 
     console.log('🔍 DEBUG: Request routing decision:', {
       useEnhancedPrompting: body.useEnhancedPrompting,
       useEnhancedPromptingResolved: useEnhancedPrompting,
       isLineItemQuery,
+      isTemporalQuery,
       forceEnhanced,
       bodyKeys: Object.keys(body),
       query: body.query
     });
 
     if (forceEnhanced) {
-      console.log('🚀 ROUTING: Taking enhanced search path (forced for line item query)');
+      const reason = isLineItemQuery ? 'line item query' : isTemporalQuery ? 'temporal query' : 'enhanced prompting';
+      console.log(`🚀 ROUTING: Taking enhanced search path (forced for ${reason})`);
       return await handleEnhancedSearch(req, body);
     } else {
       console.log('🚀 ROUTING: Taking regular search path');
