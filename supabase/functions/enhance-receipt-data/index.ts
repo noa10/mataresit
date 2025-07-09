@@ -133,7 +133,7 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   },
   'gemini-2.5-flash-lite-preview-06-17': {
     id: 'gemini-2.5-flash-lite-preview-06-17',
-    name: 'Gemini 2.5 Flash Lite Preview',
+    name: 'Gemini 2.5 Flash Lite Preview (Deprecated)',
     provider: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite-preview-06-17:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
@@ -141,7 +141,7 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     maxTokens: 64000,
     supportsText: true,
     supportsVision: true,
-    description: 'Preview version of Gemini 2.5 Flash Lite optimized for cost-effectiveness',
+    description: '⚠️ DEPRECATED: This model is currently unavailable. Automatically falls back to Gemini 2.5 Flash.',
     pricing: {
       inputTokens: 0.075,
       outputTokens: 0.30
@@ -149,7 +149,7 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     performance: {
       speed: 'fast',
       accuracy: 'very-good',
-      reliability: 0.92
+      reliability: 0.50 // Reduced reliability due to availability issues
     },
     capabilities: {
       maxImageSize: 5 * 1024 * 1024, // 5MB
@@ -619,7 +619,7 @@ async function callAIModel(
   modelId: string,
   receiptId: string,
   logger: ProcessingLogger
-): Promise<any> {
+): Promise<{ result: any; modelUsed: string }> {
   const modelSelectionStart = Date.now();
 
   // Enhanced model selection logging with timing
@@ -727,7 +727,7 @@ async function callAIModel(
     const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
     await logger.log(`✅ Provider call completed in ${providerCallDuration.toFixed(2)} seconds`, "AI");
 
-    return result;
+    return { result, modelUsed: modelConfig.id };
   } catch (error) {
     const providerCallEnd = Date.now();
     const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
@@ -735,6 +735,80 @@ async function callAIModel(
     await logger.log(`❌ Provider call failed after ${providerCallDuration.toFixed(2)} seconds: ${errorMessage}`, "ERROR");
     throw error;
   }
+}
+
+/**
+ * Parse bounding box format response from Gemini 2.5 Flash Lite Preview
+ * Note: This format provides structure but lacks actual text content
+ */
+async function parseBoundingBoxFormat(boundingBoxData: any[], logger: ProcessingLogger): Promise<any> {
+  await logger.log(`📦 Processing ${boundingBoxData.length} bounding box elements`, "AI");
+  await logger.log(`⚠️ LIMITATION: Bounding box format detected - structure available but text content missing`, "ERROR");
+
+  // Group elements by label for analysis
+  const elementsByLabel: { [key: string]: any[] } = {};
+  boundingBoxData.forEach(element => {
+    if (!elementsByLabel[element.label]) {
+      elementsByLabel[element.label] = [];
+    }
+    elementsByLabel[element.label].push(element);
+  });
+
+  const detectedLabels = Object.keys(elementsByLabel);
+  await logger.log(`🏷️ Detected ${detectedLabels.length} unique labels: ${detectedLabels.join(', ')}`, "AI");
+
+  // Create a structured response indicating what was detected
+  const result = {
+    merchant: elementsByLabel.store_name ? 'Store detected (text extraction needed)' : '',
+    date: elementsByLabel.date ? new Date().toISOString().split('T')[0] : '',
+    total: 0, // Cannot extract actual values without text content
+    tax: 0,
+    currency: 'MYR',
+    payment_method: elementsByLabel.payment_method ? 'Payment method detected' : '',
+    predicted_category: 'Other',
+    line_items: [] as any[],
+    confidence: {
+      merchant: elementsByLabel.store_name ? 50 : 0, // Lower confidence due to missing text
+      date: elementsByLabel.date ? 50 : 0,
+      total: 0,
+      tax: 0,
+      currency: 50,
+      payment_method: elementsByLabel.payment_method ? 50 : 0,
+      predicted_category: 30,
+      line_items: 0
+    },
+    // Add metadata about the bounding box detection
+    bounding_box_metadata: {
+      format_detected: 'gemini_2.5_bounding_box',
+      total_elements: boundingBoxData.length,
+      unique_labels: detectedLabels.length,
+      detected_labels: detectedLabels,
+      requires_text_extraction: true
+    }
+  };
+
+  // Create placeholder line items based on detected item descriptions
+  if (elementsByLabel.item_description) {
+    const itemCount = elementsByLabel.item_description.length;
+    for (let i = 0; i < Math.min(itemCount, 3); i++) {
+      result.line_items.push({
+        description: `Item ${i + 1} (structure detected)`,
+        amount: 0 // Cannot extract actual price without text content
+      });
+    }
+    await logger.log(`📦 Created ${result.line_items.length} placeholder line items`, "AI");
+  }
+
+  // Predict category based on structure
+  if (elementsByLabel.item_description && elementsByLabel.item_description.length > 3) {
+    result.predicted_category = 'Groceries';
+    result.confidence.predicted_category = 60;
+  }
+
+  await logger.log(`✅ Bounding box analysis complete - structure detected but text extraction needed`, "AI");
+  await logger.log(`💡 RECOMMENDATION: Use traditional JSON format or implement OCR text extraction`, "AI");
+
+  return result;
 }
 
 /**
@@ -882,6 +956,8 @@ Return your findings in the following JSON format:
           {
             text: `You are an AI assistant specialized in analyzing receipt images with expertise in Malaysian business terminology and Malay language.
 
+IMPORTANT: Please provide TEXT EXTRACTION and DATA ANALYSIS, not bounding box coordinates or structural markup. Return actual extracted text values in JSON format.
+
 Please examine this receipt image and extract the following information:
 1. MERCHANT name (store or business name) - recognize Malaysian business chains and local establishments
 2. DATE of purchase (in YYYY-MM-DD format) - handle DD/MM/YYYY format common in Malaysia
@@ -980,7 +1056,9 @@ Return your findings in the following JSON format:
     "spending_patterns": "Confidence score 0-100 for spending patterns",
     "line_items": "Confidence score 0-100"
   }
-}`
+}
+
+CRITICAL INSTRUCTION: Return ONLY the JSON object above with actual extracted text values. Do NOT return bounding box coordinates, structural markup, or any other format. Extract and return the actual text content from the receipt image.`
           },
           {
             inlineData: {
@@ -1052,12 +1130,23 @@ Return your findings in the following JSON format:
       await logger.log(`🔑 AUTH ERROR: Check GEMINI_API_KEY in environment variables`, "ERROR");
     } else if (response.status === 400) {
       await logger.log(`📝 REQUEST ERROR: Invalid payload or model configuration`, "ERROR");
+    } else if (response.status === 404 && modelConfig.id === 'gemini-2.5-flash-lite-preview-06-17') {
+      // Specific handling for the problematic model
+      await logger.log(`🔄 MODEL UNAVAILABLE: ${modelConfig.id} is not available`, "ERROR");
+      await logger.log(`💡 AUTOMATIC FALLBACK: Switching to gemini-2.5-flash`, "ERROR");
+
+      // Use fallback model
+      const fallbackModelConfig = AVAILABLE_MODELS['gemini-2.5-flash'];
+      if (fallbackModelConfig) {
+        await logger.log(`🚀 FALLBACK ATTEMPT: Retrying with ${fallbackModelConfig.name}`, "AI");
+        return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
+      }
     }
 
     throw new Error(`Failed to process with Gemini API: ${response.status} ${response.statusText}`);
   }
 
-  // Enhanced response parsing
+  // Enhanced response parsing with model-specific handling
   const responseParsingStart = Date.now();
   const geminiResponse = await response.json();
   const responseParsingEnd = Date.now();
@@ -1065,45 +1154,223 @@ Return your findings in the following JSON format:
 
   await logger.log(`✅ Response received and parsed in ${responseParsingDuration.toFixed(3)} seconds`, "AI");
 
-  // Log response metadata
+  // Log response metadata with model-specific information
   const candidatesCount = geminiResponse.candidates?.length || 0;
-  await logger.log(`📊 Response metadata: ${candidatesCount} candidate(s)`, "AI");
+  await logger.log(`📊 Response metadata: ${candidatesCount} candidate(s) from ${modelConfig.id}`, "AI");
 
-  if (candidatesCount > 0) {
-    const firstCandidate = geminiResponse.candidates[0];
-    const contentLength = firstCandidate?.content?.parts?.[0]?.text?.length || 0;
-    await logger.log(`📝 Content length: ${contentLength} characters`, "AI");
+  if (candidatesCount === 0) {
+    await logger.log(`❌ CRITICAL: No candidates in response from ${modelConfig.id}`, "ERROR");
+    await logger.log(`📄 Full response: ${JSON.stringify(geminiResponse, null, 2)}`, "ERROR");
+    throw new Error(`No candidates in Gemini response from ${modelConfig.id}`);
   }
 
-  // Parse the response
+  const firstCandidate = geminiResponse.candidates[0];
+
+  // Check for finish reason issues
+  if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
+    await logger.log(`⚠️ WARNING: Unusual finish reason: ${firstCandidate.finishReason}`, "ERROR");
+  }
+
+  // Validate response structure
+  if (!firstCandidate.content || !firstCandidate.content.parts || !firstCandidate.content.parts[0]) {
+    await logger.log(`❌ CRITICAL: Invalid response structure from ${modelConfig.id}`, "ERROR");
+    await logger.log(`📄 Candidate structure: ${JSON.stringify(firstCandidate, null, 2)}`, "ERROR");
+    throw new Error(`Invalid response structure from ${modelConfig.id}`);
+  }
+
+  const contentLength = firstCandidate.content.parts[0].text?.length || 0;
+  await logger.log(`📝 Content length: ${contentLength} characters`, "AI");
+
+  if (contentLength === 0) {
+    await logger.log(`❌ CRITICAL: Empty response text from ${modelConfig.id}`, "ERROR");
+    throw new Error(`Empty response text from ${modelConfig.id}`);
+  }
+
+  // Parse the response with enhanced error handling
   try {
     // Extract the text content from Gemini response
     const responseText = geminiResponse.candidates[0].content.parts[0].text;
     console.log(`🔍 Full Gemini response text:`, responseText);
     await logger.log("Parsing Gemini response", "AI");
+    await logger.log(`📝 Response length: ${responseText.length} characters`, "AI");
 
-    // Extract JSON from the response (handle case where other text might be included)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
+    // Enhanced parsing with support for multiple response formats
+    let enhancedData = null;
+    let jsonStr = null;
+    let parseMethod = '';
 
-    if (!jsonStr) {
-      console.error('No valid JSON found in Gemini response');
-      await logger.log("No valid JSON found in Gemini response", "ERROR");
-      return {};
+    // Strategy 1: Check for bounding box format (Gemini 2.5 Flash Lite Preview format)
+    try {
+      const boundingBoxData = JSON.parse(responseText.trim());
+      if (Array.isArray(boundingBoxData) && boundingBoxData.length > 0 && boundingBoxData[0].box_2d && boundingBoxData[0].label) {
+        await logger.log("🎯 CRITICAL: Detected bounding box format from Gemini 2.5 Flash Lite Preview", "ERROR");
+        await logger.log("🔄 FALLBACK REQUIRED: This format lacks text content needed for data extraction", "ERROR");
+
+        // This format is not suitable for our needs - trigger fallback
+        const fallbackModelConfig = AVAILABLE_MODELS['gemini-2.5-flash'];
+        if (fallbackModelConfig) {
+          await logger.log(`🚀 AUTOMATIC FALLBACK: Switching to ${fallbackModelConfig.name} due to incompatible response format`, "AI");
+          return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
+        } else {
+          // If no fallback available, parse what we can
+          enhancedData = await parseBoundingBoxFormat(boundingBoxData, logger);
+          parseMethod = 'bounding-box-fallback';
+        }
+      }
+    } catch (e) {
+      // Not bounding box format, continue to other strategies
     }
 
-    // Parse the JSON data
-    const enhancedData = JSON.parse(jsonStr);
+    // Strategy 2: Try to find JSON block with code fences
+    if (!enhancedData) {
+      const codeBlockMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+        parseMethod = 'code-block';
+        await logger.log("Found JSON in code block", "AI");
+      }
+    }
+
+    // Strategy 3: Try to find JSON object (original method)
+    if (!jsonStr && !enhancedData) {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+        parseMethod = 'regex-match';
+        await logger.log("Found JSON using regex", "AI");
+      }
+    }
+
+    // Strategy 4: Try to parse the entire response as JSON (traditional format)
+    if (!jsonStr && !enhancedData) {
+      try {
+        enhancedData = JSON.parse(responseText.trim());
+        parseMethod = 'direct-parse';
+        await logger.log("Parsed entire response as JSON", "AI");
+      } catch (e) {
+        // Continue to next strategy
+      }
+    }
+
+    // Strategy 5: Look for JSON-like content with more flexible regex
+    if (!jsonStr && !enhancedData) {
+      const flexibleMatch = responseText.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+      if (flexibleMatch) {
+        jsonStr = flexibleMatch[0];
+        parseMethod = 'flexible-regex';
+        await logger.log("Found JSON using flexible regex", "AI");
+      }
+    }
+
+    // Parse the JSON if we found a string to parse
+    if (jsonStr && !enhancedData) {
+      try {
+        enhancedData = JSON.parse(jsonStr);
+        await logger.log(`✅ JSON parsed successfully using ${parseMethod}`, "AI");
+      } catch (parseError) {
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        await logger.log(`❌ JSON parse error with ${parseMethod}: ${errorMessage}`, "ERROR");
+        await logger.log(`📄 Failed JSON string: ${jsonStr.substring(0, 200)}...`, "ERROR");
+      }
+    }
+
+    // If all parsing strategies failed
+    if (!enhancedData) {
+      console.error('No valid JSON found in Gemini response after all strategies');
+      await logger.log("❌ CRITICAL: No valid JSON found after all parsing strategies", "ERROR");
+      await logger.log(`📄 Raw response preview: ${responseText.substring(0, 500)}...`, "ERROR");
+
+      // Return a structured empty response instead of empty object
+      return {
+        merchant: '',
+        date: '',
+        total: 0,
+        tax: 0,
+        currency: 'MYR',
+        payment_method: '',
+        predicted_category: 'Other',
+        line_items: [],
+        confidence: {
+          merchant: 0,
+          date: 0,
+          total: 0,
+          tax: 0,
+          currency: 50,
+          payment_method: 0,
+          predicted_category: 0,
+          line_items: 0
+        },
+        parsing_error: 'Failed to extract JSON from model response'
+      };
+    }
+
+    // Validate and normalize the parsed data
+    await logger.log("🔍 Validating extracted data", "AI");
+
+    // Ensure all required fields exist with proper defaults
+    const validatedData = {
+      merchant: enhancedData.merchant || '',
+      date: enhancedData.date || '',
+      total: parseFloat(enhancedData.total) || 0,
+      tax: parseFloat(enhancedData.tax) || 0,
+      currency: enhancedData.currency || 'MYR',
+      payment_method: enhancedData.payment_method || '',
+      predicted_category: enhancedData.predicted_category || 'Other',
+      line_items: Array.isArray(enhancedData.line_items) ? enhancedData.line_items : [],
+      confidence: enhancedData.confidence || {}
+    };
+
+    // Ensure confidence object has all required fields
+    if (!validatedData.confidence || typeof validatedData.confidence !== 'object') {
+      validatedData.confidence = {};
+    }
+
+    const defaultConfidence = {
+      merchant: 0,
+      date: 0,
+      total: 0,
+      tax: 0,
+      currency: 50,
+      payment_method: 0,
+      predicted_category: 0,
+      line_items: 0
+    };
+
+    validatedData.confidence = { ...defaultConfidence, ...validatedData.confidence };
 
     // Set default MYR currency if not found by Gemini
     if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      if (!enhancedData.confidence) enhancedData.confidence = {};
-      enhancedData.confidence.currency = 50; // medium confidence for default
+      validatedData.currency = 'MYR';
+      validatedData.confidence.currency = 50; // medium confidence for default
       await logger.log("Using default currency: MYR", "AI");
     } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
+      await logger.log(`Detected currency: ${validatedData.currency}`, "AI");
     }
+
+    // Validate that we extracted meaningful data
+    const hasData = validatedData.merchant || validatedData.total > 0 || validatedData.date ||
+                   (validatedData.line_items && validatedData.line_items.length > 0);
+
+    if (!hasData) {
+      await logger.log("⚠️ WARNING: No meaningful data extracted from receipt", "ERROR");
+      await logger.log(`📊 Data summary: merchant='${validatedData.merchant}', total=${validatedData.total}, date='${validatedData.date}', items=${validatedData.line_items.length}`, "ERROR");
+
+      // Special handling for problematic models - attempt fallback if no data extracted
+      if (modelConfig.id === 'gemini-2.5-flash-lite-preview-06-17') {
+        await logger.log(`🔄 EMPTY DATA FALLBACK: ${modelConfig.id} returned no data, trying fallback`, "ERROR");
+
+        const fallbackModelConfig = AVAILABLE_MODELS['gemini-2.5-flash'];
+        if (fallbackModelConfig) {
+          await logger.log(`🚀 FALLBACK ATTEMPT: Retrying with ${fallbackModelConfig.name} due to empty data`, "AI");
+          return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
+        }
+      }
+    } else {
+      await logger.log("✅ Meaningful data extracted successfully", "AI");
+    }
+
+    // Replace enhancedData with validatedData for the rest of the function
+    enhancedData = validatedData;
 
     // Log final processing results
     const providerCallEnd = Date.now();
@@ -1439,8 +1706,11 @@ async function enhanceReceiptData(
   input: AIModelInput,
   modelId: string,
   receiptId: string
-) {
+): Promise<{ data: any; modelUsed: string }> {
   const logger = new ProcessingLogger(receiptId);
+
+  // Use the specified model or default based on input type
+  const modelToUse = modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL);
 
   try {
     const enhanceStartTime = Date.now();
@@ -1451,15 +1721,15 @@ async function enhanceReceiptData(
 
     await logger.log(`Starting ${modelId || 'AI'} processing`, "AI");
 
-    // Use the specified model or default based on input type
-    const modelToUse = modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL);
     console.log(`🔍 Model to use: ${modelToUse}`);
     await logger.log(`Using model: ${modelToUse}`, "AI");
 
     // Call the appropriate AI model
     console.log(`🔍 Calling AI model: ${modelToUse}`);
     const aiCallStartTime = Date.now();
-    const enhancedData = await callAIModel(input, modelToUse, receiptId, logger);
+    const aiResult = await callAIModel(input, modelToUse, receiptId, logger);
+    const enhancedData = aiResult.result;
+    const actualModelUsed = aiResult.modelUsed;
     const aiCallEndTime = Date.now();
     const aiCallDuration = (aiCallEndTime - aiCallStartTime) / 1000;
 
@@ -1516,12 +1786,12 @@ async function enhanceReceiptData(
     }
 
     await logger.log("AI processing complete", "AI");
-    return enhancedData;
+    return { data: enhancedData, modelUsed: actualModelUsed };
   } catch (error) {
     console.error("Error in enhanceReceiptData:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     await logger.log(`Error in AI enhancement: ${errorMessage}`, "ERROR");
-    return {}; // Return empty object on error to avoid breaking the flow
+    return { data: {}, modelUsed: modelToUse }; // Return empty object on error to avoid breaking the flow
   }
 }
 
@@ -1658,15 +1928,16 @@ serve(async (req) => {
     }
 
     // Process the receipt data with AI
-    const enhancedData = await enhanceReceiptData(input, modelId, receiptId);
+    const enhancementResult = await enhanceReceiptData(input, modelId, receiptId);
     console.log("Data enhancement complete");
 
     // Return the enhanced data
     return new Response(
       JSON.stringify({
         success: true,
-        result: enhancedData,
-        model_used: modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL)
+        result: enhancementResult.data,
+        model_used: enhancementResult.modelUsed,
+        model_requested: modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL)
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
