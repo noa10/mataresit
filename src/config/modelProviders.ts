@@ -118,7 +118,7 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   },
   'gemini-2.5-flash-lite-preview-06-17': {
     id: 'gemini-2.5-flash-lite-preview-06-17',
-    name: 'Gemini 2.5 Flash Lite Preview',
+    name: 'Gemini 2.5 Flash Lite Preview (Deprecated)',
     provider: 'gemini',
     endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite-preview-06-17:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
@@ -126,7 +126,7 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     maxTokens: 64000,
     supportsText: true,
     supportsVision: true,
-    description: 'Preview version of Gemini 2.5 Flash Lite optimized for cost-effectiveness',
+    description: '⚠️ DEPRECATED: This model is currently unavailable. Automatically falls back to Gemini 2.5 Flash.',
     pricing: {
       inputTokens: 0.075,
       outputTokens: 0.30
@@ -134,7 +134,7 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     performance: {
       speed: 'fast',
       accuracy: 'very-good',
-      reliability: 0.92
+      reliability: 0.50 // Reduced reliability due to availability issues
     },
     capabilities: {
       maxImageSize: 5 * 1024 * 1024, // 5MB

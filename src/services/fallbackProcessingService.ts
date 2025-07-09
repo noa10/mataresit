@@ -156,6 +156,9 @@ export class FallbackProcessingService {
       'gemini-2.5-flash': 'gemini-2.5-pro',
       'gemini-2.5-pro': 'openrouter/google/gemini-2.0-flash-exp:free',
 
+      // Specific fallback for problematic model
+      'gemini-2.5-flash-lite-preview-06-17': 'gemini-2.5-flash',
+
       // OpenRouter free models
       'openrouter/google/gemini-2.0-flash-exp:free': 'openrouter/google/gemma-3-27b-it:free',
       'openrouter/google/gemma-3-27b-it:free': 'openrouter/qwen/qwen2.5-vl-72b-instruct:free',
