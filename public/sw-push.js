@@ -8,19 +8,26 @@ const NOTIFICATION_BADGE = '/mataresit-icon.png';
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing push notification service worker');
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
+      // Use Set to ensure unique URLs and prevent duplicate cache errors
+      const urlsToCache = new Set([
         NOTIFICATION_ICON,
         NOTIFICATION_BADGE,
         '/',
         '/dashboard',
         '/receipts'
       ]);
+
+      console.log('[SW] Caching URLs:', Array.from(urlsToCache));
+      return cache.addAll(Array.from(urlsToCache));
+    }).catch((error) => {
+      console.error('[SW] Failed to cache resources during install:', error);
+      // Don't throw - allow service worker to install even if caching fails
     })
   );
-  
+
   // Take control immediately
   self.skipWaiting();
 });
@@ -28,20 +35,24 @@ self.addEventListener('install', (event) => {
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating push notification service worker');
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
+          // Only delete caches that belong to this service worker (push-related)
+          if (cacheName.startsWith('mataresit-push-') && cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old push cache:', cacheName);
             return caches.delete(cacheName);
           }
-        })
+          // Don't delete other service worker caches (like translations)
+        }).filter(Boolean) // Remove undefined values
       );
+    }).catch((error) => {
+      console.error('[SW] Failed to clean up old caches:', error);
     })
   );
-  
+
   // Take control of all clients
   self.clients.claim();
 });
@@ -258,6 +269,10 @@ self.addEventListener('error', (event) => {
 // Unhandled rejection event
 self.addEventListener('unhandledrejection', (event) => {
   console.error('[SW] Unhandled promise rejection:', event.reason);
+
+  // Prevent the default behavior (which would log to console)
+  // since we're already logging it
+  event.preventDefault();
 });
 
 console.log('[SW] Push notification service worker loaded');
