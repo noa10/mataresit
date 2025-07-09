@@ -1,0 +1,802 @@
+[
+  {
+    "event_message": "Data enhancement complete\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "f6c352ce-f56d-4753-a440-49638c3fe1e4",
+    "level": "log",
+    "timestamp": 1752082650350000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) AI processing complete\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "fc5d9dee-fe6f-441f-9c3d-3ca20a619b10",
+    "level": "log",
+    "timestamp": 1752082650149000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Tax processing complete: EXEMPT at 0%\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "f3d15b7d-6f28-47b4-927a-758320c0677b",
+    "level": "log",
+    "timestamp": 1752082649967000
+  },
+  {
+    "event_message": "🔍 Tax processing completed in 0.60 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "c6edfe63-52ef-45dd-8a14-8be800b893bd",
+    "level": "log",
+    "timestamp": 1752082649967000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) No Malaysian tax category detected, using exempt\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "a397057a-e1bc-430b-941c-9bf8ae684da0",
+    "level": "log",
+    "timestamp": 1752082649777000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Processing Malaysian tax information\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "5a367d9d-a112-4de4-ba42-b7eac1abdef4",
+    "level": "log",
+    "timestamp": 1752082649368000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Predicted category: Groceries\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "2486f46f-a4c3-4cd4-8ddc-7d2506a78192",
+    "level": "log",
+    "timestamp": 1752082649179000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Detected payment method: DEBIT CARD\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "79269e65-1e82-4456-b37d-639d0c9937ac",
+    "level": "log",
+    "timestamp": 1752082648988000
+  },
+  {
+    "event_message": "🔍 Enhanced data result: {\n  merchant: \"PASARAYA BORONG SUPER SEVEN\",\n  total: 62.3,\n  line_items_count: 6,\n  line_items: [\n    { description: \"BBB1000 50PCS\", amount: 14.99 },\n    { description: \"IKAN (FP)\", amount: 5 },\n    { description: \"7 HEAVY DUTY SPOON\", amount: 4.2 },\n    { description: \"FORK 7 HEAVY DUTY 50\", amount: 4.2 },\n    { description: \"POWERCAT 1.3KG O.TUN\", amount: 19.9 },\n    { description: \"SAYUR (FP)\", amount: 14 }\n  ],\n  confidence: {\n    merchant: 100,\n    date: 100,\n    total: 100,\n    tax: 90,\n    currency: 100,\n    payment_method: 100,\n    predicted_category: 98,\n    line_items: 100,\n    malaysian_tax_info: 90,\n    structured_data: 95,\n    line_items_analysis: 90,\n    spending_patterns: 90\n  }\n}\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "b264a6fd-40f3-4cc5-aab4-b2791d0426c7",
+    "level": "log",
+    "timestamp": 1752082648988000
+  },
+  {
+    "event_message": "🔍 AI model call completed in 33.70 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "ca67ba39-a268-4d54-bd7f-c1848d706f76",
+    "level": "log",
+    "timestamp": 1752082648986000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Provider call completed in 25.26 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0029da73-12b4-48bc-86fd-17c5131775a3",
+    "level": "log",
+    "timestamp": 1752082648805000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📊 Average confidence: 96.1%\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "dcd16957-4782-493a-b82d-f763d8f1d7a0",
+    "level": "log",
+    "timestamp": 1752082648624000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📋 Extracted fields: merchant, date, total, tax, currency, payment_method, predicted_category, line_items, confidence\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "9d0aaa45-da24-41c3-801f-258c74223389",
+    "level": "log",
+    "timestamp": 1752082648433000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ GEMINI PROCESSING COMPLETE in 24.70 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "292b0fdd-7861-4133-8bc6-7e47b47f19ad",
+    "level": "log",
+    "timestamp": 1752082648249000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Meaningful data extracted successfully\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "b42ea7c8-b6e6-4566-b190-8107f1f04dee",
+    "level": "log",
+    "timestamp": 1752082648067000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Detected currency: MYR\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "60a391ef-2be0-4f40-bf2a-a0179091f1d0",
+    "level": "log",
+    "timestamp": 1752082647874000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔍 Validating extracted data\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "ccb902dc-32ef-4713-9d00-16b2eb8a3837",
+    "level": "log",
+    "timestamp": 1752082647659000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ JSON parsed successfully using code-block\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "edb68b38-9e96-446b-81e7-36db71c323b1",
+    "level": "log",
+    "timestamp": 1752082647464000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Found JSON in code block\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "5374dcd3-c1b5-4ba4-8466-ad7d9cf1b42f",
+    "level": "log",
+    "timestamp": 1752082647278000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📝 Response length: 2361 characters\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "cb2b971d-feed-4214-8359-c64344421a0b",
+    "level": "log",
+    "timestamp": 1752082647086000
+  },
+  {
+    "event_message": "🔍 Full Gemini response text: ```json\n{\n  \"merchant\": \"PASARAYA BORONG SUPER SEVEN\",\n  \"date\": \"2025-07-09\",\n  \"total\": 62.30,\n  \"tax\": 0.00,\n  \"currency\": \"MYR\",\n  \"payment_method\": \"DEBIT CARD\",\n  \"predicted_category\": \"Groceries\",\n  \"malaysian_tax_info\": {\n    \"tax_type\": \"ZERO_RATED\",\n    \"tax_rate\": \"0.00\",\n    \"tax_amount\": \"0.00\",\n    \"is_tax_inclusive\": true,\n    \"business_category\": \"Grocery chains\"\n  },\n  \"line_items\": [\n    {\n      \"description\": \"BBB1000 50PCS\",\n      \"amount\": 14.99\n    },\n    {\n      \"description\": \"IKAN (FP)\",\n      \"amount\": 5.00\n    },\n    {\n      \"description\": \"7 HEAVY DUTY SPOON\",\n      \"amount\": 4.20\n    },\n    {\n      \"description\": \"FORK 7 HEAVY DUTY 50\",\n      \"amount\": 4.20\n    },\n    {\n      \"description\": \"POWERCAT 1.3KG O.TUN\",\n      \"amount\": 19.90\n    },\n    {\n      \"description\": \"SAYUR (FP)\",\n      \"amount\": 14.00\n    }\n  ],\n  \"structured_data\": {\n    \"merchant_normalized\": \"Super Seven\",\n    \"merchant_category\": \"grocery\",\n    \"business_type\": \"retail\",\n    \"location_city\": \"Shah Alam\",\n    \"location_state\": \"Selangor\",\n    \"receipt_type\": \"purchase\",\n    \"transaction_time\": \"10:48:30\",\n    \"item_count\": 6,\n    \"discount_amount\": 0.00,\n    \"service_charge\": 0.00,\n    \"tip_amount\": 0.00,\n    \"subtotal\": 62.29,\n    \"total_before_tax\": 62.29,\n    \"cashier_name\": \"AMMAR\",\n    \"receipt_number\": \"810710\",\n    \"transaction_id\": null,\n    \"loyalty_program\": \"Customer : [77913678]\",\n    \"loyalty_points\": null,\n    \"payment_card_last4\": null,\n    \"payment_approval_code\": null,\n    \"is_business_expense\": \"false\",\n    \"expense_type\": \"groceries\",\n    \"vendor_registration_number\": \"590150-A\",\n    \"invoice_number\": null,\n    \"purchase_order_number\": null\n  },\n  \"line_items_analysis\": {\n    \"categories\": \"Groceries, Pet Supplies, Household Goods\",\n    \"patterns\": \"Standard grocery shopping including fresh produce, pet food, and disposable cutlery.\",\n    \"anomalies\": \"None\"\n  },\n  \"spending_patterns\": {\n    \"transaction_type\": \"regular\",\n    \"price_tier\": \"budget\",\n    \"shopping_behavior\": \"necessity\"\n  },\n  \"confidence\": {\n    \"merchant\": 100,\n    \"date\": 100,\n    \"total\": 100,\n    \"tax\": 90,\n    \"currency\": 100,\n    \"payment_method\": 100,\n    \"predicted_category\": 98,\n    \"malaysian_tax_info\": 90,\n    \"structured_data\": 95,\n    \"line_items_analysis\": 90,\n    \"spending_patterns\": 90,\n    \"line_items\": 100\n  }\n}\n```\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "e4fddd7d-c777-42ce-85a3-efe47c3d1eb2",
+    "level": "log",
+    "timestamp": 1752082646897000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Parsing Gemini response\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "61ad117a-0e74-4409-ac2d-37fe471c8992",
+    "level": "log",
+    "timestamp": 1752082646897000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📝 Content length: 2361 characters\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "9dbc0cd2-32dd-464a-b948-d4fde47430da",
+    "level": "log",
+    "timestamp": 1752082646703000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📊 Response metadata: 1 candidate(s) from gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "f6cedb34-0fb8-45ff-97f6-6d4a778f3041",
+    "level": "log",
+    "timestamp": 1752082646486000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Response received and parsed in 0.000 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "772294a3-503a-46e8-9d29-d2095323b2b4",
+    "level": "log",
+    "timestamp": 1752082646303000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📡 Response status: 200 OK\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "cc805b77-5f03-466d-bc5b-e02ab02c8721",
+    "level": "log",
+    "timestamp": 1752082646107000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ⏱️ API call completed in 20.10 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "81496b78-409d-4679-b706-6e3feabb6787",
+    "level": "log",
+    "timestamp": 1752082645915000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🚀 GEMINI API REQUEST: Initiating call to Gemini 2.5 Pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "358c247c-9eb1-414e-a71d-ddb77fa7731f",
+    "level": "log",
+    "timestamp": 1752082625626000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🖼️ Image size: 129526 bytes (image/jpeg)\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "2b5a05a3-910d-49fd-acff-a253afd5d064",
+    "level": "log",
+    "timestamp": 1752082625438000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ⚙️ Generation config: temp=0.1, maxTokens=65536\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "a2a1bfb0-3d55-43dd-926a-944dad8f5986",
+    "level": "log",
+    "timestamp": 1752082625206000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📊 Payload size: 178944 bytes\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "e041768f-8b41-4165-99ca-eaef65a3b5a7",
+    "level": "log",
+    "timestamp": 1752082625020000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Payload constructed in 0.194 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "82867346-867f-43cf-8a59-f914b36efbf2",
+    "level": "log",
+    "timestamp": 1752082624837000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔧 PAYLOAD CONSTRUCTION: Building image prompt\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "3a22eb8a-1528-4d0a-b184-9a48a9231e0a",
+    "level": "log",
+    "timestamp": 1752082624643000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🌐 Endpoint: https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "90ffcf5d-1f5c-42d4-a9c6-bde0c4524591",
+    "level": "log",
+    "timestamp": 1752082624444000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🎯 Input Type: image\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "74c42fa9-1dea-4e13-89ad-4aa76405d9a8",
+    "level": "log",
+    "timestamp": 1752082624252000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📋 Model: Gemini 2.5 Pro (gemini-2.5-pro)\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "470cb421-4480-4d77-8b3d-6bc15ffbbafd",
+    "level": "log",
+    "timestamp": 1752082624059000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔵 GEMINI API CALL INITIATED\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0674a093-0439-40d3-ad8e-bd430ee79b50",
+    "level": "log",
+    "timestamp": 1752082623546000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🚀 PROVIDER ROUTING: Calling GEMINI API\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0a90d598-d8e5-440a-a770-3de24f2111c5",
+    "level": "log",
+    "timestamp": 1752082623358000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📋 SELECTION SUMMARY: Using requested Gemini 2.5 Pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "fe7174b3-f3c3-41f3-8d29-7f6911ab9efc",
+    "level": "log",
+    "timestamp": 1752082623162000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ API key validated for GEMINI\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "6bd17ca6-5962-43b0-ad8c-6af0eba6d816",
+    "level": "log",
+    "timestamp": 1752082622970000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔑 API KEY VALIDATION: Checking GEMINI_API_KEY\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "7f5f6c18-55bb-4e23-bdc9-993a4a834bfc",
+    "level": "log",
+    "timestamp": 1752082622780000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Compatibility check passed in 0.230 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "4899047c-3289-4a61-8271-21f356a19f2b",
+    "level": "log",
+    "timestamp": 1752082622581000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔍 COMPATIBILITY CHECK: Validating image input with Gemini 2.5 Pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "a554b4d7-dd3e-460d-b542-e3d71c6499e0",
+    "level": "log",
+    "timestamp": 1752082622351000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ⏰ Model selected at: 2025-07-09T17:37:02.166Z\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "d8dda24a-6fa5-454f-9d15-58e47605554c",
+    "level": "log",
+    "timestamp": 1752082622166000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    📤 Output: $5.000\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "236f961a-d027-4cfb-a48b-127e80f1947b",
+    "level": "log",
+    "timestamp": 1752082621952000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    📥 Input: $1.250\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "79aa9395-9fc9-42f5-9431-0c7c823b36c2",
+    "level": "log",
+    "timestamp": 1752082621748000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 💰 PRICING (per 1M tokens):\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "4ab25c06-0fa7-49a5-bb7d-ca97f5eff2a5",
+    "level": "log",
+    "timestamp": 1752082621211000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    🧠 Context Window: 1,048,576 tokens\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "ffcb194c-1e2c-4a5e-a0b8-c39a3bf2a9d6",
+    "level": "log",
+    "timestamp": 1752082620984000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    📄 Supported Formats: image/jpeg, image/png, application/pdf\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "805cd466-bef7-4f70-87d5-3d1480eb4c25",
+    "level": "log",
+    "timestamp": 1752082620773000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    📏 Max Image Size: 5.0MB\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "167ab4b8-9410-44ba-a614-cbf93b96a260",
+    "level": "log",
+    "timestamp": 1752082620540000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔧 CAPABILITY SPECIFICATIONS:\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "28dd72f2-bbd1-42e0-9d3c-ac5b35fb4c7f",
+    "level": "log",
+    "timestamp": 1752082620321000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    🛡️ Reliability: 98.0%\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "c8585b63-5aef-4251-a8ef-2528d4cc3205",
+    "level": "log",
+    "timestamp": 1752082619781000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    🎯 Accuracy: EXCELLENT\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "659fdd05-4d71-45bd-89d2-bd26cbafc337",
+    "level": "log",
+    "timestamp": 1752082619585000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614)    ⚡ Speed: MEDIUM\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "09d39a72-6854-47a7-8dfd-f4413938042c",
+    "level": "log",
+    "timestamp": 1752082619385000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🚀 PERFORMANCE PROFILE:\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "7bd3a3aa-3290-41f0-8374-1cdd2c7a8cc5",
+    "level": "log",
+    "timestamp": 1752082618884000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔑 API Key Variable: GEMINI_API_KEY\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "34b70366-2882-45a4-8048-63bebf1b7ad1",
+    "level": "log",
+    "timestamp": 1752082618668000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🌐 Endpoint: https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "28a5f8c3-bd33-423c-a7fe-08dfd2244a01",
+    "level": "log",
+    "timestamp": 1752082618476000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ⚙️ Temperature: 0.1, Max Tokens: 65536\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "81b28125-2cef-48a1-9d39-024e392a4ac4",
+    "level": "log",
+    "timestamp": 1752082618273000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Input Compatibility: image processing SUPPORTED\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "4a14406b-9cf9-49ff-8492-935000d3310b",
+    "level": "log",
+    "timestamp": 1752082618075000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🔧 Capabilities: Text, Vision\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "941d7153-7d1d-494f-9704-83244d439f5a",
+    "level": "log",
+    "timestamp": 1752082617873000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📝 Description: Most advanced Gemini model with superior reasoning and thinking capabilities\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0ac03f34-605f-4866-a70b-af61d84d4432",
+    "level": "log",
+    "timestamp": 1752082617673000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📊 Provider: GEMINI\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "03a0586d-2155-4125-a0aa-751a97522221",
+    "level": "log",
+    "timestamp": 1752082617142000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🤖 MODEL SELECTED: Gemini 2.5 Pro (gemini-2.5-pro)\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "b659ed74-8a42-44d9-979a-eb16305169bf",
+    "level": "log",
+    "timestamp": 1752082616945000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ⏱️ Model selection completed in 1.463 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "b685d980-ba68-4ac1-b9ef-4a07803d5d5e",
+    "level": "log",
+    "timestamp": 1752082616752000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) ✅ Requested model found: Gemini 2.5 Pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "2cee2a5c-8102-48eb-af5f-255d604b3169",
+    "level": "log",
+    "timestamp": 1752082616207000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📊 Input type: image\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "f3764b1e-e3ab-4d9f-9d7b-97bd2bf6802f",
+    "level": "log",
+    "timestamp": 1752082616019000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 📝 Requested model ID: gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "1a380d8e-41ff-4642-8f41-a0dd4e289289",
+    "level": "log",
+    "timestamp": 1752082615823000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) 🎯 MODEL SELECTION STARTED: Receipt 58229a6a-69ae-41a9-9eb0-b8513e534614\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "17ccd69e-9a63-46a0-9f2a-e0f8418f84e5",
+    "level": "log",
+    "timestamp": 1752082615288000
+  },
+  {
+    "event_message": "🔍 Calling AI model: gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "a9c28c20-a24e-4809-9c6f-41d4fe0b46ff",
+    "level": "log",
+    "timestamp": 1752082615287000
+  },
+  {
+    "event_message": "🔍 Model to use: gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "6e290cd7-39b4-4ac8-995e-4f1283270bba",
+    "level": "log",
+    "timestamp": 1752082615088000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Using model: gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0c5285a9-0d12-400c-a2b3-68e9771ff68b",
+    "level": "log",
+    "timestamp": 1752082615088000
+  },
+  {
+    "event_message": "🔍 ENHANCE-RECEIPT-DATA DEBUG - Starting processing at 2025-07-09T17:36:54.344Z\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "8deb4826-f2d4-4c44-af68-defb514e1cd8",
+    "level": "log",
+    "timestamp": 1752082614344000
+  },
+  {
+    "event_message": "🔍 Receipt ID: 58229a6a-69ae-41a9-9eb0-b8513e534614\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "6ac01bae-8a18-4117-8246-37e52fb32cdb",
+    "level": "log",
+    "timestamp": 1752082614344000
+  },
+  {
+    "event_message": "[AI] (Receipt: 58229a6a-69ae-41a9-9eb0-b8513e534614) Starting gemini-2.5-pro processing\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "241c0aca-87ea-4fa4-a98c-df20f847ec19",
+    "level": "log",
+    "timestamp": 1752082614344000
+  },
+  {
+    "event_message": "🔍 Model ID requested: gemini-2.5-pro\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "1a455931-6338-4863-b371-fb7674d9a080",
+    "level": "log",
+    "timestamp": 1752082614344000
+  },
+  {
+    "event_message": "🔍 Input type: image\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "d358ef87-fa87-47d0-b54e-d7fcd3e3a5ba",
+    "level": "log",
+    "timestamp": 1752082614344000
+  },
+  {
+    "event_message": "Processing with image input (direct vision)\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "42ff16db-bb74-45f9-9b78-92b42d9bf87a",
+    "level": "log",
+    "timestamp": 1752082614342000
+  },
+  {
+    "event_message": "🔍 Successfully processed imageData, final size: 129526 bytes\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "1bbe6f5f-aded-48b4-a57f-6518a589e9ea",
+    "level": "log",
+    "timestamp": 1752082614342000
+  },
+  {
+    "event_message": "🔍 Request keys: [ \"imageData\", \"receiptId\", \"modelId\" ]\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "9e0f3683-9753-4d22-9f1f-66082ad8ac80",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData.data type: string\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "5c54c63c-fc74-4c9c-a0e2-1eeae2684e2b",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 Has fullText: false\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "0e460c16-663b-49e5-8659-09e29efc8ee3",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData keys: [ \"data\", \"mimeType\", \"isBase64\" ]\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "e5dd1b80-5d1c-4475-aa20-6c0c605ca663",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData.data length: 172704\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "3fdd9c0d-db9b-42de-b1ba-09fc2f7db84d",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 Has imageData: true\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "274bd7b0-5213-40e4-a85d-edbb9d5ea926",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 Has textractData: false\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "deadcf26-8489-4866-a1db-66fb853ceeed",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData.isBase64: true\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "ed740c08-dcec-460c-86f3-1cc3bf31eda7",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData.mimeType: image/jpeg\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "428afaec-16ea-4920-ba6b-426fd2b881ad",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 imageData.data exists: true\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "dbaa7cb6-639d-4039-b79e-5a6cd86f88bd",
+    "level": "log",
+    "timestamp": 1752082614339000
+  },
+  {
+    "event_message": "🔍 ENHANCE-RECEIPT-DATA REQUEST DEBUG:\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "87d7cb77-c2b8-4c62-94dd-e89b597d4650",
+    "level": "log",
+    "timestamp": 1752082614338000
+  },
+  {
+    "event_message": "Received request to enhance receipt data\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "1d9ffac3-8a66-45d8-bdc9-0cb974f7b855",
+    "level": "log",
+    "timestamp": 1752082614335000
+  },
+  {
+    "event_message": "Listening on http://localhost:9999/\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "b3d96b6f-b9fd-4b97-8a58-e7caf6e95f7d",
+    "level": "log",
+    "timestamp": 1752082614328000
+  },
+  {
+    "event_message": "booted (time: 26ms)",
+    "event_type": "Boot",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "24c0e442-83d3-4333-b847-4b5d3b1f71a7",
+    "level": "log",
+    "timestamp": 1752082614321000
+  },
+  {
+    "event_message": "Data enhancement complete\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "6e93b38f-07ef-48ba-94ff-d0012d0793c7",
+    "level": "log",
+    "timestamp": 1752082513105000
+  },
+  {
+    "event_message": "[AI] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) AI processing complete\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "749e608e-6f9f-4a1d-b34c-d36996eaf784",
+    "level": "log",
+    "timestamp": 1752082512908000
+  },
+  {
+    "event_message": "🔍 Tax processing completed in 0.60 seconds\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "cf723d3b-20db-42b4-a34a-34572a21ca4b",
+    "level": "log",
+    "timestamp": 1752082512724000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) Tax processing complete: EXEMPT at 0%\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "e4b95419-78f8-4584-a949-70dbbe151507",
+    "level": "log",
+    "timestamp": 1752082512724000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) No Malaysian tax category detected, using exempt\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "7bbce46b-7fdc-4781-b427-20d7349ee0fa",
+    "level": "log",
+    "timestamp": 1752082512537000
+  },
+  {
+    "event_message": "[TAX] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) Processing Malaysian tax information\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "02e3ec3a-c6a4-4cd8-a01b-0f757663ea63",
+    "level": "log",
+    "timestamp": 1752082512124000
+  },
+  {
+    "event_message": "[AI] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) Predicted category: Groceries\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "94acc418-d61f-446a-8aee-a242a4ae7dc7",
+    "level": "log",
+    "timestamp": 1752082511929000
+  },
+  {
+    "event_message": "[AI] (Receipt: 2acac944-b1a1-4707-97e1-51a53b82784e) Detected payment method: Debit Card\n",
+    "event_type": "Log",
+    "function_id": "cd5d41b4-6801-469c-8b29-cf31c3611e11",
+    "id": "f3d9a2ad-edd0-44db-8c1d-6eee939c5cb6",
+    "level": "log",
+    "timestamp": 1752082511676000
+  }
+]
