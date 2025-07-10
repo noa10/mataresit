@@ -130,51 +130,80 @@ export class AdminService {
 
   async getSystemStats() {
     try {
-      // Get user count
-      const { count: userCount, error: userCountError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // Try to use the new admin system stats function first
+      const { data: adminStats, error: adminStatsError } = await supabase.rpc('get_admin_system_stats');
+
+      if (!adminStatsError && adminStats) {
+        console.log('✅ Using admin system stats function');
+        return {
+          userCount: adminStats.userCount || 0,
+          receiptCount: adminStats.receiptCount || 0,
+          activeUsersCount: adminStats.activeUsersCount || 0,
+          recentActivity: adminStats.recentActivity || [],
+          lastUpdated: adminStats.lastUpdated
+        };
+      }
+
+      console.warn('⚠️ Admin stats function failed, falling back to individual queries:', adminStatsError?.message);
+
+      // Fallback to individual queries with admin policies
+      const [userCountResult, receiptCountResult, recentReceiptsResult] = await Promise.all([
+        // Get user count from profiles table (now with admin policy)
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+
+        // Get receipt count (now with admin policy)
+        supabase.from('receipts').select('*', { count: 'exact', head: true }),
+
+        // Get recent activity (last 10 receipts)
+        supabase
+          .from('receipts')
+          .select('id, merchant, total, currency, date, created_at, user_id')
+          .order('created_at', { ascending: false })
+          .limit(10)
+      ]);
+
+      const { count: userCount, error: userCountError } = userCountResult;
+      const { count: receiptCount, error: receiptCountError } = receiptCountResult;
+      const { data: recentReceipts, error: recentActivityError } = recentReceiptsResult;
 
       if (userCountError) {
         console.error('Error fetching user count:', userCountError);
         throw userCountError;
       }
 
-      // Get receipt count
-      const { count: receiptCount, error: receiptCountError } = await supabase
-        .from('receipts')
-        .select('*', { count: 'exact', head: true });
-
       if (receiptCountError) {
         console.error('Error fetching receipt count:', receiptCountError);
         throw receiptCountError;
       }
 
-      // Get recent activity (last 10 receipts) - simplified approach
-      const { data: recentReceipts, error: recentActivityError } = await supabase
-        .from('receipts')
-        .select('id, merchant, total, date, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
       if (recentActivityError) {
         console.error('Error fetching recent activity:', recentActivityError);
-        throw recentActivityError;
+        // Don't throw for recent activity errors, just log and continue
+        console.warn('Recent activity will be empty due to error');
       }
 
-      // Transform the data without profile info for now (to avoid FK issues)
+      // Transform the data for consistency
       const transformedActivity = (recentReceipts || []).map((receipt: any) => ({
         id: receipt.id,
         merchant: receipt.merchant,
         total: receipt.total,
+        currency: receipt.currency,
         date: receipt.date,
-        profile: null // We'll add profile info later if needed
+        created_at: receipt.created_at,
+        user_id: receipt.user_id
       }));
+
+      console.log('📊 System stats retrieved:', {
+        userCount: userCount || 0,
+        receiptCount: receiptCount || 0,
+        recentActivityCount: transformedActivity.length
+      });
 
       return {
         userCount: userCount || 0,
         receiptCount: receiptCount || 0,
-        recentActivity: transformedActivity
+        recentActivity: transformedActivity,
+        lastUpdated: new Date().toISOString()
       };
     } catch (error) {
       console.error('Error in getSystemStats:', error);

@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, Users, AlertCircle, BookOpen, Database } from "lucide-react";
+import { ShoppingBag, Users, AlertCircle, BookOpen, Database, RefreshCw } from "lucide-react";
 import { BlogAnalytics } from "@/components/admin/BlogAnalytics";
 import { EmbeddingRepairTest } from "@/components/admin/EmbeddingRepairTest";
 import { CacheMonitor } from "@/components/admin/CacheMonitor";
@@ -16,7 +16,9 @@ import { EmbeddingSystemDiagnostics } from "@/components/admin/EmbeddingSystemDi
 interface SystemStats {
   userCount: number;
   receiptCount: number;
+  activeUsersCount?: number;
   recentActivity: any[];
+  lastUpdated?: string;
 }
 
 export default function AdminDashboard() {
@@ -32,9 +34,12 @@ export default function AdminDashboard() {
   const fetchSystemStats = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Fetching admin system stats...');
       const stats = await adminService.getSystemStats();
+      console.log('✅ Admin system stats loaded:', stats);
       setSystemStats(stats);
     } catch (error: any) {
+      console.error('❌ Error loading admin system stats:', error);
       toast({
         title: t("errors.title"),
         description: error.message || t("errors.loadStatsFailed"),
@@ -62,10 +67,20 @@ export default function AdminDashboard() {
         <>
           {/* System Overview */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {t("dashboard.systemOverview")}
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {t("dashboard.systemOverview")}
+              </h2>
+              <button
+                onClick={fetchSystemStats}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
@@ -75,9 +90,12 @@ export default function AdminDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{systemStats?.userCount}</div>
+                <div className="text-2xl font-bold">{systemStats?.userCount || 0}</div>
                 <p className="text-sm text-muted-foreground">
-                  {t("dashboard.descriptions.totalUsers")}
+                  {systemStats?.activeUsersCount !== undefined
+                    ? `${systemStats.activeUsersCount} active in last 30 days`
+                    : t("dashboard.descriptions.totalUsers")
+                  }
                 </p>
               </CardContent>
             </Card>
