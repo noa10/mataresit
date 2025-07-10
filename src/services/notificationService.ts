@@ -30,6 +30,7 @@ export class NotificationService {
   }> = new Map();
   private pendingSubscriptions: Set<string> = new Set();
   private cleanupTimers: Map<string, NodeJS.Timeout> = new Map();
+  private cleanupInProgress: Set<string> = new Set();
 
   // =============================================
   // CONNECTION MANAGEMENT
@@ -187,6 +188,7 @@ export class NotificationService {
       }
 
       if (!this.isRealTimeAvailable()) {
+        console.warn('❌ Real-time not available in this environment');
         return false;
       }
 
@@ -197,10 +199,23 @@ export class NotificationService {
         return false;
       }
 
+      // Log connection attempt details for debugging
+      console.log('🔍 Starting real-time connection test...', {
+        url: import.meta.env.VITE_SUPABASE_URL || "https://mpmkbtsufihzdelrlszs.supabase.co",
+        hasRealtime: !!supabase.realtime,
+        isConnected: supabase.realtime?.isConnected?.() || false
+      });
+
       // Quick connection test with reasonable timeout
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
-          console.log('⏰ Real-time quick test timeout (3s)');
+          console.warn('⏰ Real-time quick test timeout (3s) - WebSocket connection failed');
+          console.log('🔍 Connection diagnostic:', {
+            realtimeStatus: supabase.realtime?.isConnected?.() || 'unknown',
+            websocketUrl: `wss://${import.meta.env.VITE_SUPABASE_URL?.replace('https://', '') || 'mpmkbtsufihzdelrlszs.supabase.co'}/realtime/v1/websocket`,
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+          });
           resolve(false);
         }, 3000); // Increased to 3 seconds for better reliability
 
@@ -218,18 +233,24 @@ export class NotificationService {
           const testChannel = supabase.channel(testChannelName);
 
           testChannel.subscribe((status) => {
+            console.log(`📡 Test channel status: ${status}`);
             clearTimeout(timeout);
             try {
               supabase.removeChannel(testChannel);
             } catch (e) {
-              // Ignore cleanup errors
+              console.warn('Error cleaning up test channel:', e);
             }
 
             if (status === 'SUBSCRIBED') {
               console.log('✅ Real-time test channel subscribed successfully');
               resolve(true);
             } else if (status === 'CHANNEL_ERROR') {
-              console.warn('❌ Real-time test channel error');
+              console.error('❌ Real-time test channel error - WebSocket connection failed');
+              console.log('🔍 Error diagnostic:', {
+                status,
+                websocketUrl: `wss://${import.meta.env.VITE_SUPABASE_URL?.replace('https://', '') || 'mpmkbtsufihzdelrlszs.supabase.co'}/realtime/v1/websocket`,
+                timestamp: new Date().toISOString()
+              });
               resolve(false);
             } else if (status === 'TIMED_OUT') {
               console.warn('⏰ Real-time test channel timed out');
@@ -780,8 +801,11 @@ export class NotificationService {
    * Register a new subscription with metadata
    */
   private registerSubscription(channelName: string, channel: any, userId: string, teamId?: string): void {
-    // Clean up any existing subscription with the same name
-    this.cleanupSubscription(channelName);
+    // Prevent recursive cleanup by checking if we're already cleaning up this channel
+    if (!this.cleanupInProgress.has(channelName)) {
+      // Clean up any existing subscription with the same name
+      this.cleanupSubscription(channelName);
+    }
 
     this.subscriptionRegistry.set(channelName, {
       channel,
@@ -799,24 +823,37 @@ export class NotificationService {
    * Clean up a specific subscription
    */
   private cleanupSubscription(channelName: string): void {
-    const existing = this.subscriptionRegistry.get(channelName);
-    if (existing) {
-      try {
-        supabase.removeChannel(existing.channel);
-        console.log(`🧹 Cleaned up subscription: ${channelName}`);
-      } catch (error) {
-        console.error(`❌ Error cleaning up subscription ${channelName}:`, error);
-      }
+    // Prevent recursive cleanup calls
+    if (this.cleanupInProgress.has(channelName)) {
+      console.log(`⚠️ Cleanup already in progress for ${channelName}, skipping`);
+      return;
     }
 
-    this.subscriptionRegistry.delete(channelName);
-    this.activeChannels.delete(channelName);
+    this.cleanupInProgress.add(channelName);
 
-    // Clear any pending cleanup timers
-    const timer = this.cleanupTimers.get(channelName);
-    if (timer) {
-      clearTimeout(timer);
-      this.cleanupTimers.delete(channelName);
+    try {
+      const existing = this.subscriptionRegistry.get(channelName);
+      if (existing) {
+        try {
+          supabase.removeChannel(existing.channel);
+          console.log(`🧹 Cleaned up subscription: ${channelName}`);
+        } catch (error) {
+          console.error(`❌ Error cleaning up subscription ${channelName}:`, error);
+        }
+      }
+
+      this.subscriptionRegistry.delete(channelName);
+      this.activeChannels.delete(channelName);
+
+      // Clear any pending cleanup timers
+      const timer = this.cleanupTimers.get(channelName);
+      if (timer) {
+        clearTimeout(timer);
+        this.cleanupTimers.delete(channelName);
+      }
+    } finally {
+      // Always remove from cleanup progress, even if an error occurred
+      this.cleanupInProgress.delete(channelName);
     }
   }
 
@@ -859,6 +896,9 @@ export class NotificationService {
       clearTimeout(timer);
     }
     this.cleanupTimers.clear();
+
+    // Clear cleanup progress tracking
+    this.cleanupInProgress.clear();
 
     this.notifyConnectionStatusChange('disconnected');
   }
@@ -905,6 +945,53 @@ export class NotificationService {
   // Get active channel names for debugging
   getActiveChannelNames(): string[] {
     return Array.from(this.activeChannels.keys());
+  }
+
+  // Test WebSocket connection directly
+  async testWebSocketConnection(): Promise<{
+    success: boolean;
+    error?: string;
+    diagnostics: any;
+  }> {
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || "https://mpmkbtsufihzdelrlszs.supabase.co",
+      websocketUrl: `wss://${(import.meta.env.VITE_SUPABASE_URL?.replace('https://', '') || 'mpmkbtsufihzdelrlszs.supabase.co')}/realtime/v1/websocket`,
+      hasRealtime: !!supabase.realtime,
+      isConnected: supabase.realtime?.isConnected?.() || false,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      environment: {
+        dev: import.meta.env.DEV,
+        disableRealtime: import.meta.env.VITE_DISABLE_REALTIME,
+        enableRealtime: import.meta.env.VITE_ENABLE_REALTIME,
+        realtimeDebug: import.meta.env.VITE_REALTIME_DEBUG
+      }
+    };
+
+    try {
+      // Test basic WebSocket connectivity
+      const testResult = await this.quickRealTimeTest();
+
+      return {
+        success: testResult,
+        diagnostics: {
+          ...diagnostics,
+          testResult,
+          connectionStatus: this.connectionStatus,
+          activeChannels: this.getActiveChannelCount(),
+          reconnectAttempts: this.reconnectAttempts
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        diagnostics: {
+          ...diagnostics,
+          error: error instanceof Error ? error.stack : error
+        }
+      };
+    }
   }
 
   /**
