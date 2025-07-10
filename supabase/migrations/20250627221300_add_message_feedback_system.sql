@@ -351,12 +351,8 @@ AS $$
 DECLARE
   is_admin BOOLEAN;
 BEGIN
-  -- Check if user is admin
-  SELECT EXISTS (
-    SELECT 1 FROM auth.users 
-    WHERE id = auth.uid() 
-    AND raw_user_meta_data->>'role' = 'admin'
-  ) INTO is_admin;
+  -- Check if user is admin using the user_roles table
+  SELECT public.has_role(auth.uid(), 'admin'::public.app_role) INTO is_admin;
 
   IF NOT is_admin THEN
     RAISE EXCEPTION 'Access denied. Admin role required.';
