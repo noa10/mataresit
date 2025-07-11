@@ -46,6 +46,13 @@ export interface EnhancedResponse {
     selfCorrectionApplied?: boolean;
     toolCallsExecuted?: number;
     criticAnalysis?: any;
+    formattingApplied?: boolean;
+    contentStructure?: {
+      hasTables: boolean;
+      hasHeaders: boolean;
+      hasLists: boolean;
+      sectionsCount: number;
+    };
   };
   toolResults?: ToolCallResult[];
   selfCorrectionData?: SelfCorrectionResult;
@@ -164,6 +171,9 @@ export async function generateEnhancedResponse(
     const responseType = determineResponseType(context, parsedResponse);
     const confidence = calculateResponseConfidence(context, parsedResponse);
 
+    // Analyze content structure for metadata
+    const contentStructure = analyzeContentStructure(parsedResponse.content || finalResponseText);
+
     return {
       content: parsedResponse.content || finalResponseText,
       uiComponents,
@@ -175,7 +185,9 @@ export async function generateEnhancedResponse(
         processingTime: Date.now() - startTime,
         tokensUsed: result.response.usageMetadata?.totalTokenCount,
         modelUsed: 'gemini-1.5-flash',
-        toolCallsExecuted: toolResults.length
+        toolCallsExecuted: toolResults.length,
+        formattingApplied: true,
+        contentStructure
       },
       toolResults: toolResults.length > 0 ? toolResults : undefined
     };
@@ -224,19 +236,57 @@ function selectResponseStrategy(context: EnhancedResponseContext): ResponseStrat
       templateId: 'financial_analysis',
       systemPrompt: `You are Mataresit AI Assistant, a financial data analysis expert. Provide clear, data-driven insights with appropriate visualizations. Focus on actionable insights and trends.
 
-IMPORTANT: When describing receipts or financial data in text, always use actual formatted data, never use template placeholders like {{date}} or {{amount}}. Format dates as DD/MM/YYYY for Malaysian context and include proper currency symbols (MYR/USD).`,
+FINANCIAL ANALYSIS FORMATTING REQUIREMENTS:
+
+RESPONSE STRUCTURE:
+1. # Financial Analysis Summary
+2. ## Spending Overview (use summary statistics)
+3. ## Transaction Breakdown (use detailed table)
+4. ## Insights & Trends
+5. ## Recommendations
+
+FINANCIAL DATA FORMATTING:
+- Currency: Always use "MYR 25.50" format (space between currency and amount)
+- Percentages: Use "+15.2%" or "-8.7%" format for changes
+- Large numbers: Use commas for thousands (e.g., MYR 1,234.56)
+- Totals: Use bold formatting **Total: MYR 245.30**
+- Averages: Show as "Average: MYR 35.04 per receipt"
+
+SUMMARY STATISTICS FORMAT:
+## Spending Overview
+• **Total Spent**: MYR 245.30
+• **Number of Transactions**: 12 receipts
+• **Date Range**: 15/01/2024 - 28/01/2024
+• **Average per Transaction**: MYR 20.44
+• **Top Category**: Groceries (67% of spending)
+• **Most Frequent Merchant**: SUPER SEVEN (5 transactions)
+
+TABLE FORMAT FOR TRANSACTIONS:
+| Date | Merchant | Category | Amount | Notes |
+|------|----------|----------|--------|-------|
+| 15/01/2024 | SUPER SEVEN | Groceries | MYR 17.90 | POWERCAT 1.3KG |
+| 16/01/2024 | TESCO EXTRA | Groceries | MYR 45.60 | Weekly shopping |
+
+INSIGHTS FORMAT:
+## Key Insights
+• **Spending Trend**: +15.2% increase from last month
+• **Category Analysis**: Groceries account for 67% of total spending
+• **Frequency Pattern**: Most transactions on weekends
+• **Budget Impact**: 23% of monthly budget used
+
+IMPORTANT: Always use actual formatted data, never template placeholders like {{date}} or {{amount}}. Format dates as DD/MM/YYYY for Malaysian context and include proper currency symbols (MYR/USD).`,
       userPromptTemplate: `Analyze the financial data and provide insights for: "{query}"
 
 Search Results: {searchResults}
 Total Results: {resultCount}
 
-Provide:
-1. Clear summary of findings
-2. Key insights and trends
-3. Data visualizations using UI components
-4. Actionable recommendations
+Follow the financial analysis formatting requirements above. Provide:
+1. Comprehensive summary with key financial metrics
+2. Detailed transaction breakdown using proper table formatting
+3. Data-driven insights with percentage changes and trends
+4. Actionable recommendations based on spending patterns
 
-When mentioning specific receipts or amounts in your response text, use the actual formatted data from the search results, not template placeholders. Format dates as DD/MM/YYYY and include currency information. Use appropriate UI components like summary cards, charts, and data tables.`,
+Use actual data from search results with proper currency formatting (MYR 25.50) and date formatting (DD/MM/YYYY). Include appropriate UI components like summary cards, charts, and data tables.`,
       temperature: 0.3,
       maxTokens: 2000,
       includeUIComponents: true,
@@ -247,20 +297,54 @@ When mentioning specific receipts or amounts in your response text, use the actu
       templateId: 'document_retrieval',
       systemPrompt: `You are Mataresit AI Assistant, helping users find and organize their receipts and documents. Present results clearly and suggest refinements when needed.
 
-IMPORTANT: When describing receipts in text, always use actual formatted data, never use template placeholders like {{date}} or {{amount}}. Format dates as DD/MM/YYYY for Malaysian context and include proper currency symbols (MYR/USD).`,
+FORMATTING REQUIREMENTS FOR DOCUMENT RETRIEVAL:
+- Start with a clear summary section using headers
+- Use tables for multiple receipts with consistent formatting
+- Include aggregate statistics (totals, counts, date ranges)
+- Format all financial data with proper currency symbols
+- Use actual data from search results, never placeholders
+
+RESPONSE STRUCTURE:
+1. # Search Results Summary
+2. ## Receipt Details (use table format)
+3. ## Key Statistics
+4. ## Suggested Actions
+
+EXAMPLE RESPONSE FORMAT:
+# Search Results for "POWERCAT"
+
+Found **7 receipts** matching your search criteria.
+
+## Receipt Details
+| Merchant | Date | Amount | Description |
+|----------|------|--------|-------------|
+| SUPER SEVEN CASH & CARRY | 15/01/2024 | MYR 17.90 | POWERCAT 1.3KG |
+| SUPER SEVEN CASH & CARRY | 16/01/2024 | MYR 17.90 | POWERCAT 1.3KG |
+
+## Key Statistics
+• **Total Amount**: MYR 125.30
+• **Date Range**: 15/01/2024 - 22/01/2024
+• **Merchants**: 1 (SUPER SEVEN CASH & CARRY)
+• **Average per Receipt**: MYR 17.90
+
+## Suggested Actions
+• View detailed receipt information
+• Export data to spreadsheet
+• Set up spending alerts for this category
+
+IMPORTANT: Always use actual data from search results, format dates as DD/MM/YYYY, and include proper currency symbols (MYR/USD).`,
       userPromptTemplate: `Help find documents for: "{query}"
 
 Search Results: {searchResults}
 Total Results: {resultCount}
 
-Create a comprehensive response that includes:
-1. A concise summary highlighting key findings (total amount, date range, merchant count)
-2. Present results using receipt cards with enhanced visual design
-3. Use actual data from search results - format dates as DD/MM/YYYY and include currency
-4. If searching for specific items like "POWERCAT", mention the total count and aggregate amounts
-5. Suggest related searches or actions the user might want to take
+Create a comprehensive response following the formatting requirements above. Include:
+1. Clear summary with key findings (total amount, date range, merchant count)
+2. Organized table of receipt details with proper formatting
+3. Key statistics section with aggregate data
+4. Actionable suggestions for next steps
 
-Focus on making the information scannable and actionable. Present results in an organized manner using receipt cards and data tables. If no results, provide helpful suggestions for refining the search.`,
+Focus on making the information scannable and actionable. Use proper markdown formatting throughout.`,
       temperature: 0.2,
       maxTokens: 2000,
       includeUIComponents: true,
@@ -293,16 +377,31 @@ RESPONSE STYLE REQUIREMENTS:
 - End with a simple question: "What would you like to do?"
 - Use actual data, never template placeholders like {{date}} or {{amount}}
 - Format dates as DD/MM/YYYY and currency as MYR
+- Use markdown formatting for better readability
 
-EXAMPLE GOOD RESPONSE:
-"I found 7 receipts matching "powercat", all from SUPER SEVEN CASH & CARRY.
-They are all for POWERCAT 1.3KG at MYR 17.90.
-What would you like to do?"
+FORMATTING EXAMPLES:
+
+For single receipt:
+"I found 1 receipt for POWERCAT from SUPER SEVEN CASH & CARRY on 15/01/2024 for MYR 17.90. What would you like to do?"
+
+For multiple similar receipts:
+"I found 7 receipts matching "powercat", all from SUPER SEVEN CASH & CARRY for POWERCAT 1.3KG at MYR 17.90 each. Total: **MYR 125.30**. What would you like to do?"
+
+For multiple different receipts (use table):
+"I found 5 receipts from different merchants:
+
+| Merchant | Date | Amount | Item |
+|----------|------|--------|------|
+| SUPER SEVEN | 15/01/2024 | MYR 17.90 | POWERCAT 1.3KG |
+| TESCO EXTRA | 16/01/2024 | MYR 45.60 | Groceries |
+| SHELL STATION | 17/01/2024 | MYR 80.00 | Fuel |
+
+**Total**: MYR 143.50. What would you like to do?"
 
 AVOID:
 - Long detailed explanations in the initial response
 - Repetitive information
-- Complex tables or lists in text
+- Complex nested structures
 - Template placeholders`,
       userPromptTemplate: `Respond to: "{query}"
 
@@ -320,25 +419,43 @@ Generate a conversational, concise response following the style requirements abo
       templateId: 'temporal_empty',
       systemPrompt: `You are Mataresit AI Assistant. When temporal queries return no results, provide helpful guidance about the date range searched and suggest alternatives.
 
-RESPONSE STYLE REQUIREMENTS:
-- Acknowledge the specific time period searched (e.g., "No receipts found for June 2025")
-- Explain the exact date range that was searched (format dates as DD/MM/YYYY)
-- Provide context about why this might happen (e.g., "This was before you started using Mataresit" or "You might not have uploaded receipts for this period")
-- Suggest 3-4 specific alternative time periods that are likely to have data
-- Offer to search broader time ranges automatically
-- Keep the tone helpful, understanding, and solution-oriented
-- Be concise but comprehensive
+TEMPORAL EMPTY RESPONSE FORMATTING:
 
-EXAMPLE GOOD RESPONSE:
-"No receipts found for June 2025 (01/06/2025 - 30/06/2025). This might be because you didn't upload receipts for this period or started using Mataresit later.
+RESPONSE STRUCTURE:
+1. Clear acknowledgment of the search period
+2. Explanation of why no results were found
+3. Formatted list of alternative suggestions
+4. Helpful call-to-action
 
-Here are some alternatives to try:
-• "This month" - for July 2025 receipts
-• "Last 30 days" - for your most recent receipts
-• "Recent receipts" - for your latest uploads
-• "Last 3 months" - for a broader search
+FORMATTING REQUIREMENTS:
+- Use exact date ranges in DD/MM/YYYY format
+- Use bullet points (•) for alternative suggestions
+- Use bold formatting for important information
+- Keep tone helpful and solution-oriented
 
-Would you like me to automatically search a broader time period?"`,
+EXAMPLE RESPONSE FORMAT:
+## No Receipts Found
+
+No receipts found for **June 2025** (01/06/2025 - 30/06/2025). This might be because:
+• You didn't upload receipts for this period
+• You started using Mataresit after this date
+• This period is in the future
+
+## Alternative Searches
+Try these time periods instead:
+• **"This month"** - for current month receipts
+• **"Last 30 days"** - for your most recent receipts
+• **"Recent receipts"** - for your latest uploads
+• **"Last 3 months"** - for a broader search
+
+## Quick Action
+Would you like me to automatically search a broader time period?
+
+FORMATTING RULES:
+- Always format dates as DD/MM/YYYY
+- Use bold for emphasis on key information
+- Use bullet points for lists
+- Include helpful context about why no results were found`,
       userPromptTemplate: `The user searched for: "{query}"
 
 Date range searched: {dateRange}
@@ -380,6 +497,58 @@ Search Results: {searchResults}
 Explain clearly that the original search was expanded, mention the fallback strategy in user-friendly terms, show both date ranges, and present the results with actual data. Be transparent about the search expansion while keeping the tone positive and helpful.`,
       temperature: 0.3,
       maxTokens: 700,
+      includeUIComponents: true,
+      includeFollowUps: true
+    },
+
+    receipt_formatting: {
+      templateId: 'receipt_formatting',
+      systemPrompt: `You are Mataresit AI Assistant, specialized in presenting receipt data with optimal formatting and organization.
+
+RECEIPT DATA FORMATTING STANDARDS:
+
+SINGLE RECEIPT FORMAT:
+"Found 1 receipt from **SUPER SEVEN CASH & CARRY** on 15/01/2024 for **MYR 17.90** (POWERCAT 1.3KG)."
+
+MULTIPLE SIMILAR RECEIPTS FORMAT:
+"Found 7 receipts for POWERCAT, all from **SUPER SEVEN CASH & CARRY**:
+• All for POWERCAT 1.3KG at **MYR 17.90** each
+• Date range: 15/01/2024 - 22/01/2024
+• **Total**: MYR 125.30"
+
+MULTIPLE DIFFERENT RECEIPTS FORMAT:
+"Found 5 receipts from different merchants:
+
+| Merchant | Date | Amount | Description |
+|----------|------|--------|-------------|
+| SUPER SEVEN CASH & CARRY | 15/01/2024 | MYR 17.90 | POWERCAT 1.3KG |
+| TESCO EXTRA | 16/01/2024 | MYR 45.60 | Weekly groceries |
+| SHELL STATION | 17/01/2024 | MYR 80.00 | Fuel |
+| STARBUCKS | 18/01/2024 | MYR 12.50 | Coffee |
+| GUARDIAN | 19/01/2024 | MYR 25.30 | Personal care |
+
+## Summary
+• **Total Amount**: MYR 181.30
+• **Date Range**: 15/01/2024 - 19/01/2024
+• **Merchants**: 5 different stores
+• **Categories**: Groceries, Fuel, Food & Beverage, Personal Care"
+
+FORMATTING RULES:
+- Always use actual data, never placeholders
+- Format currency as "MYR 25.50" (space between currency and amount)
+- Format dates as DD/MM/YYYY
+- Use bold for totals and important amounts
+- Use tables for 3+ different receipts
+- Include summary statistics for multiple receipts
+- Use bullet points for key information`,
+      userPromptTemplate: `Present receipt data for: "{query}"
+
+Search Results: {searchResults}
+Total Results: {resultCount}
+
+Format the receipt data according to the standards above. Choose the appropriate format based on the number and similarity of receipts found. Always use actual data from the search results with proper formatting.`,
+      temperature: 0.2,
+      maxTokens: 1000,
       includeUIComponents: true,
       includeFollowUps: true
     }
@@ -426,6 +595,67 @@ function buildEnhancedPrompt(
   strategy: ResponseStrategy
 ): string {
   let prompt = strategy.systemPrompt;
+
+  // Add comprehensive formatting instructions
+  prompt += `\n\nCOMPREHENSIVE FORMATTING REQUIREMENTS:
+
+📋 CONTENT STRUCTURE:
+- Use markdown headers to organize content hierarchically
+- # for main sections (e.g., "# Receipt Analysis Summary")
+- ## for subsections (e.g., "## Transaction Details")
+- ### for sub-subsections (e.g., "### Payment Methods")
+- Always include a brief introductory sentence before diving into details
+
+📊 TABLE FORMATTING:
+- For receipt data, ALWAYS use this exact table format:
+  | Merchant | Date | Amount | Description |
+  |----------|------|--------|-------------|
+  | SUPER SEVEN CASH & CARRY | 15/01/2024 | MYR 17.90 | POWERCAT 1.3KG |
+- Ensure proper column alignment (amounts right-aligned)
+- Include table headers even for single rows
+- Use consistent spacing and formatting
+- For large datasets (>5 rows), consider grouping by merchant or date
+
+💰 FINANCIAL DATA:
+- Format currency as "MYR 25.50" (space between currency and amount)
+- Always include currency symbol (MYR, USD, etc.)
+- Use proper decimal places (2 for currency)
+- For totals, use bold: **Total: MYR 245.30**
+- Show percentage changes as "+15.2%" or "-8.7%"
+
+📅 DATE FORMATTING:
+- Always use DD/MM/YYYY format (e.g., 15/01/2024)
+- For date ranges: "15/01/2024 - 20/01/2024"
+- For relative dates: "3 days ago (15/01/2024)"
+- Be consistent throughout the response
+
+📝 LIST FORMATTING:
+- Use bullet points (•) for unordered lists
+- Use numbers (1., 2., 3.) for ordered lists
+- For key-value pairs: "• **Merchant**: SUPER SEVEN CASH & CARRY"
+- Maintain consistent indentation
+
+🎯 SUMMARY SECTIONS:
+- Always include a summary section for multiple items
+- Use this format:
+  ## Summary
+  • **Total Receipts**: 7 items
+  • **Total Amount**: MYR 125.30
+  • **Date Range**: 15/01/2024 - 20/01/2024
+  • **Top Merchant**: SUPER SEVEN (5 receipts)
+
+📱 MOBILE-FRIENDLY FORMATTING:
+- Keep table columns concise but informative
+- Use line breaks for better readability
+- Avoid overly wide tables (max 4-5 columns)
+- Use abbreviations when necessary (e.g., "Desc." for Description)
+
+⚠️ CRITICAL RULES:
+- NEVER use template placeholders like {{date}} or {{amount}}
+- ALWAYS use actual data from search results
+- Maintain consistent formatting throughout the response
+- Use proper markdown syntax for all formatting elements
+- Ensure tables are properly formatted with | separators`;
 
   // Add user profile context
   if (context.userProfile) {
@@ -510,6 +740,84 @@ function parseStructuredResponse(responseText: string): { content: string; rawCo
   const rawComponents: any[] = [];
   let cleanedContent = responseText;
 
+  // Look for markdown headers and convert them to UI components
+  const markdownHeaderRegex = /^(#{1,3})\s+(.+)$/gm;
+  let headerMatch;
+  while ((headerMatch = markdownHeaderRegex.exec(responseText)) !== null) {
+    try {
+      const level = headerMatch[1].length as 1 | 2 | 3;
+      const title = headerMatch[2].trim();
+
+      // Create a section_header component
+      const headerComponent = {
+        type: 'ui_component',
+        component: 'section_header',
+        data: {
+          title,
+          level,
+          variant: level === 1 ? 'primary' : 'default',
+          divider: level <= 2
+        },
+        metadata: {
+          title: `Section Header - ${title}`,
+          interactive: false
+        }
+      };
+
+      rawComponents.push(headerComponent);
+      // Remove the markdown header from content (it will be rendered as a component)
+      cleanedContent = cleanedContent.replace(headerMatch[0], '').trim();
+    } catch {
+      // Skip invalid header format
+    }
+  }
+
+  // Look for markdown tables and convert them to UI components
+  const markdownTableRegex = /\|(.+)\|\n\|(?:-+\|)+\n((?:\|.+\|\n)+)/g;
+  let tableMatch;
+  while ((tableMatch = markdownTableRegex.exec(responseText)) !== null) {
+    try {
+      const headers = tableMatch[1].split('|').map(h => h.trim()).filter(Boolean);
+      const rows = tableMatch[2].split('\n').filter(row => row.trim().length > 0)
+        .map(row => row.split('|').map(cell => cell.trim()).filter(Boolean));
+
+      // Create a data_table component
+      const tableComponent = {
+        type: 'ui_component',
+        component: 'data_table',
+        data: {
+          columns: headers.map((header, index) => ({
+            key: `col_${index}`,
+            label: header,
+            sortable: true,
+            align: index === headers.length - 1 && header.toLowerCase().includes('amount') ? 'right' : 'left'
+          })),
+          rows: rows.map(row => {
+            const rowData: any = {};
+            headers.forEach((header, index) => {
+              rowData[`col_${index}`] = row[index] || '';
+            });
+            return rowData;
+          }),
+          sortable: true,
+          searchable: true,
+          pagination: rows.length > 10
+        },
+        metadata: {
+          title: 'Data Table',
+          interactive: true
+        }
+      };
+
+      rawComponents.push(tableComponent);
+      // Remove the markdown table from content
+      cleanedContent = cleanedContent.replace(tableMatch[0], '').trim();
+    } catch {
+      // Skip invalid table format
+    }
+  }
+
+  // Process JSON blocks
   let match;
   while ((match = jsonBlockRegex.exec(responseText)) !== null) {
     try {
@@ -552,6 +860,39 @@ async function generateUIComponents(
   // This ensures receipt cards are shown for document_retrieval, general_search, financial_analysis, etc.
   if (searchResults.length > 0) {
     const receiptResults = searchResults.filter(r => r.sourceType === 'receipt');
+
+    // Create a receipt table component for better organization
+    if (receiptResults.length > 0) {
+      const tableRows = receiptResults.map(result => ({
+        col_0: result.metadata?.merchant || result.title || 'Unknown',
+        col_1: formatDate(result.metadata?.date || result.createdAt),
+        col_2: formatCurrency(result.metadata?.total || result.metadata?.amount || 0, result.metadata?.currency || 'MYR'),
+        col_3: result.metadata?.category || result.metadata?.predicted_category || 'Other',
+        col_4: result.metadata?.line_items_count ? `${result.metadata.line_items_count} items` : '-'
+      }));
+
+      components.push({
+        type: 'ui_component',
+        component: 'data_table',
+        data: {
+          columns: [
+            { key: 'col_0', label: 'Merchant', sortable: true, align: 'left' },
+            { key: 'col_1', label: 'Date', sortable: true, align: 'left' },
+            { key: 'col_2', label: 'Amount', sortable: true, align: 'right' },
+            { key: 'col_3', label: 'Category', sortable: true, align: 'left' },
+            { key: 'col_4', label: 'Items', sortable: false, align: 'center' }
+          ],
+          rows: tableRows,
+          sortable: true,
+          searchable: true,
+          pagination: tableRows.length > 10
+        },
+        metadata: {
+          title: 'Receipt Summary',
+          interactive: true
+        }
+      });
+    }
 
     // Remove the hardcoded limit - show all receipt results
     // The search API already handles pagination and limits appropriately
@@ -822,5 +1163,39 @@ function generateSearchSummary(results: any[], query: string) {
       latest: latestDate?.toISOString()
     },
     avgAmount: results.length > 0 ? totalAmount / results.length : 0
+  };
+}
+
+/**
+ * Helper functions for formatting
+ */
+function formatDate(dateString?: string): string {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return dateString;
+  }
+}
+
+function formatCurrency(amount: number, currency: string = 'MYR'): string {
+  return `${currency} ${amount.toFixed(2)}`;
+}
+
+/**
+ * Analyze content structure to help UI rendering
+ */
+function analyzeContentStructure(content: string): {
+  hasTables: boolean;
+  hasHeaders: boolean;
+  hasLists: boolean;
+  sectionsCount: number;
+} {
+  return {
+    hasTables: /\|(.+)\|\n\|(?:-+\|)+\n/.test(content),
+    hasHeaders: /^#{1,3}\s+.+$/m.test(content),
+    hasLists: /^[*-]\s+.+$/m.test(content),
+    sectionsCount: (content.match(/^#{1,3}\s+.+$/gm) || []).length
   };
 }
