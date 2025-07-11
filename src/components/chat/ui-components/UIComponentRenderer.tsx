@@ -13,6 +13,7 @@ import { DataTableComponent } from './DataTableComponent';
 import { BarChartComponent } from './BarChartComponent';
 import { PieChartComponent } from './PieChartComponent';
 import { SummaryCardComponent } from './SummaryCardComponent';
+import { SectionHeaderComponent } from './SectionHeaderComponent';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 
@@ -110,6 +111,15 @@ function SingleUIComponent({ component, onAction, compact = false }: SingleUICom
       case 'summary_card':
         return (
           <SummaryCardComponent
+            data={component.data as any}
+            onAction={onAction}
+            compact={compact}
+          />
+        );
+
+      case 'section_header':
+        return (
+          <SectionHeaderComponent
             data={component.data as any}
             onAction={onAction}
             compact={compact}
