@@ -13,7 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { usePushNotificationContext, usePushNotificationStatus } from '@/contexts/PushNotificationContext';
-import { useNotificationPreferences } from '@/hooks/usePushNotifications';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { toast } from 'sonner';
 
 interface NotificationSetupGuideProps {
@@ -24,7 +24,7 @@ interface NotificationSetupGuideProps {
 export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSetupGuideProps) {
   const pushContext = usePushNotificationContext();
   const pushStatus = usePushNotificationStatus();
-  const { preferences } = useNotificationPreferences();
+  const { preferences } = useNotifications();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 

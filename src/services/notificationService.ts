@@ -1033,15 +1033,17 @@ export class NotificationService {
   private monitorConnectionHealth(): void {
     const state = this.getConnectionState();
 
-    // Log health metrics
-    console.log(`📊 Connection Health: ${state.activeChannels} channels, ${state.registeredSubscriptions} subscriptions, ${state.pendingSubscriptions} pending`);
+    // Only log health metrics in development or when explicitly enabled
+    if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_CONNECTION_LOGS === 'true') {
+      console.log(`📊 Connection Health: ${state.activeChannels} channels, ${state.registeredSubscriptions} subscriptions, ${state.pendingSubscriptions} pending`);
+    }
 
-    // Alert if too many subscriptions (potential leak)
+    // Alert if too many subscriptions (potential leak) - always show critical alerts
     if (state.activeChannels > 10) {
       console.warn(`⚠️ High number of active channels (${state.activeChannels}). Possible subscription leak.`);
     }
 
-    // Alert if many pending subscriptions (potential issue)
+    // Alert if many pending subscriptions (potential issue) - always show critical alerts
     if (state.pendingSubscriptions > 5) {
       console.warn(`⚠️ High number of pending subscriptions (${state.pendingSubscriptions}). Possible connection issues.`);
     }

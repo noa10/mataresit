@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef, ReactNode, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { notificationService } from '@/services/notificationService';
-import { Notification, NotificationFilters, NotificationType, NotificationPriority, shouldShowNotificationWithPreferences } from '@/types/notifications';
-import { useNotificationPreferences } from '@/hooks/usePushNotifications';
+import { Notification, NotificationFilters, NotificationType, NotificationPriority, shouldShowNotificationWithPreferences, NotificationPreferences } from '@/types/notifications';
 import { toast } from 'sonner';
 import { performanceMonitor } from '@/services/realTimePerformanceMonitor';
 
@@ -288,6 +287,11 @@ interface NotificationContextType {
   error: string | null;
   lastUpdated: string | null;
 
+  // Notification Preferences (centralized)
+  preferences: NotificationPreferences | null;
+  preferencesLoading: boolean;
+  preferencesError: string | null;
+
   // Actions
   loadNotifications: (filters?: NotificationFilters) => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
@@ -295,6 +299,10 @@ interface NotificationContextType {
   archiveNotification: (notificationId: string) => Promise<void>;
   deleteNotification: (notificationId: string) => Promise<void>;
   refreshNotifications: () => Promise<void>;
+
+  // Notification Preferences Actions
+  loadPreferences: () => Promise<void>;
+  updatePreferences: (updates: Partial<NotificationPreferences>) => Promise<void>;
 
   // Real-time connection management
   reconnect: () => void;
@@ -336,12 +344,17 @@ interface NotificationProviderProps {
 export function NotificationProvider({ children }: NotificationProviderProps) {
   const { user } = useAuth();
   const { currentTeam } = useTeam();
-  const { preferences: notificationPreferences } = useNotificationPreferences();
   const [state, dispatch] = useReducer(notificationReducer, initialState);
   const retryAttempts = useRef(0);
   const maxRetryAttempts = parseInt(import.meta.env.VITE_REALTIME_MAX_RETRIES || '3', 10);
   const fallbackMode = useRef(false);
   const healthMonitoringStarted = useRef(false);
+
+  // Centralized notification preferences state
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [preferencesLoading, setPreferencesLoading] = useState(false);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const preferencesLoadedRef = useRef(false);
 
   // OPTIMIZATION: Performance monitoring for rate limiting and operations
   const performanceMetrics = useRef({
@@ -531,6 +544,59 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       }
     }, 500) // Debounce rapid refresh requests
   );
+
+  // Centralized notification preferences loading
+  const loadPreferences = useCallback(async () => {
+    if (!user || preferencesLoadedRef.current) return;
+
+    setPreferencesLoading(true);
+    setPreferencesError(null);
+
+    try {
+      const prefs = await notificationService.getUserNotificationPreferences();
+      setPreferences(prefs);
+      preferencesLoadedRef.current = true;
+      if (import.meta.env.DEV) {
+        console.log('✅ Notification preferences loaded centrally');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load preferences';
+      setPreferencesError(errorMessage);
+      console.error('❌ Error loading notification preferences:', err);
+    } finally {
+      setPreferencesLoading(false);
+    }
+  }, [user]);
+
+  // Centralized notification preferences updating
+  const updatePreferences = useCallback(async (updates: Partial<NotificationPreferences>) => {
+    if (!user) return;
+
+    setPreferencesLoading(true);
+    setPreferencesError(null);
+
+    try {
+      await notificationService.updateNotificationPreferences(updates);
+
+      // Reload preferences after update (avoid circular dependency)
+      preferencesLoadedRef.current = false;
+      const prefs = await notificationService.getUserNotificationPreferences();
+      setPreferences(prefs);
+      preferencesLoadedRef.current = true;
+
+      toast.success('Notification preferences updated');
+      if (import.meta.env.DEV) {
+        console.log('✅ Notification preferences updated and reloaded');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update preferences';
+      setPreferencesError(errorMessage);
+      toast.error(errorMessage);
+      console.error('❌ Error updating notification preferences:', err);
+    } finally {
+      setPreferencesLoading(false);
+    }
+  }, [user]);
 
   // Load notifications from the server
   const loadNotifications = useCallback(async (filters?: NotificationFilters) => {
@@ -812,7 +878,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
                 }
 
                 // Handle new notifications with enhanced throttling and rate limiting
-                if (shouldShowNotificationWithPreferences(notification, notificationPreferences)) {
+                if (shouldShowNotificationWithPreferences(notification, preferences)) {
                   const startTime = performance.now();
                   try {
                     const success = throttledAddNotification.current(notification);
@@ -1036,19 +1102,22 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         console.log('🏥 Starting connection health monitoring');
         notificationService.startConnectionHealthMonitoring();
 
-        // OPTIMIZATION: Start performance monitoring with integration
+        // OPTIMIZATION: Start performance monitoring with integration (only in development)
         const performanceReportInterval = setInterval(() => {
           const stats = performanceMetrics.current.getStats();
           if (stats.processed > 0 || stats.blocked > 0) {
-            console.log('📊 Notification Performance Stats:', {
-              processed: stats.processed,
-              blocked: stats.blocked,
-              blockRate: `${stats.blockRate.toFixed(1)}%`,
-              avgProcessingTime: `${stats.averageProcessingTime.toFixed(2)}ms`,
-              maxProcessingTime: `${stats.maxProcessingTime.toFixed(2)}ms`,
-              circuitBreakerTrips: stats.circuitBreakerTrips,
-              timeWindow: `${(stats.timeWindowMs / 1000).toFixed(1)}s`
-            });
+            // Only log performance stats in development or when explicitly enabled
+            if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_PERFORMANCE_LOGS === 'true') {
+              console.log('📊 Notification Performance Stats:', {
+                processed: stats.processed,
+                blocked: stats.blocked,
+                blockRate: `${stats.blockRate.toFixed(1)}%`,
+                avgProcessingTime: `${stats.averageProcessingTime.toFixed(2)}ms`,
+                maxProcessingTime: `${stats.maxProcessingTime.toFixed(2)}ms`,
+                circuitBreakerTrips: stats.circuitBreakerTrips,
+                timeWindow: `${(stats.timeWindowMs / 1000).toFixed(1)}s`
+              });
+            }
 
             // OPTIMIZATION: Update performance monitor with notification metrics
             performanceMonitor.updateNotificationMetrics({
@@ -1060,12 +1129,12 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
               circuitBreakerTrips: stats.circuitBreakerTrips
             });
 
-            // Alert if block rate is too high
+            // Alert if block rate is too high (only critical alerts in production)
             if (stats.blockRate > 20) {
               console.warn(`⚠️ High notification block rate: ${stats.blockRate.toFixed(1)}%`);
             }
 
-            // Alert if processing time is too high
+            // Alert if processing time is too high (only critical alerts in production)
             if (stats.averageProcessingTime > 50) {
               console.warn(`⚠️ High notification processing time: ${stats.averageProcessingTime.toFixed(2)}ms`);
             }
@@ -1073,7 +1142,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             // Reset metrics for next window
             performanceMetrics.current.reset();
           }
-        }, 120000); // Report every 2 minutes for reduced overhead
+        }, 300000); // Report every 5 minutes for reduced overhead in production
 
         // Cleanup interval on unmount
         return () => clearInterval(performanceReportInterval);
@@ -1082,6 +1151,18 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       }
     }
   }, [user, currentTeam?.id, loadNotifications]);
+
+  // Load notification preferences when user changes
+  useEffect(() => {
+    if (user && !preferencesLoadedRef.current) {
+      loadPreferences();
+    } else if (!user) {
+      // Reset preferences state when user logs out
+      setPreferences(null);
+      setPreferencesError(null);
+      preferencesLoadedRef.current = false;
+    }
+  }, [user]); // Remove loadPreferences dependency to prevent infinite loops
 
   // Optimized cross-tab synchronization using localStorage
   useEffect(() => {
@@ -1185,7 +1266,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     };
   }, []);
 
-  const contextValue: NotificationContextType = {
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue: NotificationContextType = useMemo(() => ({
     // State
     notifications: state.notifications,
     unreadCount: state.unreadCount,
@@ -1193,6 +1275,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     isConnected: state.isConnected,
     error: state.error,
     lastUpdated: state.lastUpdated,
+
+    // Notification Preferences (centralized)
+    preferences,
+    preferencesLoading,
+    preferencesError,
 
     // Actions
     loadNotifications,
@@ -1202,6 +1289,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     deleteNotification,
     refreshNotifications,
     reconnect,
+
+    // Notification Preferences Actions
+    loadPreferences,
+    updatePreferences,
 
     // Performance monitoring
     getPerformanceStats,
@@ -1221,7 +1312,28 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       circuitBreaker.current.reset();
       console.log('🔄 Rate limiting metrics reset');
     },
-  };
+  }), [
+    // Dependencies for useMemo
+    state.notifications,
+    state.unreadCount,
+    state.isLoading,
+    state.isConnected,
+    state.error,
+    state.lastUpdated,
+    preferences,
+    preferencesLoading,
+    preferencesError,
+    loadNotifications,
+    markAsRead,
+    markAllAsRead,
+    archiveNotification,
+    deleteNotification,
+    refreshNotifications,
+    reconnect,
+    loadPreferences,
+    updatePreferences,
+    getPerformanceStats,
+  ]);
 
   return (
     <NotificationContext.Provider value={contextValue}>

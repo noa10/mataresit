@@ -24,8 +24,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { useNotificationPreferences } from '@/hooks/usePushNotifications';
 import { usePushNotificationContext, usePushNotificationStatus } from '@/contexts/PushNotificationContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { NOTIFICATION_CATEGORIES } from '@/types/notifications';
 import { useSettingsTranslation } from '@/contexts/LanguageContext';
 import { NotificationSetupGuide } from '@/components/notifications/NotificationSetupGuide';
@@ -33,7 +33,7 @@ import { NotificationTestPanel } from '@/components/notifications/NotificationTe
 
 export function NotificationPreferences() {
   const { t } = useSettingsTranslation();
-  const { preferences, isLoading, updatePreferences } = useNotificationPreferences();
+  const { preferences, preferencesLoading: isLoading, updatePreferences } = useNotifications();
   const pushContext = usePushNotificationContext();
   const pushStatus = usePushNotificationStatus();
   

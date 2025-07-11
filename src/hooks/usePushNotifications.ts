@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PushNotificationService } from '@/services/pushNotificationService';
 import { notificationService } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -232,58 +232,24 @@ export function usePushNotifications(): PushNotificationState & PushNotification
   };
 }
 
-// Hook for checking notification preferences
+// DEPRECATED: Hook for checking notification preferences
+// This hook is now deprecated. Use useNotifications() from NotificationContext instead
+// which provides centralized preferences to avoid multiple API calls.
 export function useNotificationPreferences() {
-  const { user } = useAuth();
-  const [preferences, setPreferences] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  console.error('🚫 useNotificationPreferences is DEPRECATED and DISABLED. Use useNotifications().preferences instead for better performance.');
 
-  const loadPreferences = useCallback(async () => {
-    if (!user) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const prefs = await notificationService.getUserNotificationPreferences();
-      setPreferences(prefs);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load preferences';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const updatePreferences = useCallback(async (updates: any) => {
-    if (!user) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await notificationService.updateNotificationPreferences(updates);
-      await loadPreferences(); // Reload preferences
-      toast.success('Notification preferences updated');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update preferences';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, loadPreferences]);
-
-  useEffect(() => {
-    loadPreferences();
-  }, [loadPreferences]);
-
+  // Return empty state immediately to prevent any API calls
   return {
-    preferences,
-    isLoading,
-    error,
-    loadPreferences,
-    updatePreferences
+    preferences: null,
+    isLoading: false,
+    error: 'This hook is deprecated. Use useNotifications().preferences instead.',
+    loadPreferences: async () => {
+      console.error('🚫 loadPreferences is disabled. Use useNotifications().loadPreferences instead.');
+    },
+    updatePreferences: async () => {
+      console.error('🚫 updatePreferences is disabled. Use useNotifications().updatePreferences instead.');
+    }
   };
+
+  // All implementation removed to prevent infinite loading issues
 }

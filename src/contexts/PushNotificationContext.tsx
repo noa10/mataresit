@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useCallback, ReactNode } from 'react';
 import { usePushNotifications, PushNotificationState, PushNotificationActions } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -37,7 +37,7 @@ interface PushNotificationProviderProps {
 export function PushNotificationProvider({ children }: PushNotificationProviderProps) {
   const { user } = useAuth();
   const pushNotifications = usePushNotifications();
-  const { notifications, lastUpdated } = useNotifications();
+  const { notifications, lastUpdated, preferences: centralizedPreferences } = useNotifications();
 
   // Auto-initialize when user is available and push is supported
   useEffect(() => {
@@ -69,26 +69,29 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
     }
   }, [user, pushNotifications.isSubscribed, notifications, lastUpdated]);
 
-  const shouldShowPushNotification = async (type: NotificationType): Promise<boolean> => {
+  const shouldShowPushNotification = useCallback(async (type: NotificationType): Promise<boolean> => {
     try {
       if (!user) return false;
-      
-      // Check user preferences
-      const preferences = await notificationService.getUserNotificationPreferences();
-      
+
+      // Use centralized preferences from NotificationContext to avoid duplicate API calls
+      if (!centralizedPreferences) {
+        console.warn('Push notification preferences not loaded yet');
+        return false;
+      }
+
       // Check if push notifications are enabled
-      if (!preferences.push_enabled) return false;
-      
+      if (!centralizedPreferences.push_enabled) return false;
+
       // Check specific notification type preference
-      const prefKey = `push_${type}` as keyof typeof preferences;
-      const isEnabled = preferences[prefKey];
-      
+      const prefKey = `push_${type}` as keyof typeof centralizedPreferences;
+      const isEnabled = centralizedPreferences[prefKey];
+
       return typeof isEnabled === 'boolean' ? isEnabled : true;
     } catch (error) {
       console.error('Error checking push notification preferences:', error);
       return false;
     }
-  };
+  }, [user, centralizedPreferences]);
 
   const showNotificationForType = async (notification: any) => {
     try {
@@ -216,7 +219,7 @@ export function usePushNotificationStatus() {
 // Utility hook for managing push notification settings
 export function usePushNotificationSettings() {
   const context = usePushNotificationContext();
-  const { preferences, updatePreferences } = useNotificationPreferences();
+  const { preferences, updatePreferences } = useNotifications();
   
   const togglePushNotifications = async (enabled: boolean) => {
     if (enabled && !context.isSubscribed) {
@@ -247,5 +250,5 @@ export function usePushNotificationSettings() {
   };
 }
 
-// Re-export the hook for convenience
-export { useNotificationPreferences } from '@/hooks/usePushNotifications';
+// REMOVED: Re-export of deprecated useNotificationPreferences hook
+// Use useNotifications() from NotificationContext instead for centralized preferences

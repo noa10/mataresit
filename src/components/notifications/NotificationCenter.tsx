@@ -22,7 +22,6 @@ import {
   formatNotificationTime,
   shouldShowNotificationWithPreferences,
 } from '@/types/notifications';
-import { useNotificationPreferences } from '@/hooks/usePushNotifications';
 import { cn } from '@/lib/utils';
 
 interface NotificationCenterProps {
@@ -47,10 +46,8 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
     deleteNotification,
     refreshNotifications,
     reconnect,
+    preferences: notificationPreferences,
   } = useNotifications();
-
-  // Load user notification preferences
-  const { preferences: notificationPreferences } = useNotificationPreferences();
 
   // Filter notifications by team if specified
   const filteredNotifications = teamId
