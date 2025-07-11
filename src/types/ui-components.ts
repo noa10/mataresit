@@ -25,7 +25,8 @@ export type UIComponentType =
   | 'data_table'
   | 'bar_chart'
   | 'pie_chart'
-  | 'summary_card';
+  | 'summary_card'
+  | 'section_header';
 
 // Component Metadata
 export interface UIComponentMetadata {
@@ -48,7 +49,8 @@ export type UIComponentData =
   | DataTableData
   | BarChartData
   | PieChartData
-  | SummaryCardData;
+  | SummaryCardData
+  | SectionHeaderData;
 
 // Receipt Card Component Data
 export interface ReceiptCardData {
@@ -203,15 +205,25 @@ export interface DataTableData {
   pagination?: boolean;
   total_rows?: number;
   currency?: string;
+  // Enhanced features
+  filterable?: boolean;
+  exportable?: boolean;
+  selectable?: boolean;
+  compact?: boolean;
 }
 
 export interface DataTableColumn {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'currency' | 'date' | 'badge' | 'action';
+  type: 'text' | 'number' | 'currency' | 'date' | 'badge' | 'action' | 'boolean' | 'email' | 'url';
   sortable?: boolean;
+  filterable?: boolean;
   width?: string;
   align?: 'left' | 'center' | 'right';
+  // Enhanced properties
+  hidden?: boolean;
+  resizable?: boolean;
+  description?: string;
 }
 
 export interface DataTableRow {
@@ -276,4 +288,22 @@ export interface SummaryCardData {
   color?: 'default' | 'primary' | 'success' | 'warning' | 'danger';
   actions?: ActionButtonData[];
   metadata?: Record<string, any>;
+}
+
+// Section Header Component Data
+export interface SectionHeaderData {
+  title: string;
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  subtitle?: string;
+  collapsible?: boolean;
+  collapsed?: boolean;
+  icon?: string;
+  badge?: {
+    text: string;
+    variant?: 'default' | 'secondary' | 'destructive' | 'outline';
+  };
+  variant?: 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info';
+  divider?: boolean;
+  anchor?: string;
+  standalone?: boolean; // Indicates if this is a standalone header that might be duplicated
 }

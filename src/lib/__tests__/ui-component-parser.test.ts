@@ -182,6 +182,65 @@ This should fail parsing.`;
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
+
+    it('should parse markdown headers and mark standalone headers', () => {
+      const content = `# Financial Analysis Summary
+
+This analysis examines spending patterns.
+
+## Spending Overview
+
+Here are the details.
+
+## Transaction Breakdown
+
+Individual transactions listed below.
+
+# Regular Header
+
+This is a regular header with content.`;
+
+      const result = parseUIComponents(content);
+
+      expect(result.success).toBe(true);
+      expect(result.components).toHaveLength(4);
+
+      // Check that standalone headers are marked correctly
+      const financialHeader = result.components.find(c => c.data.title === 'Financial Analysis Summary');
+      const spendingHeader = result.components.find(c => c.data.title === 'Spending Overview');
+      const transactionHeader = result.components.find(c => c.data.title === 'Transaction Breakdown');
+      const regularHeader = result.components.find(c => c.data.title === 'Regular Header');
+
+      expect(financialHeader?.data.standalone).toBe(true);
+      expect(spendingHeader?.data.standalone).toBe(true);
+      expect(transactionHeader?.data.standalone).toBe(true);
+      expect(regularHeader?.data.standalone).toBe(false);
+    });
+
+    it('should clean up redundant content patterns', () => {
+      const content = `# Financial Analysis Summary
+
+Financial Analysis Summary:
+
+This analysis examines spending.
+
+Spending Overview:
+
+Transaction details follow.
+
+## Spending Overview
+
+More content here.`;
+
+      const result = parseUIComponents(content);
+
+      expect(result.success).toBe(true);
+      // Should remove the redundant "Financial Analysis Summary:" and "Spending Overview:" lines
+      expect(result.cleanedContent).not.toContain('Financial Analysis Summary:');
+      expect(result.cleanedContent).not.toContain('Spending Overview:');
+      expect(result.cleanedContent).toContain('This analysis examines spending.');
+      expect(result.cleanedContent).toContain('More content here.');
+    });
   });
 
   describe('generateSampleComponent', () => {

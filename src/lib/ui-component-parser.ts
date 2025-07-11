@@ -21,7 +21,8 @@ import {
   DataTableData,
   BarChartData,
   PieChartData,
-  SummaryCardData
+  SummaryCardData,
+  SectionHeaderData
 } from '@/types/ui-components';
 
 // Zod schemas for validation
@@ -227,7 +228,7 @@ const UIComponentSchema = z.object({
   component: z.enum([
     'receipt_card', 'spending_chart', 'action_button', 'category_breakdown',
     'trend_chart', 'merchant_summary', 'financial_insight', 'data_table',
-    'bar_chart', 'pie_chart', 'summary_card'
+    'bar_chart', 'pie_chart', 'summary_card', 'section_header'
   ]),
   data: z.any(), // Will be validated based on component type
   metadata: UIComponentMetadataSchema,
@@ -240,6 +241,244 @@ const UIComponentSchema = z.object({
 const JSON_BLOCK_REGEX = /```(?:json|ui_component)\s*\n([\s\S]*?)\n```/g;
 
 /**
+ * Regular expressions for markdown content detection
+ */
+const MARKDOWN_TABLE_REGEX = /\|(.+)\|\n\|(?:-+\|)+\n((?:\|.+\|\n?)+)/g;
+const MARKDOWN_HEADER_REGEX = /^(#{1,6})\s+(.+)$/gm;
+
+/**
+ * Parse markdown tables and convert them to DataTable UI components
+ */
+function parseMarkdownTables(content: string): { components: UIComponent[], cleanedContent: string } {
+  const components: UIComponent[] = [];
+  let cleanedContent = content;
+
+  // Reset regex lastIndex to ensure proper matching
+  MARKDOWN_TABLE_REGEX.lastIndex = 0;
+
+  const matches = Array.from(content.matchAll(MARKDOWN_TABLE_REGEX));
+
+  for (const match of matches) {
+    try {
+      const headerRow = match[1];
+      const dataRows = match[2];
+
+      // Parse headers
+      const headers = headerRow.split('|')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+
+      // Parse data rows
+      const rows = dataRows.split('\n')
+        .filter(row => row.trim().length > 0)
+        .map(row => {
+          const cells = row.split('|')
+            .map(cell => cell.trim())
+            .filter(cell => cell.length > 0);
+          return cells;
+        })
+        .filter(row => row.length > 0);
+
+      if (headers.length > 0 && rows.length > 0) {
+        // Extract column values for type detection
+        const columnValues = headers.map((_, colIndex) =>
+          rows.map(row => row[colIndex] || '').filter(val => val.trim().length > 0)
+        );
+
+        // Create column definitions with smart type detection
+        const columns = headers.map((header, index) => {
+          const columnKey = `col_${index}`;
+          const values = columnValues[index];
+          const { type, align } = detectColumnType(header, values);
+
+          return {
+            key: columnKey,
+            label: header,
+            type,
+            sortable: true,
+            align
+          };
+        });
+
+        // Create row data
+        const tableRows = rows.map((row, rowIndex) => {
+          const rowData: any = { id: `row_${rowIndex}` };
+          headers.forEach((header, colIndex) => {
+            const columnKey = `col_${colIndex}`;
+            let cellValue = row[colIndex] || '';
+
+            // Clean up cell value
+            cellValue = cellValue.trim();
+
+            // Try to parse numbers for currency/number columns
+            const column = columns[colIndex];
+            if (column.type === 'currency' || column.type === 'number') {
+              const numMatch = cellValue.match(/[\d,]+\.?\d*/);
+              if (numMatch) {
+                const numValue = parseFloat(numMatch[0].replace(/,/g, ''));
+                if (!isNaN(numValue)) {
+                  cellValue = numValue;
+                }
+              }
+            }
+
+            rowData[columnKey] = cellValue;
+          });
+          return rowData;
+        });
+
+        // Create DataTable component
+        const tableComponent: UIComponent = {
+          type: 'ui_component',
+          component: 'data_table',
+          data: {
+            columns,
+            rows: tableRows,
+            searchable: true,
+            sortable: true,
+            pagination: tableRows.length > 10,
+            currency: 'MYR' // Default currency
+          } as DataTableData,
+          metadata: {
+            title: 'Data Table',
+            interactive: true,
+            description: 'Interactive table generated from markdown'
+          }
+        };
+
+        components.push(tableComponent);
+
+        // Remove the markdown table from content
+        cleanedContent = cleanedContent.replace(match[0], '').trim();
+      }
+    } catch (error) {
+      console.warn('Failed to parse markdown table:', error);
+      // Continue processing other tables
+    }
+  }
+
+  return { components, cleanedContent };
+}
+
+/**
+ * Parse markdown headers and convert them to SectionHeader UI components
+ */
+function parseMarkdownHeaders(content: string): { components: UIComponent[], cleanedContent: string } {
+  const components: UIComponent[] = [];
+  let cleanedContent = content;
+
+  // Reset regex lastIndex to ensure proper matching
+  MARKDOWN_HEADER_REGEX.lastIndex = 0;
+
+  const matches = Array.from(content.matchAll(MARKDOWN_HEADER_REGEX));
+
+  for (const match of matches) {
+    try {
+      const level = match[1].length as 1 | 2 | 3 | 4 | 5 | 6;
+      const title = match[2].trim();
+
+      // Skip if title is empty
+      if (!title) continue;
+
+      // Check if this is a standalone section header that might be duplicated
+      const standaloneHeaders = [
+        'Financial Analysis Summary',
+        'Spending Overview',
+        'Transaction Breakdown',
+        'Insights & Trends',
+        'Recommendations',
+        'Key Insights',
+        'Summary',
+        'Analysis'
+      ];
+
+      const isStandaloneHeader = standaloneHeaders.some(header =>
+        title.toLowerCase().includes(header.toLowerCase()) && title.length < 60
+      );
+
+      // Create SectionHeader component
+      const headerComponent: UIComponent = {
+        type: 'ui_component',
+        component: 'section_header',
+        data: {
+          title,
+          level,
+          variant: level === 1 ? 'primary' : 'default',
+          divider: level <= 2,
+          standalone: isStandaloneHeader
+        } as SectionHeaderData,
+        metadata: {
+          title: `Section Header - ${title}`,
+          interactive: false,
+          description: `Level ${level} header${isStandaloneHeader ? ' (standalone)' : ''}`
+        }
+      };
+
+      components.push(headerComponent);
+
+      // Always remove the markdown header from content to prevent duplication
+      cleanedContent = cleanedContent.replace(match[0], '').trim();
+    } catch (error) {
+      console.warn('Failed to parse markdown header:', error);
+      // Continue processing other headers
+    }
+  }
+
+  return { components, cleanedContent };
+}
+
+/**
+ * Clean up redundant content patterns that might cause confusion
+ */
+function cleanupRedundantContent(content: string): string {
+  let cleaned = content;
+
+  // Remove standalone section headers that appear as plain text
+  const redundantPatterns = [
+    // Remove lines that are just section headers without content
+    /^(Financial Analysis Summary|Spending Overview|Transaction Breakdown|Insights & Trends|Recommendations|Key Insights|Summary|Analysis):\s*$/gm,
+
+    // Remove duplicate titles in quotes followed by section names
+    /^"[^"]*"\s+(Chill Purchases|Chili Purchases|Analysis|Summary|Overview|Breakdown|Insights|Recommendations)\s*$/gm,
+
+    // Remove standalone quoted titles that appear to be duplicated headers (but preserve those with meaningful content)
+    /^"[^"]*"\s+(Chill Purchases|Chili Purchases|Analysis|Summary|Overview|Breakdown|Insights|Recommendations|Purchases)\s*$/gm,
+
+    // Remove empty lines that follow removed headers
+    /\n\s*\n\s*\n/g,
+
+    // Remove trailing colons on standalone lines
+    /^([A-Z][a-z\s&]+):\s*$/gm
+  ];
+
+  redundantPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, (match, group1) => {
+      // For the last pattern, only remove if it's a known section header
+      if (group1) {
+        const knownHeaders = [
+          'Financial Analysis Summary',
+          'Spending Overview',
+          'Transaction Breakdown',
+          'Insights & Trends',
+          'Recommendations',
+          'Key Insights',
+          'Summary',
+          'Analysis'
+        ];
+        return knownHeaders.includes(group1) ? '' : match;
+      }
+      return '';
+    });
+  });
+
+  // Clean up excessive whitespace
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  cleaned = cleaned.replace(/^\s+$/gm, '');
+
+  return cleaned.trim();
+}
+
+/**
  * Parse LLM response content and extract UI components
  */
 export function parseUIComponents(content: string): UIComponentParseResult {
@@ -248,8 +487,21 @@ export function parseUIComponents(content: string): UIComponentParseResult {
   let cleanedContent = content;
 
   try {
-    // Find all JSON blocks in the content
-    const matches = Array.from(content.matchAll(JSON_BLOCK_REGEX));
+    // First, parse markdown tables and convert them to UI components
+    const tableParseResult = parseMarkdownTables(cleanedContent);
+    components.push(...tableParseResult.components);
+    cleanedContent = tableParseResult.cleanedContent;
+
+    // Then, parse markdown headers and convert them to UI components
+    const headerParseResult = parseMarkdownHeaders(cleanedContent);
+    components.push(...headerParseResult.components);
+    cleanedContent = headerParseResult.cleanedContent;
+
+    // Additional cleanup for redundant content patterns
+    cleanedContent = cleanupRedundantContent(cleanedContent);
+
+    // Finally, find all JSON blocks in the content
+    const matches = Array.from(cleanedContent.matchAll(JSON_BLOCK_REGEX));
 
     for (const match of matches) {
       const jsonString = match[1].trim();
@@ -287,6 +539,140 @@ export function parseUIComponents(content: string): UIComponentParseResult {
       components: [],
       cleanedContent: content,
       errors: [`Parser error: ${error.message}`],
+    };
+  }
+}
+
+/**
+ * Enhanced parsing with configuration options
+ */
+export interface ParseOptions {
+  parseMarkdownTables?: boolean;
+  parseMarkdownHeaders?: boolean;
+  parseJsonBlocks?: boolean;
+  defaultCurrency?: string;
+  tableRowLimit?: number;
+}
+
+export function parseUIComponentsWithOptions(
+  content: string,
+  options: ParseOptions = {}
+): UIComponentParseResult {
+  const {
+    parseMarkdownTables = true,
+    parseMarkdownHeaders = true,
+    parseJsonBlocks = true,
+    defaultCurrency = 'MYR',
+    tableRowLimit = 100
+  } = options;
+
+  // Performance optimization: Early return for empty content
+  if (!content || content.trim().length === 0) {
+    return {
+      success: true,
+      components: [],
+      cleanedContent: '',
+      errors: undefined,
+    };
+  }
+
+  // Performance optimization: Skip processing if content is too large
+  const MAX_CONTENT_LENGTH = 50000; // 50KB limit
+  if (content.length > MAX_CONTENT_LENGTH) {
+    console.warn(`Content too large for parsing: ${content.length} characters. Limit: ${MAX_CONTENT_LENGTH}`);
+    return {
+      success: false,
+      components: [],
+      cleanedContent: content,
+      errors: ['Content too large for processing'],
+    };
+  }
+
+  const components: UIComponent[] = [];
+  const errors: string[] = [];
+  let cleanedContent = content;
+
+  try {
+    // Parse markdown tables if enabled
+    if (parseMarkdownTables) {
+      const tableParseResult = parseMarkdownTables(cleanedContent);
+      // Apply row limit to tables with performance optimization
+      const limitedTableComponents = tableParseResult.components.map(comp => {
+        if (comp.component === 'data_table') {
+          const tableData = comp.data as DataTableData;
+          if (tableData.rows.length > tableRowLimit) {
+            // Performance optimization: Use more efficient slicing for large tables
+            const truncatedRows = tableData.rows.length > 1000
+              ? tableData.rows.slice(0, tableRowLimit)
+              : tableData.rows.slice(0, tableRowLimit);
+
+            return {
+              ...comp,
+              data: {
+                ...tableData,
+                rows: truncatedRows,
+                pagination: true,
+                virtualScrolling: tableData.rows.length > 50 // Enable virtualization for large tables
+              },
+              metadata: {
+                ...comp.metadata,
+                description: `Table truncated to ${tableRowLimit} rows (${tableData.rows.length} total)`,
+                originalRowCount: tableData.rows.length,
+                performanceOptimized: true
+              }
+            };
+          }
+        }
+        return comp;
+      });
+
+      components.push(...limitedTableComponents);
+      cleanedContent = tableParseResult.cleanedContent;
+    }
+
+    // Parse markdown headers if enabled
+    if (parseMarkdownHeaders) {
+      const headerParseResult = parseMarkdownHeaders(cleanedContent);
+      components.push(...headerParseResult.components);
+      cleanedContent = headerParseResult.cleanedContent;
+    }
+
+    // Parse JSON blocks if enabled
+    if (parseJsonBlocks) {
+      const matches = Array.from(cleanedContent.matchAll(JSON_BLOCK_REGEX));
+
+      for (const match of matches) {
+        const jsonString = match[1].trim();
+
+        try {
+          const jsonData = JSON.parse(jsonString);
+          const validationResult = validateUIComponent(jsonData);
+
+          if (validationResult.valid && validationResult.component) {
+            components.push(validationResult.component);
+            cleanedContent = cleanedContent.replace(match[0], '').trim();
+          } else {
+            errors.push(`Invalid UI component: ${validationResult.errors.join(', ')}`);
+          }
+        } catch (parseError) {
+          errors.push(`JSON parse error: ${parseError.message}`);
+        }
+      }
+    }
+
+    return {
+      success: components.length > 0 || errors.length === 0,
+      components,
+      cleanedContent,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      components: [],
+      cleanedContent: content,
+      errors: [`Enhanced parser error: ${error.message}`],
     };
   }
 }
@@ -397,6 +783,146 @@ function validateComponentData(componentType: UIComponentType, data: any): Compo
       errors: [`Data validation error: ${error.message}`],
     };
   }
+}
+
+/**
+ * Analyze content to detect markdown structures
+ */
+export function analyzeMarkdownContent(content: string): {
+  hasMarkdownTables: boolean;
+  hasMarkdownHeaders: boolean;
+  tableCount: number;
+  headerCount: number;
+  headerLevels: number[];
+} {
+  const tableMatches = Array.from(content.matchAll(MARKDOWN_TABLE_REGEX));
+  const headerMatches = Array.from(content.matchAll(MARKDOWN_HEADER_REGEX));
+
+  return {
+    hasMarkdownTables: tableMatches.length > 0,
+    hasMarkdownHeaders: headerMatches.length > 0,
+    tableCount: tableMatches.length,
+    headerCount: headerMatches.length,
+    headerLevels: headerMatches.map(match => match[1].length)
+  };
+}
+
+/**
+ * Extract table preview from markdown table
+ */
+export function extractTablePreview(content: string, maxRows: number = 3): {
+  tables: Array<{
+    headers: string[];
+    rows: string[][];
+    totalRows: number;
+  }>;
+} {
+  const tables: Array<{
+    headers: string[];
+    rows: string[][];
+    totalRows: number;
+  }> = [];
+
+  const matches = Array.from(content.matchAll(MARKDOWN_TABLE_REGEX));
+
+  for (const match of matches) {
+    try {
+      const headerRow = match[1];
+      const dataRows = match[2];
+
+      const headers = headerRow.split('|')
+        .map(h => h.trim())
+        .filter(h => h.length > 0);
+
+      const allRows = dataRows.split('\n')
+        .filter(row => row.trim().length > 0)
+        .map(row => {
+          const cells = row.split('|')
+            .map(cell => cell.trim())
+            .filter(cell => cell.length > 0);
+          return cells;
+        })
+        .filter(row => row.length > 0);
+
+      const previewRows = allRows.slice(0, maxRows);
+
+      tables.push({
+        headers,
+        rows: previewRows,
+        totalRows: allRows.length
+      });
+    } catch (error) {
+      console.warn('Failed to extract table preview:', error);
+    }
+  }
+
+  return { tables };
+}
+
+/**
+ * Smart column type detection based on content analysis
+ */
+function detectColumnType(header: string, values: string[]): {
+  type: 'text' | 'number' | 'currency' | 'date' | 'badge';
+  align: 'left' | 'center' | 'right';
+} {
+  const headerLower = header.toLowerCase();
+
+  // Check header keywords first
+  if (headerLower.includes('amount') || headerLower.includes('total') ||
+      headerLower.includes('price') || headerLower.includes('cost')) {
+    return { type: 'currency', align: 'right' };
+  }
+
+  if (headerLower.includes('date') || headerLower.includes('time')) {
+    return { type: 'date', align: 'left' };
+  }
+
+  if (headerLower.includes('category') || headerLower.includes('status') ||
+      headerLower.includes('type') || headerLower.includes('tag')) {
+    return { type: 'badge', align: 'center' };
+  }
+
+  if (headerLower.includes('count') || headerLower.includes('number') ||
+      headerLower.includes('qty') || headerLower.includes('quantity')) {
+    return { type: 'number', align: 'right' };
+  }
+
+  // Analyze content patterns
+  const nonEmptyValues = values.filter(v => v && v.trim().length > 0);
+  if (nonEmptyValues.length === 0) {
+    return { type: 'text', align: 'left' };
+  }
+
+  // Check for currency patterns
+  const currencyPattern = /^[A-Z]{3}\s*[\d,]+\.?\d*$|^[\d,]+\.?\d*\s*[A-Z]{3}$|^\$[\d,]+\.?\d*$|^[\d,]+\.?\d*$/;
+  const currencyMatches = nonEmptyValues.filter(v => currencyPattern.test(v.trim()));
+  if (currencyMatches.length > nonEmptyValues.length * 0.7) {
+    return { type: 'currency', align: 'right' };
+  }
+
+  // Check for date patterns
+  const datePattern = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$|^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/;
+  const dateMatches = nonEmptyValues.filter(v => datePattern.test(v.trim()));
+  if (dateMatches.length > nonEmptyValues.length * 0.7) {
+    return { type: 'date', align: 'left' };
+  }
+
+  // Check for number patterns
+  const numberPattern = /^[\d,]+\.?\d*$/;
+  const numberMatches = nonEmptyValues.filter(v => numberPattern.test(v.trim()));
+  if (numberMatches.length > nonEmptyValues.length * 0.7) {
+    return { type: 'number', align: 'right' };
+  }
+
+  // Check if values look like categories/tags (short, limited set)
+  const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()));
+  if (uniqueValues.size <= Math.max(3, nonEmptyValues.length * 0.3) &&
+      nonEmptyValues.every(v => v.trim().length <= 20)) {
+    return { type: 'badge', align: 'center' };
+  }
+
+  return { type: 'text', align: 'left' };
 }
 
 /**
