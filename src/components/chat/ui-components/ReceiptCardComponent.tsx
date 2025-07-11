@@ -10,14 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   ExternalLink,
-  Edit,
-  Tag,
   Calendar,
   DollarSign,
   Store,
   FileText,
-  Star,
-  ExternalLinkIcon
+  Star
 } from 'lucide-react';
 import { ReceiptCardData, UIComponentProps } from '@/types/ui-components';
 import { useNavigate } from 'react-router-dom';
@@ -112,28 +109,6 @@ export function ReceiptCardComponent({
       case 'view_receipt_new_window':
         openReceiptInNewWindow(data.receipt_id, navigationOptions);
         break;
-      case 'edit_receipt':
-        const editOptions = { ...navigationOptions, openEditMode: true };
-        if (event) {
-          handleReceiptClick(event, data.receipt_id, navigate, editOptions);
-        } else {
-          navigate(`/receipt/${data.receipt_id}`, {
-            state: editOptions
-          });
-        }
-        toast.info('Opening receipt for editing...');
-        break;
-      case 'categorize_receipt':
-        const categoryOptions = { ...navigationOptions, focusCategory: true };
-        if (event) {
-          handleReceiptClick(event, data.receipt_id, navigate, categoryOptions);
-        } else {
-          navigate(`/receipt/${data.receipt_id}`, {
-            state: categoryOptions
-          });
-        }
-        toast.info('Opening receipt for categorization...');
-        break;
       default:
         console.log(`Unknown action: ${action}`);
     }
@@ -206,29 +181,13 @@ export function ReceiptCardComponent({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => handleAction('view_receipt', e)}
-                  onMouseDown={(e) => {
-                    // Handle middle click
-                    if (e.button === 1) {
-                      e.preventDefault();
-                      handleAction('view_receipt', e);
-                    }
-                  }}
-                  className="flex-shrink-0"
-                  title={`View receipt from ${data.merchant} (Ctrl/Cmd+click for new window)`}
-                  aria-label={`View receipt from ${data.merchant}`}
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
                   onClick={() => handleAction('view_receipt_new_window')}
-                  className="flex-shrink-0 px-2"
-                  title={`Open ${data.merchant} receipt in new window`}
-                  aria-label={`Open ${data.merchant} receipt in new window`}
+                  className="flex-shrink-0"
+                  title={`View receipt details from ${data.merchant} in new tab`}
+                  aria-label={`View receipt details from ${data.merchant} in new tab`}
                 >
-                  <ExternalLinkIcon className="h-3 w-3" />
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  <span className="text-xs">View</span>
                 </Button>
               </div>
             </div>
@@ -371,73 +330,18 @@ export function ReceiptCardComponent({
             </div>
           )}
 
-          {/* Action Buttons - Enhanced Design */}
-          <div className="flex gap-2 pt-4 border-t border-border/50">
+          {/* Action Button - Streamlined Design */}
+          <div className="flex pt-4 border-t border-border/50">
             <Button
               variant="default"
               size="sm"
-              onClick={(e) => handleAction('view_receipt', e)}
-              onMouseDown={(e) => {
-                // Handle middle click
-                if (e.button === 1) {
-                  e.preventDefault();
-                  handleAction('view_receipt', e);
-                }
-              }}
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-              title={`View details for ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
-              aria-label={`View details for ${data.merchant} receipt`}
+              onClick={() => handleAction('view_receipt_new_window')}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+              title={`View details for ${data.merchant} receipt in new tab`}
+              aria-label={`View details for ${data.merchant} receipt in new tab`}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               View Details
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => handleAction('edit_receipt', e)}
-              onMouseDown={(e) => {
-                // Handle middle click
-                if (e.button === 1) {
-                  e.preventDefault();
-                  handleAction('edit_receipt', e);
-                }
-              }}
-              className="flex-1 hover:bg-muted/50"
-              title={`Edit ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
-              aria-label={`Edit ${data.merchant} receipt`}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            {!data.category && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => handleAction('categorize_receipt', e)}
-                onMouseDown={(e) => {
-                  // Handle middle click
-                  if (e.button === 1) {
-                    e.preventDefault();
-                    handleAction('categorize_receipt', e);
-                  }
-                }}
-                className="flex-1"
-                title={`Categorize ${data.merchant} receipt (Ctrl/Cmd+click for new window)`}
-                aria-label={`Categorize ${data.merchant} receipt`}
-              >
-                <Tag className="h-4 w-4 mr-2" />
-                Categorize
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleAction('view_receipt_new_window')}
-              className="px-3"
-              title={`Open ${data.merchant} receipt in new window`}
-              aria-label={`Open ${data.merchant} receipt in new window`}
-            >
-              <ExternalLinkIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -456,42 +360,12 @@ export function ReceiptCardComponent({
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
           onClick={() => {
-            handleAction('view_receipt');
-            setShowContextMenu(false);
-          }}
-        >
-          Open in Same Window
-        </button>
-        <button
-          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-          onClick={() => {
             handleAction('view_receipt_new_window');
             setShowContextMenu(false);
           }}
         >
-          Open in New Window
+          View Receipt Details
         </button>
-        <hr className="my-1 border-border" />
-        <button
-          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-          onClick={() => {
-            handleAction('edit_receipt');
-            setShowContextMenu(false);
-          }}
-        >
-          Edit Receipt
-        </button>
-        {!data.category && (
-          <button
-            className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-            onClick={() => {
-              handleAction('categorize_receipt');
-              setShowContextMenu(false);
-            }}
-          >
-            Categorize Receipt
-          </button>
-        )}
       </div>
     )}
   </div>

@@ -14,6 +14,7 @@ import { UIComponentRenderer } from './ui-components/UIComponentRenderer';
 import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
 import { FeedbackButtons } from './FeedbackButtons';
 import { EnhancedSearchResults } from '../search/EnhancedSearchResults';
+import { ChatMarkdownRenderer, MarkdownRenderer } from '../ui/MarkdownRenderer';
 
 export interface ChatMessage {
   id: string;
@@ -54,8 +55,37 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
         // Parse UI components from message content
         const parseResult = parseUIComponents(message.content);
         setParsedComponents(parseResult.components);
-        setCleanedContent(parseResult.cleanedContent);
-        contentToStream = parseResult.cleanedContent;
+
+        // Clean up the content to remove redundant headers and improve structure
+        let cleanedText = parseResult.cleanedContent;
+
+        // Remove standalone section headers that are now represented as components
+        const standaloneHeaderPatterns = [
+          /^Financial Analysis Summary:?\s*$/gm,
+          /^Spending Overview:?\s*$/gm,
+          /^Transaction Breakdown:?\s*$/gm,
+          /^Insights & Trends:?\s*$/gm,
+          /^Recommendations:?\s*$/gm,
+          /^Key Insights:?\s*$/gm,
+          /^Summary:?\s*$/gm,
+          /^Analysis:?\s*$/gm,
+          // Remove duplicate titles that appear as both headers and text
+          /^"[^"]*"\s+(Chill Purchases|Analysis|Summary|Overview|Breakdown|Insights|Recommendations)$/gm
+        ];
+
+        standaloneHeaderPatterns.forEach(pattern => {
+          cleanedText = cleanedText.replace(pattern, '');
+        });
+
+        // Remove excessive line breaks and clean up spacing
+        cleanedText = cleanedText.replace(/\n{3,}/g, '\n\n');
+        cleanedText = cleanedText.replace(/^\s*\n+/gm, '\n');
+
+        // Trim whitespace
+        cleanedText = cleanedText.trim();
+
+        setCleanedContent(cleanedText);
+        contentToStream = cleanedText;
       }
 
       // Use cleaned content for streaming (without JSON blocks)
@@ -266,32 +296,16 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
                     )}
                   </div>
                   
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex mt-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
-                      onClick={(e) => handleViewReceipt(receipt.id, 'receipt', e)}
-                      onMouseDown={(e) => {
-                        // Handle middle click
-                        if (e.button === 1) {
-                          e.preventDefault();
-                          handleViewReceipt(receipt.id, 'receipt', e);
-                        }
-                      }}
-                      title={`View receipt from ${receipt.merchant || 'Unknown'} (Ctrl/Cmd+click for new window)`}
+                      className="w-full"
+                      onClick={() => handleViewReceiptNewWindow(receipt.id, 'receipt')}
+                      title={`View receipt details from ${receipt.merchant || 'Unknown'} in new tab`}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
-                      View Receipt
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="px-2"
-                      onClick={() => handleViewReceiptNewWindow(receipt.id, 'receipt')}
-                      title={`Open ${receipt.merchant || 'Unknown'} receipt in new window`}
-                    >
-                      <ExternalLinkIcon className="h-3 w-3" />
+                      View Details
                     </Button>
                   </div>
                 </CardContent>
@@ -371,7 +385,11 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
       <div className="flex justify-end mb-4">
         <div className="flex items-start space-x-2 max-w-[80%]">
           <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2">
-            <p className="text-sm">{message.content}</p>
+            <MarkdownRenderer
+              content={message.content}
+              variant="compact"
+              className="text-primary-foreground [&_code]:bg-primary-foreground/20 [&_pre]:bg-primary-foreground/20"
+            />
           </div>
           <div className="flex-shrink-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center">
             <User className="h-4 w-4 text-primary-foreground" />
@@ -389,10 +407,11 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
             <Bot className="h-4 w-4 text-secondary-foreground" />
           </div>
           <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-2 flex-1">
-            <p className="text-sm mb-2">
-              {displayedText}
-              {isStreaming && <span className="animate-pulse">|</span>}
-            </p>
+            <ChatMarkdownRenderer
+              content={displayedText}
+              isStreaming={isStreaming}
+              className="text-sm mb-2"
+            />
             {!isStreaming && renderSearchResults()}
 
             {/* Render UI Components after streaming is complete */}
