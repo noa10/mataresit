@@ -69,9 +69,17 @@ export function SearchResults({
       });
     } catch (error) {
       console.error('Error opening receipt:', error);
-      toast.error('Navigation failed', {
-        description: 'Could not open the receipt page. Please try again.'
-      });
+
+      // Check if it's a popup blocking error
+      if (error instanceof Error && error.message.includes('popup')) {
+        toast.error('Popup blocked', {
+          description: 'Please allow popups for this site and try again, or check your browser settings.'
+        });
+      } else {
+        toast.error('Navigation failed', {
+          description: 'Could not open the receipt page. Please try again.'
+        });
+      }
     }
   };
 

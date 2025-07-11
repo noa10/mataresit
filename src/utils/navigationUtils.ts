@@ -49,11 +49,11 @@ export function openReceiptInNewWindow(
     
     // Open in new window/tab
     const newWindow = window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    
+
     if (!newWindow) {
       console.warn('Failed to open new window - popup might be blocked');
-      // Fallback: try to navigate in same window
-      window.location.href = url.toString();
+      // Don't fallback to same-window navigation to preserve search context
+      throw new Error('Unable to open new tab. Please check if popups are blocked and try again.');
     }
   } catch (error) {
     console.error('Error opening receipt in new window:', error);
