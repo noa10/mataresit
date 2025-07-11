@@ -60,23 +60,17 @@ export function SearchResults({
     }
 
     try {
-      console.log(`Navigating to receipt: ${id} (from ${itemType || 'unknown'})`);
+      console.log(`Opening receipt in new tab: ${id} (from ${itemType || 'unknown'})`);
 
-      // Get the current URL search params to preserve search state
-      const urlParams = new URLSearchParams(window.location.search);
-
-      // Navigate to receipt detail with search state in the URL
-      navigate(`/receipt/${id}?${urlParams.toString()}`, {
-        state: {
-          from: 'search',
-          searchQuery: searchQuery,
-          itemType: itemType
-        }
+      // Open in new window/tab to preserve search context
+      openReceiptInNewWindow(id, {
+        from: 'search',
+        itemType: itemType
       });
     } catch (error) {
-      console.error('Error navigating to receipt:', error);
+      console.error('Error opening receipt:', error);
       toast.error('Navigation failed', {
-        description: 'Could not navigate to the receipt page. Please try again.'
+        description: 'Could not open the receipt page. Please try again.'
       });
     }
   };

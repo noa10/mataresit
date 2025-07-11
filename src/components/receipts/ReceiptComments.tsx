@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +60,33 @@ export function ReceiptComments({ receiptId, teamId, canComment = true, classNam
     loadComments();
   }, [receiptId]);
 
+  // Define loadComments before useEffect to avoid dependency issues
+  const loadComments = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('receipt_comments')
+        .select(`
+          *,
+          user_profile:profiles(first_name, last_name, email, avatar_url)
+        `)
+        .eq('receipt_id', receiptId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading comments:', error);
+        toast.error('Failed to load comments');
+        return;
+      }
+
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      toast.error('Failed to load comments');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [receiptId]);
+
   // OPTIMIZATION: Use unified subscription system for receipt comments
   useEffect(() => {
     const unsubscribe = subscribeToReceiptAll(
@@ -87,32 +114,6 @@ export function ReceiptComments({ receiptId, teamId, canComment = true, classNam
 
     return unsubscribe;
   }, [receiptId, loadComments]);
-
-  const loadComments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('receipt_comments')
-        .select(`
-          *,
-          user_profile:profiles(first_name, last_name, email, avatar_url)
-        `)
-        .eq('receipt_id', receiptId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error loading comments:', error);
-        toast.error('Failed to load comments');
-        return;
-      }
-
-      setComments(data || []);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-      toast.error('Failed to load comments');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSubmitComment = async () => {
     if (!user || !newComment.trim()) return;

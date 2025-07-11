@@ -225,6 +225,10 @@ export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: 
     return null;
   }
 
+  // First, try to fetch the receipt with the current team context
+  let receiptData = null;
+  let receiptError = null;
+
   // Build query with team context filtering (same logic as fetchReceipts)
   let query = supabase
     .from("receipts")
@@ -250,7 +254,38 @@ export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: 
     query = query.eq("user_id", user.user.id).is("team_id", null);
   }
 
-  const { data: receiptData, error: receiptError } = await query.single();
+  const { data: primaryData, error: primaryError } = await query.single();
+  receiptData = primaryData;
+  receiptError = primaryError;
+
+  // If the primary query failed and we were looking for personal receipts,
+  // try looking for team receipts that the user has access to
+  if (receiptError && !teamContext?.currentTeam?.id) {
+    console.log("🔄 Primary query failed, trying to find receipt in user's teams...");
+
+    // Try to find the receipt in any team the user belongs to
+    const fallbackQuery = supabase
+      .from("receipts")
+      .select(`
+        *,
+        custom_categories (
+          id,
+          name,
+          color,
+          icon
+        )
+      `)
+      .eq("id", id)
+      .eq("user_id", user.user.id); // Still filter by user for security
+
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery.single();
+
+    if (!fallbackError && fallbackData) {
+      console.log("✅ Found receipt in fallback query");
+      receiptData = fallbackData;
+      receiptError = null;
+    }
+  }
 
   // Enhanced debug logging for category data
   console.log("🔍 Receipt query result:", {
@@ -1619,10 +1654,42 @@ interface UnifiedReceiptSubscription {
   createdAt: number;
   lastActivity: number;
   subscriptionTypes: Set<'receipt' | 'logs' | 'comments'>;
+  isCleaningUp?: boolean; // Flag to prevent race conditions during cleanup
 }
 
 // OPTIMIZATION: Unified connection pooling for all receipt-related subscriptions
 const unifiedReceiptSubscriptions = new Map<string, UnifiedReceiptSubscription>();
+
+// Circuit breaker to prevent excessive subscription creation
+const subscriptionCreationLimiter = new Map<string, { count: number; lastReset: number }>();
+const MAX_SUBSCRIPTIONS_PER_RECEIPT = 5;
+const LIMITER_RESET_INTERVAL = 60000; // 1 minute
+
+const canCreateSubscription = (receiptId: string): boolean => {
+  const now = Date.now();
+  const limiter = subscriptionCreationLimiter.get(receiptId);
+
+  if (!limiter) {
+    subscriptionCreationLimiter.set(receiptId, { count: 1, lastReset: now });
+    return true;
+  }
+
+  // Reset counter if enough time has passed
+  if (now - limiter.lastReset > LIMITER_RESET_INTERVAL) {
+    limiter.count = 1;
+    limiter.lastReset = now;
+    return true;
+  }
+
+  // Check if we've exceeded the limit
+  if (limiter.count >= MAX_SUBSCRIPTIONS_PER_RECEIPT) {
+    console.warn(`🚫 Subscription creation blocked for receipt ${receiptId} - too many attempts (${limiter.count})`);
+    return false;
+  }
+
+  limiter.count++;
+  return true;
+};
 
 // Legacy connection pooling for backward compatibility
 const activeReceiptSubscriptions = new Map<string, {
@@ -1764,10 +1831,20 @@ export const subscribeToReceiptAll = (
   const subscriptionKey = `unified-receipt-${receiptId}`;
   const existing = unifiedReceiptSubscriptions.get(subscriptionKey);
 
-  if (existing) {
-    console.log(`🔄 Adding callbacks to existing unified subscription for receipt ${receiptId}`);
+  // Circuit breaker: prevent excessive subscription creation
+  if (!existing && !canCreateSubscription(receiptId)) {
+    // Return a no-op cleanup function
+    return () => {};
+  }
+
+  if (existing && !existing.isCleaningUp) {
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log(`🔄 Adding callbacks to existing unified subscription for receipt ${receiptId}`);
+    }
     existing.callbacks.set(callbackId, callbacks);
     existing.lastActivity = Date.now();
+    existing.isCleaningUp = false; // Reset cleanup flag
 
     // Add new subscription types if needed
     if (options?.subscribeToLogs && !existing.subscriptionTypes.has('logs')) {
@@ -1780,7 +1857,10 @@ export const subscribeToReceiptAll = (
     return () => cleanupUnifiedCallback(receiptId, callbackId);
   }
 
-  console.log(`✅ Creating new unified subscription for receipt ${receiptId}`);
+  // Only log subscription creation in development
+  if (import.meta.env.DEV) {
+    console.log(`✅ Creating new unified subscription for receipt ${receiptId}`);
+  }
 
   // Create the unified subscription
   const subscription: UnifiedReceiptSubscription = {
@@ -1788,7 +1868,8 @@ export const subscribeToReceiptAll = (
     callbacks: new Map([[callbackId, callbacks]]),
     createdAt: Date.now(),
     lastActivity: Date.now(),
-    subscriptionTypes: new Set(['receipt'])
+    subscriptionTypes: new Set(['receipt']),
+    isCleaningUp: false
   };
 
   // Set up receipt status subscription
@@ -1845,7 +1926,7 @@ const setupReceiptSubscription = (
       }
     )
     .subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED' && import.meta.env.DEV) {
         console.log(`✅ Unified receipt subscription active for ${receiptId}`);
       }
       if (err) {
@@ -1884,7 +1965,7 @@ const setupLogSubscription = (
       }
     )
     .subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED' && import.meta.env.DEV) {
         console.log(`✅ Unified log subscription active for ${receiptId}`);
       }
       if (err) {
@@ -1923,7 +2004,7 @@ const setupCommentSubscription = (
       }
     )
     .subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
+      if (status === 'SUBSCRIBED' && import.meta.env.DEV) {
         console.log(`✅ Unified comment subscription active for ${receiptId}`);
       }
       if (err) {
@@ -1937,19 +2018,34 @@ const cleanupUnifiedCallback = (receiptId: string, callbackId: string): void => 
   const subscriptionKey = `unified-receipt-${receiptId}`;
   const subscription = unifiedReceiptSubscriptions.get(subscriptionKey);
 
-  if (!subscription) return;
+  if (!subscription || subscription.isCleaningUp) return;
 
   subscription.callbacks.delete(callbackId);
 
   // If no more callbacks, clean up the entire subscription
   if (subscription.callbacks.size === 0) {
-    console.log(`🧹 Cleaning up unified subscription for receipt ${receiptId} (no more callbacks)`);
+    // Set cleanup flag to prevent race conditions
+    subscription.isCleaningUp = true;
 
-    subscription.receiptChannel?.unsubscribe();
-    subscription.logChannel?.unsubscribe();
-    subscription.commentChannel?.unsubscribe();
+    // Only log cleanup in development
+    if (import.meta.env.DEV) {
+      console.log(`🧹 Cleaning up unified subscription for receipt ${receiptId} (no more callbacks)`);
+    }
 
-    unifiedReceiptSubscriptions.delete(subscriptionKey);
+    // Use setTimeout to debounce cleanup and prevent rapid create/destroy cycles
+    setTimeout(() => {
+      // Double-check that no new callbacks were added during the timeout
+      if (subscription.callbacks.size === 0) {
+        subscription.receiptChannel?.unsubscribe();
+        subscription.logChannel?.unsubscribe();
+        subscription.commentChannel?.unsubscribe();
+
+        unifiedReceiptSubscriptions.delete(subscriptionKey);
+      } else {
+        // Reset cleanup flag if new callbacks were added
+        subscription.isCleaningUp = false;
+      }
+    }, 100); // 100ms debounce
   }
 };
 

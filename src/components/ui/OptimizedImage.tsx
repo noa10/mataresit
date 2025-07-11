@@ -98,7 +98,7 @@ function ImageError({
 /**
  * Optimized Image Component with lazy loading, skeleton states, and error handling
  */
-export function OptimizedImage({
+export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageProps>(({
   src,
   alt,
   lazy = true,
@@ -114,7 +114,7 @@ export function OptimizedImage({
   enableRetry = true,
   className,
   ...props
-}: OptimizedImageProps) {
+}, forwardedRef) => {
   // Use appropriate hook based on lazy loading preference
   const imageHook = lazy 
     ? useLazyImage(src, {
@@ -131,12 +131,12 @@ export function OptimizedImage({
         enableRetry
       });
 
-  const { 
-    src: imageSrc, 
-    isLoading, 
-    hasError, 
-    ref, 
-    retry 
+  const {
+    src: imageSrc,
+    isLoading,
+    hasError,
+    ref: hookRef,
+    retry
   } = imageHook;
 
   // Show skeleton while loading
@@ -161,11 +161,14 @@ export function OptimizedImage({
     );
   }
 
+  // Combine refs - use forwardedRef if provided, otherwise use hookRef
+  const combinedRef = forwardedRef || hookRef;
+
   // Render image
   return (
     <div className={containerClassName}>
       <img
-        ref={ref}
+        ref={combinedRef}
         src={imageSrc}
         alt={alt}
         className={cn(
@@ -181,7 +184,9 @@ export function OptimizedImage({
       />
     </div>
   );
-}
+});
+
+OptimizedImage.displayName = 'OptimizedImage';
 
 /**
  * Preset configurations for common use cases
@@ -249,9 +254,11 @@ export function ReceiptCardImage(props: Omit<OptimizedImageProps, keyof typeof I
   return <OptimizedImage {...ImagePresets.receiptCard} {...props} />;
 }
 
-export function ReceiptViewerImage(props: Omit<OptimizedImageProps, keyof typeof ImagePresets.receiptViewer>) {
-  return <OptimizedImage {...ImagePresets.receiptViewer} {...props} />;
-}
+export const ReceiptViewerImage = React.forwardRef<HTMLImageElement, Omit<OptimizedImageProps, keyof typeof ImagePresets.receiptViewer>>((props, ref) => {
+  return <OptimizedImage {...ImagePresets.receiptViewer} {...props} ref={ref} />;
+});
+
+ReceiptViewerImage.displayName = 'ReceiptViewerImage';
 
 export function ReceiptPickerImage(props: Omit<OptimizedImageProps, keyof typeof ImagePresets.receiptPicker>) {
   return <OptimizedImage {...ImagePresets.receiptPicker} {...props} />;

@@ -194,12 +194,16 @@ export default function ReceiptCard({
               {t('actions.viewDetails')}
             </Button>
           ) : (
-            <Link to={`/receipt/${id}`}>
-              <Button className="w-full gap-2">
-                <Eye size={16} />
-                {t('actions.viewDetails')}
-              </Button>
-            </Link>
+            <Button
+              className="w-full gap-2"
+              onClick={() => {
+                const url = `/receipt/${id}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              <Eye size={16} />
+              {t('actions.viewDetails')}
+            </Button>
           )}
 
           {/* Create Claim Button */}

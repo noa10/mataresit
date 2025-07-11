@@ -329,16 +329,56 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         }));
 
         // Only show the verification toast when the value has been debounced
-        const fieldKey = field as keyof typeof t;
-        const fieldName = t(`fields.${field}` as keyof typeof t) || field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ');
-        toast.success(t('viewer.verified', { field: fieldName }), {
+        const fieldName = field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ');
+        toast.success(`${fieldName} verified`, {
           duration: 1500,
           position: 'bottom-right',
           icon: '✓'
         });
       }
     });
-  }, [debouncedInputValues, receipt, t]);
+  }, [debouncedInputValues, receipt]); // Removed unstable 't' dependency
+
+  // Create stable callbacks to prevent infinite re-subscriptions
+  const handleReceiptUpdate = useCallback((payload: any) => {
+    if (import.meta.env.DEV) {
+      console.log('📝 Receipt status update in viewer:', payload.new);
+    }
+    const newStatus = payload.new.processing_status as ProcessingStatus;
+    const newError = payload.new.processing_error;
+
+    setProcessingStatus(newStatus);
+
+    if (newError) {
+      toast.error(`Processing error: ${newError}`);
+    } else if (newStatus === 'complete') {
+      toast.success('Receipt processed successfully');
+      // Refresh data - this will also re-run the first useEffect to update confidence
+      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+      // Invalidate batch receipt queries (for modals and lists)
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    }
+  }, [receipt.id, queryClient]);
+
+  const handleLogUpdate = useCallback((payload: any) => {
+    const newLog = payload.new as ProcessingLog;
+    if (import.meta.env.DEV) {
+      console.log('📝 New log received in viewer:', newLog);
+    }
+
+    // Add new log to the list
+    setProcessLogs((prev) => {
+      // Check if we already have this log (avoid duplicates)
+      if (prev.some(log => log.id === newLog.id)) {
+        return prev;
+      }
+      // Add and sort by created_at
+      return [...prev, newLog].sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    });
+  }, []);
 
   // OPTIMIZATION: Use unified subscription system for receipt updates and logs
   useEffect(() => {
@@ -348,40 +388,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       receipt.id,
       'receipt-viewer',
       {
-        onReceiptUpdate: (payload) => {
-          console.log('📝 Receipt status update in viewer:', payload.new);
-          const newStatus = payload.new.processing_status as ProcessingStatus;
-          const newError = payload.new.processing_error;
-
-          setProcessingStatus(newStatus);
-
-          if (newError) {
-            toast.error(t('viewer.processingError', { error: newError }));
-          } else if (newStatus === 'complete') {
-            toast.success(t('viewer.processedSuccessfully'));
-            // Refresh data - this will also re-run the first useEffect to update confidence
-            queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-            // Invalidate batch receipt queries (for modals and lists)
-            queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
-            queryClient.invalidateQueries({ queryKey: ['receipts'] });
-          }
-        },
-        onLogUpdate: (payload) => {
-          const newLog = payload.new as ProcessingLog;
-          console.log('📝 New log received in viewer:', newLog);
-
-          // Add new log to the list
-          setProcessLogs((prev) => {
-            // Check if we already have this log (avoid duplicates)
-            if (prev.some(log => log.id === newLog.id)) {
-              return prev;
-            }
-            // Add and sort by created_at
-            return [...prev, newLog].sort((a, b) =>
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-          });
-        }
+        onReceiptUpdate: handleReceiptUpdate,
+        onLogUpdate: handleLogUpdate
       },
       {
         subscribeToLogs: true,
@@ -391,7 +399,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
     // Clean up the unified subscription when component unmounts
     return unsubscribe;
-  }, [receipt.id, queryClient, t]);
+  }, [receipt.id, handleReceiptUpdate, handleLogUpdate]); // Use stable callbacks
 
   // Reset image error state when receipt changes
   useEffect(() => {
@@ -418,7 +426,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         }));
 
         // Log the data being sent to the server for debugging
-        console.log("Sending data to updateReceipt:", {
+        if (import.meta.env.DEV) {
+          console.log("Sending data to updateReceipt:", {
           id: receipt.id,
           receipt: {
             merchant: editedReceipt.merchant,
@@ -432,6 +441,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           },
           lineItems: formattedLineItems
         });
+        }
 
         return await updateReceiptWithLineItems(
           receipt.id,
@@ -499,7 +509,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       // Save confidence scores as part of the receipt update
       // This is now handled by the update_receipt_final function
       // We're keeping this code for reference, but it's not needed anymore
-      console.log("Confidence scores are now saved as part of the receipt update");
+      if (import.meta.env.DEV) {
+        console.log("Confidence scores are now saved as part of the receipt update");
+      }
 
       // Update the local state to reflect the new confidence scores
       const confidenceToSave = {
@@ -511,7 +523,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         line_items: editedConfidence.line_items || 0,
       };
 
-      console.log("Updated confidence scores:", confidenceToSave);
+      if (import.meta.env.DEV) {
+        console.log("Updated confidence scores:", confidenceToSave);
+      }
 
       // Invalidate queries to refetch data including updated confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
@@ -647,7 +661,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   const handleSaveChanges = () => {
     // Log what we're about to save for debugging
-    console.log("Saving receipt details:", {
+    if (import.meta.env.DEV) {
+      console.log("Saving receipt details:", {
       id: receipt.id,
       merchant: editedReceipt.merchant,
       date: editedReceipt.date,
@@ -658,6 +673,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       predicted_category: editedReceipt.predicted_category,
       lineItems: editedReceipt.lineItems
     });
+    }
 
     // Validate required fields before saving
     if (!editedReceipt.merchant) {
