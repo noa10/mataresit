@@ -35,7 +35,7 @@
     "extractionFailed": "Failed to extract data from the receipt",
     "lowConfidence": "Low confidence in extracted data. Please review manually.",
     "aiServiceUnavailable": "AI processing service is currently unavailable",
-    "ocrFailed": "OCR processing failed",
+    "aiProcessingFailed": "AI processing failed",
     "imageQualityPoor": "Image quality is too poor for processing",
     "unsupportedLanguage": "Language not supported for processing",
     "timeoutError": "Processing timed out. Please try again."

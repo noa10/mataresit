@@ -4,7 +4,7 @@ ADD COLUMN IF NOT EXISTS processing_status TEXT,
 ADD COLUMN IF NOT EXISTS processing_error TEXT;
 
 -- Add comment to explain the purpose of these columns
-COMMENT ON COLUMN public.receipts.processing_status IS 'Tracks the current status of receipt processing (uploading, uploaded, processing_ocr, etc.)';
+COMMENT ON COLUMN public.receipts.processing_status IS 'Tracks the current status of receipt processing (uploading, uploaded, processing, etc.)';
 COMMENT ON COLUMN public.receipts.processing_error IS 'Stores error messages if processing fails at any step';
 
 -- Create an index on processing_status for faster queries
@@ -20,6 +20,6 @@ BEGIN
     processing_error = NULL
   WHERE 
     id = receipt_id 
-    AND processing_status IN ('failed_ocr', 'failed_ai');
+    AND processing_status IN ('failed', 'failed_ai');
 END;
 $$ LANGUAGE plpgsql; 

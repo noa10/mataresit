@@ -101,11 +101,11 @@
         "editingNote": "Editing a field manually sets its confidence to 100%."
       },
       "aiProcessing": {
-        "title": "AI Processing: Vision vs. OCR",
-        "description": "In **Settings → Processing**, you can choose your preferred method:",
+        "title": "AI Vision Processing",
+        "description": "Our advanced AI Vision technology provides:",
         "methods": {
-          "aiVision": "AI Vision (Default): The AI model directly analyzes the receipt image, offering superior accuracy for complex or handwritten receipts.",
-          "compare": "Compare with Alternative: For maximum accuracy, the system runs both AI Vision and a traditional OCR + AI method, highlighting any differences for your review."
+          "aiVision": "AI Vision: The AI model directly analyzes the receipt image, offering superior accuracy for complex or handwritten receipts, various layouts, and different languages.",
+          "benefits": "Benefits: No intermediate text extraction steps, better handling of visual elements, and improved accuracy for challenging receipt formats."
         }
       },
       "aiSearch": {
@@ -137,7 +137,7 @@
       "title": "Glossary",
       "heading": "5. Glossary",
       "terms": {
-        "ocr": "OCR (Optical Character Recognition): Technology to convert images of text into machine-readable text.",
+        "aiVisionProcessing": "AI Vision Processing: Advanced AI technology that directly analyzes receipt images to extract data without requiring separate text recognition steps.",
         "aiVision": "AI Vision: A processing method where an AI model directly analyzes an image to understand its content.",
         "embedding": "Embedding: A numerical representation of text that captures its semantic meaning, powering our AI Search.",
         "semanticSearch": "Semantic Search: A search technique that understands the user's intent and the contextual meaning of words."
