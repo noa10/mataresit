@@ -157,7 +157,7 @@ export interface ReceiptWithDetails extends Receipt {
   document_structure?: DocumentStructure;
 }
 
-// Simplified AI processing result interface (replacing OCRResult)
+// AI processing result interface for receipt data extraction
 export interface AIResult {
   merchant: string;
   date: string | null; // Allow null for invalid dates
@@ -179,26 +179,6 @@ export interface AIResult {
   predicted_category?: string;
   modelUsed?: string;
   processing_time?: number;
-}
-
-// Keep OCRResult for backward compatibility but mark as deprecated
-/** @deprecated Use AIResult instead */
-export interface OCRResult extends AIResult {
-  confidence: {
-    merchant: number;
-    date: number;
-    total: number;
-    tax?: number;
-    line_items?: number;
-    payment_method?: number;
-  };
-  primaryMethod?: 'ai-vision';
-  alternativeResult?: any;
-  discrepancies?: Array<{
-    field: string;
-    primaryValue: any;
-    alternativeValue: any;
-  }>;
 }
 
 // Interface for processing logs

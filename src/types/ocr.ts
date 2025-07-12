@@ -1,4 +1,4 @@
-// AI processing result interface (simplified from OCR)
+// AI processing result interface for receipt data extraction
 export interface AIResult {
   merchant: string;
   date: string | null; // Allow null for invalid dates
@@ -16,16 +16,4 @@ export interface AIResult {
   processing_time?: number;
   modelUsed?: string;
   confidence_scores?: Record<string, number>;
-}
-
-// Backward compatibility alias
-/** @deprecated Use AIResult instead */
-export interface OCRResult extends AIResult {
-  alternativeResult?: OCRResult;
-  discrepancies?: Array<{
-    field: string;
-    primaryValue: any;
-    alternativeValue: any;
-  }>;
-  primaryMethod?: 'ai-vision';
 }

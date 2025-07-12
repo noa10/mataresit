@@ -1,10 +1,10 @@
 /**
  * Intelligent processing optimization utilities
- * Provides automatic fallback mechanisms and processing method selection
+ * Provides AI model selection and processing optimization
  */
 
 export interface ProcessingRecommendation {
-  recommendedMethod: 'ocr-ai' | 'ai-vision';
+  recommendedMethod: 'ai-vision';
   recommendedModel: string;
   confidence: 'high' | 'medium' | 'low';
   reasoning: string[];
@@ -14,9 +14,9 @@ export interface ProcessingRecommendation {
 }
 
 export interface FallbackStrategy {
-  primaryMethod: 'ocr-ai' | 'ai-vision';
+  primaryMethod: 'ai-vision';
   primaryModel: string;
-  fallbackMethod: 'ocr-ai' | 'ai-vision';
+  fallbackMethod: 'ai-vision';
   fallbackModel: string;
   triggers: string[];
   maxRetries: number;
@@ -32,27 +32,7 @@ export interface FileAnalysis {
 }
 
 // Import model configurations from the centralized config
-import { AVAILABLE_MODELS, getModelConfig } from '@/config/modelProviders';
-
-// Processing method characteristics
-const METHOD_CHARACTERISTICS = {
-  'ai-vision': {
-    accuracy: 'excellent',
-    speed: 'medium',
-    resourceUsage: 'high',
-    maxFileSize: 5 * 1024 * 1024,
-    reliability: 0.88, // Lower due to resource limits
-    bestFor: ['complex-receipts', 'handwritten', 'poor-quality']
-  },
-  'ocr-ai': {
-    accuracy: 'very-good',
-    speed: 'fast',
-    resourceUsage: 'medium',
-    maxFileSize: 10 * 1024 * 1024,
-    reliability: 0.95,
-    bestFor: ['simple-receipts', 'printed-text', 'good-quality']
-  }
-};
+import { getModelConfig } from '@/config/modelProviders';
 
 /**
  * Analyze file characteristics to determine processing complexity
@@ -109,20 +89,16 @@ export function analyzeFile(file: File, dimensions?: { width: number; height: nu
 export function getProcessingRecommendation(
   fileAnalysis: FileAnalysis,
   userPreferences?: {
-    preferredMethod?: 'ocr-ai' | 'ai-vision';
     preferredModel?: string;
     prioritizeSpeed?: boolean;
     prioritizeAccuracy?: boolean;
   }
 ): ProcessingRecommendation {
   const reasoning: string[] = [];
-  let recommendedMethod: 'ocr-ai' | 'ai-vision' = 'ai-vision'; // Default
+  const recommendedMethod: 'ai-vision' = 'ai-vision'; // Always AI Vision
   let recommendedModel = 'gemini-2.0-flash-lite'; // Default
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
-
-  // Always recommend AI Vision as the primary method
-  recommendedMethod = 'ai-vision';
 
   // PRIORITY 1: User's preferred model takes highest priority
   if (userPreferences?.preferredModel) {
@@ -132,13 +108,22 @@ export function getProcessingRecommendation(
   } else {
     // PRIORITY 2: Analyze file characteristics for automatic model selection
     // Only apply automatic selection if user hasn't specified a model
-    if (fileAnalysis.size > 6 * 1024 * 1024) {
+    if (fileAnalysis.size > 8 * 1024 * 1024) {
       recommendedModel = 'gemini-2.5-pro';
       reasoning.push('Very large file size detected - using high-capacity AI Vision model');
+      riskLevel = 'high';
+    } else if (fileAnalysis.size > 6 * 1024 * 1024) {
+      recommendedModel = 'gemini-2.5-pro';
+      reasoning.push('Large file size detected - using high-capacity AI Vision model');
       riskLevel = 'medium';
     } else if (fileAnalysis.complexity === 'high' && fileAnalysis.size > 4 * 1024 * 1024) {
       recommendedModel = 'gemini-2.5-flash';
       reasoning.push('High complexity large receipt - AI Vision with advanced model provides better accuracy');
+      riskLevel = 'medium';
+    } else if (fileAnalysis.estimatedProcessingDifficulty > 8) {
+      recommendedModel = 'gemini-2.5-pro';
+      reasoning.push('Very complex receipt detected - using most accurate AI Vision model');
+      riskLevel = 'high';
     } else {
       // Default to gemini-2.0-flash-lite for better reliability and rate limit avoidance
       recommendedModel = 'gemini-2.0-flash-lite';
@@ -147,11 +132,8 @@ export function getProcessingRecommendation(
     }
   }
 
-  // Apply user preferences (always AI Vision, but acknowledge method preference)
-  if (userPreferences?.preferredMethod) {
-    // We always use AI Vision, but acknowledge user preference in reasoning
-    reasoning.push(`AI Vision processing (user preference noted)`);
-  }
+  // Always use AI Vision processing
+  reasoning.push('Using AI Vision processing for optimal accuracy');
 
   // PRIORITY 3: Apply speed/accuracy preferences only if no specific model was chosen
   if (!userPreferences?.preferredModel) {
@@ -203,20 +185,25 @@ export function getProcessingRecommendation(
  * Create a fallback strategy based on primary method and file characteristics
  */
 function createFallbackStrategy(
-  primaryMethod: 'ocr-ai' | 'ai-vision',
+  primaryMethod: 'ai-vision',
   primaryModel: string,
   fileAnalysis: FileAnalysis
 ): FallbackStrategy {
-  // Always use OCR-AI as fallback since primary is always AI Vision
-  const fallbackMethod: 'ocr-ai' | 'ai-vision' = 'ocr-ai';
+  // Use different AI Vision model as fallback
+  const fallbackMethod: 'ai-vision' = 'ai-vision';
 
   // Choose fallback model based on file characteristics
-  // Use available models for reliable fallback processing
+  // Use different models for reliable fallback processing
   let fallbackModel = 'gemini-2.5-flash';
   if (fileAnalysis.size > 3 * 1024 * 1024) {
     fallbackModel = 'gemini-2.0-flash-lite'; // Use fastest for large files
   } else if (fileAnalysis.complexity === 'high') {
     fallbackModel = 'gemini-2.5-pro'; // Use most accurate model for complex files
+  }
+
+  // Ensure fallback model is different from primary model
+  if (fallbackModel === primaryModel) {
+    fallbackModel = primaryModel === 'gemini-2.0-flash-lite' ? 'gemini-2.5-flash' : 'gemini-2.0-flash-lite';
   }
 
   // Define triggers for fallback
@@ -261,7 +248,6 @@ export function shouldTriggerFallback(error: string, fallbackStrategy: FallbackS
 export function getBatchProcessingOptimization(
   files: File[],
   userPreferences?: {
-    preferredMethod?: 'ocr-ai' | 'ai-vision';
     preferredModel?: string;
     prioritizeSpeed?: boolean;
     prioritizeAccuracy?: boolean;

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, OCRResult, AIResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus } from "@/types/receipt";
+import { Receipt, ReceiptLineItem, LineItem, ConfidenceScore, ReceiptWithDetails, AIResult, ReceiptStatus, Correction, AISuggestions, ProcessingStatus } from "@/types/receipt";
 import { toast } from "sonner";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { normalizeMerchant } from '../lib/receipts/validation';
@@ -1141,7 +1141,7 @@ export const processReceiptWithAI = async (
         hasUrl: !!supabaseUrl,
         sessionData: anon
       });
-      await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+      await updateReceiptProcessingStatus(receiptId, 'failed', errorMsg);
       throw new Error(errorMsg);
     }
 
@@ -1155,7 +1155,7 @@ export const processReceiptWithAI = async (
           hasAnonKey: !!supabaseAnonKey,
           sessionData: anon
         });
-        await updateReceiptProcessingStatus(receiptId, 'failed_ocr', errorMsg);
+        await updateReceiptProcessingStatus(receiptId, 'failed', errorMsg);
         throw new Error(errorMsg);
       }
     }
@@ -1344,9 +1344,7 @@ export const processReceiptWithAI = async (
   }
 };
 
-// Backward compatibility alias
-/** @deprecated Use processReceiptWithAI instead */
-export const processReceiptWithOCR = processReceiptWithAI;
+
 
 // Delete a receipt
 export const deleteReceipt = async (id: string): Promise<boolean> => {
@@ -2284,7 +2282,7 @@ export const markReceiptUploaded = async (id: string): Promise<boolean> => {
 interface BatchProcessingResult {
   successes: Array<{
     receiptId: string;
-    result: OCRResult;
+    result: AIResult;
   }>;
   failures: Array<{
     receiptId: string;
@@ -2314,7 +2312,7 @@ export const processBatchReceipts = async (
     const results = await Promise.all(
       receiptIds.map(async (receiptId) => {
         try {
-          const processedResult = await processReceiptWithOCR(receiptId, options);
+          const processedResult = await processReceiptWithAI(receiptId, options);
           if (processedResult) {
             return {
               success: true,
