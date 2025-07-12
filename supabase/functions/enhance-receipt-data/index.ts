@@ -428,7 +428,7 @@ const DEFAULT_VISION_MODEL = 'gemini-2.0-flash-lite';
  */
 interface TextInput {
   type: 'text';
-  textractData: any;
+  extractedData: any; // Legacy field name for compatibility
   fullText: string;
 }
 
@@ -806,7 +806,7 @@ async function parseBoundingBoxFormat(boundingBoxData: any[], logger: Processing
   }
 
   await logger.log(`✅ Bounding box analysis complete - structure detected but text extraction needed`, "AI");
-  await logger.log(`💡 RECOMMENDATION: Use traditional JSON format or implement OCR text extraction`, "AI");
+  await logger.log(`💡 RECOMMENDATION: Use traditional JSON format for better data extraction`, "AI");
 
   return result;
 }
@@ -836,15 +836,15 @@ async function callGeminiAPI(
   let payload: any;
 
   if (input.type === 'text') {
-    // Text-based prompt for OCR data with Malaysian business context
+    // Text-based prompt for extracted data with Malaysian business context
     const prompt = `
 You are an AI assistant specialized in analyzing receipt data with expertise in Malaysian business terminology and Malay language.
 
 RECEIPT TEXT:
 ${input.fullText}
 
-TEXTRACT EXTRACTED DATA:
-${JSON.stringify(input.textractData, null, 2)}
+EXTRACTED DATA:
+${JSON.stringify(input.extractedData, null, 2)}
 
 Based on the receipt text above, please:
 1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
@@ -865,15 +865,15 @@ Based on the receipt text above, please:
    - Zero-rated items: Basic food, medical, education
    - Detect if tax is inclusive or exclusive in the total
 6. Handle Malay language text and mixed English-Malay content
-7. Provide SUGGESTIONS for potential OCR errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
+7. Provide SUGGESTIONS for potential extraction errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
 
 Return your findings in the following JSON format:
 {
   "currency": "The currency code (e.g., MYR, USD)",
   "payment_method": "The payment method used",
   "predicted_category": "One of the categories from the list above",
-  "merchant": "The merchant name if you find a better match than Textract",
-  "total": "The total amount if you find a better match than Textract",
+  "merchant": "The merchant name if you find a better match than extracted data",
+  "total": "The total amount if you find a better match than extracted data",
   "malaysian_tax_info": {
     "tax_type": "GST, SST_SALES, SST_SERVICE, EXEMPT, or ZERO_RATED",
     "tax_rate": "Tax rate percentage (e.g., 6.00, 10.00)",
@@ -919,7 +919,7 @@ Return your findings in the following JSON format:
     "shopping_behavior": "planned, impulse, necessity based on items"
   },
   "suggestions": {
-    "merchant": "A suggested correction for merchant name if OCR made errors",
+    "merchant": "A suggested correction for merchant name if extraction made errors",
     "date": "A suggested date correction in YYYY-MM-DD format if needed",
     "total": "A suggested total amount correction if needed",
     "tax": "A suggested tax amount correction if needed"
@@ -1434,8 +1434,8 @@ async function callOpenRouterAPI(
 RECEIPT TEXT:
 ${input.fullText}
 
-TEXTRACT EXTRACTED DATA:
-${JSON.stringify(input.textractData, null, 2)}
+EXTRACTED DATA:
+${JSON.stringify(input.extractedData, null, 2)}
 
 Based on the receipt text above, please:
 1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
@@ -1446,17 +1446,17 @@ Based on the receipt text above, please:
    - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
 3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
 4. Recognize Malaysian business terminology and handle Malay language text.
-5. Provide SUGGESTIONS for potential OCR errors.
+5. Provide SUGGESTIONS for potential extraction errors.
 
 Return your findings in JSON format:
 {
   "currency": "The currency code (e.g., MYR, USD)",
   "payment_method": "The payment method used",
   "predicted_category": "One of the categories from the list above",
-  "merchant": "The merchant name if you find a better match than Textract",
-  "total": "The total amount if you find a better match than Textract",
+  "merchant": "The merchant name if you find a better match than extracted data",
+  "total": "The total amount if you find a better match than extracted data",
   "suggestions": {
-    "merchant": "A suggested correction for merchant name if OCR made errors",
+    "merchant": "A suggested correction for merchant name if extraction made errors",
     "date": "A suggested date correction in YYYY-MM-DD format if needed",
     "total": "A suggested total amount correction if needed",
     "tax": "A suggested tax amount correction if needed"
@@ -1818,7 +1818,7 @@ serve(async (req) => {
     // Enhanced debugging for request validation
     console.log("🔍 ENHANCE-RECEIPT-DATA REQUEST DEBUG:");
     console.log("🔍 Request keys:", Object.keys(requestData));
-    console.log("🔍 Has textractData:", !!requestData.textractData);
+    console.log("🔍 Has extractedData:", !!requestData.extractedData);
     console.log("🔍 Has fullText:", !!requestData.fullText);
     console.log("🔍 Has imageData:", !!requestData.imageData);
     if (requestData.imageData) {
@@ -1831,7 +1831,9 @@ serve(async (req) => {
     }
 
     // Extract and validate required parameters
-    const { textractData, fullText, imageData, receiptId, modelId } = requestData;
+    const { extractedData, fullText, imageData, receiptId, modelId } = requestData;
+    // Legacy support for textractData field name
+    const textractData = requestData.textractData || extractedData;
 
     if (!receiptId) {
       return new Response(
@@ -1849,10 +1851,10 @@ serve(async (req) => {
     if (textractData && fullText) {
       input = {
         type: 'text',
-        textractData,
+        extractedData: textractData,
         fullText
       };
-      console.log("Processing with text input (OCR data)");
+      console.log("Processing with text input (extracted data)");
     } else if (imageData && imageData.data) {
       // Additional validation for imageData.data
       if (typeof imageData.data !== 'string' && !Array.isArray(imageData.data) && !(imageData.data instanceof Uint8Array)) {
@@ -1904,7 +1906,7 @@ serve(async (req) => {
       // Enhanced error message with specific details
       const missingDetails: string[] = [];
       if (!textractData && !fullText) {
-        missingDetails.push('textractData and fullText for OCR processing');
+        missingDetails.push('extractedData and fullText for text processing');
       }
       if (!imageData) {
         missingDetails.push('imageData for vision processing');

@@ -1,7 +1,7 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 /// <reference types="https://deno.land/x/deno/cli/types/v1.39.1/index.d.ts" />
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-// AWS Textract import removed - OCR processing no longer used
+// AI Vision processing for receipt data extraction
 import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encodeBase64 } from "jsr:@std/encoding/base64"
@@ -30,7 +30,7 @@ const corsHeaders = {
 // Construct the target function URL dynamically
 const enhanceFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/enhance-receipt-data`;
 
-// AWS Textract client configuration removed - OCR processing no longer used
+// AI Vision processing configuration
 
 // Main function to process receipt image and extract data using AI Vision only
 async function processReceiptImage(
@@ -220,7 +220,8 @@ async function processReceiptImage(
   }
 }
 
-// Helper function to extract structured data from Textract response (deprecated - OCR removed)
+// DEPRECATED: Legacy function for structured data extraction - no longer used with AI-only processing
+// TODO: Remove this function in future cleanup as it's not called anywhere
 function extractTextractData(response: any, logger: ProcessingLogger) {
   // Feature flag to control whether to use the new columns
   const ENABLE_GEOMETRY_COLUMNS = true; // Re-enabled now that columns exist in the database
@@ -552,7 +553,8 @@ function extractTextractData(response: any, logger: ProcessingLogger) {
   return result;
 }
 
-// Merge Textract and AI enhanced data (deprecated - OCR removed)
+// DEPRECATED: Legacy function for merging OCR and AI data - no longer used with AI-only processing
+// TODO: Remove this function in future cleanup
 function mergeTextractAndAIData(textractData: any, enhancedData: any) {
   const result = { ...textractData };
 
@@ -601,13 +603,13 @@ function mergeTextractAndAIData(textractData: any, enhancedData: any) {
     // Preserve geometry information if we're keeping the original total
   }
 
-  // Merge line items if provided by AI and better than OCR
+  // Merge line items if provided by AI and better than existing data
   if (enhancedData.line_items && Array.isArray(enhancedData.line_items) &&
       (result.line_items.length === 0 || enhancedData.line_items.length > result.line_items.length)) {
 
-    // If AI provides more line items, use those but try to preserve geometry from OCR where possible
+    // If AI provides more line items, use those but try to preserve geometry from existing data where possible
     const aiLineItems = enhancedData.line_items.map((aiItem: any) => {
-      // Try to find a matching OCR line item to preserve geometry
+      // Try to find a matching existing line item to preserve geometry
       const matchingOcrItem = result.line_items.find((ocrItem: any) =>
         ocrItem.description.toLowerCase().includes(aiItem.description.toLowerCase()) ||
         aiItem.description.toLowerCase().includes(ocrItem.description.toLowerCase())
@@ -616,7 +618,7 @@ function mergeTextractAndAIData(textractData: any, enhancedData: any) {
       return {
         description: aiItem.description,
         amount: aiItem.amount,
-        // Preserve geometry from OCR if available, otherwise null
+        // Preserve geometry from existing data if available, otherwise null
         geometry: matchingOcrItem?.geometry || null
       };
     });
@@ -634,7 +636,7 @@ function mergeTextractAndAIData(textractData: any, enhancedData: any) {
   // Feature flag to control whether to use the new columns
   const ENABLE_GEOMETRY_COLUMNS = true; // Re-enabled now that columns exist in the database
 
-  // Preserve document structure from OCR if enabled
+  // Preserve document structure from existing data if enabled
   if (ENABLE_GEOMETRY_COLUMNS && 'document_structure' in result && !result.document_structure && textractData.document_structure) {
     result.document_structure = textractData.document_structure;
   }
@@ -707,7 +709,8 @@ function formatAIVisionResult(visionData: any) {
   return result;
 }
 
-// Find discrepancies between primary and alternative results (deprecated - OCR removed)
+// DEPRECATED: Legacy function for finding discrepancies between processing methods - no longer used with AI-only processing
+// TODO: Remove this function in future cleanup
 function findDiscrepancies(primaryResult: any, alternativeResult: any) {
   const discrepancies: any[] = [];
 
@@ -860,7 +863,7 @@ async function optimizeImageForProcessing(imageBytes: Uint8Array, logger: Proces
 // Add this helper function below the processReceiptImage function
 // Helper function to calculate more meaningful confidence scores
 function calculateFieldConfidence(baseConfidence: number, value: string, fieldType: string): number {
-  // Start with the base confidence from OCR
+  // Start with the base confidence from processing
   let adjustedConfidence = baseConfidence || 50;
 
   // Don't allow very low confidence - minimum of 30%
