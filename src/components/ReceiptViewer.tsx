@@ -1076,7 +1076,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 <p className="mt-1">Try one of these solutions:</p>
                 <ul className="list-disc list-inside mt-1">
                   <li>Use a smaller or clearer image (we now support up to 5MB)</li>
-                  <li>Try the OCR+AI method if AI Vision encounters issues</li>
+                  <li>Try reprocessing with a different AI model</li>
                   <li>Manually enter the receipt details</li>
                 </ul>
               </>
@@ -1146,15 +1146,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             {renderProcessingStatus()}
           </div>
           <div className="flex-1 min-h-0 overflow-auto rounded-lg relative bg-secondary/30">
-            {processingStatus && !['complete', 'failed_ocr', 'failed_ai'].includes(processingStatus) && (
+            {processingStatus && !['complete', 'failed', 'failed_ai'].includes(processingStatus) && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
                 <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
                   <Loader2 size={40} className="animate-spin mb-2" />
                   <span className="text-lg font-medium">
                     {processingStatus === 'uploading' && 'Uploading Receipt...'}
-                    {processingStatus === 'uploaded' && 'Preparing for OCR...'}
-                    {processingStatus === 'processing_ocr' && 'Running OCR...'}
-                    {processingStatus === 'processing_ai' && 'AI Analysis...'}
+                    {processingStatus === 'uploaded' && 'Preparing for AI Processing...'}
+                    {processingStatus === 'processing' && 'Running AI Analysis...'}
+                    {processingStatus === 'processing_ai' && 'AI Enhancement...'}
                   </span>
                 </div>
               </div>
@@ -1394,7 +1394,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               variant="outline"
               className="w-full gap-2"
               onClick={handleReprocessReceipt}
-              disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed_ocr', 'failed_ai', 'complete'].includes(processingStatus))}
+              disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed', 'failed_ai', 'complete'].includes(processingStatus))}
             >
               {isProcessing ? (
                 <>

@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  FileText,
   Zap,
   Brain,
   AlertTriangle,
@@ -21,7 +19,6 @@ interface FileAnalyzerProps {
   showDetails?: boolean;
   compact?: boolean;
   userPreferences?: {
-    preferredMethod?: 'ocr-ai' | 'ai-vision';
     preferredModel?: string;
     prioritizeSpeed?: boolean;
     prioritizeAccuracy?: boolean;
@@ -31,7 +28,6 @@ interface FileAnalyzerProps {
 export function FileAnalyzer({
   file,
   onRecommendationChange,
-  showDetails = true,
   compact = false,
   userPreferences
 }: FileAnalyzerProps) {
@@ -153,7 +149,7 @@ export function FileAnalyzer({
       >
         {getMethodIcon(recommendation.recommendedMethod)}
         <span className="text-sm font-medium">
-          {recommendation.recommendedMethod === 'ai-vision' ? 'AI Vision' : 'OCR + AI'}
+          AI Vision
         </span>
         <Badge variant="outline" className={getConfidenceColor(recommendation.confidence)}>
           {recommendation.confidence} confidence

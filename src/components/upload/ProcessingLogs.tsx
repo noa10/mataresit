@@ -122,7 +122,7 @@ export function ProcessingLogs({
         return <Upload size={14} className="text-blue-500" />;
       case 'FETCH':
         return <Database size={14} className="text-indigo-500" />;
-      case 'OCR':
+      case 'AI':
         return <Zap size={14} className="text-purple-500" />;
       case 'GEMINI':
         return <Brain size={14} className="text-violet-500" />;

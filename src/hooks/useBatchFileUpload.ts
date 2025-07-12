@@ -1,6 +1,6 @@
 import { useReducer, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { ReceiptUpload, ProcessingStatus } from "@/types/receipt";
+import { ReceiptUpload, ProcessingStatus, ProcessingLog } from "@/types/receipt";
 import { useFileUpload } from "./useFileUpload";
 import {
   createReceipt,
@@ -14,7 +14,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/utils/processingOptimizer";
-import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
+
 import { ReceiptNotificationService } from "@/services/receiptNotificationService";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
 
@@ -169,7 +169,7 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
           ...action.recommendations
         },
         // Generate a new batch ID if this is the first batch or if starting a new batch
-        batchId: state.batchId || `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        batchId: state.batchId || `batch_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
       };
     }
 
@@ -341,7 +341,7 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
 }
 
 export function useBatchFileUpload(options: BatchUploadOptions = {}) {
-  const { maxConcurrent = 2, autoStart = false, useEnhancedFallback = false } = options; // Temporarily disabled for consistency
+  const { maxConcurrent = 2, autoStart = false } = options;
 
   // Use the base file upload hook for file selection and validation
   const baseUpload = useFileUpload();
@@ -543,7 +543,6 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     // Get intelligent batch processing optimization with user preferences
     const userPreferences = {
       preferredModel: settings.selectedModel,
-      preferredMethod: 'ai-vision' as const, // Always use AI Vision
     };
 
     const batchOptimization = getBatchProcessingOptimization(validFiles, userPreferences);
@@ -743,9 +742,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         image_url: imageUrl,
         // user_id is added by the createReceipt function
         processing_status: 'uploading',
-        primary_method: settings.processingMethod,
         model_used: settings.selectedModel,
-        has_alternative_data: settings.compareWithAlternative,
         payment_method: "", // Add required field
         custom_category_id: upload.categoryId || null // Include category from upload
       }, [], {
@@ -784,19 +781,15 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
             // Update progress based on processing status
             console.log(`Receipt ${newReceiptId} status updated to ${newStatus}`);
 
-            if (newStatus === 'processing_ocr') {
+            if (newStatus === 'processing') {
               updateUploadStatus(upload.id, 'processing', 70);
-            } else if (newStatus === 'processing_ai') {
-              updateUploadStatus(upload.id, 'processing', 85);
             } else if (newStatus === 'complete') {
               console.log(`Receipt ${newReceiptId} processing complete, updating UI to 100%`);
               addLocalLog(upload.id, 'COMPLETE', 'Processing complete - receipt ready for review');
               updateUploadStatus(upload.id, 'completed', 100);
               statusChannel.unsubscribe();
-            } else if (newStatus === 'failed_ocr' || newStatus === 'failed_ai') {
-              const errorMsg = newStatus === 'failed_ocr'
-                ? "OCR processing failed"
-                : "AI analysis failed";
+            } else if (newStatus === 'failed') {
+              const errorMsg = "AI processing failed";
 
               console.log(`Receipt ${newReceiptId} processing failed: ${errorMsg}`);
               addLocalLog(upload.id, 'ERROR', `Processing failed: ${errorMsg}`);
@@ -819,37 +812,13 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         const recommendation = processingRecommendations[upload.id];
-        let result;
+        let result: any;
 
-        if (useEnhancedFallback && recommendation) {
-          console.log(`Using enhanced fallback processing for ${newReceiptId}:`, {
-            method: recommendation.recommendedMethod,
-            model: recommendation.recommendedModel,
-            riskLevel: recommendation.riskLevel
-          });
-
-          result = await processReceiptWithEnhancedFallback(
-            newReceiptId,
-            recommendation,
-            {
-              onProgress: (stage, progress) => {
-                console.log(`Enhanced processing ${newReceiptId}: ${stage} (${progress}%)`);
-              },
-              onFallback: (reason, newMethod) => {
-                console.log(`Fallback triggered for ${newReceiptId}: ${reason} → ${newMethod}`);
-              },
-              onRetry: (attempt, maxAttempts) => {
-                console.log(`Processing attempt ${attempt}/${maxAttempts} for ${newReceiptId}`);
-              }
-            }
-          );
-        } else {
-          // Fallback to original processing with AI Vision
-          result = await processReceiptWithAI(newReceiptId, {
-            modelId: recommendation?.recommendedModel || settings.selectedModel,
-            uploadContext: 'batch'
-          });
-        }
+        // Process with AI Vision
+        result = await processReceiptWithAI(newReceiptId, {
+          modelId: recommendation?.recommendedModel || settings.selectedModel,
+          uploadContext: 'batch'
+        });
 
         console.log(`Processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
 

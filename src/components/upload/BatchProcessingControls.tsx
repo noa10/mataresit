@@ -39,7 +39,7 @@ interface BatchProcessingControlsProps {
   allComplete?: boolean;
   startTime?: number;
   averageFileSize?: number;
-  processingMethod?: 'ocr-ai' | 'ai-vision';
+  processingMethod?: 'ai-vision';
   isProgressUpdating?: boolean; // New prop to indicate when progress is actively updating
 }
 

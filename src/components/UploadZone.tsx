@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Upload, Loader2, XCircle, AlertCircle, FileText, FileImage, Settings } from "lucide-react";
+import { Upload, Loader2, XCircle, FileText, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
@@ -11,27 +11,24 @@ import {
   uploadReceiptImage,
   processReceiptWithAI,
   markReceiptUploaded,
-  fixProcessingStatus,
   subscribeToReceiptAll
 } from "@/services/receiptService";
-import { ProcessingLog, ProcessingStatus, ReceiptUpload } from "@/types/receipt";
+import { ProcessingLog, ProcessingStatus, Receipt } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
-import { useSubscription } from "@/hooks/useSubscription";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
-import { ProcessingTimeline } from "./upload/ProcessingTimeline";
+
 import { EnhancedProcessingTimeline } from "./upload/EnhancedProcessingTimeline";
 import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
 import { FileAnalyzer } from "./upload/FileAnalyzer";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { processReceiptWithEnhancedFallback } from "@/services/fallbackProcessingService";
+
 import { ProcessingRecommendation, analyzeFile, getProcessingRecommendation } from "@/utils/processingOptimizer";
 import { CategorySelector } from "./categories/CategorySelector";
 import { Label } from "@/components/ui/label";
@@ -52,11 +49,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showOptions, setShowOptions] = useState(false);
   const [isProgressUpdating, setIsProgressUpdating] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
-  const [useEnhancedFallback, setUseEnhancedFallback] = useState(false); // Temporarily disabled for consistency
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // Use settings hook instead of local state
@@ -70,15 +65,12 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
     isDragging,
     isInvalidFile,
     receiptUploads,
-    selectedFileIndex,
     fileInputRef,
-    setSelectedFileIndex,
     handleDragEnter,
     handleDragLeave,
     handleDragOver,
     handleDrop,
     handleFileInputChange,
-    handleFiles,
     openFileDialog,
     resetUpload,
   } = useFileUpload();
@@ -169,9 +161,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = `${t('upload.processing')} ${processingStatus.replace('_', ' ')}`;
           if (processingStatus === 'complete') {
-            ariaLiveRegion.textContent = t('viewer.processedSuccessfully');
+            ariaLiveRegion.textContent = String(t('viewer.processedSuccessfully'));
           } else if (processingStatus === 'failed') {
-            ariaLiveRegion.textContent = t('upload.error');
+            ariaLiveRegion.textContent = String(t('upload.error'));
           }
         }
       }
@@ -188,20 +180,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       {
         onReceiptUpdate: (payload) => {
           console.log('📝 Receipt status update during upload:', payload.new);
-          const newStatus = payload.new.processing_status as ProcessingStatus;
-          const newError = payload.new.processing_error;
+          // Type guard to ensure payload.new is a Receipt object
+          if (payload.new && typeof payload.new === 'object' && 'id' in payload.new) {
+            const receipt = payload.new as Receipt;
+            const newStatus = receipt.processing_status as ProcessingStatus;
+            const newError = receipt.processing_error;
 
-          setProcessingStatus(newStatus);
+            setProcessingStatus(newStatus);
 
-          if (newError) {
-            setError(newError);
-            toast.error(t('viewer.processingError', { error: newError }));
-          } else if (newStatus === 'complete') {
-            toast.success(t('viewer.processedSuccessfully'));
-          } else if (newStatus === 'failed') {
-            const errorMsg = t('upload.error');
-            setError(errorMsg);
-            toast.error(errorMsg);
+            if (newError) {
+              setError(newError);
+              toast.error(String(t('viewer.processingError', { error: newError })));
+            } else if (newStatus === 'complete') {
+              toast.success(String(t('viewer.processedSuccessfully')));
+            } else if (newStatus === 'failed') {
+              const errorMsg = String(t('upload.error'));
+              setError(errorMsg);
+              toast.error(errorMsg);
+            }
           }
         }
       },
@@ -351,7 +347,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
   const processUploadedFiles = async (files: File[]) => {
     if (!user) {
-      toast.error(t('upload.error'));
+      toast.error(String(t('upload.error')));
       navigate("/auth");
       return;
     }
@@ -391,7 +387,6 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         const fileAnalysis = analyzeFile(file);
         const userPreferences = {
           preferredModel: settings.selectedModel,
-          preferredMethod: 'ai-vision' as const, // Always use AI Vision
         };
 
         const recommendation = getProcessingRecommendation(fileAnalysis, userPreferences);
@@ -555,139 +550,94 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       try {
-        // Use enhanced fallback processing if available and recommended
-        if (useEnhancedFallback && processingRecommendation) {
-          console.log('Using enhanced fallback processing with recommendation:', processingRecommendation);
+        // ENHANCED MODEL SELECTION DEBUG - Track exact values
+        console.log('🔍 MODEL SELECTION DEBUG - Raw values:', {
+          'settings.selectedModel': settings.selectedModel,
+          'settings.selectedModel type': typeof settings.selectedModel,
+          'settings.selectedModel length': settings.selectedModel?.length,
+          'processingRecommendation?.recommendedModel': processingRecommendation?.recommendedModel,
+          'localStorage raw': localStorage.getItem('receiptProcessingSettings'),
+          'settings object': settings
+        });
 
-          const success = await processReceiptWithEnhancedFallback(
-            newReceiptId,
-            processingRecommendation,
-            {
-              onProgress: (stage, progress) => {
-                console.log(`Enhanced processing: ${stage} (${progress}%)`);
-                if (ariaLiveRegion) {
-                  ariaLiveRegion.textContent = stage;
-                }
-              },
-              onFallback: (reason, newMethod) => {
-                console.log(`Fallback triggered: ${reason} → ${newMethod}`);
-                toast.info(`Switching to AI Vision method...`);
-              },
-              onRetry: (attempt, maxAttempts) => {
-                console.log(`Processing attempt ${attempt}/${maxAttempts}`);
-                if (ariaLiveRegion) {
-                  ariaLiveRegion.textContent = `Processing attempt ${attempt}/${maxAttempts}...`;
-                }
-              },
-              onComplete: (success, stats) => {
-                console.log('Enhanced processing completed:', { success, stats });
-                if (success) {
-                  setUploadProgress(100);
-                  if (ariaLiveRegion) {
-                    ariaLiveRegion.textContent = 'Receipt processed successfully';
-                  }
-                } else {
-                  setCurrentStage('ERROR');
-                  if (ariaLiveRegion) {
-                    ariaLiveRegion.textContent = 'Processing failed after multiple attempts';
-                  }
-                }
-              }
-            }
-          );
+        // Determine which model to use - prioritize user's explicit selection with enhanced validation
+        let modelToUse: string;
+        let prioritySource: string;
 
-          if (!success) {
-            throw new Error('Enhanced processing failed after all fallback attempts');
-          }
-        } else {
-          // ENHANCED MODEL SELECTION DEBUG - Track exact values
-          console.log('🔍 MODEL SELECTION DEBUG - Raw values:', {
-            'settings.selectedModel': settings.selectedModel,
-            'settings.selectedModel type': typeof settings.selectedModel,
-            'settings.selectedModel length': settings.selectedModel?.length,
-            'processingRecommendation?.recommendedModel': processingRecommendation?.recommendedModel,
-            'localStorage raw': localStorage.getItem('receiptProcessingSettings'),
-            'settings object': settings
-          });
+        // PRIORITY 1: User's explicit selection (must be non-empty string)
+        if (settings.selectedModel && settings.selectedModel.trim().length > 0) {
+          modelToUse = settings.selectedModel.trim();
+          prioritySource = 'user_selection';
+          console.log('✅ Using user selected model:', modelToUse);
+        }
+        // PRIORITY 2: Processing recommendation
+        else if (processingRecommendation?.recommendedModel && processingRecommendation.recommendedModel.trim().length > 0) {
+          modelToUse = processingRecommendation.recommendedModel.trim();
+          prioritySource = 'recommendation';
+          console.log('📋 Using recommended model:', modelToUse);
+        }
+        // PRIORITY 3: Default fallback
+        else {
+          modelToUse = 'gemini-2.0-flash-lite';
+          prioritySource = 'default';
+          console.log('⚠️ Using default model:', modelToUse);
+        }
 
-          // Determine which model to use - prioritize user's explicit selection with enhanced validation
-          let modelToUse: string;
-          let prioritySource: string;
+        console.log('🎯 FINAL MODEL SELECTION:', {
+          userSelectedModel: settings.selectedModel,
+          recommendedModel: processingRecommendation?.recommendedModel,
+          finalModelUsed: modelToUse,
+          prioritySource: prioritySource,
+          isOpenRouterModel: modelToUse.startsWith('openrouter/'),
+          modelLength: modelToUse.length
+        });
 
-          // PRIORITY 1: User's explicit selection (must be non-empty string)
-          if (settings.selectedModel && settings.selectedModel.trim().length > 0) {
-            modelToUse = settings.selectedModel.trim();
-            prioritySource = 'user_selection';
-            console.log('✅ Using user selected model:', modelToUse);
-          }
-          // PRIORITY 2: Processing recommendation
-          else if (processingRecommendation?.recommendedModel && processingRecommendation.recommendedModel.trim().length > 0) {
-            modelToUse = processingRecommendation.recommendedModel.trim();
-            prioritySource = 'recommendation';
-            console.log('📋 Using recommended model:', modelToUse);
-          }
-          // PRIORITY 3: Default fallback
-          else {
-            modelToUse = 'gemini-2.0-flash-lite';
-            prioritySource = 'default';
-            console.log('⚠️ Using default model:', modelToUse);
-          }
+        addLocalLog('PROCESSING', `Using AI model: ${modelToUse} (${prioritySource})`);
 
-          console.log('🎯 FINAL MODEL SELECTION:', {
-            userSelectedModel: settings.selectedModel,
-            recommendedModel: processingRecommendation?.recommendedModel,
-            finalModelUsed: modelToUse,
-            prioritySource: prioritySource,
-            isOpenRouterModel: modelToUse.startsWith('openrouter/'),
-            modelLength: modelToUse.length
-          });
+        // Check if this is an OpenRouter model for local progress tracking
+        const isOpenRouterModel = modelToUse.startsWith('openrouter/');
 
-          addLocalLog('PROCESSING', `Using AI model: ${modelToUse} (${prioritySource})`);
+        if (isOpenRouterModel) {
+          console.log('🔄 Using OpenRouter model - enabling local progress tracking');
 
-          // Check if this is an OpenRouter model for local progress tracking
-          const isOpenRouterModel = modelToUse.startsWith('openrouter/');
+          // Start OpenRouter progress tracking
+          openRouterActions.startProcessing(newReceiptId);
 
-          if (isOpenRouterModel) {
-            console.log('🔄 Using OpenRouter model - enabling local progress tracking');
-
-            // Start OpenRouter progress tracking
-            openRouterActions.startProcessing(newReceiptId);
-
-            // Process with OpenRouter progress tracking
-            try {
-              await processReceiptWithAI(newReceiptId, {
-                modelId: modelToUse,
-                uploadContext: 'single',
-                onProgress: (stepName: string, message: string, progress?: number) => {
-                  console.log(`OpenRouter Progress: ${stepName} - ${message}${progress ? ` (${progress}%)` : ''}`);
-                  openRouterActions.addLog(stepName, message, progress);
-
-                  // Also add to local logs for UI consistency
-                  addLocalLog(stepName, message, progress);
-
-                  // Update ARIA live region
-                  if (ariaLiveRegion) {
-                    ariaLiveRegion.textContent = message;
-                  }
-                }
-              });
-
-              // Complete OpenRouter progress tracking
-              openRouterActions.completeProcessing();
-              addLocalLog('COMPLETE', 'OpenRouter processing completed successfully');
-            } catch (openRouterError: Error) {
-              console.error('OpenRouter processing failed:', openRouterError);
-              openRouterActions.failProcessing(openRouterError.message || 'Unknown error');
-              throw openRouterError; // Re-throw to be handled by outer catch
-            }
-          } else {
-            // Standard Edge Function processing
-            console.log('🚀 Calling processReceiptWithAI with Edge Function model:', modelToUse);
+          // Process with OpenRouter progress tracking
+          try {
             await processReceiptWithAI(newReceiptId, {
               modelId: modelToUse,
-              uploadContext: 'single'
+              uploadContext: 'single',
+              onProgress: (stepName: string, message: string, progress?: number) => {
+                console.log(`OpenRouter Progress: ${stepName} - ${message}${progress ? ` (${progress}%)` : ''}`);
+                openRouterActions.addLog(stepName, message, progress);
+
+                // Also add to local logs for UI consistency
+                addLocalLog(stepName, message, progress);
+
+                // Update ARIA live region
+                if (ariaLiveRegion) {
+                  ariaLiveRegion.textContent = message;
+                }
+              }
             });
+
+            // Complete OpenRouter progress tracking
+            openRouterActions.completeProcessing();
+            addLocalLog('COMPLETE', 'OpenRouter processing completed successfully');
+          } catch (openRouterError: unknown) {
+            console.error('OpenRouter processing failed:', openRouterError);
+            const errorMessage = openRouterError instanceof Error ? openRouterError.message : 'Unknown error';
+            openRouterActions.failProcessing(errorMessage);
+            throw openRouterError; // Re-throw to be handled by outer catch
           }
+        } else {
+          // Standard Edge Function processing
+          console.log('🚀 Calling processReceiptWithAI with Edge Function model:', modelToUse);
+          await processReceiptWithAI(newReceiptId, {
+            modelId: modelToUse,
+            uploadContext: 'single'
+          });
         }
 
         addLocalLog('COMPLETE', 'Processing complete - receipt ready for review');
@@ -695,10 +645,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Receipt processed successfully';
         }
-      } catch (ocrError: Error) {
+      } catch (ocrError: unknown) {
         console.error("Processing error:", ocrError);
         toast.error("Processing failed. Please edit manually or try again.");
-        addLocalLog('ERROR', `Processing failed: ${ocrError.message || 'Unknown error'}`);
+        const errorMessage = ocrError instanceof Error ? ocrError.message : 'Unknown error';
+        addLocalLog('ERROR', `Processing failed: ${errorMessage}`);
         setCurrentStage('ERROR');
 
         if (ariaLiveRegion) {
@@ -720,16 +671,17 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       }
-    } catch (error: Error) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
-      setError(error.message || "There was an error uploading your receipt");
-      toast.error(error.message || "There was an error uploading your receipt");
+      const errorMessage = error instanceof Error ? error.message : "There was an error uploading your receipt";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setIsUploading(false);
       setUploadProgress(0);
       setCurrentStage('ERROR');
 
       if (document.getElementById('upload-status')) {
-        document.getElementById('upload-status')!.textContent = 'Upload failed: ' + (error.message || "Unknown error");
+        document.getElementById('upload-status')!.textContent = 'Upload failed: ' + errorMessage;
       }
     }
   };
@@ -932,7 +884,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                   stageHistory={stageHistory}
                   uploadProgress={uploadProgress}
                   fileSize={receiptUploads[0]?.file?.size}
-                  processingMethod={settings.processingMethod}
+                  processingMethod="ai-vision"
                   modelId={settings.selectedModel}
                   startTime={startTime}
                   isProgressUpdating={isProgressUpdating}
@@ -1003,17 +955,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       {!isUploading && (
         <div className="w-full flex-shrink-0">
           <ReceiptProcessingOptions
-            defaultMethod={settings.processingMethod}
             defaultModel={settings.selectedModel}
-            defaultCompare={settings.compareWithAlternative}
-            onMethodChange={(method) => {
-              updateSettings({ processingMethod: method });
-            }}
             onModelChange={(model) => {
               updateSettings({ selectedModel: model });
-            }}
-            onCompareChange={(compare) => {
-              updateSettings({ compareWithAlternative: compare });
             }}
           />
         </div>
