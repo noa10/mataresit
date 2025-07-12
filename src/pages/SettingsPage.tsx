@@ -15,8 +15,9 @@ import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { CategoryManager } from "@/components/categories/CategoryManager";
 import { CompactSubscriptionLimitError } from "@/components/SubscriptionLimitError";
 import { Link } from "react-router-dom";
-import { Crown, Key, Zap, ArrowRight, Bell } from "lucide-react";
+import { Crown, Key, Zap, ArrowRight, Bell, Palette } from "lucide-react";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { ThemePreferences } from "@/components/settings/ThemePreferences";
 import {
   Tabs,
   TabsContent,
@@ -177,12 +178,16 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="processing" className="w-full">
-            <TabsList className="grid w-full mb-8 max-w-3xl grid-cols-6">
+            <TabsList className="grid w-full mb-8 max-w-4xl grid-cols-7">
               <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
               <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>
               <TabsTrigger value="notifications">
                 <Bell className="h-4 w-4 mr-1" />
                 {t('tabs.notifications')}
+              </TabsTrigger>
+              <TabsTrigger value="theme">
+                <Palette className="h-4 w-4 mr-1" />
+                {t('tabs.theme')}
               </TabsTrigger>
               <TabsTrigger value="providers">{t('tabs.providers')}</TabsTrigger>
               <TabsTrigger
@@ -302,6 +307,10 @@ export default function SettingsPage() {
 
           <TabsContent value="notifications">
             <NotificationPreferences />
+          </TabsContent>
+
+          <TabsContent value="theme">
+            <ThemePreferences />
           </TabsContent>
 
           <TabsContent value="providers" className="space-y-6">

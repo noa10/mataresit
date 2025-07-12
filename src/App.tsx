@@ -10,6 +10,7 @@ import { StripeProvider } from "@/contexts/StripeContext";
 import { ChatControlsProvider } from "@/contexts/ChatControlsContext";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
 import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
 import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
@@ -95,14 +96,15 @@ const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <LanguageProvider>
-          <TeamProvider>
-            <StripeProvider>
-              <PersonalizationProvider>
-                <BackgroundSearchProvider>
-                  <ChatControlsProvider>
-                    <NotificationProvider>
-                      <PushNotificationProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <TeamProvider>
+              <StripeProvider>
+                <PersonalizationProvider>
+                  <BackgroundSearchProvider>
+                    <ChatControlsProvider>
+                      <NotificationProvider>
+                        <PushNotificationProvider>
                       <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -267,6 +269,7 @@ const App = () => (
                     <NotificationFilteringTestPage />
                   </Suspense>
                 } />
+
                 <Route path="/test/enhanced-search" element={
                   <Suspense fallback={<PageLoading />}>
                     <TestEnhancedSearch />
@@ -326,7 +329,8 @@ const App = () => (
             </StripeProvider>
           </TeamProvider>
         </LanguageProvider>
-      </AuthProvider>
+      </ThemeProvider>
+    </AuthProvider>
     </QueryClientProvider>
   </HelmetProvider>
 );

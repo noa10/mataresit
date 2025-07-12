@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileTranslation } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +27,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useProfileTranslation();
-  const [isDarkMode, setIsDarkMode] = useState(
-    document.documentElement.classList.contains('dark')
-  );
+  const { isDarkMode, toggleMode } = useTheme();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,21 +55,23 @@ export default function Profile() {
   }, [user?.id, toast]);
 
   // Handle dark mode toggle
-  const toggleDarkMode = () => {
-    if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    }
-    setIsDarkMode(!isDarkMode);
+  const toggleDarkMode = async () => {
+    const success = await toggleMode();
 
-    toast({
-      title: !isDarkMode ? t('appearance.darkModeActivated') : t('appearance.lightModeActivated'),
-      description: t('appearance.themeChanged', { mode: !isDarkMode ? 'dark' : 'light' }),
-      duration: 2000,
-    });
+    if (success) {
+      toast({
+        title: !isDarkMode ? t('appearance.darkModeActivated') : t('appearance.lightModeActivated'),
+        description: t('appearance.themeChanged', { mode: !isDarkMode ? 'dark' : 'light' }),
+        duration: 2000,
+      });
+    } else {
+      toast({
+        title: t('appearance.themeChangeError'),
+        description: t('appearance.themeChangeErrorDescription'),
+        duration: 3000,
+        variant: 'destructive',
+      });
+    }
   };
 
   // Handle sign out

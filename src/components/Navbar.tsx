@@ -5,6 +5,7 @@ import { useStripe } from "@/contexts/StripeContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { useChatControls } from "@/contexts/ChatControlsContext";
 import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
 import { Button } from "./ui/button";
@@ -38,7 +39,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
   const { chatControls } = useChatControls();
   const { t: tNav } = useNavigationTranslation();
   const { t: tCommon } = useCommonTranslation();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isDarkMode, toggleMode } = useTheme();
   const location = useLocation();
 
   // Check if we're on the search/chat page
@@ -47,19 +48,9 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
   // Check if we're on a public page (outside AppLayout)
   const isPublicPage = ['/', '/pricing', '/help', '/docs', '/status', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success', '/features'].includes(location.pathname);
 
-  useEffect(() => {
-    setIsDarkMode(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  const toggleTheme = () => {
-    if (isDarkMode) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    }
-    setIsDarkMode(!isDarkMode);
+  // Theme toggle function using the new context
+  const handleThemeToggle = async () => {
+    await toggleMode();
   };
 
   const initial = user?.email?.charAt(0).toUpperCase() ?? "";
@@ -214,7 +205,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
           </div>
 
           {/* Theme Toggle */}
-          <Button variant="ghost" size="sm" onClick={toggleTheme} title="Toggle theme" className="hidden sm:flex">
+          <Button variant="ghost" size="sm" onClick={handleThemeToggle} title="Toggle theme" className="hidden sm:flex">
             {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
@@ -281,7 +272,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
                   <div className="px-2 py-1">
                     <LanguageSelector variant="default" className="w-full justify-start" />
                   </div>
-                  <DropdownMenuItem onClick={toggleTheme}>
+                  <DropdownMenuItem onClick={handleThemeToggle}>
                     {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
                     {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
                   </DropdownMenuItem>
@@ -412,7 +403,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
                           <div className="px-2 py-1">
                             <LanguageSelector variant="default" className="w-full justify-start" />
                           </div>
-                          <DropdownMenuItem onClick={toggleTheme}>
+                          <DropdownMenuItem onClick={handleThemeToggle}>
                             {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
                             {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
                           </DropdownMenuItem>
@@ -523,7 +514,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
                           <div className="px-2 py-1">
                             <LanguageSelector variant="default" className="w-full justify-start" />
                           </div>
-                          <DropdownMenuItem onClick={toggleTheme}>
+                          <DropdownMenuItem onClick={handleThemeToggle}>
                             {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
                             {isDarkMode ? tCommon('theme.light') : tCommon('theme.dark')}
                           </DropdownMenuItem>
