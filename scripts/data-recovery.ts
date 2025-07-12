@@ -9,7 +9,7 @@
  * Features:
  * - Scans storage bucket for existing receipt images
  * - Creates/verifies user account with admin privileges
- * - Processes images through OCR/AI pipeline (ai-vision with Gemini 2.0 Flash Lite)
+ * - Processes images through AI Vision pipeline (ai-vision with Gemini 2.0 Flash Lite)
  * - Generates thumbnails and embeddings
  * - Handles errors gracefully with retry mechanisms
  * - Provides progress tracking and status updates
@@ -43,7 +43,6 @@ if (!SUPABASE_SERVICE_KEY) {
 const TARGET_USER_EMAIL = 'k.anwarbakar@gmail.com';
 const STORAGE_BUCKET = 'receipt_images'; // Bucket ID for 'Receipt Images'
 const DEFAULT_MODEL = 'gemini-2.0-flash-lite';
-const DEFAULT_METHOD = 'ai-vision';
 const BATCH_SIZE = 5; // Process 5 receipts at a time
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 2000; // 2 seconds
@@ -298,7 +297,7 @@ class DataRecoveryService {
         targetUser: TARGET_USER_EMAIL,
         storageBucket: STORAGE_BUCKET,
         defaultModel: DEFAULT_MODEL,
-        defaultMethod: DEFAULT_METHOD,
+        processingMethod: 'ai-vision',
         batchSize: BATCH_SIZE
       });
 
@@ -813,10 +812,10 @@ class DataRecoveryService {
 
       // Step 1: Create initial receipt record
       receiptId = await this.createInitialReceiptRecord(file);
-      await this.updateReceiptProcessingStatus(receiptId, 'processing_ocr');
+      await this.updateReceiptProcessingStatus(receiptId, 'processing');
 
       // Step 2: Call the process-receipt edge function
-      Logger.info(`Starting OCR/AI processing for: ${receiptId}`);
+      Logger.info(`Starting AI Vision processing for: ${receiptId}`);
       await this.callProcessReceiptFunction(receiptId);
 
       // Step 3: Generate thumbnail if not already created
@@ -917,9 +916,7 @@ class DataRecoveryService {
     const payload = {
       receiptId,
       imageUrl: receipt.image_url,
-      modelId: DEFAULT_MODEL,
-      primaryMethod: DEFAULT_METHOD,
-      compareWithAlternative: false
+      modelId: DEFAULT_MODEL
     };
 
     // Call the edge function
