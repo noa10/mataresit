@@ -64,7 +64,7 @@ sequenceDiagram
 
 1.  **Modify `enhance-receipt-data` Function (`supabase/functions/enhance-receipt-data/index.ts`):**
     *   Update the prompt sent to Gemini to explicitly ask for:
-        *   Field-level suggestions for potential OCR errors (e.g., merchant name, date format, total mismatches). Return these as a JSON object (`suggestions`).
+        *   Field-level suggestions for potential extraction errors (e.g., merchant name, date format, total mismatches). Return these as a JSON object (`suggestions`).
         *   A predicted category from a predefined list (e.g., "Groceries", "Dining", "Travel", "Utilities", "Other"). Return this as a string (`predicted_category`).
     *   Adjust the expected JSON response format in the prompt and the parsing logic to handle the new `suggestions` object and `predicted_category` string.
     *   Ensure the function returns these new fields along with the existing ones (currency, payment_method).
@@ -92,7 +92,7 @@ sequenceDiagram
 **Phase 3: Frontend - Integration & Feedback**
 
 3.  **Update Frontend Service (`src/services/receiptService.ts`):**
-    *   Modify the `processReceiptWithOCR` function:
+    *   Modify the `processReceiptWithAI` function:
         *   Extract `ai_suggestions` and `predicted_category` from the result.
         *   Add these fields to the `updateData` object passed to `updateReceipt`.
     *   Modify the `updateReceipt` function (or create `logCorrection`):
@@ -131,10 +131,10 @@ sequenceDiagram
 8.  **Testing:**
     *   **Component Tests:** Test the `ReceiptViewer.tsx` component in isolation to verify UI rendering with/without suggestions/category, state updates on interaction ("Accept" button), and form submission logic.
     *   **Integration Tests:**
-        *   Test `receiptService.ts` functions (`processReceiptWithOCR`, `updateReceipt`, `fetchReceiptById`) to ensure they correctly interact with the deployed Supabase functions and database schema. Mock Supabase client calls if necessary.
+        *   Test `receiptService.ts` functions (`processReceiptWithAI`, `updateReceipt`, `fetchReceiptById`) to ensure they correctly interact with the deployed Supabase functions and database schema. Mock Supabase client calls if necessary.
         *   Test the interaction between `process-receipt` and `enhance-receipt-data` functions, potentially using mock data or local Supabase environment.
     *   **End-to-End (E2E) Tests:** (Manual or Automated)
         *   **Happy Path:** Upload -> Process -> View -> Verify AI data displayed -> Edit/Accept -> Save -> Verify DB update (`receipts` & `corrections`).
-        *   **Error Handling:** Test scenarios where Gemini API fails or returns unexpected data. Does the UI handle it gracefully? Is processing still completed with OCR data?
+        *   **Error Handling:** Test scenarios where Gemini API fails or returns unexpected data. Does the UI handle it gracefully? Is processing still completed with fallback handling?
         *   **Edge Cases:** Test with different receipt types, currencies, image qualities. Test without AI suggestions generated.
     *   **Regression Testing:** Verify existing core functionalities (upload, basic view, manual edit without AI) remain unaffected.

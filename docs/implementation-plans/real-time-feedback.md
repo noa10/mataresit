@@ -14,21 +14,21 @@ Architectural plan for implementing real-time status updates for receipt process
 
 1.  **Database Schema Modification:**
     *   **Table:** `receipts`
-    *   **Add Column:** `processing_status` (type: `text`, nullable: `true`). This will hold statuses like `uploading`, `uploaded`, `processing_ocr`, `processing_ai`, `failed_ocr`, `failed_ai`, `complete`.
+    *   **Add Column:** `processing_status` (type: `text`, nullable: `true`). This will hold statuses like `uploading`, `uploaded`, `processing`, `processing_ai`, `failed`, `failed_ai`, `complete`.
     *   **Add Column:** `processing_error` (type: `text`, nullable: `true`). Stores error messages if processing fails at any step.
     *   *(Optional)* **Add Column:** `upload_progress` (type: `integer`, nullable: `true`). Could store upload percentage (0-100), though often managed transiently in the UI state.
 
 2.  **Type Definitions (`src/types/receipt.ts`):**
     *   Define a `ProcessingStatus` enum or string literal union type:
         ```typescript
-        export type ProcessingStatus = 
-          | 'uploading' 
-          | 'uploaded' 
-          | 'processing_ocr' 
-          | 'processing_ai' 
-          | 'failed_ocr' 
-          | 'failed_ai' 
-          | 'complete' 
+        export type ProcessingStatus =
+          | 'uploading'
+          | 'uploaded'
+          | 'processing'
+          | 'processing_ai'
+          | 'failed'
+          | 'failed_ai'
+          | 'complete'
           | null; // Represents not started or finished old flow
         ```
     *   Update `Receipt`, `ReceiptWithDetails` interfaces to include:
@@ -70,7 +70,7 @@ Architectural plan for implementing real-time status updates for receipt process
             *   Use the `receiptId` to call `subscribeToReceiptUpdates`, passing a callback function (`handleStatusUpdate`).
             *   Call `uploadReceiptImage`, providing a progress callback (`handleUploadProgress`) that updates the local UI state (e.g., progress bar percentage).
         *   `handleUploadProgress(progress: number)`: Updates component state for the progress bar.
-        *   `handleStatusUpdate(payload: RealtimePostgresChangesPayload<Receipt>)`: Updates component state based on `payload.new.processing_status` and `payload.new.processing_error`. Display appropriate messages ("Uploading...", "Processing OCR...", "AI Analysis...", "Error: ...", "Complete").
+        *   `handleStatusUpdate(payload: RealtimePostgresChangesPayload<Receipt>)`: Updates component state based on `payload.new.processing_status` and `payload.new.processing_error`. Display appropriate messages ("Uploading...", "AI Processing...", "AI Analysis...", "Error: ...", "Complete").
         *   When `processing_status` becomes `'complete'` or a `'failed_*'` state, potentially update the UI permanently and consider unsubscribing from the channel.
         *   Implement cleanup: Unsubscribe from the Supabase channel when the component unmounts or the process is definitively finished/failed.
     *   **Receipt List/Details View:**
@@ -84,8 +84,8 @@ Architectural plan for implementing real-time status updates for receipt process
 3.  **UI:** Starts subscription for `receiptId`.
 4.  **UI:** Calls `uploadReceiptImage` with progress callback.
 5.  **Service/UI:** Upload progresses, UI updates progress bar.
-6.  **Service:** Upload completes, calls `processReceiptWithOCR`.
-7.  **Service:** Updates DB `processing_status: 'processing_ocr'`. (UI receives update via subscription).
+6.  **Service:** Upload completes, calls `processReceiptWithAI`.
+7.  **Service:** Updates DB `processing_status: 'processing'`. (UI receives update via subscription).
 8.  **Service:** Invokes `process-receipt` function.
 9.  **(If successful) Service:** Updates DB `processing_status: 'processing_ai'`. (UI receives update).
 10. **Service:** Invokes `enhance-receipt-data` function.

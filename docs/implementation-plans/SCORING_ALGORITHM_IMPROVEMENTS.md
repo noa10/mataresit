@@ -57,8 +57,8 @@ function scoreDate(value: string): number {
 
 1. **Backend Updates**:
 ```typescript
-// Updated processReceiptWithOCR
-const processReceiptWithOCR = async (imageData) => {
+// Updated processReceiptWithAI
+const processReceiptWithAI = async (imageData) => {
   // Initialize with 50% scores
   const initialScores = {
     merchant: 50,
@@ -68,10 +68,10 @@ const processReceiptWithOCR = async (imageData) => {
   };
   
   // Process and update scores
-  const ocrData = await performOCR(imageData);
-  const finalScores = calculateFinalScores(ocrData);
-  
-  return { ...ocrData, confidence: finalScores };
+  const aiData = await performAIProcessing(imageData);
+  const finalScores = calculateFinalScores(aiData);
+
+  return { ...aiData, confidence: finalScores };
 };
 ```
 

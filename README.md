@@ -1,6 +1,6 @@
 # Mataresit
 
-A modern web application for automated receipt processing and expense management, powered by AI and OCR technology.
+A modern web application for automated receipt processing and expense management, powered by AI Vision technology.
 
 ## Quick Start
 

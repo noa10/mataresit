@@ -9,7 +9,7 @@ This document outlines the changes made to implement AI suggestions, categorizat
 - Updated `enhance-receipt-data` Supabase Function with a new Gemini prompt that:
   - Identifies currency and payment method (existing functionality)
   - Predicts a receipt category (new)
-  - Provides AI suggestions for potential OCR errors (new)
+  - Provides AI suggestions for potential extraction errors (new)
   - Returns confidence scores for predictions and suggestions
 
 ### Phase 2: Database Schema
@@ -26,7 +26,7 @@ This document outlines the changes made to implement AI suggestions, categorizat
   - Created new interfaces for AISuggestions and Correction
 
 - Enhanced `src/services/receiptService.ts`:
-  - Updated `processReceiptWithOCR` to handle AI suggestions and categorization
+  - Updated `processReceiptWithAI` to handle AI suggestions and categorization
   - Added `logCorrections` function to track when users correct AI suggestions
   - Modified `updateReceipt` to call the logging function
 

@@ -85,7 +85,7 @@ Navigasi ke halaman **Carian AI** untuk mencari mana-mana resit atau item baris 
 
 ### Mengapakah pemprosesan resit saya tersekat atau gagal?
 
-`processing_status` pada kad resit atau dalam pemapar akan menunjukkan peringkat semasa. Jika ia `failed_ocr` atau `failed_ai`, ralat telah berlaku. Ini boleh berlaku dengan imej berkualiti rendah. Anda boleh sama ada cuba memproses semula resit atau memasukkan data secara manual.
+`processing_status` pada kad resit atau dalam pemapar akan menunjukkan peringkat semasa. Jika ia `failed` atau `failed_ai`, ralat telah berlaku. Ini boleh berlaku dengan imej berkualiti rendah. Anda boleh sama ada cuba memproses semula resit atau memasukkan data secara manual.
 
 ### Mengapakah hasil carian saya tidak seperti yang saya jangkakan?
 
@@ -99,7 +99,7 @@ Anda boleh mengurus langganan anda, melihat invois dan mengemas kini kaedah pemb
 
 ## 5. Glosari
 
-*   **OCR (Pengecaman Aksara Optik):** Teknologi untuk menukar imej teks kepada teks yang boleh dibaca oleh mesin.
+*   **Pemprosesan AI Vision:** Teknologi AI canggih yang menganalisis imej resit secara langsung untuk mengekstrak data dengan ketepatan tinggi.
 *   **AI Vision:** Kaedah pemprosesan di mana model AI secara langsung menganalisis imej untuk memahami kandungannya.
 *   **Embedding:** Perwakilan berangka teks yang menangkap makna semantiknya, menggerakkan Carian AI kami.
 *   **Carian Semantik:** Teknik carian yang memahami niat pengguna dan makna kontekstual perkataan.

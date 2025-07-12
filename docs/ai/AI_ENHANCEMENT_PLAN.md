@@ -22,10 +22,10 @@ This document outlines the implementation plan for enhancing our receipt process
    - ✅ Update logging to track model performance across both text and vision processing.
 
 2. ✅ **Update `process-receipt` Function**
-   - ✅ Modify to accept parameters: `primaryMethod` (`'ocr-ai'` or `'ai-vision'`), `modelId`, and `compareWithAlternative`.
-   - ✅ For `'ocr-ai'`, perform OCR and pass the text to `enhance-receipt-data` with the selected text model.
-   - ✅ For `'ai-vision'`, pass the image directly to `enhance-receipt-data` with the selected vision model.
-   - ✅ If `compareWithAlternative` is true, execute the alternative method (e.g., OCR + default text model for vision primary, or vision + default vision model for OCR primary), compare outputs, and identify discrepancies.
+   - ✅ Modified to accept parameters: `modelId` for AI Vision processing (deprecated: `primaryMethod` and `compareWithAlternative`).
+   - ✅ Now exclusively uses `'ai-vision'` method, passing images directly to `enhance-receipt-data` with the selected vision model.
+   - ✅ Legacy comparison functionality has been deprecated as the application now uses AI Vision exclusively.
+   - ✅ Simplified processing pipeline focuses on single AI Vision method for optimal performance and consistency.
    - ✅ Update the response format to include the primary extraction, alternative extraction (if applicable), discrepancies, and the model used.
 
 3. ✅ **Environment Configuration**
@@ -225,15 +225,16 @@ async function callAIModel(input: string | Image, modelConfig: ModelConfig, apiK
    - Updated `enhance-receipt-data` and `callAIModel` to handle image inputs for vision LLMs, enabling direct data extraction from receipt images.
    - Implemented "AI Vision" as a primary processing method in the UI, with model filtering based on vision support.
 
-2. ✅ **Comparison with OCR-Processed Data**
-   - Added `compareWithAlternative` option to run both vision LLM and OCR + text model extractions when enabled.
+2. ✅ **Comparison with Alternative Processing Methods** (DEPRECATED - AI-only processing)
+   - Previously added `compareWithAlternative` option to run both vision LLM and text model extractions when enabled.
    - Implemented comparison logic in `process-receipt` to identify discrepancies and return them in the API response.
    - Enhanced the UI to display discrepancies and allow users to review and correct data, fulfilling the suggestion requirement.
+   - NOTE: This feature is deprecated as the application now uses AI Vision exclusively.
 
 3. ✅ **Database Schema Updates**
    - Added new columns to the receipts table:
      - `model_used`: Tracks which AI model was used
-     - `primary_method`: Records whether OCR+AI or AI Vision was the primary method
+     - `primary_method`: Records the AI processing method used (deprecated field)
      - `has_alternative_data`: Indicates if comparison data is available
      - `discrepancies`: Stores identified differences between primary and alternative methods
 

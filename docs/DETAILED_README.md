@@ -1,6 +1,6 @@
 # Automated Receipt Processing Application - Detailed Documentation
 
-A web-based application for automating receipt data extraction using OCR technology with Amazon Textract.
+A web-based application for automating receipt data extraction using AI Vision technology.
 
 ## Table of Contents
 
@@ -21,23 +21,23 @@ A web-based application for automating receipt data extraction using OCR technol
 The Automated Receipt Processing Application streamlines the digitization and management of paper receipts through a complete workflow:
 
 1.  **Upload** - Users upload receipt images (JPEG, PNG, PDF). The UI provides real-time feedback on upload progress and backend processing stages. **Supports single and batch uploads.**
-2.  **Process** - Amazon Textract performs OCR, extracting text and structured data.
+2.  **Process** - AI Vision models directly analyze receipt images, extracting text and structured data.
 3.  **Enhance** - AI models (currently Google Gemini) enhance the data, validate formats, normalize fields (merchant, payment method), suggest corrections, predict categories, and calculate confidence scores.
-4.  **Verify** - A side-by-side interface allows users to review OCR data alongside the receipt image, accept AI suggestions, and make corrections. Confidence indicators highlight potentially inaccurate fields.
+4.  **Verify** - A side-by-side interface allows users to review AI-extracted data alongside the receipt image, accept AI suggestions, and make corrections. Confidence indicators highlight potentially inaccurate fields.
 5.  **Feedback & Store** - User corrections are logged to a `corrections` table, creating a feedback loop for future AI improvements. Final data is stored in the Supabase database.
 6.  **Sync** - Verified expenses can be optionally synced to an external service.
 
 ### Key Features
 
--   **OCR Data Extraction**: Utilizes Amazon Textract for robust text and data extraction.
+-   **AI Vision Data Extraction**: Utilizes advanced AI models for robust text and data extraction directly from images.
 -   **AI-Powered Data Enhancement (Gemini)**:
     -   **Normalization**: Standardizes merchant names and payment methods.
     -   **Validation**: Checks date formats and flags inconsistencies.
     -   **Categorization**: Predicts expense categories (e.g., Groceries, Dining, Travel).
-    -   **Suggestions**: Provides field-level correction suggestions for potential OCR errors.
+    -   **Suggestions**: Provides field-level correction suggestions for potential extraction errors.
     -   **Currency Identification**: Detects currency (with basic USD->MYR conversion).
 -   **Confidence Scoring**:
-    -   Multi-stage scoring (OCR -> AI -> User Verification).
+    -   Multi-stage scoring (AI Vision -> AI Enhancement -> User Verification).
     -   Scores assigned to key fields (merchant, date, total, etc.).
     -   UI indicators (color-coded) highlight low-confidence fields.
     -   User edits automatically set score to 100%.
@@ -48,7 +48,7 @@ The Automated Receipt Processing Application streamlines the digitization and ma
     -   "Accept Suggestion" buttons for quick AI correction application.
 -   **Real-time Processing Feedback**:
     -   Detailed upload status tracking (`ReceiptUpload` state).
-    -   Live updates on backend processing stages (OCR, AI Enhancement, Thumbnail Generation) via Supabase Realtime.
+    -   Live updates on backend processing stages (AI Processing, AI Enhancement, Thumbnail Generation) via Supabase Realtime.
     -   Displays final processing time.
     -   **Detailed processing logs are recorded and viewable.**
 -   **Secure Authentication**: Managed by Supabase Auth.

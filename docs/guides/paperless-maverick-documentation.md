@@ -1,6 +1,6 @@
 # Mataresit: Automated Receipt Processing
 
-A web-based application for automating receipt data extraction using OCR technology with Amazon Textract.
+A web-based application for automating receipt data extraction using AI Vision technology.
 
 ## Table of Contents
 
@@ -25,15 +25,15 @@ Mataresit streamlines the digitization and management of paper receipts through 
 
 ### Key Features
 
-- **OCR Data Extraction**: Utilizes Amazon Textract for robust text and data extraction.
+- **AI Vision Data Extraction**: Utilizes advanced AI models for robust text and data extraction directly from images.
 - **AI-Powered Data Enhancement (Gemini)**:
     - **Normalization**: Standardizes merchant names and payment methods.
     - **Validation**: Checks date formats and flags inconsistencies.
     - **Categorization**: Predicts expense categories (e.g., Groceries, Dining, Travel).
-    - **Suggestions**: Provides field-level correction suggestions for potential OCR errors.
+    - **Suggestions**: Provides field-level correction suggestions for potential extraction errors.
     - **Currency Identification**: Detects currency (with basic USD->MYR conversion).
 - **Confidence Scoring**:
-    - Multi-stage scoring (OCR -> AI -> User Verification).
+    - Multi-stage scoring (AI Vision -> AI Enhancement -> User Verification).
     - Scores assigned to key fields (merchant, date, total, etc.).
     - UI indicators (color-coded) highlight low-confidence fields.
     - User edits automatically set score to 100%.
@@ -69,7 +69,7 @@ graph TD
     end
 
     subgraph External Services
-        Textract[Amazon Textract]
+        AIVision[AI Vision Models]
         Gemini[Google Gemini]
       end
 
@@ -120,7 +120,7 @@ graph TD
 #### `receipts`
 - `id` (UUID, PK) - Unique identifier
 - `user_id` (UUID, FK `auth.users`) - Reference to the user
-- `merchant` (VARCHAR) - Original merchant name from OCR/user
+- `merchant` (VARCHAR) - Original merchant name from AI extraction/user
 - `normalized_merchant` (TEXT) - Standardized merchant name (optional, added via migration)
 - `date` (DATE) - Receipt date
 - `total` (DECIMAL) - Total amount
@@ -132,11 +132,11 @@ graph TD
 - `ai_suggestions` (JSONB) - AI-generated suggestions (e.g., `{"merchant": "Suggestion A", "total": "Suggestion B"}`)
 - `confidence_scores` (JSONB) - Stores confidence scores for fields like merchant, date, total, etc., as a JSON object.
 - `status` (VARCHAR) - Review status (e.g., `unreviewed`, `reviewed`, `synced`)
-- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'processing_ai', 'failed_ai', 'complete')
+- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing', 'processing_ai', 'failed_ai', 'complete')
 - `processing_error` (TEXT) - Stores error messages if processing fails
 - `processing_time` (FLOAT) - Time taken for backend processing in seconds (optional, added via migration)
 - `image_url` (TEXT) - URL to stored receipt image in Supabase Storage
-- `fullText` (TEXT) - Raw text extracted by OCR (optional)
+- `fullText` (TEXT) - Raw text extracted by AI Vision (optional)
 - `created_at` (TIMESTAMP WITH TIME ZONE) - Creation timestamp
 - `updated_at` (TIMESTAMP WITH TIME ZONE) - Last update timestamp
 
@@ -254,7 +254,7 @@ graph TD
 #### `ReceiptCard`
 - Summary display of receipt for listings
 - Status indicator (unreviewed/reviewed/synced)
-- **Processing Status**: Displays a badge indicating the current processing status (e.g., 'Uploading...', 'OCR Failed') if not 'complete'. Shows an overlay during active processing.
+- **Processing Status**: Displays a badge indicating the current processing status (e.g., 'Uploading...', 'Processing Failed') if not 'complete'. Shows an overlay during active processing.
 - Quick actions
 
 #### `DailyPDFReportGenerator`
@@ -266,9 +266,9 @@ graph TD
 
 ## External Integrations
 
-### Amazon Textract
+### AI Vision Processing
 
-The application uses Amazon Textract for initial OCR processing and data extraction.
+The application uses advanced AI models for direct image analysis and data extraction.
 
 #### Implementation
 
@@ -309,7 +309,7 @@ The application uses the Google Gemini API via the `enhance-receipt-data` Edge F
 
 - Node.js & npm installed
 - Supabase account
-- Amazon AWS account with Textract access
+- Google Cloud account with Gemini API access
 - Google Cloud account with Gemini API enabled
 
 ### Local Development
@@ -332,9 +332,8 @@ npm run dev
 
 These will be stored as Supabase secrets:
 
-- `AWS_ACCESS_KEY_ID` - Amazon AWS access key
-- `AWS_SECRET_ACCESS_KEY` - Amazon AWS secret key
-- `AWS_REGION` - Amazon AWS region
+- `GOOGLE_CLOUD_PROJECT_ID` - Google Cloud project ID (if needed)
+- `GOOGLE_APPLICATION_CREDENTIALS` - Google Cloud service account credentials (if needed)
 - `GEMINI_API_KEY` - Google Gemini API Key
 
 ### Deployment

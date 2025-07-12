@@ -10,14 +10,14 @@ We've successfully implemented the real-time status updates for receipt processi
 ## 2. TypeScript Types
 - Added a `ProcessingStatus` type with all the possible states:
   ```typescript
-  export type ProcessingStatus = 
-    | 'uploading' 
-    | 'uploaded' 
-    | 'processing_ocr' 
-    | 'processing_ai' 
-    | 'failed_ocr' 
-    | 'failed_ai' 
-    | 'complete' 
+  export type ProcessingStatus =
+    | 'uploading'
+    | 'uploaded'
+    | 'processing'
+    | 'processing_ai'
+    | 'failed'
+    | 'failed_ai'
+    | 'complete'
     | null;
   ```
 - Updated the `Receipt` and `ReceiptWithDetails` interfaces to include the new fields
@@ -30,16 +30,16 @@ We've successfully implemented the real-time status updates for receipt processi
 - Added `markReceiptUploaded` helper to mark when image upload is complete
 - Added `fixProcessingStatus` to fix processing status when a receipt is manually edited
 - Modified `createReceipt` to set initial processing status to 'uploading'
-- Enhanced `processReceiptWithOCR` to update status at different processing stages
+- Enhanced `processReceiptWithAI` to update status at different processing stages
 
 ## 4. Status Flow Implementation
 The receipt now follows this status flow:
 1. `uploading` - When the receipt is initially created and the image is being uploaded
-2. `uploaded` - When the image upload is complete, before OCR starts
-3. `processing_ocr` - When OCR processing begins
-4. `processing_ai` - When AI enhancement begins
+2. `uploaded` - When the image upload is complete, before AI processing starts
+3. `processing` - When AI processing begins
+4. `processing_ai` - When AI enhancement begins (deprecated status)
 5. `complete` - When all processing is successfully completed
-6. `failed_ocr` or `failed_ai` - If an error occurs at any stage
+6. `failed` or `failed_ai` - If an error occurs at any stage
 
 ## 5. Error Handling
 - Added robust error handling at each stage of processing
@@ -60,7 +60,7 @@ The receipt now follows this status flow:
     - Provides a "Mark as fixed" button when the status is `failed_ocr` or `failed_ai`.
 - **`ReceiptCard.tsx`**:
     - Receives `processingStatus` as a prop.
-    - Displays a badge indicating the current processing status (e.g., 'Uploading...', 'OCR Failed').
+    - Displays a badge indicating the current processing status (e.g., 'Uploading...', 'Processing Failed').
     - Shows an overlay on the card image during active processing or failed states.
 - **`Dashboard.tsx`**:
     - Subscribes to real-time updates for *all* user receipts to keep the list fresh.

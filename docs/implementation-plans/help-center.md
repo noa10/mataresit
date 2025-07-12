@@ -25,8 +25,8 @@ const faqItems = [
     answer: "You can upload receipts by navigating to the Dashboard and using the 'Upload' button. You can drag and drop files or select them from your device. We support JPEG, PNG, and PDF formats."
   },
   {
-    question: "What is the difference between OCR+AI and AI Vision processing?",
-    answer: "AI Vision directly analyzes the image of the receipt for higher accuracy, especially with complex layouts. OCR+AI first extracts text and then uses AI to structure it. We recommend AI Vision for the best results."
+    question: "How does AI Vision processing work?",
+    answer: "AI Vision directly analyzes the image of the receipt using advanced AI models for superior accuracy, especially with complex layouts, handwritten text, and various receipt formats. This provides the most reliable data extraction available."
   },
   {
     question: "How can I improve search results?",
@@ -847,15 +847,15 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 
 ### Key Features
 
-- **OCR Data Extraction**: Utilizes Amazon Textract for robust text and data extraction.
+- **AI Vision Data Extraction**: Utilizes advanced AI models for robust text and data extraction directly from images.
 - **AI-Powered Data Enhancement (Gemini)**:
     - **Normalization**: Standardizes merchant names and payment methods.
     - **Validation**: Checks date formats and flags inconsistencies.
     - **Categorization**: Predicts expense categories (e.g., Groceries, Dining, Travel).
-    - **Suggestions**: Provides field-level correction suggestions for potential OCR errors.
+    - **Suggestions**: Provides field-level correction suggestions for potential extraction errors.
     - **Currency Identification**: Detects currency (with basic USD->MYR conversion).
 - **Confidence Scoring**:
-    - Multi-stage scoring (OCR -> AI -> User Verification).
+    - Multi-stage scoring (AI Vision -> AI Enhancement -> User Verification).
     - Scores assigned to key fields (merchant, date, total, etc.).
     - UI indicators (color-coded) highlight low-confidence fields.
     - User edits automatically set score to 100%.
@@ -919,9 +919,9 @@ graph TD
 2. Image is stored in Supabase Storage.
 3. An initial `receipts` record is created/updated in Supabase DB.
 4. Edge Function `process-receipt` is triggered (records start time).
-5. `process-receipt` sends the image URL to Amazon Textract for OCR.
-6. Textract returns OCR data (text, fields) to `process-receipt`.
-7. `process-receipt` calls the `enhance-receipt-data` Edge Function with OCR data.
+5. `process-receipt` sends the image directly to AI Vision models for analysis.
+6. AI Vision models return structured data (text, fields) to `process-receipt`.
+7. `process-receipt` calls the `enhance-receipt-data` Edge Function with extracted data.
 8. `enhance-receipt-data`:
     - Constructs a prompt for Google Gemini, requesting normalization, validation, categorization, suggestions, and confidence scores.
     - Sends prompt to Gemini API.
@@ -942,7 +942,7 @@ graph TD
 #### `receipts`
 - `id` (UUID, PK) - Unique identifier
 - `user_id` (UUID, FK `auth.users`) - Reference to the user
-- `merchant` (VARCHAR) - Original merchant name from OCR/user
+- `merchant` (VARCHAR) - Original merchant name from AI extraction/user
 - `normalized_merchant` (TEXT) - Standardized merchant name (optional, added via migration)
 - `date` (DATE) - Receipt date
 - `total` (DECIMAL) - Total amount
@@ -954,7 +954,7 @@ graph TD
 - `ai_suggestions` (JSONB) - AI-generated suggestions (e.g., `{"merchant": "Suggestion A", "total": "Suggestion B"}`)
 - `confidence_scores` (JSONB) - Stores confidence scores for fields like merchant, date, total, etc., as a JSON object.
 - `status` (VARCHAR) - Review status (e.g., `unreviewed`, `reviewed`, `synced`)
-- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'processing_ai', 'failed_ai', 'complete')
+- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing', 'processing_ai', 'failed_ai', 'complete')
 - `processing_error` (TEXT) - Stores error messages if processing fails
 - `processing_time` (FLOAT) - Time taken for backend processing in seconds (optional, added via migration)
 - `image_url` (TEXT) - URL to stored receipt image in Supabase Storage
@@ -982,7 +982,7 @@ graph TD
 - `id` (SERIAL, PK) - Unique identifier for the correction entry
 - `receipt_id` (UUID, FK `receipts.id` ON DELETE CASCADE) - Reference to the receipt being corrected
 - `field_name` (TEXT NOT NULL) - Name of the field that was corrected (e.g., 'merchant', 'total')
-- `original_value` (TEXT) - The original value extracted by OCR
+- `original_value` (TEXT) - The original value extracted by AI processing
 - `ai_suggestion` (TEXT) - The suggestion provided by the AI for this field, if any
 - `corrected_value` (TEXT NOT NULL) - The final value saved by the user
 - `created_at` (TIMESTAMP WITH TIME ZONE DEFAULT NOW()) - Timestamp when the correction was made
@@ -1057,7 +1057,7 @@ graph TD
 - **Real-time Detailed Status**: Uses `ReceiptUpload` interface to track and display:
     - Overall status (`pending`, `uploading`, `processing`, `completed`, `error`).
     - Upload progress percentage.
-    - Current backend processing stage (`queueing`, `ocr`, `ai_enhancement`).
+    - Current backend processing stage (`queueing`, `ai_processing`, `ai_enhancement`).
     - Specific error details if failure occurs.
 - Leverages Supabase Realtime for live updates on `processing_status` from the `receipts` table.
 - Can display processing logs (`ProcessingLogs`) and error states (`ErrorState`).
@@ -2016,8 +2016,8 @@ const faqItems = [
     answer: "You can upload receipts by navigating to the Dashboard and using the 'Upload' button. You can drag and drop files or select them from your device. We support JPEG, PNG, and PDF formats."
   },
   {
-    question: "What is the difference between OCR+AI and AI Vision processing?",
-    answer: "AI Vision directly analyzes the image of the receipt for higher accuracy, especially with complex layouts. OCR+AI first extracts text and then uses AI to structure it. We recommend AI Vision for the best results."
+    question: "How does AI Vision processing work?",
+    answer: "AI Vision directly analyzes the image of the receipt using advanced AI models for superior accuracy, especially with complex layouts, handwritten text, and various receipt formats. This provides the most reliable data extraction available."
   },
   {
     question: "How can I improve search results?",
@@ -2732,15 +2732,15 @@ The Automated Receipt Processing Application streamlines the digitization and ma
 
 ### Key Features
 
-- **OCR Data Extraction**: Utilizes Amazon Textract for robust text and data extraction.
+- **AI Vision Data Extraction**: Utilizes advanced AI models for robust text and data extraction directly from images.
 - **AI-Powered Data Enhancement (Gemini)**:
     - **Normalization**: Standardizes merchant names and payment methods.
     - **Validation**: Checks date formats and flags inconsistencies.
     - **Categorization**: Predicts expense categories (e.g., Groceries, Dining, Travel).
-    - **Suggestions**: Provides field-level correction suggestions for potential OCR errors.
+    - **Suggestions**: Provides field-level correction suggestions for potential extraction errors.
     - **Currency Identification**: Detects currency (with basic USD->MYR conversion).
 - **Confidence Scoring**:
-    - Multi-stage scoring (OCR -> AI -> User Verification).
+    - Multi-stage scoring (AI Vision -> AI Enhancement -> User Verification).
     - Scores assigned to key fields (merchant, date, total, etc.).
     - UI indicators (color-coded) highlight low-confidence fields.
     - User edits automatically set score to 100%.
@@ -2827,7 +2827,7 @@ graph TD
 #### `receipts`
 - `id` (UUID, PK) - Unique identifier
 - `user_id` (UUID, FK `auth.users`) - Reference to the user
-- `merchant` (VARCHAR) - Original merchant name from OCR/user
+- `merchant` (VARCHAR) - Original merchant name from AI extraction/user
 - `normalized_merchant` (TEXT) - Standardized merchant name (optional, added via migration)
 - `date` (DATE) - Receipt date
 - `total` (DECIMAL) - Total amount
@@ -2839,7 +2839,7 @@ graph TD
 - `ai_suggestions` (JSONB) - AI-generated suggestions (e.g., `{"merchant": "Suggestion A", "total": "Suggestion B"}`)
 - `confidence_scores` (JSONB) - Stores confidence scores for fields like merchant, date, total, etc., as a JSON object.
 - `status` (VARCHAR) - Review status (e.g., `unreviewed`, `reviewed`, `synced`)
-- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing_ocr', 'processing_ai', 'failed_ai', 'complete')
+- `processing_status` (TEXT) - Live status of backend processing (e.g., 'uploading', 'processing', 'processing_ai', 'failed_ai', 'complete')
 - `processing_error` (TEXT) - Stores error messages if processing fails
 - `processing_time` (FLOAT) - Time taken for backend processing in seconds (optional, added via migration)
 - `image_url` (TEXT) - URL to stored receipt image in Supabase Storage
@@ -2867,7 +2867,7 @@ graph TD
 - `id` (SERIAL, PK) - Unique identifier for the correction entry
 - `receipt_id` (UUID, FK `receipts.id` ON DELETE CASCADE) - Reference to the receipt being corrected
 - `field_name` (TEXT NOT NULL) - Name of the field that was corrected (e.g., 'merchant', 'total')
-- `original_value` (TEXT) - The original value extracted by OCR
+- `original_value` (TEXT) - The original value extracted by AI processing
 - `ai_suggestion` (TEXT) - The suggestion provided by the AI for this field, if any
 - `corrected_value` (TEXT NOT NULL) - The final value saved by the user
 - `created_at` (TIMESTAMP WITH TIME ZONE DEFAULT NOW()) - Timestamp when the correction was made
@@ -2942,7 +2942,7 @@ graph TD
 - **Real-time Detailed Status**: Uses `ReceiptUpload` interface to track and display:
     - Overall status (`pending`, `uploading`, `processing`, `completed`, `error`).
     - Upload progress percentage.
-    - Current backend processing stage (`queueing`, `ocr`, `ai_enhancement`).
+    - Current backend processing stage (`queueing`, `ai_processing`, `ai_enhancement`).
     - Specific error details if failure occurs.
 - Leverages Supabase Realtime for live updates on `processing_status` from the `receipts` table.
 - Can display processing logs (`ProcessingLogs`) and error states (`ErrorState`).
