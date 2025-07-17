@@ -19,6 +19,7 @@ import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 // Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";
+import { CacheInvalidationService } from "@/services/cacheInvalidationService";
 import Index from "./pages/Index";
 
 // Cross-browser testing disabled - uncomment to enable debug mode
@@ -91,6 +92,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Initialize CacheInvalidationService with QueryClient
+CacheInvalidationService.initialize(queryClient);
 
 const App = () => (
   <HelmetProvider>

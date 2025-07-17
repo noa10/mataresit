@@ -51,3 +51,4 @@ tests/manual/temp/
 .aider*
 .cursor/rules/pdf-report-generation.mdc
 .augment
+.kiro
