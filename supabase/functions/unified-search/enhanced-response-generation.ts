@@ -30,6 +30,12 @@ export interface EnhancedResponseContext {
   user?: any;
   useSelfCorrection?: boolean;
   useToolCalling?: boolean;
+  // Smart suggestions for zero results
+  smartSuggestions?: {
+    dateAnalysis?: any;
+    followUpSuggestions?: string[];
+    enhancedMessage?: string;
+  };
 }
 
 export interface EnhancedResponse {
@@ -460,8 +466,10 @@ FORMATTING RULES:
 
 Date range searched: {dateRange}
 Search Results: {searchResults} (empty)
+Smart Suggestions Available: {smartSuggestions}
+Enhanced Message: {enhancedMessage}
 
-Provide a helpful and understanding response explaining that no receipts were found for the specific time period. Include the exact date range searched and provide specific, actionable suggestions for alternative searches. Consider that the user might be new to the app or might not have receipts for that specific period.`,
+Provide a helpful and understanding response explaining that no receipts were found for the specific time period. If smart suggestions are available, use them instead of generic alternatives. If an enhanced message is provided, incorporate it naturally into your response. Include the exact date range searched and provide specific, actionable suggestions for alternative searches.`,
       temperature: 0.3,
       maxTokens: 500,
       includeUIComponents: false,
@@ -721,7 +729,10 @@ function buildEnhancedPrompt(
     dateRange: dateRangeText,
     originalDateRange: originalDateRangeText,
     expandedDateRange: expandedDateRangeText,
-    fallbackStrategy: fallbackStrategy
+    fallbackStrategy: fallbackStrategy,
+    smartSuggestions: context.smartSuggestions?.followUpSuggestions ?
+      JSON.stringify(context.smartSuggestions.followUpSuggestions) : 'None',
+    enhancedMessage: context.smartSuggestions?.enhancedMessage || 'None'
   };
 
   Object.entries(substitutions).forEach(([key, value]) => {
@@ -856,13 +867,97 @@ async function generateUIComponents(
   const { intent } = context.preprocessResult;
   const { searchResults } = context;
 
+  // 🔍 DEBUG: Log search results structure for debugging
+  console.log('🔍 DEBUG: generateUIComponents called with:', {
+    searchResultsLength: searchResults?.length || 0,
+    intent,
+    firstResult: searchResults?.[0] ? {
+      sourceType: searchResults[0].sourceType,
+      contentType: searchResults[0].contentType,
+      title: searchResults[0].title,
+      hasMetadata: !!searchResults[0].metadata
+    } : null
+  });
+
   // Generate receipt cards for any intent that returns receipt results
   // This ensures receipt cards are shown for document_retrieval, general_search, financial_analysis, etc.
   if (searchResults.length > 0) {
     const receiptResults = searchResults.filter(r => r.sourceType === 'receipt');
+    const lineItemResults = searchResults.filter(r => r.sourceType === 'line_item' || r.sourceType === 'lineItem');
 
-    // Create a receipt table component for better organization
+    // 🔍 DEBUG: Log filtering results
+    console.log('🔍 DEBUG: Filtering results:', {
+      totalResults: searchResults.length,
+      receiptResults: receiptResults.length,
+      lineItemResults: lineItemResults.length,
+      sourceTypes: searchResults.map(r => r.sourceType)
+    });
+
+    // Handle line item results first (for queries like "ikan")
+    if (lineItemResults.length > 0) {
+      console.log(`🍽️ Processing ${lineItemResults.length} line item results`);
+
+      // Create a line items table component for better organization
+      const lineItemTableRows = lineItemResults.map(result => ({
+        col_0: result.metadata?.description || result.title || 'Unknown Item',
+        col_1: result.metadata?.merchant || result.metadata?.parent_receipt_merchant || 'Unknown Merchant',
+        col_2: formatCurrency(result.metadata?.amount || result.metadata?.line_item_price || 0, result.metadata?.currency || 'MYR'),
+        col_3: formatDate(result.metadata?.date || result.metadata?.parent_receipt_date || result.createdAt),
+        col_4: `${Math.round((result.similarity || 0) * 100)}% match`
+      }));
+
+      components.push({
+        type: 'ui_component',
+        component: 'data_table',
+        data: {
+          columns: [
+            { key: 'col_0', label: 'Item', sortable: true, align: 'left' },
+            { key: 'col_1', label: 'Merchant', sortable: true, align: 'left' },
+            { key: 'col_2', label: 'Amount', sortable: true, align: 'right' },
+            { key: 'col_3', label: 'Date', sortable: true, align: 'left' },
+            { key: 'col_4', label: 'Match', sortable: true, align: 'center' }
+          ],
+          rows: lineItemTableRows,
+          sortable: true,
+          searchable: true,
+          pagination: lineItemTableRows.length > 10
+        },
+        metadata: {
+          title: 'Line Items Found',
+          interactive: true
+        }
+      });
+
+      // Generate line item cards
+      lineItemResults.forEach(result => {
+        components.push({
+          type: 'ui_component' as const,
+          component: 'line_item_card',
+          data: {
+            line_item_id: result.sourceId,
+            receipt_id: result.metadata?.receipt_id || result.metadata?.parent_receipt_id,
+            description: result.metadata?.description || result.title || 'Unknown Item',
+            amount: result.metadata?.amount || result.metadata?.line_item_price || 0,
+            currency: result.metadata?.currency || 'MYR',
+            merchant: result.metadata?.merchant || result.metadata?.parent_receipt_merchant || 'Unknown Merchant',
+            date: result.metadata?.date || result.metadata?.parent_receipt_date || result.createdAt,
+            confidence: result.similarity || 0.8,
+            quantity: result.metadata?.quantity || 1
+          },
+          metadata: {
+            title: 'Line Item Card',
+            interactive: true,
+            actions: ['view_receipt', 'view_item_details']
+          }
+        });
+      });
+
+      console.log(`🎯 Generated ${lineItemResults.length} line item cards for intent: ${intent}`);
+    }
+
+    // Handle receipt results (for general receipt queries)
     if (receiptResults.length > 0) {
+      // Create a receipt table component for better organization
       const tableRows = receiptResults.map(result => ({
         col_0: result.metadata?.merchant || result.title || 'Unknown',
         col_1: formatDate(result.metadata?.date || result.createdAt),
@@ -892,38 +987,38 @@ async function generateUIComponents(
           interactive: true
         }
       });
+
+      // Generate receipt cards
+      receiptResults.forEach(result => {
+        components.push({
+          type: 'ui_component' as const,
+          component: 'receipt_card',
+          data: {
+            receipt_id: result.sourceId,
+            merchant: result.metadata?.merchant || result.title || 'Unknown Merchant',
+            total: result.metadata?.total || result.metadata?.amount || 0,
+            currency: result.metadata?.currency || 'MYR',
+            date: result.metadata?.date || result.createdAt || new Date().toISOString().split('T')[0],
+            category: result.metadata?.category || result.metadata?.predicted_category,
+            confidence: result.similarity || 0.8,
+            line_items_count: result.metadata?.line_items_count,
+            tags: result.metadata?.tags || []
+          },
+          metadata: {
+            title: 'Receipt Card',
+            interactive: true,
+            actions: ['view_receipt', 'edit_receipt']
+          }
+        });
+      });
+
+      console.log(`🎯 Generated ${receiptResults.length} receipt cards for intent: ${intent}`);
     }
 
-    // Remove the hardcoded limit - show all receipt results
-    // The search API already handles pagination and limits appropriately
-    receiptResults.forEach(result => {
-      components.push({
-        type: 'ui_component' as const,
-        component: 'receipt_card',
-        data: {
-          receipt_id: result.sourceId,
-          merchant: result.metadata?.merchant || result.title || 'Unknown Merchant',
-          total: result.metadata?.total || result.metadata?.amount || 0,
-          currency: result.metadata?.currency || 'MYR',
-          date: result.metadata?.date || result.createdAt || new Date().toISOString().split('T')[0],
-          category: result.metadata?.category || result.metadata?.predicted_category,
-          confidence: result.similarity || 0.8,
-          line_items_count: result.metadata?.line_items_count,
-          tags: result.metadata?.tags || []
-        },
-        metadata: {
-          title: 'Receipt Card',
-          interactive: true,
-          actions: ['view_receipt', 'edit_receipt']
-        }
-      });
-    });
-
-    console.log(`🎯 Generated ${receiptResults.length} receipt cards for intent: ${intent}`);
-
     // Add enhanced summary metadata for better presentation
-    if (receiptResults.length > 0) {
-      const summaryData = generateSearchSummary(receiptResults, context.originalQuery);
+    const allResults = [...receiptResults, ...lineItemResults];
+    if (allResults.length > 0) {
+      const summaryData = generateSearchSummary(allResults, context.originalQuery, context);
 
       // Add summary as metadata to the first component for the frontend to use
       if (components.length > 0) {
@@ -955,6 +1050,12 @@ async function generateUIComponents(
     });
   }
 
+  // 🔍 DEBUG: Log final component count
+  console.log('🔍 DEBUG: generateUIComponents completed:', {
+    componentsGenerated: components.length,
+    componentTypes: components.map(c => c.component)
+  });
+
   return components;
 }
 
@@ -962,7 +1063,13 @@ async function generateUIComponents(
  * Generate follow-up suggestions
  */
 async function generateFollowUpSuggestions(context: EnhancedResponseContext): Promise<string[]> {
-  // Special suggestions for temporal queries with no results
+  // Use smart suggestions if available (from date analysis)
+  if (context.smartSuggestions?.followUpSuggestions && context.smartSuggestions.followUpSuggestions.length > 0) {
+    console.log('🔍 Using smart suggestions for follow-ups:', context.smartSuggestions.followUpSuggestions);
+    return context.smartSuggestions.followUpSuggestions;
+  }
+
+  // Special suggestions for temporal queries with no results (fallback)
   const isTemporalQuery = context.metadata?.temporalRouting?.isTemporalQuery || false;
   const hasResults = context.searchResults.length > 0;
 
@@ -1139,7 +1246,7 @@ function generateFallbackResponse(context: EnhancedResponseContext): EnhancedRes
 /**
  * Generate enhanced summary data for search results
  */
-function generateSearchSummary(results: any[], query: string) {
+function generateSearchSummary(results: any[], query: string, context?: any) {
   const totalAmount = results.reduce((sum, r) => sum + (r.metadata?.total || 0), 0);
   const merchants = new Set(results.map(r => r.metadata?.merchant || r.title).filter(Boolean));
   const dates = results
@@ -1151,6 +1258,32 @@ function generateSearchSummary(results: any[], query: string) {
   const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
   const latestDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
 
+  // CRITICAL FIX: Use intended search date range for temporal queries instead of calculated range
+  let dateRange = {
+    earliest: earliestDate?.toISOString(),
+    latest: latestDate?.toISOString()
+  };
+
+  // If this is a temporal query, use the intended search date range for display
+  if (context?.metadata?.filters?.startDate && context?.metadata?.filters?.endDate) {
+    console.log('🔍 DEBUG: Using intended search date range for UI display:', {
+      intended: {
+        start: context.metadata.filters.startDate,
+        end: context.metadata.filters.endDate
+      },
+      calculated: {
+        earliest: earliestDate?.toISOString(),
+        latest: latestDate?.toISOString()
+      },
+      reason: 'temporal_query_with_intended_range'
+    });
+
+    dateRange = {
+      earliest: new Date(context.metadata.filters.startDate).toISOString(),
+      latest: new Date(context.metadata.filters.endDate).toISOString()
+    };
+  }
+
   return {
     query,
     totalResults: results.length,
@@ -1158,10 +1291,7 @@ function generateSearchSummary(results: any[], query: string) {
     currency: results[0]?.metadata?.currency || 'MYR',
     merchantCount: merchants.size,
     topMerchants: Array.from(merchants).slice(0, 3),
-    dateRange: {
-      earliest: earliestDate?.toISOString(),
-      latest: latestDate?.toISOString()
-    },
+    dateRange,
     avgAmount: results.length > 0 ? totalAmount / results.length : 0
   };
 }

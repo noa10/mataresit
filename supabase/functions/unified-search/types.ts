@@ -100,6 +100,9 @@ export interface SearchMetadata {
   fallbackStrategy?: string;
   originalDateRange?: { start: string; end: string };
   expandedDateRange?: { start: string; end: string };
+  // Dynamic limit metadata for temporal queries
+  totalReceiptsInRange?: number;
+  receiptIdsInRange?: number;
 }
 
 // UI Component types for actionable chat interface

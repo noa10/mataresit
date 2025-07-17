@@ -35,6 +35,12 @@ import {
   financialCacheWrapper,
   EdgeCacheKeyGenerator
 } from '../_shared/edge-cache.ts';
+import {
+  analyzeAvailableDates,
+  convertToFollowUpSuggestions,
+  generateZeroResultsMessage,
+  type DateAnalysis
+} from '../_shared/smart-date-suggestions.ts';
 
 // Pipeline stage interfaces
 export interface RAGPipelineContext {
@@ -44,6 +50,12 @@ export interface RAGPipelineContext {
   params: UnifiedSearchParams;
   startTime: number;
   metadata: SearchMetadata;
+  // Smart suggestions for zero results
+  smartSuggestions?: {
+    dateAnalysis?: DateAnalysis;
+    followUpSuggestions?: string[];
+    enhancedMessage?: string;
+  };
 }
 
 export interface PipelineStageResult<T = any> {
@@ -60,6 +72,12 @@ export interface RAGPipelineResult {
   totalResults: number;
   searchMetadata: SearchMetadata;
   error?: string;
+  // Smart suggestions for zero results
+  smartSuggestions?: {
+    dateAnalysis?: DateAnalysis;
+    followUpSuggestions?: string[];
+    enhancedMessage?: string;
+  };
 }
 
 /**
@@ -96,6 +114,28 @@ export class RAGPipeline {
       hasStartTime: !!this.context?.startTime,
       hasMetadata: !!this.context?.metadata
     });
+
+    // CRITICAL FIX: Validate user context at the start of pipeline execution
+    if (!this.context?.user?.id) {
+      console.error('❌ CRITICAL: User context missing or invalid at pipeline start');
+      console.error('🔍 DEBUG: User context details:', {
+        userExists: !!this.context?.user,
+        userId: this.context?.user?.id || 'MISSING',
+        userObject: this.context?.user
+      });
+      return {
+        success: false,
+        error: 'User authentication required for search execution',
+        data: [],
+        processingTime: 0
+      };
+    }
+
+    console.log('✅ User context validated:', {
+      userId: this.context.user.id,
+      userEmail: this.context.user.email || 'not provided'
+    });
+
     console.log('🔍 DEBUG: About to enter try block...');
 
     // Add timeout protection - if we're already close to timeout, fail fast
@@ -166,14 +206,33 @@ export class RAGPipeline {
       this.context.metadata.searchDuration = Date.now() - this.context.startTime;
       
       // Add temporal routing and filters to metadata for response generation
-      this.context.metadata.temporalRouting = this.context.params.temporalRouting;
-      this.context.metadata.filters = this.context.params.filters;
+      this.context.metadata.temporalRouting = this.context.params.temporalRouting || this.context.metadata.llmPreprocessing?.temporalRouting;
+
+      // CRITICAL FIX: Preserve original date range in metadata even if fallbacks were used
+      const originalFilters = { ...this.context.params.filters };
+
+      // If this was a fallback result, preserve the original date range for display
+      if (this.context.metadata.isFallbackResult && this.context.metadata.originalDateRange) {
+        console.log('🔍 DEBUG: Preserving original date range in metadata for fallback result');
+        originalFilters.startDate = this.context.metadata.originalDateRange.start;
+        originalFilters.endDate = this.context.metadata.originalDateRange.end;
+      }
+
+      this.context.metadata.filters = originalFilters;
+
+      console.log('🔍 DEBUG: Final metadata filters set:', {
+        startDate: this.context.metadata.filters?.startDate,
+        endDate: this.context.metadata.filters?.endDate,
+        isFallbackResult: this.context.metadata.isFallbackResult,
+        originalDateRange: this.context.metadata.originalDateRange
+      });
 
       return {
         success: true,
         results: responseResult.data!.results,
         totalResults: responseResult.data!.totalResults,
-        searchMetadata: this.context.metadata
+        searchMetadata: this.context.metadata,
+        smartSuggestions: this.context.smartSuggestions
       };
 
     } catch (error) {
@@ -375,14 +434,16 @@ export class RAGPipeline {
         console.log('❌ NOT detected as line item query');
       }
 
-      // Enhanced temporal query routing
-      const temporalRouting = this.context.params.temporalRouting;
+      // Enhanced temporal query routing - check both params and preprocessing result
+      const temporalRouting = this.context.params.temporalRouting || this.context.metadata.llmPreprocessing?.temporalRouting;
       console.log('🔍 DEBUG: Temporal routing check:', {
         hasTemporalRouting: !!temporalRouting,
         isTemporalQuery: temporalRouting?.isTemporalQuery,
         routingStrategy: temporalRouting?.routingStrategy,
         hasSemanticContent: temporalRouting?.hasSemanticContent,
-        semanticTerms: temporalRouting?.semanticTerms
+        semanticTerms: temporalRouting?.semanticTerms,
+        sourceParams: !!this.context.params.temporalRouting,
+        sourcePreprocessing: !!this.context.metadata.llmPreprocessing?.temporalRouting
       });
 
       console.log('🔍 DEBUG: About to check temporal routing condition...');
@@ -595,6 +656,40 @@ export class RAGPipeline {
   }
 
   /**
+   * Validate temporal search prerequisites
+   */
+  private validateTemporalSearchPrerequisites(): { isValid: boolean; error?: string } {
+    const startDate = this.context.params.filters?.startDate;
+    const endDate = this.context.params.filters?.endDate;
+
+    if (!startDate || !endDate) {
+      return {
+        isValid: false,
+        error: 'Date range is required for temporal search but was not provided'
+      };
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return {
+        isValid: false,
+        error: 'Invalid date format in temporal search parameters'
+      };
+    }
+
+    if (start > end) {
+      return {
+        isValid: false,
+        error: 'Start date cannot be after end date in temporal search'
+      };
+    }
+
+    return { isValid: true };
+  }
+
+  /**
    * Execute temporal search with hybrid routing strategy
    */
   private async executeTemporalSearch(
@@ -603,6 +698,17 @@ export class RAGPipeline {
   ): Promise<PipelineStageResult<UnifiedSearchResult[]>> {
     const stageStart = Date.now();
     console.log('⏰ Executing temporal search with strategy:', temporalRouting.routingStrategy);
+
+    // Validate prerequisites
+    const validation = this.validateTemporalSearchPrerequisites();
+    if (!validation.isValid) {
+      console.error('❌ Temporal search validation failed:', validation.error);
+      return {
+        success: false,
+        error: validation.error!,
+        processingTime: Date.now() - stageStart
+      };
+    }
 
     try {
       let result;
@@ -623,6 +729,24 @@ export class RAGPipeline {
             dataLength: result.data?.length || 0,
             error: result.error
           });
+
+          // CRITICAL FIX: If hybrid search returns 0 results, try date filter only as fallback
+          if (result.success && result.data && result.data.length === 0) {
+            console.log('🔄 Hybrid temporal semantic search returned 0 results, trying date filter only fallback...');
+            const dateFilterResult = await this.executeDateFilterOnlySearch();
+            if (dateFilterResult.success && dateFilterResult.data && dateFilterResult.data.length > 0) {
+              console.log(`✅ Date filter fallback found ${dateFilterResult.data.length} results`);
+              // Update metadata to indicate this was a fallback
+              dateFilterResult.metadata = {
+                ...dateFilterResult.metadata,
+                searchMethod: 'date_filter_only_fallback_from_hybrid',
+                originalSearchMethod: 'hybrid_temporal_semantic',
+                fallbackReason: 'hybrid_search_returned_zero_results'
+              };
+              return dateFilterResult;
+            }
+          }
+
           return result;
 
         case 'semantic_only':
@@ -679,6 +803,40 @@ export class RAGPipeline {
         limit: this.context.params.limit || 20
       });
 
+      // CRITICAL FIX: Add comprehensive debugging for date filter only search
+      console.log('🔍 DEBUG: Date filter only search parameters:', {
+        userId: this.context.user?.id,
+        dateRangeStart: dateRange.start,
+        dateRangeEnd: dateRange.end,
+        limit: this.context.params.limit || 20,
+        userContextExists: !!this.context.user
+      });
+
+      // CRITICAL FIX: Validate user context before executing query
+      if (!this.context.user?.id) {
+        console.error('❌ CRITICAL: User context missing in date filter only search');
+        throw new Error('User authentication required for date filter search');
+      }
+
+      // CRITICAL FIX: For temporal queries, we need to return ALL receipts in the date range
+      // First, check if we have information about the total count from previous steps
+      const expectedReceiptCount = this.context.metadata?.receiptIdsInRange ||
+                                   this.context.metadata?.totalReceiptsInRange;
+
+      // Calculate appropriate limit: use expected count + buffer, or default limit
+      const dynamicLimit = expectedReceiptCount ?
+        Math.max(expectedReceiptCount + 10, this.context.params.limit || 20) :
+        (this.context.params.limit || 20);
+
+      console.log('🔍 DEBUG: Dynamic limit calculation:', {
+        expectedReceiptCount,
+        originalLimit: this.context.params.limit || 20,
+        dynamicLimit,
+        reasoning: expectedReceiptCount ?
+          'Using expected count + buffer for temporal query' :
+          'Using default limit (no count available)'
+      });
+
       // Query receipts table directly with date filtering
       const { data: receipts, error } = await this.context.supabase
         .from('receipts')
@@ -690,7 +848,13 @@ export class RAGPipeline {
         .gte('date', dateRange.start)
         .lte('date', dateRange.end)
         .order('date', { ascending: false })
-        .limit(this.context.params.limit || 20);
+        .limit(dynamicLimit);
+
+      console.log('🔍 DEBUG: Date filter only query result:', {
+        error: error?.message || null,
+        resultCount: receipts?.length || 0,
+        sampleResults: receipts?.slice(0, 3)?.map(r => ({ id: r.id, merchant: r.merchant, date: r.date })) || []
+      });
 
       console.log('🔍 DEBUG: Database query result:', {
         error: error,
@@ -786,6 +950,17 @@ export class RAGPipeline {
     originalStageStart: number
   ): Promise<PipelineStageResult<UnifiedSearchResult[]>> {
     console.log('🔄 Executing fallback temporal search with broader date ranges');
+    console.log('🔍 DEBUG: Fallback search triggered with original date range:', originalDateRange);
+
+    // CRITICAL FIX: Validate user context before fallback
+    if (!this.context.user?.id) {
+      console.error('❌ CRITICAL: User context missing in fallback temporal search');
+      return {
+        success: false,
+        error: 'User authentication required for fallback temporal search',
+        processingTime: Date.now() - originalStageStart
+      };
+    }
 
     // Define fallback strategies in order of preference
     const fallbackStrategies = [
@@ -830,6 +1005,14 @@ export class RAGPipeline {
       const fallbackDateRange = strategy.getDateRange();
       console.log(`🔄 Trying fallback strategy: ${strategy.name}`, fallbackDateRange);
 
+      // CRITICAL FIX: Add detailed debugging for each fallback strategy
+      console.log('🔍 DEBUG: Fallback strategy details:', {
+        strategyName: strategy.name,
+        originalDateRange,
+        fallbackDateRange,
+        daysDifference: Math.ceil((new Date(fallbackDateRange.end).getTime() - new Date(fallbackDateRange.start).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      });
+
       try {
         const { data: receipts, error } = await this.context.supabase
           .from('receipts')
@@ -841,7 +1024,13 @@ export class RAGPipeline {
           .gte('date', fallbackDateRange.start)
           .lte('date', fallbackDateRange.end)
           .order('date', { ascending: false })
-          .limit(Math.min(this.context.params.limit || 20, 10)); // Limit fallback results
+          .limit(Math.max(this.context.params.limit || 20, 50)); // CRITICAL FIX: Use higher limit for fallback temporal results
+
+        console.log(`🔍 DEBUG: Fallback strategy ${strategy.name} query result:`, {
+          error: error?.message || null,
+          resultCount: receipts?.length || 0,
+          sampleResults: receipts?.slice(0, 3)?.map(r => ({ id: r.id, merchant: r.merchant, date: r.date })) || []
+        });
 
         if (error) {
           console.warn(`⚠️ Fallback strategy ${strategy.name} failed:`, error);
@@ -878,6 +1067,14 @@ export class RAGPipeline {
           }));
 
           this.context.metadata.sourcesSearched.push(`fallback_temporal_${strategy.name}`);
+
+          // CRITICAL FIX: Mark this as a fallback result in the context metadata
+          // This will be used later to preserve the original date range for display
+          console.log('🔍 DEBUG: Marking context as fallback result with original date range');
+          this.context.metadata.isFallbackResult = true;
+          this.context.metadata.fallbackStrategy = strategy.name;
+          this.context.metadata.originalDateRange = originalDateRange;
+          this.context.metadata.expandedDateRange = fallbackDateRange;
 
           return {
             success: true,
@@ -936,6 +1133,21 @@ export class RAGPipeline {
       console.log('🔄 Using date range for hybrid search:', dateRange);
 
       // Step 1: Get receipt IDs within date range
+      // CRITICAL FIX: Add comprehensive debugging for date filtering
+      console.log('🔍 DEBUG: Date filtering query parameters:', {
+        userId: this.context.user?.id,
+        dateRangeStart: dateRange.start,
+        dateRangeEnd: dateRange.end,
+        userContextExists: !!this.context.user,
+        supabaseExists: !!this.context.supabase
+      });
+
+      // CRITICAL FIX: Validate user context before executing query
+      if (!this.context.user?.id) {
+        console.error('❌ CRITICAL: User context missing in hybrid temporal search');
+        throw new Error('User authentication required for temporal search');
+      }
+
       const { data: dateFilteredReceipts, error: dateError } = await this.context.supabase
         .from('receipts')
         .select('id')
@@ -943,16 +1155,119 @@ export class RAGPipeline {
         .gte('date', dateRange.start)
         .lte('date', dateRange.end);
 
+      console.log('🔍 DEBUG: Date filtering query result:', {
+        error: dateError?.message || null,
+        resultCount: dateFilteredReceipts?.length || 0,
+        sampleResults: dateFilteredReceipts?.slice(0, 3)
+      });
+
       if (dateError) {
+        console.error('❌ Date filtering query failed:', dateError);
         throw new Error(`Date filtering failed: ${dateError.message}`);
       }
 
       const receiptIds = (dateFilteredReceipts || []).map(r => r.id);
-      console.log(`📅 Found ${receiptIds.length} receipts in date range`);
-      console.log('🔍 DEBUG: Receipt IDs in date range:', receiptIds);
+      console.log(`📅 Found ${receiptIds.length} receipts in date range ${dateRange.start} to ${dateRange.end}`);
+      console.log('🔍 DEBUG: Receipt IDs in date range:', receiptIds.slice(0, 10)); // Limit to first 10 for readability
+
+      // CRITICAL FIX: Store receipt count in metadata for dynamic limit calculation
+      this.context.metadata.totalReceiptsInRange = receiptIds.length;
+      this.context.metadata.receiptIdsInRange = receiptIds.length;
+      console.log('🔍 DEBUG: Stored receipt count in metadata for dynamic limiting:', {
+        totalReceiptsInRange: receiptIds.length,
+        dateRange: `${dateRange.start} to ${dateRange.end}`
+      });
+
+      // CRITICAL FIX: If no receipts found, verify the issue before triggering fallback
+      if (receiptIds.length === 0) {
+        console.log('⚠️ CRITICAL: No receipts found in date range - investigating...');
+
+        // Check if receipts exist for this user at all
+        const { data: userReceiptCount, error: countError } = await this.context.supabase
+          .from('receipts')
+          .select('id', { count: 'exact' })
+          .eq('user_id', this.context.user.id);
+
+        console.log('🔍 DEBUG: User receipt verification:', {
+          totalUserReceipts: userReceiptCount?.length || 0,
+          countError: countError?.message || null
+        });
+
+        // Check if receipts exist in the date range for any user (debugging)
+        const { data: dateRangeReceipts, error: dateRangeError } = await this.context.supabase
+          .from('receipts')
+          .select('id, user_id, date')
+          .gte('date', dateRange.start)
+          .lte('date', dateRange.end)
+          .limit(5);
+
+        console.log('🔍 DEBUG: Date range verification (any user):', {
+          receiptsInDateRange: dateRangeReceipts?.length || 0,
+          sampleReceipts: dateRangeReceipts?.map(r => ({ id: r.id, date: r.date, user_id: r.user_id })) || [],
+          dateRangeError: dateRangeError?.message || null
+        });
+      }
+
+      // PERFORMANCE FIX: Check for large date ranges that might cause timeouts
+      const rangeStartDate = new Date(dateRange.start);
+      const rangeEndDate = new Date(dateRange.end);
+      const daysDiff = Math.ceil((rangeEndDate.getTime() - rangeStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const isLargeDateRange = daysDiff > 7 || receiptIds.length > 50;
+
+      if (isLargeDateRange) {
+        console.log(`⚠️ Large temporal query detected: ${daysDiff} days, ${receiptIds.length} receipts - using optimized approach`);
+
+        // For large date ranges, skip semantic search and go directly to date filter only
+        if (daysDiff > 14 || receiptIds.length > 100) {
+          console.log('🔄 Date range too large for hybrid search, falling back to date filter only');
+          const fallbackResult = await this.executeDateFilterOnlySearch();
+          if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
+            console.log(`✅ Date filter fallback found ${fallbackResult.data.length} results for large range`);
+            fallbackResult.metadata = {
+              ...fallbackResult.metadata,
+              searchMethod: 'date_filter_only_large_range_optimization',
+              originalSearchMethod: 'hybrid_temporal_semantic',
+              optimizationReason: 'large_date_range_performance',
+              daysDiff,
+              receiptIdsInRange: receiptIds.length
+            };
+            return fallbackResult;
+          }
+        }
+      }
 
       if (receiptIds.length === 0) {
         console.log('🔄 No receipts found in date range for hybrid search, trying fallback...');
+        console.log('🔍 DEBUG: Fallback trigger details:', {
+          originalDateRange: dateRange,
+          userHasReceipts: this.context.user?.id ? 'checked above' : 'unknown',
+          searchMethod: 'hybrid_temporal_semantic'
+        });
+
+        // CRITICAL FIX: Before triggering fallback, try date filter only search first
+        // This ensures we use the correct date range before expanding to broader ranges
+        console.log('🔄 Trying date filter only search with original date range before fallback...');
+        const dateFilterResult = await this.executeDateFilterOnlySearch();
+        if (dateFilterResult.success && dateFilterResult.data && dateFilterResult.data.length > 0) {
+          console.log(`✅ Date filter only search found ${dateFilterResult.data.length} results with original date range`);
+
+          // CRITICAL FIX: Ensure the original date range is preserved when using date filter as fallback
+          console.log('🔍 DEBUG: Date filter fallback preserving original date range');
+          this.context.metadata.isFallbackResult = false; // This is not a fallback, it's using the correct date range
+          this.context.metadata.originalDateRange = dateRange; // Preserve the original date range
+
+          dateFilterResult.metadata = {
+            ...dateFilterResult.metadata,
+            searchMethod: 'date_filter_only_from_hybrid_fallback',
+            originalSearchMethod: 'hybrid_temporal_semantic',
+            fallbackReason: 'no_receipt_ids_found_in_hybrid_search',
+            preservedOriginalDateRange: true
+          };
+          return dateFilterResult;
+        }
+
+        // If date filter only also fails, then try broader fallback
+        console.log('🔄 Date filter only search also failed, trying broader temporal fallback...');
         const fallbackResult = await this.executeFallbackTemporalSearch(dateRange, stageStart);
         if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
           console.log(`✅ Fallback temporal search found ${fallbackResult.data.length} results for hybrid query`);
@@ -992,7 +1307,9 @@ export class RAGPipeline {
         candidateLimit
       });
 
-      const { data: semanticResults, error: semanticError } = await this.context.supabase.rpc('enhanced_hybrid_search', {
+      // CRITICAL FIX: Add timeout protection for temporal search database query
+      const TEMPORAL_DB_QUERY_TIMEOUT = 25000; // 25 seconds for temporal database query (shorter than regular)
+      const temporalDbQueryPromise = this.context.supabase.rpc('enhanced_hybrid_search', {
         query_embedding: queryEmbedding,
         query_text: semanticQuery,
         source_types: ['receipt'],
@@ -1011,6 +1328,21 @@ export class RAGPipeline {
         amount_currency: null,
         receipt_ids_filter: receiptIds // 🔧 FIX: Constrain search to date-filtered receipts
       });
+
+      const temporalTimeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Temporal database query timeout')), TEMPORAL_DB_QUERY_TIMEOUT);
+      });
+
+      let semanticResults, semanticError;
+      try {
+        const result = await Promise.race([temporalDbQueryPromise, temporalTimeoutPromise]);
+        semanticResults = result.data;
+        semanticError = result.error;
+      } catch (timeoutError) {
+        console.warn('⚠️ Temporal database query timed out, falling back to date filter only');
+        semanticError = timeoutError;
+        semanticResults = null;
+      }
 
       console.log('🔍 DEBUG: enhanced_hybrid_search results:', {
         resultsCount: semanticResults?.length || 0,
@@ -1031,6 +1363,38 @@ export class RAGPipeline {
       const filteredResults = (semanticResults || []).filter(result =>
         result.source_type === 'receipt' && receiptIds.includes(result.source_id)
       );
+
+      console.log(`🔍 Semantic search results: ${semanticResults?.length || 0} total, ${filteredResults.length} in date range`);
+
+      // CRITICAL FIX: If semantic search returns 0 results but we have receipts in date range,
+      // fall back to returning the receipts directly (no embeddings available)
+      if (filteredResults.length === 0 && receiptIds.length > 0) {
+        console.log('🔄 Semantic search returned 0 results but receipts exist in date range - falling back to direct receipt query');
+        console.log(`📅 Falling back to date filter only search for ${receiptIds.length} receipts in range`);
+        console.log('💡 This suggests that receipts exist but embeddings are missing - this is expected for recently uploaded receipts');
+
+        // Fall back to date filter only search which queries receipts table directly
+        const fallbackResult = await this.executeDateFilterOnlySearch();
+        if (fallbackResult.success && fallbackResult.data && fallbackResult.data.length > 0) {
+          console.log(`✅ Date filter fallback found ${fallbackResult.data.length} results`);
+
+          // Add user-friendly message about why fallback was used
+          const fallbackMessage = `Found ${fallbackResult.data.length} receipt${fallbackResult.data.length === 1 ? '' : 's'} from the specified date range. Note: These receipts may still be processing for enhanced search capabilities.`;
+
+          // Update metadata to indicate this was a hybrid query with fallback
+          fallbackResult.metadata = {
+            ...fallbackResult.metadata,
+            searchMethod: 'hybrid_temporal_semantic_with_date_fallback',
+            originalSearchMethod: 'hybrid_temporal_semantic',
+            fallbackReason: 'no_embeddings_for_receipts_in_date_range',
+            receiptIdsInRange: receiptIds.length,
+            semanticResults: 0,
+            userMessage: fallbackMessage,
+            isEmbeddingFallback: true
+          };
+          return fallbackResult;
+        }
+      }
 
       // Step 4: Deduplicate and transform to UnifiedSearchResult format
       // Group by source_id to handle multiple embeddings per receipt
@@ -1340,40 +1704,33 @@ export class RAGPipeline {
       // Transform line item results to unified format
       const rawResults: UnifiedSearchResult[] = lineItemResults.lineItems.map((item: any) => ({
         id: `line-item-${item.line_item_id}`,
-        sourceType: 'receipt',
-        sourceId: item.receipt_id,
+        sourceType: 'line_item', // 🔧 FIX: Set correct sourceType for line items
+        sourceId: item.line_item_id, // 🔧 FIX: Use line_item_id as sourceId for line items
         contentType: 'line_item',
         title: `${item.description} - ${item.merchant}`,
         content: item.description,
         similarity: item.similarity || 0.8,
         metadata: {
           merchant: item.merchant,
-          total: item.total, // 🔧 FIX: Use receipt total, not line item amount
+          amount: item.amount, // 🔧 FIX: Use line item amount, not receipt total
+          line_item_price: item.amount, // Keep for compatibility
           currency: item.currency || 'MYR',
           date: item.date,
+          parent_receipt_date: item.date,
+          parent_receipt_merchant: item.merchant,
           line_item_id: item.line_item_id,
-          line_item_amount: item.amount, // Keep line item amount for reference
+          receipt_id: item.receipt_id, // Keep receipt reference
+          description: item.description,
           match_type: item.matchType || 'hybrid'
         },
         createdAt: item.date
       }));
 
-      // 🔧 FIX: Deduplicate by receipt_id to ensure each receipt appears only once
-      const receiptMap = new Map<string, UnifiedSearchResult>();
+      // For line item searches, we want to show individual line items, not deduplicated receipts
+      // Each line item should be displayed separately (e.g., multiple "IKAN LONGGOK" entries)
+      const transformedResults = rawResults;
 
-      for (const result of rawResults) {
-        const receiptId = result.sourceId;
-        const existingResult = receiptMap.get(receiptId);
-
-        // Keep the result with higher similarity score
-        if (!existingResult || (result.similarity > existingResult.similarity)) {
-          receiptMap.set(receiptId, result);
-        }
-      }
-
-      const transformedResults = Array.from(receiptMap.values());
-
-      console.log(`🔧 Line item deduplication: ${rawResults.length} raw results → ${transformedResults.length} unique receipts`);
+      console.log(`🔧 Line item results: ${rawResults.length} individual line items found`);
 
       return {
         success: true,
@@ -1608,6 +1965,29 @@ export class RAGPipeline {
   }
 
   /**
+   * Helper method to get effective limit for temporal queries
+   * Uses dynamic limit when available, falls back to original limit
+   */
+  private getEffectiveLimit(): number {
+    // Check if we have dynamic limit information from temporal search
+    const dynamicLimit = this.context.metadata?.totalReceiptsInRange ||
+                        this.context.metadata?.receiptIdsInRange;
+
+    if (dynamicLimit && dynamicLimit > (this.context.params.limit || 20)) {
+      const effectiveLimit = Math.max(dynamicLimit + 10, this.context.params.limit || 20);
+      console.log('🔍 DEBUG: Using dynamic limit for re-ranking:', {
+        originalLimit: this.context.params.limit || 20,
+        dynamicLimit,
+        effectiveLimit,
+        reason: 'temporal_query_with_more_results_available'
+      });
+      return effectiveLimit;
+    }
+
+    return this.context.params.limit || 20;
+  }
+
+  /**
    * Stage 4: Result Re-ranking
    * Uses advanced LLM to re-order results based on contextual relevance
    */
@@ -1621,7 +2001,10 @@ export class RAGPipeline {
       const MAX_PIPELINE_TIME = 75000; // 75 seconds max
       if (timeElapsed > MAX_PIPELINE_TIME * 0.7) { // If 70% of time already used
         console.warn('⚠️ Stage 4: Approaching timeout, skipping re-ranking for performance');
-        const fastResults = searchResults.slice(0, this.context.params.limit || 20);
+
+        // CRITICAL FIX: Use dynamic limit for temporal queries instead of original limit
+        const effectiveLimit = this.getEffectiveLimit();
+        const fastResults = searchResults.slice(0, effectiveLimit);
 
         this.context.metadata.reRanking = {
           applied: false,
@@ -1644,7 +2027,10 @@ export class RAGPipeline {
 
       if (isSimpleQuery && searchResults.length <= 10) {
         console.log('⚡ Skipping re-ranking for simple query to improve performance');
-        const fastResults = searchResults.slice(0, this.context.params.limit || 20);
+
+        // CRITICAL FIX: Use dynamic limit for temporal queries
+        const effectiveLimit = this.getEffectiveLimit();
+        const fastResults = searchResults.slice(0, effectiveLimit);
 
         this.context.metadata.reRanking = {
           applied: false,
@@ -1663,10 +2049,13 @@ export class RAGPipeline {
 
       if (searchResults.length <= 1) {
         console.log('⚠️ Skipping re-ranking - insufficient candidates');
+        // CRITICAL FIX: Use dynamic limit for temporal queries
+        const effectiveLimit = this.getEffectiveLimit();
         console.log('🔍 DEBUG: Stage 4 re-ranking bypass:', {
           searchResultsLength: searchResults.length,
-          limit: this.context.params.limit,
-          sliceResult: searchResults.slice(0, this.context.params.limit || 20).length
+          originalLimit: this.context.params.limit,
+          effectiveLimit,
+          sliceResult: searchResults.slice(0, effectiveLimit).length
         });
 
         this.context.metadata.reRanking = {
@@ -1677,7 +2066,9 @@ export class RAGPipeline {
           confidenceLevel: 'low'
         };
 
-        const finalResults = searchResults.slice(0, this.context.params.limit || 20);
+        // CRITICAL FIX: Use dynamic limit for temporal queries
+        const effectiveLimit2 = this.getEffectiveLimit();
+        const finalResults = searchResults.slice(0, effectiveLimit2);
         console.log('🔍 DEBUG: Stage 4 returning results:', {
           originalCount: searchResults.length,
           finalCount: finalResults.length,
@@ -1701,10 +2092,18 @@ export class RAGPipeline {
       try {
         // Add timeout protection for re-ranking
         const RERANKING_TIMEOUT = 15000; // 15 seconds max for re-ranking
+        // CRITICAL FIX: Use dynamic limit for temporal queries in re-ranking
+        const maxResults = this.getEffectiveLimit();
+        console.log('🔍 DEBUG: Re-ranking with dynamic limit:', {
+          originalLimit: this.context.params.limit,
+          maxResults,
+          candidatesCount: reRankingCandidates.length
+        });
+
         const reRankingPromise = reRankSearchResults({
           originalQuery: this.context.originalQuery,
           candidates: reRankingCandidates,
-          maxResults: this.context.params.limit
+          maxResults
         });
 
         const timeoutPromise = new Promise((_, reject) => {
@@ -1722,8 +2121,9 @@ export class RAGPipeline {
         console.error('❌ Re-ranking failed, creating fallback result:', reRankError);
 
         // Create a fallback result with proper structure
+        const fallbackLimit = this.getEffectiveLimit();
         reRankingResult = {
-          rerankedResults: searchResults.slice(0, this.context.params.limit),
+          rerankedResults: searchResults.slice(0, fallbackLimit),
           reRankingMetadata: {
             modelUsed: 'fallback-error',
             processingTime: 0,
@@ -1931,6 +2331,38 @@ export class RAGPipeline {
         originalCount: results.length,
         filteredCount: filteredResults.length
       });
+
+      // SMART SUGGESTIONS: Generate intelligent suggestions for zero results
+      if (filteredResults.length === 0 && results.length > 0) {
+        console.log('🔍 DEBUG: No results found in date range, generating smart suggestions...');
+
+        const dateAnalysis = analyzeAvailableDates(
+          results,
+          { start: startDate, end: endDate },
+          this.context.originalQuery
+        );
+
+        const followUpSuggestions = convertToFollowUpSuggestions(dateAnalysis.suggestions);
+        const enhancedMessage = generateZeroResultsMessage(
+          this.context.originalQuery,
+          { start: startDate, end: endDate },
+          dateAnalysis
+        );
+
+        console.log('🔍 DEBUG: Smart suggestions generated:', {
+          totalSuggestions: dateAnalysis.suggestions.length,
+          followUpSuggestions,
+          enhancedMessage,
+          availableDateRange: dateAnalysis.dateRange
+        });
+
+        // Store suggestions in context for later use
+        this.context.smartSuggestions = {
+          dateAnalysis,
+          followUpSuggestions,
+          enhancedMessage
+        };
+      }
     } else if (this.context.params.filters?.dateRange) {
       // LEGACY: Fallback to dateRange object if startDate/endDate not available
       const { start, end } = this.context.params.filters.dateRange;
@@ -1961,6 +2393,38 @@ export class RAGPipeline {
         originalCount: results.length,
         filteredCount: filteredResults.length
       });
+
+      // SMART SUGGESTIONS: Generate intelligent suggestions for zero results (legacy path)
+      if (filteredResults.length === 0 && results.length > 0) {
+        console.log('🔍 DEBUG: No results found in date range (legacy), generating smart suggestions...');
+
+        const dateAnalysis = analyzeAvailableDates(
+          results,
+          { start, end },
+          this.context.originalQuery
+        );
+
+        const followUpSuggestions = convertToFollowUpSuggestions(dateAnalysis.suggestions);
+        const enhancedMessage = generateZeroResultsMessage(
+          this.context.originalQuery,
+          { start, end },
+          dateAnalysis
+        );
+
+        console.log('🔍 DEBUG: Smart suggestions generated (legacy):', {
+          totalSuggestions: dateAnalysis.suggestions.length,
+          followUpSuggestions,
+          enhancedMessage,
+          availableDateRange: dateAnalysis.dateRange
+        });
+
+        // Store suggestions in context for later use
+        this.context.smartSuggestions = {
+          dateAnalysis,
+          followUpSuggestions,
+          enhancedMessage
+        };
+      }
     }
 
     // Apply amount range filter (for receipts and claims)
@@ -2115,9 +2579,63 @@ export class RAGPipeline {
    * Generate financial analysis UI components
    */
   private async generateFinancialAnalysisComponents(results: UnifiedSearchResult[]): Promise<void> {
-    // For now, we'll add this as a placeholder
-    // In a full implementation, this would generate spending charts, category breakdowns, etc.
-    console.log('📊 Would generate financial analysis components');
+    console.log('📊 Generating financial analysis components for', results.length, 'results');
+
+    // Filter line item results for financial analysis
+    const lineItemResults = results.filter(r => r.sourceType === 'line_item' || r.sourceType === 'lineItem');
+
+    if (lineItemResults.length > 0) {
+      console.log(`🍽️ Processing ${lineItemResults.length} line item results for financial analysis`);
+
+      // Generate line item cards for financial analysis
+      lineItemResults.forEach(result => {
+        this.context.metadata.uiComponents.push({
+          type: 'ui_component' as const,
+          component: 'line_item_card',
+          data: {
+            line_item_id: result.sourceId,
+            receipt_id: result.metadata?.receipt_id || result.metadata?.parent_receipt_id,
+            description: result.metadata?.description || result.title || 'Unknown Item',
+            amount: result.metadata?.amount || result.metadata?.line_item_price || 0,
+            currency: result.metadata?.currency || 'MYR',
+            merchant: result.metadata?.merchant || result.metadata?.parent_receipt_merchant || 'Unknown Merchant',
+            date: result.metadata?.date || result.metadata?.parent_receipt_date || result.createdAt,
+            confidence: result.similarity || 0.8,
+            quantity: result.metadata?.quantity || 1
+          },
+          metadata: {
+            title: 'Line Item Card',
+            interactive: true,
+            actions: ['view_receipt', 'view_item_details']
+          }
+        });
+      });
+
+      console.log(`🎯 Generated ${lineItemResults.length} line item cards for financial analysis`);
+    }
+
+    // Add financial summary if we have results
+    if (results.length > 0) {
+      const totalAmount = results.reduce((sum, r) => sum + (r.metadata?.amount || r.metadata?.total || 0), 0);
+
+      this.context.metadata.uiComponents.push({
+        type: 'ui_component' as const,
+        component: 'summary_card',
+        data: {
+          title: 'Total Amount',
+          value: totalAmount,
+          currency: 'MYR',
+          icon: 'dollar-sign',
+          color: 'primary'
+        },
+        metadata: {
+          title: 'Financial Summary',
+          interactive: true
+        }
+      });
+
+      console.log(`💰 Added financial summary card with total: MYR ${totalAmount}`);
+    }
   }
 
   /**

@@ -6,6 +6,7 @@
  */
 
 import { LLMPreprocessResult } from './types.ts';
+import { parseTemporalQuery, type ParsedTemporalQuery } from '../_shared/temporal-parser.ts';
 
 export interface EnhancedPreprocessResult extends LLMPreprocessResult {
   alternativeQueries: string[];
@@ -25,6 +26,15 @@ export interface EnhancedPreprocessResult extends LLMPreprocessResult {
   };
   promptTemplate: string;
   contextualHints: string[];
+  // CRITICAL FIX: Add temporal routing to enhanced preprocessing
+  temporalRouting?: {
+    isTemporalQuery: boolean;
+    hasSemanticContent: boolean;
+    routingStrategy: 'date_filter_only' | 'semantic_only' | 'hybrid_temporal_semantic';
+    temporalConfidence: number;
+    semanticTerms: string[];
+  };
+  temporalParsing?: ParsedTemporalQuery;
 }
 
 /**
@@ -38,9 +48,19 @@ export async function enhancedQueryPreprocessing(
   const startTime = Date.now();
   const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
 
+  // CRITICAL FIX: Always run temporal parsing first
+  console.log('🕐 ENHANCED PREPROCESSING: Running temporal parsing for query:', query);
+  const temporalParsing = parseTemporalQuery(query);
+  console.log('🕐 ENHANCED PREPROCESSING: Temporal parsing result:', {
+    isTemporalQuery: temporalParsing.temporalIntent?.isTemporalQuery,
+    routingStrategy: temporalParsing.temporalIntent?.routingStrategy,
+    hasSemanticContent: temporalParsing.temporalIntent?.hasSemanticContent,
+    dateRange: temporalParsing.dateRange
+  });
+
   if (!geminiApiKey) {
-    console.warn('GEMINI_API_KEY not available, using basic preprocessing');
-    return createBasicEnhancedResult(query);
+    console.warn('GEMINI_API_KEY not available, using basic preprocessing with temporal parsing');
+    return createBasicEnhancedResult(query, temporalParsing);
   }
 
   try {
@@ -185,7 +205,7 @@ Return only valid JSON, no explanation.`;
       queryType: parsed.queryType || 'conversational',
       suggestedSources: parsed.suggestedSources || ['receipt'],
       processingTime: Date.now() - startTime,
-      
+
       // Enhanced fields
       alternativeQueries: parsed.alternativeQueries || [],
       extractedEntities: {
@@ -203,19 +223,23 @@ Return only valid JSON, no explanation.`;
         analysisType: parsed.queryClassification?.analysisType || 'descriptive'
       },
       promptTemplate: parsed.promptTemplate || parsed.intent || 'general_search',
-      contextualHints: parsed.contextualHints || []
+      contextualHints: parsed.contextualHints || [],
+
+      // CRITICAL FIX: Include temporal routing from parsing
+      temporalRouting: temporalParsing.temporalIntent,
+      temporalParsing: temporalParsing
     };
 
   } catch (error) {
     console.error('Enhanced query preprocessing error:', error);
-    return createBasicEnhancedResult(query);
+    return createBasicEnhancedResult(query, temporalParsing);
   }
 }
 
 /**
  * Create basic enhanced result when LLM is unavailable
  */
-function createBasicEnhancedResult(query: string): EnhancedPreprocessResult {
+function createBasicEnhancedResult(query: string, temporalParsing?: ParsedTemporalQuery): EnhancedPreprocessResult {
   return {
     expandedQuery: query,
     intent: 'general_search',
@@ -224,7 +248,7 @@ function createBasicEnhancedResult(query: string): EnhancedPreprocessResult {
     queryType: 'conversational',
     suggestedSources: ['receipt'],
     processingTime: 0,
-    
+
     alternativeQueries: [],
     extractedEntities: {
       merchants: [],
@@ -241,7 +265,11 @@ function createBasicEnhancedResult(query: string): EnhancedPreprocessResult {
       analysisType: 'descriptive'
     },
     promptTemplate: 'general_search',
-    contextualHints: []
+    contextualHints: [],
+
+    // CRITICAL FIX: Include temporal routing even in basic result
+    temporalRouting: temporalParsing?.temporalIntent,
+    temporalParsing: temporalParsing
   };
 }
 

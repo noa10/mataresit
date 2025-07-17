@@ -303,7 +303,12 @@ async function validateRequest(req: Request, body?: any): Promise<{ params: Unif
       // Add date range if detected
       ...(temporalParsing.dateRange && {
         startDate: temporalParsing.dateRange.start,
-        endDate: temporalParsing.dateRange.end
+        endDate: temporalParsing.dateRange.end,
+        // CRITICAL FIX: Add dateRange object for RAG pipeline compatibility
+        dateRange: {
+          start: temporalParsing.dateRange.start,
+          end: temporalParsing.dateRange.end
+        }
       }),
       // Add amount range if detected
       ...(temporalParsing.amountRange && {
@@ -436,16 +441,23 @@ async function enforceSubscriptionLimits(
   params: UnifiedSearchParams
 ): Promise<{ allowed: boolean; filteredParams: UnifiedSearchParams; limits: any }> {
   try {
-    // If no user, allow with basic limits (fallback for anonymous access)
+    // CRITICAL FIX: If no user, return error instead of limiting to 5 results
+    // This prevents the search from silently returning limited results
     if (!user || !user.id) {
-      console.warn('⚠️ No user found, applying basic limits');
+      console.error('❌ CRITICAL: No user found for subscription limits check');
+      console.error('🔍 DEBUG: User context details:', {
+        userExists: !!user,
+        userId: user?.id || 'MISSING',
+        userObject: user
+      });
       return {
-        allowed: true,
-        filteredParams: {
-          ...params,
-          limit: Math.min(params.limit || 10, 5) // Limit anonymous searches to 5 results
-        },
-        limits: { tier: 'anonymous', max_results: 5 }
+        allowed: false,
+        filteredParams: params,
+        limits: {
+          tier: 'anonymous',
+          max_results: 0,
+          reason: 'User authentication required for search execution'
+        }
       };
     }
 
@@ -593,6 +605,27 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
         userProfile
       );
 
+      // CRITICAL FIX: Update params with temporal routing from preprocessing
+      if (preprocessResult.temporalRouting && !filteredParams.temporalRouting) {
+        console.log('🔧 CRITICAL FIX: Adding temporal routing from preprocessing to params');
+        filteredParams.temporalRouting = preprocessResult.temporalRouting;
+
+        // Also add date filters if available
+        if (preprocessResult.temporalParsing?.dateRange) {
+          filteredParams.filters = {
+            ...filteredParams.filters,
+            startDate: preprocessResult.temporalParsing.dateRange.start,
+            endDate: preprocessResult.temporalParsing.dateRange.end
+          };
+        }
+
+        console.log('🔧 Updated params with temporal routing:', {
+          hasTemporalRouting: !!filteredParams.temporalRouting,
+          routingStrategy: filteredParams.temporalRouting?.routingStrategy,
+          dateRange: preprocessResult.temporalParsing?.dateRange
+        });
+      }
+
       // Execute search using RAG pipeline with enhanced preprocessing
       const ragContext: RAGPipelineContext = {
         originalQuery: query,
@@ -636,7 +669,8 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
           searchResults: pipelineResult.results,
           userProfile,
           conversationHistory,
-          metadata: pipelineResult.searchMetadata
+          metadata: pipelineResult.searchMetadata,
+          smartSuggestions: pipelineResult.smartSuggestions
         };
 
         const enhancedResponse = await generateEnhancedResponse(responseContext);
@@ -659,7 +693,7 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
           enhancedResponse: {
             content: enhancedResponse.content,
             uiComponents: enhancedResponse.uiComponents,
-            followUpSuggestions: enhancedResponse.followUpSuggestions,
+            followUpSuggestions: pipelineResult.smartSuggestions?.followUpSuggestions || enhancedResponse.followUpSuggestions,
             confidence: enhancedResponse.confidence,
             responseType: enhancedResponse.responseType
           }
@@ -862,6 +896,15 @@ async function handleRegularSearch(
     // RAG Pipeline completed successfully
     console.log('✅ RAG Pipeline completed successfully');
 
+    // Extract UI components from RAG pipeline metadata
+    const uiComponents = pipelineResult.searchMetadata?.uiComponents || [];
+
+    // 🔍 DEBUG: Log UI components from RAG pipeline
+    console.log('🔍 RAG Pipeline UI components:', {
+      uiComponentsLength: uiComponents.length,
+      componentTypes: uiComponents.map((c: any) => c.component)
+    });
+
     const response: UnifiedSearchResponse = {
       success: true,
       results: pipelineResult.results,
@@ -873,8 +916,29 @@ async function handleRegularSearch(
           ? (filteredParams.offset || 0) + (filteredParams.limit || 20)
           : undefined,
         totalPages: Math.ceil(pipelineResult.totalResults / (filteredParams.limit || 20))
-      }
+      },
+      // Include UI components from RAG pipeline in enhancedResponse format
+      enhancedResponse: uiComponents.length > 0 ? {
+        content: `Found ${pipelineResult.totalResults} results`,
+        uiComponents: uiComponents,
+        followUpSuggestions: [
+          "Refine my search",
+          "Show me more details",
+          "Export these results"
+        ],
+        confidence: 0.9,
+        responseType: 'complete'
+      } : undefined
     };
+
+    // 🔍 DEBUG: Log final response structure
+    console.log('🔍 Final RAG Pipeline response structure:', {
+      success: response.success,
+      resultsLength: response.results?.length,
+      totalResults: response.totalResults,
+      hasEnhancedResponse: !!response.enhancedResponse,
+      enhancedResponseUIComponents: response.enhancedResponse?.uiComponents?.length || 0
+    });
 
     const finalResponse = new Response(
       JSON.stringify(response),

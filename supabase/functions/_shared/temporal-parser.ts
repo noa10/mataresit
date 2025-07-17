@@ -58,15 +58,45 @@ const TEMPORAL_PATTERNS: TemporalPattern[] = [
     pattern: /\b(today|today's)\s*(receipts?|purchases?|expenses?)?\b/i,
     handler: () => getTodayRange(),
     priority: 1,
-    isHybridCapable: false,
+    isHybridCapable: true,
     description: 'Today references'
   },
   {
     pattern: /\b(yesterday|yesterday's)\s*(receipts?|purchases?|expenses?)?\b/i,
     handler: () => getYesterdayRange(),
     priority: 1,
-    isHybridCapable: false,
+    isHybridCapable: true,
     description: 'Yesterday references'
+  },
+
+  // High priority - time-based patterns (hours and minutes)
+  {
+    pattern: /\b(last|past)\s+(hour)\b/i,
+    handler: () => getRelativeDateRange(1, 'hour'),
+    priority: 1,
+    isHybridCapable: true,
+    description: 'Last hour (singular)'
+  },
+  {
+    pattern: /\b(last|past)\s+(minute)\b/i,
+    handler: () => getRelativeDateRange(1, 'minute'),
+    priority: 1,
+    isHybridCapable: true,
+    description: 'Last minute (singular)'
+  },
+  {
+    pattern: /\b(last|past)\s+(\d+)\s+(minutes?)\b/i,
+    handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]),
+    priority: 1,
+    isHybridCapable: true,
+    description: 'Last X minutes'
+  },
+  {
+    pattern: /\b(last|past)\s+(\d+)\s+(hours?)\b/i,
+    handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]),
+    priority: 1,
+    isHybridCapable: true,
+    description: 'Last X hours'
   },
 
   // Specific date patterns with month names (high priority)
@@ -450,54 +480,54 @@ const TEMPORAL_PATTERNS: TemporalPattern[] = [
     description: 'Last month references'
   },
 
-  // Lower priority - numeric relative dates
+  // Lower priority - numeric relative dates (including hours and minutes)
   {
-    pattern: /\b(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i,
+    pattern: /\b(last|past)\s+(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\b/i,
     handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[2]), match[3]),
     priority: 3,
     isHybridCapable: true,
-    description: 'Numeric relative dates (last X days/weeks/months)'
+    description: 'Numeric relative dates (last X minutes/hours/days/weeks/months)'
   },
   {
-    pattern: /\b(within|in)\s+the\s+(last|past)\s+(\d+)\s+(days?|weeks?|months?)\b/i,
+    pattern: /\b(within|in)\s+the\s+(last|past)\s+(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\b/i,
     handler: (match: RegExpMatchArray) => getRelativeDateRange(parseInt(match[3]), match[4]),
     priority: 3,
     isHybridCapable: true,
-    description: 'Within/in the last X period'
+    description: 'Within/in the last X period (including minutes/hours)'
   },
 
-  // Critical missing patterns - "X days ago" format (high priority)
-  // Handle "from X days ago" as range queries
+  // Critical missing patterns - "X time ago" format (high priority)
+  // Handle "from X time ago" as range queries
   {
-    pattern: /\bfrom\s+(\d+)\s+(days?|weeks?|months?)\s+ago\b/i,
+    pattern: /\bfrom\s+(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\s+ago\b/i,
     handler: (match: RegExpMatchArray) => getFromDaysAgoRange(parseInt(match[1]), match[2]),
     priority: 1,
     isHybridCapable: true,
-    description: 'From X days ago (range query from X days ago to today)'
+    description: 'From X time ago (range query from X time ago to today)'
   },
-  // Handle "from X days back" as range queries (same as "from X days ago")
+  // Handle "from X time back" as range queries (same as "from X time ago")
   {
-    pattern: /\bfrom\s+(\d+)\s+(days?|weeks?|months?)\s+back\b/i,
+    pattern: /\bfrom\s+(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\s+back\b/i,
     handler: (match: RegExpMatchArray) => getFromDaysAgoRange(parseInt(match[1]), match[2]),
     priority: 1,
     isHybridCapable: true,
-    description: 'From X days back (range query from X days back to today)'
+    description: 'From X time back (range query from X time back to today)'
   },
-  // Handle exact "X days ago" as single date queries
+  // Handle exact "X time ago" as single date queries
   {
-    pattern: /\b(\d+)\s+(days?|weeks?|months?)\s+ago\b/i,
+    pattern: /\b(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\s+ago\b/i,
     handler: (match: RegExpMatchArray) => getExactDaysAgoRange(parseInt(match[1]), match[2]),
     priority: 2,
     isHybridCapable: true,
-    description: 'Exact days ago (X days ago, X weeks ago, X months ago)'
+    description: 'Exact time ago (X minutes/hours/days/weeks/months ago)'
   },
-  // Handle exact "X days back" as single date queries
+  // Handle exact "X time back" as single date queries
   {
-    pattern: /\b(\d+)\s+(days?|weeks?|months?)\s+back\b/i,
+    pattern: /\b(\d+)\s+(minutes?|hours?|days?|weeks?|months?)\s+back\b/i,
     handler: (match: RegExpMatchArray) => getExactDaysAgoRange(parseInt(match[1]), match[2]),
     priority: 2,
     isHybridCapable: true,
-    description: 'Exact days back (X days back, X weeks back, X months back)'
+    description: 'Exact time back (X minutes/hours/days/weeks/months back)'
   },
   // Handle "from a/one day ago" as range queries
   {
@@ -532,7 +562,21 @@ const TEMPORAL_PATTERNS: TemporalPattern[] = [
     description: 'Single unit back (a day back, one week back, etc.)'
   },
 
-  // Enhanced hybrid patterns
+  // Enhanced hybrid patterns - HIGH PRIORITY for common query formats
+  {
+    pattern: /\b(find|get|show|give)\s+(me\s+)?(all\s+)?(receipts?|purchases?|expenses?)\s+(from|in|during)\s+(last\s+week|this\s+week|last\s+month|this\s+month)\b/i,
+    handler: (match: RegExpMatchArray) => detectTemporalFromContext(match[6]),
+    priority: 1,
+    isHybridCapable: true,
+    description: 'Find/get receipts from temporal period'
+  },
+  {
+    pattern: /\b(receipts?|purchases?|expenses?)\s+(from|in|during)\s+(last\s+week|this\s+week|last\s+month|this\s+month)\b/i,
+    handler: (match: RegExpMatchArray) => detectTemporalFromContext(match[3]),
+    priority: 2,
+    isHybridCapable: true,
+    description: 'Receipts from temporal period'
+  },
   {
     pattern: /\b(recent|latest)\s+([a-zA-Z\s]+)\s+(receipts?|purchases?|expenses?)\b/i,
     handler: () => getRecentDateRange(7),
@@ -582,6 +626,16 @@ export function parseTemporalQuery(query: string, timezone: string = 'Asia/Kuala
     pattern: testPattern.toString(),
     match: testMatch ? testMatch[0] : null,
     groups: testMatch ? testMatch.slice(1) : null
+  });
+
+  // ENHANCED DEBUG: Test the new "find receipts from last week" pattern
+  const findReceiptsPattern = /\b(find|get|show|give)\s+(me\s+)?(all\s+)?(receipts?|purchases?|expenses?)\s+(from|in|during)\s+(last\s+week|this\s+week|last\s+month|this\s+month)\b/i;
+  const findReceiptsMatch = normalizedQuery.match(findReceiptsPattern);
+  console.log('🔍 DEBUG: Manual pattern test for "find receipts from temporal":', {
+    pattern: findReceiptsPattern.toString(),
+    match: findReceiptsMatch ? findReceiptsMatch[0] : null,
+    groups: findReceiptsMatch ? findReceiptsMatch.slice(1) : null,
+    query: normalizedQuery
   });
 
   const result: ParsedTemporalQuery = {
@@ -805,26 +859,44 @@ export function parseTemporalQuery(query: string, timezone: string = 'Asia/Kuala
  */
 function extractSemanticTermsFromQuery(query: string, temporalMatch: RegExpMatchArray | null): string[] {
   let cleanQuery = query;
-  
+
   // Remove temporal expressions
   if (temporalMatch) {
     cleanQuery = cleanQuery.replace(temporalMatch[0], '');
   }
-  
-  // Remove common stop words and clean up
+
+  // CRITICAL FIX: Don't remove semantic content words like "receipts", "purchases", "expenses"
+  // These are important for determining hasSemanticContent for temporal routing
+  const semanticContentWords = ['receipts', 'purchases', 'expenses', 'receipt', 'purchase', 'expense'];
+  const foundSemanticWords = semanticContentWords.filter(word =>
+    query.toLowerCase().includes(word)
+  );
+
+  // Remove only stop words and action words, but preserve semantic content
   cleanQuery = cleanQuery
-    .replace(/\b(receipts?|purchases?|expenses?|show|me|all|list|find|get)\b/gi, '')
+    .replace(/\b(show|me|all|list|find|get|give)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
-  
-  // Split into meaningful terms
+
+  // Split into meaningful terms and add back semantic content words
   const terms = cleanQuery
     .split(/\s+/)
     .filter(term => term.length > 2)
     .filter(term => !/^\d+$/.test(term))
     .filter(term => !['and', 'or', 'the', 'for', 'with', 'from', 'all'].includes(term.toLowerCase()));
-  
-  return terms;
+
+  // Always include found semantic content words
+  const allTerms = [...new Set([...terms, ...foundSemanticWords])];
+
+  console.log('🔍 DEBUG: Semantic term extraction:', {
+    originalQuery: query,
+    cleanQuery,
+    foundSemanticWords,
+    extractedTerms: terms,
+    finalTerms: allTerms
+  });
+
+  return allTerms;
 }
 
 /**
@@ -841,6 +913,14 @@ function detectTemporalFromContext(temporalPhrase: string): DateRange {
   return getRecentDateRange(7);
 }
 
+// Helper function to format date to YYYY-MM-DD without timezone issues
+function formatDateToYYYYMMDD(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Date range calculation functions (consolidated and consistent)
 function getRecentDateRange(days: number): DateRange {
   const now = new Date();
@@ -855,7 +935,7 @@ function getRecentDateRange(days: number): DateRange {
 }
 
 function getTodayRange(): DateRange {
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatDateToYYYYMMDD(new Date());
   return {
     start: today,
     end: today,
@@ -866,8 +946,8 @@ function getTodayRange(): DateRange {
 function getYesterdayRange(): DateRange {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = yesterday.toISOString().split('T')[0];
-  
+  const dateStr = formatDateToYYYYMMDD(yesterday);
+
   return {
     start: dateStr,
     end: dateStr,
@@ -889,16 +969,53 @@ function getThisWeekRange(): DateRange {
 
 function getLastWeekRange(): DateRange {
   const now = new Date();
-  const endOfLastWeek = new Date(now);
-  endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
-  const startOfLastWeek = new Date(endOfLastWeek);
-  startOfLastWeek.setDate(endOfLastWeek.getDate() - 6);
-  
-  return {
-    start: startOfLastWeek.toISOString().split('T')[0],
-    end: endOfLastWeek.toISOString().split('T')[0],
+
+  // FIXED: Use proper Monday-to-Sunday week calculation
+  // Get the start of this week (Monday)
+  const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Convert Sunday to 6
+
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - daysFromMonday);
+  startOfThisWeek.setHours(0, 0, 0, 0);
+
+  // CORRECTED: Last week starts exactly 7 days before start of this week
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+  // End of last week = 6 days after start of last week (Sunday)
+  const endOfLastWeek = new Date(startOfLastWeek);
+  endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
+  endOfLastWeek.setHours(23, 59, 59, 999);
+
+  // FIXED: Use local date formatting to avoid timezone issues
+  const result = {
+    start: formatDateToYYYYMMDD(startOfLastWeek),
+    end: formatDateToYYYYMMDD(endOfLastWeek),
     preset: 'last_week'
   };
+
+  // Verify the calculation is correct (should be exactly 7 days)
+  const startDate = new Date(result.start);
+  const endDate = new Date(result.end);
+  const daysDiff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+  console.log('🔍 DEBUG: getLastWeekRange calculation:', {
+    currentDate: now.toISOString(),
+    currentDayOfWeek,
+    daysFromMonday,
+    startOfThisWeek: startOfThisWeek.toISOString(),
+    startOfLastWeek: startOfLastWeek.toISOString(),
+    endOfLastWeek: endOfLastWeek.toISOString(),
+    result,
+    verification: {
+      daysDifference: daysDiff,
+      totalDays: daysDiff + 1,
+      isCorrect: daysDiff === 6 // 6 days difference = 7 days total
+    }
+  });
+
+  return result;
 }
 
 function getThisMonthRange(): DateRange {
@@ -929,6 +1046,14 @@ function getRelativeDateRange(amount: number, unit: string): DateRange {
   const start = new Date();
 
   switch (unit.toLowerCase()) {
+    case 'minute':
+    case 'minutes':
+      start.setMinutes(start.getMinutes() - amount);
+      break;
+    case 'hour':
+    case 'hours':
+      start.setHours(start.getHours() - amount);
+      break;
     case 'day':
     case 'days':
       start.setDate(start.getDate() - amount);
@@ -961,6 +1086,14 @@ function getFromDaysAgoRange(amount: number, unit: string): DateRange {
   const startDate = new Date();
 
   switch (unit.toLowerCase()) {
+    case 'minute':
+    case 'minutes':
+      startDate.setMinutes(startDate.getMinutes() - amount);
+      break;
+    case 'hour':
+    case 'hours':
+      startDate.setHours(startDate.getHours() - amount);
+      break;
     case 'day':
     case 'days':
       startDate.setDate(startDate.getDate() - amount);
@@ -997,6 +1130,14 @@ function getExactDaysAgoRange(amount: number, unit: string): DateRange {
   const targetDate = new Date();
 
   switch (unit.toLowerCase()) {
+    case 'minute':
+    case 'minutes':
+      targetDate.setMinutes(targetDate.getMinutes() - amount);
+      break;
+    case 'hour':
+    case 'hours':
+      targetDate.setHours(targetDate.getHours() - amount);
+      break;
     case 'day':
     case 'days':
       targetDate.setDate(targetDate.getDate() - amount);
