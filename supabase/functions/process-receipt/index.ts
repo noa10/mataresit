@@ -644,6 +644,9 @@ function mergeTextractAndAIData(textractData: any, enhancedData: any) {
   return result;
 }
 
+// Import content synthesis utilities
+import { generateSyntheticFullText } from '../_shared/content-synthesis.ts';
+
 // Format the AI Vision result to match our expected structure
 function formatAIVisionResult(visionData: any) {
   // Feature flag to control whether to use the new columns
@@ -657,7 +660,7 @@ function formatAIVisionResult(visionData: any) {
     payment_method: visionData.payment_method || '',
     currency: visionData.currency || 'MYR',
     line_items: [] as { description: string; amount: number; geometry?: any }[],
-    fullText: '', // Vision doesn't have full text
+    fullText: generateSyntheticFullText(visionData), // Generate rich fullText from structured data
     predicted_category: visionData.predicted_category || '',
     ai_suggestions: {},
     confidence: {

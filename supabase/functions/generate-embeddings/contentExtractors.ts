@@ -1,6 +1,13 @@
 // Content extractors for different data sources
 // Phase 4: Embedding Generation System Enhancement
 
+// Import content synthesis utilities
+import {
+  synthesizeReceiptContent,
+  validateAndEnhanceContent,
+  ContentExtractionStrategy
+} from '../_shared/content-synthesis.ts';
+
 export interface ContentExtractionResult {
   contentType: string;
   contentText: string;
@@ -22,6 +29,15 @@ export class ContentExtractor {
       fullText: receipt.fullText ? `${receipt.fullText.length} chars` : 'missing',
       hasUserId: !!receipt.user_id
     });
+
+    // Generate synthetic content from structured data if fullText is missing
+    let contentStrategy: ContentExtractionStrategy | null = null;
+
+    if (!receipt.fullText || receipt.fullText.trim().length === 0) {
+      console.log(`🔄 Generating synthetic content for receipt ${receipt.id} (missing fullText)`);
+      contentStrategy = synthesizeReceiptContent(receipt);
+      contentStrategy = validateAndEnhanceContent(contentStrategy, receipt);
+    }
 
     // Extract merchant name (primary content)
     if (receipt.merchant && receipt.merchant.trim()) {
@@ -45,10 +61,10 @@ export class ContentExtractor {
       console.warn(`⚠️ No merchant name found for receipt ${receipt.id}`);
     }
 
-    // Extract full text if available
-    if (receipt.fullText && receipt.fullText.trim()) {
-      const fullTextContent = receipt.fullText.trim();
-      console.log(`✅ Extracted full text: ${fullTextContent.length} characters`);
+    // Extract full text - use synthetic if original is missing
+    const fullTextContent = receipt.fullText?.trim() || contentStrategy?.synthetic_fulltext || '';
+    if (fullTextContent) {
+      console.log(`✅ Extracted full text: ${fullTextContent.length} characters ${contentStrategy ? '(synthetic)' : '(original)'}`);
 
       results.push({
         contentType: 'full_text',
@@ -58,7 +74,8 @@ export class ContentExtractor {
           total: receipt.total,
           merchant: receipt.merchant,
           currency: receipt.currency,
-          fulltext_length: fullTextContent.length
+          fulltext_length: fullTextContent.length,
+          is_synthetic: !!contentStrategy
         },
         userId: receipt.user_id,
         teamId: receipt.team_id,
@@ -66,6 +83,66 @@ export class ContentExtractor {
       });
     } else {
       console.warn(`⚠️ No full text found for receipt ${receipt.id}`);
+    }
+
+    // Add enhanced content types if synthetic content was generated
+    if (contentStrategy) {
+      console.log(`🔄 Adding enhanced content types for receipt ${receipt.id}`);
+
+      // Add items description if available
+      if (contentStrategy.items_description && contentStrategy.items_description.trim()) {
+        results.push({
+          contentType: 'items_description',
+          contentText: contentStrategy.items_description,
+          metadata: {
+            receipt_date: receipt.date,
+            total: receipt.total,
+            merchant: receipt.merchant,
+            currency: receipt.currency,
+            content_source: 'ai_vision_line_items'
+          },
+          userId: receipt.user_id,
+          teamId: receipt.team_id,
+          language: 'en'
+        });
+      }
+
+      // Add transaction summary
+      if (contentStrategy.transaction_summary && contentStrategy.transaction_summary.trim()) {
+        results.push({
+          contentType: 'transaction_summary',
+          contentText: contentStrategy.transaction_summary,
+          metadata: {
+            receipt_date: receipt.date,
+            total: receipt.total,
+            merchant: receipt.merchant,
+            currency: receipt.currency,
+            content_source: 'ai_vision_transaction'
+          },
+          userId: receipt.user_id,
+          teamId: receipt.team_id,
+          language: 'en'
+        });
+      }
+
+      // Add category context
+      if (contentStrategy.category_context && contentStrategy.category_context.trim()) {
+        results.push({
+          contentType: 'category_context',
+          contentText: contentStrategy.category_context,
+          metadata: {
+            receipt_date: receipt.date,
+            total: receipt.total,
+            merchant: receipt.merchant,
+            currency: receipt.currency,
+            predicted_category: receipt.predicted_category,
+            content_source: 'ai_vision_category'
+          },
+          userId: receipt.user_id,
+          teamId: receipt.team_id,
+          language: 'en'
+        });
+      }
     }
 
     // Create fallback content if no primary content available

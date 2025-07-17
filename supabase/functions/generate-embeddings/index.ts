@@ -184,7 +184,9 @@ async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabas
     success: true,
     receiptId,
     contentType,
-    dimensions: embedding.length
+    dimensions: embedding.length,
+    contentText: content, // Add content text for quality analysis
+    metadata: metadata // Add metadata for quality analysis
   };
 }
 
@@ -247,78 +249,100 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
 
   console.log(`Processing receipt: ${receiptId}, fields available:`, Object.keys(receipt));
 
+  // Import enhanced content extraction and quality metrics
+  const { ContentExtractor } = await import('./contentExtractors.ts');
+  const {
+    generateEmbeddingQualityMetrics,
+    logEmbeddingQualityMetrics,
+    storeEmbeddingQualityMetrics
+  } = await import('../_shared/embedding-quality-metrics.ts');
+
   // Define the type for embedding results
   type EmbeddingResult = {
     success: boolean;
     receiptId: string;
     contentType: string;
     dimensions: number;
+    contentText?: string; // Add content text for quality analysis
+    metadata?: any; // Add metadata for quality analysis
   };
 
   const results: EmbeddingResult[] = [];
   let contentProcessed = false;
 
-  // Generate embedding for the full text (check both raw_text and fullText fields)
-  const fullTextContent = receipt.raw_text || receipt.fullText;
-  console.log(`Receipt ${receiptId} fullText content available: ${!!fullTextContent}`);
-  console.log(`Receipt ${receiptId} raw_text: ${receipt.raw_text ? 'present' : 'missing'}`);
-  console.log(`Receipt ${receiptId} fullText: ${receipt.fullText ? 'present' : 'missing'}`);
+  console.log(`🔄 Starting enhanced embedding generation for receipt ${receiptId}`);
 
-  if (fullTextContent) {
-    contentProcessed = true;
-    console.log(`Processing full text content for receipt ${receiptId}, length: ${fullTextContent.length}`);
-    const fullTextResult = await processReceiptEmbedding({
-      receiptId,
-      contentType: 'full_text',
-      content: fullTextContent,
-      metadata: {
-        receipt_date: receipt.date,
-        total: receipt.total,
-        currency: receipt.currency,
-        merchant: receipt.merchant,
-        category: receipt.predicted_category,
-        payment_method: receipt.payment_method,
-        // Temporal metadata will be auto-enriched by add_unified_embedding function
-        source_metadata: 'full_text_content'
-      },
-      model
-    }, supabaseClient);
-    results.push(fullTextResult);
-    console.log(`Successfully processed full text embedding for receipt ${receiptId}`);
-  } else {
-    console.log(`No full text content found for receipt ${receiptId}`);
+  // Use enhanced content extraction to get all content types
+  try {
+    const extractedContents = await ContentExtractor.extractReceiptContent(receipt);
+    console.log(`📋 Extracted ${extractedContents.length} content types for receipt ${receiptId}`);
+
+    // Process each extracted content type
+    for (const extractedContent of extractedContents) {
+      if (!extractedContent.contentText || extractedContent.contentText.trim().length === 0) {
+        console.log(`⚠️ Skipping empty content for type: ${extractedContent.contentType}`);
+        continue;
+      }
+
+      contentProcessed = true;
+      console.log(`🔄 Processing ${extractedContent.contentType} content (${extractedContent.contentText.length} chars)`);
+
+      const embeddingResult = await processReceiptEmbedding({
+        receiptId,
+        contentType: extractedContent.contentType,
+        content: extractedContent.contentText,
+        metadata: {
+          ...extractedContent.metadata,
+          // Temporal metadata will be auto-enriched by add_unified_embedding function
+          source_metadata: `enhanced_${extractedContent.contentType}`,
+          extraction_method: 'ai_vision_enhanced'
+        },
+        model
+      }, supabaseClient);
+
+      results.push(embeddingResult);
+      console.log(`✅ Successfully processed ${extractedContent.contentType} embedding for receipt ${receiptId}`);
+    }
+
+  } catch (extractionError) {
+    console.error(`❌ Error during enhanced content extraction for receipt ${receiptId}:`, extractionError);
+
+    // Fallback to legacy extraction method
+    console.log(`🔄 Falling back to legacy extraction for receipt ${receiptId}`);
+
+    // Generate embedding for the full text (check both raw_text and fullText fields)
+    const fullTextContent = receipt.raw_text || receipt.fullText;
+    console.log(`Receipt ${receiptId} fullText content available: ${!!fullTextContent}`);
+
+    if (fullTextContent) {
+      contentProcessed = true;
+      console.log(`Processing full text content for receipt ${receiptId}, length: ${fullTextContent.length}`);
+      const fullTextResult = await processReceiptEmbedding({
+        receiptId,
+        contentType: 'full_text',
+        content: fullTextContent,
+        metadata: {
+          receipt_date: receipt.date,
+          total: receipt.total,
+          currency: receipt.currency,
+          merchant: receipt.merchant,
+          category: receipt.predicted_category,
+          payment_method: receipt.payment_method,
+          source_metadata: 'legacy_full_text_content'
+        },
+        model
+      }, supabaseClient);
+      results.push(fullTextResult);
+      console.log(`Successfully processed full text embedding for receipt ${receiptId}`);
+    } else {
+      console.log(`No full text content found for receipt ${receiptId}`);
+    }
   }
 
-  // Generate embedding for the merchant name
-  console.log(`Receipt ${receiptId} merchant: ${receipt.merchant || 'missing'}`);
-  if (receipt.merchant) {
+  // Process notes separately if they exist (not handled by enhanced extraction)
+  if (receipt.notes && receipt.notes.trim()) {
     contentProcessed = true;
-    console.log(`Processing merchant name for receipt ${receiptId}: "${receipt.merchant}"`);
-    const merchantResult = await processReceiptEmbedding({
-      receiptId,
-      contentType: 'merchant',
-      content: receipt.merchant,
-      metadata: {
-        receipt_date: receipt.date,
-        total: receipt.total,
-        currency: receipt.currency,
-        merchant: receipt.merchant,
-        category: receipt.predicted_category,
-        payment_method: receipt.payment_method,
-        // Temporal metadata will be auto-enriched by add_unified_embedding function
-        source_metadata: 'merchant_name'
-      },
-      model
-    }, supabaseClient);
-    results.push(merchantResult);
-    console.log(`Successfully processed merchant embedding for receipt ${receiptId}`);
-  } else {
-    console.log(`No merchant name found for receipt ${receiptId}`);
-  }
-
-  // Generate embedding for any notes
-  if (receipt.notes) {
-    contentProcessed = true;
+    console.log(`🔄 Processing notes for receipt ${receiptId}: "${receipt.notes.substring(0, 50)}..."`);
     const notesResult = await processReceiptEmbedding({
       receiptId,
       contentType: 'notes',
@@ -331,11 +355,13 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
         category: receipt.predicted_category,
         payment_method: receipt.payment_method,
         // Temporal metadata will be auto-enriched by add_unified_embedding function
-        source_metadata: 'receipt_notes'
+        source_metadata: 'receipt_notes',
+        extraction_method: 'direct_field'
       },
       model
     }, supabaseClient);
     results.push(notesResult);
+    console.log(`✅ Successfully processed notes embedding for receipt ${receiptId}`);
   }
 
   // If no content was processable, use a combination of available fields as fallback
@@ -380,10 +406,33 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
     }
   }
 
+  // Generate and log quality metrics
+  console.log(`📊 Generating quality metrics for receipt ${receiptId}`);
+  const qualityMetrics = generateEmbeddingQualityMetrics(
+    receiptId,
+    results.map(r => ({
+      ...r,
+      contentText: r.contentText || '', // Use the correct field name
+      metadata: r.metadata || {}
+    })),
+    contentProcessed ? 'enhanced' : 'fallback'
+  );
+
+  // Log quality metrics
+  logEmbeddingQualityMetrics(qualityMetrics);
+
+  // Store quality metrics for analysis (optional, don't fail if it errors)
+  try {
+    await storeEmbeddingQualityMetrics(qualityMetrics, supabaseClient);
+  } catch (metricsError) {
+    console.warn('Failed to store quality metrics:', metricsError.message);
+  }
+
   return {
     success: true,
     receiptId,
-    results
+    results,
+    qualityMetrics
   };
 }
 
@@ -622,82 +671,148 @@ async function processReceiptEmbeddingsUnified(
     }
 
     const results = [];
-    const contentTypesToProcess = contentTypes || ['full_text', 'merchant'];
 
-    // Process each content type
-    for (const contentType of contentTypesToProcess) {
-      try {
-        let content = '';
-        let metadata = {
-          receipt_date: receipt.date,
-          total: receipt.total,
-          currency: receipt.currency,
-          merchant: receipt.merchant,
-          category: receipt.predicted_category,
-          payment_method: receipt.payment_method,
-          // Temporal metadata will be auto-enriched by add_unified_embedding function
-          source_metadata: `unified_${contentType}`
-        };
+    console.log(`🔄 Using enhanced content extraction for unified processing of receipt ${receiptId}`);
 
-        // Extract content based on type
-        switch (contentType) {
-          case 'full_text':
-            content = receipt.fullText || '';
-            break;
-          case 'merchant':
-            content = receipt.merchant || '';
-            break;
+    // Use enhanced content extraction
+    try {
+      const extractedContents = await ContentExtractor.extractReceiptContent(receipt);
+      console.log(`📋 Extracted ${extractedContents.length} content types for unified processing`);
 
-          default:
-            console.log(`Skipping unknown content type: ${contentType}`);
+      // Filter by requested content types if specified
+      const contentsToProcess = contentTypes
+        ? extractedContents.filter(content => contentTypes.includes(content.contentType))
+        : extractedContents;
+
+      console.log(`🎯 Processing ${contentsToProcess.length} content types: ${contentsToProcess.map(c => c.contentType).join(', ')}`);
+
+      // Process each extracted content type
+      for (const extractedContent of contentsToProcess) {
+        try {
+          if (!extractedContent.contentText || extractedContent.contentText.trim() === '') {
+            console.log(`⚠️ Skipping empty content for type: ${extractedContent.contentType}`);
             continue;
-        }
+          }
 
-        // Skip if no content
-        if (!content || content.trim() === '') {
-          console.log(`Skipping ${contentType} for receipt ${receiptId} - no content`);
-          continue;
-        }
+          console.log(`🔄 Processing ${extractedContent.contentType} content (${extractedContent.contentText.length} chars)`);
 
-        // Generate embedding
-        const embedding = await generateEmbedding({ text: content });
+          // Generate embedding
+          const embedding = await generateEmbedding({ text: extractedContent.contentText });
 
-        // Store in unified_embeddings table
-        const { data: embeddingData, error: embeddingError } = await supabaseClient
-          .rpc('add_unified_embedding', {
-            p_source_type: 'receipt',
-            p_source_id: receiptId,
-            p_content_type: contentType,
-            p_content_text: content,
-            p_embedding: embedding,
-            p_metadata: metadata,
-            p_user_id: receipt.user_id,
-            p_language: 'en'
+          // Store in unified_embeddings table
+          const { data: embeddingData, error: embeddingError } = await supabaseClient
+            .rpc('add_unified_embedding', {
+              p_source_type: 'receipt',
+              p_source_id: receiptId,
+              p_content_type: extractedContent.contentType,
+              p_content_text: extractedContent.contentText,
+              p_embedding: embedding,
+              p_metadata: {
+                ...extractedContent.metadata,
+                source_metadata: `unified_enhanced_${extractedContent.contentType}`,
+                extraction_method: 'ai_vision_enhanced'
+              },
+              p_user_id: extractedContent.userId || receipt.user_id,
+              p_team_id: extractedContent.teamId,
+              p_language: extractedContent.language || 'en'
+            });
+
+          if (embeddingError) {
+            console.error(`❌ Error storing ${extractedContent.contentType} embedding for receipt ${receiptId}:`, embeddingError);
+            results.push({
+              contentType: extractedContent.contentType,
+              success: false,
+              error: embeddingError.message
+            });
+          } else {
+            console.log(`✅ Successfully stored ${extractedContent.contentType} embedding for receipt ${receiptId}`);
+            results.push({
+              contentType: extractedContent.contentType,
+              success: true,
+              embeddingId: embeddingData,
+              contentLength: extractedContent.contentText.length
+            });
+          }
+
+        } catch (error) {
+          console.error(`❌ Error processing ${extractedContent.contentType} for receipt ${receiptId}:`, error);
+          results.push({
+            contentType: extractedContent.contentType,
+            success: false,
+            error: error.message
           });
+        }
+      }
 
-        if (embeddingError) {
-          console.error(`Error storing ${contentType} embedding for receipt ${receiptId}:`, embeddingError);
+    } catch (extractionError) {
+      console.error(`❌ Error during enhanced content extraction for receipt ${receiptId}:`, extractionError);
+
+      // Fallback to basic processing if enhanced extraction fails
+      console.log(`🔄 Falling back to basic processing for receipt ${receiptId}`);
+
+      const basicContentTypes = contentTypes || ['full_text', 'merchant'];
+      for (const contentType of basicContentTypes) {
+        try {
+          let content = '';
+          switch (contentType) {
+            case 'full_text':
+              content = receipt.fullText || '';
+              break;
+            case 'merchant':
+              content = receipt.merchant || '';
+              break;
+            default:
+              continue;
+          }
+
+          if (!content || content.trim() === '') {
+            console.log(`⚠️ Skipping ${contentType} for receipt ${receiptId} - no content`);
+            continue;
+          }
+
+          const embedding = await generateEmbedding({ text: content });
+
+          const { data: embeddingData, error: embeddingError } = await supabaseClient
+            .rpc('add_unified_embedding', {
+              p_source_type: 'receipt',
+              p_source_id: receiptId,
+              p_content_type: contentType,
+              p_content_text: content,
+              p_embedding: embedding,
+              p_metadata: {
+                receipt_date: receipt.date,
+                total: receipt.total,
+                currency: receipt.currency,
+                merchant: receipt.merchant,
+                source_metadata: `unified_fallback_${contentType}`,
+                extraction_method: 'fallback'
+              },
+              p_user_id: receipt.user_id,
+              p_language: 'en'
+            });
+
+          if (embeddingError) {
+            results.push({
+              contentType,
+              success: false,
+              error: embeddingError.message
+            });
+          } else {
+            results.push({
+              contentType,
+              success: true,
+              embeddingId: embeddingData,
+              fallback: true
+            });
+          }
+
+        } catch (error) {
           results.push({
             contentType,
             success: false,
-            error: embeddingError.message
-          });
-        } else {
-          console.log(`Successfully stored ${contentType} embedding for receipt ${receiptId}`);
-          results.push({
-            contentType,
-            success: true,
-            embeddingId: embeddingData
+            error: error.message
           });
         }
-
-      } catch (error) {
-        console.error(`Error processing ${contentType} for receipt ${receiptId}:`, error);
-        results.push({
-          contentType,
-          success: false,
-          error: error.message
-        });
       }
     }
 
