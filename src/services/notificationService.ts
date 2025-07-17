@@ -142,20 +142,45 @@ export class NotificationService {
 
   async reconnectWithBackoff(): Promise<boolean> {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      console.error('❌ Max reconnection attempts reached, entering fallback mode');
       this.notifyConnectionStatusChange('disconnected');
       this.connectionInProgress = false;
+
+      // Log diagnostic information for debugging
+      console.log('🔍 Final connection diagnostic:', {
+        attempts: this.reconnectAttempts,
+        maxAttempts: this.maxReconnectAttempts,
+        activeChannels: this.getActiveChannelCount(),
+        connectionStatus: this.connectionStatus,
+        timestamp: new Date().toISOString()
+      });
+
       return false;
     }
 
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    // Cap the delay at 30 seconds and add jitter to prevent thundering herd
+    const baseDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    const maxDelay = Math.min(baseDelay, 30000);
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const delay = maxDelay + jitter;
 
-    console.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    console.log(`🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(delay)}ms`);
+    this.notifyConnectionStatusChange('reconnecting');
 
     await new Promise(resolve => setTimeout(resolve, delay));
 
-    return await this.ensureConnection();
+    try {
+      const connected = await this.ensureConnection();
+      if (connected) {
+        console.log('✅ Reconnection successful');
+        this.reconnectAttempts = 0; // Reset on success
+      }
+      return connected;
+    } catch (error) {
+      console.error(`❌ Reconnection attempt ${this.reconnectAttempts} failed:`, error);
+      return false;
+    }
   }
 
   // Reset connection state for fresh start
@@ -534,7 +559,9 @@ export class NotificationService {
       throw new Error('User not authenticated');
     }
 
-    const channelName = `user-notifications-${user.id}`;
+    // 🔧 FIX: Shorten channel name to avoid length limits
+    const userIdShort = user.id.substring(0, 8);
+    const channelName = `user-notifs-${userIdShort}`;
 
     // Remove existing channel if it exists
     if (this.activeChannels.has(channelName)) {
@@ -613,10 +640,14 @@ export class NotificationService {
         throw new Error('User not authenticated');
       }
       filter = `recipient_id=eq.${user.id}`;
-      channelName = `user-notification-updates-${user.id}`;
+      // 🔧 FIX: Shorten channel name
+      const userIdShort = user.id.substring(0, 8);
+      channelName = `user-updates-${userIdShort}`;
     } else {
       filter = `id=eq.${notificationId}`;
-      channelName = `notification-updates-${notificationId}`;
+      // 🔧 FIX: Shorten notification ID for channel name
+      const notifIdShort = notificationId.substring(0, 8);
+      channelName = `notif-updates-${notifIdShort}`;
     }
 
     // Remove existing channel if it exists
@@ -684,7 +715,9 @@ export class NotificationService {
       throw new Error('User not authenticated');
     }
 
-    const channelName = `user-all-changes-${user.id}`;
+    // 🔧 FIX: Shorten channel name to avoid length limits and improve reliability
+    const userIdShort = user.id.substring(0, 8); // Use first 8 chars of UUID
+    const channelName = `user-changes-${userIdShort}`;
 
     // OPTIMIZATION: Check for duplicate subscriptions and prevent them
     if (this.hasActiveSubscription(channelName, user.id, teamId)) {
@@ -767,14 +800,32 @@ export class NotificationService {
           this.notifyConnectionStatusChange('connected');
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Channel error for all notification changes: ${channelName}`);
-          this.cleanupSubscription(channelName);
-          this.notifyConnectionStatusChange('disconnected');
-          // Attempt reconnection
-          this.reconnectWithBackoff();
+          console.log('🔍 Channel error diagnostic:', {
+            channelName,
+            userId: user.id,
+            teamId,
+            activeChannels: this.getActiveChannelCount(),
+            reconnectAttempts: this.reconnectAttempts,
+            timestamp: new Date().toISOString()
+          });
+
+          // Enhanced error recovery
+          this.handleChannelError(channelName, user.id, teamId, callback, options);
         } else if (status === 'CLOSED') {
           console.log(`🔌 Channel closed for all notification changes: ${channelName}`);
           this.cleanupSubscription(channelName);
           this.notifyConnectionStatusChange('disconnected');
+
+          // Attempt to reestablish if not intentionally closed
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            console.log('🔄 Attempting to reestablish closed channel...');
+            setTimeout(() => {
+              this.reconnectWithBackoff();
+            }, 2000);
+          }
+        } else if (status === 'TIMED_OUT') {
+          console.warn(`⏰ Channel subscription timed out: ${channelName}`);
+          this.handleChannelTimeout(channelName, user.id, teamId, callback, options);
         }
       });
 
@@ -992,6 +1043,77 @@ export class NotificationService {
         }
       };
     }
+  }
+
+  /**
+   * Enhanced channel error handling with recovery strategies
+   */
+  private async handleChannelError(
+    channelName: string,
+    userId: string,
+    teamId: string | undefined,
+    callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
+    options?: any
+  ): Promise<void> {
+    console.log(`🔧 Handling channel error for: ${channelName}`);
+
+    // Clean up the failed channel
+    this.cleanupSubscription(channelName);
+    this.notifyConnectionStatusChange('disconnected');
+
+    // Strategy 1: Try immediate reconnection with shorter channel name
+    if (this.reconnectAttempts < 2) {
+      console.log('🔄 Attempting immediate recovery with optimized channel...');
+
+      try {
+        // Wait a bit before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Try to reestablish the subscription
+        const connected = await this.ensureConnection();
+        if (connected) {
+          // Retry the subscription with the same parameters
+          return this.subscribeToAllUserNotificationChanges(callback, teamId, options);
+        }
+      } catch (retryError) {
+        console.warn('Immediate recovery failed:', retryError);
+      }
+    }
+
+    // Strategy 2: Exponential backoff reconnection
+    this.reconnectWithBackoff();
+  }
+
+  /**
+   * Handle channel timeout with progressive recovery
+   */
+  private async handleChannelTimeout(
+    channelName: string,
+    userId: string,
+    teamId: string | undefined,
+    callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
+    options?: any
+  ): Promise<void> {
+    console.log(`⏰ Handling channel timeout for: ${channelName}`);
+
+    // Clean up the timed out channel
+    this.cleanupSubscription(channelName);
+
+    // Progressive timeout recovery
+    const timeoutDelay = Math.min(3000 * (this.reconnectAttempts + 1), 15000);
+    console.log(`🔄 Retrying after timeout in ${timeoutDelay}ms...`);
+
+    setTimeout(async () => {
+      try {
+        const connected = await this.ensureConnection();
+        if (connected) {
+          return this.subscribeToAllUserNotificationChanges(callback, teamId, options);
+        }
+      } catch (error) {
+        console.error('Timeout recovery failed:', error);
+        this.reconnectWithBackoff();
+      }
+    }, timeoutDelay);
   }
 
   /**

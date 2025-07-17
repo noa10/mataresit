@@ -5,6 +5,8 @@ import { searchCache } from './searchCache';
 import { searchPerformanceMonitor } from './searchPerformanceMonitor';
 import { searchParameterOptimizer } from './searchParameterOptimizer';
 import { advancedSearchRanking } from './advancedSearchRanking';
+import { optimizedSearchExecutor } from './optimized-search-executor';
+import { optimizedEdgeFunctionCaller } from './optimized-edge-function-caller';
 
 /**
  * Normalize query to extract core search terms and remove numerical qualifiers
@@ -95,10 +97,11 @@ export interface LineItemSearchResult {
 export interface SearchResult {
   receipts?: ReceiptWithSimilarity[]; // Optional: results for receipts (legacy support)
   lineItems?: LineItemSearchResult[]; // Optional: results for line items (legacy support)
-  results?: (ReceiptWithSimilarity | LineItemSearchResult)[]; // Combined results for unified search
+  results?: (ReceiptWithSimilarity | LineItemSearchResult | any)[]; // Combined results for unified search (any for UnifiedSearchResult)
   count: number;
   total: number;
-  searchParams: SearchParams;
+  searchParams: SearchParams | any; // Allow any for unified search params
+  searchMetadata?: any; // Optional metadata from unified search
 }
 
 /**
@@ -1906,7 +1909,7 @@ function mapFrontendSourcesToBackend(frontendSources: string[]): string[] {
  * 🚀 Use this instead of semanticSearch for new implementations
  */
 export async function unifiedSearch(params: UnifiedSearchParams): Promise<UnifiedSearchResponse> {
-  console.log('🚀 UNIFIED-SEARCH: Starting unified search with params:', params);
+  console.log('🚀 UNIFIED-SEARCH: Starting optimized unified search at', new Date().toISOString(), 'with params:', params);
 
   // Log monetary query parameters specifically
   if (params.filters?.amountRange) {
@@ -1931,12 +1934,9 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
   });
 
   const startTime = performance.now();
-  let cacheHit = false;
-  let errorOccurred = false;
-  let errorMessage: string | undefined;
 
   try {
-    console.log('Performing unified search...', params);
+    console.log('Performing optimized unified search...', params);
 
     // Check if user is authenticated
     const { data: { session } } = await supabase.auth.getSession();
@@ -1946,312 +1946,36 @@ export async function unifiedSearch(params: UnifiedSearchParams): Promise<Unifie
 
     const userId = session.user.id;
 
-    // Validate required parameters
-    if (!params.query || params.query.trim() === '') {
-      throw new Error('Search query is required');
-    }
-
-    // Set defaults
-    const baseParams: UnifiedSearchParams = {
-      query: params.query.trim(),
-      sources: params.sources || ['receipts', 'business_directory'],
-      contentTypes: params.contentTypes,
-      limit: Math.min(params.limit || 20, 100), // Cap at 100 results
-      offset: params.offset || 0,
-      filters: params.filters || {},
-      similarityThreshold: params.similarityThreshold || 0.2,
-      includeMetadata: params.includeMetadata !== false, // Default to true
-      aggregationMode: params.aggregationMode || 'relevance'
-    };
-
-    // Optimize search parameters based on quality validation findings
-    const optimizationResult = searchParameterOptimizer.optimizeParameters(baseParams);
-    const searchParams = optimizationResult.optimizedParams;
-
-    // Map frontend source names to backend source names
-    if (searchParams.sources) {
-      searchParams.sources = mapFrontendSourcesToBackend(searchParams.sources);
-      console.log('🔄 Mapped frontend sources to backend sources:', searchParams.sources);
-    }
-
-    console.log('🎯 Parameter optimization applied:', {
-      original: {
-        similarityThreshold: baseParams.similarityThreshold,
-        limit: baseParams.limit,
-        aggregationMode: baseParams.aggregationMode
-      },
-      optimized: {
-        similarityThreshold: searchParams.similarityThreshold,
-        limit: searchParams.limit,
-        aggregationMode: searchParams.aggregationMode
-      },
-      reason: optimizationResult.optimizationReason,
-      confidence: optimizationResult.confidenceScore,
-      expectedImprovements: optimizationResult.expectedImprovements
-    });
-
-    // TEMPORARILY DISABLE CACHE FOR TESTING TEMPORAL PARSING CHANGES
-    // Check cache first (only for non-paginated searches to avoid stale results)
-    if (false && searchParams.offset === 0) { // Disabled cache for testing
-      const cachedResult = await searchCache.get(searchParams, userId);
-      if (cachedResult) {
-        cacheHit = true;
-        const queryTime = performance.now() - startTime;
-
-        // Log performance metrics
-        await searchPerformanceMonitor.logSearchMetric(
-          searchParams,
-          cachedResult,
-          {
-            queryTime,
-            resultCount: cachedResult.totalResults,
-            cacheHit: true,
-            sources: searchParams.sources || [],
-            similarityThreshold: searchParams.similarityThreshold || 0.2,
-            errorOccurred: false
-          },
-          userId
-        );
-
-        console.log(`🎯 Cache hit for unified search: "${searchParams.query}" (${queryTime.toFixed(2)}ms)`);
-        return cachedResult;
-      }
-    }
-
-    // Call the unified-search Edge Function with fallback handling
-    let response;
-    try {
-      console.log('🚀 Calling unified-search Edge Function with params:', searchParams);
-      // Use extended timeout for complex unified search operations
-      response = await callEdgeFunction('unified-search', 'POST', searchParams, undefined, 2, 90000); // 90 seconds timeout
-
-      // 🔍 DEBUG: Log the actual response structure for debugging
-      console.log('🔍 Unified search response received:', {
-        hasResponse: !!response,
-        responseType: typeof response,
-        isNull: response === null,
-        isUndefined: response === undefined,
-        successField: response?.success,
-        resultsLength: response?.results?.length,
-        hasError: !!response?.error,
-        responseKeys: response && typeof response === 'object' ? Object.keys(response) : [],
-        fullResponse: response // Log the full response for debugging
-      });
-
-      // 🔧 IMPROVED: More robust response validation
-      // Check for various success indicators and response structures
-      const isValidResponse = response && (
-        response.success === true ||
-        (response.results && Array.isArray(response.results)) ||
-        (response.enhancedResponse && response.enhancedResponse.content)
-      );
-
-      if (!isValidResponse) {
-        errorOccurred = true;
-        errorMessage = response?.error || response?.message || 'Unified search failed';
-
-        // 🔍 DEBUG: Enhanced error logging
-        console.error('🔍 Unified search validation failed:', {
-          hasResponse: !!response,
-          successField: response?.success,
-          hasResults: !!(response?.results),
-          resultsLength: response?.results?.length,
-          errorField: response?.error
-        });
-
-        throw new Error(errorMessage);
-      }
-
-      // 🔧 NORMALIZE: Ensure response has success field set to true
-      if (response.success !== true && (response.results || response.enhancedResponse)) {
-        console.log('🔧 Normalizing response: setting success=true based on presence of results');
-        response.success = true;
-      }
-    } catch (edgeFunctionError) {
-      // 🔍 DEBUG: Enhanced error logging
-      console.error('🔍 Edge Function call failed:', {
-        errorType: edgeFunctionError?.constructor?.name,
-        errorMessage: edgeFunctionError?.message,
-        query: searchParams.query
-      });
-
-      // 🔧 IMPROVED: Check for specific error types that warrant fallback
-      const isNetworkError = edgeFunctionError instanceof Error &&
-        (edgeFunctionError.message.includes('Failed to fetch') ||
-         edgeFunctionError.message.includes('CORS') ||
-         edgeFunctionError.message.includes('Network error'));
-
-      const isAuthError = edgeFunctionError instanceof Error &&
-        (edgeFunctionError.message.includes('authentication') ||
-         edgeFunctionError.message.includes('Invalid authentication token') ||
-         edgeFunctionError.message.includes('401'));
-
-      const isTimeoutError = edgeFunctionError instanceof Error &&
-        (edgeFunctionError.message.includes('timed out') ||
-         edgeFunctionError.message.includes('timeout') ||
-         edgeFunctionError.message.includes('AbortError'));
-
-      if (isNetworkError || isAuthError || isTimeoutError) {
-        const errorType = isNetworkError ? 'Network' : isAuthError ? 'Authentication' : 'Timeout';
-        console.log(`🔄 UNIFIED-SEARCH: ${errorType} error detected, using fallback search`);
-
-        // Convert unified params to legacy format for fallback
-        const legacyParams: SearchParams = {
-          query: params.query,
-          searchTarget: params.sources?.includes('business_directory') ? 'all' : 'receipts',
-          limit: params.limit || 20,
-          offset: params.offset || 0,
-          isNaturalLanguage: true,
-          startDate: params.filters?.dateRange?.start,
-          endDate: params.filters?.dateRange?.end,
-          minAmount: params.filters?.amountRange?.min,
-          maxAmount: params.filters?.amountRange?.max,
-          categories: params.filters?.categories,
-          merchants: params.filters?.merchants
-        };
-
-        const fallbackResult = await fallbackBasicSearch(legacyParams);
-
-        // Convert fallback result to unified format
-        return {
-          success: true,
-          results: fallbackResult.results || [],
-          totalResults: fallbackResult.total || 0,
-          pagination: {
-            hasMore: (fallbackResult.total || 0) > (params.offset || 0) + (params.limit || 20),
-            nextOffset: (params.offset || 0) + (params.limit || 20),
-            totalPages: Math.ceil((fallbackResult.total || 0) / (params.limit || 20))
-          },
-          searchMetadata: {
-            queryTime: performance.now() - startTime,
-            sourcesSearched: params.sources || ['receipts'],
-            fallbackUsed: true,
-            searchMethod: 'database_fallback',
-            fallbackReason: isNetworkError ? 'network_error' : isAuthError ? 'auth_error' : 'timeout_error'
-          }
-        };
-      } else {
-        // 🚨 For other errors (validation, server errors, etc.), don't fall back
-        // Let the caller handle these errors appropriately
-        console.error('🚨 UNIFIED-SEARCH: Non-recoverable error, not using fallback:', edgeFunctionError.message);
-        throw edgeFunctionError;
-      }
-    }
-
-    let searchResponse = response as UnifiedSearchResponse;
-
-    // 🔍 DEBUG: Log successful response processing
-    console.log('🔍 Processing successful unified search response:', {
-      resultsLength: searchResponse.results?.length,
-      totalResults: searchResponse.totalResults,
-      hasEnhancedResponse: !!(searchResponse.enhancedResponse)
-    });
-
-    // Apply advanced ranking algorithm to optimize result ordering
-    if (searchResponse.results && searchResponse.results.length > 0) {
-      console.log(`🎯 Applying advanced ranking to ${searchResponse.results.length} results...`);
-
-      const rankingContext = advancedSearchRanking.analyzeSearchContext(searchParams.query, searchParams);
-      const rankedResults = advancedSearchRanking.rankSearchResults(
-        searchResponse.results,
-        rankingContext,
-        searchParams
-      );
-
-      // Update response with ranked results
-      searchResponse = {
-        ...searchResponse,
-        results: rankedResults
-      };
-
-      console.log(`✅ Advanced ranking applied. Top result: "${rankedResults[0]?.title}" (score: ${rankedResults[0]?.similarity.toFixed(3)})`);
-    }
-
-    const queryTime = performance.now() - startTime;
-
-    // Cache the results (only for successful, non-paginated searches)
-    if (searchParams.offset === 0 && searchResponse.success) {
-      await searchCache.set(searchParams, userId, searchResponse);
-    }
+    // Use optimized search executor
+    const result = await optimizedSearchExecutor.executeSearch(params, userId);
 
     // Log performance metrics
-    await searchPerformanceMonitor.logSearchMetric(
-      searchParams,
-      searchResponse,
-      {
-        queryTime,
-        resultCount: searchResponse.totalResults,
-        cacheHit: false,
-        sources: searchParams.sources || [],
-        similarityThreshold: searchParams.similarityThreshold || 0.2,
-        errorOccurred: false
-      },
-      userId
-    );
+    const totalTime = performance.now() - startTime;
+    console.log(`🚀 Optimized unified search completed in ${totalTime.toFixed(2)}ms`);
 
-    console.log('Unified search response:', {
-      totalResults: searchResponse.totalResults,
-      sourcesSearched: searchResponse.searchMetadata?.sourcesSearched,
-      searchDuration: searchResponse.searchMetadata?.searchDuration,
-      queryTime: queryTime.toFixed(2) + 'ms',
-      cacheHit: false
-    });
-
-    // 🔍 DEBUG: Final response validation
-    console.log('🔍 Final unified search response:', {
-      success: searchResponse.success,
-      resultsLength: searchResponse.results?.length,
-      totalResults: searchResponse.totalResults
-    });
-
-    return searchResponse;
+    return result;
 
   } catch (error) {
-    console.error('Error in unifiedSearch:', error);
-    errorOccurred = true;
-    errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Optimized unified search failed:', error);
 
-    const queryTime = performance.now() - startTime;
-
-    // Log error metrics
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await searchPerformanceMonitor.logSearchMetric(
-          params,
-          null,
-          {
-            queryTime,
-            resultCount: 0,
-            cacheHit,
-            sources: params.sources || [],
-            similarityThreshold: params.similarityThreshold || 0.2,
-            errorOccurred: true,
-            errorMessage
-          },
-          session.user.id
-        );
-      }
-    } catch (metricError) {
-      console.warn('Failed to log error metrics:', metricError);
-    }
-
-    // Return error response in expected format
+    // Return error response
     return {
       success: false,
+      error: error instanceof Error ? error.message : 'Search failed',
       results: [],
       totalResults: 0,
-      searchMetadata: {
-        sourcesSearched: params.sources || [],
-        searchDuration: queryTime,
-        subscriptionLimitsApplied: false,
-        fallbacksUsed: []
-      },
       pagination: {
         hasMore: false,
+        nextOffset: 0,
         totalPages: 0
       },
-      error: errorMessage
+      searchMetadata: {
+        queryTime: performance.now() - startTime,
+        sourcesSearched: params.sources || ['receipts'],
+        fallbackUsed: true,
+        searchMethod: 'error_fallback',
+        fallbackReason: 'search_execution_error'
+      }
     };
   }
 }

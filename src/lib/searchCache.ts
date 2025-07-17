@@ -59,11 +59,11 @@ class SearchCache {
   };
 
   private config: CacheConfig = {
-    memoryTTL: 5 * 60 * 1000,      // 5 minutes
-    persistentTTL: 30 * 60 * 1000,  // 30 minutes
-    maxMemoryEntries: 100,
-    maxMemorySize: 50, // 50MB
-    compressionThreshold: 10240 // 10KB
+    memoryTTL: 3 * 60 * 1000,      // 🚀 PERFORMANCE: Reduced to 3 minutes for faster cache turnover
+    persistentTTL: 15 * 60 * 1000,  // 🚀 PERFORMANCE: Reduced to 15 minutes to prevent stale results
+    maxMemoryEntries: 150,          // 🚀 PERFORMANCE: Increased for better hit rate
+    maxMemorySize: 75, // 🚀 PERFORMANCE: Increased memory limit to 75MB
+    compressionThreshold: 5120 // 🚀 PERFORMANCE: Reduced threshold for better compression (5KB)
   };
 
   private currentMemoryUsage = 0;
@@ -410,6 +410,38 @@ class SearchCache {
   }
 
   /**
+   * Clear conversation cache for temporal queries
+   */
+  clearTemporalConversationCache(): void {
+    try {
+      const conversationCacheKeys = Object.keys(localStorage).filter(key => key.startsWith('conv_cache_'));
+      let clearedCount = 0;
+
+      conversationCacheKeys.forEach(key => {
+        try {
+          const cacheData = localStorage.getItem(key);
+          if (cacheData) {
+            const entry = JSON.parse(cacheData);
+            if (entry.searchParams && this.isTemporalQuery(entry.searchParams.query)) {
+              localStorage.removeItem(key);
+              clearedCount++;
+              console.log(`🕐 Cleared temporal conversation cache: ${key}`);
+            }
+          }
+        } catch (error) {
+          // If we can't parse the entry, remove it anyway
+          localStorage.removeItem(key);
+          clearedCount++;
+        }
+      });
+
+      console.log(`🧹 Cleared ${clearedCount} temporal conversation cache entries`);
+    } catch (error) {
+      console.warn('Failed to clear temporal conversation cache:', error);
+    }
+  }
+
+  /**
    * Nuclear option: Clear ALL search-related cache
    */
   forceNuclearClear(): void {
@@ -517,6 +549,14 @@ class SearchCache {
     searchParams: UnifiedSearchParams,
     userId: string
   ): Promise<UnifiedSearchResponse | null> {
+    // 🔧 FIX: Check for temporal queries first and bypass conversation cache
+    const isTemporalQuery = this.isTemporalQuery(searchParams.query);
+    if (isTemporalQuery) {
+      console.log('🕐 Temporal query detected in conversation cache, bypassing conversation cache for fresh results');
+      // Skip conversation cache and go directly to regular cache (which also bypasses for temporal queries)
+      return await this.get(searchParams, userId);
+    }
+
     try {
       const conversationCacheKey = this.getConversationCacheKey(conversationId, searchParams, userId);
       const cacheData = localStorage.getItem(`conv_cache_${conversationCacheKey}`);
@@ -587,6 +627,10 @@ class SearchCache {
 // Export singleton instance
 export const searchCache = new SearchCache();
 
+// Clear any existing temporal conversation cache on initialization
+// This ensures the fix takes effect immediately for temporal queries
+searchCache.clearTemporalConversationCache();
+
 // Global utility for debugging - accessible from browser console
 if (typeof window !== 'undefined') {
   (window as any).clearPowercatCache = () => {
@@ -623,6 +667,13 @@ if (typeof window !== 'undefined') {
     });
 
     console.log('💥 Nuclear cache clear complete! Please refresh the page.');
+  };
+
+  // Add temporal cache clearing to window for debugging
+  (window as any).clearTemporalCache = () => {
+    console.log('🕐 Clearing temporal conversation cache...');
+    searchCache.clearTemporalConversationCache();
+    console.log('✅ Temporal cache cleared! Try your search again.');
   };
 }
 export type { CacheMetrics, SearchCacheKey };

@@ -30,12 +30,29 @@ export async function callEdgeFunction<T = any>(
   try {
     // Get the session for the current user to include the auth token
     console.log(`🔍 DEBUG: Getting auth session for ${functionName}...`);
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    // 🔧 FIX: Try to refresh the session first to ensure we have a valid token
+    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    // If no session or session error, try to refresh
+    if (!session || sessionError) {
+      console.log(`🔍 DEBUG: No session or session error, attempting refresh for ${functionName}...`);
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.warn(`🔍 DEBUG: Session refresh failed for ${functionName}:`, refreshError);
+      } else if (refreshData.session) {
+        console.log(`🔍 DEBUG: Session refreshed successfully for ${functionName}`);
+        session = refreshData.session;
+        sessionError = null;
+      }
+    }
 
     console.log(`🔍 DEBUG: Auth session for ${functionName}:`, {
       hasSession: !!session,
       sessionError: sessionError?.message,
-      sessionKeys: session ? Object.keys(session) : []
+      sessionKeys: session ? Object.keys(session) : [],
+      tokenExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'unknown'
     });
 
     if (sessionError) {
