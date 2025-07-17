@@ -60,6 +60,22 @@ export function EnhancedSearchResults({
   onSaveSearch,
   className
 }: EnhancedSearchResultsProps) {
+  // 🔍 DEBUG: Log enhanced search results data
+  console.log('🔍 DEBUG: EnhancedSearchResults received:', {
+    resultsLength: results?.length || 0,
+    uiComponentsLength: uiComponents?.length || 0,
+    uiComponentsPreview: uiComponents?.map((comp, idx) => ({
+      index: idx,
+      type: comp.type,
+      component: comp.component,
+      hasData: !!comp.data,
+      dataKeys: comp.data ? Object.keys(comp.data) : []
+    })),
+    searchQuery,
+    totalResults,
+    isLoading
+  });
+
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -337,81 +353,38 @@ export function EnhancedSearchResults({
       {/* Results */}
       {uiComponents && uiComponents.length > 0 ? (
         <div className="space-y-6">
-          {Object.entries(groupedResults).map(([groupKey, groupResults]) => {
-            const isExpanded = expandedGroups.has(groupKey) || groupBy === 'none';
-            const shouldShowGroup = groupBy !== 'none';
-
-            return (
-              <motion.div
-                key={groupKey}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-4"
-              >
-                {/* Group Header */}
-                {shouldShowGroup && (
-                  <div className="flex items-center justify-between">
-                    <Button
-                      variant="ghost"
-                      onClick={() => toggleGroupExpansion(groupKey)}
-                      className="flex items-center gap-2 p-2 h-auto"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronUp className="h-4 w-4" />
-                      )}
-                      <h3 className="text-lg font-semibold">{groupKey}</h3>
-                      <Badge variant="secondary" className="ml-2">
-                        {groupResults.length}
-                      </Badge>
-                    </Button>
-                  </div>
-                )}
-
-                {/* Group Results */}
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className={cn(
-                        "grid gap-4",
-                        viewMode === 'grid'
-                          ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                          : "grid-cols-1"
-                      )}
-                    >
-                      {groupResults.map((result, index) => {
-                        // Find the corresponding UI component for this result
-                        const componentIndex = sortedResults.findIndex(r =>
-                          (r.id || r.receipt_id || r.sourceId) === (result.id || result.receipt_id || result.sourceId)
-                        );
-                        const component = uiComponents[componentIndex];
-
-                        if (!component) return null;
-
-                        return (
-                          <motion.div
-                            key={`${groupKey}-${index}`}
-                            variants={itemVariants}
-                            className="w-full"
-                          >
-                            <UIComponentRenderer
-                              components={[component]}
-                              compact={viewMode === 'list'}
-                            />
-                          </motion.div>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            );
-          })}
+          {/* 🔧 TEMP FIX: Render all UI components directly without complex matching */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+              "grid gap-4",
+              viewMode === 'grid'
+                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                : "grid-cols-1"
+            )}
+          >
+            {uiComponents.map((component, index) => {
+              // Only render line_item_card and receipt_card components
+              if (component.component === 'line_item_card' || component.component === 'receipt_card') {
+                return (
+                  <motion.div
+                    key={`component-${index}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="w-full"
+                  >
+                    <UIComponentRenderer
+                      components={[component]}
+                      compact={viewMode === 'list'}
+                    />
+                  </motion.div>
+                );
+              }
+              return null;
+            })}
+          </motion.div>
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">

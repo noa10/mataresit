@@ -34,6 +34,8 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, conversationId, onCopy, onFeedback }: ChatMessageProps) {
+
+
   const navigate = useNavigate();
   const { t } = useChatTranslation();
   const [displayedText, setDisplayedText] = useState('');
@@ -91,22 +93,31 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
       // Use cleaned content for streaming (without JSON blocks)
       const textToStream = contentToStream;
 
-      setIsStreaming(true);
-      setDisplayedText('');
+      // 🔧 FIX: Skip streaming for cached messages or messages with search results
+      // These are already complete and don't need the streaming animation
+      const shouldSkipStreaming = message.searchResults || message.uiComponents?.length > 0;
 
-      let currentIndex = 0;
+      if (shouldSkipStreaming) {
+        setIsStreaming(false);
+        setDisplayedText(textToStream);
+      } else {
+        setIsStreaming(true);
+        setDisplayedText('');
 
-      const streamInterval = setInterval(() => {
-        if (currentIndex < textToStream.length) {
-          setDisplayedText(textToStream.slice(0, currentIndex + 1));
-          currentIndex++;
-        } else {
-          setIsStreaming(false);
-          clearInterval(streamInterval);
-        }
-      }, 20); // Adjust speed as needed
+        let currentIndex = 0;
 
-      return () => clearInterval(streamInterval);
+        const streamInterval = setInterval(() => {
+          if (currentIndex < textToStream.length) {
+            setDisplayedText(textToStream.slice(0, currentIndex + 1));
+            currentIndex++;
+          } else {
+            setIsStreaming(false);
+            clearInterval(streamInterval);
+          }
+        }, 20);
+
+        return () => clearInterval(streamInterval);
+      }
     } else {
       // For non-AI messages, just set the content directly
       setDisplayedText(message.content);
@@ -229,9 +240,134 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
   const renderSearchResults = () => {
     if (!message.searchResults?.results) return null;
 
+    // 🔍 DEBUG: Log search results and UI components for debugging
+    console.log('🔍 DEBUG: ChatMessage renderSearchResults called with:', {
+      hasSearchResults: !!message.searchResults,
+      resultsLength: message.searchResults?.results?.length || 0,
+      hasUIComponents: !!message.uiComponents,
+      uiComponentsLength: message.uiComponents?.length || 0,
+      parsedComponentsLength: parsedComponents.length,
+      messageId: message.id,
+      messageType: message.type,
+      searchResultsStructure: message.searchResults ? Object.keys(message.searchResults) : [],
+      uiComponentTypes: message.uiComponents?.map(c => c.component) || [],
+      parsedComponentTypes: parsedComponents.map(c => c.component),
+      firstResult: message.searchResults?.results?.[0] ? {
+        id: message.searchResults.results[0].id,
+        merchant: message.searchResults.results[0].merchant,
+        sourceType: message.searchResults.results[0].sourceType,
+        contentType: message.searchResults.results[0].contentType
+      } : null
+    });
+
     // Use enhanced search results if UI components are present
-    const hasReceiptUIComponents = parsedComponents.some(c => c.component === 'receipt_card');
-    if (hasReceiptUIComponents) {
+    // Check for both receipt_card and line_item_card components
+    const hasUIComponents = parsedComponents.some(c =>
+      c.component === 'receipt_card' || c.component === 'line_item_card'
+    );
+
+
+
+    // 🔧 FIX: Generate UI components from search results if missing
+    if (message.searchResults?.results && message.searchResults.results.length > 0) {
+      let uiComponentsToUse = message.uiComponents || [];
+
+      // 🔍 DEBUG: Log UI component generation attempt
+      console.log('🔍 DEBUG: ChatMessage attempting UI component generation:', {
+        hasUIComponents: uiComponentsToUse.length > 0,
+        uiComponentsLength: uiComponentsToUse.length,
+        searchResultsLength: message.searchResults.results.length,
+        firstResultType: message.searchResults.results[0]?.sourceType,
+        firstResultMerchant: message.searchResults.results[0]?.merchant,
+        firstResultDescription: message.searchResults.results[0]?.line_item_description
+      });
+
+      // If UI components are missing but we have search results, generate them
+      if (uiComponentsToUse.length === 0) {
+
+
+        // 🔍 DEBUG: Log search results before filtering
+        const firstResult = message.searchResults.results[0];
+        console.log('🔍 DEBUG: Search results before filtering:', {
+          totalResults: message.searchResults.results.length,
+          firstResult: firstResult,
+          firstResultKeys: firstResult ? Object.keys(firstResult) : [],
+          lineItemResults: message.searchResults.results.filter(r => r.sourceType === 'line_item').length
+        });
+
+        // 🔍 DEBUG: Log actual type values
+        const sourceTypes = message.searchResults.results.map(r => r.sourceType);
+        const uniqueSourceTypes = [...new Set(sourceTypes)];
+        console.log('🔍 DEBUG: Actual result types:');
+        console.log('  - First 5 sourceTypes:', sourceTypes.slice(0, 5));
+        console.log('  - Unique sourceTypes:', uniqueSourceTypes);
+        console.log('  - First result full object:', message.searchResults.results[0]);
+
+        // 🔧 FIX: Handle both line_item and receipt type results
+        // Since the current results have type: "receipt" and sourceType: undefined,
+        // we need to adapt to the actual data structure
+        uiComponentsToUse = message.searchResults.results
+          .map(result => {
+            // 🔍 DEBUG: Log each result being processed
+            console.log('🔍 DEBUG: Processing search result:', {
+              id: result.id,
+              type: result.type,
+              sourceType: result.sourceType,
+              title: result.title,
+              content: result.content,
+              hasMetadata: !!result.metadata,
+              metadataKeys: result.metadata ? Object.keys(result.metadata) : [],
+              metadata: result.metadata
+            });
+
+            // For receipt-type results, create a line item card with available data
+            return {
+              type: 'ui_component' as const,
+              component: 'line_item_card',
+              data: {
+                line_item_id: result.id,
+                receipt_id: result.id,
+                description: result.title || result.metadata?.description || 'Unknown Item',
+                amount: result.metadata?.amount || result.metadata?.total || 0,
+                currency: result.metadata?.currency || 'MYR',
+                merchant: result.metadata?.merchant || result.metadata?.store_name || 'Unknown Merchant',
+                date: result.metadata?.date || result.createdAt,
+                confidence: result.similarity || 0.8,
+                quantity: result.metadata?.quantity || 1
+              }
+            };
+          });
+
+        // 🔍 DEBUG: Log generated UI components
+        console.log('🔍 DEBUG: Generated UI components:', {
+          generatedCount: uiComponentsToUse.length,
+          componentTypes: uiComponentsToUse.map(c => c.component)
+        });
+
+
+      }
+
+      if (uiComponentsToUse.length > 0) {
+
+
+        // Extract search query from message content or use a default
+        const searchQuery = message.content.match(/search.*?["']([^"']+)["']/i)?.[1] ||
+                           message.content.match(/looking for\s+([^\s.!?]+)/i)?.[1] ||
+                           'search results';
+
+        return (
+          <EnhancedSearchResults
+            results={message.searchResults.results}
+            uiComponents={uiComponentsToUse}
+            searchQuery={searchQuery}
+            totalResults={message.searchResults.total || message.searchResults.results.length}
+            className="mt-4"
+          />
+        );
+      }
+    }
+
+    if (hasUIComponents) {
       // Extract search query from message content or use a default
       const searchQuery = message.content.match(/search.*?["']([^"']+)["']/i)?.[1] ||
                          message.content.match(/looking for\s+([^\s.!?]+)/i)?.[1] ||
@@ -375,6 +511,9 @@ export function ChatMessage({ message, conversationId, onCopy, onFeedback }: Cha
               </Card>
             );
           }
+
+          // Fallback for unknown result types
+          return null;
         })}
       </div>
     );

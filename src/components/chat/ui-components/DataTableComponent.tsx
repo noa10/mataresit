@@ -49,6 +49,18 @@ export function DataTableComponent({
   className = '',
   compact = false
 }: DataTableComponentProps) {
+  // 🔍 DEBUG: Log data table component data
+  console.log('🔍 DEBUG: DataTableComponent received data:', {
+    hasData: !!data,
+    columnsCount: data?.columns?.length || 0,
+    rowsCount: data?.rows?.length || 0,
+    columns: data?.columns?.map(col => ({ key: col.key, label: col.label })),
+    firstRowData: data?.rows?.[0],
+    searchable: data?.searchable,
+    sortable: data?.sortable,
+    pagination: data?.pagination
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

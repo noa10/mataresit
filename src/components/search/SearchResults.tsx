@@ -143,8 +143,189 @@ export function SearchResults({
 
       <div className="space-y-4">
         {results.map((result) => {
-          // Check if this is a receipt (has merchant property) or a line item
-          if ('merchant' in result) {
+          // Check if this is a unified search result or legacy format
+          if ('sourceType' in result) {
+            // This is a unified search result
+            const unifiedResult = result as any; // UnifiedSearchResult type
+            const similarityScore = unifiedResult.similarity || 0;
+            const formattedScore = (similarityScore * 100).toFixed(0);
+
+            // Check if it's a line item based on sourceType
+            if (unifiedResult.sourceType === 'line_item') {
+              // This is a line item from unified search
+              const metadata = unifiedResult.metadata || {};
+
+              console.log(`Line item card (unified) - ID: ${unifiedResult.sourceId || 'undefined'}, Merchant: ${metadata.merchant || 'Unknown'}, Type: line_item`);
+
+              return (
+                <Card
+                  key={unifiedResult.id}
+                  className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-base sm:text-lg line-clamp-1">
+                        {metadata.description || unifiedResult.title || 'Unknown Item'}
+                      </CardTitle>
+                      {similarityScore > 0 && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {formattedScore}% match
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription className="text-xs sm:text-sm">
+                      From: {metadata.merchant || metadata.parent_receipt_merchant || 'Unknown Merchant'}
+                      {(metadata.date || metadata.parent_receipt_date) && (
+                        <span className="ml-2" title={new Date(metadata.date || metadata.parent_receipt_date).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}>
+                          on {new Date(metadata.date || metadata.parent_receipt_date).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2 px-3 sm:px-6">
+                    {(metadata.quantity !== undefined || metadata.amount !== undefined || metadata.line_item_price !== undefined) && (
+                      <p className="text-xs sm:text-sm">
+                        {metadata.quantity !== undefined && (
+                          <span>Qty: {metadata.quantity}</span>
+                        )}
+                        {metadata.quantity !== undefined &&
+                         (metadata.amount !== undefined || metadata.line_item_price !== undefined) && (
+                          <span className="mx-1">•</span>
+                        )}
+                        {(metadata.amount !== undefined || metadata.line_item_price !== undefined) && (
+                          <span>Price: {metadata.currency || 'MYR'} {typeof (metadata.amount || metadata.line_item_price) === 'number'
+                            ? (metadata.amount || metadata.line_item_price).toFixed(2)
+                            : (metadata.amount || metadata.line_item_price)}</span>
+                        )}
+                      </p>
+                    )}
+
+                    {!metadata.receipt_id && (
+                      <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        <span>Parent receipt information is missing</span>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="px-3 sm:px-6 py-2 sm:py-4">
+                    {metadata.receipt_id ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+                        onClick={(e) => handleNavigateToReceipt(e, metadata.receipt_id, 'line_item')}
+                      >
+                        <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span>View Parent Receipt</span>
+                        <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+                        disabled
+                      >
+                        <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span>Receipt Not Available</span>
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              );
+            } else {
+              // This is a receipt from unified search
+              const metadata = unifiedResult.metadata || {};
+              const date = metadata.date ? new Date(metadata.date) : null;
+
+              console.log(`Receipt card (unified) - ID: ${unifiedResult.sourceId || 'undefined'}, Merchant: ${metadata.merchant || 'Unknown'}, Type: receipt`);
+
+              return (
+                <Card
+                  key={unifiedResult.id}
+                  className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-base sm:text-lg line-clamp-1">
+                        {metadata.merchant || unifiedResult.title || 'Unknown Merchant'}
+                      </CardTitle>
+                      {similarityScore > 0 && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {formattedScore}% match
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription className="text-xs sm:text-sm">
+                      {date ? (
+                        <span title={date.toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}>
+                          {date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                          <span className="hidden sm:inline">
+                            ({formatDistanceToNow(date, { addSuffix: true })})
+                          </span>
+                        </span>
+                      ) : (
+                        'Unknown date'
+                      )}
+                      {(metadata.total || metadata.amount) && (
+                        <span className="ml-2 font-medium">
+                          {typeof (metadata.total || metadata.amount) === 'number'
+                            ? `${metadata.currency || 'MYR'} ${(metadata.total || metadata.amount).toFixed(2)}`
+                            : (metadata.total || metadata.amount)}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2 px-3 sm:px-6">
+                    {metadata.notes ? (
+                      <p className="text-xs sm:text-sm line-clamp-2">{metadata.notes}</p>
+                    ) : metadata.raw_text ? (
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
+                        {metadata.raw_text.substring(0, 150)}...
+                      </p>
+                    ) : (
+                      <p className="text-xs sm:text-sm text-muted-foreground">No additional details</p>
+                    )}
+
+                    {metadata.predicted_category && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        <Badge variant="secondary" className="text-xs">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {metadata.predicted_category}
+                        </Badge>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="px-3 sm:px-6 py-2 sm:py-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+                      onClick={(e) => handleNavigateToReceipt(e, unifiedResult.sourceId, 'receipt')}
+                    >
+                      <Receipt className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span>View Receipt</span>
+                      <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            }
+          } else if ('merchant' in result) {
             // This is a receipt
             const receipt = result;
             const date = receipt.date ? new Date(receipt.date) : null;

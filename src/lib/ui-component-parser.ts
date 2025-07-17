@@ -226,7 +226,7 @@ const SummaryCardDataSchema = z.object({
 const UIComponentSchema = z.object({
   type: z.literal('ui_component'),
   component: z.enum([
-    'receipt_card', 'spending_chart', 'action_button', 'category_breakdown',
+    'receipt_card', 'line_item_card', 'spending_chart', 'action_button', 'category_breakdown',
     'trend_chart', 'merchant_summary', 'financial_insight', 'data_table',
     'bar_chart', 'pie_chart', 'summary_card', 'section_header'
   ]),

@@ -7,6 +7,11 @@ import { semanticSearch, SearchParams, SearchResult, unifiedSearch } from '../li
 import { UnifiedSearchParams, UnifiedSearchResponse } from '@/types/unified-search';
 import { generateIntelligentResponse, detectUserIntent } from '../lib/chat-response-generator';
 import { parseNaturalLanguageQuery } from '../lib/enhanced-query-parser';
+import { optimizedQueryProcessor, OptimizedQueryResult } from '../lib/optimized-query-processor';
+import { detectIntentOptimized } from '../lib/optimized-intent-detector';
+import { useStreamingResponse, useAdaptiveStreamingConfig } from '../hooks/useStreamingResponse';
+import { StreamingChatMessage } from '../components/chat/StreamingChatMessage';
+import { toast } from 'sonner';
 import { formatCurrencyAmount } from '../lib/currency-converter';
 import { usePersonalizationContext } from '@/contexts/PersonalizationContext';
 import { personalizedChatService } from '@/services/personalizedChatService';
@@ -14,6 +19,7 @@ import { conversationMemoryService } from '@/services/conversationMemoryService'
 import { useBackgroundSearch } from '@/contexts/BackgroundSearchContext';
 import { backgroundSearchService } from '@/services/backgroundSearchService';
 import { searchCache } from '@/lib/searchCache';
+import { supabase } from '@/lib/supabase';
 
 import { ChatContainer } from '../components/chat/ChatContainer';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -66,6 +72,28 @@ export default function SemanticSearchPage() {
   // Conversation updater for real-time updates
   const { saveConversation: saveConversationWithEvents } = useConversationUpdater();
 
+  // Streaming response hooks
+  const streamingConfig = useAdaptiveStreamingConfig();
+  const {
+    state: streamingState,
+    generateResponse: generateStreamingResponse,
+    cancelGeneration,
+    resetState: resetStreamingState
+  } = useStreamingResponse({
+    enableStreaming: streamingConfig.enableStreaming,
+    enableProgressiveLoading: streamingConfig.enableProgressiveLoading,
+    onProgress: (progress) => {
+      updateStatus('generating', `Streaming response... ${Math.round(progress)}%`);
+    },
+    onComplete: (response) => {
+      console.log('✅ Streaming response completed:', response);
+    },
+    onError: (error) => {
+      console.error('❌ Streaming response failed:', error);
+      toast.error('Failed to stream response');
+    }
+  });
+
   // Chat controls context
   const { setChatControls } = useChatControls();
 
@@ -96,9 +124,64 @@ export default function SemanticSearchPage() {
     });
   }, [user]);
 
-  // 🔍 DEBUG: Log component mount
+  // 🔍 DEBUG: Log component mount and test Edge Function
   useEffect(() => {
     console.log('🔍 DEBUG: SemanticSearch component mounted at:', new Date().toISOString());
+
+    // Clear all cache for debugging
+    console.log('🗑️ DEBUG: Clearing all search cache for debugging...');
+
+    // Clear search cache
+    searchCache.invalidate();
+
+    // Clear conversation cache
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('conversations');
+      localStorage.removeItem('conversationSearchCache');
+      // Clear all search cache keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('search_cache_') || key.startsWith('conversation_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
+    console.log('✅ DEBUG: Cache cleared successfully');
+
+    // 🔍 DEBUG: Test Edge Function directly
+    const testEdgeFunction = async () => {
+      try {
+        console.log('🔍 DEBUG: Testing Edge Function directly...');
+        const response = await fetch('https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/unified-search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({
+            query: 'ikan',
+            sources: ['receipts'],
+            limit: 5,
+            useEnhancedPrompting: true
+          })
+        });
+
+        const data = await response.json();
+        console.log('🔍 DEBUG: Edge Function response:', data);
+
+        if (data.enhancedResponse && data.enhancedResponse.uiComponents) {
+          console.log('✅ DEBUG: Enhanced response with UI components found!');
+          console.log('🔍 DEBUG: UI Components:', data.enhancedResponse.uiComponents);
+        } else {
+          console.log('❌ DEBUG: No enhanced response or UI components found');
+        }
+      } catch (error) {
+        console.log('❌ DEBUG: Edge Function test failed:', error);
+      }
+    };
+
+    // Run test after a short delay
+    setTimeout(testEdgeFunction, 2000);
   }, []);
 
   // Personalization context
@@ -332,7 +415,7 @@ export default function SemanticSearchPage() {
     }
   }, [handleClearCache]);
 
-  // Handle sending a new message with background search
+  // Handle sending a new message with optimized processing
   const handleSendMessage = async (content: string) => {
     console.log('🔍 DEBUG: handleSendMessage called with:', {
       content,
@@ -356,10 +439,21 @@ export default function SemanticSearchPage() {
     // Add user message immediately
     setMessages(prev => [...prev, userMessage]);
 
-    // Generate or use existing conversation ID
-    const conversationId = currentConversationId || generateConversationId();
-    if (!currentConversationId) {
+    // 🔧 TEMPORAL FIX: Force new conversation for temporal queries to ensure fresh results
+    const isTemporalQuery = /\b(yesterday|today|tomorrow|last\s+week|this\s+week|next\s+week|last\s+month|this\s+month|next\s+month)\b/i.test(content);
+    let conversationId;
+
+    if (isTemporalQuery) {
+      // Always create a new conversation for temporal queries
+      conversationId = generateConversationId();
       setCurrentConversationId(conversationId);
+      console.log('🕐 TEMPORAL QUERY: Created new conversation ID for fresh results:', conversationId);
+    } else {
+      // Use existing conversation ID for non-temporal queries
+      conversationId = currentConversationId || generateConversationId();
+      if (!currentConversationId) {
+        setCurrentConversationId(conversationId);
+      }
     }
 
     // Track chat message for personalization
@@ -374,13 +468,25 @@ export default function SemanticSearchPage() {
     updateStatus('preprocessing', 'Understanding your question...');
 
     try {
-      // First check for special intents (help, greetings, etc.)
-      const intentCheck = detectUserIntent(content);
-      if (intentCheck.intent !== 'search' && intentCheck.response) {
+      // Use optimized query processing pipeline
+      const processingResult = await optimizedQueryProcessor.processQuery(content, {
+        useCache: true,
+        conversationHistory: messages.slice(-5).map(m => m.content)
+      });
+
+      console.log('🚀 Optimized processing result:', {
+        intent: processingResult.intent.intent,
+        confidence: processingResult.intent.confidence,
+        processingTime: processingResult.metrics.totalTime,
+        cacheHit: processingResult.metrics.cacheHit
+      });
+
+      // Handle non-search intents quickly
+      if (processingResult.intent.intent !== 'search' && processingResult.intent.response) {
         const aiMessage: ChatMessage = {
           id: generateMessageId(),
           type: 'ai',
-          content: intentCheck.response,
+          content: processingResult.intent.response,
           timestamp: new Date(),
         };
 
@@ -390,33 +496,30 @@ export default function SemanticSearchPage() {
         return;
       }
 
-      // Check if this is a "show more" request
-      const isShowMoreRequest = /\b(show\s+more|more\s+results|load\s+more|see\s+more|additional\s+results)\b/i.test(content);
+      // Check if this is a "show more" request using optimized detection
+      const isShowMoreRequest = processingResult.intent.intent === 'show_more';
 
-      // 🔍 DEBUG: Add comprehensive logging for monetary queries
-      console.log('🔍 DEBUG: Chat message received:', {
+      // 🔍 DEBUG: Add comprehensive logging for optimized processing
+      console.log('🔍 DEBUG: Optimized processing completed:', {
         content,
         isShowMoreRequest,
+        queryType: processingResult.parsedQuery.queryType,
+        confidence: processingResult.parsedQuery.confidence,
+        processingTime: processingResult.metrics.totalTime,
         timestamp: new Date().toISOString()
       });
 
-      // Check if this looks like a monetary query
-      const monetaryPatterns = [
-        /\b(over|above|more\s+than|greater\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
-        /\b(under|below|less\s+than|cheaper\s+than)\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i,
-        /\b(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)\s*(?:to|[-–])\s*(\$|rm|myr)?\s*(\d+(?:\.\d{2})?)/i
-      ];
-
-      const isMonetaryQuery = monetaryPatterns.some(pattern => pattern.test(content));
-      console.log('💰 DEBUG: Monetary query detection:', {
+      // Check if this looks like a monetary query from parsed results
+      const isMonetaryQuery = !!processingResult.parsedQuery.amountRange;
+      console.log('💰 DEBUG: Monetary query detection from parser:', {
         isMonetaryQuery,
-        content,
-        patterns: monetaryPatterns.map(p => p.source)
+        amountRange: processingResult.parsedQuery.amountRange,
+        content
       });
 
       let params: SearchParams;
       let results: SearchResult;
-      let parsedQuery: any = null;
+      let parsedQuery: any = processingResult.parsedQuery;
 
       if (isShowMoreRequest && lastSearchParams) {
         // Use previous search parameters with increased offset
@@ -456,69 +559,16 @@ export default function SemanticSearchPage() {
           return;
         }
       } else {
-        // Regular new search - use unified search with enhanced query parsing
-        console.log('🔍 Parsing natural language query:', content);
+        // Regular new search - use optimized search parameters
+        console.log('🔍 Using optimized query processing result:', parsedQuery);
 
-        // Parse the natural language query to extract filters
-        parsedQuery = parseNaturalLanguageQuery(content);
-        console.log('📊 Parsed query result:', parsedQuery);
+        // Use the pre-processed search parameters from optimized processor
+        const unifiedParams = processingResult.searchParams;
 
-        // Convert parsed amount range to unified search filters
-        const filters: any = {};
-
-        if (parsedQuery.amountRange) {
-          console.log('💰 DEBUG: Amount range detected in SemanticSearch:', {
-            amountRange: parsedQuery.amountRange,
-            min: parsedQuery.amountRange.min,
-            max: parsedQuery.amountRange.max,
-            minType: typeof parsedQuery.amountRange.min,
-            maxType: typeof parsedQuery.amountRange.max
-          });
-
-          // The enhanced query parser now handles currency conversion automatically
-          const { min, max, currency, conversionInfo } = parsedQuery.amountRange;
-
-          // Log conversion details if available
-          if (conversionInfo && conversionInfo.conversionApplied) {
-            console.log(`💱 Currency conversion applied: ${conversionInfo.reasoning}`);
-            console.log(`💱 Exchange rate: ${conversionInfo.exchangeRate}`);
-          }
-
-          filters.amountRange = {
-            min: min || 0,
-            max: max || Number.MAX_SAFE_INTEGER,
-            currency: currency || 'MYR'
-          };
-
-          console.log('💰 DEBUG: Applied amount range to unified search filters:', {
-            filters: filters.amountRange,
-            minType: typeof filters.amountRange.min,
-            maxType: typeof filters.amountRange.max
-          });
-        }
-
-        if (parsedQuery.dateRange) {
-          filters.dateRange = parsedQuery.dateRange;
-        }
-
-        if (parsedQuery.merchants && parsedQuery.merchants.length > 0) {
-          filters.merchants = parsedQuery.merchants;
-        }
-
-        if (parsedQuery.categories && parsedQuery.categories.length > 0) {
-          filters.categories = parsedQuery.categories;
-        }
-
-        const unifiedParams: UnifiedSearchParams = {
-          query: content,
-          sources: ['receipts', 'business_directory'], // Default sources
-          limit: 10,
-          offset: 0,
-          filters,
-          similarityThreshold: 0.2,
-          includeMetadata: true,
-          aggregationMode: 'relevance'
-        };
+        console.log('💰 DEBUG: Amount range from optimized processing:', {
+          amountRange: unifiedParams.filters?.amountRange,
+          hasAmountRange: !!unifiedParams.filters?.amountRange
+        });
 
         console.log('🚀 Unified search params with filters:', unifiedParams);
 
@@ -535,7 +585,33 @@ export default function SemanticSearchPage() {
             }
           }
 
-          if (cachedResults) {
+          // 🔍 DEBUG: Force bypass cache for debugging
+          const FORCE_BYPASS_CACHE = true;
+
+          // 🔧 TEMPORAL FIX: Add cache-busting for temporal queries
+          const isTemporalQuery = /\b(yesterday|today|tomorrow|last\s+week|this\s+week|next\s+week|last\s+month|this\s+month|next\s+month)\b/i.test(content);
+          if (isTemporalQuery) {
+            console.log('🕐 TEMPORAL QUERY DETECTED: Forcing fresh search for:', content);
+            // Clear any existing conversation cache for this query
+            if (typeof window !== 'undefined' && window.localStorage) {
+              const cacheKeys = Object.keys(localStorage).filter(key =>
+                key.includes('conv_cache_') || key.includes('search_cache_')
+              );
+              cacheKeys.forEach(key => {
+                try {
+                  const cacheData = localStorage.getItem(key);
+                  if (cacheData && cacheData.includes(content.toLowerCase())) {
+                    localStorage.removeItem(key);
+                    console.log('🧹 Cleared temporal cache entry:', key);
+                  }
+                } catch (error) {
+                  console.warn('Failed to clear cache entry:', key, error);
+                }
+              });
+            }
+          }
+
+          if (cachedResults && !FORCE_BYPASS_CACHE) {
             console.log(`💾 Using cached search results for conversation ${conversationId}:`, {
               hasResults: !!cachedResults,
               resultsType: typeof cachedResults,
@@ -605,6 +681,8 @@ export default function SemanticSearchPage() {
             ...unifiedParams,
             useEnhancedPrompting: true,
             conversationHistory: messages.slice(-5).map(m => m.content), // Last 5 messages for context
+            // 🔧 TEMPORAL FIX: Add cache-busting timestamp for temporal queries
+            ...(isTemporalQuery && { cacheBuster: Date.now() })
           };
 
           // Start background search
@@ -624,17 +702,24 @@ export default function SemanticSearchPage() {
 
           // 🔧 FIX: Instead of relying on background search context,
           // let's call the unified search directly and handle the results
-          console.log('🔍 DEBUG: Calling unifiedSearch directly with params:', enhancedParams);
+          console.log('🔍 DEBUG: Calling unifiedSearch directly with params at', new Date().toISOString(), ':', enhancedParams);
 
           const searchResults = await unifiedSearch(enhancedParams);
 
-          console.log('🔍 DEBUG: Direct unifiedSearch returned:', {
+          console.log('🔍 DEBUG: Direct unifiedSearch returned at', new Date().toISOString(), ':', {
             hasResults: !!searchResults,
             resultType: typeof searchResults,
             success: searchResults?.success,
             resultsLength: searchResults?.results?.length,
+            totalResults: searchResults?.totalResults,
             error: searchResults?.error,
             resultKeys: searchResults && typeof searchResults === 'object' ? Object.keys(searchResults) : [],
+            firstResult: searchResults?.results?.[0] ? {
+              id: searchResults.results[0].id,
+              title: searchResults.results[0].title,
+              sourceType: searchResults.results[0].sourceType,
+              contentType: searchResults.results[0].contentType
+            } : null,
             fullResults: searchResults // Log full results for debugging
           });
 
@@ -657,19 +742,10 @@ export default function SemanticSearchPage() {
           console.log('✅ Search completed successfully with', searchResults.results.length, 'results');
 
           // Process results when search completes
+          // 🔧 FIX: Keep the original unified search results format instead of converting to legacy format
+          // This preserves the sourceType information needed for proper frontend rendering
           const results = {
-            results: searchResults.results.map(result => ({
-              id: result.sourceId,
-              merchant: result.title,
-              date: result.metadata?.date || result.createdAt,
-              total: result.metadata?.total || 0,
-              total_amount: result.metadata?.total || 0,
-              currency: result.metadata?.currency || 'MYR',
-              similarity_score: result.similarity,
-              predicted_category: result.metadata?.predicted_category,
-              fullText: result.content,
-              ...(result.metadata || {})
-            })),
+            results: searchResults.results, // Keep original unified search results with sourceType
             count: searchResults.results.length,
             total: searchResults.totalResults || searchResults.results.length,
             searchParams: {
@@ -682,6 +758,14 @@ export default function SemanticSearchPage() {
             searchMetadata: searchResults.searchMetadata || {}
           };
 
+          console.log('🔍 DEBUG: Processed results object:', {
+            resultsLength: results.results.length,
+            count: results.count,
+            total: results.total,
+            searchResultsTotalResults: searchResults.totalResults,
+            searchResultsResultsLength: searchResults.results.length
+          });
+
           // Generate AI response
           const aiResponse = await generateIntelligentResponse(results, content, messages);
 
@@ -691,6 +775,46 @@ export default function SemanticSearchPage() {
                              searchResults.enhancedResponse?.uiComponents ||
                              [];
 
+          // 🔍 DEBUG: Log search response structure for debugging
+          console.log('🔍 DEBUG: SemanticSearch received searchResults:', {
+            hasSearchResults: !!searchResults,
+            searchResultsKeys: searchResults ? Object.keys(searchResults) : [],
+            hasResults: !!searchResults.results,
+            resultsLength: searchResults.results?.length || 0,
+            hasEnhancedResponse: !!searchResults.enhancedResponse,
+            enhancedResponseKeys: searchResults.enhancedResponse ? Object.keys(searchResults.enhancedResponse) : [],
+            hasTopLevelUIComponents: !!searchResults.uiComponents,
+            topLevelUIComponentsLength: searchResults.uiComponents?.length || 0,
+            hasEnhancedUIComponents: !!searchResults.enhancedResponse?.uiComponents,
+            enhancedUIComponentsLength: searchResults.enhancedResponse?.uiComponents?.length || 0,
+            extractedUIComponentsLength: uiComponents.length,
+            extractedUIComponentTypes: uiComponents.map(c => c.component),
+            success: searchResults.success,
+            error: searchResults.error,
+            // Log the full structure for debugging
+            fullSearchResults: searchResults,
+            enhancedResponseContent: searchResults.enhancedResponse?.content,
+            enhancedResponseUIComponents: searchResults.enhancedResponse?.uiComponents
+          });
+
+          // 🔍 DEBUG: Log detailed UI components data
+          if (uiComponents.length > 0) {
+            console.log('🔍 DEBUG: Extracted UI Components Details:', uiComponents.map((component, index) => ({
+              index,
+              type: component.type,
+              component: component.component,
+              hasData: !!component.data,
+              dataKeys: component.data ? Object.keys(component.data) : [],
+              dataPreview: component.data,
+              hasMetadata: !!component.metadata,
+              metadataKeys: component.metadata ? Object.keys(component.metadata) : []
+            })));
+          } else {
+            console.log('🔍 DEBUG: No UI components extracted - checking raw response structure');
+            console.log('🔍 DEBUG: Raw enhanced response:', searchResults.enhancedResponse);
+            console.log('🔍 DEBUG: Raw top-level uiComponents:', searchResults.uiComponents);
+          }
+
           const aiMessage: ChatMessage = {
             id: generateMessageId(),
             type: 'ai',
@@ -699,6 +823,29 @@ export default function SemanticSearchPage() {
             searchResults: results,
             uiComponents: uiComponents,
           };
+
+          console.log('🔍 DEBUG: ChatMessage created with searchResults:', {
+            searchResultsTotal: aiMessage.searchResults?.total,
+            searchResultsCount: aiMessage.searchResults?.count,
+            searchResultsLength: aiMessage.searchResults?.results?.length,
+            uiComponentsLength: aiMessage.uiComponents?.length,
+            isTemporalQuery,
+            conversationId,
+            timestamp: new Date().toISOString()
+          });
+
+          // 🔧 TEMPORAL VERIFICATION: Log detailed results for temporal queries
+          if (isTemporalQuery) {
+            console.log('🕐 TEMPORAL QUERY RESULTS VERIFICATION:', {
+              query: content,
+              backendResultsLength: searchResults?.results?.length,
+              backendTotalResults: searchResults?.totalResults,
+              frontendResultsLength: aiMessage.searchResults?.results?.length,
+              frontendTotal: aiMessage.searchResults?.total,
+              firstResultId: aiMessage.searchResults?.results?.[0]?.id,
+              lastResultId: aiMessage.searchResults?.results?.[aiMessage.searchResults.results.length - 1]?.id
+            });
+          }
 
           setMessages(prev => [...prev, aiMessage]);
           updateStatus('complete', 'Search completed successfully');

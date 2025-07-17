@@ -16,6 +16,7 @@ export interface UIComponent {
 // Supported UI Component Types
 export type UIComponentType =
   | 'receipt_card'
+  | 'line_item_card'
   | 'spending_chart'
   | 'action_button'
   | 'category_breakdown'
@@ -40,6 +41,7 @@ export interface UIComponentMetadata {
 // Union type for all component data types
 export type UIComponentData =
   | ReceiptCardData
+  | LineItemCardData
   | SpendingChartData
   | ActionButtonData
   | CategoryBreakdownData
@@ -64,6 +66,19 @@ export interface ReceiptCardData {
   thumbnail_url?: string;
   line_items_count?: number;
   tags?: string[];
+}
+
+// Line Item Card Component Data
+export interface LineItemCardData {
+  line_item_id: string;
+  receipt_id?: string;
+  description: string;
+  amount: number;
+  currency: string;
+  merchant: string;
+  date: string;
+  confidence?: number;
+  quantity?: number;
 }
 
 // Spending Chart Component Data

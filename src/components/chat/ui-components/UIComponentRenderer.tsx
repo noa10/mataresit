@@ -8,6 +8,7 @@
 import React from 'react';
 import { UIComponent, UIComponentProps } from '@/types/ui-components';
 import { ReceiptCardComponent } from './ReceiptCardComponent';
+import { LineItemCardComponent } from './LineItemCardComponent';
 import { ActionButtonComponent } from './ActionButtonComponent';
 import { DataTableComponent } from './DataTableComponent';
 import { BarChartComponent } from './BarChartComponent';
@@ -27,13 +28,31 @@ interface UIComponentRendererProps {
 /**
  * Main UI Component Renderer
  */
-export function UIComponentRenderer({ 
-  components, 
-  onAction, 
-  className = '', 
-  compact = false 
+export function UIComponentRenderer({
+  components,
+  onAction,
+  className = '',
+  compact = false
 }: UIComponentRendererProps) {
+  // 🔍 DEBUG: Log UI components being rendered
+  console.log('🔍 DEBUG: UIComponentRenderer received components:', {
+    componentsLength: components?.length || 0,
+    componentsPreview: components?.map((comp, idx) => ({
+      index: idx,
+      type: comp.type,
+      component: comp.component,
+      hasData: !!comp.data,
+      dataKeys: comp.data ? Object.keys(comp.data) : [],
+      dataPreview: comp.component === 'data_table' ? {
+        columns: comp.data?.columns?.length || 0,
+        rows: comp.data?.rows?.length || 0,
+        firstRowPreview: comp.data?.rows?.[0]
+      } : comp.data
+    }))
+  });
+
   if (!components || components.length === 0) {
+    console.log('🔍 DEBUG: UIComponentRenderer - No components to render');
     return null;
   }
 
@@ -66,6 +85,15 @@ function SingleUIComponent({ component, onAction, compact = false }: SingleUICom
       case 'receipt_card':
         return (
           <ReceiptCardComponent
+            data={component.data as any}
+            onAction={onAction}
+            compact={compact}
+          />
+        );
+
+      case 'line_item_card':
+        return (
+          <LineItemCardComponent
             data={component.data as any}
             onAction={onAction}
             compact={compact}
