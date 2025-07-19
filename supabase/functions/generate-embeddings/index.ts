@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.2.0';
 import { ContentExtractor } from './contentExtractors.ts';
 import { BatchProcessor } from './batchProcessor.ts';
 import { validateAndConvertEmbedding, EMBEDDING_DIMENSIONS } from '../_shared/vector-validation.ts';
+import { EmbeddingMetricsCollector, createMetricsCollector, withMetricsCollection } from './metricsCollector.ts';
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -82,8 +83,14 @@ const EMBEDDING_DIMENSIONS = 1536; // OpenAI's standard dimension
 /**
  * Generate embeddings for a text using Google's Gemini embedding model
  * Improved to handle dimension conversion more effectively with retry logic
+ * Enhanced with metrics collection
  */
-async function generateEmbedding(text: string, retryCount = 0): Promise<number[]> {
+async function generateEmbedding(
+  text: string,
+  retryCount = 0,
+  metricsCollector?: EmbeddingMetricsCollector,
+  metricId?: string
+): Promise<number[]> {
   try {
     // Handle empty or invalid text
     if (!text || typeof text !== 'string' || text.trim() === '') {
@@ -95,23 +102,50 @@ async function generateEmbedding(text: string, retryCount = 0): Promise<number[]
     // Trim very long text to avoid API limits
     const trimmedText = text.length > 10000 ? text.substring(0, 10000) : text;
 
+    // Estimate tokens for metrics (rough approximation: 1 token ≈ 4 characters)
+    const estimatedTokens = Math.ceil(trimmedText.length / 4);
+
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: 'embedding-001' });
+
+    // Record API call start
+    const apiCallStart = performance.now();
     const result = await model.embedContent(trimmedText);
+    const apiCallEnd = performance.now();
+
+    // Record API metrics
+    if (metricsCollector && metricId) {
+      metricsCollector.recordApiCall(metricId, estimatedTokens, false);
+    }
+
     let embedding = result.embedding.values;
 
     // 🔧 CRITICAL FIX: Use shared validation utility to prevent corruption
     embedding = validateAndConvertEmbedding(embedding, EMBEDDING_DIMENSIONS);
+
+    console.log(`API call completed in ${(apiCallEnd - apiCallStart).toFixed(2)}ms, estimated tokens: ${estimatedTokens}`);
+
     return embedding;
   } catch (error) {
     console.error('Error calling Gemini API:', error);
+
+    // Check if this is a rate limiting error
+    const isRateLimit = error.message?.includes('rate limit') ||
+                       error.message?.includes('quota') ||
+                       error.message?.includes('429');
+
+    // Record rate limiting in metrics
+    if (metricsCollector && metricId && isRateLimit) {
+      const estimatedTokens = Math.ceil(text.length / 4);
+      metricsCollector.recordApiCall(metricId, estimatedTokens, true);
+    }
 
     // Implement retry logic for transient errors
     if (retryCount < 3) {
       console.log(`Retrying embedding generation (attempt ${retryCount + 1})`);
       // Exponential backoff
       await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-      return generateEmbedding(text, retryCount + 1);
+      return generateEmbedding(text, retryCount + 1, metricsCollector, metricId);
     }
 
     // If we've exhausted retries, throw the error
@@ -160,8 +194,14 @@ async function storeEmbedding(
 
 /**
  * Process receipt data and generate embeddings
+ * Enhanced with metrics collection
  */
-async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabaseClient: any) {
+async function processReceiptEmbedding(
+  request: ReceiptEmbeddingRequest,
+  supabaseClient: any,
+  metricsCollector?: EmbeddingMetricsCollector,
+  metricId?: string
+) {
   const { receiptId, contentType, content, metadata = {} } = request;
   // Note: model parameter is not used directly but kept in the interface for future use
 
@@ -172,8 +212,14 @@ async function processReceiptEmbedding(request: ReceiptEmbeddingRequest, supabas
 
   console.log(`Generating ${contentType} embedding for receipt ${receiptId}`);
 
+  // Record content processing in metrics
+  if (metricsCollector && metricId) {
+    const syntheticContent = metadata.is_synthetic || metadata.extraction_method === 'ai_vision_enhanced';
+    metricsCollector.recordContentProcessing(metricId, contentType, content.length, syntheticContent);
+  }
+
   // Generate the embedding
-  const embedding = await generateEmbedding(content);
+  const embedding = await generateEmbedding(content, 0, metricsCollector, metricId);
 
   console.log(`Successfully generated embedding with ${embedding.length} dimensions`);
 
@@ -230,24 +276,41 @@ async function processLineItemEmbedding(request: LineItemEmbeddingRequest, supab
 
 /**
  * Generate embeddings for multiple content types from a receipt
+ * Enhanced with metrics collection
  */
-async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string, model?: string) {
-  // Fetch the receipt data
-  const { data: receipt, error } = await supabaseClient
-    .from('receipts')
-    .select('*')
-    .eq('id', receiptId)
-    .single();
+async function generateReceiptEmbeddings(
+  supabaseClient: any,
+  receiptId: string,
+  model?: string,
+  uploadContext: 'single' | 'batch' = 'single'
+) {
+  // Create metrics collector
+  const metricsCollector = createMetricsCollector(supabaseClient);
 
-  if (error) {
-    throw new Error(`Error fetching receipt: ${error.message}`);
-  }
+  // Start metrics collection
+  const metricId = await metricsCollector.startMetricsCollection({
+    receiptId,
+    uploadContext,
+    modelUsed: model || 'gemini-embedding-001'
+  });
 
-  if (!receipt) {
-    throw new Error(`Receipt with ID ${receiptId} not found`);
-  }
+  try {
+    // Fetch the receipt data
+    const { data: receipt, error } = await supabaseClient
+      .from('receipts')
+      .select('*')
+      .eq('id', receiptId)
+      .single();
 
-  console.log(`Processing receipt: ${receiptId}, fields available:`, Object.keys(receipt));
+    if (error) {
+      throw new Error(`Error fetching receipt: ${error.message}`);
+    }
+
+    if (!receipt) {
+      throw new Error(`Receipt with ID ${receiptId} not found`);
+    }
+
+    console.log(`Processing receipt: ${receiptId}, fields available:`, Object.keys(receipt));
 
   // Import enhanced content extraction and quality metrics
   const { ContentExtractor } = await import('./contentExtractors.ts');
@@ -298,7 +361,7 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
           extraction_method: 'ai_vision_enhanced'
         },
         model
-      }, supabaseClient);
+      }, supabaseClient, metricsCollector, metricId);
 
       results.push(embeddingResult);
       console.log(`✅ Successfully processed ${extractedContent.contentType} embedding for receipt ${receiptId}`);
@@ -331,7 +394,7 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
           source_metadata: 'legacy_full_text_content'
         },
         model
-      }, supabaseClient);
+      }, supabaseClient, metricsCollector, metricId);
       results.push(fullTextResult);
       console.log(`Successfully processed full text embedding for receipt ${receiptId}`);
     } else {
@@ -359,7 +422,7 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
         extraction_method: 'direct_field'
       },
       model
-    }, supabaseClient);
+    }, supabaseClient, metricsCollector, metricId);
     results.push(notesResult);
     console.log(`✅ Successfully processed notes embedding for receipt ${receiptId}`);
   }
@@ -397,7 +460,7 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
           source_metadata: 'fallback_content'
         },
         model
-      }, supabaseClient);
+      }, supabaseClient, metricsCollector, metricId);
       results.push(fallbackResult);
       console.log(`Successfully processed fallback embedding for receipt ${receiptId}`);
     } else {
@@ -428,12 +491,25 @@ async function generateReceiptEmbeddings(supabaseClient: any, receiptId: string,
     console.warn('Failed to store quality metrics:', metricsError.message);
   }
 
+  // Complete metrics collection successfully
+  await metricsCollector.completeMetricsCollection(metricId);
+
   return {
     success: true,
     receiptId,
     results,
     qualityMetrics
   };
+
+  } catch (error) {
+    // Handle metrics collection failure
+    const errorType = metricsCollector.classifyError(error as Error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await metricsCollector.failMetricsCollection(metricId, errorType, errorMessage);
+
+    // Re-throw the error
+    throw error;
+  }
 }
 
 /**
@@ -1050,7 +1126,9 @@ serve(async (req: Request) => {
         sourceId,
         batchSize,
         priority,
-        limit
+        limit,
+        // Phase 1: Metrics collection parameter
+        uploadContext = 'single' // Default to single if not specified
       } = requestBody;
 
       console.log('Parsed generate-embeddings parameters:', {
@@ -1212,7 +1290,7 @@ serve(async (req: Request) => {
       // If processAllFields is true, generate embeddings for all fields
       else if (processAllFields && receiptId) {
         try {
-          const result = await generateReceiptEmbeddings(supabaseClient, receiptId, model);
+          const result = await generateReceiptEmbeddings(supabaseClient, receiptId, model, uploadContext);
           return new Response(
             JSON.stringify(result),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1232,13 +1310,25 @@ serve(async (req: Request) => {
       // Process a single embedding
       else if (receiptId && contentType && content) {
         try {
-          const result = await processReceiptEmbedding({
-            receiptId,
-            contentType,
-            content,
-            metadata,
-            model
-          }, supabaseClient);
+          // Use metrics collection wrapper for single embedding
+          const result = await withMetricsCollection(
+            createMetricsCollector(supabaseClient),
+            {
+              receiptId,
+              uploadContext,
+              modelUsed: model || 'gemini-embedding-001'
+            },
+            async (metricId) => {
+              const metricsCollector = createMetricsCollector(supabaseClient);
+              return await processReceiptEmbedding({
+                receiptId,
+                contentType,
+                content,
+                metadata,
+                model
+              }, supabaseClient, metricsCollector, metricId);
+            }
+          );
 
           return new Response(
             JSON.stringify(result),
