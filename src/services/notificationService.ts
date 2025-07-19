@@ -703,6 +703,12 @@ export class NotificationService {
       priorities?: NotificationPriority[];
     }
   ) {
+    // TEMPORARY FIX: Disable subscriptions to prevent infinite recursion
+    console.log(`🚫 TEMP FIX: Skipping subscription creation to prevent infinite recursion`);
+    return () => {
+      console.log(`🚫 TEMP FIX: No-op unsubscribe function`);
+    };
+
     // Ensure connection before subscribing
     const connected = await this.ensureConnection();
     if (!connected) {
@@ -874,6 +880,10 @@ export class NotificationService {
    * Clean up a specific subscription
    */
   private cleanupSubscription(channelName: string): void {
+    // TEMPORARY FIX: Disable cleanup to prevent infinite recursion
+    console.log(`🚫 TEMP FIX: Skipping cleanup for ${channelName} to prevent infinite recursion`);
+    return;
+
     // Prevent recursive cleanup calls
     if (this.cleanupInProgress.has(channelName)) {
       console.log(`⚠️ Cleanup already in progress for ${channelName}, skipping`);
@@ -926,8 +936,13 @@ export class NotificationService {
 
   /**
    * Clean up all active channels with enhanced logging
+   * TEMPORARY FIX: Disabled to prevent infinite recursion
    */
   disconnectAll(): void {
+    // TEMPORARY FIX: Disable disconnectAll to prevent infinite recursion
+    console.log(`🚫 TEMP FIX: Skipping disconnectAll to prevent infinite recursion`);
+    return;
+
     console.log(`🔌 Disconnecting ${this.activeChannels.size} active channels`);
 
     for (const [channelName, channel] of this.activeChannels) {
