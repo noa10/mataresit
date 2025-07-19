@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Mode Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(var(--border))',
+                        background: 'hsl(var(--background))',
+                        foreground: 'hsl(var(--foreground))',
+                        card: 'hsl(var(--card))',
+                        'card-foreground': 'hsl(var(--card-foreground))',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --border: 214.3 31.8% 91.4%;
+        }
+
+        .dark {
+            --background: 222.2 84% 4.9%;
+            --foreground: 210 40% 98%;
+            --card: 222.2 84% 4.9%;
+            --card-foreground: 210 40% 98%;
+            --border: 217.2 32.6% 17.5%;
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <div class="container mx-auto p-6 space-y-6">
+        <h1 class="text-3xl font-bold">Dark Mode Test - Embedding Metrics</h1>
+        
+        <!-- Test Alert Colors -->
+        <div class="space-y-4">
+            <h2 class="text-xl font-semibold">Alert Colors Test</h2>
+            
+            <!-- Critical Alert -->
+            <div class="p-4 rounded-lg border transition-all bg-red-50 dark:bg-red-950/50 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800">
+                <div class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                    <span class="font-medium">Critical Alert</span>
+                </div>
+                <p class="mt-2 text-sm">Database connection failed</p>
+            </div>
+            
+            <!-- Warning Alert -->
+            <div class="p-4 rounded-lg border transition-all bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100 border-yellow-200 dark:border-yellow-800">
+                <div class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span class="font-medium">Warning Alert</span>
+                </div>
+                <p class="mt-2 text-sm">Response time elevated</p>
+            </div>
+            
+            <!-- Success Alert -->
+            <div class="p-4 rounded-lg border transition-all bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                <div class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                    </svg>
+                    <span class="font-medium">Success Alert</span>
+                </div>
+                <p class="mt-2 text-sm">All systems operational</p>
+            </div>
+        </div>
+        
+        <!-- Test Status Badges -->
+        <div class="space-y-4">
+            <h2 class="text-xl font-semibold">Status Badges Test</h2>
+            <div class="flex flex-wrap gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                    Healthy
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100 border-yellow-200 dark:border-yellow-800">
+                    Warning
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-red-50 dark:bg-red-950/50 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800">
+                    Critical
+                </span>
+            </div>
+        </div>
+        
+        <!-- Toggle Button -->
+        <button onclick="toggleDarkMode()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Toggle Dark Mode
+        </button>
+    </div>
+    
+    <script>
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>

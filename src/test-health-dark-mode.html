@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Status Dark Mode Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(var(--border))',
+                        background: 'hsl(var(--background))',
+                        foreground: 'hsl(var(--foreground))',
+                        card: 'hsl(var(--card))',
+                        'card-foreground': 'hsl(var(--card-foreground))',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --border: 214.3 31.8% 91.4%;
+        }
+
+        .dark {
+            --background: 222.2 84% 4.9%;
+            --foreground: 210 40% 98%;
+            --card: 222.2 84% 4.9%;
+            --card-foreground: 210 40% 98%;
+            --border: 217.2 32.6% 17.5%;
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <div class="container mx-auto p-6 space-y-6">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold">Health Status Dark Mode Test</h1>
+            <button onclick="toggleDarkMode()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Toggle Dark Mode
+            </button>
+        </div>
+        
+        <!-- System Health Status Card -->
+        <div class="bg-card border border-border rounded-lg p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold flex items-center gap-2">
+                    <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                    </svg>
+                    System Health Status
+                </h2>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                    HEALTHY
+                </span>
+            </div>
+            
+            <!-- Health Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
+                    <p class="text-sm font-medium text-muted-foreground">Health Score</p>
+                    <p class="text-2xl font-bold">93/100</p>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
+                        <div class="bg-green-600 h-2 rounded-full" style="width: 93%"></div>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-muted-foreground">Uptime</p>
+                    <p class="text-2xl font-bold">83.0%</p>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
+                        <div class="bg-blue-600 h-2 rounded-full" style="width: 83%"></div>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-muted-foreground">Last Check</p>
+                    <p class="text-2xl font-bold">Just now</p>
+                    <p class="text-xs text-muted-foreground mt-2">Auto-refresh every 30s</p>
+                </div>
+            </div>
+            
+            <!-- Issues and Recommendations -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Issues Detected -->
+                <div class="space-y-2">
+                    <h4 class="font-medium text-red-800 dark:text-red-200 flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        Issues Detected
+                    </h4>
+                    <ul class="space-y-1">
+                        <li class="text-sm text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-800/50">
+                            recent_data: Last metrics data is 20.3 hours old
+                        </li>
+                        <li class="text-sm text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-800/50">
+                            Database connection timeout detected
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Recommendations -->
+                <div class="space-y-2">
+                    <h4 class="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"></polyline>
+                            <polyline points="17,6 23,6 23,12"></polyline>
+                        </svg>
+                        Recommendations
+                    </h4>
+                    <ul class="space-y-1">
+                        <li class="text-sm text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 rounded border border-blue-200 dark:border-blue-800/50">
+                            Check embedding generation pipeline
+                        </li>
+                        <li class="text-sm text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 rounded border border-blue-200 dark:border-blue-800/50">
+                            Verify metrics collection is active
+                        </li>
+                        <li class="text-sm text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 rounded border border-blue-200 dark:border-blue-800/50">
+                            Consider increasing database timeout values
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Comparison: Before and After -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Before (Problematic) -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <h3 class="text-lg font-semibold mb-4 text-red-600">❌ Before (Problematic)</h3>
+                <div class="space-y-2">
+                    <h4 class="font-medium text-red-800 flex items-center gap-2">Issues Detected</h4>
+                    <div class="text-sm text-red-700 bg-red-50 p-2 rounded">
+                        Bright white background in dark mode
+                    </div>
+                </div>
+                <div class="space-y-2 mt-4">
+                    <h4 class="font-medium text-blue-800 flex items-center gap-2">Recommendations</h4>
+                    <div class="text-sm text-blue-700 bg-blue-50 p-2 rounded">
+                        Harsh contrast, poor readability
+                    </div>
+                </div>
+            </div>
+            
+            <!-- After (Fixed) -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <h3 class="text-lg font-semibold mb-4 text-green-600">✅ After (Fixed)</h3>
+                <div class="space-y-2">
+                    <h4 class="font-medium text-red-800 dark:text-red-200 flex items-center gap-2">Issues Detected</h4>
+                    <div class="text-sm text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-800/50">
+                        Proper dark mode background
+                    </div>
+                </div>
+                <div class="space-y-2 mt-4">
+                    <h4 class="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">Recommendations</h4>
+                    <div class="text-sm text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-950/30 p-2 rounded border border-blue-200 dark:border-blue-800/50">
+                        Good contrast, readable text
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Color Palette Reference -->
+        <div class="bg-card border border-border rounded-lg p-4">
+            <h3 class="text-lg font-semibold mb-4">Dark Mode Color Palette Used</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <div class="bg-red-950/30 border border-red-800/50 p-2 rounded mb-1"></div>
+                    <p>Issues: bg-red-950/30</p>
+                </div>
+                <div>
+                    <div class="bg-blue-950/30 border border-blue-800/50 p-2 rounded mb-1"></div>
+                    <p>Recommendations: bg-blue-950/30</p>
+                </div>
+                <div>
+                    <div class="bg-yellow-950/30 border border-yellow-800/50 p-2 rounded mb-1"></div>
+                    <p>Warnings: bg-yellow-950/30</p>
+                </div>
+                <div>
+                    <div class="bg-green-950/30 border border-green-800/50 p-2 rounded mb-1"></div>
+                    <p>Success: bg-green-950/30</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>

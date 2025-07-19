@@ -31,6 +31,7 @@ tests/screenshots/
 tests/videos/
 tests/fixtures/temp/
 tests/manual/temp/
+tools/testing/logs/
 
 # Editor directories and files
 .vscode/*

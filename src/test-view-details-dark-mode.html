@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Details Dark Mode Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(var(--border))',
+                        background: 'hsl(var(--background))',
+                        foreground: 'hsl(var(--foreground))',
+                        card: 'hsl(var(--card))',
+                        'card-foreground': 'hsl(var(--card-foreground))',
+                        muted: 'hsl(var(--muted))',
+                        'muted-foreground': 'hsl(var(--muted-foreground))',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --border: 214.3 31.8% 91.4%;
+            --muted: 210 40% 96.1%;
+            --muted-foreground: 215.4 16.3% 46.9%;
+        }
+
+        .dark {
+            --background: 222.2 84% 4.9%;
+            --foreground: 210 40% 98%;
+            --card: 222.2 84% 4.9%;
+            --card-foreground: 210 40% 98%;
+            --border: 217.2 32.6% 17.5%;
+            --muted: 217.2 32.6% 17.5%;
+            --muted-foreground: 215 20.2% 65.1%;
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <div class="container mx-auto p-6 space-y-6">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold">System Components - View Details Test</h1>
+            <button onclick="toggleDarkMode()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Toggle Dark Mode
+            </button>
+        </div>
+        
+        <!-- System Components Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Database Component Card -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="m3 5 0 14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"></path>
+                            <path d="m3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"></path>
+                        </svg>
+                        <span class="font-medium capitalize">Database</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                        </svg>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                            HEALTHY
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">Database responding normally</p>
+                
+                <div class="flex justify-between text-xs text-muted-foreground">
+                    <span>Response: 982ms</span>
+                    <span>Just now</span>
+                </div>
+
+                <details class="mt-2">
+                    <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                    <pre class="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 overflow-auto border border-gray-200 dark:border-gray-700">{
+  "connection_pool": {
+    "active": 5,
+    "idle": 15,
+    "max": 20
+  },
+  "query_performance": {
+    "avg_response_time": "982ms",
+    "slow_queries": 0
+  },
+  "last_check": "2024-01-15T21:43:25Z"
+}</pre>
+                </details>
+            </div>
+
+            <!-- Embedding Tables Component Card -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 7v1a3 3 0 0 0 3 3h1m0-11v18m0 0h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 1-2 2z"></path>
+                        </svg>
+                        <span class="font-medium capitalize">Embedding Tables</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                        </svg>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                            HEALTHY
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">All embedding tables are accessible</p>
+                
+                <div class="flex justify-between text-xs text-muted-foreground">
+                    <span>Response: 572ms</span>
+                    <span>Just now</span>
+                </div>
+
+                <details class="mt-2">
+                    <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                    <pre class="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 overflow-auto border border-gray-200 dark:border-gray-700">{
+  "tables": {
+    "receipt_embeddings": {
+      "status": "healthy",
+      "row_count": 1247,
+      "last_updated": "2024-01-15T21:42:18Z"
+    },
+    "embedding_metrics": {
+      "status": "healthy", 
+      "row_count": 8934,
+      "last_updated": "2024-01-15T21:43:01Z"
+    }
+  },
+  "indexes": {
+    "embedding_vector_idx": "healthy",
+    "receipt_id_idx": "healthy"
+  }
+}</pre>
+                </details>
+            </div>
+
+            <!-- Aggregation Functions Component Card -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"></polygon>
+                        </svg>
+                        <span class="font-medium capitalize">Aggregation Functions</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                        </svg>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                            HEALTHY
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">Aggregation functions are available and responding</p>
+                
+                <div class="flex justify-between text-xs text-muted-foreground">
+                    <span>Response: 105ms</span>
+                    <span>Just now</span>
+                </div>
+
+                <details class="mt-2">
+                    <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                    <pre class="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 overflow-auto border border-gray-200 dark:border-gray-700">{
+  "functions": {
+    "check_embedding_aggregation_health": {
+      "status": "deployed",
+      "last_execution": "2024-01-15T21:43:20Z",
+      "execution_time": "45ms"
+    },
+    "webhook_trigger_embedding_aggregation": {
+      "status": "deployed",
+      "last_execution": "2024-01-15T21:40:15Z",
+      "execution_time": "60ms"
+    }
+  },
+  "performance": {
+    "avg_execution_time": "52ms",
+    "success_rate": "99.8%"
+  }
+}</pre>
+                </details>
+            </div>
+
+            <!-- Warning State Example -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 7v1a3 3 0 0 0 3 3h1m0-11v18m0 0h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 1-2 2z"></path>
+                        </svg>
+                        <span class="font-medium capitalize">Cache System</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="h-5 w-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100 border-yellow-200 dark:border-yellow-800">
+                            WARNING
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">Cache hit rate below optimal threshold</p>
+                
+                <div class="flex justify-between text-xs text-muted-foreground">
+                    <span>Response: 1.2s</span>
+                    <span>2 min ago</span>
+                </div>
+
+                <details class="mt-2">
+                    <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                    <pre class="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 overflow-auto border border-gray-200 dark:border-gray-700">{
+  "cache_stats": {
+    "hit_rate": "68.5%",
+    "miss_rate": "31.5%",
+    "optimal_threshold": "85%"
+  },
+  "recommendations": [
+    "Increase cache size",
+    "Review cache warming strategy"
+  ]
+}</pre>
+                </details>
+            </div>
+        </div>
+        
+        <!-- Before/After Comparison -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+            <!-- Before (Problematic) -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <h3 class="text-lg font-semibold mb-4 text-red-600">❌ Before (Problematic)</h3>
+                <div class="space-y-2">
+                    <p class="text-sm text-gray-700 mb-2">Component message text</p>
+                    <details class="mt-2">
+                        <summary class="text-xs text-blue-600 cursor-pointer">View Details</summary>
+                        <pre class="text-xs bg-gray-50 p-2 rounded mt-1">Barely visible in dark mode</pre>
+                    </details>
+                </div>
+            </div>
+            
+            <!-- After (Fixed) -->
+            <div class="bg-card border border-border rounded-lg p-4">
+                <h3 class="text-lg font-semibold mb-4 text-green-600">✅ After (Fixed)</h3>
+                <div class="space-y-2">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">Component message text</p>
+                    <details class="mt-2">
+                        <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                        <pre class="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 border border-gray-200 dark:border-gray-700">Clearly visible with proper contrast</pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>

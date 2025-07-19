@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toggle Dark Mode</title>
+</head>
+<body>
+    <h1>Dark Mode Toggle</h1>
+    <button onclick="enableDarkMode()">Enable Dark Mode</button>
+    <button onclick="enableLightMode()">Enable Light Mode</button>
+    <button onclick="goToEmbeddingMetrics()">Go to Embedding Metrics</button>
+    
+    <script>
+        function enableDarkMode() {
+            localStorage.setItem('theme', 'dark');
+            localStorage.setItem('theme-config', JSON.stringify({mode: 'dark', variant: 'default'}));
+            alert('Dark mode enabled! Now navigate to the embedding metrics page.');
+        }
+        
+        function enableLightMode() {
+            localStorage.setItem('theme', 'light');
+            localStorage.setItem('theme-config', JSON.stringify({mode: 'light', variant: 'default'}));
+            alert('Light mode enabled! Now navigate to the embedding metrics page.');
+        }
+        
+        function goToEmbeddingMetrics() {
+            window.location.href = '/admin/embedding-metrics';
+        }
+    </script>
+</body>
+</html>
