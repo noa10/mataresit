@@ -43,6 +43,7 @@ const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
 const ReceiptsManagement = lazy(() => import("./pages/admin/ReceiptsManagement"));
 const AnalyticsPage = lazy(() => import("./pages/admin/AnalyticsPage"));
+const EmbeddingMetricsPage = lazy(() => import("./pages/admin/EmbeddingMetricsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 const BlogManagement = lazy(() => import("./pages/admin/BlogManagement"));
 
@@ -308,6 +309,11 @@ const App = () => (
                 <Route path="analytics" element={
                   <Suspense fallback={<PageLoading />}>
                     <AnalyticsPage />
+                  </Suspense>
+                } />
+                <Route path="embedding-metrics" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <EmbeddingMetricsPage />
                   </Suspense>
                 } />
                 <Route path="blog" element={
