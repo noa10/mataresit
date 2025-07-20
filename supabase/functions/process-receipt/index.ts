@@ -1325,11 +1325,12 @@ async function saveResultsToDatabase(
 
 /**
  * Triggers post-processing tasks (embeddings) asynchronously
+ * Phase 2: Enhanced with queue-based processing and fallback to direct processing
  */
 async function triggerPostProcessing(receiptId: string, supabase: any, logger: ProcessingLogger): Promise<void> {
   try {
     await logger.log("Triggering embedding generation", "EMBEDDING");
-    console.log("Calling generate-embeddings function...");
+    console.log("Determining embedding processing method...");
 
     // Check if GEMINI_API_KEY is set in environment variables
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
@@ -1338,6 +1339,86 @@ async function triggerPostProcessing(receiptId: string, supabase: any, logger: P
       await logger.log("GEMINI_API_KEY is not set. Embeddings cannot be generated.", "WARNING");
       return;
     }
+
+    // Check if queue-based processing is enabled
+    const { data: queueConfig } = await supabase
+      .from('embedding_queue_config')
+      .select('config_value')
+      .eq('config_key', 'queue_enabled')
+      .single();
+
+    const useQueue = queueConfig?.config_value === true || queueConfig?.config_value === 'true';
+
+    if (useQueue) {
+      // Use queue-based processing
+      await queueBasedEmbeddingProcessing(receiptId, supabase, logger);
+    } else {
+      // Use direct processing (existing behavior)
+      await directEmbeddingProcessing(receiptId, supabase, logger);
+    }
+  } catch (embeddingError) {
+    console.error("Error in triggerPostProcessing:", embeddingError);
+    await logger.log(`Embedding processing error: ${embeddingError.message}`, "WARNING");
+    // Continue processing even if embedding generation fails
+  }
+}
+
+/**
+ * Queue-based embedding processing (Phase 2)
+ */
+async function queueBasedEmbeddingProcessing(receiptId: string, supabase: any, logger: ProcessingLogger): Promise<void> {
+  try {
+    await logger.log("Adding embedding generation to queue", "EMBEDDING");
+
+    const { error } = await supabase
+      .from('embedding_queue')
+      .insert({
+        source_type: 'receipts',
+        source_id: receiptId,
+        operation: 'INSERT',
+        priority: 'high', // Receipt processing gets high priority
+        metadata: {
+          triggered_by: 'process_receipt',
+          upload_context: 'direct_processing',
+          timestamp: new Date().toISOString()
+        }
+      });
+
+    if (error) {
+      await logger.log(`Queue insertion error: ${error.message}`, "WARNING");
+      // Fallback to direct processing
+      await logger.log("Falling back to direct embedding processing", "EMBEDDING");
+      await directEmbeddingProcessing(receiptId, supabase, logger);
+    } else {
+      await logger.log("Successfully queued for embedding generation", "EMBEDDING");
+
+      // Update receipt status to indicate queued for embeddings
+      try {
+        await supabase
+          .from('receipts')
+          .update({
+            embedding_status: 'queued'
+          })
+          .eq('id', receiptId);
+      } catch (updateError) {
+        console.error("Error updating receipt embedding status to queued:", updateError);
+        await logger.log(`Error updating embedding status: ${updateError.message}`, "WARNING");
+      }
+    }
+  } catch (queueError) {
+    console.error("Error in queue-based processing:", queueError);
+    await logger.log(`Queue processing error: ${queueError.message}`, "WARNING");
+    // Fallback to direct processing
+    await directEmbeddingProcessing(receiptId, supabase, logger);
+  }
+}
+
+/**
+ * Direct embedding processing (existing behavior, extracted for reuse)
+ */
+async function directEmbeddingProcessing(receiptId: string, supabase: any, logger: ProcessingLogger): Promise<void> {
+  try {
+    await logger.log("Using direct embedding processing", "EMBEDDING");
 
     // Use service role key for authorization
     const authorization = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
