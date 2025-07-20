@@ -8,9 +8,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./tests/alerting/setup/vitest-setup.ts'],
+    setupFiles: [
+      './tests/alerting/setup/vitest-setup.ts',
+      './tests/queue/setup/vitest-setup.ts'
+    ],
     include: [
       'tests/alerting/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'tests/queue/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
     ],
     exclude: [
@@ -20,7 +24,8 @@ export default defineConfig({
       '.git',
       '.cache',
       'tests/alerting/e2e/**/*',
-      'tests/alerting/performance/**/*'
+      'tests/alerting/performance/**/*',
+      'tests/queue/performance/**/*'
     ],
     coverage: {
       provider: 'v8',
