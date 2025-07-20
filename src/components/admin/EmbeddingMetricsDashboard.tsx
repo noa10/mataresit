@@ -41,6 +41,8 @@ import { EmbeddingConnectionMonitor } from './EmbeddingConnectionMonitor';
 import { HealthStatusDashboard } from './HealthStatusDashboard';
 import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { HealthStatusIndicator } from './HealthStatusIndicator';
+import { EmbeddingQueueManagement } from './EmbeddingQueueManagement';
+import { EmbeddingQueueMetrics } from './EmbeddingQueueMetrics';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { toast } from 'sonner';
 import { getAutoRefreshClasses } from '@/lib/darkModeUtils';
@@ -250,7 +252,7 @@ function EmbeddingMetricsDashboardContent() {
       )}
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -314,19 +316,26 @@ function EmbeddingMetricsDashboardContent() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Queue Status Card */}
+        <EmbeddingQueueMetrics showDetailed={false} />
       </div>
 
       {/* Detailed Metrics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="quality">Quality</TabsTrigger>
           <TabsTrigger value="costs">Costs</TabsTrigger>
+          <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="health">Health</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {/* Queue Metrics Overview */}
+          <EmbeddingQueueMetrics showDetailed={true} />
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Recent Activity */}
             <Card>
@@ -404,10 +413,14 @@ function EmbeddingMetricsDashboardContent() {
         </TabsContent>
 
         <TabsContent value="costs" className="space-y-4">
-          <EmbeddingCostAnalysis 
+          <EmbeddingCostAnalysis
             costBreakdown={costBreakdown}
             isLoading={isRefreshing}
           />
+        </TabsContent>
+
+        <TabsContent value="queue" className="space-y-4">
+          <EmbeddingQueueManagement />
         </TabsContent>
 
         <TabsContent value="health" className="space-y-4">
