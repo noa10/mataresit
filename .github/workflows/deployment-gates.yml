@@ -1,0 +1,419 @@
+name: Deployment Gates and Quality Checks
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      skip_security_scan:
+        required: false
+        type: boolean
+        default: false
+      skip_performance_tests:
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      gate_passed:
+        description: "Whether all deployment gates passed"
+        value: ${{ jobs.deployment-gate.outputs.passed }}
+      security_score:
+        description: "Security scan score"
+        value: ${{ jobs.security-gate.outputs.score }}
+      performance_score:
+        description: "Performance test score"
+        value: ${{ jobs.performance-gate.outputs.score }}
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Security gate
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.security-evaluation.outputs.passed }}
+      score: ${{ steps.security-evaluation.outputs.score }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run comprehensive security audit
+        id: security-audit
+        run: |
+          echo "Running comprehensive security audit..."
+          
+          # NPM audit
+          npm audit --audit-level=moderate --json > npm-audit.json || true
+          
+          # Count vulnerabilities by severity
+          CRITICAL=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "critical")) | length' npm-audit.json 2>/dev/null || echo "0")
+          HIGH=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "high")) | length' npm-audit.json 2>/dev/null || echo "0")
+          MODERATE=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "moderate")) | length' npm-audit.json 2>/dev/null || echo "0")
+          
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Run Snyk security scan
+        id: snyk-scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --json > snyk-results.json
+        continue-on-error: true
+
+      - name: Container security scan
+        id: container-scan
+        if: inputs.skip_security_scan != true
+        run: |
+          # Pull the image for scanning
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+          
+          # Run Trivy scan
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --format json --output trivy-results.json \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} || true
+          
+          # Count vulnerabilities
+          if [[ -f trivy-results.json ]]; then
+            CONTAINER_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-results.json 2>/dev/null || echo "0")
+            CONTAINER_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-results.json 2>/dev/null || echo "0")
+            
+            echo "container_critical=$CONTAINER_CRITICAL" >> $GITHUB_OUTPUT
+            echo "container_high=$CONTAINER_HIGH" >> $GITHUB_OUTPUT
+          else
+            echo "container_critical=0" >> $GITHUB_OUTPUT
+            echo "container_high=0" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: OWASP ZAP security scan
+        id: zap-scan
+        if: inputs.environment != 'production'
+        run: |
+          # Start application for security testing
+          docker run -d --name test-app -p 3000:3000 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+          
+          # Wait for application to start
+          sleep 30
+          
+          # Run OWASP ZAP baseline scan
+          docker run --rm --network host \
+            -v $(pwd):/zap/wrk/:rw \
+            owasp/zap2docker-stable zap-baseline.py \
+            -t http://localhost:3000 \
+            -J zap-report.json \
+            -r zap-report.html || true
+          
+          # Stop test application
+          docker stop test-app && docker rm test-app
+          
+          # Parse ZAP results
+          if [[ -f zap-report.json ]]; then
+            ZAP_HIGH=$(jq '[.site[]?.alerts[]? | select(.riskdesc | startswith("High"))] | length' zap-report.json 2>/dev/null || echo "0")
+            ZAP_MEDIUM=$(jq '[.site[]?.alerts[]? | select(.riskdesc | startswith("Medium"))] | length' zap-report.json 2>/dev/null || echo "0")
+            
+            echo "zap_high=$ZAP_HIGH" >> $GITHUB_OUTPUT
+            echo "zap_medium=$ZAP_MEDIUM" >> $GITHUB_OUTPUT
+          else
+            echo "zap_high=0" >> $GITHUB_OUTPUT
+            echo "zap_medium=0" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Evaluate security gate
+        id: security-evaluation
+        run: |
+          # Get vulnerability counts
+          CRITICAL=${{ steps.security-audit.outputs.critical || 0 }}
+          HIGH=${{ steps.security-audit.outputs.high || 0 }}
+          MODERATE=${{ steps.security-audit.outputs.moderate || 0 }}
+          CONTAINER_CRITICAL=${{ steps.container-scan.outputs.container_critical || 0 }}
+          CONTAINER_HIGH=${{ steps.container-scan.outputs.container_high || 0 }}
+          ZAP_HIGH=${{ steps.zap-scan.outputs.zap_high || 0 }}
+          ZAP_MEDIUM=${{ steps.zap-scan.outputs.zap_medium || 0 }}
+          
+          # Calculate security score (0-100)
+          TOTAL_CRITICAL=$((CRITICAL + CONTAINER_CRITICAL))
+          TOTAL_HIGH=$((HIGH + CONTAINER_HIGH + ZAP_HIGH))
+          TOTAL_MEDIUM=$((MODERATE + ZAP_MEDIUM))
+          
+          # Score calculation: Start with 100, deduct points for vulnerabilities
+          SCORE=100
+          SCORE=$((SCORE - (TOTAL_CRITICAL * 20)))  # Critical: -20 points each
+          SCORE=$((SCORE - (TOTAL_HIGH * 10)))      # High: -10 points each
+          SCORE=$((SCORE - (TOTAL_MEDIUM * 2)))     # Medium: -2 points each
+          
+          # Ensure score doesn't go below 0
+          if [[ $SCORE -lt 0 ]]; then
+            SCORE=0
+          fi
+          
+          # Determine pass/fail based on environment
+          PASSED=false
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            # Production: No critical, max 2 high
+            if [[ $TOTAL_CRITICAL -eq 0 ]] && [[ $TOTAL_HIGH -le 2 ]]; then
+              PASSED=true
+            fi
+          elif [[ "${{ inputs.environment }}" == "staging" ]]; then
+            # Staging: Max 1 critical, max 5 high
+            if [[ $TOTAL_CRITICAL -le 1 ]] && [[ $TOTAL_HIGH -le 5 ]]; then
+              PASSED=true
+            fi
+          else
+            # Development: Max 3 critical, max 10 high
+            if [[ $TOTAL_CRITICAL -le 3 ]] && [[ $TOTAL_HIGH -le 10 ]]; then
+              PASSED=true
+            fi
+          fi
+          
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          
+          echo "Security Gate Results:"
+          echo "- Critical vulnerabilities: $TOTAL_CRITICAL"
+          echo "- High vulnerabilities: $TOTAL_HIGH"
+          echo "- Medium vulnerabilities: $TOTAL_MEDIUM"
+          echo "- Security score: $SCORE/100"
+          echo "- Gate passed: $PASSED"
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports-${{ inputs.environment }}-${{ github.run_number }}
+          path: |
+            npm-audit.json
+            snyk-results.json
+            trivy-results.json
+            zap-report.json
+            zap-report.html
+          retention-days: 30
+
+  # Performance gate
+  performance-gate:
+    name: Performance Gate
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.performance-evaluation.outputs.passed }}
+      score: ${{ steps.performance-evaluation.outputs.score }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start application for testing
+        if: inputs.skip_performance_tests != true
+        run: |
+          # Start application container
+          docker run -d --name perf-test-app -p 3000:3000 \
+            -e NODE_ENV=production \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+          
+          # Wait for application to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+
+      - name: Run performance tests
+        id: performance-tests
+        if: inputs.skip_performance_tests != true
+        run: |
+          # Install k6 for load testing
+          curl -s https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar xz
+          sudo mv k6-v0.47.0-linux-amd64/k6 /usr/local/bin/
+          
+          # Create k6 test script
+          cat > performance-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          
+          export let options = {
+            stages: [
+              { duration: '30s', target: 10 },
+              { duration: '1m', target: 20 },
+              { duration: '30s', target: 0 },
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'],
+              http_req_failed: ['rate<0.05'],
+            },
+          };
+          
+          export default function() {
+            let response = http.get('http://localhost:3000/health');
+            check(response, {
+              'status is 200': (r) => r.status === 200,
+              'response time < 2000ms': (r) => r.timings.duration < 2000,
+            });
+            sleep(1);
+          }
+          EOF
+          
+          # Run performance test
+          k6 run --out json=performance-results.json performance-test.js || true
+          
+          # Parse results
+          if [[ -f performance-results.json ]]; then
+            # Extract key metrics
+            AVG_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration.values.avg' performance-results.json 2>/dev/null || echo "0")
+            P95_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration.values["p(95)"]' performance-results.json 2>/dev/null || echo "0")
+            ERROR_RATE=$(jq -r '.metrics.http_req_failed.values.rate' performance-results.json 2>/dev/null || echo "0")
+            
+            echo "avg_response_time=$AVG_RESPONSE_TIME" >> $GITHUB_OUTPUT
+            echo "p95_response_time=$P95_RESPONSE_TIME" >> $GITHUB_OUTPUT
+            echo "error_rate=$ERROR_RATE" >> $GITHUB_OUTPUT
+          else
+            echo "avg_response_time=0" >> $GITHUB_OUTPUT
+            echo "p95_response_time=0" >> $GITHUB_OUTPUT
+            echo "error_rate=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stop test application
+        if: always() && inputs.skip_performance_tests != true
+        run: |
+          docker stop perf-test-app && docker rm perf-test-app || true
+
+      - name: Evaluate performance gate
+        id: performance-evaluation
+        run: |
+          if [[ "${{ inputs.skip_performance_tests }}" == "true" ]]; then
+            echo "Performance tests skipped"
+            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "score=100" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Get performance metrics
+          AVG_RESPONSE_TIME=${{ steps.performance-tests.outputs.avg_response_time || 0 }}
+          P95_RESPONSE_TIME=${{ steps.performance-tests.outputs.p95_response_time || 0 }}
+          ERROR_RATE=${{ steps.performance-tests.outputs.error_rate || 0 }}
+          
+          # Calculate performance score (0-100)
+          SCORE=100
+          
+          # Deduct points based on response times
+          if (( $(echo "$P95_RESPONSE_TIME > 2000" | bc -l) )); then
+            SCORE=$((SCORE - 30))
+          elif (( $(echo "$P95_RESPONSE_TIME > 1000" | bc -l) )); then
+            SCORE=$((SCORE - 15))
+          fi
+          
+          # Deduct points based on error rate
+          if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
+            SCORE=$((SCORE - 40))
+          elif (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+            SCORE=$((SCORE - 20))
+          fi
+          
+          # Ensure score doesn't go below 0
+          if [[ $SCORE -lt 0 ]]; then
+            SCORE=0
+          fi
+          
+          # Determine pass/fail based on environment
+          PASSED=false
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            # Production: P95 < 2000ms, error rate < 1%
+            if (( $(echo "$P95_RESPONSE_TIME < 2000" | bc -l) )) && (( $(echo "$ERROR_RATE < 0.01" | bc -l) )); then
+              PASSED=true
+            fi
+          elif [[ "${{ inputs.environment }}" == "staging" ]]; then
+            # Staging: P95 < 3000ms, error rate < 5%
+            if (( $(echo "$P95_RESPONSE_TIME < 3000" | bc -l) )) && (( $(echo "$ERROR_RATE < 0.05" | bc -l) )); then
+              PASSED=true
+            fi
+          else
+            # Development: P95 < 5000ms, error rate < 10%
+            if (( $(echo "$P95_RESPONSE_TIME < 5000" | bc -l) )) && (( $(echo "$ERROR_RATE < 0.10" | bc -l) )); then
+              PASSED=true
+            fi
+          fi
+          
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          
+          echo "Performance Gate Results:"
+          echo "- Average response time: ${AVG_RESPONSE_TIME}ms"
+          echo "- P95 response time: ${P95_RESPONSE_TIME}ms"
+          echo "- Error rate: ${ERROR_RATE}"
+          echo "- Performance score: $SCORE/100"
+          echo "- Gate passed: $PASSED"
+
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-reports-${{ inputs.environment }}-${{ github.run_number }}
+          path: |
+            performance-results.json
+            performance-test.js
+          retention-days: 30
+
+  # Overall deployment gate
+  deployment-gate:
+    name: Deployment Gate
+    runs-on: ubuntu-latest
+    needs: [security-gate, performance-gate]
+    outputs:
+      passed: ${{ steps.gate-evaluation.outputs.passed }}
+    
+    steps:
+      - name: Evaluate deployment gate
+        id: gate-evaluation
+        run: |
+          SECURITY_PASSED=${{ needs.security-gate.outputs.passed }}
+          PERFORMANCE_PASSED=${{ needs.performance-gate.outputs.passed }}
+          SECURITY_SCORE=${{ needs.security-gate.outputs.score }}
+          PERFORMANCE_SCORE=${{ needs.performance-gate.outputs.score }}
+          
+          # Overall gate passes if both security and performance pass
+          if [[ "$SECURITY_PASSED" == "true" ]] && [[ "$PERFORMANCE_PASSED" == "true" ]]; then
+            GATE_PASSED=true
+            GATE_STATUS="✅ All deployment gates passed"
+          else
+            GATE_PASSED=false
+            GATE_STATUS="❌ Deployment gates failed"
+          fi
+          
+          echo "passed=$GATE_PASSED" >> $GITHUB_OUTPUT
+          
+          echo "## 🚦 Deployment Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status**: $GATE_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Gate**: ${{ needs.security-gate.outputs.passed == 'true' && '✅ Passed' || '❌ Failed' }} (Score: $SECURITY_SCORE/100)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance Gate**: ${{ needs.performance-gate.outputs.passed == 'true' && '✅ Passed' || '❌ Failed' }} (Score: $PERFORMANCE_SCORE/100)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Tag: ${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,336 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      rollback_steps:
+        description: 'Number of deployment steps to rollback'
+        required: false
+        default: '1'
+      reason:
+        description: 'Reason for rollback'
+        required: true
+      notify_channels:
+        description: 'Notify all channels'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  NAMESPACE: ${{ github.event.inputs.environment == 'production' && 'paperless-maverick' || 'paperless-maverick-staging' }}
+
+jobs:
+  # Pre-rollback validation
+  pre-rollback:
+    name: Pre-rollback Validation
+    runs-on: ubuntu-latest
+    outputs:
+      current-revision: ${{ steps.current.outputs.revision }}
+      target-revision: ${{ steps.target.outputs.revision }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Get current deployment revision
+        id: current
+        run: |
+          APP_REVISION=$(kubectl rollout history deployment/paperless-maverick -n ${{ env.NAMESPACE }} --revision=0 | tail -1 | awk '{print $1}')
+          WORKER_REVISION=$(kubectl rollout history deployment/embedding-queue-workers -n ${{ env.NAMESPACE }} --revision=0 | tail -1 | awk '{print $1}')
+          echo "revision=app:$APP_REVISION,worker:$WORKER_REVISION" >> $GITHUB_OUTPUT
+          echo "Current revisions - App: $APP_REVISION, Worker: $WORKER_REVISION"
+
+      - name: Calculate target revision
+        id: target
+        run: |
+          STEPS=${{ github.event.inputs.rollback_steps }}
+          APP_CURRENT=$(kubectl rollout history deployment/paperless-maverick -n ${{ env.NAMESPACE }} --revision=0 | tail -1 | awk '{print $1}')
+          WORKER_CURRENT=$(kubectl rollout history deployment/embedding-queue-workers -n ${{ env.NAMESPACE }} --revision=0 | tail -1 | awk '{print $1}')
+          
+          APP_TARGET=$((APP_CURRENT - STEPS))
+          WORKER_TARGET=$((WORKER_CURRENT - STEPS))
+          
+          echo "revision=app:$APP_TARGET,worker:$WORKER_TARGET" >> $GITHUB_OUTPUT
+          echo "Target revisions - App: $APP_TARGET, Worker: $WORKER_TARGET"
+
+      - name: Validate rollback target
+        run: |
+          # Check if target revisions exist
+          APP_TARGET=$(echo "${{ steps.target.outputs.revision }}" | cut -d',' -f1 | cut -d':' -f2)
+          WORKER_TARGET=$(echo "${{ steps.target.outputs.revision }}" | cut -d',' -f2 | cut -d':' -f2)
+          
+          if [ $APP_TARGET -lt 1 ] || [ $WORKER_TARGET -lt 1 ]; then
+            echo "Error: Invalid rollback target. Cannot rollback beyond first revision."
+            exit 1
+          fi
+          
+          # Verify revisions exist in history
+          kubectl rollout history deployment/paperless-maverick -n ${{ env.NAMESPACE }} --revision=$APP_TARGET
+          kubectl rollout history deployment/embedding-queue-workers -n ${{ env.NAMESPACE }} --revision=$WORKER_TARGET
+
+  # Emergency approval for production
+  emergency-approval:
+    name: Emergency Approval
+    runs-on: ubuntu-latest
+    needs: pre-rollback
+    if: github.event.inputs.environment == 'production'
+    
+    steps:
+      - name: Emergency rollback approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: ${{ secrets.EMERGENCY_APPROVERS }}
+          minimum-approvals: 1
+          issue-title: "🚨 EMERGENCY PRODUCTION ROLLBACK"
+          issue-body: |
+            ## 🚨 EMERGENCY PRODUCTION ROLLBACK REQUEST
+            
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Reason:** ${{ github.event.inputs.reason }}
+            **Requested by:** ${{ github.actor }}
+            **Rollback Steps:** ${{ github.event.inputs.rollback_steps }}
+            
+            ### Current State
+            - **Current Revisions:** ${{ needs.pre-rollback.outputs.current-revision }}
+            - **Target Revisions:** ${{ needs.pre-rollback.outputs.target-revision }}
+            
+            ### ⚠️ WARNING
+            This is an emergency rollback that will immediately revert the production environment.
+            
+            **Please approve ONLY if:**
+            - There is a critical production issue
+            - The rollback target has been verified
+            - You understand the impact of this rollback
+            
+            ### Impact Assessment
+            - Production traffic will be affected during rollback
+            - Recent changes will be reverted
+            - Database migrations may need manual handling
+            
+            **Approve this rollback immediately if production is down or critically impacted.**
+          exclude-workflow-initiator-as-approver: false
+
+  # Execute rollback
+  execute-rollback:
+    name: Execute Rollback
+    runs-on: ubuntu-latest
+    needs: [pre-rollback, emergency-approval]
+    if: always() && needs.pre-rollback.result == 'success' && (needs.emergency-approval.result == 'success' || github.event.inputs.environment != 'production')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Create rollback backup
+        run: |
+          # Backup current state before rollback
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          mkdir -p rollback-backup-$TIMESTAMP
+          
+          kubectl get deployment paperless-maverick -n ${{ env.NAMESPACE }} -o yaml > rollback-backup-$TIMESTAMP/app-deployment.yaml
+          kubectl get deployment embedding-queue-workers -n ${{ env.NAMESPACE }} -o yaml > rollback-backup-$TIMESTAMP/worker-deployment.yaml
+          kubectl get configmap -n ${{ env.NAMESPACE }} -o yaml > rollback-backup-$TIMESTAMP/configmaps.yaml
+          kubectl get services -n ${{ env.NAMESPACE }} -o yaml > rollback-backup-$TIMESTAMP/services.yaml
+
+      - name: Execute application rollback
+        run: |
+          echo "🔄 Rolling back application deployment..."
+          APP_TARGET=$(echo "${{ needs.pre-rollback.outputs.target-revision }}" | cut -d',' -f1 | cut -d':' -f2)
+          
+          if [ "${{ github.event.inputs.rollback_steps }}" == "1" ]; then
+            # Simple rollback to previous version
+            kubectl rollout undo deployment/paperless-maverick -n ${{ env.NAMESPACE }}
+          else
+            # Rollback to specific revision
+            kubectl rollout undo deployment/paperless-maverick -n ${{ env.NAMESPACE }} --to-revision=$APP_TARGET
+          fi
+
+      - name: Execute worker rollback
+        run: |
+          echo "🔄 Rolling back worker deployment..."
+          WORKER_TARGET=$(echo "${{ needs.pre-rollback.outputs.target-revision }}" | cut -d',' -f2 | cut -d':' -f2)
+          
+          if [ "${{ github.event.inputs.rollback_steps }}" == "1" ]; then
+            # Simple rollback to previous version
+            kubectl rollout undo deployment/embedding-queue-workers -n ${{ env.NAMESPACE }}
+          else
+            # Rollback to specific revision
+            kubectl rollout undo deployment/embedding-queue-workers -n ${{ env.NAMESPACE }} --to-revision=$WORKER_TARGET
+          fi
+
+      - name: Wait for rollback completion
+        run: |
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/paperless-maverick -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/embedding-queue-workers -n ${{ env.NAMESPACE }} --timeout=600s
+
+      - name: Verify rollback health
+        run: |
+          echo "🔍 Verifying rollback health..."
+          
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod -l app=paperless-maverick -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=embedding-queue-worker -n ${{ env.NAMESPACE }} --timeout=300s
+          
+          # Check deployment status
+          kubectl get deployments -n ${{ env.NAMESPACE }}
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          
+          # Test health endpoints
+          APP_POD=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=paperless-maverick -o jsonpath='{.items[0].metadata.name}')
+          WORKER_POD=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=embedding-queue-worker -o jsonpath='{.items[0].metadata.name}')
+          
+          echo "Testing application health..."
+          kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:3000/health
+          
+          echo "Testing worker health..."
+          kubectl exec -n ${{ env.NAMESPACE }} $WORKER_POD -- node health-check.js
+
+      - name: Upload rollback artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-backup-${{ github.run_number }}
+          path: rollback-backup-*/
+          retention-days: 90
+
+  # Post-rollback validation
+  post-rollback-validation:
+    name: Post-rollback Validation
+    runs-on: ubuntu-latest
+    needs: execute-rollback
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running post-rollback smoke tests..."
+          npm run test:integration
+        env:
+          TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'production' && secrets.SUPABASE_URL || secrets.STAGING_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ github.event.inputs.environment == 'production' && secrets.SUPABASE_ANON_KEY || secrets.STAGING_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'production' && secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_GEMINI_API_KEY: ${{ github.event.inputs.environment == 'production' && secrets.GEMINI_API_KEY || secrets.STAGING_GEMINI_API_KEY }}
+
+      - name: Generate rollback report
+        run: |
+          echo "📊 Generating rollback validation report..."
+          npm run test:phase4:report
+
+      - name: Upload validation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-validation-${{ github.run_number }}
+          path: test-results/
+          retention-days: 30
+
+  # Notifications
+  notify-rollback:
+    name: Notify Rollback Status
+    runs-on: ubuntu-latest
+    needs: [execute-rollback, post-rollback-validation]
+    if: always()
+    
+    steps:
+      - name: Notify rollback success
+        if: needs.execute-rollback.result == 'success' && needs.post-rollback-validation.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            ✅ ROLLBACK COMPLETED SUCCESSFULLY
+            
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Reason:** ${{ github.event.inputs.reason }}
+            **Executed by:** ${{ github.actor }}
+            **Steps rolled back:** ${{ github.event.inputs.rollback_steps }}
+            
+            **Previous revisions:** ${{ needs.pre-rollback.outputs.current-revision }}
+            **Current revisions:** ${{ needs.pre-rollback.outputs.target-revision }}
+            
+            ✅ All post-rollback validations passed
+            🔗 System is operational
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify rollback failure
+        if: needs.execute-rollback.result == 'failure' || needs.post-rollback-validation.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            🚨 ROLLBACK FAILED
+            
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Reason:** ${{ github.event.inputs.reason }}
+            **Executed by:** ${{ github.actor }}
+            
+            ❌ Rollback execution or validation failed
+            🚨 IMMEDIATE MANUAL INTERVENTION REQUIRED
+            
+            Check workflow logs and system status immediately!
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create incident issue
+        if: needs.execute-rollback.result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 ROLLBACK FAILURE - ${context.payload.inputs.environment.toUpperCase()}`,
+              body: `## 🚨 Emergency: Rollback Failed
+              
+              **Environment:** ${context.payload.inputs.environment}
+              **Reason for rollback:** ${context.payload.inputs.reason}
+              **Executed by:** ${context.actor}
+              **Workflow:** ${context.workflow}
+              **Run ID:** ${context.runId}
+              
+              ### Immediate Actions Required:
+              1. Check system status manually
+              2. Verify application availability
+              3. Review workflow logs
+              4. Consider manual rollback procedures
+              5. Escalate to on-call engineer
+              
+              ### Links:
+              - [Workflow Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+              - [Production Dashboard](https://grafana.mataresit.com)
+              - [System Status](https://status.mataresit.com)
+              `,
+              labels: ['emergency', 'rollback-failure', 'production']
+            })

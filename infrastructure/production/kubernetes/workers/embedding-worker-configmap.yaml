@@ -1,0 +1,279 @@
+# ConfigMap for Embedding Queue Workers
+# Configuration settings for worker behavior, performance tuning, and monitoring
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: embedding-worker-config
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: config
+    environment: production
+    version: v1.0.0
+  annotations:
+    description: "Configuration for embedding queue workers"
+data:
+  # Core Worker Configuration
+  NODE_ENV: "production"
+  WORKER_TYPE: "embedding-queue"
+  LOG_LEVEL: "info"
+  
+  # Queue Processing Configuration
+  QUEUE_POLL_INTERVAL: "5000"          # 5 seconds
+  MAX_CONCURRENT_JOBS: "3"             # Maximum concurrent jobs per worker
+  BATCH_SIZE: "5"                      # Items to process in each batch
+  HEARTBEAT_INTERVAL: "30000"          # 30 seconds
+  MAX_PROCESSING_TIME: "600000"        # 10 minutes maximum per job
+  IDLE_TIMEOUT: "300000"               # 5 minutes idle timeout
+  
+  # Rate Limiting Configuration
+  MAX_REQUESTS_PER_MINUTE: "60"        # API requests per minute
+  MAX_TOKENS_PER_MINUTE: "100000"      # Token limit per minute
+  BACKOFF_MULTIPLIER: "2"              # Exponential backoff multiplier
+  MAX_BACKOFF_MS: "30000"              # Maximum backoff time (30 seconds)
+  RATE_LIMIT_WINDOW_MS: "60000"        # Rate limit window (1 minute)
+  
+  # Retry Configuration
+  MAX_RETRY_ATTEMPTS: "3"              # Maximum retry attempts
+  RETRY_DELAY_MS: "5000"               # Initial retry delay (5 seconds)
+  EXPONENTIAL_BACKOFF: "true"          # Enable exponential backoff
+  DEAD_LETTER_THRESHOLD: "5"           # Failed attempts before dead letter
+  
+  # Health Check Configuration
+  HEALTH_CHECK_PORT: "8080"
+  HEALTH_CHECK_TIMEOUT: "5000"         # 5 seconds
+  STARTUP_TIMEOUT: "60000"             # 60 seconds startup timeout
+  SHUTDOWN_TIMEOUT: "30000"            # 30 seconds graceful shutdown
+  
+  # Metrics Configuration
+  METRICS_PORT: "9091"
+  METRICS_PATH: "/metrics"
+  ENABLE_DETAILED_METRICS: "true"
+  METRICS_COLLECTION_INTERVAL: "10000" # 10 seconds
+  
+  # Performance Configuration
+  MEMORY_LIMIT_MB: "1024"              # Memory limit in MB
+  CPU_LIMIT_CORES: "1.0"               # CPU limit in cores
+  GC_INTERVAL_MS: "300000"             # Garbage collection interval (5 minutes)
+  ENABLE_PERFORMANCE_MONITORING: "true"
+  
+  # Database Configuration
+  DB_POOL_SIZE: "5"                    # Database connection pool size
+  DB_CONNECTION_TIMEOUT: "30000"       # 30 seconds
+  DB_IDLE_TIMEOUT: "600000"            # 10 minutes
+  DB_MAX_RETRIES: "3"
+  
+  # Queue Management
+  QUEUE_CLEANUP_INTERVAL: "3600000"    # 1 hour cleanup interval
+  STALE_JOB_TIMEOUT: "1800000"         # 30 minutes stale job timeout
+  PRIORITY_QUEUE_ENABLED: "true"
+  HIGH_PRIORITY_THRESHOLD: "10"        # High priority queue threshold
+  
+  # Error Handling
+  ERROR_REPORTING_ENABLED: "true"
+  ERROR_SAMPLING_RATE: "0.1"           # 10% error sampling
+  ENABLE_ERROR_ALERTS: "true"
+  ERROR_THRESHOLD_PER_MINUTE: "10"
+  
+  # Feature Flags Integration
+  FEATURE_FLAG_POLL_INTERVAL: "60000"  # 1 minute
+  ENABLE_FEATURE_FLAG_CACHING: "true"
+  FEATURE_FLAG_CACHE_TTL: "300000"     # 5 minutes
+  
+  # Monitoring and Observability
+  ENABLE_DISTRIBUTED_TRACING: "true"
+  TRACE_SAMPLING_RATE: "0.1"           # 10% trace sampling
+  ENABLE_STRUCTURED_LOGGING: "true"
+  LOG_CORRELATION_ID: "true"
+  
+  # Security Configuration
+  ENABLE_REQUEST_VALIDATION: "true"
+  MAX_REQUEST_SIZE_MB: "10"            # Maximum request size
+  ENABLE_RATE_LIMITING: "true"
+  SECURITY_HEADERS_ENABLED: "true"
+  
+  # Development and Debug
+  ENABLE_DEBUG_MODE: "false"
+  DEBUG_LOG_REQUESTS: "false"
+  ENABLE_PROFILING: "false"
+  PROFILING_INTERVAL: "300000"         # 5 minutes
+
+---
+# Secret for sensitive worker configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: embedding-worker-secrets
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: secrets
+    environment: production
+type: Opaque
+stringData:
+  # Encryption keys for sensitive data
+  WORKER_ENCRYPTION_KEY: "change-this-in-production"
+  
+  # API Keys (these should be set via external secret management)
+  SENTRY_DSN: ""
+  DATADOG_API_KEY: ""
+  
+  # Database credentials (if different from main app)
+  DB_PASSWORD: ""
+  
+  # Internal API keys for worker communication
+  WORKER_API_KEY: "change-this-in-production"
+
+---
+# ServiceAccount for workers
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: embedding-queue-worker
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: serviceaccount
+    environment: production
+automountServiceAccountToken: true
+
+---
+# Role for worker permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: embedding-queue-worker-role
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: rbac
+    environment: production
+rules:
+# Allow reading ConfigMaps and Secrets
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+# Allow reading own pod information
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+  resourceNames: []
+
+# Allow creating events for logging
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+---
+# RoleBinding for worker permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: embedding-queue-worker-binding
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: rbac
+    environment: production
+subjects:
+- kind: ServiceAccount
+  name: embedding-queue-worker
+  namespace: paperless-maverick
+roleRef:
+  kind: Role
+  name: embedding-queue-worker-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Priority Class for worker pods
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: embedding-worker-priority
+  labels:
+    app: embedding-queue-worker
+    component: scheduling
+    environment: production
+value: 100
+globalDefault: false
+description: "Priority class for embedding queue workers"
+
+---
+# Resource Quota for worker namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: embedding-workers-quota
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: quota
+    environment: production
+spec:
+  hard:
+    # Pod limits
+    pods: "20"
+    
+    # Resource limits
+    requests.cpu: "5"
+    requests.memory: "10Gi"
+    limits.cpu: "20"
+    limits.memory: "20Gi"
+    
+    # Storage limits
+    requests.storage: "50Gi"
+    persistentvolumeclaims: "10"
+    
+    # Service limits
+    services: "5"
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+    
+    # ConfigMap and Secret limits
+    configmaps: "10"
+    secrets: "10"
+
+---
+# Limit Range for worker pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: embedding-workers-limits
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: limits
+    environment: production
+spec:
+  limits:
+  # Container limits
+  - type: Container
+    default:
+      cpu: "500m"
+      memory: "512Mi"
+      ephemeral-storage: "1Gi"
+    defaultRequest:
+      cpu: "250m"
+      memory: "256Mi"
+      ephemeral-storage: "500Mi"
+    max:
+      cpu: "2"
+      memory: "2Gi"
+      ephemeral-storage: "5Gi"
+    min:
+      cpu: "100m"
+      memory: "128Mi"
+      ephemeral-storage: "100Mi"
+  
+  # Pod limits
+  - type: Pod
+    max:
+      cpu: "4"
+      memory: "4Gi"
+      ephemeral-storage: "10Gi"
+    min:
+      cpu: "100m"
+      memory: "128Mi"
+      ephemeral-storage: "100Mi"

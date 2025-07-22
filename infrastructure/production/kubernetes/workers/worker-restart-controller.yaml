@@ -1,0 +1,398 @@
+# Worker Restart Controller
+# Custom controller for intelligent worker restart and recovery mechanisms
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-restart-controller
+  namespace: paperless-maverick
+  labels:
+    app: worker-restart-controller
+    component: controller
+    environment: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-restart-controller
+  template:
+    metadata:
+      labels:
+        app: worker-restart-controller
+        component: controller
+        environment: production
+    spec:
+      serviceAccountName: worker-restart-controller
+      containers:
+      - name: controller
+        image: paperless-maverick-worker-controller:latest
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONTROLLER_NAME
+          value: "worker-restart-controller"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: HEALTH_PORT
+          value: "8080"
+        
+        # Restart Policy Configuration
+        - name: MAX_RESTART_ATTEMPTS
+          value: "5"
+        - name: RESTART_BACKOFF_SECONDS
+          value: "60"
+        - name: HEALTH_CHECK_INTERVAL
+          value: "30"
+        - name: UNHEALTHY_THRESHOLD
+          value: "3"
+        - name: RECOVERY_TIMEOUT_MINUTES
+          value: "10"
+        
+        # Worker Monitoring Configuration
+        - name: WORKER_DEPLOYMENT_NAME
+          value: "embedding-queue-workers"
+        - name: WORKER_LABEL_SELECTOR
+          value: "app=embedding-queue-worker,component=worker"
+        - name: MONITOR_INTERVAL_SECONDS
+          value: "30"
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        
+        volumeMounts:
+        - name: controller-config
+          mountPath: /app/config
+          readOnly: true
+      
+      volumes:
+      - name: controller-config
+        configMap:
+          name: worker-restart-controller-config
+
+---
+# ConfigMap for Worker Restart Controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-restart-controller-config
+  namespace: paperless-maverick
+  labels:
+    app: worker-restart-controller
+    component: config
+data:
+  controller-config.yaml: |
+    # Worker Restart Controller Configuration
+    controller:
+      name: "worker-restart-controller"
+      namespace: "paperless-maverick"
+      
+    # Monitoring Configuration
+    monitoring:
+      interval: 30s
+      healthCheckTimeout: 10s
+      metricsPort: 9090
+      
+    # Restart Policies
+    restartPolicies:
+      # Immediate restart for critical failures
+      critical:
+        conditions:
+          - type: "PodCrashLoopBackOff"
+          - type: "PodImagePullBackOff"
+          - type: "PodOutOfMemory"
+        action: "restart"
+        delay: 0s
+        maxAttempts: 3
+        
+      # Delayed restart for recoverable failures
+      recoverable:
+        conditions:
+          - type: "PodUnhealthy"
+          - type: "PodHighErrorRate"
+          - type: "PodSlowResponse"
+        action: "restart"
+        delay: 60s
+        maxAttempts: 5
+        
+      # Scaling for capacity issues
+      capacity:
+        conditions:
+          - type: "QueueDepthHigh"
+          - type: "HighCPUUsage"
+          - type: "HighMemoryUsage"
+        action: "scale"
+        scaleUpBy: 2
+        maxReplicas: 10
+        
+    # Health Check Configuration
+    healthChecks:
+      endpoints:
+        - path: "/health"
+          port: 8080
+          timeout: 5s
+          expectedStatus: 200
+        - path: "/ready"
+          port: 8080
+          timeout: 3s
+          expectedStatus: 200
+        - path: "/metrics"
+          port: 9091
+          timeout: 5s
+          expectedStatus: 200
+          
+    # Recovery Strategies
+    recoveryStrategies:
+      # Graceful restart
+      graceful:
+        steps:
+          - action: "drain"
+            timeout: 30s
+          - action: "terminate"
+            timeout: 10s
+          - action: "restart"
+            timeout: 60s
+          - action: "validate"
+            timeout: 30s
+            
+      # Force restart
+      force:
+        steps:
+          - action: "terminate"
+            timeout: 5s
+          - action: "restart"
+            timeout: 60s
+          - action: "validate"
+            timeout: 30s
+            
+    # Alerting Configuration
+    alerting:
+      enabled: true
+      channels:
+        - type: "slack"
+          webhook: "${SLACK_WEBHOOK_URL}"
+        - type: "email"
+          recipients: ["ops@company.com"]
+      conditions:
+        - event: "WorkerRestarted"
+          severity: "warning"
+        - event: "WorkerRestartFailed"
+          severity: "critical"
+        - event: "WorkerScaled"
+          severity: "info"
+
+---
+# ServiceAccount for Worker Restart Controller
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker-restart-controller
+  namespace: paperless-maverick
+  labels:
+    app: worker-restart-controller
+    component: serviceaccount
+
+---
+# ClusterRole for Worker Restart Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: worker-restart-controller-role
+  labels:
+    app: worker-restart-controller
+    component: rbac
+rules:
+# Pod management
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "delete", "patch"]
+
+# Deployment management
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+
+# Event creation
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+# ConfigMap and Secret access
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+# Metrics access
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+# HPA management
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+
+---
+# ClusterRoleBinding for Worker Restart Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: worker-restart-controller-binding
+  labels:
+    app: worker-restart-controller
+    component: rbac
+subjects:
+- kind: ServiceAccount
+  name: worker-restart-controller
+  namespace: paperless-maverick
+roleRef:
+  kind: ClusterRole
+  name: worker-restart-controller-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service for Worker Restart Controller
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-restart-controller-service
+  namespace: paperless-maverick
+  labels:
+    app: worker-restart-controller
+    component: service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  selector:
+    app: worker-restart-controller
+
+---
+# CronJob for Periodic Worker Health Validation
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: worker-health-validator
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-validator
+    component: cronjob
+    environment: production
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: worker-health-validator
+            component: job
+        spec:
+          serviceAccountName: worker-restart-controller
+          restartPolicy: OnFailure
+          containers:
+          - name: health-validator
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting worker health validation..."
+              
+              # Get list of worker pods
+              WORKER_PODS=$(curl -s -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                "https://kubernetes.default.svc/api/v1/namespaces/paperless-maverick/pods?labelSelector=app=embedding-queue-worker" | \
+                jq -r '.items[].metadata.name')
+              
+              UNHEALTHY_COUNT=0
+              TOTAL_COUNT=0
+              
+              for pod in $WORKER_PODS; do
+                TOTAL_COUNT=$((TOTAL_COUNT + 1))
+                
+                # Check pod health
+                POD_IP=$(curl -s -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                  "https://kubernetes.default.svc/api/v1/namespaces/paperless-maverick/pods/$pod" | \
+                  jq -r '.status.podIP')
+                
+                if [ "$POD_IP" != "null" ] && [ -n "$POD_IP" ]; then
+                  if ! curl -f -s --max-time 10 "http://$POD_IP:8080/health" > /dev/null; then
+                    echo "Pod $pod is unhealthy"
+                    UNHEALTHY_COUNT=$((UNHEALTHY_COUNT + 1))
+                    
+                    # Trigger restart via controller
+                    curl -X POST -H "Content-Type: application/json" \
+                      "http://worker-restart-controller-service:8080/restart" \
+                      -d "{\"pod\": \"$pod\", \"reason\": \"health_check_failed\"}" || true
+                  else
+                    echo "Pod $pod is healthy"
+                  fi
+                else
+                  echo "Pod $pod has no IP address"
+                  UNHEALTHY_COUNT=$((UNHEALTHY_COUNT + 1))
+                fi
+              done
+              
+              echo "Health validation completed: $UNHEALTHY_COUNT/$TOTAL_COUNT pods unhealthy"
+              
+              # Exit with error if too many unhealthy pods
+              if [ $TOTAL_COUNT -gt 0 ] && [ $((UNHEALTHY_COUNT * 100 / TOTAL_COUNT)) -gt 50 ]; then
+                echo "ERROR: More than 50% of workers are unhealthy"
+                exit 1
+              fi
+            
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "10m"
+              limits:
+                memory: "64Mi"
+                cpu: "50m"
+            
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 65534
+              capabilities:
+                drop:
+                - ALL

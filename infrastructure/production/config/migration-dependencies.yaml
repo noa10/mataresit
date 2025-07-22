@@ -1,0 +1,354 @@
+# Migration Dependencies Configuration
+# Defines migration ordering, dependencies, and validation rules
+# Version: 1.0.0
+
+# Global migration settings
+global:
+  version: "1.0.0"
+  project_name: "paperless-maverick"
+  default_timeout: 1800
+  validation_timeout: 300
+  backup_retention_days: 30
+  max_concurrent_migrations: 1
+
+# Migration phases and ordering
+phases:
+  phase1_foundation:
+    description: "Foundation schema and core tables"
+    order: 1
+    migrations:
+      - "20231125123456_create_receipt_storage_bucket"
+      - "20231126000000_initial_schema"
+      - "20240101000000_add_geometry_columns"
+      - "20240606000000_line_item_search_functions"
+      - "20240701000000_add_ai_model_columns"
+    dependencies: []
+    validation_rules:
+      - check_core_tables_exist
+      - check_storage_bucket_exists
+    rollback_strategy: "full_reset"
+    
+  phase2_subscriptions:
+    description: "Subscription and user management"
+    order: 2
+    migrations:
+      - "20250115000000_add_subscription_schema"
+      - "20250115000001_fix_duplicate_foreign_keys"
+      - "20250116000000_update_subscription_limits"
+      - "20250120000000_fix_profiles_insert_policy"
+      - "20250126000000_fix_subscription_update_function"
+      - "20250127000000_enhance_subscription_enforcement"
+      - "20250127000001_add_stripe_price_ids_to_limits"
+      - "20250127000002_fix_can_perform_action_function"
+      - "20250128000000_update_pricing_structure"
+    dependencies: ["phase1_foundation"]
+    validation_rules:
+      - check_subscription_tables_exist
+      - check_subscription_policies_exist
+    rollback_strategy: "selective_rollback"
+    
+  phase3_embeddings:
+    description: "Embedding system and search functionality"
+    order: 3
+    migrations:
+      - "20250510093800_enable_pgvector"
+      - "20250510111449_create_receipt_embedding_function"
+      - "20250510111912_create_semantic_search_fallback_function"
+      - "20250510192624_add_line_item_embedding_column"
+      - "20250510192638_update_line_item_search_functions"
+      - "20250512000000_add_embedding_regeneration_function"
+      - "20250618120000_fix_receipt_embedding_content_storage"
+      - "20250618162703_fix_embedding_functions_schema_mismatch"
+      - "20250618230000_create_unified_search_function"
+      - "20250618230100_migrate_receipt_embeddings_to_unified"
+      - "20250619020000_fix_unified_search_rls_bypass"
+    dependencies: ["phase1_foundation", "phase2_subscriptions"]
+    validation_rules:
+      - check_pgvector_extension
+      - check_embedding_functions_exist
+      - check_unified_search_function
+    rollback_strategy: "selective_rollback"
+    
+  phase4_malaysian_features:
+    description: "Malaysian localization and cultural adaptations"
+    order: 4
+    migrations:
+      - "20250616120000_add_language_support"
+      - "20250617000000_add_malaysian_tax_system"
+      - "20250617010000_add_malaysian_business_directory"
+      - "20250617020000_add_malaysian_currency_payment_processing"
+      - "20250617030000_add_malaysian_cultural_adaptations"
+      - "20250617040000_add_performance_optimizations"
+    dependencies: ["phase3_embeddings"]
+    validation_rules:
+      - check_malaysian_tables_exist
+      - check_language_support
+      - check_currency_support
+    rollback_strategy: "selective_rollback"
+    
+  phase5_advanced_features:
+    description: "Advanced features and optimizations"
+    order: 5
+    migrations:
+      - "20250626000000_create_external_api_infrastructure"
+      - "20250627000000_enhance_structured_receipt_fields"
+      - "20250627010000_financial_analysis_functions"
+      - "20250627120000_enhance_hybrid_search_with_trigrams"
+      - "20250627130000_add_tool_system_functions"
+      - "20250627221300_add_message_feedback_system"
+      - "20250627230000_add_user_preference_learning_system"
+      - "20250627240000_add_conversation_memory_system"
+      - "20250628020000_add_analytics_functions"
+    dependencies: ["phase4_malaysian_features"]
+    validation_rules:
+      - check_external_api_infrastructure
+      - check_analytics_functions
+      - check_tool_system_functions
+    rollback_strategy: "selective_rollback"
+    
+  phase6_notifications:
+    description: "Notification and alerting system"
+    order: 6
+    migrations:
+      - "20250703120000_add_notification_preferences"
+      - "20250703130000_add_receipt_notification_triggers"
+      - "20250703140000_add_receipt_comments_system"
+      - "20250703150000_optimize_notification_system"
+      - "20250705000000_add_team_categories_support"
+      - "20250705150000_fix_notification_trigger_filtering"
+      - "20250708000000_optimize_notification_performance"
+    dependencies: ["phase5_advanced_features"]
+    validation_rules:
+      - check_notification_tables_exist
+      - check_notification_triggers_exist
+    rollback_strategy: "selective_rollback"
+    
+  phase7_monitoring:
+    description: "Monitoring and metrics system"
+    order: 7
+    migrations:
+      - "20250715000000_create_embedding_quality_metrics"
+      - "20250717000001_create_embedding_metrics_tables"
+      - "20250717000002_setup_embedding_metrics_cron"
+      - "20250718000000_create_alerting_system"
+      - "20250718010000_add_team_escalation_configs"
+      - "20250718020000_add_alert_suppression_system"
+    dependencies: ["phase6_notifications"]
+    validation_rules:
+      - check_metrics_tables_exist
+      - check_alerting_system_tables
+      - check_cron_jobs_exist
+    rollback_strategy: "selective_rollback"
+    
+  phase8_queue_system:
+    description: "Queue-based processing system"
+    order: 8
+    migrations:
+      - "20250719000000_create_embedding_queue_system"
+      - "20250719000001_enhance_embedding_queue_phase2"
+      - "20250719000002_implement_queue_management_functions"
+      - "20250720000003_batch_upload_optimization"
+    dependencies: ["phase7_monitoring"]
+    validation_rules:
+      - check_queue_system_tables
+      - check_queue_management_functions
+      - check_batch_optimization_tables
+    rollback_strategy: "selective_rollback"
+
+# Migration validation rules
+validation_rules:
+  check_core_tables_exist:
+    description: "Verify core tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name IN ('receipts', 'line_items', 'profiles')
+    expected_result: 3
+    
+  check_storage_bucket_exists:
+    description: "Verify storage bucket exists"
+    query: |
+      SELECT COUNT(*) FROM storage.buckets 
+      WHERE name = 'receipts'
+    expected_result: 1
+    
+  check_subscription_tables_exist:
+    description: "Verify subscription tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name IN ('subscription_limits', 'user_subscriptions')
+    expected_result: 2
+    
+  check_subscription_policies_exist:
+    description: "Verify subscription policies exist"
+    query: |
+      SELECT COUNT(*) FROM pg_policies 
+      WHERE schemaname = 'public' 
+      AND tablename IN ('receipts', 'line_items')
+    expected_result: ">= 4"
+    
+  check_pgvector_extension:
+    description: "Verify pgvector extension is enabled"
+    query: |
+      SELECT COUNT(*) FROM pg_extension 
+      WHERE extname = 'vector'
+    expected_result: 1
+    
+  check_embedding_functions_exist:
+    description: "Verify embedding functions exist"
+    query: |
+      SELECT COUNT(*) FROM pg_proc 
+      WHERE proname IN ('generate_receipt_embedding', 'semantic_search_receipts')
+    expected_result: 2
+    
+  check_unified_search_function:
+    description: "Verify unified search function exists"
+    query: |
+      SELECT COUNT(*) FROM pg_proc 
+      WHERE proname = 'unified_search'
+    expected_result: 1
+    
+  check_malaysian_tables_exist:
+    description: "Verify Malaysian feature tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE 'malaysian_%'
+    expected_result: ">= 3"
+    
+  check_language_support:
+    description: "Verify language support columns exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'receipts' 
+      AND column_name = 'language'
+    expected_result: 1
+    
+  check_currency_support:
+    description: "Verify currency support is properly configured"
+    query: |
+      SELECT COUNT(DISTINCT currency) FROM receipts 
+      WHERE currency IN ('MYR', 'USD', 'SGD')
+    expected_result: ">= 1"
+    
+  check_external_api_infrastructure:
+    description: "Verify external API infrastructure exists"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE 'external_api_%'
+    expected_result: ">= 2"
+    
+  check_analytics_functions:
+    description: "Verify analytics functions exist"
+    query: |
+      SELECT COUNT(*) FROM pg_proc 
+      WHERE proname LIKE '%analytics%'
+    expected_result: ">= 3"
+    
+  check_tool_system_functions:
+    description: "Verify tool system functions exist"
+    query: |
+      SELECT COUNT(*) FROM pg_proc 
+      WHERE proname LIKE '%tool%'
+    expected_result: ">= 2"
+    
+  check_notification_tables_exist:
+    description: "Verify notification tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE '%notification%'
+    expected_result: ">= 2"
+    
+  check_notification_triggers_exist:
+    description: "Verify notification triggers exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.triggers 
+      WHERE trigger_schema = 'public'
+    expected_result: ">= 3"
+    
+  check_metrics_tables_exist:
+    description: "Verify metrics tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE '%metrics%'
+    expected_result: ">= 3"
+    
+  check_alerting_system_tables:
+    description: "Verify alerting system tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE 'alert_%'
+    expected_result: ">= 3"
+    
+  check_cron_jobs_exist:
+    description: "Verify cron jobs exist"
+    query: |
+      SELECT COUNT(*) FROM cron.job 
+      WHERE jobname LIKE '%embedding%'
+    expected_result: ">= 1"
+    
+  check_queue_system_tables:
+    description: "Verify queue system tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE '%queue%'
+    expected_result: ">= 2"
+    
+  check_queue_management_functions:
+    description: "Verify queue management functions exist"
+    query: |
+      SELECT COUNT(*) FROM pg_proc 
+      WHERE proname LIKE '%queue%'
+    expected_result: ">= 5"
+    
+  check_batch_optimization_tables:
+    description: "Verify batch optimization tables exist"
+    query: |
+      SELECT COUNT(*) FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name LIKE 'batch_%'
+    expected_result: ">= 2"
+
+# Rollback strategies
+rollback_strategies:
+  full_reset:
+    description: "Complete database reset - use with extreme caution"
+    requires_force: true
+    backup_required: true
+    
+  selective_rollback:
+    description: "Rollback specific migrations while preserving data"
+    requires_force: false
+    backup_required: true
+    
+  data_preserving:
+    description: "Rollback schema changes while preserving all data"
+    requires_force: false
+    backup_required: true
+
+# Environment-specific settings
+environments:
+  production:
+    backup_required: true
+    validation_required: true
+    force_confirmation: true
+    max_migration_time: 3600
+    
+  staging:
+    backup_required: true
+    validation_required: true
+    force_confirmation: false
+    max_migration_time: 1800
+    
+  development:
+    backup_required: false
+    validation_required: false
+    force_confirmation: false
+    max_migration_time: 600

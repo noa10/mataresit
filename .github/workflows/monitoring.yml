@@ -1,0 +1,370 @@
+name: Production Monitoring & Health Checks
+
+on:
+  schedule:
+    # Run health checks every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to monitor'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      check_type:
+        description: 'Type of monitoring check'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - health
+        - performance
+
+env:
+  NAMESPACE: ${{ github.event.inputs.environment == 'staging' && 'paperless-maverick-staging' || 'paperless-maverick' }}
+
+jobs:
+  # System Health Monitoring
+  health-monitoring:
+    name: System Health Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'health' || github.event_name == 'schedule'
+    outputs:
+      health-status: ${{ steps.health.outputs.status }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_KUBECONFIG || secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Check deployment health
+        id: health
+        run: |
+          echo "Checking deployment health..."
+          
+          # Check deployment status
+          APP_READY=$(kubectl get deployment paperless-maverick -n ${{ env.NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+          APP_DESIRED=$(kubectl get deployment paperless-maverick -n ${{ env.NAMESPACE }} -o jsonpath='{.spec.replicas}')
+          
+          WORKER_READY=$(kubectl get deployment embedding-queue-workers -n ${{ env.NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+          WORKER_DESIRED=$(kubectl get deployment embedding-queue-workers -n ${{ env.NAMESPACE }} -o jsonpath='{.spec.replicas}')
+          
+          echo "App pods: $APP_READY/$APP_DESIRED ready"
+          echo "Worker pods: $WORKER_READY/$WORKER_DESIRED ready"
+          
+          # Check pod health
+          UNHEALTHY_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} --field-selector=status.phase!=Running --no-headers | wc -l)
+          
+          if [ "$APP_READY" != "$APP_DESIRED" ] || [ "$WORKER_READY" != "$WORKER_DESIRED" ] || [ "$UNHEALTHY_PODS" -gt 0 ]; then
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "::error::System health check failed"
+            exit 1
+          else
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ System health check passed"
+          fi
+
+      - name: Test application endpoints
+        run: |
+          echo "Testing application endpoints..."
+          
+          # Get application pod
+          APP_POD=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=paperless-maverick -o jsonpath='{.items[0].metadata.name}')
+          
+          if [ -n "$APP_POD" ]; then
+            echo "Testing health endpoint..."
+            kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:3000/health
+            
+            echo "Testing readiness endpoint..."
+            kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:3000/ready
+            
+            echo "Testing metrics endpoint..."
+            kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:9090/metrics
+          else
+            echo "::error::No application pods found"
+            exit 1
+          fi
+
+      - name: Test worker endpoints
+        run: |
+          echo "Testing worker endpoints..."
+          
+          # Get worker pod
+          WORKER_POD=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=embedding-queue-worker -o jsonpath='{.items[0].metadata.name}')
+          
+          if [ -n "$WORKER_POD" ]; then
+            echo "Testing worker health..."
+            kubectl exec -n ${{ env.NAMESPACE }} $WORKER_POD -- node health-check.js
+            
+            echo "Testing worker metrics..."
+            kubectl exec -n ${{ env.NAMESPACE }} $WORKER_POD -- curl -f http://localhost:9091/metrics
+          else
+            echo "::error::No worker pods found"
+            exit 1
+          fi
+
+  # Performance Monitoring
+  performance-monitoring:
+    name: Performance Monitoring
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'performance' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run performance tests
+        run: |
+          echo "Running performance monitoring tests..."
+          npm run test:phase4:performance
+        env:
+          TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Check resource utilization
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_KUBECONFIG || secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Monitor resource usage
+        run: |
+          echo "Monitoring resource usage..."
+          
+          # Get resource usage
+          kubectl top pods -n ${{ env.NAMESPACE }} || echo "Metrics server not available"
+          kubectl top nodes || echo "Node metrics not available"
+          
+          # Check HPA status
+          kubectl get hpa -n ${{ env.NAMESPACE }}
+          kubectl describe hpa -n ${{ env.NAMESPACE }}
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results-${{ github.run_number }}
+          path: test-results/
+          retention-days: 7
+
+  # Security Monitoring
+  security-monitoring:
+    name: Security Monitoring
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'security' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_KUBECONFIG || secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Check security policies
+        run: |
+          echo "Checking security policies..."
+          
+          # Check network policies
+          kubectl get networkpolicies -n ${{ env.NAMESPACE }}
+          
+          # Check pod security policies
+          kubectl get pods -n ${{ env.NAMESPACE }} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.securityContext}{"\n"}{end}'
+          
+          # Check RBAC
+          kubectl get rolebindings -n ${{ env.NAMESPACE }}
+          kubectl get clusterrolebindings | grep ${{ env.NAMESPACE }} || true
+
+      - name: Check for security vulnerabilities
+        run: |
+          echo "Checking for security vulnerabilities..."
+          
+          # Check for privileged containers
+          PRIVILEGED=$(kubectl get pods -n ${{ env.NAMESPACE }} -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.securityContext.privileged}{"\n"}{end}{end}' | grep -c true || echo "0")
+          
+          if [ "$PRIVILEGED" -gt 0 ]; then
+            echo "::warning::Found $PRIVILEGED privileged containers"
+          fi
+          
+          # Check for containers running as root
+          ROOT_CONTAINERS=$(kubectl get pods -n ${{ env.NAMESPACE }} -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.securityContext.runAsUser}{"\n"}{end}{end}' | grep -c "^0$" || echo "0")
+          
+          if [ "$ROOT_CONTAINERS" -gt 0 ]; then
+            echo "::warning::Found $ROOT_CONTAINERS containers running as root"
+          fi
+
+  # Alert System Monitoring
+  alert-monitoring:
+    name: Alert System Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'alerts' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test alerting system
+        run: |
+          echo "Testing alerting system..."
+          npm run test:integration:alerting
+        env:
+          TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Check notification channels
+        run: |
+          echo "Checking notification channels..."
+          
+          # Test Slack webhook (if configured)
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{"text":"🔍 Monitoring system health check - all systems operational"}' \
+              ${{ secrets.SLACK_WEBHOOK_URL }} || echo "Slack notification failed"
+          fi
+
+  # Generate Monitoring Report
+  monitoring-report:
+    name: Generate Monitoring Report
+    runs-on: ubuntu-latest
+    needs: [health-monitoring, performance-monitoring, security-monitoring, alert-monitoring]
+    if: always()
+    
+    steps:
+      - name: Generate monitoring summary
+        run: |
+          cat > monitoring-report.md << 'EOF'
+          # Production Monitoring Report
+          
+          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Environment:** ${{ github.event.inputs.environment || 'production' }}
+          **Triggered by:** ${{ github.event_name }}
+          
+          ## System Status Summary
+          
+          | Component | Status | Details |
+          |-----------|--------|---------|
+          | Health Check | ${{ needs.health-monitoring.result }} | System health and endpoints |
+          | Performance | ${{ needs.performance-monitoring.result }} | Resource usage and performance |
+          | Security | ${{ needs.security-monitoring.result }} | Security policies and vulnerabilities |
+          | Alerts | ${{ needs.alert-monitoring.result }} | Alert system functionality |
+          
+          ## Health Status
+          - **Overall Health:** ${{ needs.health-monitoring.outputs.health-status || 'unknown' }}
+          
+          ## Recommendations
+          
+          ${{ needs.health-monitoring.result == 'failure' && '⚠️ **CRITICAL**: Health check failed - immediate investigation required' || '' }}
+          ${{ needs.performance-monitoring.result == 'failure' && '⚠️ **WARNING**: Performance issues detected - review resource usage' || '' }}
+          ${{ needs.security-monitoring.result == 'failure' && '🔒 **SECURITY**: Security issues found - review and fix immediately' || '' }}
+          ${{ needs.alert-monitoring.result == 'failure' && '📢 **ALERTS**: Alert system issues - verify notification channels' || '' }}
+          
+          ## Next Monitoring Check
+          - **Scheduled:** Every 15 minutes
+          - **Manual:** Use workflow_dispatch to run specific checks
+          
+          EOF
+
+      - name: Upload monitoring report
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-report-${{ github.run_number }}
+          path: monitoring-report.md
+          retention-days: 30
+
+  # Critical Alert Notifications
+  critical-alerts:
+    name: Critical Alert Notifications
+    runs-on: ubuntu-latest
+    needs: [health-monitoring, performance-monitoring, security-monitoring, alert-monitoring]
+    if: always() && (needs.health-monitoring.result == 'failure' || needs.security-monitoring.result == 'failure')
+    
+    steps:
+      - name: Send critical alert
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            🚨 CRITICAL SYSTEM ALERT
+            
+            **Environment:** ${{ github.event.inputs.environment || 'production' }}
+            **Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            
+            **Failed Checks:**
+            ${{ needs.health-monitoring.result == 'failure' && '❌ Health Check Failed' || '' }}
+            ${{ needs.performance-monitoring.result == 'failure' && '⚠️ Performance Issues' || '' }}
+            ${{ needs.security-monitoring.result == 'failure' && '🔒 Security Issues' || '' }}
+            ${{ needs.alert-monitoring.result == 'failure' && '📢 Alert System Issues' || '' }}
+            
+            **Immediate Action Required:**
+            - Check system status dashboard
+            - Review application logs
+            - Verify service availability
+            - Escalate to on-call engineer if needed
+            
+            [View Monitoring Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
+
+      - name: Create incident issue
+        if: needs.health-monitoring.result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 System Health Alert - ${context.payload.inputs?.environment || 'production'}`,
+              body: `## 🚨 Critical System Health Alert
+              
+              **Environment:** ${context.payload.inputs?.environment || 'production'}
+              **Time:** ${new Date().toISOString()}
+              **Health Status:** ${{ needs.health-monitoring.outputs.health-status }}
+              
+              ### Failed Checks:
+              - Health Monitoring: ${{ needs.health-monitoring.result }}
+              - Performance: ${{ needs.performance-monitoring.result }}
+              - Security: ${{ needs.security-monitoring.result }}
+              - Alerts: ${{ needs.alert-monitoring.result }}
+              
+              ### Immediate Actions Required:
+              1. Check system dashboard
+              2. Review application and worker logs
+              3. Verify database connectivity
+              4. Check resource utilization
+              5. Escalate if service is down
+              
+              ### Links:
+              - [Monitoring Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+              - [Production Dashboard](https://grafana.mataresit.com)
+              - [System Logs](https://logs.mataresit.com)
+              `,
+              labels: ['critical', 'monitoring', 'incident', context.payload.inputs?.environment || 'production']
+            });

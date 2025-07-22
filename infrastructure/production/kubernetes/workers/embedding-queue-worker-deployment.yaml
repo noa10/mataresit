@@ -1,0 +1,354 @@
+# Embedding Queue Worker Deployment
+# Production-ready Kubernetes deployment for embedding queue workers with comprehensive monitoring and auto-scaling
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-queue-workers
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: worker
+    environment: production
+    version: v1.0.0
+    tier: processing
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "Embedding queue workers for processing receipt embeddings"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: embedding-queue-worker
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: embedding-queue-worker
+        component: worker
+        environment: production
+        version: v1.0.0
+        tier: processing
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+        config.linkerd.io/proxy-cpu-request: "10m"
+        config.linkerd.io/proxy-memory-request: "16Mi"
+    spec:
+      serviceAccountName: embedding-queue-worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: embedding-worker
+        image: paperless-maverick-worker:latest
+        imagePullPolicy: Always
+        ports:
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9091
+          protocol: TCP
+        env:
+        # Core Configuration
+        - name: NODE_ENV
+          value: "production"
+        - name: WORKER_TYPE
+          value: "embedding-queue"
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Supabase Configuration
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: supabase-secrets
+              key: url
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: supabase-secrets
+              key: service-role-key
+        
+        # AI API Configuration
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: gemini-api-key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: openai-api-key
+              optional: true
+        
+        # Queue Configuration
+        - name: QUEUE_POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: QUEUE_POLL_INTERVAL
+        - name: MAX_CONCURRENT_JOBS
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: MAX_CONCURRENT_JOBS
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: BATCH_SIZE
+        - name: HEARTBEAT_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: HEARTBEAT_INTERVAL
+        - name: MAX_PROCESSING_TIME
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: MAX_PROCESSING_TIME
+        
+        # Rate Limiting Configuration
+        - name: MAX_REQUESTS_PER_MINUTE
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: MAX_REQUESTS_PER_MINUTE
+        - name: MAX_TOKENS_PER_MINUTE
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: MAX_TOKENS_PER_MINUTE
+        - name: BACKOFF_MULTIPLIER
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: BACKOFF_MULTIPLIER
+        - name: MAX_BACKOFF_MS
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: MAX_BACKOFF_MS
+        
+        # Monitoring Configuration
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: embedding-worker-config
+              key: LOG_LEVEL
+        - name: METRICS_PORT
+          value: "9091"
+        - name: HEALTH_CHECK_PORT
+          value: "8080"
+        - name: ENABLE_PERFORMANCE_MONITORING
+          value: "true"
+        - name: ENABLE_DETAILED_LOGGING
+          value: "true"
+        
+        # Feature Flags
+        - name: ENABLE_QUEUE_PROCESSING
+          valueFrom:
+            configMapKeyRef:
+              name: feature-flags-config
+              key: ENABLE_QUEUE_PROCESSING
+        - name: ENABLE_BATCH_OPTIMIZATION
+          valueFrom:
+            configMapKeyRef:
+              name: feature-flags-config
+              key: ENABLE_BATCH_OPTIMIZATION
+        
+        # Resource Configuration
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            ephemeral-storage: "2Gi"
+        
+        # Health Checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: health
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+          successThreshold: 1
+        
+        # Volume Mounts
+        volumeMounts:
+        - name: worker-logs
+          mountPath: /app/logs
+        - name: worker-config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        
+        # Security Context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          capabilities:
+            drop:
+            - ALL
+        
+        # Lifecycle Hooks
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Gracefully shutting down worker..."
+                curl -X POST http://localhost:8080/shutdown || true
+                sleep 15
+      
+      # Init Container for Database Migration Check
+      initContainers:
+      - name: migration-check
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Checking database migrations..."
+          until curl -f -s "${SUPABASE_URL}/rest/v1/embedding_queue?select=id&limit=1" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"; do
+            echo "Waiting for database to be ready..."
+            sleep 5
+          done
+          echo "Database is ready"
+        env:
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: supabase-secrets
+              key: url
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: supabase-secrets
+              key: service-role-key
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volumes
+      volumes:
+      - name: worker-logs
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: worker-config
+        configMap:
+          name: embedding-worker-config
+          defaultMode: 0644
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      # Pod Scheduling
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - embedding-queue-worker
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - worker
+      
+      # Tolerations
+      tolerations:
+      - key: "worker-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # DNS Configuration
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
+      
+      # Termination Grace Period
+      terminationGracePeriodSeconds: 60
+      
+      # Restart Policy
+      restartPolicy: Always

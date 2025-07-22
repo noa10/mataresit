@@ -1,0 +1,421 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Worker Health & Resource Monitoring",
+    "tags": ["paperless-maverick", "workers", "health", "resources"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "10s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Worker Status Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(up{job=\"embedding-queue-workers\"} == 1)",
+            "legendFormat": "Healthy Workers"
+          },
+          {
+            "expr": "count(up{job=\"embedding-queue-workers\"} == 0)",
+            "legendFormat": "Unhealthy Workers"
+          },
+          {
+            "expr": "count(up{job=\"embedding-queue-workers\"})",
+            "legendFormat": "Total Workers"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Healthy Workers"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "green"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Unhealthy Workers"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "fixed",
+                    "fixedColor": "red"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Worker CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"embedding-queue-workers-.*\"}[5m]) * 100",
+            "legendFormat": "{{pod}}"
+          },
+          {
+            "expr": "avg(rate(container_cpu_usage_seconds_total{pod=~\"embedding-queue-workers-.*\"}[5m])) * 100",
+            "legendFormat": "Average CPU Usage"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "CPU Usage %",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 70,
+            "colorMode": "critical",
+            "op": "gt"
+          },
+          {
+            "value": 50,
+            "colorMode": "warning",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Worker Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{pod=~\"embedding-queue-workers-.*\"} / container_spec_memory_limit_bytes * 100",
+            "legendFormat": "{{pod}}"
+          },
+          {
+            "expr": "avg(container_memory_usage_bytes{pod=~\"embedding-queue-workers-.*\"} / container_spec_memory_limit_bytes) * 100",
+            "legendFormat": "Average Memory Usage"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage %",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 85,
+            "colorMode": "critical",
+            "op": "gt"
+          },
+          {
+            "value": 70,
+            "colorMode": "warning",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Worker Restart Count",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(kube_pod_container_status_restarts_total{pod=~\"embedding-queue-workers-.*\"}[1h])",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Restarts per hour",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6}
+      },
+      {
+        "id": 5,
+        "title": "Worker Health Check Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "probe_duration_seconds{job=\"blackbox\", instance=~\".*embedding-queue-workers.*\"}",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Response Time (s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6}
+      },
+      {
+        "id": 6,
+        "title": "Worker Job Processing Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(worker_jobs_processed_total[5m]) * 60",
+            "legendFormat": "{{worker_id}} - Jobs/min"
+          },
+          {
+            "expr": "rate(worker_jobs_failed_total[5m]) * 60",
+            "legendFormat": "{{worker_id}} - Failures/min"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Jobs per minute",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 7,
+        "title": "Worker Queue Assignment",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "worker_assigned_jobs",
+            "legendFormat": "{{worker_id}} - Assigned Jobs"
+          },
+          {
+            "expr": "worker_active_jobs",
+            "legendFormat": "{{worker_id}} - Active Jobs"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Job Count",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Worker Network I/O",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_network_receive_bytes_total{pod=~\"embedding-queue-workers-.*\"}[5m])",
+            "legendFormat": "{{pod}} - RX"
+          },
+          {
+            "expr": "rate(container_network_transmit_bytes_total{pod=~\"embedding-queue-workers-.*\"}[5m])",
+            "legendFormat": "{{pod}} - TX"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Bytes per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 9,
+        "title": "Worker Disk I/O",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_fs_reads_bytes_total{pod=~\"embedding-queue-workers-.*\"}[5m])",
+            "legendFormat": "{{pod}} - Read"
+          },
+          {
+            "expr": "rate(container_fs_writes_bytes_total{pod=~\"embedding-queue-workers-.*\"}[5m])",
+            "legendFormat": "{{pod}} - Write"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Bytes per second",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 10,
+        "title": "Worker Error Rates",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(worker_errors_total{type=\"timeout\"}[5m]) * 60",
+            "legendFormat": "Timeouts/min"
+          },
+          {
+            "expr": "rate(worker_errors_total{type=\"api_error\"}[5m]) * 60",
+            "legendFormat": "API Errors/min"
+          },
+          {
+            "expr": "rate(worker_errors_total{type=\"validation\"}[5m]) * 60",
+            "legendFormat": "Validation Errors/min"
+          },
+          {
+            "expr": "rate(worker_errors_total{type=\"system\"}[5m]) * 60",
+            "legendFormat": "System Errors/min"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Errors per minute",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+      },
+      {
+        "id": 11,
+        "title": "Worker Scaling Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kube_deployment_status_replicas{deployment=\"embedding-queue-workers\"}",
+            "legendFormat": "Desired Replicas"
+          },
+          {
+            "expr": "kube_deployment_status_replicas_available{deployment=\"embedding-queue-workers\"}",
+            "legendFormat": "Available Replicas"
+          },
+          {
+            "expr": "kube_deployment_status_replicas_ready{deployment=\"embedding-queue-workers\"}",
+            "legendFormat": "Ready Replicas"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Replica Count",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
+      },
+      {
+        "id": 12,
+        "title": "Worker Health Score",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "worker_health_score",
+            "legendFormat": "{{worker_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 36}
+      },
+      {
+        "id": 13,
+        "title": "Worker Uptime",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "time() - container_start_time_seconds{pod=~\"embedding-queue-workers-.*\"}",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": {
+              "mode": "continuous-GrYlRd"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 36}
+      },
+      {
+        "id": 14,
+        "title": "Worker Load Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (worker_id) (worker_active_jobs)",
+            "legendFormat": "{{worker_id}}"
+          }
+        ],
+        "pieType": "donut",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 36}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "worker",
+          "type": "query",
+          "query": "label_values(up{job=\"embedding-queue-workers\"}, pod)",
+          "current": {
+            "value": "all",
+            "text": "All Workers"
+          },
+          "includeAll": true,
+          "allValue": ".*"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Worker Restarts",
+          "datasource": "prometheus",
+          "expr": "changes(kube_pod_container_status_restarts_total{pod=~\"embedding-queue-workers-.*\"}[1m])",
+          "iconColor": "orange",
+          "textFormat": "Worker {{pod}} restarted"
+        },
+        {
+          "name": "Scaling Events",
+          "datasource": "prometheus",
+          "expr": "changes(kube_deployment_status_replicas{deployment=\"embedding-queue-workers\"}[1m])",
+          "iconColor": "blue",
+          "textFormat": "Workers scaled to {{value}} replicas"
+        }
+      ]
+    }
+  }
+}

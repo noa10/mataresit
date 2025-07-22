@@ -1,0 +1,395 @@
+# Worker Health Monitoring System
+# Comprehensive monitoring and alerting for embedding queue workers
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-health-monitoring-config
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-monitoring
+    component: config
+    environment: production
+data:
+  # Health Check Configuration
+  health-check-config.yaml: |
+    healthChecks:
+      # Basic health check
+      basic:
+        endpoint: "/health"
+        timeout: 5s
+        interval: 30s
+        retries: 3
+        
+      # Readiness check
+      readiness:
+        endpoint: "/ready"
+        timeout: 3s
+        interval: 10s
+        retries: 3
+        
+      # Startup check
+      startup:
+        endpoint: "/startup"
+        timeout: 3s
+        interval: 5s
+        retries: 12
+        
+      # Deep health check
+      deep:
+        endpoint: "/health/deep"
+        timeout: 10s
+        interval: 60s
+        retries: 2
+        
+    # Health check thresholds
+    thresholds:
+      cpu_usage_percent: 80
+      memory_usage_percent: 85
+      queue_depth_warning: 50
+      queue_depth_critical: 100
+      error_rate_warning: 5
+      error_rate_critical: 10
+      response_time_warning: 5000
+      response_time_critical: 10000
+      
+    # Alert configuration
+    alerts:
+      enabled: true
+      channels:
+        - slack
+        - email
+        - pagerduty
+      escalation_delay: 300s
+      
+  # Prometheus Rules
+  prometheus-rules.yaml: |
+    groups:
+    - name: embedding-worker-health
+      interval: 30s
+      rules:
+      # Worker availability
+      - alert: EmbeddingWorkerDown
+        expr: up{job="embedding-queue-workers"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: "Embedding worker is down"
+          description: "Worker {{ $labels.instance }} has been down for more than 1 minute"
+          
+      # High CPU usage
+      - alert: EmbeddingWorkerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{pod=~"embedding-queue-workers-.*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "High CPU usage on embedding worker"
+          description: "Worker {{ $labels.pod }} CPU usage is {{ $value }}% for more than 5 minutes"
+          
+      # High memory usage
+      - alert: EmbeddingWorkerHighMemory
+        expr: (container_memory_usage_bytes{pod=~"embedding-queue-workers-.*"} / container_spec_memory_limit_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "High memory usage on embedding worker"
+          description: "Worker {{ $labels.pod }} memory usage is {{ $value }}% for more than 5 minutes"
+          
+      # Queue depth alerts
+      - alert: EmbeddingQueueDepthHigh
+        expr: embedding_queue_depth > 50
+        for: 2m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "Embedding queue depth is high"
+          description: "Queue depth is {{ $value }} items, above warning threshold"
+          
+      - alert: EmbeddingQueueDepthCritical
+        expr: embedding_queue_depth > 100
+        for: 1m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "Embedding queue depth is critical"
+          description: "Queue depth is {{ $value }} items, above critical threshold"
+          
+      # Error rate alerts
+      - alert: EmbeddingWorkerHighErrorRate
+        expr: rate(embedding_worker_errors_total[5m]) * 100 > 5
+        for: 3m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "High error rate on embedding worker"
+          description: "Worker error rate is {{ $value }}% for more than 3 minutes"
+          
+      # Processing time alerts
+      - alert: EmbeddingWorkerSlowProcessing
+        expr: histogram_quantile(0.95, rate(embedding_processing_duration_seconds_bucket[5m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "Slow embedding processing"
+          description: "95th percentile processing time is {{ $value }}s for more than 5 minutes"
+          
+      # Worker restart alerts
+      - alert: EmbeddingWorkerRestartLoop
+        expr: rate(kube_pod_container_status_restarts_total{pod=~"embedding-queue-workers-.*"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "Embedding worker restarting frequently"
+          description: "Worker {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"
+
+---
+# Health Monitoring Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-health-monitor
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-monitor
+    component: monitoring
+    environment: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-health-monitor
+  template:
+    metadata:
+      labels:
+        app: worker-health-monitor
+        component: monitoring
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: worker-health-monitor
+      containers:
+      - name: health-monitor
+        image: prom/blackbox-exporter:latest
+        ports:
+        - name: http
+          containerPort: 9115
+        - name: metrics
+          containerPort: 8080
+        env:
+        - name: BLACKBOX_CONFIG_FILE
+          value: "/etc/blackbox/config.yml"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/blackbox
+          readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9115
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9115
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      
+      volumes:
+      - name: config
+        configMap:
+          name: blackbox-exporter-config
+
+---
+# Blackbox Exporter Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter-config
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-monitor
+    component: config
+data:
+  config.yml: |
+    modules:
+      http_2xx:
+        prober: http
+        timeout: 5s
+        http:
+          valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+          valid_status_codes: [200]
+          method: GET
+          headers:
+            User-Agent: "Blackbox Exporter"
+          fail_if_ssl: false
+          fail_if_not_ssl: false
+          
+      http_post_2xx:
+        prober: http
+        timeout: 5s
+        http:
+          valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+          valid_status_codes: [200]
+          method: POST
+          headers:
+            Content-Type: "application/json"
+            User-Agent: "Blackbox Exporter"
+            
+      tcp_connect:
+        prober: tcp
+        timeout: 5s
+        
+      worker_health:
+        prober: http
+        timeout: 10s
+        http:
+          valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+          valid_status_codes: [200]
+          method: GET
+          headers:
+            User-Agent: "Worker Health Monitor"
+          fail_if_body_not_matches_regexp:
+            - "\"status\":\\s*\"healthy\""
+
+---
+# ServiceAccount for health monitor
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker-health-monitor
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-monitor
+    component: serviceaccount
+
+---
+# ClusterRole for health monitor
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: worker-health-monitor-role
+  labels:
+    app: worker-health-monitor
+    component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for health monitor
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: worker-health-monitor-binding
+  labels:
+    app: worker-health-monitor
+    component: rbac
+subjects:
+- kind: ServiceAccount
+  name: worker-health-monitor
+  namespace: paperless-maverick
+roleRef:
+  kind: ClusterRole
+  name: worker-health-monitor-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Service for health monitor
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-health-monitor-service
+  namespace: paperless-maverick
+  labels:
+    app: worker-health-monitor
+    component: service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9115"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9115
+    targetPort: 9115
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: worker-health-monitor
+
+---
+# PrometheusRule for worker monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: embedding-worker-rules
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: monitoring
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: embedding-worker.rules
+    interval: 30s
+    rules:
+    # Recording rules for worker metrics
+    - record: embedding_worker:cpu_usage_rate
+      expr: rate(container_cpu_usage_seconds_total{pod=~"embedding-queue-workers-.*"}[5m])
+      
+    - record: embedding_worker:memory_usage_percent
+      expr: (container_memory_usage_bytes{pod=~"embedding-queue-workers-.*"} / container_spec_memory_limit_bytes) * 100
+      
+    - record: embedding_worker:processing_rate
+      expr: rate(embedding_jobs_processed_total[5m])
+      
+    - record: embedding_worker:error_rate
+      expr: rate(embedding_worker_errors_total[5m]) / rate(embedding_jobs_processed_total[5m]) * 100
+      
+    - record: embedding_worker:queue_depth
+      expr: embedding_queue_pending_jobs
+      
+    # Alert rules
+    - alert: EmbeddingWorkerUnhealthy
+      expr: up{job="embedding-queue-workers"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: embedding-worker
+      annotations:
+        summary: "Embedding worker is unhealthy"
+        description: "Worker {{ $labels.instance }} has been unhealthy for more than 2 minutes"
+        runbook_url: "https://docs.company.com/runbooks/embedding-worker-down"

@@ -1,0 +1,372 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code Security Scanning
+  code-security:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+          queries: security-extended,security-and-quality
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  # Dependency Security Scanning
+  dependency-security:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=moderate --json > npm-audit.json || true
+          npm audit --audit-level=moderate
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --json > snyk-results.json
+        continue-on-error: true
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+
+      - name: Check for high severity vulnerabilities
+        run: |
+          if [ -f npm-audit.json ]; then
+            HIGH_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.high // 0')
+            CRITICAL_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.critical // 0')
+            
+            if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
+              echo "::error::Found $CRITICAL_VULNS critical and $HIGH_VULNS high severity vulnerabilities"
+              exit 1
+            fi
+          fi
+
+  # Container Security Scanning
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: [code-security]
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infrastructure/production/docker/Dockerfile
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:security-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:security-scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Grype vulnerability scanner
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.IMAGE_NAME }}:security-scan
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload Grype scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+
+  # Infrastructure Security Scanning
+  infrastructure-security:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov on Kubernetes manifests
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure/production/kubernetes/
+          framework: kubernetes
+          output_format: sarif
+          output_file_path: checkov-k8s.sarif
+          soft_fail: true
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-k8s.sarif
+
+      - name: Run Checkov on Terraform
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure/production/terraform/
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-terraform.sarif
+          soft_fail: true
+
+      - name: Upload Terraform Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-terraform.sarif
+
+      - name: Run kube-score on Kubernetes manifests
+        run: |
+          # Install kube-score
+          wget https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz
+          tar xzf kube-score_linux_amd64.tar.gz
+          chmod +x kube-score
+          
+          # Run kube-score on manifests
+          ./kube-score score infrastructure/production/kubernetes/*.yaml > kube-score-results.txt || true
+          cat kube-score-results.txt
+
+  # Secrets Scanning
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # Security Report Generation
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [code-security, dependency-security, container-security, infrastructure-security, secrets-scan]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate security summary
+        run: |
+          cat > security-report.md << 'EOF'
+          # Security Scan Report
+          
+          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          **Triggered by:** ${{ github.event_name }}
+          
+          ## Scan Results Summary
+          
+          | Scan Type | Status | Details |
+          |-----------|--------|---------|
+          | Code Security | ${{ needs.code-security.result }} | CodeQL analysis |
+          | Dependencies | ${{ needs.dependency-security.result }} | npm audit + Snyk |
+          | Container | ${{ needs.container-security.result }} | Trivy + Grype |
+          | Infrastructure | ${{ needs.infrastructure-security.result }} | Checkov + kube-score |
+          | Secrets | ${{ needs.secrets-scan.result }} | TruffleHog + GitLeaks |
+          
+          ## Recommendations
+          
+          - Review all failed security scans immediately
+          - Update dependencies with known vulnerabilities
+          - Fix container security issues before deployment
+          - Address infrastructure misconfigurations
+          - Rotate any exposed secrets
+          
+          ## Next Steps
+          
+          1. Address critical and high severity issues
+          2. Update security policies if needed
+          3. Re-run scans after fixes
+          4. Document any accepted risks
+          
+          EOF
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_number }}
+          path: security-report.md
+          retention-days: 90
+
+      - name: Comment security report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('security-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔒 Security Scan Results\n\n${report}`
+            });
+
+  # Security Notifications
+  security-notifications:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [code-security, dependency-security, container-security, infrastructure-security, secrets-scan]
+    if: always() && (needs.code-security.result == 'failure' || needs.dependency-security.result == 'failure' || needs.container-security.result == 'failure' || needs.secrets-scan.result == 'failure')
+    
+    steps:
+      - name: Notify security team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            🚨 SECURITY SCAN FAILURES DETECTED
+            
+            **Repository:** ${{ github.repository }}
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Triggered by:** ${{ github.event_name }}
+            
+            **Failed Scans:**
+            - Code Security: ${{ needs.code-security.result }}
+            - Dependencies: ${{ needs.dependency-security.result }}
+            - Container: ${{ needs.container-security.result }}
+            - Infrastructure: ${{ needs.infrastructure-security.result }}
+            - Secrets: ${{ needs.secrets-scan.result }}
+            
+            **Action Required:** Review and fix security issues immediately
+            
+            [View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+
+      - name: Create security issue
+        if: github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failedScans = [];
+            if ('${{ needs.code-security.result }}' === 'failure') failedScans.push('Code Security');
+            if ('${{ needs.dependency-security.result }}' === 'failure') failedScans.push('Dependencies');
+            if ('${{ needs.container-security.result }}' === 'failure') failedScans.push('Container');
+            if ('${{ needs.infrastructure-security.result }}' === 'failure') failedScans.push('Infrastructure');
+            if ('${{ needs.secrets-scan.result }}' === 'failure') failedScans.push('Secrets');
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔒 Security Scan Failures - ${new Date().toISOString().split('T')[0]}`,
+              body: `## Security Scan Failures Detected
+              
+              **Date:** ${new Date().toISOString()}
+              **Commit:** ${context.sha}
+              **Failed Scans:** ${failedScans.join(', ')}
+              
+              ### Action Required:
+              1. Review the security scan results
+              2. Fix identified vulnerabilities
+              3. Update dependencies if needed
+              4. Re-run security scans
+              
+              ### Links:
+              - [Workflow Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+              - [Security Tab](${context.payload.repository.html_url}/security)
+              `,
+              labels: ['security', 'vulnerability', 'automated']
+            });

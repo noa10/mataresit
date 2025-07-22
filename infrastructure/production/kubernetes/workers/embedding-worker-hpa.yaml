@@ -1,0 +1,275 @@
+# Horizontal Pod Autoscaler for Embedding Queue Workers
+# Automatically scales workers based on CPU, memory, and custom metrics
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: embedding-queue-workers-hpa
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: autoscaler
+    environment: production
+  annotations:
+    description: "Auto-scales embedding queue workers based on resource usage and queue depth"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: embedding-queue-workers
+  
+  minReplicas: 2
+  maxReplicas: 10
+  
+  # Scaling Behavior
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+  
+  # Metrics for Scaling
+  metrics:
+  # CPU Utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Memory Utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Custom Metrics - Queue Depth
+  - type: External
+    external:
+      metric:
+        name: embedding_queue_depth
+        selector:
+          matchLabels:
+            queue_type: "embedding"
+      target:
+        type: AverageValue
+        averageValue: "10"
+  
+  # Custom Metrics - Queue Processing Rate
+  - type: External
+    external:
+      metric:
+        name: embedding_queue_processing_rate
+        selector:
+          matchLabels:
+            queue_type: "embedding"
+      target:
+        type: AverageValue
+        averageValue: "5"
+  
+  # Custom Metrics - Worker Utilization
+  - type: External
+    external:
+      metric:
+        name: embedding_worker_utilization
+        selector:
+          matchLabels:
+            worker_type: "embedding"
+      target:
+        type: AverageValue
+        averageValue: "75"
+
+---
+# Vertical Pod Autoscaler for Resource Optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: embedding-queue-workers-vpa
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: vpa
+    environment: production
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: embedding-queue-workers
+  
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 2
+  
+  resourcePolicy:
+    containerPolicies:
+    - containerName: embedding-worker
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 2Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: embedding-queue-workers-pdb
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: pdb
+    environment: production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: embedding-queue-worker
+      component: worker
+
+---
+# Service for Worker Health Checks and Metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-queue-workers-service
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: service
+    environment: production
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: health
+    port: 8080
+    targetPort: health
+    protocol: TCP
+  - name: metrics
+    port: 9091
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: embedding-queue-worker
+    component: worker
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: embedding-queue-workers-monitor
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: monitoring
+    environment: production
+spec:
+  selector:
+    matchLabels:
+      app: embedding-queue-worker
+      component: service
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - paperless-maverick
+
+---
+# Network Policy for Worker Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: embedding-queue-workers-netpol
+  namespace: paperless-maverick
+  labels:
+    app: embedding-queue-worker
+    component: security
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: embedding-queue-worker
+      component: worker
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow health checks from Kubernetes
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  # Allow metrics scraping from Prometheus
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  
+  # Allow internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app: paperless-maverick
+    ports:
+    - protocol: TCP
+      port: 8080
+  
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  
+  # Allow HTTPS to external APIs (Supabase, Gemini)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  
+  # Allow HTTP for health checks
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80

@@ -1,0 +1,53 @@
+# Production Dockerfile for Embedding Queue Workers
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat curl
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build worker-specific components
+RUN npm run build:worker || echo "No worker build script found"
+
+# Production image for worker
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV WORKER_TYPE=embedding-queue
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 worker
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy built application and worker scripts
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/supabase/functions ./supabase/functions
+COPY --from=builder /app/package.json ./package.json
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy worker-specific files
+COPY infrastructure/production/workers/embedding-worker.js ./worker.js
+COPY infrastructure/production/workers/health-check.js ./health-check.js
+
+USER worker
+
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node health-check.js || exit 1
+
+CMD ["node", "worker.js"]

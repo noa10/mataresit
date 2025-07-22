@@ -1,0 +1,323 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Embedding Performance Deep Dive",
+    "tags": ["paperless-maverick", "embedding", "performance"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "15s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Embedding Success Rate Trend",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(embedding_jobs_processed_total{status=\"success\"}[5m]) / rate(embedding_jobs_processed_total[5m])",
+            "legendFormat": "Overall Success Rate"
+          },
+          {
+            "expr": "rate(embedding_jobs_processed_total{status=\"success\", team_id=\"$team\"}[5m]) / rate(embedding_jobs_processed_total{team_id=\"$team\"}[5m])",
+            "legendFormat": "Team {{team_id}} Success Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Success Rate",
+            "min": 0,
+            "max": 1
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "query": {
+                "queryType": "",
+                "refId": "A"
+              },
+              "reducer": {
+                "type": "avg",
+                "params": []
+              },
+              "evaluator": {
+                "params": [0.95],
+                "type": "lt"
+              }
+            }
+          ],
+          "executionErrorState": "alerting",
+          "noDataState": "no_data",
+          "frequency": "10s",
+          "handler": 1,
+          "name": "Embedding Success Rate Alert",
+          "message": "Embedding success rate has dropped below 95%"
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Processing Time Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(embedding_processing_duration_seconds_bucket[5m])",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "heatmap": {
+          "xBucketSize": "1m",
+          "yBucketSize": "auto",
+          "yAxis": {
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 3,
+        "title": "Queue Depth Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "embedding_queue_depth",
+            "legendFormat": "Total Queue Depth"
+          },
+          {
+            "expr": "embedding_queue_depth{priority=\"high\"}",
+            "legendFormat": "High Priority Queue"
+          },
+          {
+            "expr": "embedding_queue_depth{priority=\"normal\"}",
+            "legendFormat": "Normal Priority Queue"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Queue Items",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "API Provider Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total{provider=\"gemini\", status=\"success\"}[5m]) / rate(api_requests_total{provider=\"gemini\"}[5m])",
+            "legendFormat": "Gemini Success Rate"
+          },
+          {
+            "expr": "rate(api_requests_total{provider=\"openai\", status=\"success\"}[5m]) / rate(api_requests_total{provider=\"openai\"}[5m])",
+            "legendFormat": "OpenAI Success Rate"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(api_request_duration_seconds_bucket{provider=\"gemini\"}[5m]))",
+            "legendFormat": "Gemini 95th Percentile Latency"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(api_request_duration_seconds_bucket{provider=\"openai\"}[5m]))",
+            "legendFormat": "OpenAI 95th Percentile Latency"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Success Rate / Latency (s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "Rate Limiting Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate_limit_remaining{provider=\"gemini\", type=\"requests\"}",
+            "legendFormat": "Gemini Requests Remaining"
+          },
+          {
+            "expr": "rate_limit_remaining{provider=\"gemini\", type=\"tokens\"}",
+            "legendFormat": "Gemini Tokens Remaining"
+          },
+          {
+            "expr": "rate(rate_limit_exceeded_total{provider=\"gemini\"}[5m]) * 60",
+            "legendFormat": "Rate Limit Hits/min"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Remaining / Hits per minute",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Error Analysis",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (error_type) (rate(embedding_errors_total[5m]))",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "pieType": "donut",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Throughput by Team",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "sum by (team_id) (rate(embedding_jobs_processed_total{status=\"success\"}[5m]) * 60)",
+            "legendFormat": "{{team_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "displayName": "Jobs/minute"
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Cost Analysis",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(api_cost_total{provider=\"gemini\"})",
+            "legendFormat": "Total Gemini Cost"
+          },
+          {
+            "expr": "rate(api_cost_total{provider=\"gemini\"}[1h]) * 24",
+            "legendFormat": "Daily Cost Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Batch Processing Efficiency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "avg(batch_size{status=\"completed\"})",
+            "legendFormat": "Average Batch Size"
+          },
+          {
+            "expr": "rate(batch_jobs_processed_total[5m]) * 60",
+            "legendFormat": "Batches/minute"
+          },
+          {
+            "expr": "avg(batch_processing_duration_seconds)",
+            "legendFormat": "Average Batch Duration"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Size / Rate / Duration",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 10,
+        "title": "Worker Health Matrix",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "up{job=\"embedding-queue-workers\"}",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"embedding-queue-workers-.*\"}[5m]) * 100",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "container_memory_usage_bytes{pod=~\"embedding-queue-workers-.*\"} / container_spec_memory_limit_bytes * 100",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              },
+              "renameByName": {
+                "instance": "Worker",
+                "Value #A": "Status",
+                "Value #B": "CPU %",
+                "Value #C": "Memory %"
+              }
+            }
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "team",
+          "type": "query",
+          "query": "label_values(embedding_jobs_processed_total, team_id)",
+          "current": {
+            "value": "all",
+            "text": "All Teams"
+          },
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "worker",
+          "type": "query",
+          "query": "label_values(up{job=\"embedding-queue-workers\"}, instance)",
+          "current": {
+            "value": "all",
+            "text": "All Workers"
+          },
+          "includeAll": true,
+          "allValue": ".*"
+        }
+      ]
+    }
+  }
+}

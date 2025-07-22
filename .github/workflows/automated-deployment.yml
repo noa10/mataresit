@@ -1,0 +1,568 @@
+name: Automated Deployment Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: false
+        default: 'rolling'
+        type: choice
+        options:
+        - rolling
+        - blue-green
+        - canary
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: false
+        default: 'latest'
+      skip_tests:
+        description: 'Skip post-deployment tests'
+        required: false
+        default: false
+        type: boolean
+      force_deployment:
+        description: 'Force deployment (skip safety checks)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Determine deployment configuration
+  setup:
+    name: Setup Deployment Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.config.outputs.environment }}
+      namespace: ${{ steps.config.outputs.namespace }}
+      deployment_strategy: ${{ steps.config.outputs.deployment_strategy }}
+      image_tag: ${{ steps.config.outputs.image_tag }}
+      skip_tests: ${{ steps.config.outputs.skip_tests }}
+      force_deployment: ${{ steps.config.outputs.force_deployment }}
+      requires_approval: ${{ steps.config.outputs.requires_approval }}
+    
+    steps:
+      - name: Determine deployment configuration
+        id: config
+        run: |
+          # Determine environment based on trigger
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+            DEPLOYMENT_STRATEGY="${{ github.event.inputs.deployment_strategy }}"
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+            SKIP_TESTS="${{ github.event.inputs.skip_tests }}"
+            FORCE_DEPLOYMENT="${{ github.event.inputs.force_deployment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            ENVIRONMENT="production"
+            DEPLOYMENT_STRATEGY="rolling"
+            IMAGE_TAG="latest"
+            SKIP_TESTS="false"
+            FORCE_DEPLOYMENT="false"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            ENVIRONMENT="staging"
+            DEPLOYMENT_STRATEGY="rolling"
+            IMAGE_TAG="develop"
+            SKIP_TESTS="false"
+            FORCE_DEPLOYMENT="false"
+          else
+            echo "No deployment for this branch/event"
+            exit 0
+          fi
+          
+          # Set namespace based on environment
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            NAMESPACE="paperless-maverick"
+            REQUIRES_APPROVAL="true"
+          else
+            NAMESPACE="paperless-maverick-$ENVIRONMENT"
+            REQUIRES_APPROVAL="false"
+          fi
+          
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "deployment_strategy=$DEPLOYMENT_STRATEGY" >> $GITHUB_OUTPUT
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "skip_tests=$SKIP_TESTS" >> $GITHUB_OUTPUT
+          echo "force_deployment=$FORCE_DEPLOYMENT" >> $GITHUB_OUTPUT
+          echo "requires_approval=$REQUIRES_APPROVAL" >> $GITHUB_OUTPUT
+
+  # Pre-deployment validation and security scanning
+  pre-deployment-validation:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.environment != ''
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run comprehensive security scan
+        run: |
+          echo "Running security scans..."
+          npm audit --audit-level=moderate
+          
+          # Run TruffleHog for secrets scanning
+          docker run --rm -v "$PWD:/pwd" trufflesecurity/trufflehog:latest filesystem /pwd --only-verified
+
+      - name: Validate deployment configuration
+        run: |
+          echo "Validating deployment configuration..."
+          
+          # Check if deployment scripts exist
+          if [[ ! -f "infrastructure/production/scripts/master-deployment.sh" ]]; then
+            echo "Error: Master deployment script not found"
+            exit 1
+          fi
+          
+          # Validate configuration files
+          if [[ ! -f "infrastructure/production/config/deployment-config.yaml" ]]; then
+            echo "Error: Deployment configuration not found"
+            exit 1
+          fi
+          
+          echo "Deployment configuration validation passed"
+
+      - name: Build and test application
+        run: |
+          npm run build
+          npm run test:unit
+        env:
+          NODE_ENV: test
+
+      - name: Build Docker images
+        run: |
+          # Build main application image
+          docker build -f infrastructure/production/docker/Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }} .
+          
+          # Build worker image
+          docker build -f infrastructure/production/docker/Dockerfile.worker -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ needs.setup.outputs.image_tag }} .
+
+      - name: Container security scanning
+        run: |
+          # Scan main application image
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --severity HIGH,CRITICAL \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}
+          
+          # Scan worker image
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --severity HIGH,CRITICAL \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ needs.setup.outputs.image_tag }}
+
+      - name: Push Docker images
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ needs.setup.outputs.image_tag }}
+
+  # Manual approval for production deployments
+  production-approval:
+    name: Production Deployment Approval
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation]
+    if: needs.setup.outputs.requires_approval == 'true' && needs.setup.outputs.force_deployment != 'true'
+    environment: production-approval
+    
+    steps:
+      - name: Request production deployment approval
+        run: |
+          echo "🚨 Production deployment approval required"
+          echo "Environment: ${{ needs.setup.outputs.environment }}"
+          echo "Image Tag: ${{ needs.setup.outputs.image_tag }}"
+          echo "Deployment Strategy: ${{ needs.setup.outputs.deployment_strategy }}"
+          echo "Namespace: ${{ needs.setup.outputs.namespace }}"
+
+  # Database migration execution
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, production-approval]
+    if: always() && (needs.production-approval.result == 'success' || needs.setup.outputs.requires_approval != 'true')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup deployment environment
+        run: |
+          # Install required tools
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Execute database migrations
+        run: |
+          chmod +x infrastructure/production/scripts/migrate-database.sh
+          
+          ./infrastructure/production/scripts/migrate-database.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --validate-only \
+            --verbose
+          
+          if [[ "${{ needs.setup.outputs.force_deployment }}" == "true" ]]; then
+            FORCE_FLAG="--force"
+          else
+            FORCE_FLAG=""
+          fi
+          
+          ./infrastructure/production/scripts/migrate-database.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --auto-approve \
+            --verbose \
+            $FORCE_FLAG
+
+  # Infrastructure deployment
+  infrastructure-deployment:
+    name: Infrastructure Deployment
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, production-approval, database-migration]
+    if: always() && needs.database-migration.result == 'success'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Deploy infrastructure
+        run: |
+          chmod +x infrastructure/production/scripts/deploy-infrastructure.sh
+          
+          ./infrastructure/production/scripts/deploy-infrastructure.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --verbose \
+            --validate-config
+
+  # Application deployment using our automation scripts
+  application-deployment:
+    name: Application Deployment
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, production-approval, database-migration, infrastructure-deployment]
+    if: always() && needs.infrastructure-deployment.result == 'success'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Deploy application
+        run: |
+          chmod +x infrastructure/production/scripts/deploy-application.sh
+          
+          # Determine deployment strategy flag
+          case "${{ needs.setup.outputs.deployment_strategy }}" in
+            "blue-green")
+              STRATEGY_FLAG="--blue-green"
+              ;;
+            "canary")
+              STRATEGY_FLAG="--canary"
+              ;;
+            *)
+              STRATEGY_FLAG=""
+              ;;
+          esac
+          
+          if [[ "${{ needs.setup.outputs.force_deployment }}" == "true" ]]; then
+            FORCE_FLAG="--force"
+          else
+            FORCE_FLAG=""
+          fi
+          
+          ./infrastructure/production/scripts/deploy-application.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --image-tag ${{ needs.setup.outputs.image_tag }} \
+            --worker-tag ${{ needs.setup.outputs.image_tag }} \
+            --verbose \
+            $STRATEGY_FLAG \
+            $FORCE_FLAG
+
+  # Monitoring setup
+  monitoring-deployment:
+    name: Monitoring Deployment
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, production-approval, application-deployment]
+    if: always() && needs.application-deployment.result == 'success'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Deploy monitoring stack
+        run: |
+          chmod +x infrastructure/production/scripts/deploy-monitoring.sh
+          
+          ./infrastructure/production/scripts/deploy-monitoring.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --verbose
+
+  # Post-deployment validation using our validation framework
+  post-deployment-validation:
+    name: Post-deployment Validation
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, production-approval, application-deployment, monitoring-deployment]
+    if: always() && needs.application-deployment.result == 'success' && needs.setup.outputs.skip_tests != 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Run comprehensive deployment validation
+        run: |
+          chmod +x infrastructure/production/scripts/deployment-validation-framework.sh
+
+          # Run comprehensive validation suite
+          ./infrastructure/production/scripts/deployment-validation-framework.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --suite comprehensive \
+            --verbose
+
+      - name: Upload validation reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-reports-${{ needs.setup.outputs.environment }}-${{ github.run_number }}
+          path: |
+            reports/validation/
+            logs/validation/
+          retention-days: 30
+
+      - name: Run integration tests
+        run: |
+          npm run test:integration
+        env:
+          TEST_SUPABASE_URL: ${{ needs.setup.outputs.environment == 'production' && secrets.SUPABASE_URL || secrets.STAGING_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ needs.setup.outputs.environment == 'production' && secrets.SUPABASE_ANON_KEY || secrets.STAGING_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ needs.setup.outputs.environment == 'production' && secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_GEMINI_API_KEY: ${{ needs.setup.outputs.environment == 'production' && secrets.GEMINI_API_KEY || secrets.STAGING_GEMINI_API_KEY }}
+
+      - name: Performance benchmarking
+        if: needs.setup.outputs.environment == 'production'
+        run: |
+          npm run test:performance:benchmark
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  # Automated rollback on validation failure
+  automated-rollback:
+    name: Automated Rollback
+    runs-on: ubuntu-latest
+    needs: [setup, application-deployment, post-deployment-validation]
+    if: always() && needs.application-deployment.result == 'success' && needs.post-deployment-validation.result == 'failure'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ needs.setup.outputs.environment == 'production' && secrets.PRODUCTION_KUBECONFIG || secrets.STAGING_KUBECONFIG }}
+
+      - name: Execute automated rollback
+        run: |
+          chmod +x infrastructure/production/scripts/rollback-automation.sh
+
+          ./infrastructure/production/scripts/rollback-automation.sh \
+            --type full \
+            --target previous \
+            --reason "Automated rollback due to post-deployment validation failure" \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --auto-approve \
+            --verbose
+
+      - name: Validate rollback success
+        run: |
+          chmod +x infrastructure/production/scripts/deployment-validation-framework.sh
+
+          ./infrastructure/production/scripts/deployment-validation-framework.sh \
+            --environment ${{ needs.setup.outputs.environment }} \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --suite health \
+            --verbose
+
+  # Deployment notifications
+  deployment-notification:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [setup, application-deployment, post-deployment-validation, automated-rollback]
+    if: always()
+
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.application-deployment.result }}" == "success" ]] && [[ "${{ needs.post-deployment-validation.result }}" == "success" || "${{ needs.setup.outputs.skip_tests }}" == "true" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Deployment completed successfully" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.automated-rollback.result }}" == "success" ]]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+            echo "message=🔄 Deployment failed and was automatically rolled back" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "message=❌ Deployment failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "${{ steps.status.outputs.message }}",
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "fields": [
+                    {
+                      "title": "Environment",
+                      "value": "${{ needs.setup.outputs.environment }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Image Tag",
+                      "value": "${{ needs.setup.outputs.image_tag }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Deployment Strategy",
+                      "value": "${{ needs.setup.outputs.deployment_strategy }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Namespace",
+                      "value": "${{ needs.setup.outputs.namespace }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>",
+                      "short": true
+                    },
+                    {
+                      "title": "Workflow",
+                      "value": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow>",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deployment summary and cleanup
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [setup, pre-deployment-validation, database-migration, infrastructure-deployment, application-deployment, monitoring-deployment, post-deployment-validation, automated-rollback]
+    if: always()
+
+    steps:
+      - name: Generate deployment summary
+        run: |
+          echo "# Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace**: ${{ needs.setup.outputs.namespace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: ${{ needs.setup.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Strategy**: ${{ needs.setup.outputs.deployment_strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Force Deployment**: ${{ needs.setup.outputs.force_deployment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Skip Tests**: ${{ needs.setup.outputs.skip_tests }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pre-deployment Validation**: ${{ needs.pre-deployment-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Migration**: ${{ needs.database-migration.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Infrastructure Deployment**: ${{ needs.infrastructure-deployment.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application Deployment**: ${{ needs.application-deployment.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Monitoring Deployment**: ${{ needs.monitoring-deployment.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Post-deployment Validation**: ${{ needs.post-deployment-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Automated Rollback**: ${{ needs.automated-rollback.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Determine overall status
+          if [[ "${{ needs.application-deployment.result }}" == "success" ]] && [[ "${{ needs.post-deployment-validation.result }}" == "success" || "${{ needs.setup.outputs.skip_tests }}" == "true" ]]; then
+            echo "## ✅ Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.automated-rollback.result }}" == "success" ]]; then
+            echo "## 🔄 Deployment Status: ROLLED BACK" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
