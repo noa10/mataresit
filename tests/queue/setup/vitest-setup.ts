@@ -34,15 +34,19 @@ beforeAll(() => {
   }));
   
   // Setup global performance mock
-  global.performance = {
-    now: vi.fn(() => Date.now()),
-    mark: vi.fn(),
-    measure: vi.fn(),
-    getEntriesByName: vi.fn(() => []),
-    getEntriesByType: vi.fn(() => []),
-    clearMarks: vi.fn(),
-    clearMeasures: vi.fn()
-  } as any;
+  Object.defineProperty(global, 'performance', {
+    value: {
+      now: vi.fn(() => Date.now()),
+      mark: vi.fn(),
+      measure: vi.fn(),
+      getEntriesByName: vi.fn(() => []),
+      getEntriesByType: vi.fn(() => []),
+      clearMarks: vi.fn(),
+      clearMeasures: vi.fn()
+    },
+    writable: true,
+    configurable: true
+  });
   
   console.log('🧪 Queue test environment initialized');
 });

@@ -1,0 +1,243 @@
+{
+  "scripts": {
+    "test:integration": "node tests/phase4-integration/scripts/run-all-tests.js",
+    "test:integration:critical": "node tests/phase4-integration/scripts/run-all-tests.js --suites critical",
+    "test:integration:parallel": "node tests/phase4-integration/scripts/run-all-tests.js --parallel",
+    "test:integration:verbose": "node tests/phase4-integration/scripts/run-all-tests.js --verbose",
+    "test:integration:ci": "node tests/phase4-integration/scripts/run-all-tests.js --ci --suites critical",
+    
+    "test:performance": "node tests/phase4-integration/scripts/run-all-tests.js --suites performance",
+    "test:load": "node tests/phase4-integration/scripts/run-all-tests.js --suites load",
+    "test:consistency": "node tests/phase4-integration/scripts/run-all-tests.js --suites consistency",
+    
+    "test:production-readiness": "node tests/phase4-integration/production-readiness/run-production-readiness.js",
+    "test:production-readiness:performance": "node tests/phase4-integration/production-readiness/run-production-readiness.js --category performance",
+    "test:production-readiness:reliability": "node tests/phase4-integration/production-readiness/run-production-readiness.js --category reliability",
+    "test:production-readiness:security": "node tests/phase4-integration/production-readiness/run-production-readiness.js --category security",
+    "test:production-readiness:operational": "node tests/phase4-integration/production-readiness/run-production-readiness.js --category operational",
+    
+    "test:report": "node tests/phase4-integration/scripts/run-all-tests.js --generate-reports",
+    "test:dashboard": "node tests/phase4-integration/production-readiness/run-production-readiness.js --format html --output test-results/dashboard.html",
+    "test:trends": "node tests/phase4-integration/production-readiness/run-production-readiness.js --format html --output test-results/trends.html",
+    
+    "test:single-upload": "npx vitest run tests/phase4-integration/performance/single-upload-performance.test.ts",
+    "test:batch-upload": "npx vitest run tests/phase4-integration/performance/batch-upload-performance.test.ts",
+    "test:queue-system": "npx vitest run tests/phase4-integration/performance/queue-system-performance.test.ts",
+    "test:monitoring": "npx vitest run tests/phase4-integration/performance/monitoring-dashboard-performance.test.ts",
+    
+    "test:high-volume": "npx vitest run tests/phase4-integration/high-volume-batch-upload.test.ts",
+    "test:failure-recovery": "npx vitest run tests/phase4-integration/system-failure-recovery.test.ts",
+    "test:data-consistency": "npx vitest run tests/phase4-integration/production-readiness/data-consistency-validation.test.ts",
+    "test:concurrent-modification": "npx vitest run tests/phase4-integration/production-readiness/concurrent-modification.test.ts",
+    "test:data-integrity": "npx vitest run tests/phase4-integration/production-readiness/data-integrity-validation.test.ts",
+    
+    "test:peak-load": "npx vitest run tests/phase4-integration/load-testing/peak-usage-load.test.ts",
+    "test:stress": "npx vitest run tests/phase4-integration/load-testing/stress-testing.test.ts",
+    
+    "test:setup": "node tests/phase4-integration/setup/test-setup.js",
+    "test:cleanup": "node tests/phase4-integration/setup/test-cleanup.js",
+    "test:db-connection": "node -e \"const { createClient } = require('@supabase/supabase-js'); const client = createClient(process.env.TEST_SUPABASE_URL, process.env.TEST_SUPABASE_ANON_KEY); client.from('receipts').select('count').then(r => console.log('DB:', r.error ? r.error.message : 'Connected'));\""
+  },
+  "description": "Phase 4 Integration Test Scripts",
+  "usage": {
+    "quick_start": [
+      "npm run test:integration",
+      "npm run test:production-readiness",
+      "npm run test:dashboard"
+    ],
+    "development": [
+      "npm run test:integration:verbose",
+      "npm run test:performance",
+      "npm run test:consistency"
+    ],
+    "ci_cd": [
+      "npm run test:integration:ci",
+      "npm run test:production-readiness",
+      "npm run test:report"
+    ],
+    "individual_tests": [
+      "npm run test:single-upload",
+      "npm run test:batch-upload",
+      "npm run test:high-volume",
+      "npm run test:data-consistency"
+    ]
+  },
+  "environment_variables": {
+    "required": [
+      "TEST_SUPABASE_URL",
+      "TEST_SUPABASE_ANON_KEY",
+      "TEST_SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "optional": [
+      "TEST_GEMINI_API_KEY",
+      "TEST_OPENROUTER_API_KEY",
+      "TEST_TIMEOUT",
+      "TEST_PARALLEL",
+      "TEST_VERBOSE",
+      "NODE_ENV"
+    ]
+  },
+  "test_suites": {
+    "integration": {
+      "description": "Core integration tests",
+      "duration": "~5 minutes",
+      "critical": true,
+      "files": [
+        "high-volume-batch-upload.test.ts",
+        "system-failure-recovery.test.ts"
+      ]
+    },
+    "performance": {
+      "description": "Performance benchmarking tests",
+      "duration": "~10 minutes",
+      "critical": true,
+      "files": [
+        "performance/single-upload-performance.test.ts",
+        "performance/batch-upload-performance.test.ts",
+        "performance/queue-system-performance.test.ts",
+        "performance/monitoring-dashboard-performance.test.ts"
+      ]
+    },
+    "load": {
+      "description": "Load testing scenarios",
+      "duration": "~30 minutes",
+      "critical": false,
+      "files": [
+        "load-testing/peak-usage-load.test.ts",
+        "load-testing/stress-testing.test.ts"
+      ]
+    },
+    "consistency": {
+      "description": "Data consistency validation",
+      "duration": "~15 minutes",
+      "critical": true,
+      "files": [
+        "production-readiness/data-consistency-validation.test.ts",
+        "production-readiness/concurrent-modification.test.ts",
+        "production-readiness/data-integrity-validation.test.ts"
+      ]
+    },
+    "production_readiness": {
+      "description": "Production readiness validation",
+      "duration": "~20 minutes",
+      "critical": true,
+      "files": [
+        "production-readiness/production-readiness-validation.test.ts"
+      ]
+    }
+  },
+  "performance_targets": {
+    "single_upload_processing": "< 7.5 seconds",
+    "batch_upload_processing": "< 9 seconds per file",
+    "queue_system_throughput": "> 45 items per minute",
+    "dashboard_load_time": "< 2.5 seconds",
+    "system_success_rate": "> 95%",
+    "data_consistency": "> 98%"
+  },
+  "load_testing_targets": {
+    "peak_usage": {
+      "concurrent_users": 50,
+      "duration": "10 minutes",
+      "success_rate": "> 95%"
+    },
+    "stress_test": {
+      "concurrent_users": 100,
+      "duration": "15 minutes",
+      "success_rate": "> 80%"
+    },
+    "spike_test": {
+      "concurrent_users": "10→80",
+      "duration": "30 seconds",
+      "success_rate": "> 90%"
+    },
+    "endurance": {
+      "concurrent_users": 30,
+      "duration": "60 minutes",
+      "success_rate": "> 95%"
+    }
+  },
+  "production_readiness_criteria": {
+    "performance": {
+      "weight": "30%",
+      "minimum_score": "80%",
+      "critical_checks": [
+        "single_upload_performance",
+        "batch_upload_performance",
+        "queue_throughput"
+      ]
+    },
+    "reliability": {
+      "weight": "30%",
+      "minimum_score": "85%",
+      "critical_checks": [
+        "system_success_rate",
+        "failure_recovery",
+        "data_consistency"
+      ]
+    },
+    "security": {
+      "weight": "25%",
+      "minimum_score": "95%",
+      "critical_checks": [
+        "api_authentication",
+        "data_encryption",
+        "input_validation"
+      ]
+    },
+    "operational": {
+      "weight": "15%",
+      "minimum_score": "75%",
+      "critical_checks": [
+        "monitoring_alerting",
+        "logging_observability",
+        "backup_recovery"
+      ]
+    }
+  },
+  "deployment_criteria": {
+    "minimum_overall_score": "85%",
+    "minimum_critical_pass_rate": "90%",
+    "maximum_critical_failures": 2,
+    "required_category_scores": {
+      "performance": "80%",
+      "reliability": "85%",
+      "security": "95%",
+      "operational": "75%"
+    }
+  },
+  "troubleshooting": {
+    "common_issues": {
+      "environment_variables_not_set": "node -e \"console.log('Supabase URL:', process.env.TEST_SUPABASE_URL ? 'Set' : 'Missing')\"",
+      "test_timeouts": "NODE_OPTIONS=\"--max-old-space-size=4096\" npm run test:integration",
+      "database_connection_issues": "npm run test:db-connection",
+      "memory_issues": "NODE_OPTIONS=\"--max-old-space-size=4096\" npm run test:integration"
+    },
+    "debug_commands": {
+      "verbose_output": "npm run test:integration:verbose",
+      "single_test_debug": "npx vitest run tests/phase4-integration/high-volume-batch-upload.test.ts --verbose",
+      "performance_debug": "npm run test:production-readiness -- --verbose --format html"
+    }
+  },
+  "ci_cd_integration": {
+    "github_actions": {
+      "workflow_file": ".github/workflows/phase4-integration.yml",
+      "command": "npm run test:integration:ci"
+    },
+    "gitlab_ci": {
+      "config_file": ".gitlab-ci.yml",
+      "command": "npm run test:integration:ci"
+    },
+    "jenkins": {
+      "pipeline_file": "Jenkinsfile",
+      "command": "npm run test:integration:ci"
+    }
+  },
+  "reports": {
+    "html_dashboard": "test-results/test-dashboard.html",
+    "json_report": "test-results/test-report.json",
+    "junit_xml": "test-results/junit.xml",
+    "performance_trends": "test-results/performance-trends.html",
+    "production_readiness": "test-results/production-readiness.html",
+    "regression_analysis": "test-results/regression-analysis.html"
+  }
+}

@@ -10,11 +10,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: [
       './tests/alerting/setup/vitest-setup.ts',
-      './tests/queue/setup/vitest-setup.ts'
+      './tests/queue/setup/vitest-setup.ts',
+      './tests/phase4-integration/setup/vitest-setup.ts'
     ],
     include: [
       'tests/alerting/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'tests/queue/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'tests/phase4-integration/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
     ],
     exclude: [
@@ -25,7 +27,8 @@ export default defineConfig({
       '.cache',
       'tests/alerting/e2e/**/*',
       'tests/alerting/performance/**/*',
-      'tests/queue/performance/**/*'
+      'tests/queue/performance/**/*',
+      'tests/phase4-integration/load-testing/**/*'
     ],
     coverage: {
       provider: 'v8',
