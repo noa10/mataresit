@@ -1,4 +1,4 @@
-import { useReducer, useRef, useCallback, useEffect } from "react";
+import { useReducer, useRef, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ReceiptUpload, ProcessingStatus, ProcessingLog } from "@/types/receipt";
 import { useFileUpload } from "./useFileUpload";
@@ -18,10 +18,49 @@ import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/util
 import { ReceiptNotificationService } from "@/services/receiptNotificationService";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
 
+// Phase 3: Batch Upload Optimization - Import new systems
+import {
+  BatchSessionService,
+  createBatchSessionService,
+  ProcessingStrategy,
+  BatchSession,
+  BatchSessionProgress,
+  BatchSessionMetrics,
+  validateBatchSessionRequest,
+  estimateBatchProcessingTime,
+  getProcessingStrategyConfig
+} from "@/lib/batch-session";
+import {
+  RateLimitingManager,
+  createRateLimitingManager,
+  getDefaultQuotaLimits,
+  estimateTokensFromImageSize
+} from "@/lib/rate-limiting";
+import {
+  ProgressTrackingService,
+  ProgressMetrics,
+  ETACalculation,
+  ProgressAlert,
+  FileProgressDetail,
+  createProgressTrackingService
+} from "@/lib/progress-tracking";
+
 interface BatchUploadOptions {
   maxConcurrent?: number;
   autoStart?: boolean;
   useEnhancedFallback?: boolean;
+  // Phase 3: Enhanced batch upload options
+  processingStrategy?: ProcessingStrategy;
+  enableRateLimiting?: boolean;
+  enableSessionTracking?: boolean;
+  sessionName?: string;
+  enableRealTimeUpdates?: boolean;
+  // Phase 3: Enhanced progress tracking options
+  enableProgressTracking?: boolean;
+  progressTrackingMode?: 'minimal' | 'basic' | 'enhanced' | 'comprehensive';
+  enableETACalculation?: boolean;
+  enablePerformanceAlerts?: boolean;
+  enableQualityTracking?: boolean;
 }
 
 // Progress mapping for granular log-based progress updates (same as single upload)
@@ -95,7 +134,19 @@ type BatchUploadAction =
   | { type: 'UPLOAD_FAILED'; uploadId: string; error: { code: string; message: string } }
   | { type: 'SET_RECEIPT_ID'; uploadId: string; receiptId: string }
   | { type: 'RETRY_UPLOAD'; uploadId: string }
-  | { type: 'SET_PROGRESS_UPDATING'; uploadId: string; isUpdating: boolean };
+  | { type: 'SET_PROGRESS_UPDATING'; uploadId: string; isUpdating: boolean }
+  // Phase 3: Enhanced batch session actions
+  | { type: 'SET_BATCH_SESSION'; session: BatchSession | null }
+  | { type: 'UPDATE_SESSION_PROGRESS'; progress: BatchSessionProgress }
+  | { type: 'UPDATE_SESSION_METRICS'; metrics: BatchSessionMetrics }
+  | { type: 'SET_PROCESSING_STRATEGY'; strategy: ProcessingStrategy }
+  | { type: 'UPDATE_RATE_LIMIT_STATUS'; status: BatchUploadState['rateLimitStatus'] }
+  // Phase 3: Enhanced progress tracking actions
+  | { type: 'UPDATE_PROGRESS_METRICS'; metrics: ProgressMetrics }
+  | { type: 'UPDATE_ETA_CALCULATION'; eta: ETACalculation }
+  | { type: 'ADD_PROGRESS_ALERT'; alert: ProgressAlert }
+  | { type: 'DISMISS_PROGRESS_ALERT'; alertId: string }
+  | { type: 'UPDATE_FILE_PROGRESS'; fileId: string; progress: FileProgressDetail };
 
 /**
  * State shape for batch upload management
@@ -111,6 +162,23 @@ interface BatchUploadState {
   processingRecommendations: Record<string, ProcessingRecommendation>;
   progressUpdating: Record<string, boolean>; // Track which uploads are actively updating progress
   batchId: string | null; // Unique identifier for the current batch
+  // Phase 3: Enhanced batch session state
+  batchSession: BatchSession | null;
+  sessionProgress: BatchSessionProgress | null;
+  sessionMetrics: BatchSessionMetrics | null;
+  processingStrategy: ProcessingStrategy;
+  rateLimitStatus: {
+    isRateLimited: boolean;
+    requestsRemaining: number;
+    tokensRemaining: number;
+    backoffMs: number;
+  } | null;
+  // Phase 3: Enhanced progress tracking state
+  progressMetrics: ProgressMetrics | null;
+  etaCalculation: ETACalculation | null;
+  progressAlerts: ProgressAlert[];
+  fileProgressDetails: Record<string, FileProgressDetail>;
+  progressTrackingEnabled: boolean;
 }
 
 /**
@@ -126,7 +194,19 @@ const initialBatchState: BatchUploadState = {
   receiptIds: {},
   processingRecommendations: {},
   progressUpdating: {},
-  batchId: null
+  batchId: null,
+  // Phase 3: Enhanced batch session state
+  batchSession: null,
+  sessionProgress: null,
+  sessionMetrics: null,
+  processingStrategy: 'balanced',
+  rateLimitStatus: null,
+  // Phase 3: Enhanced progress tracking state
+  progressMetrics: null,
+  etaCalculation: null,
+  progressAlerts: [],
+  fileProgressDetails: {},
+  progressTrackingEnabled: false
 };
 
 /**
@@ -335,24 +415,146 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
       };
     }
 
+    // Phase 3: Enhanced batch session action handlers
+    case 'SET_BATCH_SESSION': {
+      return {
+        ...state,
+        batchSession: action.session
+      };
+    }
+
+    case 'UPDATE_SESSION_PROGRESS': {
+      return {
+        ...state,
+        sessionProgress: action.progress
+      };
+    }
+
+    case 'UPDATE_SESSION_METRICS': {
+      return {
+        ...state,
+        sessionMetrics: action.metrics
+      };
+    }
+
+    case 'SET_PROCESSING_STRATEGY': {
+      return {
+        ...state,
+        processingStrategy: action.strategy
+      };
+    }
+
+    case 'UPDATE_RATE_LIMIT_STATUS': {
+      return {
+        ...state,
+        rateLimitStatus: action.status
+      };
+    }
+
+    // Phase 3: Enhanced progress tracking action handlers
+    case 'UPDATE_PROGRESS_METRICS': {
+      return {
+        ...state,
+        progressMetrics: action.metrics
+      };
+    }
+
+    case 'UPDATE_ETA_CALCULATION': {
+      return {
+        ...state,
+        etaCalculation: action.eta
+      };
+    }
+
+    case 'ADD_PROGRESS_ALERT': {
+      return {
+        ...state,
+        progressAlerts: [...state.progressAlerts, action.alert]
+      };
+    }
+
+    case 'DISMISS_PROGRESS_ALERT': {
+      return {
+        ...state,
+        progressAlerts: state.progressAlerts.filter(alert => alert.id !== action.alertId)
+      };
+    }
+
+    case 'UPDATE_FILE_PROGRESS': {
+      return {
+        ...state,
+        fileProgressDetails: {
+          ...state.fileProgressDetails,
+          [action.fileId]: action.progress
+        }
+      };
+    }
+
     default:
       return state;
   }
 }
 
 export function useBatchFileUpload(options: BatchUploadOptions = {}) {
-  const { maxConcurrent = 2, autoStart = false } = options;
+  const {
+    maxConcurrent = 2,
+    autoStart = false,
+    processingStrategy = 'balanced',
+    enableRateLimiting = true,
+    enableSessionTracking = true,
+    sessionName,
+    enableRealTimeUpdates = true,
+    // Phase 3: Enhanced progress tracking options
+    enableProgressTracking = true,
+    progressTrackingMode = 'enhanced',
+    enableETACalculation = true,
+    enablePerformanceAlerts = true,
+    enableQualityTracking = true
+  } = options;
 
   // Use the base file upload hook for file selection and validation
   const baseUpload = useFileUpload();
 
   // Use reducer for complex state management
-  const [state, dispatch] = useReducer(batchUploadReducer, initialBatchState);
+  const [state, dispatch] = useReducer(batchUploadReducer, {
+    ...initialBatchState,
+    processingStrategy
+  });
   const processingRef = useRef<boolean>(false);
 
   const { user } = useAuth();
   const { currentTeam } = useTeam();
   const { settings } = useSettings();
+
+  // Phase 3: Initialize batch session service and rate limiting
+  const [batchSessionService] = useState(() =>
+    enableSessionTracking ? createBatchSessionService({
+      enableRateLimiting,
+      enableRealTimeUpdates,
+      defaultStrategy: processingStrategy,
+      maxConcurrentSessions: 3
+    }) : null
+  );
+
+  const [rateLimitingManager] = useState(() =>
+    enableRateLimiting ? createRateLimitingManager({
+      apiProvider: 'gemini',
+      strategy: processingStrategy,
+      quotaLimits: getDefaultQuotaLimits('gemini'),
+      enablePersistentTracking: true
+    }) : null
+  );
+
+  // Phase 3: Initialize progress tracking service
+  const [progressTrackingService] = useState(() =>
+    enableProgressTracking ? createProgressTrackingService({
+      enablePersistence: enableSessionTracking,
+      enableRealTimeUpdates,
+      enableAnalytics: enableQualityTracking,
+      updateIntervalMs: progressTrackingMode === 'comprehensive' ? 2000 : 5000,
+      persistenceIntervalMs: 30000
+    }) : null
+  );
 
   // Destructure state for easier access
   const {
@@ -365,7 +567,19 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     receiptIds,
     processingRecommendations,
     progressUpdating,
-    batchId
+    batchId,
+    // Phase 3: Enhanced batch session state
+    batchSession,
+    sessionProgress,
+    sessionMetrics,
+    processingStrategy: currentProcessingStrategy,
+    rateLimitStatus,
+    // Phase 3: Enhanced progress tracking state
+    progressMetrics,
+    etaCalculation,
+    progressAlerts,
+    fileProgressDetails,
+    progressTrackingEnabled
   } = state;
 
   // Computed properties
@@ -384,6 +598,91 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const currentlyFailedUploads = batchUploads.filter(upload =>
     failedUploads.includes(upload.id)
   );
+
+  // Phase 3: Batch session management functions
+  const createBatchSession = useCallback(async (files: File[]) => {
+    if (!batchSessionService || !user) return null;
+
+    try {
+      const validation = validateBatchSessionRequest({
+        files,
+        processingStrategy: currentProcessingStrategy,
+        sessionName,
+        maxConcurrent
+      });
+
+      if (!validation.valid) {
+        validation.errors.forEach(error => toast.error(error));
+        return null;
+      }
+
+      const session = await batchSessionService.createBatchSession(
+        {
+          files,
+          processingStrategy: currentProcessingStrategy,
+          sessionName,
+          maxConcurrent
+        },
+        user.id,
+        currentTeam?.id
+      );
+
+      if (session) {
+        dispatch({ type: 'SET_BATCH_SESSION', session });
+        console.log('✅ Batch session created:', session.id);
+      }
+
+      return session;
+    } catch (error) {
+      console.error('❌ Failed to create batch session:', error);
+      toast.error('Failed to create batch session');
+      return null;
+    }
+  }, [batchSessionService, user, currentTeam, currentProcessingStrategy, sessionName, maxConcurrent]);
+
+  const updateProcessingStrategy = useCallback((strategy: ProcessingStrategy) => {
+    dispatch({ type: 'SET_PROCESSING_STRATEGY', strategy });
+
+    // Update rate limiting manager if available
+    if (rateLimitingManager) {
+      rateLimitingManager.updateStrategy(strategy);
+    }
+
+    console.log('📊 Processing strategy updated to:', strategy);
+  }, [rateLimitingManager]);
+
+  const requestApiPermission = useCallback(async (uploadId: string, estimatedTokens: number) => {
+    if (!rateLimitingManager || !batchSession) {
+      return { allowed: true, delayMs: 0, requestId: uploadId };
+    }
+
+    try {
+      const permission = await batchSessionService?.requestApiPermission(
+        batchSession.id,
+        uploadId,
+        estimatedTokens
+      );
+
+      if (permission && !permission.allowed) {
+        // Update rate limit status in state
+        const status = await rateLimitingManager.getStatus();
+        dispatch({
+          type: 'UPDATE_RATE_LIMIT_STATUS',
+          status: {
+            isRateLimited: status.isRateLimited,
+            requestsRemaining: status.requestsRemaining,
+            tokensRemaining: status.tokensRemaining,
+            backoffMs: status.backoffMs
+          }
+        });
+      }
+
+      return permission || { allowed: true, delayMs: 0, requestId: uploadId };
+    } catch (error) {
+      console.error('❌ Error requesting API permission:', error);
+      return { allowed: true, delayMs: 0, requestId: uploadId };
+    }
+  }, [rateLimitingManager, batchSession, batchSessionService]);
 
   // Smooth progress update function for individual uploads
   const updateProgressSmooth = useCallback((uploadId: string, targetProgress: number) => {
@@ -580,6 +879,27 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       categoryId
     });
 
+    // Phase 3: Create batch session if session tracking is enabled
+    if (enableSessionTracking && !batchSession) {
+      console.log('🚀 Creating batch session for tracking...');
+      const session = await createBatchSession(validFiles);
+
+      if (session) {
+        // Show processing time and cost estimates
+        const estimates = estimateBatchProcessingTime(
+          validFiles.length,
+          currentProcessingStrategy,
+          validFiles.reduce((sum, file) => sum + file.size, 0) / validFiles.length
+        );
+
+        console.log('📊 Batch processing estimates:', estimates);
+        toast.info(
+          `Batch session created! Estimated time: ${estimates.estimatedMinutes} min, ` +
+          `Cost: $${estimates.estimatedCost.toFixed(4)}`
+        );
+      }
+    }
+
     // If autoStart is enabled, start processing
     if (autoStart && !processingRef.current) {
       console.log('Auto-start enabled, scheduling batch processing');
@@ -595,7 +915,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       status: 'pending' as const,
       uploadProgress: 0,
     }));
-  }, [autoStart]);
+  }, [autoStart, enableSessionTracking, batchSession, createBatchSession, currentProcessingStrategy]);
 
   // Remove a file from the batch queue
   const removeFromBatchQueue = useCallback((uploadId: string) => {
@@ -657,6 +977,30 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     }
 
     try {
+      // Phase 3: Request API permission with rate limiting
+      if (enableRateLimiting) {
+        const estimatedTokens = estimateTokensFromImageSize(upload.file.size);
+        const permission = await requestApiPermission(upload.id, estimatedTokens);
+
+        if (!permission.allowed) {
+          console.log(`⏳ Rate limited for upload ${upload.id}, waiting ${permission.delayMs}ms`);
+          addLocalLog(upload.id, 'START', `Rate limited - waiting ${Math.round(permission.delayMs / 1000)}s before processing`);
+
+          // Wait for the required delay
+          await new Promise(resolve => setTimeout(resolve, permission.delayMs));
+
+          // Try again after delay
+          const retryPermission = await requestApiPermission(upload.id, estimatedTokens);
+          if (!retryPermission.allowed) {
+            updateUploadStatus(upload.id, 'error', 0, {
+              code: 'RATE_LIMITED',
+              message: 'Rate limit exceeded. Please try again later.'
+            });
+            return null;
+          }
+        }
+      }
+
       // Add initial logs and update progress
       addLocalLog(upload.id, 'START', `Starting upload process for ${upload.file.name} (${(upload.file.size / 1024 / 1024).toFixed(2)} MB)`);
       updateUploadStatus(upload.id, 'uploading', 0);
@@ -764,6 +1108,17 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       addLocalLog(upload.id, 'PROCESSING', `Starting AI processing with ${settings.selectedModel}...`);
       updateUploadStatus(upload.id, 'processing', 60);
 
+      // Phase 3: Update progress tracking when processing starts
+      if (progressTrackingService && batchSession) {
+        progressTrackingService.updateFileProgress(batchSession.id, upload.id, {
+          status: 'processing',
+          stage: 'processing',
+          progress: 60,
+          stageProgress: 0,
+          startTime: new Date()
+        });
+      }
+
       // Subscribe to status updates for this receipt
       const statusChannel = supabase.channel(`receipt-status-${newReceiptId}`)
         .on(
@@ -825,6 +1180,40 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         // If we got a successful result, update the status to completed
         // This is a fallback in case the realtime subscription doesn't catch the update
         if (result) {
+          // Phase 3: Record successful API call for rate limiting
+          if (enableRateLimiting && batchSessionService && batchSession) {
+            const actualTokens = estimateTokensFromImageSize(upload.file.size);
+            const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
+
+            await batchSessionService.updateFileStatus({
+              fileId: upload.id,
+              status: 'completed',
+              receiptId: newReceiptId,
+              processingDurationMs: processingTime,
+              apiCallsMade: 1,
+              tokensUsed: actualTokens,
+              rateLimited: false
+            }, user.id);
+          }
+
+          // Phase 3: Update progress tracking for successful completion
+          if (progressTrackingService && batchSession) {
+            const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
+            const actualTokens = estimateTokensFromImageSize(upload.file.size);
+
+            progressTrackingService.updateFileProgress(batchSession.id, upload.id, {
+              status: 'completed',
+              stage: 'completed',
+              progress: 100,
+              stageProgress: 100,
+              endTime: new Date(),
+              processingTimeMs: processingTime,
+              apiCalls: 1,
+              tokensUsed: actualTokens,
+              qualityScore: 0.95 // High quality score for successful processing
+            });
+          }
+
           // Force update to completed status immediately
           updateUploadStatus(upload.id, 'completed', 100);
           statusChannel.unsubscribe();
@@ -843,6 +1232,40 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       } catch (processError: any) {
         console.error("Processing error:", processError);
         addLocalLog(upload.id, 'ERROR', `Processing failed: ${processError.message || "Failed to process receipt"}`);
+
+        // Phase 3: Record failed API call for rate limiting
+        if (enableRateLimiting && batchSessionService && batchSession) {
+          const errorType = processError.message?.includes('rate limit') ? 'rate_limited' : 'processing_failed';
+          await batchSessionService.updateFileStatus({
+            fileId: upload.id,
+            status: 'failed',
+            errorType,
+            errorMessage: processError.message || "Failed to process receipt",
+            rateLimited: errorType === 'rate_limited'
+          }, user.id);
+        }
+
+        // Phase 3: Update progress tracking for failed processing
+        if (progressTrackingService && batchSession) {
+          const isRateLimited = processError.message?.includes('rate limit');
+
+          progressTrackingService.updateFileProgress(batchSession.id, upload.id, {
+            status: 'failed',
+            stage: 'completed',
+            progress: 0,
+            stageProgress: 0,
+            endTime: new Date(),
+            errorMessage: processError.message || "Failed to process receipt",
+            rateLimited: isRateLimited,
+            qualityScore: 0.1 // Low quality score for failed processing
+          });
+
+          // Record rate limiting event if applicable
+          if (isRateLimited) {
+            progressTrackingService.recordRateLimitEvent(batchSession.id, 5000); // Assume 5s delay
+          }
+        }
+
         updateUploadStatus(upload.id, 'error', 0, {
           code: 'PROCESSING_ERROR',
           message: processError.message || "Failed to process receipt"
@@ -854,13 +1277,24 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     } catch (error: any) {
       console.error("Upload error:", error);
       addLocalLog(upload.id, 'ERROR', `Upload failed: ${error.message || "Failed to upload receipt"}`);
+
+      // Phase 3: Record failed upload for rate limiting
+      if (enableRateLimiting && batchSessionService && batchSession) {
+        await batchSessionService.updateFileStatus({
+          fileId: upload.id,
+          status: 'failed',
+          errorType: 'upload_failed',
+          errorMessage: error.message || "Failed to upload receipt"
+        }, user.id);
+      }
+
       updateUploadStatus(upload.id, 'error', 0, {
         code: 'UPLOAD_ERROR',
         message: error.message || "Failed to upload receipt"
       });
       return null;
     }
-  }, [user, settings, updateUploadStatus]);
+  }, [user, settings, updateUploadStatus, enableRateLimiting, batchSessionService, batchSession, requestApiPermission, addLocalLog]);
 
   // Process the next batch of files
   const processNextBatch = useCallback(async () => {
@@ -988,6 +1422,82 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     // Start processing
     dispatch({ type: 'START_PROCESSING' });
     processingRef.current = true;
+
+    // Phase 3: Initialize progress tracking for this batch session
+    if (progressTrackingService && batchSession) {
+      const progressTracker = progressTrackingService.startTracking(batchSession.id, {
+        mode: progressTrackingMode,
+        config: {
+          enableRealTimeUpdates,
+          enablePerformanceAlerts,
+          enableETAOptimization: enableETACalculation,
+          enableQualityTracking
+        },
+        callbacks: {
+          onProgressUpdate: (metrics: ProgressMetrics) => {
+            dispatch({ type: 'UPDATE_PROGRESS_METRICS', metrics });
+          },
+          onETAUpdate: (eta: ETACalculation) => {
+            dispatch({ type: 'UPDATE_ETA_CALCULATION', eta });
+          },
+          onPerformanceAlert: (alert: ProgressAlert) => {
+            dispatch({ type: 'ADD_PROGRESS_ALERT', alert });
+          }
+        },
+        enablePersistence: enableSessionTracking,
+        enableAnalytics: enableQualityTracking
+      });
+
+      // Initialize file progress details for all pending uploads
+      pendingUploads.forEach(upload => {
+        const fileDetail: FileProgressDetail = {
+          fileId: upload.id,
+          filename: upload.file.name,
+          status: 'pending',
+          progress: 0,
+          stage: 'uploading',
+          stageProgress: 0,
+          apiCalls: 0,
+          tokensUsed: 0,
+          retryCount: 0,
+          rateLimited: false,
+          warningMessages: []
+        };
+
+        dispatch({ type: 'UPDATE_FILE_PROGRESS', fileId: upload.id, progress: fileDetail });
+      });
+
+      // Mark progress tracking as enabled
+      dispatch({ type: 'UPDATE_PROGRESS_METRICS', metrics: {
+        totalFiles: pendingUploads.length,
+        filesCompleted: 0,
+        filesFailed: 0,
+        filesPending: pendingUploads.length,
+        filesProcessing: 0,
+        progressPercentage: 0,
+        startTime: new Date(),
+        currentTime: new Date(),
+        elapsedTimeMs: 0,
+        averageProcessingTimeMs: 0,
+        currentThroughput: 0,
+        peakThroughput: 0,
+        throughputHistory: [],
+        rateLimitHits: 0,
+        rateLimitDelayMs: 0,
+        apiCallsTotal: 0,
+        apiCallsSuccessful: 0,
+        apiCallsFailed: 0,
+        apiSuccessRate: 1,
+        totalTokensUsed: 0,
+        estimatedCost: 0,
+        costPerFile: 0,
+        tokensPerFile: 0,
+        apiEfficiency: 0,
+        retryCount: 0,
+        errorRate: 0,
+        qualityScore: 1
+      } as ProgressMetrics });
+    }
 
     toast.info(`Starting batch processing of ${pendingUploads.length} files`);
 
@@ -1172,6 +1682,73 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     };
   }, [user?.id, receiptIds, updateProgressFromLog]);
 
+  // Phase 3: Monitor batch session progress and metrics
+  useEffect(() => {
+    if (!batchSession || !batchSessionService || !user) return;
+
+    const updateSessionData = async () => {
+      try {
+        const [progress, metrics] = await Promise.all([
+          batchSessionService.getSessionProgress(batchSession.id, user.id),
+          batchSessionService.getSessionMetrics(batchSession.id, user.id)
+        ]);
+
+        if (progress) {
+          dispatch({ type: 'UPDATE_SESSION_PROGRESS', progress });
+        }
+
+        if (metrics) {
+          dispatch({ type: 'UPDATE_SESSION_METRICS', metrics });
+        }
+      } catch (error) {
+        console.error('❌ Error updating session data:', error);
+      }
+    };
+
+    // Update immediately
+    updateSessionData();
+
+    // Set up periodic updates if real-time updates are enabled
+    let interval: NodeJS.Timeout | null = null;
+    if (enableRealTimeUpdates && isProcessing) {
+      interval = setInterval(updateSessionData, 5000); // Update every 5 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [batchSession, batchSessionService, user, enableRealTimeUpdates, isProcessing]);
+
+  // Phase 3: Monitor rate limiting status
+  useEffect(() => {
+    if (!rateLimitingManager || !isProcessing) return;
+
+    const updateRateLimitStatus = async () => {
+      try {
+        const status = await rateLimitingManager.getStatus();
+        dispatch({
+          type: 'UPDATE_RATE_LIMIT_STATUS',
+          status: {
+            isRateLimited: status.isRateLimited,
+            requestsRemaining: status.requestsRemaining,
+            tokensRemaining: status.tokensRemaining,
+            backoffMs: status.backoffMs
+          }
+        });
+      } catch (error) {
+        console.error('❌ Error updating rate limit status:', error);
+      }
+    };
+
+    // Update immediately
+    updateRateLimitStatus();
+
+    // Set up periodic updates
+    const interval = setInterval(updateRateLimitStatus, 10000); // Update every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [rateLimitingManager, isProcessing]);
+
   // Handle file drop and selection using the base hook
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     console.log('handleFiles called in useBatchFileUpload with:', files);
@@ -1260,6 +1837,53 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     receiptIds,
 
     // Progress updating state
-    progressUpdating
+    progressUpdating,
+
+    // Phase 3: Enhanced batch session properties
+    batchSession,
+    sessionProgress,
+    sessionMetrics,
+    processingStrategy: currentProcessingStrategy,
+    rateLimitStatus,
+
+    // Phase 3: Enhanced batch session methods
+    updateProcessingStrategy,
+    createBatchSession,
+    requestApiPermission,
+
+    // Phase 3: Configuration and status
+    enableRateLimiting,
+    enableSessionTracking,
+    enableRealTimeUpdates,
+    rateLimitingManager,
+
+    // Phase 3: Utility functions
+    getProcessingStrategyConfig: () => getProcessingStrategyConfig(currentProcessingStrategy),
+    estimateBatchProcessingTime: (files: File[]) =>
+      estimateBatchProcessingTime(
+        files.length,
+        currentProcessingStrategy,
+        files.reduce((sum, file) => sum + file.size, 0) / files.length
+      ),
+
+    // Phase 3: Enhanced progress tracking properties
+    progressMetrics,
+    etaCalculation,
+    progressAlerts,
+    fileProgressDetails,
+    progressTrackingEnabled,
+
+    // Phase 3: Enhanced progress tracking methods
+    dismissProgressAlert: (alertId: string) => {
+      dispatch({ type: 'DISMISS_PROGRESS_ALERT', alertId });
+    },
+    getProgressSummary: () => {
+      return progressTrackingService && batchSession ?
+        progressTrackingService.getProgressSummary(batchSession.id) : null;
+    },
+    getSessionAnalytics: async () => {
+      return progressTrackingService && batchSession ?
+        await progressTrackingService.getSessionAnalytics(batchSession.id) : null;
+    }
   };
 }

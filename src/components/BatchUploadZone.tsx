@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileUp, RotateCcw, ClipboardList } from "lucide-react";
+import { Upload, FileUp, RotateCcw, ClipboardList, Settings, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBatchFileUpload } from "@/hooks/useBatchFileUpload";
 import { useSettings } from "@/hooks/useSettings";
 import { UploadQueueItem } from "@/components/upload/UploadQueueItem";
 import { BatchProcessingControls } from "@/components/upload/BatchProcessingControls";
+import { EnhancedBatchProcessingControls } from "@/components/upload/EnhancedBatchProcessingControls";
+import { EnhancedUploadQueueItem } from "@/components/upload/EnhancedUploadQueueItem";
 import { BatchUploadReview } from "@/components/upload/BatchUploadReview";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +19,10 @@ import imageCompression from "browser-image-compression";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { CategorySelector } from "./categories/CategorySelector";
 import { Label } from "@/components/ui/label";
+import { ProcessingStrategy } from "@/lib/progress-tracking";
+import { useRateLimitMonitoring } from "@/hooks/useRateLimitMonitoring";
+import { useAPIQuotaMonitoring } from "@/hooks/useAPIQuotaMonitoring";
+import { useProcessingEfficiencyMonitoring } from "@/hooks/useProcessingEfficiencyMonitoring";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -51,6 +57,11 @@ export default function BatchUploadZone({
   // State for selected category
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
+  // Phase 3: Enhanced UI state
+  const [enableEnhancedView, setEnableEnhancedView] = useState(true);
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
+  const [selectedProcessingStrategy, setSelectedProcessingStrategy] = useState<ProcessingStrategy>('balanced');
+
   const {
     isDragging,
     isInvalidFile,
@@ -78,11 +89,84 @@ export default function BatchUploadZone({
     cancelUpload,
     retryUpload,
     receiptIds,
-    progressUpdating
+    progressUpdating,
+    // Phase 3: Enhanced batch upload properties
+    progressMetrics,
+    etaCalculation,
+    progressAlerts,
+    fileProgressDetails,
+    rateLimitStatus,
+    dismissProgressAlert,
+    updateProcessingStrategy,
+    rateLimitingManager
   } = useBatchFileUpload({
     maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
-    autoStart: settings?.batchUpload?.autoStart || false
+    autoStart: settings?.batchUpload?.autoStart || false,
+    // Phase 3: Enhanced batch upload options
+    processingStrategy: selectedProcessingStrategy,
+    enableRateLimiting: true,
+    enableSessionTracking: true,
+    enableProgressTracking: true,
+    progressTrackingMode: enableEnhancedView ? 'enhanced' : 'basic',
+    enableETACalculation: true,
+    enablePerformanceAlerts: true,
+    enableQualityTracking: showAdvancedMetrics
   });
+
+  // Phase 3: Rate limit monitoring
+  const rateLimitMonitoring = useRateLimitMonitoring(rateLimitingManager, {
+    updateInterval: 5000,
+    enableEventTracking: true,
+    enableAlerts: true,
+    alertThresholds: {
+      requestsRemainingWarning: 10,
+      tokensRemainingWarning: 10000,
+      consecutiveErrorsAlert: 3,
+      backoffTimeAlert: 30000
+    }
+  });
+
+  // Phase 3: API quota monitoring
+  const quotaMonitoring = useAPIQuotaMonitoring({
+    apiProvider: 'gemini',
+    updateInterval: 10000,
+    enableHistoricalTracking: true,
+    enablePredictions: true,
+    quotaLimits: {
+      requestsPerMinute: selectedProcessingStrategy === 'conservative' ? 60 :
+                        selectedProcessingStrategy === 'aggressive' ? 120 : 90,
+      tokensPerMinute: selectedProcessingStrategy === 'conservative' ? 100000 :
+                      selectedProcessingStrategy === 'aggressive' ? 200000 : 150000
+    }
+  });
+
+  // Phase 3: Processing efficiency monitoring
+  const efficiencyMonitoring = useProcessingEfficiencyMonitoring({
+    updateInterval: 5000,
+    enableHistoricalTracking: true,
+    enableTrendAnalysis: true,
+    historicalDataPoints: 50
+  });
+
+  // Start monitoring when processing begins
+  useEffect(() => {
+    if (isProcessing && !rateLimitMonitoring.isMonitoring) {
+      rateLimitMonitoring.startMonitoring();
+      quotaMonitoring.startMonitoring();
+      efficiencyMonitoring.startMonitoring();
+    } else if (!isProcessing && rateLimitMonitoring.isMonitoring) {
+      rateLimitMonitoring.stopMonitoring();
+      quotaMonitoring.stopMonitoring();
+      efficiencyMonitoring.stopMonitoring();
+    }
+  }, [isProcessing, rateLimitMonitoring, quotaMonitoring, efficiencyMonitoring]);
+
+  // Update efficiency metrics when progress changes
+  useEffect(() => {
+    if (progressMetrics && fileProgressDetails && efficiencyMonitoring.isMonitoring) {
+      efficiencyMonitoring.updateMetrics(progressMetrics, fileProgressDetails);
+    }
+  }, [progressMetrics, fileProgressDetails, efficiencyMonitoring]);
 
   // Function to compress images and add files to the queue
   const compressAndAddFiles = useCallback(async (files: FileList | null) => {
@@ -403,6 +487,26 @@ export default function BatchUploadZone({
     }
   };
 
+  // Phase 3: Handle processing strategy changes
+  const handleProcessingStrategyChange = useCallback((strategy: ProcessingStrategy) => {
+    setSelectedProcessingStrategy(strategy);
+    if (updateProcessingStrategy) {
+      updateProcessingStrategy(strategy);
+    }
+  }, [updateProcessingStrategy]);
+
+  // Phase 3: Handle progress alert dismissal
+  const handleDismissAlert = useCallback((alertId: string) => {
+    if (dismissProgressAlert) {
+      dismissProgressAlert(alertId);
+    }
+  }, [dismissProgressAlert]);
+
+  // Phase 3: Toggle advanced metrics view
+  const handleToggleAdvancedView = useCallback(() => {
+    setShowAdvancedMetrics(!showAdvancedMetrics);
+  }, [showAdvancedMetrics]);
+
   // Custom drop handler
   const handleCustomDrop = useCallback((e: React.DragEvent) => {
     console.log('Custom drop handler in BatchUploadZone');
@@ -556,11 +660,29 @@ export default function BatchUploadZone({
             </motion.div>
 
             <div className="space-y-1">
-              <h3 className="text-base sm:text-lg font-medium">
-                {isDragging
-                  ? "Drop Files Here"
-                  : "Batch Upload Receipts"}
-              </h3>
+              <div className="flex items-center justify-center gap-2">
+                <h3 className="text-base sm:text-lg font-medium">
+                  {isDragging
+                    ? "Drop Files Here"
+                    : "Batch Upload Receipts"}
+                </h3>
+                {/* Phase 3: Enhanced view toggle */}
+                {batchUploads.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEnableEnhancedView(!enableEnhancedView)}
+                    className="h-6 w-6 p-0 ml-2"
+                    title={enableEnhancedView ? "Switch to basic view" : "Switch to enhanced view"}
+                  >
+                    {enableEnhancedView ? (
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                )}
+              </div>
               <p
                 id="batch-upload-zone-description"
                 className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
@@ -603,24 +725,67 @@ export default function BatchUploadZone({
         <AnimatePresence>
           {batchUploads.length > 0 && (
             <div className="flex-shrink-0 w-full">
-              <BatchProcessingControls
-                totalFiles={batchUploads.length}
-                pendingFiles={queuedUploads.length}
-                activeFiles={activeUploads.length}
-                completedFiles={completedUploads.length}
-                failedFiles={failedUploads.length}
-                totalProgress={totalProgress}
-                isProcessing={isProcessing}
-                isPaused={isPaused}
-                onStartProcessing={startBatchProcessing}
-                onPauseProcessing={pauseBatchProcessing}
-                onClearQueue={clearBatchQueue}
-                onClearAll={clearAllUploads}
-                onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
-                onShowReview={() => setShowReview(true)}
-                allComplete={allProcessingComplete}
-                isProgressUpdating={Object.values(progressUpdating).some(Boolean)}
-              />
+              {enableEnhancedView ? (
+                <EnhancedBatchProcessingControls
+                  totalFiles={batchUploads.length}
+                  pendingFiles={queuedUploads.length}
+                  activeFiles={activeUploads.length}
+                  completedFiles={completedUploads.length}
+                  failedFiles={failedUploads.length}
+                  totalProgress={totalProgress}
+                  isProcessing={isProcessing}
+                  isPaused={isPaused}
+                  onStartProcessing={startBatchProcessing}
+                  onPauseProcessing={pauseBatchProcessing}
+                  onClearQueue={clearBatchQueue}
+                  onClearAll={clearAllUploads}
+                  onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+                  onShowReview={() => setShowReview(true)}
+                  allComplete={allProcessingComplete}
+                  // Phase 3: Enhanced features
+                  processingStrategy={selectedProcessingStrategy}
+                  onProcessingStrategyChange={handleProcessingStrategyChange}
+                  progressMetrics={progressMetrics}
+                  etaCalculation={etaCalculation}
+                  progressAlerts={progressAlerts}
+                  rateLimitStatus={rateLimitMonitoring.status || rateLimitStatus}
+                  rateLimitMetrics={rateLimitMonitoring.metrics}
+                  rateLimitEvents={rateLimitMonitoring.events}
+                  rateLimitAlerts={rateLimitMonitoring.alerts}
+                  quotaData={quotaMonitoring.quotaData}
+                  quotaAlerts={quotaMonitoring.alerts}
+                  efficiencyData={efficiencyMonitoring.efficiencyData}
+                  efficiencyRecommendations={efficiencyMonitoring.getOptimizationRecommendations()}
+                  performanceGrade={efficiencyMonitoring.getPerformanceGrade()}
+                  onDismissAlert={handleDismissAlert}
+                  onDismissRateLimitAlert={rateLimitMonitoring.dismissAlert}
+                  onDismissQuotaAlert={quotaMonitoring.dismissAlert}
+                  onRefreshQuota={quotaMonitoring.refreshData}
+                  onStrategyRecommendation={handleProcessingStrategyChange}
+                  onOptimizationRecommendation={(rec) => console.log('Optimization:', rec)}
+                  enableAdvancedView={showAdvancedMetrics}
+                  onToggleAdvancedView={handleToggleAdvancedView}
+                />
+              ) : (
+                <BatchProcessingControls
+                  totalFiles={batchUploads.length}
+                  pendingFiles={queuedUploads.length}
+                  activeFiles={activeUploads.length}
+                  completedFiles={completedUploads.length}
+                  failedFiles={failedUploads.length}
+                  totalProgress={totalProgress}
+                  isProcessing={isProcessing}
+                  isPaused={isPaused}
+                  onStartProcessing={startBatchProcessing}
+                  onPauseProcessing={pauseBatchProcessing}
+                  onClearQueue={clearBatchQueue}
+                  onClearAll={clearAllUploads}
+                  onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+                  onShowReview={() => setShowReview(true)}
+                  allComplete={allProcessingComplete}
+                  isProgressUpdating={Object.values(progressUpdating).some(Boolean)}
+                />
+              )}
             </div>
           )}
         </AnimatePresence>
@@ -758,15 +923,33 @@ export default function BatchUploadZone({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                     >
-                      <UploadQueueItem
-                        upload={upload}
-                        receiptId={receiptIds[upload.id]}
-                        onRemove={removeFromBatchQueue}
-                        onCancel={cancelUpload}
-                        onRetry={retryUpload}
-                        onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
-                        isProgressUpdating={progressUpdating[upload.id] || false}
-                      />
+                      {enableEnhancedView ? (
+                        <EnhancedUploadQueueItem
+                          upload={upload}
+                          receiptId={receiptIds[upload.id]}
+                          onRemove={removeFromBatchQueue}
+                          onCancel={cancelUpload}
+                          onRetry={retryUpload}
+                          onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
+                          isProgressUpdating={progressUpdating[upload.id] || false}
+                          // Phase 3: Enhanced features
+                          fileProgressDetail={fileProgressDetails[upload.id]}
+                          showDetailedProgress={showAdvancedMetrics}
+                          rateLimited={rateLimitStatus?.isRateLimited || false}
+                          estimatedCost={progressMetrics?.costPerFile}
+                          processingTimeMs={fileProgressDetails[upload.id]?.processingTimeMs}
+                        />
+                      ) : (
+                        <UploadQueueItem
+                          upload={upload}
+                          receiptId={receiptIds[upload.id]}
+                          onRemove={removeFromBatchQueue}
+                          onCancel={cancelUpload}
+                          onRetry={retryUpload}
+                          onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
+                          isProgressUpdating={progressUpdating[upload.id] || false}
+                        />
+                      )}
                     </motion.div>
                   ))}
                 </div>

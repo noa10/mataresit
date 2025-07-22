@@ -9,6 +9,18 @@ import { BatchProcessor } from './batchProcessor.ts';
 import { validateAndConvertEmbedding, EMBEDDING_DIMENSIONS } from '../_shared/vector-validation.ts';
 import { EmbeddingMetricsCollector, createMetricsCollector, withMetricsCollection } from './metricsCollector.ts';
 
+// Phase 3: Import rate limiting system
+import {
+  initializeRateLimiting,
+  getRateLimitingManager,
+  generateEmbeddingWithRateLimit,
+  processBatchWithRateLimit,
+  getRateLimitingStatus,
+  updateProcessingStrategy,
+  estimateTokensForContent
+} from './rateLimitingUtils.ts';
+import { ProcessingStrategy } from './rateLimitingManager.ts';
+
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +36,17 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 if (!geminiApiKey) {
   throw new Error('GEMINI_API_KEY is not set in environment variables');
+}
+
+// Phase 3: Initialize rate limiting system
+const defaultStrategy: ProcessingStrategy = (Deno.env.get('RATE_LIMIT_STRATEGY') as ProcessingStrategy) || 'balanced';
+const rateLimitingEnabled = Deno.env.get('ENABLE_RATE_LIMITING') !== 'false'; // Default to enabled
+
+if (rateLimitingEnabled && supabaseUrl && supabaseServiceKey) {
+  initializeRateLimiting(defaultStrategy, supabaseUrl, supabaseServiceKey);
+  console.log(`🚀 Rate limiting initialized with strategy: ${defaultStrategy}`);
+} else {
+  console.log('⚠️ Rate limiting disabled or missing Supabase configuration');
 }
 
 // Create a type for embedding input
@@ -82,26 +105,71 @@ const EMBEDDING_DIMENSIONS = 1536; // OpenAI's standard dimension
 
 /**
  * Generate embeddings for a text using Google's Gemini embedding model
- * Improved to handle dimension conversion more effectively with retry logic
- * Enhanced with metrics collection
+ * Enhanced with Phase 3 rate limiting and improved error handling
  */
 async function generateEmbedding(
   text: string,
+  contentType: string = 'default',
   retryCount = 0,
   metricsCollector?: EmbeddingMetricsCollector,
   metricId?: string
 ): Promise<number[]> {
-  try {
-    // Handle empty or invalid text
-    if (!text || typeof text !== 'string' || text.trim() === '') {
-      console.warn('Empty or invalid text provided for embedding generation');
-      // Return a zero vector instead of failing
-      return new Array(EMBEDDING_DIMENSIONS).fill(0);
+  // Handle empty or invalid text
+  if (!text || typeof text !== 'string' || text.trim() === '') {
+    console.warn('Empty or invalid text provided for embedding generation');
+    // Return a zero vector instead of failing
+    return new Array(EMBEDDING_DIMENSIONS).fill(0);
+  }
+
+  // Trim very long text to avoid API limits
+  const trimmedText = text.length > 10000 ? text.substring(0, 10000) : text;
+
+  // Phase 3: Use rate limiting if enabled
+  const rateLimiter = getRateLimitingManager();
+
+  if (rateLimiter) {
+    try {
+      const result = await generateEmbeddingWithRateLimit(
+        trimmedText,
+        contentType,
+        async (text: string) => {
+          const genAI = new GoogleGenerativeAI(geminiApiKey);
+          const model = genAI.getGenerativeModel({ model: 'embedding-001' });
+
+          const apiResult = await model.embedContent(text);
+          let embedding = apiResult.embedding.values;
+
+          // Use shared validation utility to prevent corruption
+          embedding = validateAndConvertEmbedding(embedding, EMBEDDING_DIMENSIONS);
+
+          return embedding;
+        },
+        rateLimiter
+      );
+
+      // Record metrics if available
+      if (metricsCollector && metricId) {
+        metricsCollector.recordApiCall(metricId, result.tokensUsed, result.rateLimited);
+      }
+
+      return result.embedding;
+    } catch (error) {
+      console.error('Error with rate-limited embedding generation:', error);
+
+      // Implement retry logic for transient errors
+      if (retryCount < 3) {
+        console.log(`Retrying embedding generation (attempt ${retryCount + 1})`);
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+        return generateEmbedding(text, contentType, retryCount + 1, metricsCollector, metricId);
+      }
+
+      throw error;
     }
+  }
 
-    // Trim very long text to avoid API limits
-    const trimmedText = text.length > 10000 ? text.substring(0, 10000) : text;
-
+  // Fallback to original implementation if rate limiting is disabled
+  try {
     // Estimate tokens for metrics (rough approximation: 1 token ≈ 4 characters)
     const estimatedTokens = Math.ceil(trimmedText.length / 4);
 
@@ -120,7 +188,7 @@ async function generateEmbedding(
 
     let embedding = result.embedding.values;
 
-    // 🔧 CRITICAL FIX: Use shared validation utility to prevent corruption
+    // Use shared validation utility to prevent corruption
     embedding = validateAndConvertEmbedding(embedding, EMBEDDING_DIMENSIONS);
 
     console.log(`API call completed in ${(apiCallEnd - apiCallStart).toFixed(2)}ms, estimated tokens: ${estimatedTokens}`);
@@ -145,7 +213,7 @@ async function generateEmbedding(
       console.log(`Retrying embedding generation (attempt ${retryCount + 1})`);
       // Exponential backoff
       await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-      return generateEmbedding(text, retryCount + 1, metricsCollector, metricId);
+      return generateEmbedding(text, contentType, retryCount + 1, metricsCollector, metricId);
     }
 
     // If we've exhausted retries, throw the error
@@ -219,7 +287,7 @@ async function processReceiptEmbedding(
   }
 
   // Generate the embedding
-  const embedding = await generateEmbedding(content, 0, metricsCollector, metricId);
+  const embedding = await generateEmbedding(content, contentType, 0, metricsCollector, metricId);
 
   console.log(`Successfully generated embedding with ${embedding.length} dimensions`);
 
@@ -251,7 +319,7 @@ async function processLineItemEmbedding(request: LineItemEmbeddingRequest, supab
   console.log(`Generating embedding for line item ${lineItemId} in receipt ${receiptId}`);
 
   // Generate the embedding
-  const embedding = await generateEmbedding(content);
+  const embedding = await generateEmbedding(content, 'line_item');
 
   console.log(`Successfully generated line item embedding with ${embedding.length} dimensions`);
 
@@ -773,7 +841,7 @@ async function processReceiptEmbeddingsUnified(
           console.log(`🔄 Processing ${extractedContent.contentType} content (${extractedContent.contentText.length} chars)`);
 
           // Generate embedding
-          const embedding = await generateEmbedding({ text: extractedContent.contentText });
+          const embedding = await generateEmbedding(extractedContent.contentText, 'receipt_full');
 
           // Store in unified_embeddings table
           const { data: embeddingData, error: embeddingError } = await supabaseClient
@@ -846,7 +914,7 @@ async function processReceiptEmbeddingsUnified(
             continue;
           }
 
-          const embedding = await generateEmbedding({ text: content });
+          const embedding = await generateEmbedding(content, contentType);
 
           const { data: embeddingData, error: embeddingError } = await supabaseClient
             .rpc('add_unified_embedding', {
@@ -1392,6 +1460,84 @@ serve(async (req: Request) => {
             success: false,
             error: error instanceof Error ? error.message : String(error),
             receiptId
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    // Phase 3: Handle rate limiting management endpoints
+    else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      const action = url.searchParams.get('action');
+
+      if (action === 'rate_limit_status') {
+        // Return current rate limiting status
+        try {
+          const status = getRateLimitingStatus();
+          return new Response(
+            JSON.stringify({
+              success: true,
+              rateLimitStatus: status,
+              timestamp: new Date().toISOString()
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Error getting rate limit status:', error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+    // Handle strategy updates via PUT
+    else if (req.method === 'PUT') {
+      try {
+        const body = await req.json();
+        const { action, strategy } = body;
+
+        if (action === 'update_strategy' && strategy) {
+          const success = updateProcessingStrategy(strategy as ProcessingStrategy);
+
+          if (success) {
+            const status = getRateLimitingStatus();
+            return new Response(
+              JSON.stringify({
+                success: true,
+                message: `Processing strategy updated to ${strategy}`,
+                rateLimitStatus: status,
+                timestamp: new Date().toISOString()
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          } else {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'Failed to update processing strategy'
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } else {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Invalid action or missing strategy parameter'
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (error) {
+        console.error('Error handling PUT request:', error);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
