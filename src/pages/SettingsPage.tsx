@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { CategoryManager } from "@/components/categories/CategoryManager";
 import { CompactSubscriptionLimitError } from "@/components/SubscriptionLimitError";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Crown, Key, Zap, ArrowRight, Bell, Palette, CreditCard } from "lucide-react";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
 import { ThemePreferences } from "@/components/settings/ThemePreferences";
@@ -157,9 +157,25 @@ export default function SettingsPage() {
   const { isFeatureAvailable } = useSubscription();
   const { t } = useSettingsTranslation();
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('processing');
 
   // Check if user has access to API features
   const hasApiAccess = isFeatureAvailable('api_access');
+
+  // Handle URL parameters
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const simulatedParam = searchParams.get('simulated');
+
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+
+    if (simulatedParam === 'true') {
+      toast.info('You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal.');
+    }
+  }, [searchParams]);
 
   const handleResetConfirm = () => {
     resetSettings();
@@ -178,7 +194,7 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="processing" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full mb-8 max-w-5xl grid-cols-8">
               <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
               <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>

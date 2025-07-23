@@ -204,6 +204,7 @@ const App = () => (
                     <SettingsPage />
                   </Suspense>
                 } />
+                <Route path="/account/billing" element={<Navigate to="/settings?tab=billing" replace />} />
                 <Route path="/performance-test" element={
                   <Suspense fallback={<PageLoading />}>
                     <PerformanceTestPage />
