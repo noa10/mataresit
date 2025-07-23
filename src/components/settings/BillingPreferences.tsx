@@ -83,6 +83,9 @@ export function BillingPreferences() {
   const { t } = useSettingsTranslation();
   const { user } = useAuth();
   const { subscriptionData, createPortalSession, isLoading: stripeLoading } = useStripe();
+
+  // Check if this is a simulated subscription
+  const isSimulatedSubscription = subscriptionData?.simulated === true;
   
   const [preferences, setPreferences] = useState<BillingPreferencesData>({
     auto_renewal_enabled: true,
@@ -297,6 +300,23 @@ export function BillingPreferences() {
           Manage your subscription, payment methods, and billing notifications.
         </p>
       </div>
+
+      {/* Simulated Subscription Alert */}
+      {isSimulatedSubscription && (
+        <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
+            <div className="space-y-2">
+              <p className="font-medium">Demo Mode - Simulated Subscription</p>
+              <p className="text-sm">
+                You're viewing a simulated subscription for testing purposes.
+                To access the full Stripe billing portal and manage real payments,
+                please upgrade to a paid plan.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
