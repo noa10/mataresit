@@ -334,20 +334,74 @@ async function cancelSubscription(stripe: Stripe, profile: any, corsHeaders: any
 }
 
 async function createPortalSession(stripe: Stripe, profile: any, req: Request, corsHeaders: any) {
-  const baseUrl = req.headers.get('origin') || 'http://localhost:8080';
-
-  const session = await stripe.billingPortal.sessions.create({
-    customer: profile.stripe_customer_id,
-    return_url: `${baseUrl}/account/billing`,
+  console.log('=== CREATE PORTAL SESSION START ===');
+  console.log('Profile data:', {
+    stripe_customer_id: profile.stripe_customer_id,
+    stripe_subscription_id: profile.stripe_subscription_id
   });
 
-  return new Response(
-    JSON.stringify({ url: session.url }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
+  const baseUrl = req.headers.get('origin') || 'http://localhost:8080';
+
+  // Check if this is a simulated/test subscription
+  const isSimulatedSubscription = profile.stripe_subscription_id?.startsWith('sub_simulated_') ||
+                                 profile.stripe_subscription_id?.startsWith('test_sub_') ||
+                                 profile.stripe_customer_id?.startsWith('cus_simulated_');
+
+  if (isSimulatedSubscription) {
+    console.log('Detected simulated subscription for portal session');
+
+    // For simulated subscriptions, redirect to a local billing management page
+    // instead of trying to create a Stripe portal session
+    const localBillingUrl = `${baseUrl}/account/billing?simulated=true`;
+
+    return new Response(
+      JSON.stringify({
+        url: localBillingUrl,
+        simulated: true,
+        message: 'Redirecting to local billing management for simulated subscription'
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  console.log('Creating real Stripe portal session for customer:', profile.stripe_customer_id);
+
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${baseUrl}/account/billing`,
+    });
+
+    console.log('Stripe portal session created successfully:', session.id);
+
+    return new Response(
+      JSON.stringify({ url: session.url }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    console.error('Error creating Stripe portal session:', error);
+
+    // If Stripe portal creation fails, fall back to local billing page
+    const localBillingUrl = `${baseUrl}/account/billing?error=portal_unavailable`;
+
+    return new Response(
+      JSON.stringify({
+        url: localBillingUrl,
+        error: 'Stripe portal unavailable, redirecting to local billing management',
+        details: error.message
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
 }
 
 async function downgradeSubscription(

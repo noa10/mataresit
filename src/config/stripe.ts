@@ -79,4 +79,5 @@ export interface SubscriptionData {
   trialEndDate?: string;
   receiptsUsedThisMonth: number;
   monthlyResetDate?: string;
+  simulated?: boolean;
 }

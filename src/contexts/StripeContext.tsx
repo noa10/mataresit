@@ -120,6 +120,11 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }
 
+        // Check if this is a simulated subscription
+        const isSimulated = profile.stripe_subscription_id?.startsWith('sub_simulated_') ||
+                           profile.stripe_subscription_id?.startsWith('test_sub_') ||
+                           profile.stripe_customer_id?.startsWith('cus_simulated_');
+
         const newSubscriptionData = {
           tier: (profile.subscription_tier as SubscriptionTier) || 'free',
           status: (profile.subscription_status as SubscriptionStatus) || 'active',
@@ -130,6 +135,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           trialEndDate: profile.trial_end_date,
           receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
           monthlyResetDate: profile.monthly_reset_date,
+          simulated: isSimulated,
         };
 
         console.log('StripeContext: Updated subscription data:', {
@@ -182,6 +188,11 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (profile) {
+        // Check if this is a simulated subscription
+        const isSimulated = profile.stripe_subscription_id?.startsWith('sub_simulated_') ||
+                           profile.stripe_subscription_id?.startsWith('test_sub_') ||
+                           profile.stripe_customer_id?.startsWith('cus_simulated_');
+
         const newSubscriptionData: SubscriptionData = {
           tier: profile.subscription_tier || 'free',
           status: profile.subscription_status || 'active',
@@ -192,6 +203,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           trialEndDate: profile.trial_end_date,
           receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
           monthlyResetDate: profile.monthly_reset_date,
+          simulated: isSimulated,
         };
 
         console.log('StripeContext: Force refresh successful:', newSubscriptionData);
