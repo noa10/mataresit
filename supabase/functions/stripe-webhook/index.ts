@@ -50,26 +50,122 @@ serve(async (req) => {
 
     console.log(`Processing webhook event: ${event.type}`);
 
+    // Extract customer ID for logging
+    const getCustomerId = (obj: any): string | undefined => {
+      return obj.customer || obj.subscription?.customer || obj.setup_intent?.customer;
+    };
+
+    const customerId = getCustomerId(event.data.object);
+
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session),
+          customerId
+        );
         break;
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await handleSubscriptionChange(event.data.object as Stripe.Subscription);
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleSubscriptionChange(event.data.object as Stripe.Subscription),
+          customerId
+        );
         break;
 
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleSubscriptionDeleted(event.data.object as Stripe.Subscription),
+          customerId
+        );
         break;
 
       case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handlePaymentSucceeded(event.data.object as Stripe.Invoice),
+          customerId
+        );
         break;
 
       case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handlePaymentFailed(event.data.object as Stripe.Invoice),
+          customerId
+        );
+        break;
+
+      case 'invoice.payment_action_required':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handlePaymentActionRequired(event.data.object as Stripe.Invoice),
+          customerId
+        );
+        break;
+
+      // Enhanced billing system events
+      case 'invoice.upcoming':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleUpcomingInvoice(event.data.object as Stripe.Invoice),
+          customerId
+        );
+        break;
+
+      case 'invoice.finalized':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleInvoiceFinalized(event.data.object as Stripe.Invoice),
+          customerId
+        );
+        break;
+
+      case 'customer.subscription.trial_will_end':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleTrialWillEnd(event.data.object as Stripe.Subscription),
+          customerId
+        );
+        break;
+
+      case 'payment_method.attached':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handlePaymentMethodAttached(event.data.object as Stripe.PaymentMethod),
+          customerId
+        );
+        break;
+
+      case 'payment_method.detached':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handlePaymentMethodDetached(event.data.object as Stripe.PaymentMethod),
+          customerId
+        );
+        break;
+
+      case 'setup_intent.succeeded':
+        await handleWebhookEventSafely(
+          event.type,
+          event.id,
+          () => handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent),
+          customerId
+        );
         break;
 
       // Handle subscription item updates (for plan changes)
@@ -242,6 +338,32 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
       } else if (isUpgrade && profile.subscription_tier === newTier) {
         console.log(`🎉 UPGRADE VERIFICATION SUCCESSFUL: Database tier matches expected upgrade tier (${newTier})`);
       }
+
+      // Initialize billing preferences for new active subscriptions
+      if (subscription.status === 'active' && (changeType === 'new_subscription' || changeType === 'reactivation')) {
+        await supabaseClient.rpc('initialize_billing_preferences', {
+          p_user_id: profile.id,
+          p_subscription_tier: newTier
+        });
+        console.log(`Billing preferences initialized for user ${profile.id}`);
+      }
+
+      // Schedule renewal reminders for active subscriptions
+      if (subscription.status === 'active' && subscription.current_period_end) {
+        try {
+          await supabaseClient.functions.invoke('email-scheduler', {
+            body: {
+              action: 'schedule_billing_reminders',
+              userId: profile.id,
+              subscriptionId: subscription.id,
+              renewalDate: new Date(subscription.current_period_end * 1000).toISOString()
+            }
+          });
+          console.log(`Renewal reminders scheduled for user ${profile.id}`);
+        } catch (error) {
+          console.error(`Failed to schedule renewal reminders for user ${profile.id}:`, error);
+        }
+      }
     }
 
   } catch (error) {
@@ -292,13 +414,82 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         billing_period_end: new Date(invoice.period_end * 1000).toISOString(),
       });
 
-    // Send payment confirmation email
-    await sendPaymentConfirmationEmail(profile.id, {
-      amount: invoice.amount_paid / 100, // Convert from cents
-      currency: invoice.currency.toUpperCase(),
-      tier: profile.subscription_tier,
-      billingPeriodStart: new Date(invoice.period_start * 1000),
-      billingPeriodEnd: new Date(invoice.period_end * 1000),
+    // Update subscription renewal tracking
+    if (invoice.subscription) {
+      const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+      await supabaseClient.rpc('update_subscription_renewal_tracking', {
+        p_user_id: profile.id,
+        p_stripe_subscription_id: subscription.id,
+        p_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        p_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        p_current_tier: profile.subscription_tier,
+        p_current_price_id: subscription.items.data[0]?.price.id || '',
+        p_status: 'active'
+      });
+    }
+
+    // Clear any grace period and reset retry attempts
+    await supabaseClient
+      .from('profiles')
+      .update({
+        subscription_status: 'active',
+        grace_period_end_date: null,
+        payment_retry_attempts: 0,
+        last_payment_attempt: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id);
+
+    // Mark any pending payment retries as succeeded
+    if (invoice.subscription) {
+      await supabaseClient
+        .from('payment_retry_tracking')
+        .update({
+          status: 'succeeded',
+          succeeded_at: new Date().toISOString()
+        })
+        .eq('stripe_subscription_id', invoice.subscription as string)
+        .eq('status', 'pending');
+    }
+
+    // Send payment confirmation email using the new email system
+    await supabaseClient.functions.invoke('send-email', {
+      body: {
+        to: profile.email,
+        template_name: 'payment_confirmation',
+        template_data: {
+          recipientName: profile.full_name || profile.email,
+          recipientEmail: profile.email,
+          subscriptionTier: profile.subscription_tier,
+          amount: invoice.amount_paid / 100,
+          currency: invoice.currency,
+          billingInterval: 'monthly', // TODO: Determine from subscription
+          billingPeriodStart: new Date(invoice.period_start * 1000).toISOString(),
+          billingPeriodEnd: new Date(invoice.period_end * 1000).toISOString(),
+          nextBillingDate: new Date(invoice.period_end * 1000).toISOString(),
+          paymentMethodLast4: profile.payment_method_last_four,
+          paymentMethodBrand: profile.payment_method_brand,
+          invoiceUrl: invoice.hosted_invoice_url,
+          manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+          language: 'en' // TODO: Get from user preferences
+        }
+      }
+    });
+
+    // Log successful payment
+    await supabaseClient.rpc('log_billing_event', {
+      p_user_id: profile.id,
+      p_event_type: 'payment_succeeded',
+      p_event_description: 'Subscription payment processed successfully',
+      p_stripe_event_id: null,
+      p_stripe_subscription_id: invoice.subscription as string,
+      p_stripe_payment_intent_id: invoice.payment_intent as string,
+      p_new_values: {
+        amount_paid: invoice.amount_paid,
+        currency: invoice.currency,
+        invoice_id: invoice.id
+      },
+      p_triggered_by: 'stripe_webhook'
     });
   }
 
@@ -308,13 +499,554 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
 
-  // Update subscription status to past_due
+  console.log(`Processing payment failure for customer ${customerId}, invoice ${invoice.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Handle renewal failure using the new system
+  if (invoice.subscription) {
+    const failureReason = invoice.last_finalization_error?.message || 'Payment failed';
+
+    await supabaseClient.rpc('handle_renewal_failure', {
+      p_user_id: profile.id,
+      p_stripe_subscription_id: invoice.subscription as string,
+      p_failure_reason: failureReason,
+      p_stripe_invoice_id: invoice.id
+    });
+
+    // Get billing preferences to check if payment failure notifications are enabled
+    const { data: billingPrefs, error: prefsError } = await supabaseClient.rpc('get_billing_preferences', {
+      p_user_id: profile.id
+    });
+
+    if (!prefsError && billingPrefs?.[0]?.payment_failure_notifications && billingPrefs[0].billing_email_enabled) {
+      const prefs = billingPrefs[0];
+
+      // Schedule payment failed email with user preferences
+      await supabaseClient.functions.invoke('send-email', {
+        body: {
+          to: profile.email,
+          template_name: 'payment_failed',
+          template_data: {
+            recipientName: profile.full_name || profile.email,
+            recipientEmail: profile.email,
+            subscriptionTier: profile.subscription_tier,
+            amount: invoice.amount_due / 100,
+            currency: invoice.currency,
+            failureReason: failureReason,
+            retryAttempt: invoice.attempt_count || 1,
+            maxRetryAttempts: prefs.max_payment_retry_attempts,
+            nextRetryDate: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString() : null,
+            gracePeriodDays: prefs.grace_period_days,
+            updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-methods`,
+            manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+            language: prefs.preferred_language
+          }
+        }
+      });
+    } else {
+      console.log(`Payment failure notifications disabled for user ${profile.id}, skipping email`);
+    }
+
+    console.log(`Payment failure handled for customer ${customerId}, grace period initiated`);
+  } else {
+    // Fallback for non-subscription payments
+    await supabaseClient
+      .from('profiles')
+      .update({ subscription_status: 'past_due' })
+      .eq('stripe_customer_id', customerId);
+
+    console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+  }
+}
+
+async function handlePaymentActionRequired(invoice: Stripe.Invoice) {
+  const customerId = invoice.customer as string;
+
+  console.log(`Payment action required for customer ${customerId}, invoice ${invoice.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Update subscription status to indicate action required
   await supabaseClient
     .from('profiles')
-    .update({ subscription_status: 'past_due' })
+    .update({
+      subscription_status: 'incomplete',
+      updated_at: new Date().toISOString()
+    })
     .eq('stripe_customer_id', customerId);
 
-  console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+  // Log the event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'payment_action_required',
+    p_event_description: 'Payment requires additional authentication',
+    p_stripe_subscription_id: invoice.subscription as string,
+    p_stripe_payment_intent_id: invoice.payment_intent as string,
+    p_metadata: {
+      invoice_id: invoice.id,
+      amount_due: invoice.amount_due,
+      currency: invoice.currency
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Payment action required handled for customer ${customerId}`);
+}
+
+/**
+ * Handle upcoming invoice (30 days before billing)
+ */
+async function handleUpcomingInvoice(invoice: Stripe.Invoice) {
+  const customerId = invoice.customer as string;
+  const subscriptionId = invoice.subscription as string;
+
+  console.log(`Processing upcoming invoice for customer ${customerId}, invoice ${invoice.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Get billing preferences
+  const { data: billingPrefs, error: prefsError } = await supabaseClient.rpc('get_billing_preferences', {
+    p_user_id: profile.id
+  });
+
+  if (prefsError || !billingPrefs?.[0]?.billing_email_enabled) {
+    console.log(`Billing emails disabled for user ${profile.id}, skipping upcoming invoice notification`);
+    return;
+  }
+
+  const prefs = billingPrefs[0];
+
+  // Schedule renewal reminder emails based on user preferences
+  const renewalDate = new Date(invoice.period_end * 1000);
+  const now = new Date();
+
+  for (const daysBefore of prefs.reminder_days_before_renewal) {
+    const reminderDate = new Date(renewalDate);
+    reminderDate.setDate(reminderDate.getDate() - daysBefore);
+
+    // Only schedule if the reminder date is in the future
+    if (reminderDate > now) {
+      await supabaseClient.rpc('schedule_billing_reminder', {
+        p_user_id: profile.id,
+        p_subscription_id: subscriptionId,
+        p_reminder_type: 'upcoming_renewal',
+        p_scheduled_for: reminderDate.toISOString(),
+        p_template_data: {
+          recipientName: profile.full_name || profile.email,
+          recipientEmail: profile.email,
+          subscriptionTier: profile.subscription_tier,
+          renewalDate: renewalDate.toISOString(),
+          amount: invoice.amount_due / 100,
+          currency: invoice.currency,
+          billingInterval: 'monthly', // TODO: Determine from subscription
+          daysUntilRenewal: daysBefore,
+          paymentMethodLast4: profile.payment_method_last_four,
+          paymentMethodBrand: profile.payment_method_brand,
+          manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+          updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-method`
+        },
+        p_language: prefs.preferred_language
+      });
+
+      console.log(`Scheduled ${daysBefore}-day renewal reminder for user ${profile.id}`);
+    }
+  }
+
+  // Log the upcoming invoice event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'upcoming_invoice_processed',
+    p_event_description: 'Upcoming invoice processed and reminders scheduled',
+    p_stripe_subscription_id: subscriptionId,
+    p_metadata: {
+      invoice_id: invoice.id,
+      amount_due: invoice.amount_due,
+      period_end: renewalDate.toISOString(),
+      reminders_scheduled: prefs.reminder_days_before_renewal.filter(days => {
+        const reminderDate = new Date(renewalDate);
+        reminderDate.setDate(reminderDate.getDate() - days);
+        return reminderDate > now;
+      }).length
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Upcoming invoice processed for customer ${customerId}`);
+}
+
+/**
+ * Handle invoice finalized (invoice is ready for payment)
+ */
+async function handleInvoiceFinalized(invoice: Stripe.Invoice) {
+  const customerId = invoice.customer as string;
+
+  console.log(`Processing finalized invoice for customer ${customerId}, invoice ${invoice.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Update next billing date
+  if (invoice.period_end) {
+    await supabaseClient
+      .from('profiles')
+      .update({
+        next_billing_date: new Date(invoice.period_end * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id);
+  }
+
+  // Log the finalized invoice event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'invoice_finalized',
+    p_event_description: 'Invoice finalized and ready for payment',
+    p_stripe_subscription_id: invoice.subscription as string,
+    p_metadata: {
+      invoice_id: invoice.id,
+      amount_due: invoice.amount_due,
+      currency: invoice.currency,
+      due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString() : null
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Finalized invoice processed for customer ${customerId}`);
+}
+
+/**
+ * Handle trial will end (3 days before trial ends)
+ */
+async function handleTrialWillEnd(subscription: Stripe.Subscription) {
+  const customerId = subscription.customer as string;
+
+  console.log(`Processing trial will end for customer ${customerId}, subscription ${subscription.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Get billing preferences
+  const { data: billingPrefs, error: prefsError } = await supabaseClient.rpc('get_billing_preferences', {
+    p_user_id: profile.id
+  });
+
+  if (prefsError || !billingPrefs?.[0]?.billing_email_enabled) {
+    console.log(`Billing emails disabled for user ${profile.id}, skipping trial end notification`);
+    return;
+  }
+
+  const prefs = billingPrefs[0];
+
+  // Send trial ending email
+  await supabaseClient.functions.invoke('send-email', {
+    body: {
+      to: profile.email,
+      template_name: 'trial_ending',
+      template_data: {
+        recipientName: profile.full_name || profile.email,
+        recipientEmail: profile.email,
+        subscriptionTier: profile.subscription_tier,
+        trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+        manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+        pricingUrl: `${Deno.env.get('FRONTEND_URL')}/pricing`,
+        language: prefs.preferred_language
+      }
+    }
+  });
+
+  // Log the trial ending event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'trial_will_end',
+    p_event_description: 'Trial ending notification sent',
+    p_stripe_subscription_id: subscription.id,
+    p_metadata: {
+      trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Trial will end processed for customer ${customerId}`);
+}
+
+/**
+ * Handle payment method attached
+ */
+async function handlePaymentMethodAttached(paymentMethod: Stripe.PaymentMethod) {
+  const customerId = paymentMethod.customer as string;
+
+  console.log(`Processing payment method attached for customer ${customerId}, payment method ${paymentMethod.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Update payment method info in profile
+  if (paymentMethod.card) {
+    await supabaseClient
+      .from('profiles')
+      .update({
+        payment_method_brand: paymentMethod.card.brand,
+        payment_method_last_four: paymentMethod.card.last4,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id);
+  }
+
+  // Log the payment method attached event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'payment_method_attached',
+    p_event_description: 'New payment method attached to customer',
+    p_metadata: {
+      payment_method_id: paymentMethod.id,
+      payment_method_type: paymentMethod.type,
+      card_brand: paymentMethod.card?.brand,
+      card_last4: paymentMethod.card?.last4,
+      card_exp_month: paymentMethod.card?.exp_month,
+      card_exp_year: paymentMethod.card?.exp_year
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Payment method attached processed for customer ${customerId}`);
+}
+
+/**
+ * Handle payment method detached
+ */
+async function handlePaymentMethodDetached(paymentMethod: Stripe.PaymentMethod) {
+  const customerId = paymentMethod.customer as string;
+
+  console.log(`Processing payment method detached for customer ${customerId}, payment method ${paymentMethod.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Clear payment method info if this was the active one
+  if (profile.payment_method_last_four === paymentMethod.card?.last4) {
+    await supabaseClient
+      .from('profiles')
+      .update({
+        payment_method_brand: null,
+        payment_method_last_four: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id);
+  }
+
+  // Log the payment method detached event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'payment_method_detached',
+    p_event_description: 'Payment method detached from customer',
+    p_metadata: {
+      payment_method_id: paymentMethod.id,
+      payment_method_type: paymentMethod.type,
+      card_brand: paymentMethod.card?.brand,
+      card_last4: paymentMethod.card?.last4
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Payment method detached processed for customer ${customerId}`);
+}
+
+/**
+ * Handle setup intent succeeded (payment method setup completed)
+ */
+async function handleSetupIntentSucceeded(setupIntent: Stripe.SetupIntent) {
+  const customerId = setupIntent.customer as string;
+
+  console.log(`Processing setup intent succeeded for customer ${customerId}, setup intent ${setupIntent.id}`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(`Profile not found for customer ${customerId}:`, profileError);
+    return;
+  }
+
+  // Get the payment method details
+  if (setupIntent.payment_method) {
+    try {
+      const paymentMethod = await stripe.paymentMethods.retrieve(setupIntent.payment_method as string);
+
+      // Update payment method info in profile
+      if (paymentMethod.card) {
+        await supabaseClient
+          .from('profiles')
+          .update({
+            payment_method_brand: paymentMethod.card.brand,
+            payment_method_last_four: paymentMethod.card.last4,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', profile.id);
+      }
+    } catch (error) {
+      console.error(`Error retrieving payment method for setup intent ${setupIntent.id}:`, error);
+    }
+  }
+
+  // Log the setup intent succeeded event
+  await supabaseClient.rpc('log_billing_event', {
+    p_user_id: profile.id,
+    p_event_type: 'setup_intent_succeeded',
+    p_event_description: 'Payment method setup completed successfully',
+    p_metadata: {
+      setup_intent_id: setupIntent.id,
+      payment_method_id: setupIntent.payment_method
+    },
+    p_triggered_by: 'stripe_webhook'
+  });
+
+  console.log(`Setup intent succeeded processed for customer ${customerId}`);
+}
+
+/**
+ * Enhanced webhook event logging with comprehensive error handling
+ */
+async function logWebhookEvent(
+  eventType: string,
+  eventId: string,
+  customerId: string | null,
+  success: boolean,
+  error?: any,
+  metadata?: any
+) {
+  try {
+    // Get user profile if customer ID is available
+    let userId = null;
+    if (customerId) {
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single();
+
+      userId = profile?.id || null;
+    }
+
+    // Log the webhook event
+    await supabaseClient.rpc('log_billing_event', {
+      p_user_id: userId,
+      p_event_type: `webhook_${eventType}`,
+      p_event_description: success
+        ? `Webhook ${eventType} processed successfully`
+        : `Webhook ${eventType} processing failed`,
+      p_stripe_event_id: eventId,
+      p_metadata: {
+        event_type: eventType,
+        customer_id: customerId,
+        success: success,
+        error: error ? {
+          message: error.message,
+          stack: error.stack?.substring(0, 1000) // Limit stack trace length
+        } : null,
+        ...metadata
+      },
+      p_triggered_by: 'stripe_webhook'
+    });
+
+    console.log(`Webhook event logged: ${eventType} - ${success ? 'SUCCESS' : 'FAILED'}`);
+  } catch (logError) {
+    console.error(`Failed to log webhook event ${eventType}:`, logError);
+  }
+}
+
+/**
+ * Enhanced error handling wrapper for webhook handlers
+ */
+async function handleWebhookEventSafely(
+  eventType: string,
+  eventId: string,
+  handler: () => Promise<void>,
+  customerId?: string
+) {
+  try {
+    await handler();
+    await logWebhookEvent(eventType, eventId, customerId || null, true);
+  } catch (error) {
+    console.error(`Error handling webhook event ${eventType}:`, error);
+    await logWebhookEvent(eventType, eventId, customerId || null, false, error);
+
+    // Don't throw the error to prevent webhook retries for non-critical failures
+    // Only throw for critical subscription-related events
+    if (['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(eventType)) {
+      throw error;
+    }
+  }
 }
 
 async function sendPaymentConfirmationEmail(userId: string, paymentDetails: {
