@@ -4,9 +4,17 @@ import {
   generateReceiptProcessingEmail,
   generateBatchProcessingEmail,
   generateTeamCollaborationEmail,
+  generateBillingReminderEmail,
+  generatePaymentFailedEmail,
+  generateSubscriptionExpiryEmail,
+  generatePaymentConfirmationEmail,
   ReceiptProcessingEmailData,
   BatchProcessingEmailData,
-  TeamCollaborationEmailData
+  TeamCollaborationEmailData,
+  BillingReminderEmailData,
+  PaymentFailedEmailData,
+  SubscriptionExpiryEmailData,
+  PaymentConfirmationEmailData
 } from './templates.ts';
 
 // Initialize Supabase client for database operations
@@ -38,7 +46,8 @@ serve(async (req) => {
       related_entity_type,
       related_entity_id,
       team_id,
-      metadata
+      metadata,
+      preview_mode = false
     } = requestBody;
 
     // Generate email content from template if template_name and template_data are provided
@@ -60,6 +69,18 @@ serve(async (req) => {
           case 'team_collaboration':
             generatedEmail = generateTeamCollaborationEmail(template_data as TeamCollaborationEmailData);
             break;
+          case 'billing_reminder':
+            generatedEmail = generateBillingReminderEmail(template_data as BillingReminderEmailData);
+            break;
+          case 'payment_failed':
+            generatedEmail = generatePaymentFailedEmail(template_data as PaymentFailedEmailData);
+            break;
+          case 'subscription_expiry':
+            generatedEmail = generateSubscriptionExpiryEmail(template_data as SubscriptionExpiryEmailData);
+            break;
+          case 'payment_confirmation':
+            generatedEmail = generatePaymentConfirmationEmail(template_data as PaymentConfirmationEmailData);
+            break;
           default:
             console.warn(`Unknown template: ${template_name}`);
             break;
@@ -80,6 +101,27 @@ serve(async (req) => {
           }
         );
       }
+    }
+
+    // Handle preview mode
+    if (preview_mode) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          preview: {
+            to,
+            subject: emailSubject,
+            html: emailHtml,
+            text: emailText,
+            template_name,
+            template_data
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     if (!to || !emailSubject || (!emailHtml && !emailText)) {

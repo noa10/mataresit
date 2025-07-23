@@ -59,6 +59,68 @@ export interface TeamCollaborationEmailData {
   language?: 'en' | 'ms';
 }
 
+// Billing Email Template Interfaces
+export interface BillingReminderEmailData {
+  recipientName: string;
+  recipientEmail: string;
+  subscriptionTier: 'pro' | 'max';
+  renewalDate: string;
+  amount: number;
+  currency: string;
+  billingInterval: 'monthly' | 'annual';
+  daysUntilRenewal: number;
+  paymentMethodLast4?: string;
+  paymentMethodBrand?: string;
+  manageSubscriptionUrl: string;
+  updatePaymentMethodUrl: string;
+  language?: 'en' | 'ms';
+}
+
+export interface PaymentFailedEmailData {
+  recipientName: string;
+  recipientEmail: string;
+  subscriptionTier: 'pro' | 'max';
+  amount: number;
+  currency: string;
+  failureReason?: string;
+  retryAttempt: number;
+  maxRetryAttempts: number;
+  nextRetryDate?: string;
+  gracePeriodEndDate?: string;
+  updatePaymentMethodUrl: string;
+  manageSubscriptionUrl: string;
+  language?: 'en' | 'ms';
+}
+
+export interface SubscriptionExpiryEmailData {
+  recipientName: string;
+  recipientEmail: string;
+  subscriptionTier: 'pro' | 'max';
+  expiryDate: string;
+  gracePeriodEndDate?: string;
+  isInGracePeriod: boolean;
+  renewSubscriptionUrl: string;
+  manageSubscriptionUrl: string;
+  language?: 'en' | 'ms';
+}
+
+export interface PaymentConfirmationEmailData {
+  recipientName: string;
+  recipientEmail: string;
+  subscriptionTier: 'pro' | 'max';
+  amount: number;
+  currency: string;
+  billingInterval: 'monthly' | 'annual';
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  nextBillingDate: string;
+  paymentMethodLast4?: string;
+  paymentMethodBrand?: string;
+  invoiceUrl?: string;
+  manageSubscriptionUrl: string;
+  language?: 'en' | 'ms';
+}
+
 export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { subject: string; html: string; text: string } {
   const language = data.language || 'en';
 
@@ -1020,4 +1082,451 @@ Ini adalah pemberitahuan automatik. Sila jangan balas e-mel ini.
   `;
 
   return { subject, html: '', text }; // Simplified for space
+}
+
+/**
+ * Generate billing reminder email (upcoming renewal)
+ */
+export function generateBillingReminderEmail(data: BillingReminderEmailData): { subject: string; html: string; text: string } {
+  const language = data.language || 'en';
+
+  if (language === 'ms') {
+    return generateBillingReminderEmailMalay(data);
+  }
+
+  const tierName = data.subscriptionTier === 'pro' ? 'Pro' : 'Max';
+  const intervalText = data.billingInterval === 'monthly' ? 'monthly' : 'annual';
+  const urgencyText = data.daysUntilRenewal <= 1 ? 'tomorrow' : `in ${data.daysUntilRenewal} days`;
+
+  const subject = `Your Mataresit ${tierName} subscription renews ${urgencyText}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; }
+    .billing-summary { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #667eea; }
+    .billing-item { display: flex; justify-content: space-between; margin: 8px 0; }
+    .billing-item strong { color: #333; }
+    .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .secondary-button { display: inline-block; background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-size: 14px; margin: 10px 5px 0 0; }
+    .footer { background-color: #f8f9fa; padding: 20px 30px; text-align: center; font-size: 12px; color: #6c757d; }
+    .payment-method { background-color: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .alert { background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💳 Subscription Renewal Reminder</h1>
+    </div>
+    <div class="content">
+      <h2>Hi ${data.recipientName},</h2>
+
+      <p>Your Mataresit <strong>${tierName}</strong> subscription is set to renew ${urgencyText}. We wanted to give you a heads up about your upcoming billing.</p>
+
+      <div class="billing-summary">
+        <h3>📋 Billing Summary</h3>
+        <div class="billing-item">
+          <span>Subscription Plan:</span>
+          <strong>Mataresit ${tierName} (${intervalText})</strong>
+        </div>
+        <div class="billing-item">
+          <span>Renewal Date:</span>
+          <strong>${new Date(data.renewalDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}</strong>
+        </div>
+        <div class="billing-item">
+          <span>Amount:</span>
+          <strong>${data.currency.toUpperCase()} ${data.amount.toFixed(2)}</strong>
+        </div>
+        ${data.paymentMethodLast4 ? `
+        <div class="billing-item">
+          <span>Payment Method:</span>
+          <strong>${data.paymentMethodBrand || 'Card'} ending in ${data.paymentMethodLast4}</strong>
+        </div>
+        ` : ''}
+      </div>
+
+      ${data.paymentMethodLast4 ? `
+      <div class="payment-method">
+        <h4>💳 Payment Method</h4>
+        <p>Your subscription will be automatically charged to your ${data.paymentMethodBrand || 'card'} ending in <strong>${data.paymentMethodLast4}</strong>.</p>
+      </div>
+      ` : `
+      <div class="alert">
+        <h4>⚠️ Payment Method Required</h4>
+        <p>We don't have a valid payment method on file. Please update your payment information to avoid service interruption.</p>
+      </div>
+      `}
+
+      <p>No action is required if you want to continue with your subscription. The renewal will happen automatically.</p>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${data.manageSubscriptionUrl}" class="cta-button">Manage Subscription</a>
+        <br>
+        <a href="${data.updatePaymentMethodUrl}" class="secondary-button">Update Payment Method</a>
+      </div>
+
+      <p>If you have any questions about your subscription or billing, please don't hesitate to contact our support team.</p>
+
+      <p>Thank you for being a valued Mataresit customer!</p>
+
+      <p>Best regards,<br>The Mataresit Team</p>
+    </div>
+    <div class="footer">
+      <p>© 2024 Mataresit. All rights reserved.</p>
+      <p>This is an automated billing notification. Please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Subscription Renewal Reminder
+
+Hi ${data.recipientName},
+
+Your Mataresit ${tierName} subscription is set to renew ${urgencyText}. We wanted to give you a heads up about your upcoming billing.
+
+Billing Summary:
+- Subscription Plan: Mataresit ${tierName} (${intervalText})
+- Renewal Date: ${new Date(data.renewalDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+})}
+- Amount: ${data.currency.toUpperCase()} ${data.amount.toFixed(2)}
+${data.paymentMethodLast4 ? `- Payment Method: ${data.paymentMethodBrand || 'Card'} ending in ${data.paymentMethodLast4}` : ''}
+
+${data.paymentMethodLast4
+  ? `Your subscription will be automatically charged to your ${data.paymentMethodBrand || 'card'} ending in ${data.paymentMethodLast4}.`
+  : 'We don\'t have a valid payment method on file. Please update your payment information to avoid service interruption.'
+}
+
+No action is required if you want to continue with your subscription. The renewal will happen automatically.
+
+Manage Subscription: ${data.manageSubscriptionUrl}
+Update Payment Method: ${data.updatePaymentMethodUrl}
+
+If you have any questions about your subscription or billing, please don't hesitate to contact our support team.
+
+Thank you for being a valued Mataresit customer!
+
+Best regards,
+The Mataresit Team
+
+© 2024 Mataresit. All rights reserved.
+This is an automated billing notification. Please do not reply to this email.
+  `;
+
+  return { subject, html, text };
+}
+
+/**
+ * Generate payment failed email
+ */
+export function generatePaymentFailedEmail(data: PaymentFailedEmailData): { subject: string; html: string; text: string } {
+  const language = data.language || 'en';
+
+  if (language === 'ms') {
+    return generatePaymentFailedEmailMalay(data);
+  }
+
+  const tierName = data.subscriptionTier === 'pro' ? 'Pro' : 'Max';
+  const isLastAttempt = data.retryAttempt >= data.maxRetryAttempts;
+
+  const subject = isLastAttempt
+    ? `Action Required: Payment Failed for Mataresit ${tierName}`
+    : `Payment Failed - We'll Try Again Soon (Attempt ${data.retryAttempt}/${data.maxRetryAttempts})`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; }
+    .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 30px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+    .content { padding: 40px 30px; }
+    .alert-error { background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 20px; margin: 20px 0; color: #721c24; }
+    .alert-warning { background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 20px; margin: 20px 0; color: #856404; }
+    .billing-summary { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #dc3545; }
+    .billing-item { display: flex; justify-content: space-between; margin: 8px 0; }
+    .billing-item strong { color: #333; }
+    .cta-button { display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .secondary-button { display: inline-block; background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-size: 14px; margin: 10px 5px 0 0; }
+    .footer { background-color: #f8f9fa; padding: 20px 30px; text-align: center; font-size: 12px; color: #6c757d; }
+    .retry-info { background-color: #e7f3ff; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #007bff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>❌ Payment Failed</h1>
+    </div>
+    <div class="content">
+      <h2>Hi ${data.recipientName},</h2>
+
+      ${isLastAttempt ? `
+      <div class="alert-error">
+        <h3>⚠️ Immediate Action Required</h3>
+        <p>We were unable to process your payment for your Mataresit ${tierName} subscription after ${data.maxRetryAttempts} attempts. Your subscription may be suspended soon.</p>
+      </div>
+      ` : `
+      <div class="alert-warning">
+        <h3>Payment Issue Detected</h3>
+        <p>We encountered an issue processing your payment for your Mataresit ${tierName} subscription. Don't worry - we'll automatically try again.</p>
+      </div>
+      `}
+
+      <div class="billing-summary">
+        <h3>💳 Payment Details</h3>
+        <div class="billing-item">
+          <span>Subscription Plan:</span>
+          <strong>Mataresit ${tierName}</strong>
+        </div>
+        <div class="billing-item">
+          <span>Amount:</span>
+          <strong>${data.currency.toUpperCase()} ${data.amount.toFixed(2)}</strong>
+        </div>
+        <div class="billing-item">
+          <span>Attempt:</span>
+          <strong>${data.retryAttempt} of ${data.maxRetryAttempts}</strong>
+        </div>
+        ${data.failureReason ? `
+        <div class="billing-item">
+          <span>Reason:</span>
+          <strong>${data.failureReason}</strong>
+        </div>
+        ` : ''}
+      </div>
+
+      ${!isLastAttempt && data.nextRetryDate ? `
+      <div class="retry-info">
+        <h4>🔄 Automatic Retry</h4>
+        <p>We'll automatically try to process your payment again on <strong>${new Date(data.nextRetryDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}</strong>.</p>
+      </div>
+      ` : ''}
+
+      ${data.gracePeriodEndDate ? `
+      <div class="alert-warning">
+        <h4>⏰ Grace Period</h4>
+        <p>Your subscription will remain active until <strong>${new Date(data.gracePeriodEndDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}</strong>. Please update your payment method before this date to avoid service interruption.</p>
+      </div>
+      ` : ''}
+
+      <h3>What you can do:</h3>
+      <ul>
+        <li><strong>Update your payment method</strong> - This is the quickest way to resolve the issue</li>
+        <li><strong>Check your card details</strong> - Ensure your card hasn't expired and has sufficient funds</li>
+        <li><strong>Contact your bank</strong> - Sometimes banks block online transactions for security</li>
+      </ul>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${data.updatePaymentMethodUrl}" class="cta-button">Update Payment Method</a>
+        <br>
+        <a href="${data.manageSubscriptionUrl}" class="secondary-button">Manage Subscription</a>
+      </div>
+
+      <p>If you continue to experience issues or have questions, please contact our support team. We're here to help!</p>
+
+      <p>Best regards,<br>The Mataresit Team</p>
+    </div>
+    <div class="footer">
+      <p>© 2024 Mataresit. All rights reserved.</p>
+      <p>This is an automated billing notification. Please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Payment Failed
+
+Hi ${data.recipientName},
+
+${isLastAttempt
+  ? `We were unable to process your payment for your Mataresit ${tierName} subscription after ${data.maxRetryAttempts} attempts. Your subscription may be suspended soon.`
+  : `We encountered an issue processing your payment for your Mataresit ${tierName} subscription. Don't worry - we'll automatically try again.`
+}
+
+Payment Details:
+- Subscription Plan: Mataresit ${tierName}
+- Amount: ${data.currency.toUpperCase()} ${data.amount.toFixed(2)}
+- Attempt: ${data.retryAttempt} of ${data.maxRetryAttempts}
+${data.failureReason ? `- Reason: ${data.failureReason}` : ''}
+
+${!isLastAttempt && data.nextRetryDate ? `We'll automatically try to process your payment again on ${new Date(data.nextRetryDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit'
+})}.` : ''}
+
+${data.gracePeriodEndDate ? `Your subscription will remain active until ${new Date(data.gracePeriodEndDate).toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+})}. Please update your payment method before this date to avoid service interruption.` : ''}
+
+What you can do:
+- Update your payment method - This is the quickest way to resolve the issue
+- Check your card details - Ensure your card hasn't expired and has sufficient funds
+- Contact your bank - Sometimes banks block online transactions for security
+
+Update Payment Method: ${data.updatePaymentMethodUrl}
+Manage Subscription: ${data.manageSubscriptionUrl}
+
+If you continue to experience issues or have questions, please contact our support team. We're here to help!
+
+Best regards,
+The Mataresit Team
+
+© 2024 Mataresit. All rights reserved.
+This is an automated billing notification. Please do not reply to this email.
+  `;
+
+  return { subject, html, text };
+}
+
+// Import additional billing templates
+export {
+  generateSubscriptionExpiryEmail,
+  generatePaymentConfirmationEmail
+} from './billing-templates.ts';
+
+// Malay versions for billing reminder and payment failed emails
+function generateBillingReminderEmailMalay(data: BillingReminderEmailData): { subject: string; html: string; text: string } {
+  const tierName = data.subscriptionTier === 'pro' ? 'Pro' : 'Max';
+  const intervalText = data.billingInterval === 'monthly' ? 'bulanan' : 'tahunan';
+  const urgencyText = data.daysUntilRenewal <= 1 ? 'esok' : `dalam ${data.daysUntilRenewal} hari`;
+
+  const subject = `Langganan Mataresit ${tierName} anda akan diperbaharui ${urgencyText}`;
+
+  const text = `
+Peringatan Pembaharuan Langganan
+
+Hai ${data.recipientName},
+
+Langganan Mataresit ${tierName} anda akan diperbaharui ${urgencyText}. Kami ingin memberi anda pemberitahuan awal mengenai pengebilan yang akan datang.
+
+Ringkasan Pengebilan:
+- Pelan Langganan: Mataresit ${tierName} (${intervalText})
+- Tarikh Pembaharuan: ${new Date(data.renewalDate).toLocaleDateString('ms-MY', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+})}
+- Jumlah: ${data.currency.toUpperCase()} ${data.amount.toFixed(2)}
+${data.paymentMethodLast4 ? `- Kaedah Pembayaran: ${data.paymentMethodBrand || 'Kad'} berakhir dengan ${data.paymentMethodLast4}` : ''}
+
+${data.paymentMethodLast4
+  ? `Langganan anda akan dikenakan caj secara automatik kepada ${data.paymentMethodBrand || 'kad'} anda yang berakhir dengan ${data.paymentMethodLast4}.`
+  : 'Kami tidak mempunyai kaedah pembayaran yang sah dalam fail. Sila kemas kini maklumat pembayaran anda untuk mengelakkan gangguan perkhidmatan.'
+}
+
+Tiada tindakan diperlukan jika anda ingin meneruskan langganan anda. Pembaharuan akan berlaku secara automatik.
+
+Urus Langganan: ${data.manageSubscriptionUrl}
+Kemas Kini Kaedah Pembayaran: ${data.updatePaymentMethodUrl}
+
+Jika anda mempunyai sebarang soalan mengenai langganan atau pengebilan anda, sila jangan teragak-agak untuk menghubungi pasukan sokongan kami.
+
+Terima kasih kerana menjadi pelanggan Mataresit yang dihargai!
+
+Salam hormat,
+Pasukan Mataresit
+
+© 2024 Mataresit. Hak cipta terpelihara.
+Ini adalah pemberitahuan pengebilan automatik. Sila jangan balas e-mel ini.
+  `;
+
+  return { subject, html: '', text }; // Simplified HTML for space
+}
+
+function generatePaymentFailedEmailMalay(data: PaymentFailedEmailData): { subject: string; html: string; text: string } {
+  const tierName = data.subscriptionTier === 'pro' ? 'Pro' : 'Max';
+  const isLastAttempt = data.retryAttempt >= data.maxRetryAttempts;
+
+  const subject = isLastAttempt
+    ? `Tindakan Diperlukan: Pembayaran Gagal untuk Mataresit ${tierName}`
+    : `Pembayaran Gagal - Kami Akan Cuba Lagi Tidak Lama Lagi (Percubaan ${data.retryAttempt}/${data.maxRetryAttempts})`;
+
+  const text = `
+Pembayaran Gagal
+
+Hai ${data.recipientName},
+
+${isLastAttempt
+  ? `Kami tidak dapat memproses pembayaran anda untuk langganan Mataresit ${tierName} selepas ${data.maxRetryAttempts} percubaan. Langganan anda mungkin akan digantung tidak lama lagi.`
+  : `Kami menghadapi masalah memproses pembayaran anda untuk langganan Mataresit ${tierName}. Jangan risau - kami akan cuba secara automatik lagi.`
+}
+
+Butiran Pembayaran:
+- Pelan Langganan: Mataresit ${tierName}
+- Jumlah: ${data.currency.toUpperCase()} ${data.amount.toFixed(2)}
+- Percubaan: ${data.retryAttempt} daripada ${data.maxRetryAttempts}
+${data.failureReason ? `- Sebab: ${data.failureReason}` : ''}
+
+${!isLastAttempt && data.nextRetryDate ? `Kami akan cuba memproses pembayaran anda secara automatik lagi pada ${new Date(data.nextRetryDate).toLocaleDateString('ms-MY', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit'
+})}.` : ''}
+
+${data.gracePeriodEndDate ? `Langganan anda akan kekal aktif sehingga ${new Date(data.gracePeriodEndDate).toLocaleDateString('ms-MY', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+})}. Sila kemas kini kaedah pembayaran anda sebelum tarikh ini untuk mengelakkan gangguan perkhidmatan.` : ''}
+
+Apa yang boleh anda lakukan:
+- Kemas kini kaedah pembayaran anda - Ini adalah cara terpantas untuk menyelesaikan masalah
+- Semak butiran kad anda - Pastikan kad anda belum tamat tempoh dan mempunyai dana yang mencukupi
+- Hubungi bank anda - Kadangkala bank menyekat transaksi dalam talian untuk keselamatan
+
+Kemas Kini Kaedah Pembayaran: ${data.updatePaymentMethodUrl}
+Urus Langganan: ${data.manageSubscriptionUrl}
+
+Jika anda terus menghadapi masalah atau mempunyai soalan, sila hubungi pasukan sokongan kami. Kami di sini untuk membantu!
+
+Salam hormat,
+Pasukan Mataresit
+
+© 2024 Mataresit. Hak cipta terpelihara.
+Ini adalah pemberitahuan pengebilan automatik. Sila jangan balas e-mel ini.
+  `;
+
+  return { subject, html: '', text }; // Simplified HTML for space
 }
