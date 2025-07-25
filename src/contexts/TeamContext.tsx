@@ -418,6 +418,16 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       case 'view_receipts':
         return ['owner', 'admin', 'member', 'viewer'].includes(state.currentTeamRole);
 
+      // Member management permissions
+      case 'view_members':
+        return ['owner', 'admin', 'member', 'viewer'].includes(state.currentTeamRole);
+      case 'manage_members':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
+
+      // Audit and security permissions
+      case 'view_audit_logs':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
+
       // Claim permissions
       case 'create_claims':
         return ['owner', 'admin', 'member'].includes(state.currentTeamRole);

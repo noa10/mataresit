@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { TeamMember, TeamMemberRole, getTeamRoleDisplayName, TEAM_ROLE_COLORS } from '@/types/team';
 import { cn } from '@/lib/utils';
+import { enhancedTeamService } from '@/services/enhancedTeamService';
 
 interface BulkOperationsPanelProps {
   selectedMembers: TeamMember[];
@@ -112,18 +113,18 @@ export function BulkOperationsPanel({
         reason: bulkRoleForm.reason,
       }));
 
-      // Call enhanced bulk role update function
-      const response = await fetch('/api/team/bulk-role-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          role_updates: roleUpdates,
-          reason: bulkRoleForm.reason,
-        }),
-      });
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
 
-      const result = await response.json();
+      // Use enhanced team service instead of direct API call
+      const response = await enhancedTeamService.bulkUpdateRoles(
+        currentTeam.id,
+        roleUpdates,
+        bulkRoleForm.reason
+      );
+
+      const result = response;
 
       if (result.success) {
         toast({
@@ -169,20 +170,22 @@ export function BulkOperationsPanel({
 
       const userIds = selectedMembers.map(member => member.user_id);
 
-      // Call enhanced bulk remove function
-      const response = await fetch('/api/team/bulk-remove', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
+
+      // Use enhanced team service instead of direct API call
+      const response = await enhancedTeamService.bulkRemoveMembers(
+        currentTeam.id,
+        {
           user_ids: userIds,
           reason: bulkRemoveForm.reason,
           transfer_data: bulkRemoveForm.transferData,
-          transfer_to_user_id: bulkRemoveForm.transferToUserId || null,
-        }),
-      });
+          transfer_to_user_id: bulkRemoveForm.transferToUserId || undefined,
+        }
+      );
 
-      const result = await response.json();
+      const result = response;
 
       if (result.success) {
         toast({
@@ -237,20 +240,22 @@ export function BulkOperationsPanel({
         custom_message: bulkInviteForm.customMessage,
       }));
 
-      // Call enhanced bulk invite function
-      const response = await fetch('/api/team/bulk-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          invitations,
-          default_role: bulkInviteForm.role,
-          expires_in_days: bulkInviteForm.expiresInDays,
-          send_emails: true,
-        }),
-      });
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
 
-      const result = await response.json();
+      // Use enhanced team service instead of direct API call
+      const response = await enhancedTeamService.bulkInviteMembers(
+        currentTeam.id,
+        invitations,
+        {
+          defaultRole: bulkInviteForm.role,
+          expiresInDays: bulkInviteForm.expiresInDays,
+          sendEmails: true,
+        }
+      );
+
+      const result = response;
 
       if (result.success) {
         toast({

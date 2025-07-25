@@ -942,6 +942,496 @@ export class TeamService {
     }
   }
 
+  // =============================================
+  // MEMBER ANALYTICS
+  // =============================================
+
+  /**
+   * Get comprehensive analytics for a team member
+   */
+  async getMemberAnalytics(
+    teamId: string,
+    userId?: string,
+    options: {
+      startDate?: string;
+      endDate?: string;
+      useOptimized?: boolean;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      // Use optimized version by default for better performance
+      if (options.useOptimized !== false) {
+        const { optimizedTeamAnalyticsService } = await import('./optimizedTeamAnalyticsService');
+
+        const response = await optimizedTeamAnalyticsService.getMemberAnalyticsOptimized({
+          team_id: teamId,
+          user_id: userId,
+          useCache: true
+        });
+
+        if (response.success) {
+          return response;
+        }
+
+        // Fall back to original implementation if optimized fails
+        console.warn('Optimized analytics failed, falling back to original implementation:', response.error);
+      }
+
+      // Original implementation
+      const response = await enhancedTeamService.getMemberAnalytics({
+        team_id: teamId,
+        user_id: userId,
+        start_date: options.startDate,
+        end_date: options.endDate,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'ANALYTICS_FAILED',
+          response.error || 'Failed to get member analytics'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('ANALYTICS_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Get member activity timeline
+   */
+  async getMemberActivityTimeline(
+    teamId: string,
+    options: {
+      userId?: string;
+      limit?: number;
+      offset?: number;
+      activityTypes?: string[];
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.getMemberActivityTimeline({
+        team_id: teamId,
+        user_id: options.userId,
+        limit: options.limit,
+        offset: options.offset,
+        activity_types: options.activityTypes,
+        start_date: options.startDate,
+        end_date: options.endDate,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'ACTIVITY_TIMELINE_FAILED',
+          response.error || 'Failed to get member activity timeline'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('ACTIVITY_TIMELINE_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Get member performance insights with period comparison
+   */
+  async getMemberPerformanceInsights(
+    teamId: string,
+    userId?: string,
+    comparisonPeriodDays: number = 30
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.getMemberPerformanceInsights({
+        team_id: teamId,
+        user_id: userId,
+        comparison_period_days: comparisonPeriodDays,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'PERFORMANCE_INSIGHTS_FAILED',
+          response.error || 'Failed to get member performance insights'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('PERFORMANCE_INSIGHTS_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Advanced member search with filtering and analytics
+   */
+  async searchMembersAdvanced(
+    teamId: string,
+    options: {
+      searchQuery?: string;
+      roleFilter?: string[];
+      statusFilter?: string[];
+      activityFilter?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.searchMembersAdvanced({
+        team_id: teamId,
+        search_query: options.searchQuery,
+        role_filter: options.roleFilter as any,
+        status_filter: options.statusFilter,
+        activity_filter: options.activityFilter,
+        sort_by: options.sortBy,
+        sort_order: options.sortOrder,
+        limit: options.limit,
+        offset: options.offset,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'MEMBER_SEARCH_FAILED',
+          response.error || 'Failed to search members'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('MEMBER_SEARCH_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Get team-wide engagement metrics and analytics
+   */
+  async getTeamEngagementMetrics(
+    teamId: string,
+    periodDays: number = 30,
+    options: {
+      useOptimized?: boolean;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      // Use optimized version by default for better performance
+      if (options.useOptimized !== false) {
+        const { optimizedTeamAnalyticsService } = await import('./optimizedTeamAnalyticsService');
+
+        const response = await optimizedTeamAnalyticsService.getTeamEngagementMetricsOptimized({
+          team_id: teamId,
+          useCache: true
+        });
+
+        if (response.success) {
+          return response;
+        }
+
+        // Fall back to original implementation if optimized fails
+        console.warn('Optimized team engagement metrics failed, falling back to original implementation:', response.error);
+      }
+
+      // Original implementation
+      const response = await enhancedTeamService.getTeamEngagementMetrics({
+        team_id: teamId,
+        period_days: periodDays,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'ENGAGEMENT_METRICS_FAILED',
+          response.error || 'Failed to get team engagement metrics'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('ENGAGEMENT_METRICS_FAILED', error.message);
+    }
+  }
+
+  // =============================================
+  // SCHEDULED OPERATIONS
+  // =============================================
+
+  /**
+   * Schedule a member operation for future execution
+   */
+  async scheduleMemberOperation(
+    teamId: string,
+    operationType: string,
+    operationName: string,
+    scheduledFor: string,
+    options: {
+      operationConfig?: Record<string, any>;
+      operationDescription?: string;
+      maxRetries?: number;
+      dependsOn?: string[];
+      prerequisites?: Record<string, any>;
+      metadata?: Record<string, any>;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.scheduleMemberOperation({
+        team_id: teamId,
+        operation_type: operationType as any,
+        operation_name: operationName,
+        scheduled_for: scheduledFor,
+        operation_config: options.operationConfig,
+        operation_description: options.operationDescription,
+        max_retries: options.maxRetries,
+        depends_on: options.dependsOn,
+        prerequisites: options.prerequisites,
+        metadata: options.metadata,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'SCHEDULE_OPERATION_FAILED',
+          response.error || 'Failed to schedule operation'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('SCHEDULE_OPERATION_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Get scheduled operations for a team
+   */
+  async getScheduledOperations(
+    teamId: string,
+    options: {
+      operationTypes?: string[];
+      statusFilter?: string[];
+      includeCompleted?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.getScheduledOperations({
+        team_id: teamId,
+        operation_types: options.operationTypes as any,
+        status_filter: options.statusFilter as any,
+        include_completed: options.includeCompleted,
+        limit: options.limit,
+        offset: options.offset,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'GET_SCHEDULED_OPERATIONS_FAILED',
+          response.error || 'Failed to get scheduled operations'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('GET_SCHEDULED_OPERATIONS_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Cancel a scheduled operation
+   */
+  async cancelScheduledOperation(
+    operationId: string,
+    reason?: string
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.cancelScheduledOperation({
+        operation_id: operationId,
+        reason: reason,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'CANCEL_OPERATION_FAILED',
+          response.error || 'Failed to cancel scheduled operation'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('CANCEL_OPERATION_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Reschedule an operation to a new time
+   */
+  async rescheduleOperation(
+    operationId: string,
+    newScheduledFor: string,
+    reason?: string
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.rescheduleOperation({
+        operation_id: operationId,
+        new_scheduled_for: newScheduledFor,
+        reason: reason,
+      });
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'RESCHEDULE_OPERATION_FAILED',
+          response.error || 'Failed to reschedule operation'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('RESCHEDULE_OPERATION_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Schedule member removal for future execution
+   */
+  async scheduleMemberRemovalEnhanced(
+    teamId: string,
+    userId: string,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      transferData?: boolean;
+      transferToUserId?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.scheduleMemberRemovalEnhanced(
+        teamId,
+        userId,
+        scheduledFor,
+        options
+      );
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'SCHEDULE_REMOVAL_FAILED',
+          response.error || 'Failed to schedule member removal'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('SCHEDULE_REMOVAL_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Schedule role change for future execution
+   */
+  async scheduleRoleChange(
+    teamId: string,
+    userId: string,
+    newRole: TeamMemberRole,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.scheduleRoleChange(
+        teamId,
+        userId,
+        newRole,
+        scheduledFor,
+        options
+      );
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'SCHEDULE_ROLE_CHANGE_FAILED',
+          response.error || 'Failed to schedule role change'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('SCHEDULE_ROLE_CHANGE_FAILED', error.message);
+    }
+  }
+
+  /**
+   * Schedule permission update for future execution
+   */
+  async schedulePermissionUpdate(
+    teamId: string,
+    userId: string,
+    newPermissions: Record<string, any>,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<any>> {
+    try {
+      const response = await enhancedTeamService.schedulePermissionUpdate(
+        teamId,
+        userId,
+        newPermissions,
+        scheduledFor,
+        options
+      );
+
+      if (!response.success) {
+        throw new TeamServiceException(
+          response.error_code as any || 'SCHEDULE_PERMISSION_UPDATE_FAILED',
+          response.error || 'Failed to schedule permission update'
+        );
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error instanceof TeamServiceException) {
+        throw error;
+      }
+      throw new TeamServiceException('SCHEDULE_PERMISSION_UPDATE_FAILED', error.message);
+    }
+  }
+
   /**
    * Get enhanced team service instance for advanced operations
    */

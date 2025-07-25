@@ -19,8 +19,9 @@ import {
   Clock,
   TrendingUp,
 } from 'lucide-react';
-import { TeamMember, getTeamRoleDisplayName, TEAM_ROLE_COLORS } from '@/types/team';
+import { TeamMember, getTeamRoleDisplayName, TEAM_ROLE_COLORS, EnhancedTeamStats } from '@/types/team';
 import { cn } from '@/lib/utils';
+import { enhancedTeamService } from '@/services/enhancedTeamService';
 
 // Import enhanced components
 import { BulkOperationsPanel } from './BulkOperationsPanel';
@@ -28,19 +29,7 @@ import { EnhancedMemberTable } from './EnhancedMemberTable';
 import { EnhancedInvitationPanel } from './EnhancedInvitationPanel';
 import { AuditTrailViewer } from './AuditTrailViewer';
 
-interface TeamStats {
-  total_members: number;
-  active_members: number;
-  inactive_members: number;
-  owners: number;
-  admins: number;
-  members: number;
-  viewers: number;
-  scheduled_removals: number;
-  recent_joins: number;
-  pending_invitations: number;
-  recent_activity_count: number;
-}
+// Use the EnhancedTeamStats type from the types file instead of local interface
 
 interface EnhancedTeamManagementProps {
   className?: string;
@@ -53,7 +42,7 @@ export function EnhancedTeamManagement({ className }: EnhancedTeamManagementProp
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<TeamMember[]>([]);
-  const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+  const [teamStats, setTeamStats] = useState<EnhancedTeamStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('members');
 
@@ -82,32 +71,34 @@ export function EnhancedTeamManagement({ className }: EnhancedTeamManagementProp
   };
 
   const loadMembers = async () => {
-    const response = await fetch(`/api/team/${currentTeam?.id}/members`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+    if (!currentTeam?.id) {
+      throw new Error('No team selected');
+    }
+
+    const response = await enhancedTeamService.getTeamMembers({
+      team_id: currentTeam.id,
+      include_inactive: true,
+      include_scheduled_removal: true,
     });
 
-    const result = await response.json();
-
-    if (result.success) {
-      setMembers(result.members || []);
+    if (response.success) {
+      setMembers(response.data || []);
     } else {
-      throw new Error(result.error || 'Failed to load team members');
+      throw new Error(response.error || 'Failed to load team members');
     }
   };
 
   const loadTeamStats = async () => {
-    const response = await fetch(`/api/team/${currentTeam?.id}/stats`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!currentTeam?.id) {
+      throw new Error('No team selected');
+    }
 
-    const result = await response.json();
+    const response = await enhancedTeamService.getEnhancedTeamStats(currentTeam.id);
 
-    if (result.success) {
-      setTeamStats(result.stats);
+    if (response.success) {
+      setTeamStats(response.data);
     } else {
-      throw new Error(result.error || 'Failed to load team statistics');
+      throw new Error(response.error || 'Failed to load team statistics');
     }
   };
 

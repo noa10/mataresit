@@ -50,6 +50,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
+import { enhancedTeamService } from '@/services/enhancedTeamService';
 
 interface AuditLog {
   id: string;
@@ -93,6 +94,7 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
     page: 0,
     limit: 50,
     total: 0,
+    hasMore: false,
   });
 
   useEffect(() => {
@@ -139,20 +141,36 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
       params.append('start_date', startDate.toISOString());
       params.append('end_date', endDate.toISOString());
 
-      const response = await fetch(`/api/team/${currentTeam?.id}/audit-logs?${params}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
+
+      // Use enhanced team service instead of direct API call
+      const response = await enhancedTeamService.getAuditLogs({
+        team_id: currentTeam.id,
+        actions: actionFilter !== 'all' ? [actionFilter] : undefined,
+        userId: userFilter !== 'all' ? userFilter : undefined,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        limit: pagination.limit,
+        offset: pagination.page * pagination.limit,
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setAuditLogs(result.logs || []);
-        setPagination(prev => ({ ...prev, total: result.total || 0 }));
+      if (response.success) {
+        // response.data is a PaginatedResponse<TeamAuditLog>, so we need response.data.data for the array
+        const auditLogsData = response.data?.data;
+        setAuditLogs(Array.isArray(auditLogsData) ? auditLogsData : []);
+        setPagination(prev => ({
+          ...prev,
+          total: response.data?.total || 0,
+          hasMore: response.data?.has_more || false
+        }));
       } else {
-        throw new Error(result.error || 'Failed to load audit logs');
+        throw new Error(response.error || 'Failed to load audit logs');
       }
     } catch (error: any) {
+      // Ensure auditLogs is always an array even on error
+      setAuditLogs([]);
       toast({
         title: 'Error',
         description: error.message || 'Failed to load audit logs',
@@ -172,27 +190,30 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/team/${currentTeam?.id}/audit-logs/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          search_params: {
-            text_search: searchQuery,
-            actions: actionFilter !== 'all' ? [actionFilter] : undefined,
-            user_id: userFilter !== 'all' ? userFilter : undefined,
-            limit: pagination.limit,
-          },
-        }),
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
+
+      // Use enhanced team service for search instead of direct API call
+      const response = await enhancedTeamService.searchAuditLogs({
+        team_id: currentTeam.id,
+        search_params: {
+          text_search: searchQuery,
+          actions: actionFilter !== 'all' ? [actionFilter] : undefined,
+          user_id: userFilter !== 'all' ? userFilter : undefined,
+          limit: pagination.limit,
+        },
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setAuditLogs(result.logs || []);
+      if (response.success) {
+        const searchResults = response.data;
+        setAuditLogs(Array.isArray(searchResults) ? searchResults : []);
       } else {
-        throw new Error(result.error || 'Failed to search audit logs');
+        throw new Error(response.error || 'Failed to search audit logs');
       }
     } catch (error: any) {
+      // Ensure auditLogs is always an array even on error
+      setAuditLogs([]);
       toast({
         title: 'Error',
         description: error.message || 'Failed to search audit logs',
@@ -377,6 +398,14 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               <p className="mt-2 text-sm text-muted-foreground">Loading audit logs...</p>
             </div>
+          ) : !Array.isArray(auditLogs) ? (
+            <div className="p-8 text-center">
+              <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2 text-destructive">Data Error</h3>
+              <p className="text-muted-foreground">
+                Invalid audit logs data format. Please refresh the page.
+              </p>
+            </div>
           ) : auditLogs.length === 0 ? (
             <div className="p-8 text-center">
               <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -398,7 +427,14 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {auditLogs.map((log) => (
+                {auditLogs.map((log) => {
+                  // Additional safety check for each log item
+                  if (!log || typeof log !== 'object' || !log.id) {
+                    console.warn('Invalid audit log item:', log);
+                    return null;
+                  }
+
+                  return (
                   <TableRow key={log.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -457,7 +493,8 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                }).filter(Boolean)}
               </TableBody>
             </Table>
           )}
@@ -485,7 +522,7 @@ export function AuditTrailViewer({ className }: AuditTrailViewerProps) {
               variant="outline"
               size="sm"
               onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              disabled={(pagination.page + 1) * pagination.limit >= pagination.total}
+              disabled={!pagination.hasMore}
             >
               Next
             </Button>

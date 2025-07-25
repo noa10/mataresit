@@ -48,6 +48,7 @@ import {
 import { TeamInvitation, TeamMemberRole, getTeamRoleDisplayName, TEAM_ROLE_COLORS } from '@/types/team';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { enhancedTeamService } from '@/services/enhancedTeamService';
 
 interface EnhancedInvitationPanelProps {
   onInvitationUpdate: () => void;
@@ -98,19 +99,21 @@ export function EnhancedInvitationPanel({ onInvitationUpdate }: EnhancedInvitati
   const loadInvitations = async () => {
     try {
       setLoading(true);
-      
-      // Call enhanced get invitations function
-      const response = await fetch(`/api/team/${currentTeam?.id}/invitations`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
+
+      // Use enhanced team service instead of direct API call
+      const response = await enhancedTeamService.getTeamInvitations({
+        team_id: currentTeam.id,
+        include_expired: true,
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setInvitations(result.invitations || []);
+      if (response.success) {
+        setInvitations(response.data || []);
       } else {
-        throw new Error(result.error || 'Failed to load invitations');
+        throw new Error(response.error || 'Failed to load invitations');
       }
     } catch (error: any) {
       toast({

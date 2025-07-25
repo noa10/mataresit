@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useTeam } from '@/contexts/TeamContext';
 import { useTeamTranslation } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -54,16 +54,25 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Loader2,
+  SortAsc,
+  SortDesc,
 } from 'lucide-react';
-import { 
-  TeamMember, 
-  TeamMemberRole, 
-  getTeamRoleDisplayName, 
+import {
+  TeamMember,
+  TeamMemberRole,
+  getTeamRoleDisplayName,
   getTeamRoleDescription,
-  TEAM_ROLE_COLORS 
+  TEAM_ROLE_COLORS,
+  EnhancedMemberSearchResult,
+  MemberSearchResults
 } from '@/types/team';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { AdvancedMemberSearchInput } from './AdvancedMemberSearchInput';
+import { MemberFilterBuilder, MemberFilters } from './MemberFilterBuilder';
+import { SavedSearchManager, SavedSearch } from './SavedSearchManager';
+import { enhancedTeamService } from '@/services/enhancedTeamService';
 
 interface EnhancedMemberTableProps {
   members: TeamMember[];
@@ -78,21 +87,32 @@ interface MemberWithStatus extends TeamMember {
   removal_scheduled_at?: string;
 }
 
-export function EnhancedMemberTable({ 
-  members, 
-  selectedMembers, 
-  onSelectionChange, 
-  onMemberUpdate 
+export function EnhancedMemberTable({
+  members,
+  selectedMembers,
+  onSelectionChange,
+  onMemberUpdate
 }: EnhancedMemberTableProps) {
   const { currentTeam, currentTeamRole, hasPermission } = useTeam();
   const { t } = useTeamTranslation();
   const { toast } = useToast();
 
+  // Enhanced search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<TeamMemberRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'scheduled_removal'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'role' | 'joined_at' | 'last_active'>('name');
+  const [filters, setFilters] = useState<MemberFilters>({
+    roles: [],
+    statuses: [],
+    activityLevels: [],
+    joinDateRange: {},
+    lastActiveRange: {},
+    engagementScoreRange: {},
+    receiptCountRange: {},
+  });
+  const [sortBy, setSortBy] = useState<'name' | 'role' | 'joined_at' | 'last_active' | 'activity_score'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<EnhancedMemberSearchResult[]>([]);
+  const [useAdvancedSearch, setUseAdvancedSearch] = useState(false);
 
   const [roleUpdateDialogOpen, setRoleUpdateDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
@@ -115,30 +135,82 @@ export function EnhancedMemberTable({
     reason: '',
   });
 
+  // Enhanced search function
+  const performAdvancedSearch = useCallback(async (query: string, suggestions?: any[]) => {
+    if (!currentTeam?.id) return;
+
+    setIsSearching(true);
+    try {
+      const response = await enhancedTeamService.searchMembersAdvanced({
+        team_id: currentTeam.id,
+        search_query: query || undefined,
+        role_filter: filters.roles.length > 0 ? filters.roles : undefined,
+        status_filter: filters.statuses.length > 0 ? filters.statuses : undefined,
+        activity_filter: filters.activityLevels.length > 0 ? filters.activityLevels[0] : undefined,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        limit: 100,
+        offset: 0,
+      });
+
+      if (response.success && response.data?.members) {
+        setSearchResults(response.data.members);
+        setUseAdvancedSearch(true);
+      } else {
+        toast.error('Search failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Advanced search error:', error);
+      toast.error('Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [currentTeam?.id, filters, sortBy, sortOrder, toast]);
+
+  // Load saved search
+  const loadSavedSearch = useCallback((savedSearch: SavedSearch) => {
+    setSearchQuery(savedSearch.query);
+    setFilters(savedSearch.filters);
+    performAdvancedSearch(savedSearch.query);
+  }, [performAdvancedSearch]);
+
   // Enhanced members with status information
   const enhancedMembers: MemberWithStatus[] = useMemo(() => {
-    return members.map(member => ({
+    const membersToProcess = useAdvancedSearch ?
+      searchResults.map(result => ({
+        id: result.id,
+        team_id: result.user_id, // Note: this mapping might need adjustment
+        user_id: result.user_id,
+        role: result.role,
+        permissions: result.permissions,
+        joined_at: result.joined_at,
+        updated_at: result.updated_at,
+        email: result.email,
+        first_name: result.first_name,
+        last_name: result.last_name,
+        last_active_at: result.last_active_at,
+        removal_scheduled_at: result.removal_scheduled_at,
+      } as TeamMember)) :
+      members;
+
+    return membersToProcess.map(member => ({
       ...member,
-      status: member.removal_scheduled_at ? 'scheduled_removal' : 
+      status: member.removal_scheduled_at ? 'scheduled_removal' :
               (member.last_active_at && new Date(member.last_active_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) ? 'active' : 'inactive',
     }));
-  }, [members]);
+  }, [members, searchResults, useAdvancedSearch]);
 
-  // Filtered and sorted members
-  const filteredMembers = useMemo(() => {
+  // Basic filtered members (fallback when not using advanced search)
+  const basicFilteredMembers = useMemo(() => {
+    if (useAdvancedSearch) return enhancedMembers;
+
     let filtered = enhancedMembers.filter(member => {
       // Search filter
-      const searchMatch = searchQuery === '' || 
+      const searchMatch = searchQuery === '' ||
         `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         member.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Role filter
-      const roleMatch = roleFilter === 'all' || member.role === roleFilter;
-
-      // Status filter
-      const statusMatch = statusFilter === 'all' || member.status === statusFilter;
-
-      return searchMatch && roleMatch && statusMatch;
+      return searchMatch;
     });
 
     // Sort members
@@ -173,7 +245,9 @@ export function EnhancedMemberTable({
     });
 
     return filtered;
-  }, [enhancedMembers, searchQuery, roleFilter, statusFilter, sortBy, sortOrder]);
+  }, [enhancedMembers, searchQuery, sortBy, sortOrder, useAdvancedSearch]);
+
+  const filteredMembers = basicFilteredMembers;
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -331,42 +405,73 @@ export function EnhancedMemberTable({
 
   return (
     <div className="space-y-4">
-      {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search members..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <Select value={roleFilter} onValueChange={(value: any) => setRoleFilter(value)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Filter by role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="owner">Owner</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="member">Member</SelectItem>
-            <SelectItem value="viewer">Viewer</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Enhanced Search Interface */}
+      <div className="space-y-4">
+        {/* Search Input and Controls */}
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1">
+            <AdvancedMemberSearchInput
+              onSearch={performAdvancedSearch}
+              placeholder="Search team members by name, email, or role..."
+              isLoading={isSearching}
+              className="w-full"
+            />
+          </div>
 
-        <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-            <SelectItem value="scheduled_removal">Scheduled Removal</SelectItem>
-          </SelectContent>
-        </Select>
+          <div className="flex items-center gap-2">
+            <MemberFilterBuilder
+              filters={filters}
+              onFiltersChange={setFilters}
+              onReset={() => {
+                setFilters({
+                  roles: [],
+                  statuses: [],
+                  activityLevels: [],
+                  joinDateRange: {},
+                  lastActiveRange: {},
+                  engagementScoreRange: {},
+                  receiptCountRange: {},
+                });
+                setUseAdvancedSearch(false);
+                setSearchResults([]);
+              }}
+            />
+
+            <SavedSearchManager
+              currentQuery={searchQuery}
+              currentFilters={filters}
+              onSearchLoad={loadSavedSearch}
+            />
+          </div>
+        </div>
+
+        {/* Search Status */}
+        {isSearching && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Searching members...
+          </div>
+        )}
+
+        {useAdvancedSearch && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''}
+              {searchQuery && ` matching "${searchQuery}"`}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setUseAdvancedSearch(false);
+                setSearchResults([]);
+                setSearchQuery('');
+              }}
+            >
+              Clear Search
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Members Table */}
@@ -380,111 +485,253 @@ export function EnhancedMemberTable({
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>Member</TableHead>
-              <TableHead>Role</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (sortBy === 'name') {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy('name');
+                      setSortOrder('asc');
+                    }
+                  }}
+                  className="h-auto p-0 font-medium"
+                >
+                  Member
+                  {sortBy === 'name' && (
+                    sortOrder === 'asc' ? <SortAsc className="ml-1 h-3 w-3" /> : <SortDesc className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (sortBy === 'role') {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy('role');
+                      setSortOrder('asc');
+                    }
+                  }}
+                  className="h-auto p-0 font-medium"
+                >
+                  Role
+                  {sortBy === 'role' && (
+                    sortOrder === 'asc' ? <SortAsc className="ml-1 h-3 w-3" /> : <SortDesc className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+              </TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Last Active</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (sortBy === 'joined_at') {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy('joined_at');
+                      setSortOrder('desc');
+                    }
+                  }}
+                  className="h-auto p-0 font-medium"
+                >
+                  Joined
+                  {sortBy === 'joined_at' && (
+                    sortOrder === 'asc' ? <SortAsc className="ml-1 h-3 w-3" /> : <SortDesc className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (sortBy === 'last_active') {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy('last_active');
+                      setSortOrder('desc');
+                    }
+                  }}
+                  className="h-auto p-0 font-medium"
+                >
+                  Last Active
+                  {sortBy === 'last_active' && (
+                    sortOrder === 'asc' ? <SortAsc className="ml-1 h-3 w-3" /> : <SortDesc className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+              </TableHead>
+              {useAdvancedSearch && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (sortBy === 'activity_score') {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setSortBy('activity_score');
+                        setSortOrder('desc');
+                      }
+                    }}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Activity
+                    {sortBy === 'activity_score' && (
+                      sortOrder === 'asc' ? <SortAsc className="ml-1 h-3 w-3" /> : <SortDesc className="ml-1 h-3 w-3" />
+                    )}
+                  </Button>
+                </TableHead>
+              )}
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMembers.map((member) => (
-              <TableRow key={member.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedMembers.some(m => m.id === member.id)}
-                    onCheckedChange={(checked) => handleSelectMember(member, checked as boolean)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {member.first_name} {member.last_name}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {member.email}
+            {filteredMembers.map((member) => {
+              // Get enhanced data if available
+              const enhancedMember = useAdvancedSearch ?
+                searchResults.find(r => r.user_id === member.user_id) : null;
+
+              return (
+                <TableRow key={member.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedMembers.some(m => m.id === member.id)}
+                      onCheckedChange={(checked) => handleSelectMember(member, checked as boolean)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {member.first_name} {member.last_name}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {member.email}
+                        </div>
+                        {enhancedMember?.receipt_metrics && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {enhancedMember.receipt_metrics.total_receipts} receipts •
+                            {enhancedMember.receipt_metrics.categories_used} categories
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {getRoleIcon(member.role)}
-                    <Badge variant="outline" className={cn("gap-1", TEAM_ROLE_COLORS[member.role])}>
-                      {getTeamRoleDisplayName(member.role)}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(member.status)}
-                    <span className="text-sm capitalize">{member.status.replace('_', ' ')}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    {formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    {member.last_active_at 
-                      ? formatDistanceToNow(new Date(member.last_active_at), { addSuffix: true })
-                      : 'Never'
-                    }
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {canManageMember(member) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setRoleUpdateForm({ newRole: member.role, reason: '' });
-                            setRoleUpdateDialogOpen(true);
-                          }}
-                        >
-                          <UserCheck className="h-4 w-4 mr-2" />
-                          Update Role
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setScheduleRemovalForm({ removalDate: '', reason: '' });
-                            setScheduleRemovalDialogOpen(true);
-                          }}
-                        >
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Schedule Removal
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setRemoveForm({ reason: '', transferData: false, transferToUserId: '' });
-                            setRemoveDialogOpen(true);
-                          }}
-                          className="text-destructive"
-                        >
-                          <UserMinus className="h-4 w-4 mr-2" />
-                          Remove Member
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {getRoleIcon(member.role)}
+                      <Badge variant="outline" className={cn("gap-1", TEAM_ROLE_COLORS[member.role])}>
+                        {getTeamRoleDisplayName(member.role)}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(member.status)}
+                      <span className="text-sm capitalize">{member.status.replace('_', ' ')}</span>
+                      {enhancedMember?.member_status && enhancedMember.member_status !== member.status && (
+                        <Badge variant="outline" className="text-xs ml-1">
+                          {enhancedMember.member_status.replace('_', ' ')}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {member.last_active_at
+                        ? formatDistanceToNow(new Date(member.last_active_at), { addSuffix: true })
+                        : 'Never'
+                      }
+                    </div>
+                    {enhancedMember?.activity_metrics && (
+                      <div className="text-xs text-muted-foreground">
+                        {enhancedMember.activity_metrics.active_days} active days
+                      </div>
+                    )}
+                  </TableCell>
+                  {useAdvancedSearch && enhancedMember && (
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-medium">
+                            {enhancedMember.activity_metrics.activity_score || 0}
+                          </div>
+                          <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="bg-blue-600 h-1.5 rounded-full"
+                              style={{
+                                width: `${Math.min(100, (enhancedMember.activity_metrics.activity_score || 0))}%`
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {enhancedMember.activity_metrics.total_activities} activities
+                        </div>
+                      </div>
+                    </TableCell>
                   )}
-                </TableCell>
-              </TableRow>
-            ))}
+                  <TableCell>
+                    {canManageMember(member) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setRoleUpdateForm({ newRole: member.role, reason: '' });
+                              setRoleUpdateDialogOpen(true);
+                            }}
+                          >
+                            <UserCheck className="h-4 w-4 mr-2" />
+                            Update Role
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setScheduleRemovalForm({ removalDate: '', reason: '' });
+                              setScheduleRemovalDialogOpen(true);
+                            }}
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Schedule Removal
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setRemoveForm({ reason: '', transferData: false, transferToUserId: '' });
+                              setRemoveDialogOpen(true);
+                            }}
+                            className="text-destructive"
+                          >
+                            <UserMinus className="h-4 w-4 mr-2" />
+                            Remove Member
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

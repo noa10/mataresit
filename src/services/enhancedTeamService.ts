@@ -33,6 +33,27 @@ import {
   ExportAuditLogsRequest,
   PaginatedResponse,
   OperationProgress,
+  GetMemberAnalyticsRequest,
+  GetMemberActivityTimelineRequest,
+  GetMemberPerformanceInsightsRequest,
+  SearchMembersAdvancedRequest,
+  GetTeamEngagementMetricsRequest,
+  MemberAnalytics,
+  MemberActivityTimeline,
+  MemberPerformanceInsights,
+  MemberSearchResults,
+  TeamEngagementMetrics,
+  ScheduleMemberOperationRequest,
+  GetScheduledOperationsRequest,
+  CancelScheduledOperationRequest,
+  RescheduleOperationRequest,
+  ScheduledOperationsResponse,
+  ScheduledOperationResult,
+  ProcessScheduledOperationsResult,
+  CancelOperationResult,
+  RescheduleOperationResult,
+  ScheduledOperationType,
+  ScheduledOperationStatus,
 } from '@/types/team';
 
 /**
@@ -198,13 +219,16 @@ export class EnhancedTeamService {
 
   async getTeamMembers(request: GetTeamMembersRequest): Promise<ServiceResponse<TeamMember[]>> {
     try {
-      const { data, error } = await supabase.rpc('get_team_members_enhanced', {
+      // Use the existing get_team_members function (enhanced options not supported yet)
+      const { data, error } = await supabase.rpc('get_team_members', {
         _team_id: request.team_id,
-        _include_inactive: request.include_inactive || false,
-        _include_scheduled_removal: request.include_scheduled_removal || false,
       });
 
       if (error) throw error;
+
+      // Note: Enhanced filtering options (include_inactive, include_scheduled_removal)
+      // are not supported by the current database function
+      // TODO: Implement enhanced filtering in future database migration
 
       return {
         success: true,
@@ -366,10 +390,29 @@ export class EnhancedTeamService {
 
       if (error) throw error;
 
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'send_invitation_enhanced', team_id: request.team_id, email: request.email }
+        };
+      }
+
       return {
         success: true,
-        data: this.validateResponse(data, 'invite_team_member_enhanced'),
-        metadata: { operation: 'send_invitation_enhanced', team_id: request.team_id, email: request.email }
+        data: data.invitation_id,
+        metadata: {
+          operation: 'send_invitation_enhanced',
+          team_id: request.team_id,
+          email: request.email,
+          invitation_id: data.invitation_id,
+          token: data.token,
+          expires_at: data.expires_at,
+          team_name: data.team_name,
+          send_email: data.send_email
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'sendInvitationEnhanced');
@@ -387,10 +430,26 @@ export class EnhancedTeamService {
 
       if (error) throw error;
 
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'resend_invitation', invitation_id: request.invitation_id }
+        };
+      }
+
       return {
         success: true,
-        data: this.validateResponse(data, 'resend_team_invitation'),
-        metadata: { operation: 'resend_invitation', invitation_id: request.invitation_id }
+        data: data,
+        metadata: {
+          operation: 'resend_invitation',
+          invitation_id: request.invitation_id,
+          attempts: data.attempts,
+          expires_at: data.expires_at,
+          team_name: data.team_name
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'resendInvitation');
@@ -406,10 +465,26 @@ export class EnhancedTeamService {
 
       if (error) throw error;
 
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'cancel_invitation', invitation_id: invitationId }
+        };
+      }
+
       return {
         success: true,
-        data: this.validateResponse(data, 'cancel_team_invitation'),
-        metadata: { operation: 'cancel_invitation', invitation_id: invitationId }
+        data: data,
+        metadata: {
+          operation: 'cancel_invitation',
+          invitation_id: invitationId,
+          cancelled_at: data.cancelled_at,
+          cancelled_by: data.cancelled_by,
+          cancellation_reason: data.cancellation_reason
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'cancelInvitation');
@@ -418,20 +493,60 @@ export class EnhancedTeamService {
 
   async getTeamInvitations(request: GetTeamInvitationsRequest): Promise<ServiceResponse<EnhancedTeamInvitation[]>> {
     try {
-      const { data, error } = await supabase.rpc('get_team_invitations', {
-        _team_id: request.team_id,
-        _status: Array.isArray(request.status) ? request.status : (request.status ? [request.status] : null),
-        _include_expired: request.include_expired || false,
-        _limit: request.limit || 50,
-        _offset: request.offset || 0,
-      });
+      // Since get_team_invitations doesn't exist, use direct table query
+      let query = supabase
+        .from('team_invitations')
+        .select(`
+          id,
+          team_id,
+          email,
+          role,
+          invited_by,
+          status,
+          token,
+          expires_at,
+          accepted_at,
+          created_at,
+          updated_at
+        `)
+        .eq('team_id', request.team_id);
+
+      // Apply status filter if provided
+      if (request.status) {
+        const statusFilter = Array.isArray(request.status) ? request.status[0] : request.status;
+        query = query.eq('status', statusFilter);
+      }
+
+      // Apply expired filter
+      if (!request.include_expired) {
+        query = query.gt('expires_at', new Date().toISOString());
+      }
+
+      // Apply pagination
+      if (request.limit) {
+        query = query.limit(request.limit);
+      }
+      if (request.offset) {
+        query = query.range(request.offset, (request.offset + (request.limit || 50)) - 1);
+      }
+
+      // Order by created_at descending
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
       return {
         success: true,
         data: data || [],
-        metadata: { operation: 'get_team_invitations', team_id: request.team_id }
+        metadata: {
+          operation: 'get_team_invitations',
+          team_id: request.team_id,
+          total: (data || []).length,
+          filtered: (data || []).length,
+          pagination_applied: !!(request.limit || request.offset)
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'getTeamInvitations');
@@ -446,9 +561,19 @@ export class EnhancedTeamService {
 
       if (error) throw error;
 
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'get_invitation_stats', team_id: teamId }
+        };
+      }
+
       return {
         success: true,
-        data: data || {},
+        data: data.data || {},
         metadata: { operation: 'get_invitation_stats', team_id: teamId }
       };
     } catch (error: any) {
@@ -456,9 +581,130 @@ export class EnhancedTeamService {
     }
   }
 
+  async getInvitationAnalytics(teamId: string, dateRangeDays: number = 30): Promise<ServiceResponse<any>> {
+    try {
+      const { data, error } = await supabase.rpc('get_invitation_analytics', {
+        _team_id: teamId,
+        _date_range_days: dateRangeDays,
+      });
+
+      if (error) throw error;
+
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'get_invitation_analytics', team_id: teamId }
+        };
+      }
+
+      return {
+        success: true,
+        data: data.data || {},
+        metadata: { operation: 'get_invitation_analytics', team_id: teamId, date_range_days: dateRangeDays }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getInvitationAnalytics');
+    }
+  }
+
+  async getInvitationActivityTimeline(teamId: string, limit: number = 50, offset: number = 0): Promise<ServiceResponse<any>> {
+    try {
+      const { data, error } = await supabase.rpc('get_invitation_activity_timeline', {
+        _team_id: teamId,
+        _limit: limit,
+        _offset: offset,
+      });
+
+      if (error) throw error;
+
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'get_invitation_activity_timeline', team_id: teamId }
+        };
+      }
+
+      return {
+        success: true,
+        data: data.data || {},
+        metadata: { operation: 'get_invitation_activity_timeline', team_id: teamId, limit, offset }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getInvitationActivityTimeline');
+    }
+  }
+
+  async trackInvitationDelivery(invitationId: string, deliveryStatus: string, providerMessageId?: string, errorMessage?: string): Promise<ServiceResponse<any>> {
+    try {
+      const { data, error } = await supabase.rpc('track_invitation_delivery', {
+        _invitation_id: invitationId,
+        _delivery_status: deliveryStatus,
+        _provider_message_id: providerMessageId || null,
+        _error_message: errorMessage || null,
+      });
+
+      if (error) throw error;
+
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'track_invitation_delivery', invitation_id: invitationId }
+        };
+      }
+
+      return {
+        success: true,
+        data: data,
+        metadata: { operation: 'track_invitation_delivery', invitation_id: invitationId, delivery_status: deliveryStatus }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'trackInvitationDelivery');
+    }
+  }
+
+  async trackInvitationEngagement(invitationToken: string, engagementType: string, metadata: Record<string, any> = {}): Promise<ServiceResponse<any>> {
+    try {
+      const { data, error } = await supabase.rpc('track_invitation_engagement', {
+        _invitation_token: invitationToken,
+        _engagement_type: engagementType,
+        _metadata: metadata,
+      });
+
+      if (error) throw error;
+
+      // The function returns JSONB with success/error information
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error,
+          error_code: data.error_code,
+          metadata: { operation: 'track_invitation_engagement', invitation_token: invitationToken }
+        };
+      }
+
+      return {
+        success: true,
+        data: data,
+        metadata: { operation: 'track_invitation_engagement', invitation_token: invitationToken, engagement_type: engagementType }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'trackInvitationEngagement');
+    }
+  }
+
   async acceptInvitation(token: string): Promise<ServiceResponse<any>> {
     try {
-      const { data, error } = await supabase.rpc('accept_team_invitation_enhanced', {
+      // Use the existing accept_team_invitation function for backward compatibility
+      const { data, error } = await supabase.rpc('accept_team_invitation', {
         _token: token,
       });
 
@@ -466,7 +712,7 @@ export class EnhancedTeamService {
 
       return {
         success: true,
-        data: this.validateResponse(data, 'accept_team_invitation_enhanced'),
+        data: this.validateResponse(data, 'accept_team_invitation'),
         metadata: { operation: 'accept_invitation', token }
       };
     } catch (error: any) {
@@ -704,30 +950,25 @@ export class EnhancedTeamService {
 
   async getAuditLogs(request: GetAuditLogsRequest): Promise<ServiceResponse<PaginatedResponse<TeamAuditLog>>> {
     try {
-      const { data, error } = await supabase.rpc('get_team_audit_logs', {
-        _team_id: request.team_id,
-        _actions: request.actions || null,
-        _user_id: request.user_id || null,
-        _start_date: request.start_date || null,
-        _end_date: request.end_date || null,
-        _limit: request.limit || 50,
-        _offset: request.offset || 0,
-      });
+      // Since get_team_audit_logs doesn't exist, return empty audit logs for now
+      // TODO: Implement audit logging system with proper database tables and functions
 
-      if (error) throw error;
-
-      const result = this.validateResponse(data, 'get_team_audit_logs');
+      const emptyResponse: PaginatedResponse<TeamAuditLog> = {
+        data: [],
+        total: 0,
+        limit: request.limit || 50,
+        offset: request.offset || 0,
+        has_more: false,
+      };
 
       return {
         success: true,
-        data: {
-          data: result.logs || [],
-          total: result.total || 0,
-          limit: request.limit || 50,
-          offset: request.offset || 0,
-          has_more: (result.total || 0) > (request.offset || 0) + (request.limit || 50),
-        },
-        metadata: { operation: 'get_audit_logs', team_id: request.team_id }
+        data: emptyResponse,
+        metadata: {
+          operation: 'get_audit_logs',
+          team_id: request.team_id,
+          note: 'Audit logging system not yet implemented'
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'getAuditLogs');
@@ -736,17 +977,17 @@ export class EnhancedTeamService {
 
   async searchAuditLogs(request: SearchAuditLogsRequest): Promise<ServiceResponse<TeamAuditLog[]>> {
     try {
-      const { data, error } = await supabase.rpc('search_team_audit_logs', {
-        _team_id: request.team_id,
-        _search_params: request.search_params,
-      });
-
-      if (error) throw error;
+      // Since search_audit_logs doesn't exist, return empty results for now
+      // TODO: Implement audit log search functionality
 
       return {
         success: true,
-        data: this.validateResponse(data, 'search_team_audit_logs') || [],
-        metadata: { operation: 'search_audit_logs', team_id: request.team_id }
+        data: [],
+        metadata: {
+          operation: 'search_audit_logs',
+          team_id: request.team_id,
+          note: 'Audit log search not yet implemented'
+        }
       };
     } catch (error: any) {
       this.handleError(error, 'searchAuditLogs');
@@ -885,15 +1126,73 @@ export class EnhancedTeamService {
 
   async getEnhancedTeamStats(teamId: string): Promise<ServiceResponse<EnhancedTeamStats>> {
     try {
-      const { data, error } = await supabase.rpc('get_enhanced_team_stats', {
-        _team_id: teamId,
-      });
+      // Since get_team_member_stats doesn't exist, build stats using basic queries
 
-      if (error) throw error;
+      // Get basic team member counts by role
+      const { data: memberCounts, error: memberError } = await supabase
+        .from('team_members')
+        .select('role')
+        .eq('team_id', teamId);
+
+      if (memberError) throw memberError;
+
+      // Count members by role
+      const roleCounts = (memberCounts || []).reduce((acc, member) => {
+        acc[member.role] = (acc[member.role] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Get pending invitations count
+      const { count: pendingInvitations, error: inviteError } = await supabase
+        .from('team_invitations')
+        .select('*', { count: 'exact', head: true })
+        .eq('team_id', teamId)
+        .eq('status', 'pending');
+
+      if (inviteError) throw inviteError;
+
+      // Get basic receipt stats
+      const { data: receiptStats, error: receiptError } = await supabase
+        .from('receipts')
+        .select('total, currency')
+        .eq('team_id', teamId);
+
+      if (receiptError) throw receiptError;
+
+      // Calculate totals
+      const totalReceipts = receiptStats?.length || 0;
+      const totalAmount = receiptStats?.reduce((sum, receipt) => sum + (receipt.total || 0), 0) || 0;
+      const currency = receiptStats?.[0]?.currency || 'MYR';
+
+      // Build enhanced stats object
+      const enhancedStats: EnhancedTeamStats = {
+        // Basic TeamStats fields
+        total_members: memberCounts?.length || 0,
+        total_receipts: totalReceipts,
+        total_amount: totalAmount,
+        receipts_this_month: 0, // TODO: Implement monthly filtering
+        amount_this_month: 0, // TODO: Implement monthly filtering
+        top_categories: [], // TODO: Implement category analysis
+        recent_activity: [], // TODO: Implement recent activity
+
+        // Enhanced fields
+        active_members: memberCounts?.length || 0, // All members considered active for now
+        inactive_members: 0, // TODO: Implement inactive member tracking
+        owners: roleCounts.owner || 0,
+        admins: roleCounts.admin || 0,
+        members: roleCounts.member || 0,
+        viewers: roleCounts.viewer || 0,
+        scheduled_removals: 0, // TODO: Implement scheduled removal tracking
+        recent_joins: 0, // TODO: Implement recent joins tracking
+        pending_invitations: pendingInvitations || 0,
+        recent_activity_count: 0, // TODO: Implement activity counting
+        security_events_count: 0, // TODO: Implement security event tracking
+        bulk_operations_count: 0, // TODO: Implement bulk operations tracking
+      };
 
       return {
         success: true,
-        data: this.validateResponse(data, 'get_enhanced_team_stats'),
+        data: enhancedStats,
         metadata: { operation: 'get_enhanced_team_stats', team_id: teamId }
       };
     } catch (error: any) {
@@ -990,6 +1289,412 @@ export class EnhancedTeamService {
       };
     } catch (error: any) {
       this.handleError(error, 'cleanupExpiredData');
+    }
+  }
+
+  // ============================================================================
+  // MEMBER ANALYTICS
+  // ============================================================================
+
+  async getMemberAnalytics(request: GetMemberAnalyticsRequest): Promise<ServiceResponse<MemberAnalytics>> {
+    try {
+      const { data, error } = await supabase.rpc('get_member_analytics', {
+        _team_id: request.team_id,
+        _user_id: request.user_id || null,
+        _start_date: request.start_date || null,
+        _end_date: request.end_date || null,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'get_member_analytics');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'get_member_analytics',
+          team_id: request.team_id,
+          user_id: request.user_id,
+          analysis_period: response.data?.analysis_period
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getMemberAnalytics');
+    }
+  }
+
+  async getMemberActivityTimeline(request: GetMemberActivityTimelineRequest): Promise<ServiceResponse<MemberActivityTimeline>> {
+    try {
+      const { data, error } = await supabase.rpc('get_member_activity_timeline', {
+        _team_id: request.team_id,
+        _user_id: request.user_id || null,
+        _limit: request.limit || 50,
+        _offset: request.offset || 0,
+        _activity_types: request.activity_types || null,
+        _start_date: request.start_date || null,
+        _end_date: request.end_date || null,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'get_member_activity_timeline');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'get_member_activity_timeline',
+          team_id: request.team_id,
+          user_id: request.user_id,
+          pagination: response.data?.pagination
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getMemberActivityTimeline');
+    }
+  }
+
+  async getMemberPerformanceInsights(request: GetMemberPerformanceInsightsRequest): Promise<ServiceResponse<MemberPerformanceInsights>> {
+    try {
+      const { data, error } = await supabase.rpc('get_member_performance_insights', {
+        _team_id: request.team_id,
+        _user_id: request.user_id || null,
+        _comparison_period_days: request.comparison_period_days || 30,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'get_member_performance_insights');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'get_member_performance_insights',
+          team_id: request.team_id,
+          user_id: request.user_id,
+          comparison_period_days: request.comparison_period_days || 30
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getMemberPerformanceInsights');
+    }
+  }
+
+  async searchMembersAdvanced(request: SearchMembersAdvancedRequest): Promise<ServiceResponse<MemberSearchResults>> {
+    try {
+      const { data, error } = await supabase.rpc('search_members_advanced', {
+        _team_id: request.team_id,
+        _search_query: request.search_query || null,
+        _role_filter: request.role_filter || null,
+        _status_filter: request.status_filter || null,
+        _activity_filter: request.activity_filter || null,
+        _sort_by: request.sort_by || 'name',
+        _sort_order: request.sort_order || 'asc',
+        _limit: request.limit || 50,
+        _offset: request.offset || 0,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'search_members_advanced');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'search_members_advanced',
+          team_id: request.team_id,
+          search_params: {
+            search_query: request.search_query,
+            role_filter: request.role_filter,
+            status_filter: request.status_filter,
+            activity_filter: request.activity_filter,
+            sort_by: request.sort_by,
+            sort_order: request.sort_order
+          },
+          pagination: response.data?.pagination
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'searchMembersAdvanced');
+    }
+  }
+
+  async getTeamEngagementMetrics(request: GetTeamEngagementMetricsRequest): Promise<ServiceResponse<TeamEngagementMetrics>> {
+    try {
+      const { data, error } = await supabase.rpc('get_team_member_engagement_metrics', {
+        _team_id: request.team_id,
+        _period_days: request.period_days || 30,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'get_team_member_engagement_metrics');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'get_team_engagement_metrics',
+          team_id: request.team_id,
+          period_days: request.period_days || 30,
+          team_health_score: response.data?.team_health_score
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getTeamEngagementMetrics');
+    }
+  }
+
+  // ============================================================================
+  // SCHEDULED OPERATIONS
+  // ============================================================================
+
+  async scheduleMemberOperation(request: ScheduleMemberOperationRequest): Promise<ServiceResponse<ScheduledOperationResult>> {
+    try {
+      const { data, error } = await supabase.rpc('schedule_member_operation', {
+        _team_id: request.team_id,
+        _operation_type: request.operation_type,
+        _operation_name: request.operation_name,
+        _scheduled_for: request.scheduled_for,
+        _operation_config: request.operation_config || {},
+        _operation_description: request.operation_description || null,
+        _max_retries: request.max_retries || 3,
+        _depends_on: request.depends_on || [],
+        _prerequisites: request.prerequisites || {},
+        _metadata: request.metadata || {},
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'schedule_member_operation');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'schedule_member_operation',
+          team_id: request.team_id,
+          operation_type: request.operation_type,
+          scheduled_for: request.scheduled_for
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'scheduleMemberOperation');
+    }
+  }
+
+  async getScheduledOperations(request: GetScheduledOperationsRequest): Promise<ServiceResponse<ScheduledOperationsResponse>> {
+    try {
+      const { data, error } = await supabase.rpc('get_scheduled_operations', {
+        _team_id: request.team_id,
+        _operation_types: request.operation_types || null,
+        _status_filter: request.status_filter || null,
+        _include_completed: request.include_completed || false,
+        _limit: request.limit || 50,
+        _offset: request.offset || 0,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'get_scheduled_operations');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'get_scheduled_operations',
+          team_id: request.team_id,
+          filters: {
+            operation_types: request.operation_types,
+            status_filter: request.status_filter,
+            include_completed: request.include_completed
+          },
+          pagination: response.data?.pagination
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'getScheduledOperations');
+    }
+  }
+
+  async cancelScheduledOperation(request: CancelScheduledOperationRequest): Promise<ServiceResponse<CancelOperationResult>> {
+    try {
+      const { data, error } = await supabase.rpc('cancel_scheduled_operation', {
+        _operation_id: request.operation_id,
+        _reason: request.reason || null,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'cancel_scheduled_operation');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'cancel_scheduled_operation',
+          operation_id: request.operation_id,
+          cancellation_reason: request.reason
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'cancelScheduledOperation');
+    }
+  }
+
+  async rescheduleOperation(request: RescheduleOperationRequest): Promise<ServiceResponse<RescheduleOperationResult>> {
+    try {
+      const { data, error } = await supabase.rpc('reschedule_operation', {
+        _operation_id: request.operation_id,
+        _new_scheduled_for: request.new_scheduled_for,
+        _reason: request.reason || null,
+      });
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'reschedule_operation');
+
+      return {
+        success: true,
+        data: response.data,
+        metadata: {
+          operation: 'reschedule_operation',
+          operation_id: request.operation_id,
+          new_scheduled_for: request.new_scheduled_for,
+          reschedule_reason: request.reason
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'rescheduleOperation');
+    }
+  }
+
+  async processScheduledOperations(): Promise<ServiceResponse<ProcessScheduledOperationsResult>> {
+    try {
+      // Note: This function is typically called by system/cron jobs with service_role
+      // For client-side usage, this would need special permissions or a different approach
+      const { data, error } = await supabase.rpc('process_scheduled_operations');
+
+      if (error) throw error;
+
+      const response = this.validateResponse(data, 'process_scheduled_operations');
+
+      return {
+        success: true,
+        data: response,
+        metadata: {
+          operation: 'process_scheduled_operations',
+          processed_at: new Date().toISOString()
+        }
+      };
+    } catch (error: any) {
+      this.handleError(error, 'processScheduledOperations');
+    }
+  }
+
+  // ============================================================================
+  // SCHEDULED OPERATIONS CONVENIENCE METHODS
+  // ============================================================================
+
+  async scheduleMemberRemovalEnhanced(
+    teamId: string,
+    userId: string,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      transferData?: boolean;
+      transferToUserId?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<ScheduledOperationResult>> {
+    try {
+      return await this.scheduleMemberOperation({
+        team_id: teamId,
+        operation_type: 'member_removal',
+        operation_name: `Remove member ${userId}`,
+        scheduled_for: scheduledFor,
+        operation_config: {
+          user_id: userId,
+          reason: options.reason,
+          transfer_data: options.transferData || false,
+          transfer_to_user_id: options.transferToUserId || null,
+        },
+        operation_description: options.description || `Scheduled removal of team member`,
+        metadata: {
+          scheduled_by: 'enhanced_service',
+          operation_category: 'member_management'
+        }
+      });
+    } catch (error: any) {
+      this.handleError(error, 'scheduleMemberRemovalEnhanced');
+    }
+  }
+
+  async scheduleRoleChange(
+    teamId: string,
+    userId: string,
+    newRole: TeamMemberRole,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<ScheduledOperationResult>> {
+    try {
+      return await this.scheduleMemberOperation({
+        team_id: teamId,
+        operation_type: 'role_change',
+        operation_name: `Change role for ${userId} to ${newRole}`,
+        scheduled_for: scheduledFor,
+        operation_config: {
+          user_id: userId,
+          new_role: newRole,
+          reason: options.reason,
+        },
+        operation_description: options.description || `Scheduled role change to ${newRole}`,
+        metadata: {
+          scheduled_by: 'enhanced_service',
+          operation_category: 'member_management',
+          target_role: newRole
+        }
+      });
+    } catch (error: any) {
+      this.handleError(error, 'scheduleRoleChange');
+    }
+  }
+
+  async schedulePermissionUpdate(
+    teamId: string,
+    userId: string,
+    newPermissions: Record<string, any>,
+    scheduledFor: string,
+    options: {
+      reason?: string;
+      description?: string;
+    } = {}
+  ): Promise<ServiceResponse<ScheduledOperationResult>> {
+    try {
+      return await this.scheduleMemberOperation({
+        team_id: teamId,
+        operation_type: 'permission_update',
+        operation_name: `Update permissions for ${userId}`,
+        scheduled_for: scheduledFor,
+        operation_config: {
+          user_id: userId,
+          new_permissions: newPermissions,
+          reason: options.reason,
+        },
+        operation_description: options.description || `Scheduled permission update`,
+        metadata: {
+          scheduled_by: 'enhanced_service',
+          operation_category: 'member_management'
+        }
+      });
+    } catch (error: any) {
+      this.handleError(error, 'schedulePermissionUpdate');
     }
   }
 
