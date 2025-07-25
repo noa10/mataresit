@@ -617,3 +617,450 @@ export interface TeamServiceConfig {
   enable_rate_limiting: boolean;
   enable_ip_filtering: boolean;
 }
+
+// ============================================================================
+// MEMBER ANALYTICS TYPES
+// ============================================================================
+
+// Member analytics request types
+export interface GetMemberAnalyticsRequest {
+  team_id: string;
+  user_id?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface GetMemberActivityTimelineRequest {
+  team_id: string;
+  user_id?: string;
+  limit?: number;
+  offset?: number;
+  activity_types?: string[];
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface GetMemberPerformanceInsightsRequest {
+  team_id: string;
+  user_id?: string;
+  comparison_period_days?: number;
+}
+
+export interface SearchMembersAdvancedRequest {
+  team_id: string;
+  search_query?: string;
+  role_filter?: TeamMemberRole[];
+  status_filter?: string[];
+  activity_filter?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetTeamEngagementMetricsRequest {
+  team_id: string;
+  period_days?: number;
+}
+
+// Member analytics response types
+export interface MemberAnalytics {
+  member_info: {
+    user_id: string;
+    role: TeamMemberRole;
+    joined_at: string;
+    last_active_at?: string;
+    invitation_accepted_at?: string;
+    member_metadata?: Record<string, any>;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    full_name: string;
+    avatar_url?: string;
+    timezone?: string;
+  };
+  activity_stats: {
+    total_activities: number;
+    active_days: number;
+    activities_last_week: number;
+    activities_last_month: number;
+    receipt_activities: number;
+    team_activities: number;
+    avg_activity_interval_minutes: number;
+    activity_frequency: 'inactive' | 'low' | 'moderate' | 'active' | 'very_active';
+  };
+  engagement_metrics: {
+    receipts_created: number;
+    total_amount_processed: number;
+    categories_used: number;
+    avg_receipt_amount: number;
+    ai_processed_receipts: number;
+    recent_receipts: number;
+    ai_adoption_rate: number;
+    engagement_level: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  };
+  performance_data: {
+    days_since_joined: number;
+    days_since_last_active: number;
+    total_logged_actions: number;
+    active_days_logged: number;
+    activity_consistency: number;
+    member_status: 'very_active' | 'active' | 'moderate' | 'inactive' | 'dormant';
+  };
+  analysis_period: {
+    start_date: string;
+    end_date: string;
+    days_analyzed: number;
+  };
+}
+
+export interface MemberActivityTimelineItem {
+  id: string;
+  action: string;
+  action_description: string;
+  created_at: string;
+  performed_by: string;
+  performed_by_email: string;
+  performed_by_name: string;
+  target_user_id?: string;
+  target_user_email?: string;
+  target_user_name?: string;
+  old_values: Record<string, any>;
+  new_values: Record<string, any>;
+  metadata: Record<string, any>;
+  context_data: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export interface MemberActivityTimeline {
+  activities: MemberActivityTimelineItem[];
+  pagination: {
+    total_count: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+  filters: {
+    user_id?: string;
+    activity_types?: string[];
+    start_date: string;
+    end_date: string;
+  };
+}
+
+export interface MemberPerformanceInsights {
+  current_period: {
+    receipts: number;
+    amount: number;
+    categories: number;
+    ai_receipts: number;
+    active_days: number;
+    ai_adoption_rate: number;
+  };
+  previous_period: {
+    receipts: number;
+    amount: number;
+    categories: number;
+    ai_receipts: number;
+    active_days: number;
+  };
+  changes: {
+    receipts_change: number;
+    amount_change: number;
+    categories_change: number;
+    receipts_change_percent: number;
+    amount_change_percent: number;
+  };
+  team_comparison: {
+    receipts_vs_avg: number;
+    amount_vs_avg: number;
+    categories_vs_avg: number;
+  };
+  engagement_trends: Array<{
+    date: string;
+    receipts: number;
+    amount: number;
+    categories: number;
+  }>;
+}
+
+export interface EnhancedMemberSearchResult {
+  id: string;
+  user_id: string;
+  role: TeamMemberRole;
+  permissions: Record<string, any>;
+  joined_at: string;
+  updated_at: string;
+  last_active_at?: string;
+  invitation_accepted_at?: string;
+  added_by: string;
+  removal_scheduled_at?: string;
+  removal_scheduled_by?: string;
+  member_metadata?: Record<string, any>;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  full_name: string;
+  avatar_url?: string;
+  timezone?: string;
+  member_status: 'scheduled_removal' | 'very_active' | 'active' | 'moderate' | 'inactive' | 'dormant';
+  activity_metrics: {
+    total_activities: number;
+    recent_activities: number;
+    last_activity_date?: string;
+    active_days: number;
+    activity_score: number;
+  };
+  receipt_metrics: {
+    total_receipts: number;
+    total_amount: number;
+    recent_receipts: number;
+    categories_used: number;
+  };
+}
+
+export interface MemberSearchResults {
+  members: EnhancedMemberSearchResult[];
+  pagination: {
+    total_count: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+  filters: {
+    search_query?: string;
+    role_filter?: TeamMemberRole[];
+    status_filter?: string[];
+    activity_filter?: string;
+    sort_by: string;
+    sort_order: string;
+  };
+}
+
+export interface TeamEngagementMetrics {
+  team_overview: {
+    total_members: number;
+    very_active_members: number;
+    active_members: number;
+    moderate_members: number;
+    inactive_members: number;
+    scheduled_removals: number;
+    avg_member_tenure_days: number;
+    engagement_distribution: {
+      very_active_percent: number;
+      active_percent: number;
+      moderate_percent: number;
+      inactive_percent: number;
+    };
+  };
+  activity_metrics: {
+    total_activities: number;
+    active_contributors: number;
+    recent_activities: number;
+    recent_contributors: number;
+    receipt_activities: number;
+    team_management_activities: number;
+    avg_daily_activities: number;
+    contributor_participation_rate: number;
+  };
+  receipt_metrics: {
+    total_receipts: number;
+    total_amount: number;
+    contributing_members: number;
+    recent_receipts: number;
+    recent_amount: number;
+    recent_contributors: number;
+    categories_used: number;
+    ai_processed_receipts: number;
+    avg_receipt_amount: number;
+    ai_adoption_rate: number;
+    member_contribution_rate: number;
+  };
+  top_performers: Array<{
+    user_id: string;
+    full_name: string;
+    role: TeamMemberRole;
+    joined_at: string;
+    last_active_at?: string;
+    activity_score: number;
+    receipt_count: number;
+    total_amount: number;
+    engagement_level: 'high' | 'medium' | 'low' | 'minimal';
+  }>;
+  engagement_trends: Array<{
+    date: string;
+    active_members: number;
+    activities: number;
+    receipts: number;
+    amount: number;
+  }>;
+  team_health_score: number;
+  insights: string[];
+}
+
+// ============================================================================
+// SCHEDULED OPERATIONS TYPES
+// ============================================================================
+
+// Scheduled operation types matching database enums
+export type ScheduledOperationType =
+  | 'member_removal'
+  | 'role_change'
+  | 'permission_update'
+  | 'bulk_operation'
+  | 'invitation_expiry'
+  | 'data_cleanup'
+  | 'notification_send'
+  | 'custom_operation';
+
+export type ScheduledOperationStatus =
+  | 'pending'
+  | 'scheduled'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'expired';
+
+// Scheduled operation request types
+export interface ScheduleMemberOperationRequest {
+  team_id: string;
+  operation_type: ScheduledOperationType;
+  operation_name: string;
+  scheduled_for: string; // ISO timestamp
+  operation_config?: Record<string, any>;
+  operation_description?: string;
+  max_retries?: number;
+  depends_on?: string[]; // Array of operation IDs
+  prerequisites?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface GetScheduledOperationsRequest {
+  team_id: string;
+  operation_types?: ScheduledOperationType[];
+  status_filter?: ScheduledOperationStatus[];
+  include_completed?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CancelScheduledOperationRequest {
+  operation_id: string;
+  reason?: string;
+}
+
+export interface RescheduleOperationRequest {
+  operation_id: string;
+  new_scheduled_for: string; // ISO timestamp
+  reason?: string;
+}
+
+// Scheduled operation response types
+export interface ScheduledOperation {
+  id: string;
+  team_id: string;
+  operation_type: ScheduledOperationType;
+  operation_name: string;
+  operation_description?: string;
+  scheduled_for: string;
+  created_at: string;
+  updated_at: string;
+  status: ScheduledOperationStatus;
+  started_at?: string;
+  completed_at?: string;
+  created_by: string;
+  executed_by?: string;
+  operation_config: Record<string, any>;
+  execution_context?: Record<string, any>;
+  retry_count: number;
+  max_retries: number;
+  error_message?: string;
+  error_details?: Record<string, any>;
+  depends_on: string[];
+  prerequisites: Record<string, any>;
+  metadata: Record<string, any>;
+  creator: {
+    user_id: string;
+    email: string;
+    full_name: string;
+  };
+  executor?: {
+    user_id: string;
+    email: string;
+    full_name: string;
+  };
+  dependencies: Array<{
+    operation_id: string;
+    operation_name: string;
+    status: ScheduledOperationStatus;
+    completed_at?: string;
+  }>;
+  recent_logs: Array<{
+    log_level: string;
+    message: string;
+    logged_at: string;
+    execution_step?: string;
+    progress_percentage?: number;
+  }>;
+}
+
+export interface ScheduledOperationsResponse {
+  operations: ScheduledOperation[];
+  pagination: {
+    total_count: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+  filters: {
+    operation_types?: ScheduledOperationType[];
+    status_filter?: ScheduledOperationStatus[];
+    include_completed: boolean;
+  };
+}
+
+export interface ScheduledOperationResult {
+  operation_id: string;
+  operation_type: ScheduledOperationType;
+  operation_name: string;
+  scheduled_for: string;
+  status: ScheduledOperationStatus;
+}
+
+export interface ProcessScheduledOperationsResult {
+  summary: {
+    processed_count: number;
+    failed_count: number;
+    skipped_count: number;
+    total_operations: number;
+  };
+  results: Array<{
+    operation_id: string;
+    operation_name: string;
+    operation_type: ScheduledOperationType;
+    status: 'completed' | 'failed';
+    result: Record<string, any>;
+  }>;
+  processed_at: string;
+}
+
+export interface CancelOperationResult {
+  operation_id: string;
+  operation_name: string;
+  previous_status: ScheduledOperationStatus;
+  new_status: 'cancelled';
+  cancelled_by: string;
+  cancelled_at: string;
+}
+
+export interface RescheduleOperationResult {
+  operation_id: string;
+  operation_name: string;
+  previous_scheduled_for: string;
+  new_scheduled_for: string;
+  status: 'scheduled';
+  rescheduled_by: string;
+  rescheduled_at: string;
+}
