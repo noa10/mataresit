@@ -96,7 +96,7 @@ export function getProcessingRecommendation(
 ): ProcessingRecommendation {
   const reasoning: string[] = [];
   const recommendedMethod: 'ai-vision' = 'ai-vision'; // Always AI Vision
-  let recommendedModel = 'gemini-2.0-flash-lite'; // Default
+  let recommendedModel = 'gemini-2.5-flash-lite'; // Default
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
 
@@ -125,8 +125,8 @@ export function getProcessingRecommendation(
       reasoning.push('Very complex receipt detected - using most accurate AI Vision model');
       riskLevel = 'high';
     } else {
-      // Default to gemini-2.0-flash-lite for better reliability and rate limit avoidance
-      recommendedModel = 'gemini-2.0-flash-lite';
+      // Default to gemini-2.5-flash-lite for better reliability and rate limit avoidance
+      recommendedModel = 'gemini-2.5-flash-lite';
       reasoning.push('Using reliable fast AI Vision model for optimal processing');
       confidence = 'high';
     }
@@ -138,7 +138,7 @@ export function getProcessingRecommendation(
   // PRIORITY 3: Apply speed/accuracy preferences only if no specific model was chosen
   if (!userPreferences?.preferredModel) {
     if (userPreferences?.prioritizeSpeed) {
-      recommendedModel = 'gemini-2.0-flash-lite';
+      recommendedModel = 'gemini-2.5-flash-lite';
       reasoning.push('Speed prioritized - using fastest model');
     }
 
@@ -196,14 +196,14 @@ function createFallbackStrategy(
   // Use different models for reliable fallback processing
   let fallbackModel = 'gemini-2.5-flash';
   if (fileAnalysis.size > 3 * 1024 * 1024) {
-    fallbackModel = 'gemini-2.0-flash-lite'; // Use fastest for large files
+    fallbackModel = 'gemini-2.5-flash-lite'; // Use fastest for large files
   } else if (fileAnalysis.complexity === 'high') {
     fallbackModel = 'gemini-2.5-pro'; // Use most accurate model for complex files
   }
 
   // Ensure fallback model is different from primary model
   if (fallbackModel === primaryModel) {
-    fallbackModel = primaryModel === 'gemini-2.0-flash-lite' ? 'gemini-2.5-flash' : 'gemini-2.0-flash-lite';
+    fallbackModel = primaryModel === 'gemini-2.5-flash-lite' ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
   }
 
   // Define triggers for fallback
@@ -271,8 +271,18 @@ export function getBatchProcessingOptimization(
     sum + (rec.riskLevel === 'high' ? 3 : rec.riskLevel === 'medium' ? 2 : 1), 0
   );
 
+  // Check if most files will use the fast Gemini 2.5 Flash Lite model
+  const fastModelCount = recommendations.filter(rec =>
+    rec.recommendedModel === 'gemini-2.5-flash-lite'
+  ).length;
+  const fastModelRatio = fastModelCount / recommendations.length;
+
+  // Increase concurrency for batches using primarily fast models
+  if (fastModelRatio > 0.7 && totalComplexity <= files.length * 1.5) {
+    concurrentLimit = 3; // Higher concurrency for fast model batches
+  }
   // Reduce concurrency for complex batches
-  if (totalComplexity > files.length * 2) {
+  else if (totalComplexity > files.length * 2) {
     concurrentLimit = 1;
   }
 

@@ -1,9 +1,12 @@
 /**
  * Rate Limiting Library
  * Phase 3: Batch Upload Optimization
- * 
+ *
  * Exports all rate limiting components for batch upload optimization.
  */
+
+// Import classes for local use
+import { RateLimitingManager } from './RateLimitingManager';
 
 // Core classes
 export { AdaptiveRateLimiter } from './AdaptiveRateLimiter';

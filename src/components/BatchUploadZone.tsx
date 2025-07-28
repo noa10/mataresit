@@ -193,17 +193,23 @@ export default function BatchUploadZone({
           // Use our new optimization function with quality based on file size
           const quality = file.size > 3 * 1024 * 1024 ? 70 : 80;
 
-          // Check if the function exists
-          if (typeof optimizeImageForUpload !== 'function') {
-            console.error('optimizeImageForUpload is not a function:', optimizeImageForUpload);
-            throw new Error('optimizeImageForUpload is not a function');
-          }
+          // Robust optimization with fallback
+          let optimizedFile: File;
+          try {
+            if (typeof optimizeImageForUpload !== 'function') {
+              console.warn('optimizeImageForUpload is not available, using original file');
+              optimizedFile = file;
+            } else {
+              optimizedFile = await optimizeImageForUpload(file, 1500, quality);
 
-          const optimizedFile = await optimizeImageForUpload(file, 1500, quality);
-
-          if (!optimizedFile) {
-            console.error('Optimization returned null or undefined file');
-            throw new Error('Optimization returned null file');
+              if (!optimizedFile) {
+                console.warn('Optimization returned null, using original file');
+                optimizedFile = file;
+              }
+            }
+          } catch (optimizationError) {
+            console.warn('Optimization failed, using original file:', optimizationError);
+            optimizedFile = file;
           }
 
           console.log(`Optimized image: ${file.name}, new size: ${optimizedFile.size} (${Math.round(optimizedFile.size / file.size * 100)}% of original)`);

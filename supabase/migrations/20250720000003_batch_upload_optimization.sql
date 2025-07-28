@@ -126,9 +126,12 @@ FOR ALL USING (
   )
 );
 
--- Admin-only access for API quota tracking
-CREATE POLICY api_quota_admin_access ON public.api_quota_tracking
-FOR ALL USING (
+-- Read access for authenticated users, admin access for modifications
+CREATE POLICY api_quota_read_access ON public.api_quota_tracking
+FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY api_quota_admin_write_access ON public.api_quota_tracking
+FOR INSERT, UPDATE, DELETE USING (
   EXISTS (
     SELECT 1 FROM auth.users
     WHERE id = auth.uid()

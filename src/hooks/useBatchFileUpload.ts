@@ -385,12 +385,14 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
         return state;
       }
 
-      // Create a new upload with the same file
+      // Create a new upload with the same file and incremented retry count
       const newUpload: ReceiptUpload = {
         id: crypto.randomUUID(),
         file: uploadToRetry.file,
         status: 'pending',
-        uploadProgress: 0
+        uploadProgress: 0,
+        retryCount: (uploadToRetry.retryCount || 0) + 1,
+        categoryId: uploadToRetry.categoryId // Preserve category
       };
 
       return {
@@ -986,15 +988,31 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           console.log(`⏳ Rate limited for upload ${upload.id}, waiting ${permission.delayMs}ms`);
           addLocalLog(upload.id, 'START', `Rate limited - waiting ${Math.round(permission.delayMs / 1000)}s before processing`);
 
-          // Wait for the required delay
-          await new Promise(resolve => setTimeout(resolve, permission.delayMs));
+          // Limit maximum delay to prevent excessive waiting
+          const maxDelay = 60000; // 1 minute maximum
+          const actualDelay = Math.min(permission.delayMs, maxDelay);
 
-          // Try again after delay
-          const retryPermission = await requestApiPermission(upload.id, estimatedTokens);
-          if (!retryPermission.allowed) {
+          // Wait for the required delay
+          await new Promise(resolve => setTimeout(resolve, actualDelay));
+
+          // Try again after delay with better error handling
+          try {
+            const retryPermission = await requestApiPermission(upload.id, estimatedTokens);
+            if (!retryPermission.allowed) {
+              // Instead of failing immediately, mark for retry later
+              addLocalLog(upload.id, 'RATE_LIMITED', 'Still rate limited after delay, will retry later');
+              updateUploadStatus(upload.id, 'error', 0, {
+                code: 'RATE_LIMITED',
+                message: 'Rate limit exceeded. Please try again later or reduce concurrent uploads.'
+              });
+              return null;
+            }
+          } catch (retryError) {
+            console.error('Error during rate limit retry:', retryError);
+            addLocalLog(upload.id, 'ERROR', `Rate limiting error: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
             updateUploadStatus(upload.id, 'error', 0, {
-              code: 'RATE_LIMITED',
-              message: 'Rate limit exceeded. Please try again later.'
+              code: 'RATE_LIMIT_ERROR',
+              message: 'Rate limiting system error. Please try again.'
             });
             return null;
           }
@@ -1024,17 +1042,22 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           // Use a lower quality for larger files
           const quality = upload.file.size > 3 * 1024 * 1024 ? 70 : 80;
 
-          // Check if the function exists
-          if (typeof optimizeImageForUpload !== 'function') {
-            console.error('optimizeImageForUpload is not a function in useBatchFileUpload');
-            throw new Error('optimizeImageForUpload is not a function');
-          }
+          // Robust optimization with fallback
+          try {
+            if (typeof optimizeImageForUpload !== 'function') {
+              console.warn('optimizeImageForUpload is not available, using original file');
+              fileToUpload = upload.file;
+            } else {
+              fileToUpload = await optimizeImageForUpload(upload.file, 1500, quality);
 
-          fileToUpload = await optimizeImageForUpload(upload.file, 1500, quality);
-
-          if (!fileToUpload) {
-            console.error('Optimization returned null or undefined file');
-            throw new Error('Optimization returned null file');
+              if (!fileToUpload) {
+                console.warn('Optimization returned null, using original file');
+                fileToUpload = upload.file;
+              }
+            }
+          } catch (optimizationError) {
+            console.warn('Optimization failed, using original file:', optimizationError);
+            fileToUpload = upload.file;
           }
 
           const compressionRatio = Math.round(fileToUpload.size / upload.file.size * 100);
@@ -1052,51 +1075,97 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
       addLocalLog(upload.id, 'FETCH', 'Starting file upload to cloud storage...');
 
-      // Upload the image (optimized or original)
-      const imageUrl = await uploadReceiptImage(
-        fileToUpload,
-        user.id,
-        (progress) => {
-          // Add progress logs at key milestones
-          if (progress === 25) {
-            addLocalLog(upload.id, 'FETCH', 'Upload progress: 25% complete');
-          } else if (progress === 50) {
-            addLocalLog(upload.id, 'FETCH', 'Upload progress: 50% complete');
-          } else if (progress === 75) {
-            addLocalLog(upload.id, 'FETCH', 'Upload progress: 75% complete');
+      // Upload the image (optimized or original) with retry logic
+      let imageUrl: string | null = null;
+      let uploadAttempts = 0;
+      const maxUploadAttempts = 3;
+
+      while (!imageUrl && uploadAttempts < maxUploadAttempts) {
+        uploadAttempts++;
+        try {
+          addLocalLog(upload.id, 'FETCH', `Upload attempt ${uploadAttempts}/${maxUploadAttempts}`);
+
+          imageUrl = await uploadReceiptImage(
+            fileToUpload,
+            user.id,
+            (progress) => {
+              // Update upload progress
+              updateUploadStatus(upload.id, 'uploading', Math.round(progress * 0.4)); // Upload is 40% of total progress
+
+              // Add progress logs at key milestones
+              if (progress === 25) {
+                addLocalLog(upload.id, 'FETCH', 'Upload progress: 25% complete');
+              } else if (progress === 50) {
+                addLocalLog(upload.id, 'FETCH', 'Upload progress: 50% complete');
+              } else if (progress === 75) {
+                addLocalLog(upload.id, 'FETCH', 'Upload progress: 75% complete');
+              }
+            }
+          );
+
+          if (!imageUrl && uploadAttempts < maxUploadAttempts) {
+            addLocalLog(upload.id, 'FETCH', `Upload attempt ${uploadAttempts} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts)); // Exponential backoff
           }
+        } catch (uploadError) {
+          addLocalLog(upload.id, 'FETCH', `Upload attempt ${uploadAttempts} failed: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+          if (uploadAttempts >= maxUploadAttempts) {
+            throw uploadError;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts)); // Exponential backoff
         }
-      );
+      }
 
       if (!imageUrl) {
-        throw new Error("Failed to upload image");
+        throw new Error("Failed to upload image after multiple attempts");
       }
 
       addLocalLog(upload.id, 'FETCH', `File uploaded successfully to: ${imageUrl.split('/').pop()}`);
 
       addLocalLog(upload.id, 'SAVE', 'Creating receipt record in database...');
-      // Create receipt record
-      const today = new Date().toISOString().split('T')[0];
-      const newReceiptId = await createReceipt({
-        merchant: "Processing...",
-        date: today,
-        total: 0,
-        currency: "MYR",
-        status: "unreviewed",
-        image_url: imageUrl,
-        // user_id is added by the createReceipt function
-        processing_status: 'uploading',
-        model_used: settings.selectedModel,
-        payment_method: "", // Add required field
-        custom_category_id: upload.categoryId || null // Include category from upload
-      }, [], {
-        merchant: 0,
-        date: 0,
-        total: 0
-      }, { currentTeam });
+
+      // Create receipt record with retry logic
+      let newReceiptId: string | null = null;
+      let createAttempts = 0;
+      const maxCreateAttempts = 3;
+
+      while (!newReceiptId && createAttempts < maxCreateAttempts) {
+        createAttempts++;
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          newReceiptId = await createReceipt({
+            merchant: "Processing...",
+            date: today,
+            total: 0,
+            currency: "MYR",
+            status: "unreviewed",
+            image_url: imageUrl,
+            // user_id is added by the createReceipt function
+            processing_status: 'uploading',
+            model_used: settings.selectedModel,
+            payment_method: "", // Add required field
+            custom_category_id: upload.categoryId || null // Include category from upload
+          }, [], {
+            merchant: 0,
+            date: 0,
+            total: 0
+          }, { currentTeam });
+
+          if (!newReceiptId && createAttempts < maxCreateAttempts) {
+            addLocalLog(upload.id, 'SAVE', `Receipt creation attempt ${createAttempts} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * createAttempts));
+          }
+        } catch (createError) {
+          addLocalLog(upload.id, 'SAVE', `Receipt creation attempt ${createAttempts} failed: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
+          if (createAttempts >= maxCreateAttempts) {
+            throw createError;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * createAttempts));
+        }
+      }
 
       if (!newReceiptId) {
-        throw new Error("Failed to create receipt record");
+        throw new Error("Failed to create receipt record after multiple attempts");
       }
 
       // Store the receipt ID for this upload
@@ -1300,10 +1369,29 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
   const processNextBatch = useCallback(async () => {
     if (!processingRef.current || isPaused) return;
 
+    // Safety check to prevent infinite loops
+    const totalUploads = batchUploads.length;
+    if (totalUploads === 0) {
+      console.log('No uploads to process');
+      return;
+    }
+
     // Get pending uploads that aren't already being processed
     const pendingUploads = batchUploads.filter(upload =>
       upload.status === 'pending' && !activeUploads.includes(upload.id)
     );
+
+    // Additional safety check for stuck uploads
+    const stuckUploads = batchUploads.filter(upload =>
+      upload.status === 'uploading' && !activeUploads.includes(upload.id)
+    );
+
+    if (stuckUploads.length > 0) {
+      console.warn(`Found ${stuckUploads.length} stuck uploads, resetting to pending`);
+      stuckUploads.forEach(upload => {
+        updateUploadStatus(upload.id, 'pending', 0);
+      });
+    }
 
     // If no more pending uploads AND no active uploads, we're done
     if (pendingUploads.length === 0 && activeUploads.length === 0) {
@@ -1581,10 +1669,19 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       return;
     }
 
+    // Check retry count to prevent infinite retries
+    const retryCount = upload.retryCount || 0;
+    const maxRetries = 3;
+
+    if (retryCount >= maxRetries) {
+      toast.error(`Maximum retry attempts (${maxRetries}) reached for this upload`);
+      return;
+    }
+
     // Use the reducer to handle retry logic
     dispatch({ type: 'RETRY_UPLOAD', uploadId });
 
-    toast.info("Upload queued for retry");
+    toast.info(`Upload queued for retry (attempt ${retryCount + 1}/${maxRetries})`);
 
     // If processing is active, the new upload will be picked up automatically
     if (!isProcessing && autoStart) {

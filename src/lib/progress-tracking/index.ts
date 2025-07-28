@@ -1,9 +1,12 @@
 /**
  * Enhanced Progress Tracking Library
  * Phase 3: Batch Upload Optimization
- * 
+ *
  * Exports all progress tracking components and utilities.
  */
+
+// Import classes for local use
+import { ProgressTrackingService } from './ProgressTrackingService';
 
 // Core classes
 export { ProgressTracker } from './ProgressTracker';

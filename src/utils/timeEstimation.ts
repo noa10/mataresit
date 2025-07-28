@@ -53,6 +53,7 @@ const MODEL_MULTIPLIERS: Record<string, number> = {
   'gemini-2.0-flash-lite': 0.7,
   'gemini-2.0-flash': 0.75,
   'gemini-2.5-flash': 0.8,
+  'gemini-2.5-flash-lite': 0.65, // Fastest and most efficient model
   'gemini-2.5-flash-lite-preview-06-17': 0.75,
   'gemini-2.5-pro': 1.0,
   'openrouter/google/gemini-2.0-flash-exp:free': 0.9,

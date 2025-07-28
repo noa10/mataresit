@@ -1,9 +1,12 @@
 /**
  * Batch Session Management Library
  * Phase 3: Batch Upload Optimization
- * 
+ *
  * Exports all batch session management components.
  */
+
+// Import classes for local use
+import { BatchSessionService } from './BatchSessionService';
 
 // Core classes
 export { BatchSessionManager } from './BatchSessionManager';
