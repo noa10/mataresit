@@ -17,12 +17,13 @@
       "period": "/bulan",
       "description": "Sempurna untuk permulaan",
       "features": {
-        "receipts": "5 resit sebulan",
-        "storage": "Storan 100MB",
-        "processing": "Pemprosesan AI asas",
+        "receipts": "50 resit sebulan",
+        "storage": "Storan 1GB",
+        "processing": "Pemprosesan AI dengan Google Gemini",
         "support": "Sokongan komuniti",
         "exports": "Eksport asas",
-        "categories": "Kategori standard"
+        "categories": "Kategori standard",
+        "collaboration": "Pengguna tunggal sahaja"
       },
       "cta": "Mula Percuma",
       "popular": false
@@ -33,15 +34,16 @@
       "period": "/bulan",
       "description": "Untuk perniagaan yang berkembang",
       "features": {
-        "receipts": "50 resit sebulan",
-        "storage": "Storan 5GB",
-        "processing": "Pemprosesan AI lanjutan",
+        "receipts": "500 resit sebulan",
+        "storage": "Storan 10GB",
+        "processing": "Pemprosesan AI dengan Google Gemini",
         "support": "Sokongan e-mel",
         "exports": "Eksport lanjutan",
         "categories": "Kategori tersuai",
         "batch": "Pemprosesan kelompok",
         "search": "Carian pintar",
-        "team": "Kerjasama pasukan"
+        "team": "Kerjasama pasukan",
+        "collaboration": "Kerjasama pasukan"
       },
       "cta": "Mula Percubaan Pro",
       "popular": true
@@ -52,9 +54,9 @@
       "period": "/bulan",
       "description": "Untuk perniagaan yang mantap",
       "features": {
-        "receipts": "100 resit sebulan",
-        "storage": "Storan 20GB",
-        "processing": "Pemprosesan AI premium",
+        "receipts": "Resit tanpa had",
+        "storage": "Storan tanpa had",
+        "processing": "Pemprosesan AI dengan Google Gemini",
         "support": "Sokongan keutamaan",
         "exports": "Eksport premium",
         "categories": "Kategori tanpa had",
@@ -62,7 +64,8 @@
         "search": "Carian berkuasa AI",
         "team": "Ciri pasukan lanjutan",
         "api": "Akses API",
-        "integrations": "Integrasi pihak ketiga"
+        "integrations": "Integrasi pihak ketiga",
+        "collaboration": "Ciri pasukan lanjutan"
       },
       "cta": "Mula Percubaan Maksimum",
       "popular": false
@@ -95,6 +98,10 @@
       "support": {
         "title": "Sokongan Pelanggan",
         "description": "Dapatkan bantuan bila anda memerlukannya"
+      },
+      "collaboration": {
+        "title": "Kerjasama",
+        "description": "Bekerjasama dengan pasukan anda"
       }
     }
   },

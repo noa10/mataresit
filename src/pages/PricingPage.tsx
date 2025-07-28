@@ -28,7 +28,8 @@ import {
   Sparkles,
   Loader2,
   CheckCircle,
-  ChevronDown
+  ChevronDown,
+  Users
 } from "lucide-react";
 import { SubscriptionStatusRefresh } from "@/components/SubscriptionStatusRefresh";
 
@@ -45,10 +46,10 @@ interface PricingTier {
   features: {
     uploads: string;
     processing: string;
-    retention: string;
     storage: string;
     models: string[];
     capabilities: string[];
+    collaboration: string[];
     analytics: string[];
     support?: string;
   };
@@ -66,24 +67,21 @@ const getPricingTiers = (t: (key: string, options?: any) => string): PricingTier
     features: {
       uploads: t('plans.free.features.receipts'),
       processing: t('plans.free.features.processing'),
-      retention: t('plans.free.features.storage'),
       storage: t('plans.free.features.storage'),
       models: [
-        t('plans.free.features.processing'),
-        t('plans.free.features.support'),
-        "• Google Gemini",
-        "• OpenAI",
-        "• Claude",
-        "• Open Router",
-        "• Grok"
+        "Google Gemini (default AI processing)",
+        "Consistent AI processing across all plans"
       ],
       capabilities: [
         t('plans.free.features.exports'),
         t('plans.free.features.categories'),
         "Multi-currency detection",
         "Confidence scoring",
-        "Single processing method",
-        "Single user access"
+        "Single processing method"
+      ],
+      collaboration: [
+        "Single user access",
+        "No team features"
       ],
       analytics: [t('plans.free.features.exports'), "Basic data export (CSV)"]
     }
@@ -98,25 +96,22 @@ const getPricingTiers = (t: (key: string, options?: any) => string): PricingTier
     features: {
       uploads: t('plans.pro.features.receipts'),
       processing: t('plans.pro.features.processing'),
-      retention: t('plans.pro.features.storage'),
       storage: t('plans.pro.features.storage'),
       models: [
-        t('plans.pro.features.processing'),
-        t('plans.pro.features.support'),
-        "BYOK (bring your own key) for:",
-        "• Google Gemini",
-        "• OpenAI",
-        "• Claude",
-        "• Open Router",
-        "• Grok"
+        "Google Gemini (default AI processing)",
+        "Consistent AI processing across all plans"
       ],
       capabilities: [
         t('plans.pro.features.batch'),
         t('plans.pro.features.search'),
-        t('plans.pro.features.team'),
         t('plans.pro.features.categories'),
         t('plans.pro.features.exports'),
         "Custom branding options"
+      ],
+      collaboration: [
+        t('plans.pro.features.team'),
+        "Team member invitations",
+        "Shared receipt access"
       ],
       analytics: [
         t('plans.pro.features.search'),
@@ -136,26 +131,25 @@ const getPricingTiers = (t: (key: string, options?: any) => string): PricingTier
     features: {
       uploads: t('plans.max.features.receipts'),
       processing: t('plans.max.features.processing'),
-      retention: t('plans.max.features.storage'),
       storage: t('plans.max.features.storage'),
       models: [
-        t('plans.max.features.processing'),
-        t('plans.max.features.support'),
-        "BYOK (bring your own key) for:",
-        "• Google Gemini",
-        "• OpenAI",
-        "• Claude",
-        "• Open Router",
-        "• Grok"
+        "Google Gemini (default AI processing)",
+        "Consistent AI processing across all plans"
       ],
       capabilities: [
         t('plans.max.features.batch'),
         t('plans.max.features.search'),
-        t('plans.max.features.team'),
         t('plans.max.features.categories'),
         t('plans.max.features.exports'),
         t('plans.max.features.api'),
         t('plans.max.features.integrations')
+      ],
+      collaboration: [
+        t('plans.max.features.team'),
+        "Team member invitations",
+        "Shared receipt access",
+        "Claims management",
+        "Role-based permissions"
       ],
       analytics: [
         t('plans.max.features.search'),
@@ -174,10 +168,10 @@ const FeatureComparisonTable = ({ tiers, t }: { tiers: PricingTier[], t: (key: s
   const allFeatures = [
     { key: "uploads", label: t('features.list.aiProcessing.title') },
     { key: "processing", label: t('features.list.smartSearch.title') },
-    { key: "retention", label: t('features.list.storage.title') },
     { key: "storage", label: t('features.list.storage.title') },
     { key: "models", label: t('features.list.aiProcessing.title') },
     { key: "capabilities", label: t('features.list.categories.title') },
+    { key: "collaboration", label: t('features.list.collaboration.title') },
     { key: "analytics", label: t('features.list.exports.title') },
     { key: "support", label: t('features.list.support.title') }
   ];
@@ -586,10 +580,6 @@ export default function PricingPage() {
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>{tier.features.retention}</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                         <span>{tier.features.storage}</span>
                       </li>
                     </ul>
@@ -622,6 +612,22 @@ export default function PricingPage() {
                         <li key={idx} className="flex items-center gap-2">
                           <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                           <span>{capability}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Collaboration */}
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      {t('features.list.collaboration.title')}
+                    </h3>
+                    <ul className="space-y-1 text-sm">
+                      {tier.features.collaboration.map((collab, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span>{collab}</span>
                         </li>
                       ))}
                     </ul>

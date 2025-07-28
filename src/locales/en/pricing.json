@@ -17,12 +17,13 @@
       "period": "/month",
       "description": "Perfect for getting started",
       "features": {
-        "receipts": "5 receipts per month",
-        "storage": "100MB storage",
-        "processing": "Basic AI processing",
+        "receipts": "50 receipts per month",
+        "storage": "1GB storage",
+        "processing": "AI processing with Google Gemini",
         "support": "Community support",
         "exports": "Basic exports",
-        "categories": "Standard categories"
+        "categories": "Standard categories",
+        "collaboration": "Single user only"
       },
       "cta": "Get Started Free",
       "popular": false
@@ -33,15 +34,16 @@
       "period": "/month",
       "description": "For growing businesses",
       "features": {
-        "receipts": "50 receipts per month",
-        "storage": "5GB storage",
-        "processing": "Advanced AI processing",
+        "receipts": "500 receipts per month",
+        "storage": "10GB storage",
+        "processing": "AI processing with Google Gemini",
         "support": "Email support",
         "exports": "Advanced exports",
         "categories": "Custom categories",
         "batch": "Batch processing",
         "search": "Smart search",
-        "team": "Team collaboration"
+        "team": "Team collaboration",
+        "collaboration": "Team collaboration"
       },
       "cta": "Start Pro Trial",
       "popular": true
@@ -52,9 +54,9 @@
       "period": "/month",
       "description": "For established businesses",
       "features": {
-        "receipts": "100 receipts per month",
-        "storage": "20GB storage",
-        "processing": "Premium AI processing",
+        "receipts": "Unlimited receipts",
+        "storage": "Unlimited storage",
+        "processing": "AI processing with Google Gemini",
         "support": "Priority support",
         "exports": "Premium exports",
         "categories": "Unlimited categories",
@@ -62,7 +64,8 @@
         "search": "AI-powered search",
         "team": "Advanced team features",
         "api": "API access",
-        "integrations": "Third-party integrations"
+        "integrations": "Third-party integrations",
+        "collaboration": "Advanced team features"
       },
       "cta": "Start Max Trial",
       "popular": false
@@ -95,6 +98,10 @@
       "support": {
         "title": "Customer Support",
         "description": "Get help when you need it"
+      },
+      "collaboration": {
+        "title": "Collaboration",
+        "description": "Work together with your team"
       }
     }
   },

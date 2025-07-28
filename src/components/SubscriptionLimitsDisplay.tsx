@@ -201,9 +201,9 @@ export default function SubscriptionLimitsDisplay({
   const currentUsage = realTimeUsage || {
     receipts_this_month: usage?.receiptsUsedThisMonth || 0,
     storage_used_mb: 0, // Estimated
-    monthly_receipts_limit: limits?.monthlyReceipts || 25,
+    monthly_receipts_limit: limits?.monthlyReceipts || 50,
     storage_limit_mb: limits?.storageLimitMB || 1024,
-    batch_upload_limit: limits?.batchUploadLimit || 1
+    batch_upload_limit: limits?.batchUploadLimit || 5
   };
 
   const receiptsPercentage = getUsagePercentage(
