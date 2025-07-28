@@ -114,7 +114,7 @@ export async function getSubscriptionLimits(context: ApiContext): Promise<Subscr
 
     // Calculate receipts usage
     const receiptsUsedThisMonth = profile?.receipts_used_this_month || 0;
-    const receiptsPerMonth = tierLimits?.monthly_receipts || 25;
+    const receiptsPerMonth = tierLimits?.monthly_receipts || 50;
     const receiptsRemaining = Math.max(0, receiptsPerMonth - receiptsUsedThisMonth);
 
     // Determine capabilities based on tier
@@ -142,10 +142,10 @@ export async function getSubscriptionLimits(context: ApiContext): Promise<Subscr
     // Return safe defaults on error
     return {
       tier: 'free',
-      receiptsPerMonth: 25,
+      receiptsPerMonth: 50,
       receiptsUsedThisMonth: 0,
-      receiptsRemaining: 25,
-      batchUploadLimit: 1,
+      receiptsRemaining: 50,
+      batchUploadLimit: 5,
       storageUsedMB: 0,
       storageLimitMB: 1024,
       storageRemaining: 1024,
