@@ -701,13 +701,15 @@ export class NotificationService {
       events?: ('INSERT' | 'UPDATE' | 'DELETE')[];
       notificationTypes?: NotificationType[];
       priorities?: NotificationPriority[];
+      _recursionDepth?: number;
     }
   ) {
-    // TEMPORARY FIX: Disable subscriptions to prevent infinite recursion
-    console.log(`🚫 TEMP FIX: Skipping subscription creation to prevent infinite recursion`);
-    return () => {
-      console.log(`🚫 TEMP FIX: No-op unsubscribe function`);
-    };
+    // Prevent infinite recursion
+    const recursionDepth = (options?._recursionDepth || 0) + 1;
+    if (recursionDepth > 3) {
+      console.error('🚫 Preventing infinite recursion in notification subscription');
+      return () => {};
+    }
 
     // Ensure connection before subscribing
     const connected = await this.ensureConnection();
@@ -816,7 +818,7 @@ export class NotificationService {
           });
 
           // Enhanced error recovery
-          this.handleChannelError(channelName, user.id, teamId, callback, options);
+          this.handleChannelError(channelName, user.id, teamId, callback, options, recursionDepth);
         } else if (status === 'CLOSED') {
           console.log(`🔌 Channel closed for all notification changes: ${channelName}`);
           this.cleanupSubscription(channelName);
@@ -831,7 +833,7 @@ export class NotificationService {
           }
         } else if (status === 'TIMED_OUT') {
           console.warn(`⏰ Channel subscription timed out: ${channelName}`);
-          this.handleChannelTimeout(channelName, user.id, teamId, callback, options);
+          this.handleChannelTimeout(channelName, user.id, teamId, callback, options, recursionDepth);
         }
       });
 
@@ -1068,7 +1070,8 @@ export class NotificationService {
     userId: string,
     teamId: string | undefined,
     callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
-    options?: any
+    options?: any,
+    recursionDepth: number = 0
   ): Promise<void> {
     console.log(`🔧 Handling channel error for: ${channelName}`);
 
@@ -1087,8 +1090,11 @@ export class NotificationService {
         // Try to reestablish the subscription
         const connected = await this.ensureConnection();
         if (connected) {
-          // Retry the subscription with the same parameters
-          return this.subscribeToAllUserNotificationChanges(callback, teamId, options);
+          // Retry the subscription with the same parameters, incrementing recursion depth
+          return this.subscribeToAllUserNotificationChanges(callback, teamId, {
+            ...options,
+            _recursionDepth: recursionDepth
+          });
         }
       } catch (retryError) {
         console.warn('Immediate recovery failed:', retryError);
@@ -1107,7 +1113,8 @@ export class NotificationService {
     userId: string,
     teamId: string | undefined,
     callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
-    options?: any
+    options?: any,
+    recursionDepth: number = 0
   ): Promise<void> {
     console.log(`⏰ Handling channel timeout for: ${channelName}`);
 
@@ -1122,7 +1129,10 @@ export class NotificationService {
       try {
         const connected = await this.ensureConnection();
         if (connected) {
-          return this.subscribeToAllUserNotificationChanges(callback, teamId, options);
+          return this.subscribeToAllUserNotificationChanges(callback, teamId, {
+            ...options,
+            _recursionDepth: recursionDepth
+          });
         }
       } catch (error) {
         console.error('Timeout recovery failed:', error);

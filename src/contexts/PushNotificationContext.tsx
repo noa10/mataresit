@@ -17,7 +17,7 @@ interface PushNotificationContextType extends PushNotificationState, PushNotific
       errorMessage?: string;
     }
   ) => Promise<void>;
-  
+
   sendBatchNotification: (
     type: 'completed' | 'failed',
     batchData: {
@@ -26,6 +26,8 @@ interface PushNotificationContextType extends PushNotificationState, PushNotific
       failedReceipts?: number;
     }
   ) => Promise<void>;
+
+  showTestNotification: () => Promise<void>;
 }
 
 const PushNotificationContext = createContext<PushNotificationContextType | undefined>(undefined);
@@ -185,7 +187,8 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
   const contextValue: PushNotificationContextType = {
     ...pushNotifications,
     sendReceiptNotification,
-    sendBatchNotification
+    sendBatchNotification,
+    showTestNotification: pushNotifications.showTestNotification
   };
 
   return (

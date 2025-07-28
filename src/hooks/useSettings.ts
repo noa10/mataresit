@@ -18,8 +18,8 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  selectedModel: 'gemini-2.0-flash-lite',
-  batchModel: 'gemini-2.0-flash-lite', // Default to same model for batch
+  selectedModel: 'gemini-2.5-flash-lite',
+  batchModel: 'gemini-2.5-flash-lite', // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,
