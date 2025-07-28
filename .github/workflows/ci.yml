@@ -130,7 +130,6 @@ jobs:
           name: test-results-${{ github.run_number }}
           path: |
             test-results/
-            coverage/
           retention-days: 30
 
       - name: Publish test results

@@ -29,7 +29,7 @@ readonly DEPLOYMENT_LOG="$LOG_DIR/deployment-$(date +%Y%m%d-%H%M%S).log"
 readonly AUDIT_LOG="$LOG_DIR/audit-$(date +%Y%m%d).log"
 
 # Backup configuration
-readonly BACKUP_DIR="$PROJECT_ROOT/backups/deployment-$(date +%Y%m%d-%H%M%S)"
+readonly BACKUP_DIR="$PROJECT_ROOT/archive/backups/deployment-$(date +%Y%m%d-%H%M%S)"
 
 # Colors for output
 readonly RED='\033[0;31m'

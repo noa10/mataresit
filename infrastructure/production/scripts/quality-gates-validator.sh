@@ -274,8 +274,8 @@ validate_code_quality() {
     
     # Check test coverage
     log "INFO" "Checking test coverage..."
-    if [[ -f "coverage/coverage-summary.json" ]]; then
-        local coverage=$(jq -r '.total.lines.pct // 0' coverage/coverage-summary.json)
+    if [[ -f "test-results/coverage/coverage-summary.json" ]]; then
+        local coverage=$(jq -r '.total.lines.pct // 0' test-results/coverage/coverage-summary.json)
         local coverage_int=${coverage%.*}
         local coverage_threshold=${QUALITY_THRESHOLDS["code_coverage"]}
         

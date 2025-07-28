@@ -9,7 +9,7 @@ set -euo pipefail
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-readonly BACKUP_DIR="$PROJECT_ROOT/backups/migrations"
+readonly BACKUP_DIR="$PROJECT_ROOT/archive/backups/migrations"
 readonly ROLLBACK_LOG="$PROJECT_ROOT/logs/migrations/rollback-$(date +%Y%m%d-%H%M%S).log"
 
 # Colors

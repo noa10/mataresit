@@ -211,8 +211,8 @@ The system organizes migrations into logical phases:
 
 ### Backup Locations
 
-- **Migration Backups** - `backups/migrations/YYYYMMDD-HHMMSS/`
-- **Pre-Rollback Backups** - `backups/migrations/pre-rollback-*/`
+- **Migration Backups** - `archive/backups/migrations/YYYYMMDD-HHMMSS/`
+- **Pre-Rollback Backups** - `archive/backups/migrations/pre-rollback-*/`
 
 ## ⚠️ Important Warnings
 

@@ -140,7 +140,7 @@ npx vitest run tests/queue/unit/real-time-functionality.test.ts --reporter=verbo
 npx vitest run tests/queue/unit/ --coverage
 
 # View coverage report
-open coverage/index.html
+open test-results/coverage/index.html
 ```
 
 ## 📊 Expected Test Results

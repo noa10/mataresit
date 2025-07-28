@@ -364,8 +364,8 @@ generate_report() {
 ## Results
 EOF
     
-    if [ "$COVERAGE" = true ] && [ -f "coverage/lcov-report/index.html" ]; then
-        echo "- Coverage Report: coverage/lcov-report/index.html" >> "$report_file"
+    if [ "$COVERAGE" = true ] && [ -f "test-results/coverage/lcov-report/index.html" ]; then
+        echo "- Coverage Report: test-results/coverage/lcov-report/index.html" >> "$report_file"
     fi
     
     print_success "Test report generated: $report_file"

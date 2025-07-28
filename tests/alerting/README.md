@@ -225,7 +225,7 @@ TEST_ENV=staging ./tests/alerting/run-tests.sh --integration
 
 Tests generate comprehensive reports:
 
-- **Coverage Report**: `coverage/lcov-report/index.html`
+- **Coverage Report**: `test-results/coverage/lcov-report/index.html`
 - **Vitest Report**: `test-results/vitest-report.html`
 - **Playwright Report**: `test-results/playwright-report/index.html`
 - **Performance Report**: `test-results/performance-report.json`

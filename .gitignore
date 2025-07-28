@@ -31,6 +31,7 @@ tests/screenshots/
 tests/videos/
 tests/fixtures/temp/
 tests/manual/temp/
+test-results/coverage/
 tools/testing/logs/
 
 # Editor directories and files

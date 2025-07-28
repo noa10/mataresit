@@ -18,7 +18,7 @@ readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Rollback configuration
 readonly INFRASTRUCTURE_DIR="$PROJECT_ROOT/infrastructure/production"
-readonly BACKUP_DIR="$PROJECT_ROOT/backups/rollback"
+readonly BACKUP_DIR="$PROJECT_ROOT/archive/backups/rollback"
 readonly CONFIG_DIR="$INFRASTRUCTURE_DIR/config"
 
 # Logging configuration
