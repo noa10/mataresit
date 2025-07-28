@@ -28,7 +28,7 @@ interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
 }
 
-export default function BatchUploadZone({
+function BatchUploadZone({
   onUploadComplete
 }: BatchUploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
@@ -992,3 +992,7 @@ export default function BatchUploadZone({
     </>
   );
 }
+
+// Export both as default and named export for compatibility
+export default BatchUploadZone;
+export { BatchUploadZone };

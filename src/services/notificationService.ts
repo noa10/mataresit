@@ -307,24 +307,7 @@ export class NotificationService {
     }
   }
 
-  // Get connection state for debugging
-  getConnectionState(): {
-    status: string;
-    inProgress: boolean;
-    attempts: number;
-    lastAttempt: number;
-    activeChannels: number;
-    realTimeAvailable: boolean;
-  } {
-    return {
-      status: this.connectionStatus,
-      inProgress: this.connectionInProgress,
-      attempts: this.reconnectAttempts,
-      lastAttempt: this.lastConnectionAttempt,
-      activeChannels: this.activeChannels.size,
-      realTimeAvailable: this.isRealTimeAvailable(),
-    };
-  }
+
 
   // =============================================
   // NOTIFICATION MANAGEMENT
