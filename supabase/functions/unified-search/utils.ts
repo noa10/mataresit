@@ -21,6 +21,18 @@ export function validateSearchParams(params: any): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  // 🔍 ENHANCED LOGGING: Log validation input
+  console.log('🔍 VALIDATION: Starting parameter validation:', {
+    hasQuery: !!params.query,
+    queryType: typeof params.query,
+    queryLength: params.query?.length,
+    hasSources: !!params.sources,
+    sources: params.sources,
+    hasFilters: !!params.filters,
+    filters: params.filters,
+    allParams: Object.keys(params)
+  });
+
   // Validate required fields
   if (!params.query || typeof params.query !== 'string') {
     errors.push('Query is required and must be a string');
@@ -84,12 +96,31 @@ export function validateSearchParams(params: any): ValidationResult {
     aggregationMode: params.aggregationMode || 'relevance'
   };
 
-  return {
+  // 🔍 ENHANCED LOGGING: Log validation result
+  const result = {
     isValid: errors.length === 0,
     errors,
     warnings,
     sanitizedParams: errors.length === 0 ? sanitizedParams : undefined
   };
+
+  console.log('🔍 VALIDATION RESULT:', {
+    isValid: result.isValid,
+    errorCount: errors.length,
+    warningCount: warnings.length,
+    errors: errors,
+    warnings: warnings,
+    hasSanitizedParams: !!result.sanitizedParams
+  });
+
+  if (!result.isValid) {
+    console.error('❌ VALIDATION FAILED:', {
+      errors: errors,
+      originalParams: params
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -98,6 +129,15 @@ export function validateSearchParams(params: any): ValidationResult {
 function validateFilters(filters: any): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  // 🔍 ENHANCED LOGGING: Log filter validation
+  console.log('🔍 FILTER VALIDATION: Starting filter validation:', {
+    hasDateRange: !!filters.dateRange,
+    hasAmountRange: !!filters.amountRange,
+    amountRange: filters.amountRange,
+    dateRange: filters.dateRange,
+    allFilters: filters
+  });
 
   // Validate date range
   if (filters.dateRange) {
@@ -119,12 +159,39 @@ function validateFilters(filters: any): { errors: string[]; warnings: string[] }
 
   // Validate amount range
   if (filters.amountRange) {
-    if (typeof filters.amountRange.min !== 'number' || 
-        typeof filters.amountRange.max !== 'number') {
-      errors.push('Amount range min and max must be numbers');
-    } else if (filters.amountRange.min < 0) {
+    console.log('💰 AMOUNT RANGE VALIDATION:', {
+      amountRange: filters.amountRange,
+      min: filters.amountRange.min,
+      max: filters.amountRange.max,
+      minType: typeof filters.amountRange.min,
+      maxType: typeof filters.amountRange.max
+    });
+
+    // CRITICAL FIX: Allow either min OR max to be specified (not both required)
+    const hasMin = filters.amountRange.min !== undefined && filters.amountRange.min !== null;
+    const hasMax = filters.amountRange.max !== undefined && filters.amountRange.max !== null;
+
+    if (!hasMin && !hasMax) {
+      errors.push('Amount range must specify at least min or max value');
+    }
+
+    if (hasMin && typeof filters.amountRange.min !== 'number') {
+      errors.push('Amount range min must be a number');
+    }
+
+    if (hasMax && typeof filters.amountRange.max !== 'number') {
+      errors.push('Amount range max must be a number');
+    }
+
+    if (hasMin && filters.amountRange.min < 0) {
       errors.push('Amount range min cannot be negative');
-    } else if (filters.amountRange.min > filters.amountRange.max) {
+    }
+
+    if (hasMax && filters.amountRange.max < 0) {
+      errors.push('Amount range max cannot be negative');
+    }
+
+    if (hasMin && hasMax && filters.amountRange.min > filters.amountRange.max) {
       errors.push('Amount range min must be less than or equal to max');
     }
   }

@@ -796,14 +796,22 @@ export function parseTemporalQuery(query: string, timezone: string = 'Asia/Kuala
   ];
 
   // Parse amount expressions
-  for (const { pattern, handler } of amountPatterns) {
+  console.log('💰 DEBUG: Testing amount patterns against query:', normalizedQuery);
+  console.log('💰 DEBUG: Available amount patterns:', amountPatterns.length);
+
+  for (let i = 0; i < amountPatterns.length; i++) {
+    const { pattern, handler } = amountPatterns[i];
+    console.log(`💰 DEBUG: Testing pattern ${i + 1}/${amountPatterns.length}:`, pattern.source);
+
     const match = normalizedQuery.match(pattern);
     if (match) {
-      console.log('💰 DEBUG: Amount pattern matched:', {
-        pattern: pattern.source,
-        match: match[0],
+      console.log('💰 ✅ AMOUNT PATTERN MATCHED:', {
+        patternIndex: i + 1,
+        patternSource: pattern.source,
+        matchedText: match[0],
         fullMatch: match,
-        groups: match.slice(1)
+        groups: match.slice(1),
+        query: normalizedQuery
       });
 
       const amountRange = handler(match);
@@ -811,9 +819,22 @@ export function parseTemporalQuery(query: string, timezone: string = 'Asia/Kuala
       result.queryType = result.queryType === 'general' ? 'amount' : 'mixed';
       result.confidence += 0.3;
 
-      console.log('💰 DEBUG: Amount range set:', amountRange);
+      console.log('💰 ✅ AMOUNT RANGE EXTRACTED:', {
+        amountRange,
+        min: amountRange.min,
+        max: amountRange.max,
+        currency: amountRange.currency,
+        originalAmount: amountRange.originalAmount,
+        originalCurrency: amountRange.originalCurrency
+      });
       break; // Use first match
+    } else {
+      console.log(`💰 ❌ Pattern ${i + 1} did not match`);
     }
+  }
+
+  if (!result.amountRange) {
+    console.log('💰 ⚠️ NO AMOUNT PATTERNS MATCHED for query:', normalizedQuery);
   }
 
   // Extract search terms (excluding temporal expressions)

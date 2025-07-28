@@ -131,6 +131,32 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       contextWindow: 1048576
     }
   },
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.3,
+    maxTokens: 8192,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Fast, low-cost, high-performance Gemini 2.5 model with reasoning capabilities',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'excellent',
+      reliability: 0.97
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1048576
+    }
+  },
   'gemini-2.5-flash-lite-preview-06-17': {
     id: 'gemini-2.5-flash-lite-preview-06-17',
     name: 'Gemini 2.5 Flash Lite Preview (Deprecated)',
@@ -420,8 +446,8 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   }
 };
 
-const DEFAULT_TEXT_MODEL = 'gemini-2.0-flash-lite';
-const DEFAULT_VISION_MODEL = 'gemini-2.0-flash-lite';
+const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash-lite';
+const DEFAULT_VISION_MODEL = 'gemini-2.5-flash-lite';
 
 /**
  * Types for input to AI models

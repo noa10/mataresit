@@ -512,15 +512,24 @@ export class RAGPipeline {
       // Try enhanced hybrid search first with amount filtering support
       let searchResults, error;
       try {
-        // Prepare amount filtering parameters (FIXED: access correct property names)
+        // Prepare amount filtering parameters (CRITICAL FIX: handle both amountRange and direct amount params)
         const filters = this.context.params.filters || {};
         const amountParams = {
-          amount_min: filters.minAmount || null,
-          amount_max: filters.maxAmount || null,
-          amount_currency: filters.currency || null
+          amount_min: filters.amountRange?.min || filters.minAmount || null,
+          amount_max: filters.amountRange?.max || filters.maxAmount || null,
+          amount_currency: filters.amountRange?.currency || filters.currency || null
         };
 
-        console.log('💰 Amount filtering params:', amountParams);
+        console.log('💰 ENHANCED AMOUNT FILTERING PARAMS:', {
+          originalFilters: filters,
+          extractedAmountParams: amountParams,
+          hasMinAmount: amountParams.amount_min !== null,
+          hasMaxAmount: amountParams.amount_max !== null,
+          minAmountValue: amountParams.amount_min,
+          maxAmountValue: amountParams.amount_max,
+          currency: amountParams.amount_currency,
+          amountRange: filters.amountRange
+        });
 
         // MONETARY QUERY FIX: Bypass semantic similarity for monetary queries
         const isMonetaryQuery = amountParams.amount_min !== null || amountParams.amount_max !== null;
@@ -593,7 +602,8 @@ export class RAGPipeline {
           bypassingSemantic: isMonetaryQueryFallback
         });
 
-        const fallbackResult = await this.context.supabase.rpc('unified_search', {
+        // 💰 ENHANCED LOGGING: Log database call parameters
+        const dbCallParams = {
           query_embedding: queryEmbedding,
           source_types: this.context.params.sources,
           content_types: this.context.params.contentTypes,
@@ -607,7 +617,20 @@ export class RAGPipeline {
           end_date: dateRange?.end || null,
           min_amount: amountRange?.min || null,
           max_amount: amountRange?.max || null
+        };
+
+        console.log('💰 🔍 DATABASE CALL PARAMETERS (unified_search):', {
+          min_amount: dbCallParams.min_amount,
+          max_amount: dbCallParams.max_amount,
+          start_date: dbCallParams.start_date,
+          end_date: dbCallParams.end_date,
+          similarity_threshold: dbCallParams.similarity_threshold,
+          match_count: dbCallParams.match_count,
+          source_types: dbCallParams.source_types,
+          hasAmountFiltering: dbCallParams.min_amount !== null || dbCallParams.max_amount !== null
         });
+
+        const fallbackResult = await this.context.supabase.rpc('unified_search', dbCallParams);
 
         searchResults = fallbackResult.data;
         error = fallbackResult.error;
@@ -658,10 +681,30 @@ export class RAGPipeline {
   /**
    * Validate temporal search prerequisites
    */
-  private validateTemporalSearchPrerequisites(): { isValid: boolean; error?: string } {
+  private validateTemporalSearchPrerequisites(routingStrategy?: string): { isValid: boolean; error?: string } {
     const startDate = this.context.params.filters?.startDate;
     const endDate = this.context.params.filters?.endDate;
+    const hasAmountRange = !!(this.context.params.filters?.amountRange ||
+                             this.context.params.filters?.minAmount !== undefined ||
+                             this.context.params.filters?.maxAmount !== undefined);
 
+    console.log('🔍 TEMPORAL VALIDATION: Checking prerequisites:', {
+      routingStrategy,
+      hasStartDate: !!startDate,
+      hasEndDate: !!endDate,
+      hasAmountRange,
+      amountRange: this.context.params.filters?.amountRange,
+      minAmount: this.context.params.filters?.minAmount,
+      maxAmount: this.context.params.filters?.maxAmount
+    });
+
+    // CRITICAL FIX: For semantic_only routing with amount filtering, dates are not required
+    if (routingStrategy === 'semantic_only' && hasAmountRange) {
+      console.log('✅ TEMPORAL VALIDATION: semantic_only with amount range - dates not required');
+      return { isValid: true };
+    }
+
+    // For date-based or hybrid routing, dates are required
     if (!startDate || !endDate) {
       return {
         isValid: false,
@@ -699,8 +742,8 @@ export class RAGPipeline {
     const stageStart = Date.now();
     console.log('⏰ Executing temporal search with strategy:', temporalRouting.routingStrategy);
 
-    // Validate prerequisites
-    const validation = this.validateTemporalSearchPrerequisites();
+    // Validate prerequisites with routing strategy
+    const validation = this.validateTemporalSearchPrerequisites(temporalRouting.routingStrategy);
     if (!validation.isValid) {
       console.error('❌ Temporal search validation failed:', validation.error);
       return {
@@ -1463,12 +1506,12 @@ export class RAGPipeline {
       // Continue with the existing hybrid search logic from the original method
       const candidateLimit = Math.max(50, (this.context.params.limit || 20) * 3);
 
-      // Prepare amount filtering parameters (FIXED: access correct property names)
+      // Prepare amount filtering parameters (CRITICAL FIX: handle both amountRange and direct amount params)
       const filters = this.context.params.filters || {};
       const amountParams = {
-        amount_min: filters.minAmount || null,
-        amount_max: filters.maxAmount || null,
-        amount_currency: filters.currency || null
+        amount_min: filters.amountRange?.min || filters.minAmount || null,
+        amount_max: filters.amountRange?.max || filters.maxAmount || null,
+        amount_currency: filters.amountRange?.currency || filters.currency || null
       };
 
       console.log('💰 Amount filtering params:', amountParams);

@@ -325,7 +325,20 @@ async function validateRequest(req: Request, body?: any): Promise<{ params: Unif
     }
   };
 
-  console.log('✅ Temporal parsing results:', {
+  // 💰 ENHANCED LOGGING: Show final filter parameters
+  console.log('🔧 FINAL FILTER PARAMETERS:', {
+    hasFilters: !!params.filters,
+    minAmount: params.filters?.minAmount,
+    maxAmount: params.filters?.maxAmount,
+    currency: params.filters?.currency,
+    amountRange: params.filters?.amountRange,
+    startDate: params.filters?.startDate,
+    endDate: params.filters?.endDate,
+    dateRange: params.filters?.dateRange,
+    allFilters: params.filters
+  });
+
+  console.log('✅ TEMPORAL PARSING RESULTS:', {
     isTemporalQuery: temporalParsing.temporalIntent?.isTemporalQuery || false,
     routingStrategy: temporalParsing.temporalIntent?.routingStrategy || 'none',
     hasDateRange: !!temporalParsing.dateRange,
@@ -335,6 +348,21 @@ async function validateRequest(req: Request, body?: any): Promise<{ params: Unif
     amountRange: temporalParsing.amountRange,
     searchTerms: temporalParsing.searchTerms
   });
+
+  // 💰 ENHANCED LOGGING: Detailed amount range logging
+  if (temporalParsing.amountRange) {
+    console.log('💰 ✅ AMOUNT RANGE DETECTED IN TEMPORAL PARSING:', {
+      min: temporalParsing.amountRange.min,
+      max: temporalParsing.amountRange.max,
+      currency: temporalParsing.amountRange.currency,
+      originalAmount: temporalParsing.amountRange.originalAmount,
+      originalCurrency: temporalParsing.amountRange.originalCurrency,
+      queryType: temporalParsing.queryType,
+      confidence: temporalParsing.confidence
+    });
+  } else {
+    console.log('💰 ⚠️ NO AMOUNT RANGE DETECTED in temporal parsing for query:', validation.sanitizedParams!.query);
+  }
 
   // Add detailed debugging for temporal parsing
   if (temporalParsing.temporalIntent?.isTemporalQuery) {
@@ -511,8 +539,51 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
     const isLineItemQuery = body.query && isLineItemQueryDetection(body.query);
     const shouldUseEnhancedPipeline = useEnhancedPrompting || isLineItemQuery;
 
-    // Validate parameters
-    const validation = validateSearchParams({ query, ...otherParams });
+    // 🔧 CRITICAL FIX: Parse temporal query BEFORE validation to extract amount range
+    console.log('🕐 ENHANCED SEARCH: Parsing temporal query before validation:', query);
+    const temporalParsing = parseTemporalQuery(query);
+    console.log('🕐 ENHANCED SEARCH: Temporal parsing result:', {
+      isTemporalQuery: temporalParsing.temporalIntent?.isTemporalQuery,
+      hasAmountRange: !!temporalParsing.amountRange,
+      amountRange: temporalParsing.amountRange,
+      dateRange: temporalParsing.dateRange
+    });
+
+    // 🔧 CRITICAL FIX: Merge temporal parsing results into request parameters
+    const enhancedParams = {
+      query,
+      ...otherParams,
+      // Add filters from temporal parsing
+      filters: {
+        ...otherParams.filters || {},
+        // Add amount range if detected
+        ...(temporalParsing.amountRange && {
+          amountRange: {
+            min: temporalParsing.amountRange.min,
+            max: temporalParsing.amountRange.max,
+            currency: temporalParsing.amountRange.currency
+          }
+        }),
+        // Add date range if detected
+        ...(temporalParsing.dateRange && {
+          dateRange: {
+            start: temporalParsing.dateRange.start,
+            end: temporalParsing.dateRange.end
+          }
+        })
+      }
+    };
+
+    console.log('🔧 ENHANCED SEARCH: Enhanced parameters with temporal data:', {
+      hasFilters: !!enhancedParams.filters,
+      hasAmountRange: !!enhancedParams.filters?.amountRange,
+      amountRange: enhancedParams.filters?.amountRange,
+      hasDateRange: !!enhancedParams.filters?.dateRange,
+      dateRange: enhancedParams.filters?.dateRange
+    });
+
+    // Validate parameters (now with temporal data included)
+    const validation = validateSearchParams(enhancedParams);
     if (!validation.isValid) {
       const errorResponse = new Response(
         JSON.stringify({
@@ -528,7 +599,23 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
       return addCorsHeaders(errorResponse);
     }
 
-    const filteredParams = validation.sanitizedParams!;
+    // 🔧 CRITICAL FIX: Build parameters with temporal routing data already included
+    const processedQuery = preprocessQuery(validation.sanitizedParams!.query);
+
+    // Build enhanced parameters with temporal routing
+    const filteredParams: UnifiedSearchParams = {
+      ...validation.sanitizedParams!,
+      query: processedQuery,
+      // Enable temporal routing based on parsing results
+      temporalRouting: temporalParsing.temporalIntent || undefined
+    };
+
+    console.log('🔧 ENHANCED SEARCH: Final parameters with temporal routing:', {
+      hasTemporalRouting: !!filteredParams.temporalRouting,
+      temporalRouting: filteredParams.temporalRouting,
+      hasFilters: !!filteredParams.filters,
+      filters: filteredParams.filters
+    });
 
     // Get authenticated user using REST API approach (more reliable for Edge Functions)
     const authHeader = req.headers.get('Authorization');
