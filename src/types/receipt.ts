@@ -17,6 +17,8 @@ export interface ReceiptUpload {
   uploadProgress: number; // Percentage 0-100
   processingStage?: 'queueing' | 'ai_processing' | 'categorization' | string;
   categoryId?: string | null; // Optional category assignment
+  retryCount?: number; // Number of retry attempts
+  processingStartedAt?: Date; // When processing started
   error?: {
     code: 'FILE_TYPE' | 'SIZE_LIMIT' | 'UPLOAD_FAILED' | 'PROCESSING_FAILED' | string;
     message: string;

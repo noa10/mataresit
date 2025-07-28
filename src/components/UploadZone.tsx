@@ -578,7 +578,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
         // PRIORITY 3: Default fallback
         else {
-          modelToUse = 'gemini-2.0-flash-lite';
+          modelToUse = 'gemini-2.5-flash-lite';
           prioritySource = 'default';
           console.log('⚠️ Using default model:', modelToUse);
         }

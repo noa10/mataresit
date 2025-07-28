@@ -34,7 +34,7 @@ interface ReceiptProcessingOptionsProps {
 export function ReceiptProcessingOptions({
   onModelChange,
   onBatchModelChange,
-  defaultModel = 'gemini-2.0-flash-lite',
+  defaultModel = 'gemini-2.5-flash-lite',
   defaultBatchModel,
   showBatchModelSelection = false
 }: ReceiptProcessingOptionsProps) {

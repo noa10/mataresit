@@ -14,7 +14,8 @@ import {
   DollarSign,
   Store,
   FileText,
-  Star
+  Star,
+  Tag
 } from 'lucide-react';
 import { ReceiptCardData, UIComponentProps } from '@/types/ui-components';
 import { useNavigate } from 'react-router-dom';

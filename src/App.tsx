@@ -74,6 +74,8 @@ const TermsConditionsPage = lazy(() => import("./pages/TermsConditionsPage"));
 const ApiReferencePage = lazy(() => import("./pages/ApiReferencePage"));
 const NotificationTestingPage = lazy(() => import("./pages/NotificationTestingPage").then(m => ({ default: m.NotificationTestingPage })));
 const NotificationFilteringTestPage = lazy(() => import("./pages/NotificationFilteringTestPage").then(m => ({ default: m.NotificationFilteringTestPage })));
+const BatchSessionServiceTestPage = lazy(() => import("./pages/BatchSessionServiceTestPage"));
+const BatchUploadTestPage = lazy(() => import("./pages/BatchUploadTestPage"));
 
 
 // Create a loading component for suspense
@@ -279,6 +281,16 @@ const App = () => (
                 <Route path="/test/enhanced-search" element={
                   <Suspense fallback={<PageLoading />}>
                     <TestEnhancedSearch />
+                  </Suspense>
+                } />
+                <Route path="/test/batch-session-service" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <BatchSessionServiceTestPage />
+                  </Suspense>
+                } />
+                <Route path="/test/batch-upload" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <BatchUploadTestPage />
                   </Suspense>
                 } />
 

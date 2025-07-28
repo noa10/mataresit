@@ -30,7 +30,7 @@ export function EnhancedProcessingTimeline({
   uploadProgress,
   fileSize = 1024 * 1024, // Default 1MB
   processingMethod = 'ai-vision',
-  modelId = 'gemini-2.0-flash-lite',
+  modelId = 'gemini-2.5-flash-lite',
   startTime,
   isProgressUpdating = false
 }: EnhancedProcessingTimelineProps) {

@@ -75,3 +75,7 @@ verify_jwt = false
 [bypass-test]
 verify_jwt = false
 # Bypass test function with full API implementation
+
+[generate-embeddings]
+verify_jwt = true
+# Generate embeddings function for AI search functionality

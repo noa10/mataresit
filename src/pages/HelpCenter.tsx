@@ -50,7 +50,7 @@ const faqItems = [
   },
   {
     question: "What AI models do you support?",
-    answer: "We support multiple AI models including Google Gemini, OpenAI, Claude, Open Router, and Grok. You can use our default models or bring your own API keys (BYOK) for enhanced processing.",
+    answer: "We use Google Gemini as our default and primary AI processing engine across all plans. This ensures consistent, high-quality AI processing for all users regardless of their subscription tier.",
     category: "ai-processing"
   },
   {
