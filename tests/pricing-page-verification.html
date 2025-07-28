@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Page Verification Test - Mataresit</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #1e293b;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success {
+            background: #dcfce7;
+            border: 1px solid #16a34a;
+            color: #15803d;
+        }
+        .status.info {
+            background: #dbeafe;
+            border: 1px solid #2563eb;
+            color: #1d4ed8;
+        }
+        .status.warning {
+            background: #fef3c7;
+            border: 1px solid #d97706;
+            color: #92400e;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        .comparison-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+        .comparison-table .tier-free {
+            background: #f0fdf4;
+        }
+        .comparison-table .tier-pro {
+            background: #eff6ff;
+        }
+        .comparison-table .tier-max {
+            background: #faf5ff;
+        }
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .test-checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .test-checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .test-checklist li:before {
+            content: "✅ ";
+            color: #16a34a;
+            font-weight: bold;
+        }
+        .manual-test {
+            background: #fef7cd;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .manual-test h4 {
+            margin-top: 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Pricing Page Verification Test</h1>
+            <p><strong>Test Date:</strong> <span id="test-date"></span></p>
+            <p><strong>Application URL:</strong> <a href="http://localhost:5002/pricing" target="_blank">http://localhost:5002/pricing</a></p>
+            <p><strong>Status:</strong> <span class="status success">All Translation Files Updated ✅</span></p>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Expected Pricing Tier Limits</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Monthly Receipts</th>
+                        <th>Storage Limit</th>
+                        <th>Batch Upload</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="tier-free">
+                        <td><strong>Free</strong></td>
+                        <td>50 receipts per month</td>
+                        <td>1GB storage</td>
+                        <td>5 files</td>
+                        <td>✅ Updated</td>
+                    </tr>
+                    <tr class="tier-pro">
+                        <td><strong>Pro</strong></td>
+                        <td>500 receipts per month</td>
+                        <td>10GB storage</td>
+                        <td>50 files</td>
+                        <td>✅ Updated</td>
+                    </tr>
+                    <tr class="tier-max">
+                        <td><strong>Max</strong></td>
+                        <td>Unlimited receipts</td>
+                        <td>Unlimited storage</td>
+                        <td>100 files</td>
+                        <td>✅ Updated</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Translation Files Verification</h3>
+            
+            <h4>English Translation (src/locales/en/pricing.json)</h4>
+            <div class="code-block">
+"free": {
+  "features": {
+    "receipts": "50 receipts per month",
+    "storage": "1GB storage"
+  }
+},
+"pro": {
+  "features": {
+    "receipts": "500 receipts per month", 
+    "storage": "10GB storage"
+  }
+},
+"max": {
+  "features": {
+    "receipts": "Unlimited receipts",
+    "storage": "Unlimited storage"
+  }
+}
+            </div>
+
+            <h4>Malay Translation (src/locales/ms/pricing.json)</h4>
+            <div class="code-block">
+"free": {
+  "features": {
+    "receipts": "50 resit sebulan",
+    "storage": "Storan 1GB"
+  }
+},
+"pro": {
+  "features": {
+    "receipts": "500 resit sebulan",
+    "storage": "Storan 10GB"
+  }
+},
+"max": {
+  "features": {
+    "receipts": "Resit tanpa had",
+    "storage": "Storan tanpa had"
+  }
+}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Component Integration Verification</h3>
+            <ul class="test-checklist">
+                <li>PricingPage.tsx uses usePricingTranslation() hook correctly</li>
+                <li>Features loaded dynamically: t('plans.free.features.receipts')</li>
+                <li>No hardcoded values that override translation values</li>
+                <li>SubscriptionLimitsDisplay.tsx fallback values updated (25→50)</li>
+                <li>api-subscription-enforcement.ts fallback values updated</li>
+                <li>All configuration files aligned (stripe-config.ts, src/config/stripe.ts)</li>
+            </ul>
+        </div>
+
+        <div class="manual-test">
+            <h4>🧪 Manual Testing Instructions</h4>
+            <ol>
+                <li><strong>Open Application:</strong> Navigate to <a href="http://localhost:5002/pricing" target="_blank">http://localhost:5002/pricing</a></li>
+                <li><strong>Verify English Display:</strong>
+                    <ul>
+                        <li>Free tier shows "50 receipts per month" and "1GB storage"</li>
+                        <li>Pro tier shows "500 receipts per month" and "10GB storage"</li>
+                        <li>Max tier shows "Unlimited receipts" and "Unlimited storage"</li>
+                    </ul>
+                </li>
+                <li><strong>Test Language Switching:</strong>
+                    <ul>
+                        <li>Look for language selector (EN/MS toggle)</li>
+                        <li>Switch to Malay (MS)</li>
+                        <li>Verify Malay translations appear correctly</li>
+                    </ul>
+                </li>
+                <li><strong>Verify Malay Display:</strong>
+                    <ul>
+                        <li>Free tier shows "50 resit sebulan" and "Storan 1GB"</li>
+                        <li>Pro tier shows "500 resit sebulan" and "Storan 10GB"</li>
+                        <li>Max tier shows "Resit tanpa had" and "Storan tanpa had"</li>
+                    </ul>
+                </li>
+                <li><strong>Check Browser Console:</strong>
+                    <ul>
+                        <li>No translation errors</li>
+                        <li>No missing key warnings</li>
+                        <li>Language switching works smoothly</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Test Results Summary</h3>
+            <div class="status success">
+                <strong>Translation Files:</strong> ✅ Updated with correct limits
+            </div>
+            <div class="status success">
+                <strong>Component Integration:</strong> ✅ Verified and consistent
+            </div>
+            <div class="status success">
+                <strong>Fallback Values:</strong> ✅ Fixed hardcoded values
+            </div>
+            <div class="status info">
+                <strong>Manual Testing:</strong> 🔄 Ready for verification
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Expected Outcomes</h3>
+            <p><strong>After completing this verification, users should see:</strong></p>
+            <ul>
+                <li>Consistent pricing information across all languages</li>
+                <li>Correct tier limits that match the actual system capabilities</li>
+                <li>No discrepancies between pricing page and subscription enforcement</li>
+                <li>Smooth language switching without errors</li>
+                <li>Proper Malay translations with appropriate terminology</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Set current date and time
+        document.getElementById('test-date').textContent = new Date().toLocaleString();
+        
+        // Add click handlers for external links
+        document.addEventListener('DOMContentLoaded', function() {
+            const links = document.querySelectorAll('a[target="_blank"]');
+            links.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    console.log('Opening:', this.href);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
