@@ -9,12 +9,12 @@
     "examples": {
       "title": "Cuba tanya:",
       "queries": [
-        "Tunjukkan semua resit bulan lepas",
-        "Cari resit lebih RM400 dari restoran",
-        "Berapa saya belanja untuk bekalan pejabat tahun ini?",
-        "Tunjukkan resit dari Starbucks bulan Disember",
-        "Cari semua perbelanjaan perjalanan dari Q1",
-        "Berapa jumlah perbelanjaan saya untuk barangan runcit?"
+        "Tunjukkan resit minggu lepas",
+        "Cari resit lebih RM300 dari kedai makan",
+        "Apa yang saya beli di Tesco semalam?",
+        "Tunjukkan pembelian kopi bulan ini",
+        "Cari semua resit parking dari Mei",
+        "Berapa saya belanja untuk barangan runcit hari ini?"
       ]
     },
     "features": {
@@ -39,7 +39,7 @@
       "Cari resit minggu lepas...",
       "Tunjukkan perbelanjaan restoran...",
       "Berapa saya belanja untuk perjalanan?",
-      "Cari resit lebih RM200..."
+      "Cari resit lebih RM300..."
     ],
     "send": "Hantar",
     "clear": "Kosongkan",

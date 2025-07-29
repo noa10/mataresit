@@ -9,12 +9,12 @@
     "examples": {
       "title": "Try asking:",
       "queries": [
-        "Show me all receipts from last month",
-        "Find receipts over $100 from restaurants",
-        "What did I spend on office supplies this year?",
-        "Show me receipts from Starbucks in December",
-        "Find all travel expenses from Q1",
-        "What's my total spending on groceries?"
+        "Show me receipts from last week",
+        "Find receipts over RM200 from restaurants",
+        "What did I buy at 99 Speedmart?",
+        "Show me coffee purchases this month",
+        "Find all parking receipts from June",
+        "How much did I spend on groceries yesterday?"
       ]
     },
     "features": {
@@ -39,7 +39,7 @@
       "Find receipts from last week...",
       "Show me restaurant expenses...",
       "What did I spend on travel?",
-      "Find receipts over $50..."
+      "Find receipts over RM200..."
     ],
     "send": "Send",
     "clear": "Clear",
