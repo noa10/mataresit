@@ -6,6 +6,11 @@ import './index.css';
 import { initializeThemeSystem } from './lib/themeManager.ts';
 import './lib/i18n.ts'; // Initialize i18n
 
+// 🔧 Import notification service test utilities in development
+if (import.meta.env.DEV) {
+  import('./utils/notificationServiceTest.ts');
+}
+
 // Initialize theme system before rendering
 initializeThemeSystem();
 
