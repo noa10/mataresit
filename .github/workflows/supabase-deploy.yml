@@ -1,0 +1,305 @@
+name: Supabase Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      skip_migrations:
+        description: 'Skip database migrations'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  SUPABASE_CLI_VERSION: '1.127.4'
+
+jobs:
+  # Validate Supabase Configuration
+  validate:
+    name: Validate Supabase Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.config.outputs.environment }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: config
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENVIRONMENT="production"
+          else
+            ENVIRONMENT="staging"
+          fi
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "Deploying to: $ENVIRONMENT"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Validate Supabase configuration
+        run: |
+          # Check if supabase directory exists
+          if [ ! -d "supabase" ]; then
+            echo "Error: supabase directory not found"
+            exit 1
+          fi
+          
+          # Validate config.toml
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "Error: supabase/config.toml not found"
+            exit 1
+          fi
+          
+          echo "✅ Supabase configuration is valid"
+
+      - name: Lint Edge Functions
+        run: |
+          if [ -d "supabase/functions" ]; then
+            echo "Linting Edge Functions..."
+            for func_dir in supabase/functions/*/; do
+              if [ -d "$func_dir" ]; then
+                func_name=$(basename "$func_dir")
+                echo "Checking function: $func_name"
+                
+                # Check for index.ts
+                if [ ! -f "$func_dir/index.ts" ]; then
+                  echo "Warning: $func_name missing index.ts"
+                fi
+              fi
+            done
+          else
+            echo "No Edge Functions found"
+          fi
+
+  # Database Migrations
+  migrate:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event.inputs.skip_migrations != 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Run database migrations
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+            PROJECT_ID="${{ secrets.SUPABASE_PROJECT_ID }}"
+          else
+            SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
+            PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
+          fi
+          
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "Error: Missing Supabase credentials for $ENVIRONMENT"
+            exit 1
+          fi
+          
+          # Link to project
+          echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"
+          
+          # Run migrations
+          if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations)" ]; then
+            echo "Running database migrations..."
+            supabase db push
+          else
+            echo "No migrations to run"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # Deploy Edge Functions
+  deploy-functions:
+    name: Deploy Edge Functions
+    runs-on: ubuntu-latest
+    needs: [validate, migrate]
+    if: always() && needs.validate.result == 'success'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Deploy Edge Functions
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            PROJECT_ID="${{ secrets.SUPABASE_PROJECT_ID }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          else
+            PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
+            SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
+          fi
+          
+          # Link to project
+          echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"
+          
+          # Deploy functions
+          if [ -d "supabase/functions" ] && [ "$(ls -A supabase/functions)" ]; then
+            echo "Deploying Edge Functions..."
+            supabase functions deploy
+          else
+            echo "No Edge Functions to deploy"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # Post-deployment validation
+  validate-deployment:
+    name: Validate Deployment
+    runs-on: ubuntu-latest
+    needs: [validate, migrate, deploy-functions]
+    if: always() && needs.validate.result == 'success'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Supabase connectivity
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          else
+            SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
+            SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
+          fi
+          
+          echo "Testing Supabase connectivity for $ENVIRONMENT..."
+          
+          # Test health endpoint
+          if curl -f "$SUPABASE_URL/health" > /dev/null 2>&1; then
+            echo "✅ Supabase health check passed"
+          else
+            echo "❌ Supabase health check failed"
+            exit 1
+          fi
+          
+          # Test database connectivity
+          DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          
+          if [ "$DB_RESPONSE" = "200" ] || [ "$DB_RESPONSE" = "404" ]; then
+            echo "✅ Database connectivity test passed"
+          else
+            echo "❌ Database connectivity test failed (HTTP $DB_RESPONSE)"
+            exit 1
+          fi
+
+      - name: Test Edge Functions
+        run: |
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+            SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          else
+            SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
+            SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
+          fi
+          
+          # Test key Edge Functions if they exist
+          FUNCTIONS_TO_TEST=("stripe-webhook" "process-receipt" "manage-api-keys")
+          
+          for func in "${FUNCTIONS_TO_TEST[@]}"; do
+            echo "Testing function: $func"
+            FUNC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST "$SUPABASE_URL/functions/v1/$func" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"test": true}' || echo "000")
+            
+            if [ "$FUNC_RESPONSE" = "200" ] || [ "$FUNC_RESPONSE" = "400" ] || [ "$FUNC_RESPONSE" = "401" ]; then
+              echo "✅ Function $func is responding (HTTP $FUNC_RESPONSE)"
+            else
+              echo "⚠️ Function $func may not be deployed (HTTP $FUNC_RESPONSE)"
+            fi
+          done
+
+  # Notification
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [validate, migrate, deploy-functions, validate-deployment]
+    if: always()
+    
+    steps:
+      - name: Notify success
+        if: needs.validate-deployment.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            🚀 Supabase deployment successful!
+            
+            **Environment:** ${{ needs.validate.outputs.environment }}
+            **Migrations:** ${{ needs.migrate.result }}
+            **Functions:** ${{ needs.deploy-functions.result }}
+            **Validation:** ${{ needs.validate-deployment.result }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify failure
+        if: needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            ❌ Supabase deployment failed!
+            
+            **Environment:** ${{ needs.validate.outputs.environment }}
+            **Validation:** ${{ needs.validate.result }}
+            **Migrations:** ${{ needs.migrate.result }}
+            **Functions:** ${{ needs.deploy-functions.result }}
+            
+            Check workflow logs for details.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

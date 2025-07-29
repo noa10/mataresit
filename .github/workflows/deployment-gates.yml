@@ -75,70 +75,94 @@ jobs:
 
       - name: Run Snyk security scan
         id: snyk-scan
+        if: secrets.SNYK_TOKEN != ''
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --json > snyk-results.json
+          args: --json-file-output=snyk-results.json
         continue-on-error: true
 
-      - name: Container security scan
-        id: container-scan
+      - name: Handle missing Snyk token
+        if: secrets.SNYK_TOKEN == ''
+        run: |
+          echo "::warning::SNYK_TOKEN not configured - skipping Snyk security scan"
+          echo "This may affect security gate scoring"
+          echo "To enable Snyk scanning, add SNYK_TOKEN to repository secrets"
+          # Create empty results file to prevent downstream errors
+          echo '{"vulnerabilities": []}' > snyk-results.json
+
+      - name: Frontend security scan
+        id: frontend-scan
         if: inputs.skip_security_scan != true
         run: |
-          # Pull the image for scanning
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
-          
-          # Run Trivy scan
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy image --format json --output trivy-results.json \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} || true
-          
-          # Count vulnerabilities
-          if [[ -f trivy-results.json ]]; then
-            CONTAINER_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-results.json 2>/dev/null || echo "0")
-            CONTAINER_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-results.json 2>/dev/null || echo "0")
-            
-            echo "container_critical=$CONTAINER_CRITICAL" >> $GITHUB_OUTPUT
-            echo "container_high=$CONTAINER_HIGH" >> $GITHUB_OUTPUT
-          else
-            echo "container_critical=0" >> $GITHUB_OUTPUT
-            echo "container_high=0" >> $GITHUB_OUTPUT
+          # Build the application for security testing
+          npm run build
+
+          # Check for security issues in build output
+          FRONTEND_CRITICAL=0
+          FRONTEND_HIGH=0
+
+          if [ -d "dist" ]; then
+            # Check for source maps in production (security risk)
+            if find dist -name "*.map" | grep -q .; then
+              echo "Source maps found in production build"
+              FRONTEND_HIGH=$((FRONTEND_HIGH + 1))
+            fi
+
+            # Check for potential secrets in build output
+            if grep -r "sk_\|pk_\|api_key\|secret" dist/ --include="*.js" --include="*.css" | head -5; then
+              echo "Potential secrets found in build output"
+              FRONTEND_CRITICAL=$((FRONTEND_CRITICAL + 1))
+            fi
+
+            # Check bundle size (potential security risk if too large)
+            SIZE_BYTES=$(du -sb dist/ | cut -f1)
+            if [ $SIZE_BYTES -gt 52428800 ]; then  # 50MB
+              echo "Large bundle size detected: $(du -sh dist/)"
+              FRONTEND_HIGH=$((FRONTEND_HIGH + 1))
+            fi
           fi
+
+          echo "frontend_critical=$FRONTEND_CRITICAL" >> $GITHUB_OUTPUT
+          echo "frontend_high=$FRONTEND_HIGH" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: OWASP ZAP security scan
-        id: zap-scan
-        if: inputs.environment != 'production'
+      - name: Lighthouse security audit
+        id: lighthouse-scan
+        if: inputs.environment != 'production' && inputs.skip_security_scan != true
         run: |
-          # Start application for security testing
-          docker run -d --name test-app -p 3000:3000 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
-          
-          # Wait for application to start
-          sleep 30
-          
-          # Run OWASP ZAP baseline scan
-          docker run --rm --network host \
-            -v $(pwd):/zap/wrk/:rw \
-            owasp/zap2docker-stable zap-baseline.py \
-            -t http://localhost:3000 \
-            -J zap-report.json \
-            -r zap-report.html || true
-          
-          # Stop test application
-          docker stop test-app && docker rm test-app
-          
-          # Parse ZAP results
-          if [[ -f zap-report.json ]]; then
-            ZAP_HIGH=$(jq '[.site[]?.alerts[]? | select(.riskdesc | startswith("High"))] | length' zap-report.json 2>/dev/null || echo "0")
-            ZAP_MEDIUM=$(jq '[.site[]?.alerts[]? | select(.riskdesc | startswith("Medium"))] | length' zap-report.json 2>/dev/null || echo "0")
-            
-            echo "zap_high=$ZAP_HIGH" >> $GITHUB_OUTPUT
-            echo "zap_medium=$ZAP_MEDIUM" >> $GITHUB_OUTPUT
+          # Install Lighthouse
+          npm install -g @lhci/cli lighthouse
+
+          # Create a simple test server for the built app
+          npx serve dist -l 3000 &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          sleep 10
+
+          # Run Lighthouse audit focusing on security
+          lighthouse http://localhost:3000 \
+            --only-categories=best-practices \
+            --output=json \
+            --output-path=lighthouse-results.json \
+            --chrome-flags="--headless --no-sandbox" || true
+
+          # Stop test server
+          kill $SERVER_PID || true
+
+          # Parse Lighthouse results for security issues
+          if [[ -f lighthouse-results.json ]]; then
+            LIGHTHOUSE_SCORE=$(jq '.categories["best-practices"].score * 100' lighthouse-results.json 2>/dev/null || echo "0")
+            echo "lighthouse_score=$LIGHTHOUSE_SCORE" >> $GITHUB_OUTPUT
+
+            # Count security-related audit failures
+            SECURITY_FAILURES=$(jq '[.audits | to_entries[] | select(.value.score != null and .value.score < 1 and (.key | contains("security") or contains("https") or contains("csp")))] | length' lighthouse-results.json 2>/dev/null || echo "0")
+            echo "security_failures=$SECURITY_FAILURES" >> $GITHUB_OUTPUT
           else
-            echo "zap_high=0" >> $GITHUB_OUTPUT
-            echo "zap_medium=0" >> $GITHUB_OUTPUT
+            echo "lighthouse_score=0" >> $GITHUB_OUTPUT
+            echo "security_failures=0" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
 
@@ -149,54 +173,60 @@ jobs:
           CRITICAL=${{ steps.security-audit.outputs.critical || 0 }}
           HIGH=${{ steps.security-audit.outputs.high || 0 }}
           MODERATE=${{ steps.security-audit.outputs.moderate || 0 }}
-          CONTAINER_CRITICAL=${{ steps.container-scan.outputs.container_critical || 0 }}
-          CONTAINER_HIGH=${{ steps.container-scan.outputs.container_high || 0 }}
-          ZAP_HIGH=${{ steps.zap-scan.outputs.zap_high || 0 }}
-          ZAP_MEDIUM=${{ steps.zap-scan.outputs.zap_medium || 0 }}
-          
+          FRONTEND_CRITICAL=${{ steps.frontend-scan.outputs.frontend_critical || 0 }}
+          FRONTEND_HIGH=${{ steps.frontend-scan.outputs.frontend_high || 0 }}
+          LIGHTHOUSE_SCORE=${{ steps.lighthouse-scan.outputs.lighthouse_score || 100 }}
+          SECURITY_FAILURES=${{ steps.lighthouse-scan.outputs.security_failures || 0 }}
+
           # Calculate security score (0-100)
-          TOTAL_CRITICAL=$((CRITICAL + CONTAINER_CRITICAL))
-          TOTAL_HIGH=$((HIGH + CONTAINER_HIGH + ZAP_HIGH))
-          TOTAL_MEDIUM=$((MODERATE + ZAP_MEDIUM))
-          
+          TOTAL_CRITICAL=$((CRITICAL + FRONTEND_CRITICAL))
+          TOTAL_HIGH=$((HIGH + FRONTEND_HIGH + SECURITY_FAILURES))
+          TOTAL_MEDIUM=$((MODERATE))
+
           # Score calculation: Start with 100, deduct points for vulnerabilities
           SCORE=100
           SCORE=$((SCORE - (TOTAL_CRITICAL * 20)))  # Critical: -20 points each
           SCORE=$((SCORE - (TOTAL_HIGH * 10)))      # High: -10 points each
           SCORE=$((SCORE - (TOTAL_MEDIUM * 2)))     # Medium: -2 points each
-          
+
+          # Factor in Lighthouse score (weight: 30%)
+          LIGHTHOUSE_WEIGHT=30
+          SCORE=$(((SCORE * (100 - LIGHTHOUSE_WEIGHT)) + (LIGHTHOUSE_SCORE * LIGHTHOUSE_WEIGHT)) / 100))
+
           # Ensure score doesn't go below 0
           if [[ $SCORE -lt 0 ]]; then
             SCORE=0
           fi
-          
+
           # Determine pass/fail based on environment
           PASSED=false
           if [[ "${{ inputs.environment }}" == "production" ]]; then
-            # Production: No critical, max 2 high
-            if [[ $TOTAL_CRITICAL -eq 0 ]] && [[ $TOTAL_HIGH -le 2 ]]; then
+            # Production: No critical, max 2 high, Lighthouse score > 80
+            if [[ $TOTAL_CRITICAL -eq 0 ]] && [[ $TOTAL_HIGH -le 2 ]] && [[ $LIGHTHOUSE_SCORE -gt 80 ]]; then
               PASSED=true
             fi
           elif [[ "${{ inputs.environment }}" == "staging" ]]; then
-            # Staging: Max 1 critical, max 5 high
-            if [[ $TOTAL_CRITICAL -le 1 ]] && [[ $TOTAL_HIGH -le 5 ]]; then
+            # Staging: Max 1 critical, max 5 high, Lighthouse score > 70
+            if [[ $TOTAL_CRITICAL -le 1 ]] && [[ $TOTAL_HIGH -le 5 ]] && [[ $LIGHTHOUSE_SCORE -gt 70 ]]; then
               PASSED=true
             fi
           else
-            # Development: Max 3 critical, max 10 high
-            if [[ $TOTAL_CRITICAL -le 3 ]] && [[ $TOTAL_HIGH -le 10 ]]; then
+            # Development: Max 3 critical, max 10 high, Lighthouse score > 60
+            if [[ $TOTAL_CRITICAL -le 3 ]] && [[ $TOTAL_HIGH -le 10 ]] && [[ $LIGHTHOUSE_SCORE -gt 60 ]]; then
               PASSED=true
             fi
           fi
-          
+
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "score=$SCORE" >> $GITHUB_OUTPUT
-          
-          echo "Security Gate Results:"
+
+          echo "Security Gate Results (Vercel + Supabase):"
           echo "- Critical vulnerabilities: $TOTAL_CRITICAL"
           echo "- High vulnerabilities: $TOTAL_HIGH"
           echo "- Medium vulnerabilities: $TOTAL_MEDIUM"
-          echo "- Security score: $SCORE/100"
+          echo "- Lighthouse score: $LIGHTHOUSE_SCORE/100"
+          echo "- Security failures: $SECURITY_FAILURES"
+          echo "- Overall security score: $SCORE/100"
           echo "- Gate passed: $PASSED"
 
       - name: Upload security reports

@@ -23,11 +23,15 @@ on:
         - all
         - health
         - performance
+      timeout:
+        description: 'Timeout for health checks (seconds)'
+        required: false
+        default: '30'
 
 env:
-  NAMESPACE: ${{ github.event.inputs.environment == 'staging' && 'paperless-maverick-staging' || 'paperless-maverick' }}
   DOMAIN: ${{ github.event.inputs.environment == 'staging' && 'staging.mataresit.com' || 'mataresit.com' }}
-  API_DOMAIN: ${{ github.event.inputs.environment == 'staging' && 'api-staging.mataresit.com' || 'api.mataresit.com' }}
+  TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
+  CACHE_VERSION: 'v1'
 
 jobs:
   # System Health Monitoring
@@ -78,37 +82,41 @@ jobs:
             exit 1
           fi
 
-      - name: Test application endpoints (if Kubernetes available)
-        continue-on-error: true
+      - name: Test Vercel deployment endpoints
         run: |
-          echo "Testing application endpoints..."
+          echo "Testing Vercel deployment endpoints..."
 
-          # Check if kubectl is available and configured
-          if command -v kubectl >/dev/null 2>&1 && [ -n "${{ secrets.PRODUCTION_KUBECONFIG }}" ]; then
-            echo "Kubernetes available, testing pod endpoints..."
-
-            # Configure kubectl
-            echo "${{ github.event.inputs.environment == 'staging' && secrets.STAGING_KUBECONFIG || secrets.PRODUCTION_KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
-            export KUBECONFIG=/tmp/kubeconfig
-
-            # Get application pod
-            APP_POD=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=paperless-maverick -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
-            if [ -n "$APP_POD" ]; then
-              echo "Testing health endpoint..."
-              kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:3000/health || echo "Health endpoint test failed"
-
-              echo "Testing readiness endpoint..."
-              kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:3000/ready || echo "Readiness endpoint test failed"
-
-              echo "Testing metrics endpoint..."
-              kubectl exec -n ${{ env.NAMESPACE }} $APP_POD -- curl -f http://localhost:9090/metrics || echo "Metrics endpoint test failed"
-            else
-              echo "::warning::No application pods found or Kubernetes not accessible"
-            fi
+          # Test main application domain
+          if curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}" | grep -q "200\|301\|302"; then
+            echo "✅ Main domain (${{ env.DOMAIN }}) is accessible"
           else
-            echo "::warning::Kubernetes not configured, skipping pod-level health checks"
+            echo "❌ Main domain (${{ env.DOMAIN }}) is inaccessible"
+            exit 1
           fi
+
+          # Test specific application routes
+          ROUTES_TO_TEST=("/" "/pricing" "/login")
+
+          for route in "${ROUTES_TO_TEST[@]}"; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}$route" || echo "000")
+            if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "301" ] || [ "$RESPONSE" = "302" ]; then
+              echo "✅ Route $route: OK (HTTP $RESPONSE)"
+            else
+              echo "⚠️ Route $route: HTTP $RESPONSE"
+            fi
+          done
+
+          # Test API routes if they exist
+          API_ROUTES=("/api/health" "/api/status")
+
+          for route in "${API_ROUTES[@]}"; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}$route" || echo "000")
+            if [ "$RESPONSE" = "200" ]; then
+              echo "✅ API route $route: OK"
+            else
+              echo "ℹ️ API route $route: HTTP $RESPONSE (may not exist)"
+            fi
+          done
 
       - name: Test Supabase Edge Functions
         run: |
@@ -135,37 +143,43 @@ jobs:
             fi
           done
 
-      - name: Test Application Endpoints (Public)
+      - name: Test Vercel security headers
         run: |
-          echo "Testing public application endpoints..."
+          echo "Testing Vercel security headers..."
 
-          # Test main application domain
-          if curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}" | grep -q "200\|301\|302"; then
-            echo "✅ Main domain (${{ env.DOMAIN }}) is accessible"
+          # Test security headers on main domain
+          HEADERS_RESPONSE=$(curl -s -I "https://${{ env.DOMAIN }}" || echo "")
+
+          if echo "$HEADERS_RESPONSE" | grep -i "x-frame-options"; then
+            echo "✅ X-Frame-Options header found"
           else
-            echo "::warning::Main domain (${{ env.DOMAIN }}) may be inaccessible"
+            echo "⚠️ X-Frame-Options header missing"
           fi
 
-          # Test API domain if different
-          if [ "${{ env.API_DOMAIN }}" != "${{ env.DOMAIN }}" ]; then
-            if curl -s -o /dev/null -w "%{http_code}" "https://${{ env.API_DOMAIN }}/health" | grep -q "200"; then
-              echo "✅ API domain (${{ env.API_DOMAIN }}) is accessible"
-            else
-              echo "::warning::API domain (${{ env.API_DOMAIN }}) may be inaccessible"
-            fi
+          if echo "$HEADERS_RESPONSE" | grep -i "x-content-type-options"; then
+            echo "✅ X-Content-Type-Options header found"
+          else
+            echo "⚠️ X-Content-Type-Options header missing"
           fi
 
-          # Test specific health endpoints
-          HEALTH_ENDPOINTS=("/health" "/api/health" "/ready")
+          if echo "$HEADERS_RESPONSE" | grep -i "strict-transport-security"; then
+            echo "✅ HSTS header found"
+          else
+            echo "⚠️ HSTS header missing"
+          fi
 
-          for endpoint in "${HEALTH_ENDPOINTS[@]}"; do
-            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}$endpoint" || echo "000")
-            if [ "$RESPONSE" = "200" ]; then
-              echo "✅ Health endpoint $endpoint: OK"
-            else
-              echo "ℹ️ Health endpoint $endpoint: HTTP $RESPONSE (may not exist)"
-            fi
-          done
+      - name: Test Vercel deployment status
+        run: |
+          echo "Checking Vercel deployment status..."
+
+          # Test if the site is served by Vercel
+          SERVER_HEADER=$(curl -s -I "https://${{ env.DOMAIN }}" | grep -i "server:" || echo "")
+
+          if echo "$SERVER_HEADER" | grep -i "vercel"; then
+            echo "✅ Site is served by Vercel"
+          else
+            echo "ℹ️ Server header: $SERVER_HEADER"
+          fi
 
   # Supabase Services Monitoring
   supabase-monitoring:
