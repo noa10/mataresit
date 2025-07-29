@@ -228,58 +228,98 @@ create_secrets() {
 # Generate secrets template
 generate_template() {
     cat > secrets-template.env << 'EOF'
-# Production Environment Secrets
+# =============================================================================
+# VERCEL + SUPABASE SECRETS TEMPLATE
+# =============================================================================
+# This template is optimized for Vercel frontend + Supabase backend architecture
+# Edit the values below and use: ./setup-secrets.sh --repo owner/repo --env-file secrets-template.env
+
+# =============================================================================
+# VERCEL DEPLOYMENT SECRETS
+# =============================================================================
+# Get these from: https://vercel.com/account/tokens
+VERCEL_TOKEN=your_vercel_api_token_here
+VERCEL_ORG_ID=your_vercel_org_id_here
+VERCEL_PROJECT_ID=your_vercel_project_id_here
+
+# =============================================================================
+# SUPABASE SECRETS - PRODUCTION
+# =============================================================================
+# Get these from: https://supabase.com/dashboard/project/your-project/settings/api
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+SUPABASE_PROJECT_ID=your_project_id_here
+SUPABASE_ACCESS_TOKEN=your_supabase_cli_access_token_here
 
-# AI/ML API Keys
-GEMINI_API_KEY=your_gemini_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Security Keys
-API_KEY_ENCRYPTION_KEY=your_32_byte_encryption_key_here
-JWT_SECRET=your_jwt_secret_here
-
-# Monitoring
-SENTRY_DSN=your_sentry_dsn_here
-GRAFANA_ADMIN_PASSWORD=your_grafana_password_here
-
-# Notifications
-SLACK_WEBHOOK_URL=your_slack_webhook_url_here
-CRITICAL_ALERTS_WEBHOOK_URL=your_critical_alerts_webhook_here
-SECURITY_SLACK_WEBHOOK_URL=your_security_webhook_here
-
-# Kubernetes Configuration (base64 encoded)
-PRODUCTION_KUBECONFIG=base64_encoded_kubeconfig_here
-STAGING_KUBECONFIG=base64_encoded_staging_kubeconfig_here
-
-# Approvers (comma-separated usernames)
-PRODUCTION_APPROVERS=user1,user2,user3
-EMERGENCY_APPROVERS=user1,user2
-
-# Security Tools
-SNYK_TOKEN=your_snyk_token_here
-GITLEAKS_LICENSE=your_gitleaks_license_here
-
-# Staging Environment Secrets
+# =============================================================================
+# SUPABASE SECRETS - STAGING
+# =============================================================================
 STAGING_SUPABASE_URL=https://your-staging-project.supabase.co
 STAGING_SUPABASE_ANON_KEY=your_staging_anon_key_here
 STAGING_SUPABASE_SERVICE_ROLE_KEY=your_staging_service_role_key_here
-STAGING_GEMINI_API_KEY=your_staging_gemini_key_here
-STAGING_OPENAI_API_KEY=your_staging_openai_key_here
-STAGING_API_KEY_ENCRYPTION_KEY=your_staging_encryption_key_here
-STAGING_JWT_SECRET=your_staging_jwt_secret_here
+STAGING_SUPABASE_PROJECT_ID=your_staging_project_id_here
 
-# Test Environment Secrets
+# =============================================================================
+# SUPABASE SECRETS - TESTING
+# =============================================================================
 TEST_SUPABASE_URL=https://your-test-project.supabase.co
 TEST_SUPABASE_ANON_KEY=your_test_anon_key_here
 TEST_SUPABASE_SERVICE_ROLE_KEY=your_test_service_role_key_here
-TEST_GEMINI_API_KEY=your_test_gemini_key_here
+TEST_GEMINI_API_KEY=your_test_gemini_api_key_here
+
+# =============================================================================
+# AI/ML API KEYS
+# =============================================================================
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+# =============================================================================
+# SECURITY SCANNING TOOLS
+# =============================================================================
+# Get Snyk token from: https://app.snyk.io/account
+SNYK_TOKEN=your_snyk_api_token_here
+# GitLeaks license (optional, free for open source)
+GITLEAKS_LICENSE=your_gitleaks_license_here
+
+# =============================================================================
+# NOTIFICATION WEBHOOKS
+# =============================================================================
+# Slack webhook URLs for notifications
+SLACK_WEBHOOK_URL=your_slack_webhook_url_here
+SECURITY_SLACK_WEBHOOK_URL=your_security_alerts_webhook_here
+CRITICAL_ALERTS_WEBHOOK_URL=your_critical_alerts_webhook_here
+
+# =============================================================================
+# APPROVAL AND ACCESS CONTROL
+# =============================================================================
+# GitHub usernames for emergency approvals (comma-separated)
+EMERGENCY_APPROVERS=user1,user2,user3
+PRODUCTION_APPROVERS=user1,user2,user3
+
+# =============================================================================
+# APPLICATION SECRETS
+# =============================================================================
+# 32-byte encryption key for API key encryption
+API_KEY_ENCRYPTION_KEY=your_32_byte_encryption_key_here
+# JWT secret for token signing
+JWT_SECRET=your_jwt_secret_here
+
+# =============================================================================
+# MONITORING AND OBSERVABILITY
+# =============================================================================
+# Sentry DSN for error tracking
+SENTRY_DSN=your_sentry_dsn_here
 EOF
 
-    log "Generated secrets template: secrets-template.env"
-    log "Edit this file with your actual values and use --env-file secrets-template.env"
+    log "Generated Vercel + Supabase secrets template: secrets-template.env"
+    log ""
+    log "Next steps:"
+    log "1. Edit secrets-template.env with your actual values"
+    log "2. Run: ./setup-secrets.sh --repo owner/repo --env-file secrets-template.env"
+    log "3. Verify secrets: ./setup-secrets.sh --repo owner/repo --list"
+    log ""
+    log "For detailed setup instructions, see: .github/docs/SECURITY_SCANNING_SETUP.md"
 }
 
 # Main execution
