@@ -148,25 +148,29 @@ export default function SemanticSearchPage() {
 
     console.log('✅ DEBUG: Cache cleared successfully');
 
-    // 🔍 DEBUG: Test Edge Function directly
+    // 🔍 DEBUG: Test Edge Function using proper utility function
     const testEdgeFunction = async () => {
       try {
-        console.log('🔍 DEBUG: Testing Edge Function directly...');
-        const response = await fetch('https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/unified-search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            query: 'ikan',
-            sources: ['receipts'],
-            limit: 5,
-            useEnhancedPrompting: true
-          })
-        });
+        console.log('🔍 DEBUG: Testing Edge Function using unifiedSearch utility...');
 
-        const data = await response.json();
+        const testParams: UnifiedSearchParams = {
+          query: 'ikan',
+          sources: ['receipts'], // Use frontend plural form - will be mapped automatically
+          limit: 5,
+          offset: 0,
+          filters: {},
+          similarityThreshold: 0.2,
+          includeMetadata: true,
+          aggregationMode: 'relevance'
+        };
+
+        // Add enhanced prompting flag
+        const enhancedParams = {
+          ...testParams,
+          useEnhancedPrompting: true
+        };
+
+        const data = await unifiedSearch(enhancedParams);
         console.log('🔍 DEBUG: Edge Function response:', data);
 
         if (data.enhancedResponse && data.enhancedResponse.uiComponents) {

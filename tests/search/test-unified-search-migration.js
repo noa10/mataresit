@@ -57,7 +57,7 @@ async function testUnifiedSearchMigration() {
         },
         body: JSON.stringify({
           query: 'receipts from June 27',
-          sources: ['receipts'],
+          sources: ['receipt'],
           limit: 10,
           useEnhancedPrompting: true,
           conversationHistory: []
