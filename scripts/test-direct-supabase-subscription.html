@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Supabase Realtime Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Direct Supabase Realtime Test</h1>
+    <div id="output"></div>
+    <button onclick="testMinimalFilter()">Test Minimal Filter</button>
+    <button onclick="testProductionFilter()">Test Production Filter</button>
+    <button onclick="clearOutput()">Clear Output</button>
+
+    <script>
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(
+            'https://mpmkbtsufihzdelrlszs.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY',
+            {
+                realtime: {
+                    logger: (kind, msg, data) => {
+                        log(`[Supabase Realtime ${kind}] ${msg}`, data);
+                    }
+                }
+            }
+        );
+
+        function log(message, data = '') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>${timestamp}:</strong> ${message} ${data ? JSON.stringify(data) : ''}`;
+            output.appendChild(logEntry);
+            console.log(message, data);
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        function testMinimalFilter() {
+            log('🧪 Testing Minimal Filter...');
+            
+            const filter = 'recipient_id=eq.feecc208-3282-49d2-8e15-0c64b0ee4abb&type=in.(receipt_processing_completed)&priority=in.(high)';
+            log('Filter:', filter);
+
+            const channel = supabase
+                .channel('test-minimal-filter')
+                .on('system', {}, (payload) => {
+                    log('🔍 System message:', payload);
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: filter
+                }, (payload) => {
+                    log('📨 Notification received:', payload);
+                })
+                .subscribe((status) => {
+                    log(`📡 Subscription status: ${status}`);
+                    if (status === 'CHANNEL_ERROR') {
+                        log('❌ Channel error occurred');
+                    } else if (status === 'SUBSCRIBED') {
+                        log('✅ Successfully subscribed');
+                    }
+                });
+        }
+
+        function testProductionFilter() {
+            log('🧪 Testing Production Filter...');
+            
+            const filter = 'recipient_id=eq.feecc208-3282-49d2-8e15-0c64b0ee4abb&type=in.(receipt_processing_completed,receipt_processing_failed,receipt_ready_for_review,receipt_batch_completed,team_member_joined,team_member_left,team_member_role_changed,team_invitation_sent,team_invitation_accepted,team_invitation_declined,billing_subscription_created,billing_subscription_updated,billing_subscription_cancelled,billing_payment_succeeded,billing_payment_failed,billing_invoice_created,security_login_from_new_device,security_password_changed,security_email_changed,receipt_comment_added,receipt_shared,receipt_flagged_for_review,claim_submitted,claim_approved,claim_rejected,claim_review_requested)&priority=in.(medium,high)';
+            log('Filter length:', filter.length);
+
+            const channel = supabase
+                .channel('test-production-filter')
+                .on('system', {}, (payload) => {
+                    log('🔍 System message:', payload);
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: filter
+                }, (payload) => {
+                    log('📨 Notification received:', payload);
+                })
+                .subscribe((status) => {
+                    log(`📡 Subscription status: ${status}`);
+                    if (status === 'CHANNEL_ERROR') {
+                        log('❌ Channel error occurred');
+                    } else if (status === 'SUBSCRIBED') {
+                        log('✅ Successfully subscribed');
+                    }
+                });
+        }
+
+        // Auto-start with minimal filter test
+        window.addEventListener('load', () => {
+            log('🚀 Page loaded, ready for testing');
+            log('Click buttons above to test different filters');
+        });
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: scroll;
+            background-color: #f9f9f9;
+            margin: 20px 0;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        #output div {
+            margin: 2px 0;
+            font-size: 12px;
+        }
+    </style>
+</body>
+</html>
