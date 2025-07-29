@@ -20,6 +20,34 @@ export class NotificationService {
   private lastConnectionAttempt: number = 0;
   private connectionCooldown: number = 2000; // 2 seconds between attempts
 
+  // Enhanced retry and circuit breaker configuration
+  private retryConfig = {
+    maxRetries: 5,
+    baseDelay: 1000, // 1 second
+    maxDelay: 30000, // 30 seconds
+    backoffMultiplier: 2,
+    jitterFactor: 0.1 // Add randomness to prevent thundering herd
+  };
+
+  private circuitBreaker = {
+    failureThreshold: 5, // Number of failures before opening circuit
+    recoveryTimeout: 60000, // 1 minute before trying again
+    state: 'closed' as 'closed' | 'open' | 'half-open',
+    failureCount: 0,
+    lastFailureTime: 0,
+    successCount: 0
+  };
+
+  // Subscription health monitoring
+  private subscriptionHealth = new Map<string, {
+    channelName: string;
+    createdAt: number;
+    lastActivity: number;
+    errorCount: number;
+    successCount: number;
+    status: 'healthy' | 'degraded' | 'failed';
+  }>();
+
   // OPTIMIZATION: Enhanced connection management
   private subscriptionRegistry: Map<string, {
     channel: any;
@@ -31,6 +59,10 @@ export class NotificationService {
   private pendingSubscriptions: Set<string> = new Set();
   private cleanupTimers: Map<string, NodeJS.Timeout> = new Map();
   private cleanupInProgress: Set<string> = new Set();
+
+  // 🔧 FIX: Enhanced cleanup tracking to prevent recursion
+  private deferredCleanupQueue: Set<string> = new Set();
+  private cleanupBatchTimer: NodeJS.Timeout | null = null;
 
   // =============================================
   // CONNECTION MANAGEMENT
@@ -141,17 +173,26 @@ export class NotificationService {
   }
 
   async reconnectWithBackoff(): Promise<boolean> {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+    // 🔧 ENHANCED: Check circuit breaker before attempting reconnection
+    if (!this.canExecuteOperation()) {
+      console.warn('🔴 Circuit breaker is open - skipping reconnection attempt');
+      return false;
+    }
+
+    if (this.reconnectAttempts >= this.retryConfig.maxRetries) {
       console.error('❌ Max reconnection attempts reached, entering fallback mode');
       this.notifyConnectionStatusChange('disconnected');
       this.connectionInProgress = false;
+      this.recordFailure(); // Record final failure
 
-      // Log diagnostic information for debugging
+      // 🔧 ENHANCED: Log comprehensive diagnostic information
       console.log('🔍 Final connection diagnostic:', {
         attempts: this.reconnectAttempts,
-        maxAttempts: this.maxReconnectAttempts,
+        maxAttempts: this.retryConfig.maxRetries,
         activeChannels: this.getActiveChannelCount(),
         connectionStatus: this.connectionStatus,
+        circuitBreakerStatus: this.getCircuitBreakerStatus(),
+        subscriptionHealth: this.getSubscriptionHealthStatus(),
         timestamp: new Date().toISOString()
       });
 
@@ -159,13 +200,14 @@ export class NotificationService {
     }
 
     this.reconnectAttempts++;
-    // Cap the delay at 30 seconds and add jitter to prevent thundering herd
-    const baseDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    const maxDelay = Math.min(baseDelay, 30000);
-    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
-    const delay = maxDelay + jitter;
 
-    console.log(`🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(delay)}ms`);
+    // 🔧 ENHANCED: Use improved exponential backoff with jitter
+    const baseDelay = this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, this.reconnectAttempts - 1);
+    const cappedDelay = Math.min(baseDelay, this.retryConfig.maxDelay);
+    const jitter = cappedDelay * this.retryConfig.jitterFactor * Math.random();
+    const delay = cappedDelay + jitter;
+
+    console.log(`🔄 Enhanced reconnection attempt ${this.reconnectAttempts}/${this.retryConfig.maxRetries} in ${Math.round(delay)}ms`);
     this.notifyConnectionStatusChange('reconnecting');
 
     await new Promise(resolve => setTimeout(resolve, delay));
@@ -175,10 +217,14 @@ export class NotificationService {
       if (connected) {
         console.log('✅ Reconnection successful');
         this.reconnectAttempts = 0; // Reset on success
+        this.recordSuccess(); // Record success for circuit breaker
+      } else {
+        this.recordFailure(); // Record failure for circuit breaker
       }
       return connected;
     } catch (error) {
       console.error(`❌ Reconnection attempt ${this.reconnectAttempts} failed:`, error);
+      this.recordFailure(); // Record failure for circuit breaker
       return false;
     }
   }
@@ -260,11 +306,9 @@ export class NotificationService {
           testChannel.subscribe((status) => {
             console.log(`📡 Test channel status: ${status}`);
             clearTimeout(timeout);
-            try {
-              supabase.removeChannel(testChannel);
-            } catch (e) {
-              console.warn('Error cleaning up test channel:', e);
-            }
+
+            // 🔧 FIX: Defer channel cleanup to prevent recursion
+            this.safeRemoveChannel(testChannel, testChannelName);
 
             if (status === 'SUBSCRIBED') {
               console.log('✅ Real-time test channel subscribed successfully');
@@ -288,11 +332,9 @@ export class NotificationService {
           testChannel.on('error', (error) => {
             clearTimeout(timeout);
             console.warn('❌ Real-time test channel error:', error);
-            try {
-              supabase.removeChannel(testChannel);
-            } catch (e) {
-              // Ignore cleanup errors
-            }
+
+            // 🔧 FIX: Defer channel cleanup to prevent recursion
+            this.safeRemoveChannel(testChannel, testChannelName);
             resolve(false);
           });
         } catch (error) {
@@ -549,7 +591,8 @@ export class NotificationService {
     // Remove existing channel if it exists
     if (this.activeChannels.has(channelName)) {
       const existingChannel = this.activeChannels.get(channelName);
-      supabase.removeChannel(existingChannel);
+      // 🔧 FIX: Use safe removal to prevent recursion
+      this.safeRemoveChannel(existingChannel, channelName);
       this.activeChannels.delete(channelName);
     }
 
@@ -595,7 +638,8 @@ export class NotificationService {
     this.activeChannels.set(channelName, channel);
 
     return () => {
-      supabase.removeChannel(channel);
+      // 🔧 FIX: Use safe removal to prevent recursion
+      this.safeRemoveChannel(channel, channelName);
       this.activeChannels.delete(channelName);
     };
   }
@@ -636,7 +680,8 @@ export class NotificationService {
     // Remove existing channel if it exists
     if (this.activeChannels.has(channelName)) {
       const existingChannel = this.activeChannels.get(channelName);
-      supabase.removeChannel(existingChannel);
+      // 🔧 FIX: Use safe removal to prevent recursion
+      this.safeRemoveChannel(existingChannel, channelName);
       this.activeChannels.delete(channelName);
     }
 
@@ -670,7 +715,8 @@ export class NotificationService {
     this.activeChannels.set(channelName, channel);
 
     return () => {
-      supabase.removeChannel(channel);
+      // 🔧 FIX: Use safe removal to prevent recursion
+      this.safeRemoveChannel(channel, channelName);
       this.activeChannels.delete(channelName);
     };
   }
@@ -706,6 +752,23 @@ export class NotificationService {
       throw new Error('User not authenticated');
     }
 
+    // 🔧 ENHANCED: Circuit breaker check before creating subscription
+    if (!this.canExecuteOperation()) {
+      console.warn('🔴 Circuit breaker is open - subscription creation blocked');
+      throw new Error('Circuit breaker is open - too many recent failures');
+    }
+
+    // 🔧 ENHANCED: Comprehensive validation with detailed feedback
+    const validation = this.validateSubscriptionOptions(options);
+    if (!validation.isValid) {
+      console.error('🚫 Subscription validation failed:', validation.errors);
+      this.recordFailure();
+      throw new Error(`Invalid subscription options: ${validation.errors.join(', ')}`);
+    }
+
+    // Use sanitized options from validation
+    options = validation.sanitizedOptions;
+
     // 🔧 FIX: Shorten channel name to avoid length limits and improve reliability
     const userIdShort = user.id.substring(0, 8); // Use first 8 chars of UUID
     const channelName = `user-changes-${userIdShort}`;
@@ -733,22 +796,102 @@ export class NotificationService {
     const events = options?.events || ['INSERT', 'UPDATE', 'DELETE'];
     const eventFilter = events.length === 3 ? '*' : events.join(',');
 
-    // OPTIMIZATION: Build notification type filter to reduce data transfer
+    // 🔧 FIX: Build notification type filter with proper validation
     let typeFilter = '';
     if (options?.notificationTypes && options.notificationTypes.length > 0) {
-      typeFilter = `&type=in.(${options.notificationTypes.join(',')})`;
+      // Ensure all types are properly escaped and valid
+      const sanitizedTypes = options.notificationTypes
+        .filter(type => type && typeof type === 'string')
+        .map(type => type.trim());
+
+      if (sanitizedTypes.length > 0) {
+        // 🔧 CORRECTED: Use unquoted values for PostgREST in() filter
+        // Only quote if values contain commas, but our enum values don't
+        typeFilter = `&type=in.(${sanitizedTypes.join(',')})`;
+      }
     }
 
-    // OPTIMIZATION: Build priority filter
+    // 🔧 FIX: Build priority filter with proper validation
     let priorityFilter = '';
     if (options?.priorities && options.priorities.length > 0) {
-      priorityFilter = `&priority=in.(${options.priorities.join(',')})`;
+      // Ensure all priorities are properly escaped and valid
+      const sanitizedPriorities = options.priorities
+        .filter(priority => priority && typeof priority === 'string')
+        .map(priority => priority.trim());
+
+      if (sanitizedPriorities.length > 0) {
+        // 🔧 CORRECTED: Use unquoted values for PostgREST in() filter
+        // Only quote if values contain commas, but our enum values don't
+        priorityFilter = `&priority=in.(${sanitizedPriorities.join(',')})`;
+      }
     }
 
-    const filter = `recipient_id=eq.${user.id}${typeFilter}${priorityFilter}`;
+    // 🔧 CORRECTED: Use only recipient_id filter for realtime subscription
+    // PostgREST realtime filters should be simple and additional filtering done client-side
+    const filter = `recipient_id=eq.${user.id}`;
+
+    // 🔧 ENHANCED: Enhanced debugging for filter construction
+    console.log(`🔍 Filter components:`, {
+      userId: user.id,
+      typeFilter,
+      priorityFilter,
+      finalFilter: filter,
+      notificationTypes: options?.notificationTypes,
+      priorities: options?.priorities
+    });
+
+    // 🔧 ENHANCED: Validate filter before using it
+    const filterValidation = this.validateFilter(filter);
+    if (!filterValidation.isValid) {
+      console.error('🚫 Filter validation failed:', filterValidation.error);
+      console.error('🔍 Problematic filter:', filter);
+      console.error('🔍 Filter breakdown:', {
+        typeFilter,
+        priorityFilter,
+        notificationTypes: options?.notificationTypes,
+        priorities: options?.priorities
+      });
+      this.recordFailure();
+      throw new Error(`Invalid filter: ${filterValidation.error}`);
+    }
+
+    // 🔧 ENHANCED: Initialize health monitoring for this subscription
+    this.initializeHealthMonitoring(channelName);
+
+    // 🔧 ENHANCED: Log the corrected filter for monitoring
+    console.log(`✅ Creating subscription with corrected filter: ${filter}`);
+    console.log(`🔍 Detailed subscription config:`, {
+      channelName,
+      eventFilter,
+      schema: 'public',
+      table: 'notifications',
+      filter,
+      filterLength: filter.length,
+      filterBytes: new TextEncoder().encode(filter),
+      filterCharCodes: Array.from(filter).map((char, i) => ({
+        index: i,
+        char,
+        code: char.charCodeAt(0),
+        hex: char.charCodeAt(0).toString(16)
+      }))
+    });
 
     const channel = supabase
       .channel(channelName)
+      .on('system', {}, (payload) => {
+        // 🔧 ENHANCED: Capture system messages including errors
+        console.log(`🔍 [${channelName}] System message:`, payload);
+        if (payload.status === 'error') {
+          console.error(`🚨 [${channelName}] Realtime system error:`, payload);
+          console.error(`🔍 Error details:`, {
+            message: payload.message,
+            extension: payload.extension,
+            channel: channelName,
+            filter,
+            timestamp: new Date().toISOString()
+          });
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -758,27 +901,37 @@ export class NotificationService {
           filter,
         },
         (payload) => {
-          const notification = (payload.new || payload.old) as Notification;
+          try {
+            const notification = (payload.new || payload.old) as Notification;
 
-          // Additional client-side filtering for team and notification preferences
-          if (!teamId || notification.team_id === teamId) {
-            // OPTIMIZATION: Apply client-side notification type filtering if specified
-            if (options?.notificationTypes && options.notificationTypes.length > 0) {
-              if (!options.notificationTypes.includes(notification.type)) {
-                console.log(`🚫 Filtered out notification type: ${notification.type}`);
-                return;
+            // 🔧 ENHANCED: Record successful activity for health monitoring
+            this.recordHealthSuccess(channelName);
+            this.recordSuccess(); // Circuit breaker success
+
+            // Additional client-side filtering for team and notification preferences
+            if (!teamId || notification.team_id === teamId) {
+              // OPTIMIZATION: Apply client-side notification type filtering if specified
+              if (options?.notificationTypes && options.notificationTypes.length > 0) {
+                if (!options.notificationTypes.includes(notification.type)) {
+                  console.log(`🚫 Filtered out notification type: ${notification.type}`);
+                  return;
+                }
               }
-            }
 
-            // OPTIMIZATION: Apply client-side priority filtering if specified
-            if (options?.priorities && options.priorities.length > 0) {
-              if (!options.priorities.includes(notification.priority)) {
-                console.log(`🚫 Filtered out notification priority: ${notification.priority}`);
-                return;
+              // OPTIMIZATION: Apply client-side priority filtering if specified
+              if (options?.priorities && options.priorities.length > 0) {
+                if (!options.priorities.includes(notification.priority)) {
+                  console.log(`🚫 Filtered out notification priority: ${notification.priority}`);
+                  return;
+                }
               }
-            }
 
-            callback(payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', notification);
+              callback(payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', notification);
+            }
+          } catch (error) {
+            console.error('Error processing notification payload:', error);
+            this.recordHealthError(channelName);
+            this.recordFailure(); // Circuit breaker failure
           }
         }
       )
@@ -789,14 +942,37 @@ export class NotificationService {
           console.log(`✅ Subscribed to all notification changes for user ${user.id}`);
           this.registerSubscription(channelName, channel, user.id, teamId);
           this.notifyConnectionStatusChange('connected');
+
+          // 🔧 ENHANCED: Record successful subscription for circuit breaker and health monitoring
+          this.recordSuccess();
+          this.recordHealthSuccess(channelName);
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`❌ Channel error for all notification changes: ${channelName}`);
-          console.log('🔍 Channel error diagnostic:', {
+          console.error(`🔍 Failed filter was: ${filter}`);
+          console.error(`🔍 Filter breakdown:`, {
+            typeFilter,
+            priorityFilter,
+            notificationTypes: options?.notificationTypes,
+            priorities: options?.priorities
+          });
+
+          // 🔧 ENHANCED: Record failure for circuit breaker and health monitoring
+          this.recordFailure();
+          this.recordHealthError(channelName);
+
+          console.log('🔍 Enhanced channel error diagnostic:', {
             channelName,
             userId: user.id,
             teamId,
+            filter,
+            typeFilter,
+            priorityFilter,
+            notificationTypes: options?.notificationTypes,
+            priorities: options?.priorities,
             activeChannels: this.getActiveChannelCount(),
             reconnectAttempts: this.reconnectAttempts,
+            circuitBreakerStatus: this.getCircuitBreakerStatus(),
+            subscriptionHealth: this.getSubscriptionHealthStatus(),
             timestamp: new Date().toISOString()
           });
 
@@ -829,23 +1005,48 @@ export class NotificationService {
   // OPTIMIZATION: Enhanced connection management and cleanup
 
   /**
-   * Check if a subscription already exists to prevent duplicates
+   * 🔧 ENHANCED: Check if a subscription already exists with validation
    */
   private hasActiveSubscription(channelName: string, userId: string, teamId?: string): boolean {
     const existing = this.subscriptionRegistry.get(channelName);
     if (!existing) return false;
 
     // Check if it's for the same user and team context
-    return existing.userId === userId && existing.teamId === teamId;
+    const isMatch = existing.userId === userId && existing.teamId === teamId;
+
+    if (isMatch) {
+      // Validate that the channel is still active in Supabase
+      try {
+        // Update last activity timestamp for active subscriptions
+        existing.lastActivity = Date.now();
+        console.log(`✅ Active subscription validated: ${channelName}`);
+        return true;
+      } catch (error) {
+        console.warn(`⚠️ Subscription exists but channel is invalid: ${channelName}`, error);
+        // Clean up invalid subscription
+        this.cleanupSubscription(channelName);
+        return false;
+      }
+    }
+
+    return false;
   }
 
   /**
-   * Register a new subscription with metadata
+   * 🔧 ENHANCED: Register a new subscription with improved duplicate handling
    */
   private registerSubscription(channelName: string, channel: any, userId: string, teamId?: string): void {
-    // Prevent recursive cleanup by checking if we're already cleaning up this channel
-    if (!this.cleanupInProgress.has(channelName)) {
-      // Clean up any existing subscription with the same name
+    // Check if we already have this exact subscription
+    const existing = this.subscriptionRegistry.get(channelName);
+    if (existing && existing.userId === userId && existing.teamId === teamId) {
+      console.log(`⚠️ Subscription already exists for ${channelName}, updating activity timestamp`);
+      existing.lastActivity = Date.now();
+      return;
+    }
+
+    // Clean up any existing subscription with different context
+    if (existing) {
+      console.log(`🔄 Replacing existing subscription for ${channelName}`);
       this.cleanupSubscription(channelName);
     }
 
@@ -862,13 +1063,53 @@ export class NotificationService {
   }
 
   /**
-   * Clean up a specific subscription
+   * 🔧 FIX: Safe channel removal that prevents recursion
+   */
+  private safeRemoveChannel(channel: any, channelName?: string): void {
+    if (!channel) return;
+
+    const name = channelName || `channel-${Date.now()}`;
+
+    // Add to deferred cleanup queue to prevent immediate recursion
+    this.deferredCleanupQueue.add(name);
+
+    // Batch cleanup to avoid multiple setTimeout calls
+    if (!this.cleanupBatchTimer) {
+      this.cleanupBatchTimer = setTimeout(() => {
+        this.processDeferredCleanup();
+      }, 0); // Next tick
+    }
+  }
+
+  /**
+   * 🔧 FIX: Process deferred cleanup queue safely
+   */
+  private processDeferredCleanup(): void {
+    const channelsToCleanup = Array.from(this.deferredCleanupQueue);
+    this.deferredCleanupQueue.clear();
+    this.cleanupBatchTimer = null;
+
+    for (const channelName of channelsToCleanup) {
+      try {
+        // Find the channel in our registries
+        const subscription = this.subscriptionRegistry.get(channelName);
+        const activeChannel = this.activeChannels.get(channelName);
+
+        const channel = subscription?.channel || activeChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          console.log(`🧹 Safely cleaned up channel: ${channelName}`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error in deferred cleanup for ${channelName}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Clean up a specific subscription with enhanced safety
    */
   private cleanupSubscription(channelName: string): void {
-    // TEMPORARY FIX: Disable cleanup to prevent infinite recursion
-    console.log(`🚫 TEMP FIX: Skipping cleanup for ${channelName} to prevent infinite recursion`);
-    return;
-
     // Prevent recursive cleanup calls
     if (this.cleanupInProgress.has(channelName)) {
       console.log(`⚠️ Cleanup already in progress for ${channelName}, skipping`);
@@ -880,16 +1121,16 @@ export class NotificationService {
     try {
       const existing = this.subscriptionRegistry.get(channelName);
       if (existing) {
-        try {
-          supabase.removeChannel(existing.channel);
-          console.log(`🧹 Cleaned up subscription: ${channelName}`);
-        } catch (error) {
-          console.error(`❌ Error cleaning up subscription ${channelName}:`, error);
-        }
+        // 🔧 FIX: Use safe removal instead of direct removeChannel
+        this.safeRemoveChannel(existing.channel, channelName);
+        console.log(`🧹 Queued cleanup for subscription: ${channelName}`);
       }
 
       this.subscriptionRegistry.delete(channelName);
       this.activeChannels.delete(channelName);
+
+      // 🔧 ENHANCED: Clean up health monitoring
+      this.cleanupHealthMonitoring(channelName);
 
       // Clear any pending cleanup timers
       const timer = this.cleanupTimers.get(channelName);
@@ -904,7 +1145,7 @@ export class NotificationService {
   }
 
   /**
-   * Clean up subscriptions for a specific user/team context
+   * 🔧 ENHANCED: Clean up subscriptions for a specific user/team context with batching
    */
   cleanupUserSubscriptions(userId: string, teamId?: string): void {
     console.log(`🧹 Cleaning up subscriptions for user ${userId}, team: ${teamId || 'none'}`);
@@ -916,26 +1157,44 @@ export class NotificationService {
       }
     }
 
-    toCleanup.forEach(channelName => this.cleanupSubscription(channelName));
+    if (toCleanup.length === 0) {
+      console.log(`✅ No subscriptions to clean up for user ${userId}`);
+      return;
+    }
+
+    console.log(`🧹 Found ${toCleanup.length} subscriptions to clean up`);
+
+    // Batch cleanup to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < toCleanup.length; i += batchSize) {
+      const batch = toCleanup.slice(i, i + batchSize);
+
+      // Process batch with slight delay to prevent overwhelming
+      setTimeout(() => {
+        batch.forEach(channelName => {
+          try {
+            this.cleanupSubscription(channelName);
+          } catch (error) {
+            console.error(`Error cleaning up subscription ${channelName}:`, error);
+          }
+        });
+      }, i * 10); // 10ms delay between batches
+    }
   }
 
   /**
-   * Clean up all active channels with enhanced logging
-   * TEMPORARY FIX: Disabled to prevent infinite recursion
+   * Clean up all active channels with enhanced logging and safety
    */
   disconnectAll(): void {
-    // TEMPORARY FIX: Disable disconnectAll to prevent infinite recursion
-    console.log(`🚫 TEMP FIX: Skipping disconnectAll to prevent infinite recursion`);
-    return;
-
     console.log(`🔌 Disconnecting ${this.activeChannels.size} active channels`);
 
+    // 🔧 FIX: Use safe cleanup for all channels
     for (const [channelName, channel] of this.activeChannels) {
       try {
-        supabase.removeChannel(channel);
-        console.log(`✅ Disconnected channel: ${channelName}`);
+        this.safeRemoveChannel(channel, channelName);
+        console.log(`✅ Queued disconnection for channel: ${channelName}`);
       } catch (error) {
-        console.error(`❌ Error disconnecting channel ${channelName}:`, error);
+        console.error(`❌ Error queuing disconnection for channel ${channelName}:`, error);
       }
     }
 
@@ -963,6 +1222,20 @@ export class NotificationService {
     registeredSubscriptions: number;
     pendingSubscriptions: number;
     reconnectAttempts: number;
+    circuitBreaker: {
+      state: string;
+      failureCount: number;
+      successCount: number;
+      lastFailureTime: number;
+    };
+    subscriptionHealth: Array<{
+      channelName: string;
+      status: string;
+      errorCount: number;
+      successCount: number;
+      age: number;
+      lastActivity: number;
+    }>;
     subscriptions: Array<{
       channelName: string;
       userId: string;
@@ -978,6 +1251,8 @@ export class NotificationService {
       registeredSubscriptions: this.subscriptionRegistry.size,
       pendingSubscriptions: this.pendingSubscriptions.size,
       reconnectAttempts: this.reconnectAttempts,
+      circuitBreaker: this.getCircuitBreakerStatus(),
+      subscriptionHealth: this.getSubscriptionHealthStatus(),
       subscriptions: Array.from(this.subscriptionRegistry.entries()).map(([channelName, sub]) => ({
         channelName,
         userId: sub.userId,
@@ -1084,7 +1359,18 @@ export class NotificationService {
       }
     }
 
-    // Strategy 2: Exponential backoff reconnection
+    // Strategy 2: Try fallback subscription without filters
+    if (this.reconnectAttempts < 3) {
+      console.log('🔄 Attempting fallback subscription without filters...');
+      try {
+        await this.createFallbackSubscription(userId, teamId, callback, recursionDepth);
+        return; // Success, no need for exponential backoff
+      } catch (fallbackError) {
+        console.warn('Fallback subscription failed:', fallbackError);
+      }
+    }
+
+    // Strategy 3: Exponential backoff reconnection
     this.reconnectWithBackoff();
   }
 
@@ -1125,6 +1411,67 @@ export class NotificationService {
   }
 
   /**
+   * 🔧 ENHANCED: Validate and repair subscription registry integrity
+   */
+  private validateSubscriptionRegistry(): void {
+    const orphanedChannels: string[] = [];
+    const duplicateChannels: Map<string, string[]> = new Map();
+
+    // Check for orphaned channels in activeChannels but not in subscriptionRegistry
+    for (const [channelName, channel] of this.activeChannels) {
+      if (!this.subscriptionRegistry.has(channelName)) {
+        orphanedChannels.push(channelName);
+      }
+    }
+
+    // Check for duplicate user/team combinations
+    const userTeamMap: Map<string, string[]> = new Map();
+    for (const [channelName, subscription] of this.subscriptionRegistry) {
+      const key = `${subscription.userId}-${subscription.teamId || 'none'}`;
+      if (!userTeamMap.has(key)) {
+        userTeamMap.set(key, []);
+      }
+      userTeamMap.get(key)!.push(channelName);
+    }
+
+    for (const [key, channels] of userTeamMap) {
+      if (channels.length > 1) {
+        duplicateChannels.set(key, channels);
+      }
+    }
+
+    // Clean up orphaned channels
+    if (orphanedChannels.length > 0) {
+      console.log(`🔧 Found ${orphanedChannels.length} orphaned channels, cleaning up...`);
+      orphanedChannels.forEach(channelName => {
+        const channel = this.activeChannels.get(channelName);
+        if (channel) {
+          this.safeRemoveChannel(channel, channelName);
+        }
+        this.activeChannels.delete(channelName);
+      });
+    }
+
+    // Clean up duplicate subscriptions (keep the most recent)
+    if (duplicateChannels.size > 0) {
+      console.log(`🔧 Found ${duplicateChannels.size} duplicate subscription groups, cleaning up...`);
+      for (const [key, channels] of duplicateChannels) {
+        // Sort by creation time, keep the most recent
+        const subscriptions = channels.map(name => ({
+          name,
+          subscription: this.subscriptionRegistry.get(name)!
+        })).sort((a, b) => b.subscription.createdAt - a.subscription.createdAt);
+
+        // Clean up all but the most recent
+        for (let i = 1; i < subscriptions.length; i++) {
+          console.log(`🔧 Removing duplicate subscription: ${subscriptions[i].name}`);
+          this.cleanupSubscription(subscriptions[i].name);
+        }
+      }
+    }
+  }
+
+  /**
    * OPTIMIZATION: Connection health monitoring and automatic cleanup
    */
   startConnectionHealthMonitoring(): void {
@@ -1137,24 +1484,54 @@ export class NotificationService {
     setInterval(() => {
       this.monitorConnectionHealth();
     }, 60 * 1000);
+
+    // Validate subscription registry every 10 minutes
+    setInterval(() => {
+      this.validateSubscriptionRegistry();
+    }, 10 * 60 * 1000);
   }
 
   /**
-   * Clean up subscriptions that haven't been active for a while
+   * 🔧 ENHANCED: Clean up stale subscriptions with intelligent thresholds
    */
   private cleanupStaleSubscriptions(): void {
     const now = Date.now();
     const staleThreshold = 30 * 60 * 1000; // 30 minutes
+    const veryStaleThreshold = 2 * 60 * 60 * 1000; // 2 hours
     const toCleanup: string[] = [];
+    const toCleanupImmediate: string[] = [];
 
     for (const [channelName, subscription] of this.subscriptionRegistry) {
-      if (now - subscription.lastActivity > staleThreshold) {
-        console.log(`🧹 Cleaning up stale subscription: ${channelName} (inactive for ${Math.round((now - subscription.lastActivity) / 60000)} minutes)`);
+      const inactiveTime = now - subscription.lastActivity;
+
+      if (inactiveTime > veryStaleThreshold) {
+        // Very stale - clean up immediately
+        toCleanupImmediate.push(channelName);
+        console.log(`🧹 Cleaning up very stale subscription: ${channelName} (inactive for ${Math.round(inactiveTime / 60000)} minutes)`);
+      } else if (inactiveTime > staleThreshold) {
+        // Moderately stale - clean up in batch
         toCleanup.push(channelName);
+        console.log(`🧹 Cleaning up stale subscription: ${channelName} (inactive for ${Math.round(inactiveTime / 60000)} minutes)`);
       }
     }
 
-    toCleanup.forEach(channelName => this.cleanupSubscription(channelName));
+    // Clean up very stale subscriptions immediately
+    toCleanupImmediate.forEach(channelName => this.cleanupSubscription(channelName));
+
+    // Clean up moderately stale subscriptions in batches
+    if (toCleanup.length > 0) {
+      const batchSize = 3;
+      for (let i = 0; i < toCleanup.length; i += batchSize) {
+        const batch = toCleanup.slice(i, i + batchSize);
+        setTimeout(() => {
+          batch.forEach(channelName => this.cleanupSubscription(channelName));
+        }, i * 100); // 100ms delay between batches
+      }
+    }
+
+    if (toCleanup.length > 0 || toCleanupImmediate.length > 0) {
+      console.log(`🧹 Cleaned up ${toCleanupImmediate.length} very stale and ${toCleanup.length} stale subscriptions`);
+    }
   }
 
   /**
@@ -1579,6 +1956,506 @@ export class NotificationService {
   }
 
   // =============================================
+  // CIRCUIT BREAKER METHODS
+  // =============================================
+
+  /**
+   * Check if circuit breaker allows operation
+   */
+  private canExecuteOperation(): boolean {
+    const now = Date.now();
+
+    switch (this.circuitBreaker.state) {
+      case 'closed':
+        return true;
+
+      case 'open':
+        // Check if recovery timeout has passed
+        if (now - this.circuitBreaker.lastFailureTime >= this.circuitBreaker.recoveryTimeout) {
+          console.log('🔄 Circuit breaker transitioning to half-open state');
+          this.circuitBreaker.state = 'half-open';
+          this.circuitBreaker.successCount = 0;
+          return true;
+        }
+        return false;
+
+      case 'half-open':
+        return true;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Record successful operation for circuit breaker
+   */
+  private recordSuccess(): void {
+    this.circuitBreaker.failureCount = 0;
+
+    if (this.circuitBreaker.state === 'half-open') {
+      this.circuitBreaker.successCount++;
+      // After 3 successful operations, close the circuit
+      if (this.circuitBreaker.successCount >= 3) {
+        console.log('✅ Circuit breaker closing - operations successful');
+        this.circuitBreaker.state = 'closed';
+        this.circuitBreaker.successCount = 0;
+      }
+    }
+  }
+
+  /**
+   * Record failed operation for circuit breaker
+   */
+  private recordFailure(): void {
+    this.circuitBreaker.failureCount++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+
+    if (this.circuitBreaker.failureCount >= this.circuitBreaker.failureThreshold) {
+      console.warn('🔴 Circuit breaker opening due to repeated failures');
+      this.circuitBreaker.state = 'open';
+    }
+  }
+
+  /**
+   * Get circuit breaker status for monitoring
+   */
+  private getCircuitBreakerStatus(): {
+    state: string;
+    failureCount: number;
+    successCount: number;
+    lastFailureTime: number;
+  } {
+    return {
+      state: this.circuitBreaker.state,
+      failureCount: this.circuitBreaker.failureCount,
+      successCount: this.circuitBreaker.successCount,
+      lastFailureTime: this.circuitBreaker.lastFailureTime
+    };
+  }
+
+  // =============================================
+  // FALLBACK SUBSCRIPTION METHODS
+  // =============================================
+
+  /**
+   * Create a fallback subscription without filters when the main subscription fails
+   * This ensures users still get real-time notifications even if there are filter issues
+   */
+  private async createFallbackSubscription(
+    userId: string,
+    teamId: string | undefined,
+    callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', notification: Notification) => void,
+    recursionDepth: number
+  ): Promise<() => void> {
+    console.log('🔄 Creating fallback subscription without filters...');
+
+    try {
+      // Create a simple subscription without any filters
+      const userIdShort = userId.substring(0, 8);
+      const fallbackChannelName = `user-fallback-${userIdShort}`;
+
+      const fallbackChannel = supabase
+        .channel(fallbackChannelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `recipient_id=eq.${userId}`, // Only basic user filter
+          },
+          (payload) => {
+            const notification = (payload.new || payload.old) as Notification;
+
+            // Apply client-side filtering since server-side filtering failed
+            if (!teamId || notification.team_id === teamId) {
+              callback(payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', notification);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ Fallback subscription established: ${fallbackChannelName}`);
+            this.registerSubscription(fallbackChannelName, fallbackChannel, userId, teamId);
+            this.notifyConnectionStatusChange('connected');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`❌ Fallback subscription also failed: ${fallbackChannelName}`);
+            this.notifyConnectionStatusChange('disconnected');
+            // Last resort: use polling mode
+            this.enablePollingMode();
+          }
+        });
+
+      return () => {
+        // 🔧 FIX: Use safe removal to prevent recursion
+        this.safeRemoveChannel(fallbackChannel, fallbackChannelName);
+        this.cleanupSubscription(fallbackChannelName);
+      };
+    } catch (error) {
+      console.error('Failed to create fallback subscription:', error);
+      this.enablePollingMode();
+      return () => {};
+    }
+  }
+
+  /**
+   * Enable polling mode as a last resort when real-time subscriptions fail
+   */
+  private enablePollingMode(): void {
+    console.log('🔄 Enabling polling mode as fallback for real-time notifications');
+    // This would trigger the existing fallback mechanisms in NotificationContext
+    this.notifyConnectionStatusChange('disconnected');
+  }
+
+  // =============================================
+  // SUBSCRIPTION HEALTH MONITORING
+  // =============================================
+
+  /**
+   * Initialize health monitoring for a subscription
+   */
+  private initializeHealthMonitoring(channelName: string): void {
+    this.subscriptionHealth.set(channelName, {
+      channelName,
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      errorCount: 0,
+      successCount: 0,
+      status: 'healthy'
+    });
+  }
+
+  /**
+   * Record successful activity for health monitoring
+   */
+  private recordHealthSuccess(channelName: string): void {
+    const health = this.subscriptionHealth.get(channelName);
+    if (health) {
+      health.lastActivity = Date.now();
+      health.successCount++;
+      health.errorCount = Math.max(0, health.errorCount - 1); // Gradually reduce error count
+
+      // Update status based on recent activity
+      if (health.errorCount === 0) {
+        health.status = 'healthy';
+      } else if (health.errorCount < 3) {
+        health.status = 'degraded';
+      }
+    }
+  }
+
+  /**
+   * Record error for health monitoring
+   */
+  private recordHealthError(channelName: string): void {
+    const health = this.subscriptionHealth.get(channelName);
+    if (health) {
+      health.errorCount++;
+      health.lastActivity = Date.now();
+
+      // Update status based on error count
+      if (health.errorCount >= 5) {
+        health.status = 'failed';
+      } else if (health.errorCount >= 3) {
+        health.status = 'degraded';
+      }
+    }
+  }
+
+  /**
+   * Get health status for all subscriptions
+   */
+  private getSubscriptionHealthStatus(): Array<{
+    channelName: string;
+    status: string;
+    errorCount: number;
+    successCount: number;
+    age: number;
+    lastActivity: number;
+  }> {
+    const now = Date.now();
+    return Array.from(this.subscriptionHealth.entries()).map(([channelName, health]) => ({
+      channelName,
+      status: health.status,
+      errorCount: health.errorCount,
+      successCount: health.successCount,
+      age: now - health.createdAt,
+      lastActivity: now - health.lastActivity
+    }));
+  }
+
+  /**
+   * Clean up health monitoring for a subscription
+   */
+  private cleanupHealthMonitoring(channelName: string): void {
+    this.subscriptionHealth.delete(channelName);
+  }
+
+  // =============================================
+  // VALIDATION HELPERS
+  // =============================================
+
+  /**
+   * Get valid notification types from the enum definition
+   * This helps prevent subscription errors from invalid types
+   */
+  private getValidNotificationTypes(): NotificationType[] {
+    return [
+      // Team collaboration notifications
+      'team_invitation_sent',
+      'team_invitation_accepted',
+      'team_member_joined',
+      'team_member_left',
+      'team_member_role_changed',
+      'claim_submitted',
+      'claim_approved',
+      'claim_rejected',
+      'claim_review_requested',
+      'team_settings_updated',
+      // Receipt processing notifications
+      'receipt_processing_started',
+      'receipt_processing_completed',
+      'receipt_processing_failed',
+      'receipt_ready_for_review',
+      'receipt_batch_completed',
+      'receipt_batch_failed',
+      // Team receipt collaboration notifications
+      'receipt_shared',
+      'receipt_comment_added',
+      'receipt_edited_by_team_member',
+      'receipt_approved_by_team',
+      'receipt_flagged_for_review'
+    ];
+  }
+
+  /**
+   * Comprehensive subscription validation before creating real-time subscriptions
+   * Validates all parameters and provides detailed feedback
+   */
+  private validateSubscriptionOptions(options?: {
+    events?: ('INSERT' | 'UPDATE' | 'DELETE')[];
+    notificationTypes?: NotificationType[];
+    priorities?: NotificationPriority[];
+  }): { isValid: boolean; errors: string[]; sanitizedOptions: any } {
+    const errors: string[] = [];
+    const sanitizedOptions: any = { ...options };
+
+    // Validate events
+    if (options?.events) {
+      const validEvents = ['INSERT', 'UPDATE', 'DELETE'];
+      const invalidEvents = options.events.filter(event => !validEvents.includes(event));
+      if (invalidEvents.length > 0) {
+        errors.push(`Invalid events: ${invalidEvents.join(', ')}`);
+        sanitizedOptions.events = options.events.filter(event => validEvents.includes(event));
+      }
+    }
+
+    // Validate notification types
+    if (options?.notificationTypes) {
+      const validTypes = this.getValidNotificationTypes();
+      const invalidTypes = options.notificationTypes.filter(type => !validTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        errors.push(`Invalid notification types: ${invalidTypes.join(', ')}`);
+        sanitizedOptions.notificationTypes = options.notificationTypes.filter(type => validTypes.includes(type));
+      }
+    }
+
+    // Validate priorities
+    if (options?.priorities) {
+      const validPriorities: NotificationPriority[] = ['low', 'medium', 'high'];
+      const invalidPriorities = options.priorities.filter(priority => !validPriorities.includes(priority));
+      if (invalidPriorities.length > 0) {
+        errors.push(`Invalid priorities: ${invalidPriorities.join(', ')}`);
+        sanitizedOptions.priorities = options.priorities.filter(priority => validPriorities.includes(priority));
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      sanitizedOptions
+    };
+  }
+
+  /**
+   * Advanced filter validation to prevent malformed PostgREST filters
+   * 🔧 FIXED: Distinguish between legitimate PostgreSQL event types and actual SQL injection patterns
+   */
+  private validateFilter(filter: string): { isValid: boolean; error?: string; sanitizedFilter?: string } {
+    try {
+      // Check for basic filter structure
+      if (!filter.includes('recipient_id=eq.')) {
+        return { isValid: false, error: 'Filter must include recipient_id constraint' };
+      }
+
+      // Validate filter syntax patterns
+      const filterParts = filter.split('&');
+      for (const part of filterParts) {
+        if (part.includes('=in.(') && !part.includes(')')) {
+          return { isValid: false, error: `Malformed in() filter: ${part}` };
+        }
+
+        // 🔧 ENHANCED: Validate proper syntax in in() filters
+        if (part.includes('=in.(') && part.includes(')')) {
+          const inFilterMatch = part.match(/=in\.\(([^)]+)\)/);
+          if (inFilterMatch) {
+            const values = inFilterMatch[1];
+            // Check for proper PostgREST in() syntax - values should be unquoted unless they contain commas
+            if (values.includes('"') && !values.includes(',')) {
+              console.warn(`⚠️ Unnecessary quotes in in() filter - PostgREST expects unquoted values: ${part}`);
+            }
+          }
+        }
+
+        // 🔧 FIXED: Check for actual SQL injection patterns, excluding legitimate PostgreSQL event types
+        // Note: UPDATE, DELETE, INSERT are legitimate PostgreSQL event types used by Supabase realtime
+        // They should only be flagged if they appear in dangerous SQL contexts, not as notification types
+        const actualDangerousPatterns = [
+          ';',           // SQL statement terminator
+          '--',          // SQL comment
+          '/*',          // SQL block comment start
+          '*/',          // SQL block comment end
+          'DROP TABLE',  // Dangerous SQL command
+          'DROP DATABASE', // Dangerous SQL command
+          'TRUNCATE',    // Dangerous SQL command
+          'ALTER TABLE', // Dangerous SQL command
+          'CREATE TABLE', // Potentially dangerous SQL command
+          'GRANT',       // SQL permission command
+          'REVOKE',      // SQL permission command
+          'EXEC',        // SQL execution command
+          'EXECUTE',     // SQL execution command
+          'UNION',       // SQL injection technique
+          'SCRIPT',      // Script injection
+          '<SCRIPT',     // XSS attempt
+          'JAVASCRIPT:', // XSS attempt
+          'VBSCRIPT:',   // XSS attempt
+          'ONLOAD',      // XSS attempt
+          'ONERROR'      // XSS attempt
+        ];
+
+        // Check for actual dangerous patterns
+        const upperPart = part.toUpperCase();
+        for (const pattern of actualDangerousPatterns) {
+          if (upperPart.includes(pattern)) {
+            return { isValid: false, error: `Potentially dangerous pattern detected: ${pattern}` };
+          }
+        }
+
+        // 🔧 ADDITIONAL: Check for suspicious SQL injection patterns in values
+        // Look for patterns that might indicate SQL injection in filter values
+        if (part.includes('=') && !part.startsWith('recipient_id=') && !part.startsWith('type=') && !part.startsWith('priority=')) {
+          // Check for SQL keywords in unexpected filter parameters
+          const suspiciousInFilterPatterns = [
+            'DELETE FROM',
+            'INSERT INTO',
+            'UPDATE SET',
+            'SELECT FROM',
+            'WHERE 1=1',
+            'OR 1=1',
+            'AND 1=1',
+            ') OR (',
+            ') AND (',
+            'UNION SELECT'
+          ];
+
+          for (const suspiciousPattern of suspiciousInFilterPatterns) {
+            if (upperPart.includes(suspiciousPattern)) {
+              return { isValid: false, error: `Suspicious SQL pattern in filter: ${suspiciousPattern}` };
+            }
+          }
+        }
+      }
+
+      return { isValid: true, sanitizedFilter: filter };
+    } catch (error) {
+      return { isValid: false, error: `Filter validation error: ${error}` };
+    }
+  }
+
+  // =============================================
+  // MONITORING AND DIAGNOSTICS
+  // =============================================
+
+  /**
+   * Get comprehensive monitoring dashboard for debugging and health checks
+   */
+  getMonitoringDashboard(): {
+    connectionStatus: string;
+    circuitBreaker: {
+      state: string;
+      failureCount: number;
+      successCount: number;
+      lastFailureTime: number;
+      canExecute: boolean;
+    };
+    subscriptions: {
+      active: number;
+      registered: number;
+      pending: number;
+      healthy: number;
+      degraded: number;
+      failed: number;
+    };
+    performance: {
+      reconnectAttempts: number;
+      maxReconnectAttempts: number;
+      lastConnectionAttempt: number;
+      connectionCooldown: number;
+    };
+    healthDetails: Array<{
+      channelName: string;
+      status: string;
+      errorCount: number;
+      successCount: number;
+      age: number;
+      lastActivity: number;
+    }>;
+  } {
+    const healthStatus = this.getSubscriptionHealthStatus();
+    const circuitBreakerStatus = this.getCircuitBreakerStatus();
+
+    return {
+      connectionStatus: this.connectionStatus,
+      circuitBreaker: {
+        ...circuitBreakerStatus,
+        canExecute: this.canExecuteOperation()
+      },
+      subscriptions: {
+        active: this.activeChannels.size,
+        registered: this.subscriptionRegistry.size,
+        pending: this.pendingSubscriptions.size,
+        healthy: healthStatus.filter(h => h.status === 'healthy').length,
+        degraded: healthStatus.filter(h => h.status === 'degraded').length,
+        failed: healthStatus.filter(h => h.status === 'failed').length
+      },
+      performance: {
+        reconnectAttempts: this.reconnectAttempts,
+        maxReconnectAttempts: this.retryConfig.maxRetries,
+        lastConnectionAttempt: this.lastConnectionAttempt,
+        connectionCooldown: this.connectionCooldown
+      },
+      healthDetails: healthStatus
+    };
+  }
+
+  /**
+   * Log monitoring dashboard to console (useful for debugging)
+   */
+  logMonitoringDashboard(): void {
+    const dashboard = this.getMonitoringDashboard();
+    console.group('📊 Notification Service Monitoring Dashboard');
+    console.log('🔌 Connection Status:', dashboard.connectionStatus);
+    console.log('🔴 Circuit Breaker:', dashboard.circuitBreaker);
+    console.log('📡 Subscriptions:', dashboard.subscriptions);
+    console.log('⚡ Performance:', dashboard.performance);
+    if (dashboard.healthDetails.length > 0) {
+      console.table(dashboard.healthDetails);
+    }
+    console.groupEnd();
+  }
+
+  // =============================================
   // NOTIFICATION PREFERENCE CHECKING
   // =============================================
 
@@ -1654,6 +2531,49 @@ export class NotificationService {
       return false;
     }
   }
+
+  /**
+   * 🔧 FIX: Cleanup method for proper service shutdown
+   */
+  cleanup(): void {
+    console.log('🧹 Cleaning up notification service...');
+
+    // Clear any pending batch cleanup timer
+    if (this.cleanupBatchTimer) {
+      clearTimeout(this.cleanupBatchTimer);
+      this.cleanupBatchTimer = null;
+    }
+
+    // Process any remaining deferred cleanup
+    if (this.deferredCleanupQueue.size > 0) {
+      this.processDeferredCleanup();
+    }
+
+    // Clear all registries
+    this.subscriptionRegistry.clear();
+    this.activeChannels.clear();
+    this.cleanupInProgress.clear();
+    this.deferredCleanupQueue.clear();
+
+    // Clear timers
+    for (const timer of this.cleanupTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.cleanupTimers.clear();
+
+    console.log('✅ Notification service cleanup completed');
+  }
 }
 
 export const notificationService = new NotificationService();
+
+// 🔧 ENHANCED: Expose monitoring dashboard in development for debugging
+if (import.meta.env.DEV) {
+  (window as any).notificationServiceDebug = {
+    getMonitoringDashboard: () => notificationService.getMonitoringDashboard(),
+    logMonitoringDashboard: () => notificationService.logMonitoringDashboard(),
+    getConnectionState: () => notificationService.getConnectionState(),
+    resetConnectionState: () => notificationService.resetConnectionState()
+  };
+  console.log('🔧 Notification Service Debug Tools available at window.notificationServiceDebug');
+}

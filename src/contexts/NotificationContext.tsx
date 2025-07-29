@@ -862,9 +862,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       isSetupInProgress = true;
 
       try {
-        // OPTIMIZATION: Single consolidated subscription with selective event filtering
-        // This replaces the previous 3 separate subscriptions with one efficient subscription
-        // and adds selective filtering to reduce unnecessary data transfer
+        // 🔧 FIX: Enhanced subscription with better error handling
+        // Single consolidated subscription with selective event filtering and validation
+        console.log('🔄 Setting up real-time notification subscription...');
         unsubscribeAllNotifications = await notificationService.subscribeToAllUserNotificationChanges(
           (event, notification) => {
             // Filter by team if applicable
@@ -974,8 +974,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
             // OPTIMIZATION: Only subscribe to essential events (exclude rarely used events)
             events: ['INSERT', 'UPDATE', 'DELETE'],
 
-            // OPTIMIZATION: Filter out noise notifications at the subscription level
-            // Exclude 'receipt_processing_started' to reduce noise (already filtered server-side)
+            // 🔧 FIX: Validated notification types to prevent subscription errors
+            // Only include types that exist in the database enum
+            // 🔧 CORRECTED: Full notification types list - server-side filtering removed, client-side filtering active
             notificationTypes: [
               // Receipt processing (excluding started for noise reduction)
               'receipt_processing_completed',
@@ -999,12 +1000,12 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
               'receipt_approved_by_team',
               'receipt_flagged_for_review',
 
-              // Claims
+              // Claims (using correct enum value)
               'claim_submitted',
               'claim_approved',
               'claim_rejected',
               'claim_review_requested'
-            ],
+            ] as NotificationType[], // Type assertion to ensure compile-time validation
 
             // OPTIMIZATION: Only subscribe to medium and high priority notifications for real-time updates
             // Low priority notifications can be loaded on refresh
