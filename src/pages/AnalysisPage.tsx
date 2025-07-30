@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import Lucide icons
-import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2 } from "lucide-react";
+import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2, Loader2 } from "lucide-react";
 
 // Import services and types
 import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
@@ -43,6 +43,9 @@ import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
 
 // Import currency utility
 import { formatCurrencySafe } from '@/utils/currency';
+
+// Import download utility
+import { downloadDailyExpenseReport } from '@/lib/export/dailyExpenseReportDownload';
 
 // Currency formatting function
 const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
@@ -570,6 +573,43 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   onViewReceipts,
   isLoading
 }) => {
+  // State to track which download button is currently loading
+  const [downloadingDate, setDownloadingDate] = useState<string | null>(null);
+
+  // Handle download report for a specific date
+  const handleDownloadReport = async (dateString: string) => {
+    try {
+      setDownloadingDate(dateString);
+
+      // Validate and convert date string to Date object
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date format');
+      }
+
+      // Call the download utility function
+      const result = await downloadDailyExpenseReport(date, {
+        includeImages: true,
+        onLoadingChange: (isLoading) => {
+          // The utility function handles its own toast notifications
+          // We keep our button loading state until the operation completes
+        }
+      });
+
+      // Log the result for debugging
+      if (result.success) {
+        console.log(`Successfully downloaded report for ${dateString}`);
+      } else {
+        console.error(`Failed to download report for ${dateString}:`, result.error);
+      }
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      // The utility function already shows error toasts, so we don't need to show another one
+    } finally {
+      setDownloadingDate(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="shadow-lg">
@@ -588,24 +628,51 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
       <CardHeader>
         <CardTitle>Daily Expense Details</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         <div className="rounded-md border overflow-x-auto">
-          <Table>
+          <Table className="relative">
             <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[100px]">Date</TableHead>
-                <TableHead className="min-w-[120px]">Receipts</TableHead>
-                <TableHead className="min-w-[120px] hidden sm:table-cell">Top Merchant</TableHead>
-                <TableHead className="min-w-[100px] hidden md:table-cell">Payment Method</TableHead>
-                <TableHead className="text-right min-w-[100px]">Total Expenses</TableHead>
+              <TableRow className="border-b border-border/50">
+                <TableHead className="min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Date</TableHead>
+                <TableHead className="min-w-[120px] font-semibold text-foreground/90 py-3 px-4">Receipts</TableHead>
+                <TableHead className="min-w-[120px] hidden sm:table-cell font-semibold text-foreground/90 py-3 px-4">Top Merchant</TableHead>
+                <TableHead className="min-w-[100px] hidden md:table-cell font-semibold text-foreground/90 py-3 px-4">Payment Method</TableHead>
+                <TableHead className="text-right min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Total Expenses</TableHead>
+                <TableHead className="text-center min-w-[80px] w-[80px] hidden xs:table-cell font-semibold text-foreground/90 py-3 px-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length > 0 ? sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
-                <TableRow key={date} className={index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}>
-                  <TableCell data-label="Date" className="font-medium">
+                <TableRow
+                  key={date}
+                  className={`
+                    ${index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}
+                    hover:bg-muted/30 dark:hover:bg-muted/60 transition-colors duration-150
+                    border-b border-border/30 last:border-b-0
+                  `}
+                >
+                  <TableCell data-label="Date" className="font-medium py-3 px-4">
                     <div className="flex flex-col">
-                      <span className="text-sm">{formatFullDate(date)}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{formatFullDate(date)}</span>
+                        {/* Show download button on very small screens (xs) */}
+                        {receiptIds.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadReport(date)}
+                            disabled={downloadingDate === date}
+                            className="h-6 w-6 p-0 xs:hidden hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50 ml-2"
+                            title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
+                          >
+                            {downloadingDate === date ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Download className="w-3 h-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                       {/* Show merchant and payment method on mobile when hidden columns */}
                       <div className="sm:hidden text-xs text-muted-foreground mt-1">
                         <div>{topMerchant}</div>
@@ -613,7 +680,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell data-label="Receipts">
+                  <TableCell data-label="Receipts" className="py-3 px-4">
                     {receiptIds.length > 0 ? (
                       <Button
                         variant="outline"
@@ -630,13 +697,33 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                       <span className="text-xs text-muted-foreground">No Receipts</span>
                     )}
                   </TableCell>
-                  <TableCell data-label="Top Merchant" className="hidden sm:table-cell">{topMerchant}</TableCell>
-                  <TableCell data-label="Payment Method" className="hidden md:table-cell">{paymentMethod}</TableCell>
-                  <TableCell data-label="Total Expenses" className="text-right font-medium">{formatCurrency(total)}</TableCell>
+                  <TableCell data-label="Top Merchant" className="hidden sm:table-cell py-3 px-4">{topMerchant}</TableCell>
+                  <TableCell data-label="Payment Method" className="hidden md:table-cell py-3 px-4">{paymentMethod}</TableCell>
+                  <TableCell data-label="Total Expenses" className="text-right font-medium py-3 px-4">{formatCurrency(total)}</TableCell>
+                  <TableCell data-label="Actions" className="text-center hidden xs:table-cell py-3 px-4">
+                    {receiptIds.length > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadReport(date)}
+                        disabled={downloadingDate === date}
+                        className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50"
+                        title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
+                      >
+                        {downloadingDate === date ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
                     No expense data available for this period
                   </TableCell>
                 </TableRow>
