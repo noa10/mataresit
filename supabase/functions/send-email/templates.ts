@@ -59,6 +59,17 @@ export interface TeamCollaborationEmailData {
   language?: 'en' | 'ms';
 }
 
+export interface TeamMemberRemovedEmailData {
+  removedUserName: string;
+  teamName: string;
+  removedByUserName: string;
+  removedByUserEmail: string;
+  removalReason?: string;
+  removalTimestamp: string;
+  transferredToUserName?: string;
+  language?: 'en' | 'ms';
+}
+
 // Billing Email Template Interfaces
 export interface BillingReminderEmailData {
   recipientName: string;
@@ -718,6 +729,130 @@ ${data.merchant ? `- Merchant: ${data.merchant}` : ''}
 ${actionInfo.action}: ${data.actionUrl}
 
 Stay connected with your team's receipt management activities.
+
+Best regards,
+The Mataresit Team
+
+© 2024 Mataresit. All rights reserved.
+This is an automated notification. Please do not reply to this email.
+  `;
+
+  return { subject, html, text };
+}
+
+/**
+ * Generate team member removed notification email
+ */
+export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData): { subject: string; html: string; text: string } {
+  const language = data.language || 'en';
+
+  if (language === 'ms') {
+    return generateTeamMemberRemovedEmailMalay(data);
+  }
+
+  const subject = `You have been removed from team "${data.teamName}"`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+    .content { padding: 30px; }
+    .removal-info { background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .contact-info { background-color: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+    .cta-button { display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    h1 { margin: 0; font-size: 24px; }
+    h3 { color: #333; margin-top: 0; }
+    .warning-icon { font-size: 48px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="warning-icon">⚠️</div>
+      <h1>Team Membership Update</h1>
+    </div>
+    <div class="content">
+      <p>Dear ${data.removedUserName},</p>
+
+      <p>We're writing to inform you that you have been removed from the team <strong>"${data.teamName}"</strong> on Mataresit.</p>
+
+      <div class="removal-info">
+        <h3>Removal Details</h3>
+        <p><strong>Team:</strong> ${data.teamName}</p>
+        <p><strong>Removed by:</strong> ${data.removedByUserName}</p>
+        <p><strong>Date & Time:</strong> ${data.removalTimestamp}</p>
+        ${data.removalReason ? `<p><strong>Reason:</strong> ${data.removalReason}</p>` : ''}
+        ${data.transferredToUserName ? `<p><strong>Data transferred to:</strong> ${data.transferredToUserName}</p>` : ''}
+      </div>
+
+      <p>As a result of this change:</p>
+      <ul>
+        <li>You no longer have access to the team's receipts and data</li>
+        <li>You cannot submit new expense claims to this team</li>
+        <li>You will not receive further notifications from this team</li>
+        ${data.transferredToUserName ? `<li>Your previous contributions have been transferred to ${data.transferredToUserName}</li>` : ''}
+      </ul>
+
+      <div class="contact-info">
+        <h3>Questions or Concerns?</h3>
+        <p>If you have any questions about this removal or believe this was done in error, please contact:</p>
+        <p><strong>${data.removedByUserName}</strong><br>
+        Email: <a href="mailto:${data.removedByUserEmail}">${data.removedByUserEmail}</a></p>
+        <p>You can also reach out to our support team if you need assistance.</p>
+      </div>
+
+      <p>Thank you for your time with the team. If you need to access your personal receipt data, you can still log into your Mataresit account.</p>
+
+      <a href="https://app.mataresit.com/login" class="cta-button">Access Your Account</a>
+
+      <p>Best regards,<br>The Mataresit Team</p>
+    </div>
+    <div class="footer">
+      <p>© 2024 Mataresit. All rights reserved.</p>
+      <p>This is an automated notification. Please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+You have been removed from team "${data.teamName}"
+
+Dear ${data.removedUserName},
+
+We're writing to inform you that you have been removed from the team "${data.teamName}" on Mataresit.
+
+Removal Details:
+- Team: ${data.teamName}
+- Removed by: ${data.removedByUserName}
+- Date & Time: ${data.removalTimestamp}
+${data.removalReason ? `- Reason: ${data.removalReason}` : ''}
+${data.transferredToUserName ? `- Data transferred to: ${data.transferredToUserName}` : ''}
+
+As a result of this change:
+- You no longer have access to the team's receipts and data
+- You cannot submit new expense claims to this team
+- You will not receive further notifications from this team
+${data.transferredToUserName ? `- Your previous contributions have been transferred to ${data.transferredToUserName}` : ''}
+
+Questions or Concerns?
+If you have any questions about this removal or believe this was done in error, please contact:
+${data.removedByUserName} - ${data.removedByUserEmail}
+
+You can also reach out to our support team if you need assistance.
+
+Thank you for your time with the team. If you need to access your personal receipt data, you can still log into your Mataresit account.
+
+Access Your Account: https://app.mataresit.com/login
 
 Best regards,
 The Mataresit Team
@@ -1529,4 +1664,122 @@ Ini adalah pemberitahuan pengebilan automatik. Sila jangan balas e-mel ini.
   `;
 
   return { subject, html: '', text }; // Simplified HTML for space
+}
+
+/**
+ * Generate Malay version of team member removed email
+ */
+function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): { subject: string; html: string; text: string } {
+  const subject = `Anda telah dikeluarkan dari pasukan "${data.teamName}"`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+    .content { padding: 30px; }
+    .removal-info { background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .contact-info { background-color: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+    .cta-button { display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    h1 { margin: 0; font-size: 24px; }
+    h3 { color: #333; margin-top: 0; }
+    .warning-icon { font-size: 48px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="warning-icon">⚠️</div>
+      <h1>Kemaskini Keahlian Pasukan</h1>
+    </div>
+    <div class="content">
+      <p>Yang dihormati ${data.removedUserName},</p>
+
+      <p>Kami menulis untuk memaklumkan bahawa anda telah dikeluarkan dari pasukan <strong>"${data.teamName}"</strong> di Mataresit.</p>
+
+      <div class="removal-info">
+        <h3>Butiran Penyingkiran</h3>
+        <p><strong>Pasukan:</strong> ${data.teamName}</p>
+        <p><strong>Dikeluarkan oleh:</strong> ${data.removedByUserName}</p>
+        <p><strong>Tarikh & Masa:</strong> ${data.removalTimestamp}</p>
+        ${data.removalReason ? `<p><strong>Sebab:</strong> ${data.removalReason}</p>` : ''}
+        ${data.transferredToUserName ? `<p><strong>Data dipindahkan kepada:</strong> ${data.transferredToUserName}</p>` : ''}
+      </div>
+
+      <p>Akibat perubahan ini:</p>
+      <ul>
+        <li>Anda tidak lagi mempunyai akses kepada resit dan data pasukan</li>
+        <li>Anda tidak boleh mengemukakan tuntutan perbelanjaan baharu kepada pasukan ini</li>
+        <li>Anda tidak akan menerima pemberitahuan lanjut dari pasukan ini</li>
+        ${data.transferredToUserName ? `<li>Sumbangan anda sebelum ini telah dipindahkan kepada ${data.transferredToUserName}</li>` : ''}
+      </ul>
+
+      <div class="contact-info">
+        <h3>Soalan atau Kebimbangan?</h3>
+        <p>Jika anda mempunyai sebarang soalan mengenai penyingkiran ini atau percaya ini dilakukan secara silap, sila hubungi:</p>
+        <p><strong>${data.removedByUserName}</strong><br>
+        E-mel: <a href="mailto:${data.removedByUserEmail}">${data.removedByUserEmail}</a></p>
+        <p>Anda juga boleh menghubungi pasukan sokongan kami jika anda memerlukan bantuan.</p>
+      </div>
+
+      <p>Terima kasih atas masa anda bersama pasukan. Jika anda perlu mengakses data resit peribadi anda, anda masih boleh log masuk ke akaun Mataresit anda.</p>
+
+      <a href="https://app.mataresit.com/login" class="cta-button">Akses Akaun Anda</a>
+
+      <p>Salam hormat,<br>Pasukan Mataresit</p>
+    </div>
+    <div class="footer">
+      <p>© 2024 Mataresit. Hak cipta terpelihara.</p>
+      <p>Ini adalah pemberitahuan automatik. Sila jangan balas e-mel ini.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Anda telah dikeluarkan dari pasukan "${data.teamName}"
+
+Yang dihormati ${data.removedUserName},
+
+Kami menulis untuk memaklumkan bahawa anda telah dikeluarkan dari pasukan "${data.teamName}" di Mataresit.
+
+Butiran Penyingkiran:
+- Pasukan: ${data.teamName}
+- Dikeluarkan oleh: ${data.removedByUserName}
+- Tarikh & Masa: ${data.removalTimestamp}
+${data.removalReason ? `- Sebab: ${data.removalReason}` : ''}
+${data.transferredToUserName ? `- Data dipindahkan kepada: ${data.transferredToUserName}` : ''}
+
+Akibat perubahan ini:
+- Anda tidak lagi mempunyai akses kepada resit dan data pasukan
+- Anda tidak boleh mengemukakan tuntutan perbelanjaan baharu kepada pasukan ini
+- Anda tidak akan menerima pemberitahuan lanjut dari pasukan ini
+${data.transferredToUserName ? `- Sumbangan anda sebelum ini telah dipindahkan kepada ${data.transferredToUserName}` : ''}
+
+Soalan atau Kebimbangan?
+Jika anda mempunyai sebarang soalan mengenai penyingkiran ini atau percaya ini dilakukan secara silap, sila hubungi:
+${data.removedByUserName} - ${data.removedByUserEmail}
+
+Anda juga boleh menghubungi pasukan sokongan kami jika anda memerlukan bantuan.
+
+Terima kasih atas masa anda bersama pasukan. Jika anda perlu mengakses data resit peribadi anda, anda masih boleh log masuk ke akaun Mataresit anda.
+
+Akses Akaun Anda: https://app.mataresit.com/login
+
+Salam hormat,
+Pasukan Mataresit
+
+© 2024 Mataresit. Hak cipta terpelihara.
+Ini adalah pemberitahuan automatik. Sila jangan balas e-mel ini.
+  `;
+
+  return { subject, html, text };
 }

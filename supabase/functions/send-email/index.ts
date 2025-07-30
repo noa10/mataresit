@@ -4,6 +4,7 @@ import {
   generateReceiptProcessingEmail,
   generateBatchProcessingEmail,
   generateTeamCollaborationEmail,
+  generateTeamMemberRemovedEmail,
   generateBillingReminderEmail,
   generatePaymentFailedEmail,
   generateSubscriptionExpiryEmail,
@@ -11,6 +12,7 @@ import {
   ReceiptProcessingEmailData,
   BatchProcessingEmailData,
   TeamCollaborationEmailData,
+  TeamMemberRemovedEmailData,
   BillingReminderEmailData,
   PaymentFailedEmailData,
   SubscriptionExpiryEmailData,
@@ -68,6 +70,9 @@ serve(async (req) => {
             break;
           case 'team_collaboration':
             generatedEmail = generateTeamCollaborationEmail(template_data as TeamCollaborationEmailData);
+            break;
+          case 'team_member_removed':
+            generatedEmail = generateTeamMemberRemovedEmail(template_data as TeamMemberRemovedEmailData);
             break;
           case 'billing_reminder':
             generatedEmail = generateBillingReminderEmail(template_data as BillingReminderEmailData);

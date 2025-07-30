@@ -6,6 +6,7 @@ export type NotificationType =
   | 'team_invitation_accepted'
   | 'team_member_joined'
   | 'team_member_left'
+  | 'team_member_removed'
   | 'team_member_role_changed'
   | 'claim_submitted'
   | 'claim_approved'
@@ -120,6 +121,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   team_invitation_accepted: '✅',
   team_member_joined: '👋',
   team_member_left: '👋',
+  team_member_removed: '🚫',
   team_member_role_changed: '🔄',
   claim_submitted: '📝',
   claim_approved: '✅',
@@ -147,6 +149,7 @@ export const NOTIFICATION_TYPE_COLORS: Record<NotificationType, string> = {
   team_invitation_accepted: 'text-green-400 bg-green-900/20',
   team_member_joined: 'text-green-400 bg-green-900/20',
   team_member_left: 'text-gray-400 bg-gray-800/20',
+  team_member_removed: 'text-red-400 bg-red-900/20',
   team_member_role_changed: 'text-blue-400 bg-blue-900/20',
   claim_submitted: 'text-blue-400 bg-blue-900/20',
   claim_approved: 'text-green-400 bg-green-900/20',
@@ -395,6 +398,7 @@ export const NOTIFICATION_CATEGORIES = {
       'team_invitation_accepted',
       'team_member_joined',
       'team_member_left',
+      'team_member_removed',
       'team_member_role_changed',
       'receipt_shared',
       'receipt_comment_added',
