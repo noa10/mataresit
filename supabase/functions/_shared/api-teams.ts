@@ -87,6 +87,14 @@ export async function handleTeamsAPI(
           return await createTeam(req, context);
         } else if (action === 'members') {
           return await inviteTeamMember(req, context, teamId);
+        } else if (action === 'remove-member') {
+          return await removeTeamMemberEnhanced(req, context, teamId);
+        } else if (action === 'schedule-removal') {
+          return await scheduleTeamMemberRemoval(req, context, teamId);
+        } else if (action === 'bulk-remove') {
+          return await bulkRemoveTeamMembers(req, context, teamId);
+        } else if (action === 'update-member-role') {
+          return await updateTeamMemberRole(req, context, teamId);
         } else {
           return createErrorResponse('Invalid team action', 400);
         }
@@ -556,8 +564,299 @@ async function updateTeamMember(req: Request, context: ApiContext, teamId: strin
   return createErrorResponse('Update team member endpoint will be implemented', 501);
 }
 
+async function removeTeamMemberEnhanced(req: Request, context: ApiContext, teamId: string): Promise<Response> {
+  try {
+    // Check permissions - user must have teams:write scope
+    if (!hasScope(context, 'teams:write')) {
+      return createErrorResponse('Insufficient permissions for team member removal', 403);
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { user_id, reason, transfer_data, transfer_to_user_id } = body;
+
+    if (!user_id) {
+      return createErrorResponse('user_id is required', 400);
+    }
+
+    // Verify team access - user must be a member of the team
+    const { data: teamMember } = await context.supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', context.userId)
+      .single();
+
+    if (!teamMember) {
+      return createErrorResponse('Access denied to team', 403);
+    }
+
+    // Only owners and admins can remove members
+    if (!['owner', 'admin'].includes(teamMember.role)) {
+      return createErrorResponse('Insufficient permissions to remove team members', 403);
+    }
+
+    // Call the basic removal function (enhanced version not available in production)
+    const { data, error } = await context.supabase.rpc('remove_team_member', {
+      _team_id: teamId,
+      _user_id: user_id,
+    });
+
+    if (error) {
+      console.error('Database error removing team member:', error);
+      return createErrorResponse(`Failed to remove team member: ${error.message}`, 500);
+    }
+
+    return createSuccessResponse({
+      message: 'Team member removed successfully',
+      teamId,
+      userId: user_id,
+      result: data
+    });
+
+  } catch (error: any) {
+    console.error('Error removing team member:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+async function scheduleTeamMemberRemoval(req: Request, context: ApiContext, teamId: string): Promise<Response> {
+  try {
+    // Check permissions - user must have teams:write scope
+    if (!hasScope(context, 'teams:write')) {
+      return createErrorResponse('Insufficient permissions for team member removal scheduling', 403);
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { user_id, removal_date, reason } = body;
+
+    if (!user_id) {
+      return createErrorResponse('user_id is required', 400);
+    }
+
+    if (!removal_date) {
+      return createErrorResponse('removal_date is required', 400);
+    }
+
+    // Verify team access - user must be a member of the team
+    const { data: teamMember } = await context.supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', context.userId)
+      .single();
+
+    if (!teamMember) {
+      return createErrorResponse('Access denied to team', 403);
+    }
+
+    // Only owners and admins can schedule member removal
+    if (!['owner', 'admin'].includes(teamMember.role)) {
+      return createErrorResponse('Insufficient permissions to schedule team member removal', 403);
+    }
+
+    // Schedule removal function not available in production - return not implemented
+    return createErrorResponse('Scheduled removal feature is not available. Please remove the member immediately instead.', 501);
+
+  } catch (error: any) {
+    console.error('Error scheduling team member removal:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+async function bulkRemoveTeamMembers(req: Request, context: ApiContext, teamId: string): Promise<Response> {
+  try {
+    // Check permissions - user must have teams:write scope
+    if (!hasScope(context, 'teams:write')) {
+      return createErrorResponse('Insufficient permissions for bulk team member removal', 403);
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { user_ids, reason, transfer_data, transfer_to_user_id } = body;
+
+    if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
+      return createErrorResponse('user_ids array is required and must not be empty', 400);
+    }
+
+    // Verify team access - user must be a member of the team
+    const { data: teamMember } = await context.supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', context.userId)
+      .single();
+
+    if (!teamMember) {
+      return createErrorResponse('Access denied to team', 403);
+    }
+
+    // Only owners and admins can remove members
+    if (!['owner', 'admin'].includes(teamMember.role)) {
+      return createErrorResponse('Insufficient permissions to remove team members', 403);
+    }
+
+    // Implement basic bulk removal by calling individual removal function
+    const results = [];
+    let successful_removals = 0;
+    let failed_removals = 0;
+
+    for (const user_id of user_ids) {
+      try {
+        const { data, error } = await context.supabase.rpc('remove_team_member', {
+          _team_id: teamId,
+          _user_id: user_id,
+        });
+
+        if (error) {
+          console.error(`Failed to remove user ${user_id}:`, error);
+          results.push({ user_id, success: false, error: error.message });
+          failed_removals++;
+        } else {
+          results.push({ user_id, success: true });
+          successful_removals++;
+        }
+      } catch (err: any) {
+        console.error(`Exception removing user ${user_id}:`, err);
+        results.push({ user_id, success: false, error: err.message });
+        failed_removals++;
+      }
+    }
+
+    return createSuccessResponse({
+      message: 'Bulk team member removal completed',
+      teamId,
+      userIds: user_ids,
+      count: user_ids.length,
+      bulk_operation_id: `bulk_${Date.now()}`, // Generate a simple ID for tracking
+      total_users: user_ids.length,
+      successful_removals,
+      failed_removals,
+      completed_at: new Date().toISOString(),
+      results
+    });
+
+  } catch (error: any) {
+    console.error('Error bulk removing team members:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
+async function updateTeamMemberRole(req: Request, context: ApiContext, teamId: string): Promise<Response> {
+  try {
+    // Check permissions - user must have teams:write scope
+    if (!hasScope(context, 'teams:write')) {
+      return createErrorResponse('Insufficient permissions for team member role update', 403);
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { user_id, new_role, reason } = body;
+
+    if (!user_id) {
+      return createErrorResponse('user_id is required', 400);
+    }
+
+    if (!new_role) {
+      return createErrorResponse('new_role is required', 400);
+    }
+
+    // Validate role
+    const validRoles = ['owner', 'admin', 'member', 'viewer'];
+    if (!validRoles.includes(new_role)) {
+      return createErrorResponse(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 400);
+    }
+
+    // Verify team access - user must be a member of the team
+    const { data: teamMember } = await context.supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', context.userId)
+      .single();
+
+    if (!teamMember) {
+      return createErrorResponse('Access denied to team', 403);
+    }
+
+    // Only owners and admins can update member roles
+    if (!['owner', 'admin'].includes(teamMember.role)) {
+      return createErrorResponse('Insufficient permissions to update team member roles', 403);
+    }
+
+    // Call the role update function
+    const { data, error } = await context.supabase.rpc('update_team_member_role', {
+      _team_id: teamId,
+      _user_id: user_id,
+      _new_role: new_role,
+    });
+
+    if (error) {
+      console.error('Database error updating team member role:', error);
+      return createErrorResponse(`Failed to update team member role: ${error.message}`, 500);
+    }
+
+    return createSuccessResponse({
+      message: 'Team member role updated successfully',
+      teamId,
+      userId: user_id,
+      newRole: new_role,
+      result: data
+    });
+
+  } catch (error: any) {
+    console.error('Error updating team member role:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
+}
+
 async function removeTeamMember(context: ApiContext, teamId: string, memberId: string): Promise<Response> {
-  return createErrorResponse('Remove team member endpoint will be implemented', 501);
+  try {
+    // Check permissions - user must have teams:write scope
+    if (!hasScope(context, 'teams:write')) {
+      return createErrorResponse('Insufficient permissions for team member removal', 403);
+    }
+
+    // Verify team access - user must be a member of the team
+    const { data: teamMember } = await context.supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', context.userId)
+      .single();
+
+    if (!teamMember) {
+      return createErrorResponse('Access denied to team', 403);
+    }
+
+    // Only owners and admins can remove members
+    if (!['owner', 'admin'].includes(teamMember.role)) {
+      return createErrorResponse('Insufficient permissions to remove team members', 403);
+    }
+
+    // Call the basic removal function (enhanced version not available in production)
+    const { data, error } = await context.supabase.rpc('remove_team_member', {
+      _team_id: teamId,
+      _user_id: memberId,
+    });
+
+    if (error) {
+      console.error('Database error removing team member:', error);
+      return createErrorResponse(`Failed to remove team member: ${error.message}`, 500);
+    }
+
+    return createSuccessResponse({
+      message: 'Team member removed successfully',
+      teamId,
+      userId: memberId,
+      result: data
+    });
+
+  } catch (error: any) {
+    console.error('Error removing team member:', error);
+    return createErrorResponse('Internal server error', 500);
+  }
 }
 
 /**
