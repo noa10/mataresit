@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { TeamMember, TeamMemberRole, getTeamRoleDisplayName, TEAM_ROLE_COLORS } from '@/types/team';
 import { cn } from '@/lib/utils';
-import { enhancedTeamService } from '@/services/enhancedTeamService';
+import { TeamAPI } from '@/services/apiProxy';
 
 interface BulkOperationsPanelProps {
   selectedMembers: TeamMember[];
@@ -174,43 +174,52 @@ export function BulkOperationsPanel({
         throw new Error('No team selected');
       }
 
-      // Use enhanced team service instead of direct API call
-      const response = await enhancedTeamService.bulkRemoveMembers(
-        currentTeam.id,
-        {
-          user_ids: userIds,
-          reason: bulkRemoveForm.reason,
-          transfer_data: bulkRemoveForm.transferData,
-          transfer_to_user_id: bulkRemoveForm.transferToUserId || undefined,
-        }
-      );
-
-      const result = response;
+      // Use TeamAPI for bulk member removal
+      const result = await TeamAPI.bulkRemove({
+        team_id: currentTeam.id,
+        user_ids: userIds,
+        reason: bulkRemoveForm.reason,
+        transfer_data: bulkRemoveForm.transferData,
+        transfer_to_user_id: bulkRemoveForm.transferToUserId || null,
+      });
 
       if (result.success) {
+        const successCount = result.successful_removals || 0;
+        const failedCount = result.failed_removals || 0;
+        const totalCount = result.total_users || selectedMembers.length;
+
         toast({
-          title: 'Bulk Member Removal Started',
-          description: `Removing ${selectedMembers.length} members from team`,
+          title: 'Bulk Member Removal Completed',
+          description: `Successfully removed ${successCount} of ${totalCount} members${failedCount > 0 ? ` (${failedCount} failed)` : ''}`,
+          variant: failedCount > 0 ? 'destructive' : 'default',
         });
 
-        // Add to active operations
-        setActiveOperations(prev => [...prev, {
-          id: result.bulk_operation_id,
-          type: 'bulk_remove',
-          status: 'in_progress',
-          total_items: selectedMembers.length,
-          processed_items: 0,
-          successful_items: 0,
-          failed_items: 0,
-          progress_percentage: 0,
-          started_at: new Date().toISOString(),
-        }]);
+        // Add to active operations as completed
+        if (result.bulk_operation_id) {
+          setActiveOperations(prev => [...prev, {
+            id: result.bulk_operation_id,
+            type: 'bulk_remove',
+            status: 'completed',
+            total_items: totalCount,
+            processed_items: totalCount,
+            successful_items: successCount,
+            failed_items: failedCount,
+            progress_percentage: 100,
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+          }]);
+
+          // Remove the completed operation after a delay
+          setTimeout(() => {
+            setActiveOperations(prev => prev.filter(op => op.id !== result.bulk_operation_id));
+          }, 5000);
+        }
 
         setBulkRemoveDialogOpen(false);
         onSelectionChange([]);
         onOperationComplete();
       } else {
-        throw new Error(result.error || 'Failed to start bulk removal');
+        throw new Error(result.error || 'Failed to remove members');
       }
     } catch (error: any) {
       toast({
@@ -483,7 +492,94 @@ export function BulkOperationsPanel({
         </DialogContent>
       </Dialog>
 
-      {/* Additional dialogs would be implemented similarly... */}
+      {/* Bulk Remove Dialog */}
+      <Dialog open={bulkRemoveDialogOpen} onOpenChange={setBulkRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Team Members</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove {selectedMembers.length} member{selectedMembers.length !== 1 ? 's' : ''} from the team?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Reason (Optional)</Label>
+              <Textarea
+                placeholder="Reason for removing these members..."
+                value={bulkRemoveForm.reason}
+                onChange={(e) => setBulkRemoveForm(prev => ({ ...prev, reason: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="bulkTransferData"
+                checked={bulkRemoveForm.transferData}
+                onCheckedChange={(checked) =>
+                  setBulkRemoveForm(prev => ({ ...prev, transferData: checked as boolean }))
+                }
+              />
+              <Label htmlFor="bulkTransferData" className="text-sm">
+                Transfer members' data to another team member
+              </Label>
+            </div>
+
+            {bulkRemoveForm.transferData && (
+              <div className="space-y-2">
+                <Label>Transfer to</Label>
+                <Select
+                  value={bulkRemoveForm.transferToUserId}
+                  onValueChange={(value) =>
+                    setBulkRemoveForm(prev => ({ ...prev, transferToUserId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Show team members not in the selected list */}
+                    {currentTeam && (
+                      <>
+                        {/* This would need to be populated with actual team members */}
+                        <SelectItem value="placeholder">Select a member...</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="p-3 bg-muted rounded-lg">
+              <h4 className="font-medium mb-2">Members to be removed:</h4>
+              <div className="space-y-1">
+                {selectedMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between text-sm">
+                    <span>{member.first_name} {member.last_name} ({member.email})</span>
+                    <Badge variant="outline" className={cn("text-xs", TEAM_ROLE_COLORS[member.role])}>
+                      {getTeamRoleDisplayName(member.role)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkRemove}
+              disabled={loading || (bulkRemoveForm.transferData && !bulkRemoveForm.transferToUserId)}
+            >
+              {loading ? 'Removing...' : `Remove ${selectedMembers.length} Member${selectedMembers.length !== 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -423,6 +423,10 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         return ['owner', 'admin', 'member', 'viewer'].includes(state.currentTeamRole);
       case 'manage_members':
         return ['owner', 'admin'].includes(state.currentTeamRole);
+      case 'remove_members':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
+      case 'update_member_roles':
+        return ['owner', 'admin'].includes(state.currentTeamRole);
 
       // Audit and security permissions
       case 'view_audit_logs':

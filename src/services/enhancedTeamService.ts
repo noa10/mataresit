@@ -400,6 +400,51 @@ export class EnhancedTeamService {
         };
       }
 
+      // If email sending was requested, trigger the email function
+      if (request.send_email !== false && data.invitation_id) {
+        try {
+          console.log('Sending invitation email for invitation:', data.invitation_id);
+
+          const emailResponse = await supabase.functions.invoke('send-team-invitation-email', {
+            body: {
+              invitation_id: data.invitation_id
+            }
+          });
+
+          if (emailResponse.error) {
+            console.error('Failed to send invitation email:', emailResponse.error);
+            // Don't fail the entire operation if email fails, just log it
+          } else {
+            console.log('Invitation email sent successfully');
+          }
+        } catch (emailError) {
+          console.error('Error sending invitation email:', emailError);
+          // Don't fail the entire operation if email fails
+        }
+      }
+
+      // Trigger in-app notifications for team admins
+      try {
+        // Import the notification service dynamically to avoid circular dependencies
+        const { TeamCollaborationNotificationService } = await import('./teamCollaborationNotificationService');
+
+        // Get current user info
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.log('Sending in-app notification for team invitation...');
+          await TeamCollaborationNotificationService.notifyTeamInvitationSent({
+            teamId: request.team_id,
+            actorUserId: user.id,
+            actorName: user.user_metadata?.full_name || user.email || 'Unknown User',
+            invitationEmail: request.email
+          });
+          console.log('In-app notification sent successfully');
+        }
+      } catch (notificationError) {
+        console.error('Error sending in-app notifications:', notificationError);
+        // Don't fail the entire operation if notifications fail
+      }
+
       return {
         success: true,
         data: data.invitation_id,
@@ -411,7 +456,8 @@ export class EnhancedTeamService {
           token: data.token,
           expires_at: data.expires_at,
           team_name: data.team_name,
-          send_email: data.send_email
+          send_email: data.send_email,
+          email_triggered: request.send_email !== false
         }
       };
     } catch (error: any) {
@@ -440,6 +486,48 @@ export class EnhancedTeamService {
         };
       }
 
+      // Send the resent invitation email
+      try {
+        console.log('Sending resent invitation email for invitation:', request.invitation_id);
+
+        const emailResponse = await supabase.functions.invoke('send-team-invitation-email', {
+          body: {
+            invitation_id: request.invitation_id
+          }
+        });
+
+        if (emailResponse.error) {
+          console.error('Failed to send resent invitation email:', emailResponse.error);
+          // Don't fail the entire operation if email fails, just log it
+        } else {
+          console.log('Resent invitation email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending resent invitation email:', emailError);
+        // Don't fail the entire operation if email fails
+      }
+
+      // Trigger in-app notifications for team admins about resent invitation
+      try {
+        const { TeamCollaborationNotificationService } = await import('./teamCollaborationNotificationService');
+
+        // Get current user info
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && data.email) {
+          console.log('Sending in-app notification for resent team invitation...');
+          await TeamCollaborationNotificationService.notifyTeamInvitationSent({
+            teamId: data.team_id || '',
+            actorUserId: user.id,
+            actorName: user.user_metadata?.full_name || user.email || 'Unknown User',
+            invitationEmail: data.email
+          });
+          console.log('In-app notification for resent invitation sent successfully');
+        }
+      } catch (notificationError) {
+        console.error('Error sending in-app notifications for resent invitation:', notificationError);
+        // Don't fail the entire operation if notifications fail
+      }
+
       return {
         success: true,
         data: data,
@@ -448,7 +536,8 @@ export class EnhancedTeamService {
           invitation_id: request.invitation_id,
           attempts: data.attempts,
           expires_at: data.expires_at,
-          team_name: data.team_name
+          team_name: data.team_name,
+          email_triggered: true
         }
       };
     } catch (error: any) {

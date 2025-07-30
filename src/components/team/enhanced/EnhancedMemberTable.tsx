@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useTeam } from '@/contexts/TeamContext';
 import { useTeamTranslation } from '@/contexts/LanguageContext';
+import { TeamAPI } from '@/services/apiProxy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -118,6 +119,7 @@ export function EnhancedMemberTable({
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [scheduleRemovalDialogOpen, setScheduleRemovalDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const [roleUpdateForm, setRoleUpdateForm] = useState({
     newRole: 'member' as TeamMemberRole,
@@ -266,22 +268,17 @@ export function EnhancedMemberTable({
   };
 
   const handleRoleUpdate = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember || !currentTeam?.id) return;
 
     try {
-      // Call enhanced role update function
-      const response = await fetch('/api/team/update-member-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          user_id: selectedMember.user_id,
-          new_role: roleUpdateForm.newRole,
-          reason: roleUpdateForm.reason,
-        }),
-      });
+      setLoading(true);
 
-      const result = await response.json();
+      // Call enhanced role update function using TeamAPI
+      const result = await TeamAPI.updateMemberRole(
+        currentTeam.id,
+        selectedMember.user_id,
+        roleUpdateForm.newRole
+      );
 
       if (result.success) {
         toast({
@@ -299,27 +296,25 @@ export function EnhancedMemberTable({
         description: error.message || 'Failed to update member role',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleRemoveMember = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember || !currentTeam?.id) return;
 
     try {
-      // Call enhanced remove member function
-      const response = await fetch('/api/team/remove-member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          user_id: selectedMember.user_id,
-          reason: removeForm.reason,
-          transfer_data: removeForm.transferData,
-          transfer_to_user_id: removeForm.transferToUserId || null,
-        }),
-      });
+      setLoading(true);
 
-      const result = await response.json();
+      // Call enhanced remove member function using TeamAPI
+      const result = await TeamAPI.removeMember({
+        team_id: currentTeam.id,
+        user_id: selectedMember.user_id,
+        reason: removeForm.reason,
+        transfer_data: removeForm.transferData,
+        transfer_to_user_id: removeForm.transferToUserId || null,
+      });
 
       if (result.success) {
         toast({
@@ -337,26 +332,24 @@ export function EnhancedMemberTable({
         description: error.message || 'Failed to remove member',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleScheduleRemoval = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember || !currentTeam?.id) return;
 
     try {
-      // Call schedule removal function
-      const response = await fetch('/api/team/schedule-removal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          user_id: selectedMember.user_id,
-          removal_date: scheduleRemovalForm.removalDate,
-          reason: scheduleRemovalForm.reason,
-        }),
-      });
+      setLoading(true);
 
-      const result = await response.json();
+      // Call schedule removal function using TeamAPI
+      const result = await TeamAPI.scheduleRemoval({
+        team_id: currentTeam.id,
+        user_id: selectedMember.user_id,
+        removal_date: scheduleRemovalForm.removalDate,
+        reason: scheduleRemovalForm.reason,
+      });
 
       if (result.success) {
         toast({
@@ -374,6 +367,8 @@ export function EnhancedMemberTable({
         description: error.message || 'Failed to schedule removal',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -782,14 +777,129 @@ export function EnhancedMemberTable({
             <Button variant="outline" onClick={() => setRoleUpdateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRoleUpdate}>
-              Update Role
+            <Button onClick={handleRoleUpdate} disabled={loading}>
+              {loading ? 'Updating...' : 'Update Role'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Additional dialogs would be implemented similarly... */}
+      {/* Remove Member Dialog */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Team Member</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove {selectedMember?.first_name} {selectedMember?.last_name} from the team?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Reason (Optional)</Label>
+              <Textarea
+                placeholder="Reason for removing this member..."
+                value={removeForm.reason}
+                onChange={(e) => setRemoveForm(prev => ({ ...prev, reason: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="transferData"
+                checked={removeForm.transferData}
+                onCheckedChange={(checked) =>
+                  setRemoveForm(prev => ({ ...prev, transferData: checked as boolean }))
+                }
+              />
+              <Label htmlFor="transferData" className="text-sm">
+                Transfer member's data to another team member
+              </Label>
+            </div>
+
+            {removeForm.transferData && (
+              <div className="space-y-2">
+                <Label>Transfer to</Label>
+                <Select
+                  value={removeForm.transferToUserId}
+                  onValueChange={(value) =>
+                    setRemoveForm(prev => ({ ...prev, transferToUserId: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members
+                      .filter(member => member.user_id !== selectedMember?.user_id)
+                      .map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          {member.first_name} {member.last_name} ({member.email})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveMember}
+              disabled={loading || (removeForm.transferData && !removeForm.transferToUserId)}
+            >
+              {loading ? 'Removing...' : 'Remove Member'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Removal Dialog */}
+      <Dialog open={scheduleRemovalDialogOpen} onOpenChange={setScheduleRemovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Member Removal</DialogTitle>
+            <DialogDescription>
+              Schedule {selectedMember?.first_name} {selectedMember?.last_name} for removal at a future date.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Removal Date</Label>
+              <Input
+                type="date"
+                value={scheduleRemovalForm.removalDate}
+                onChange={(e) => setScheduleRemovalForm(prev => ({ ...prev, removalDate: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reason (Optional)</Label>
+              <Textarea
+                placeholder="Reason for scheduling removal..."
+                value={scheduleRemovalForm.reason}
+                onChange={(e) => setScheduleRemovalForm(prev => ({ ...prev, reason: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleRemovalDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleScheduleRemoval} disabled={loading}>
+              {loading ? 'Scheduling...' : 'Schedule Removal'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

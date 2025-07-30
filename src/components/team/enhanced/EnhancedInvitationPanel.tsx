@@ -128,22 +128,20 @@ export function EnhancedInvitationPanel({ onInvitationUpdate }: EnhancedInvitati
 
   const handleSendInvitation = async () => {
     try {
-      // Call enhanced invite function
-      const response = await fetch('/api/team/invite-enhanced', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_id: currentTeam?.id,
-          email: inviteForm.email,
-          role: inviteForm.role,
-          custom_message: inviteForm.customMessage,
-          permissions: inviteForm.permissions,
-          expires_in_days: inviteForm.expiresInDays,
-          send_email: inviteForm.sendEmail,
-        }),
-      });
+      if (!currentTeam?.id) {
+        throw new Error('No team selected');
+      }
 
-      const result = await response.json();
+      // Use the enhanced team service instead of direct API call
+      const result = await enhancedTeamService.sendInvitationEnhanced({
+        team_id: currentTeam.id,
+        email: inviteForm.email,
+        role: inviteForm.role,
+        custom_message: inviteForm.customMessage,
+        permissions: inviteForm.permissions,
+        expires_in_days: inviteForm.expiresInDays,
+        send_email: inviteForm.sendEmail,
+      });
 
       if (result.success) {
         toast({
@@ -160,7 +158,7 @@ export function EnhancedInvitationPanel({ onInvitationUpdate }: EnhancedInvitati
           expiresInDays: 7,
           sendEmail: true,
         });
-        
+
         loadInvitations();
         onInvitationUpdate();
       } else {
@@ -179,19 +177,13 @@ export function EnhancedInvitationPanel({ onInvitationUpdate }: EnhancedInvitati
     if (!selectedInvitation) return;
 
     try {
-      // Call enhanced resend function
-      const response = await fetch('/api/team/resend-invitation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invitation_id: selectedInvitation.id,
-          custom_message: resendForm.customMessage,
-          extend_expiration: resendForm.extendExpiration,
-          new_expiration_days: resendForm.newExpirationDays,
-        }),
+      // Use the enhanced team service instead of direct API call
+      const result = await enhancedTeamService.resendInvitation({
+        invitation_id: selectedInvitation.id,
+        custom_message: resendForm.customMessage,
+        extend_expiration: resendForm.extendExpiration,
+        new_expiration_days: resendForm.newExpirationDays,
       });
-
-      const result = await response.json();
 
       if (result.success) {
         toast({
@@ -215,17 +207,11 @@ export function EnhancedInvitationPanel({ onInvitationUpdate }: EnhancedInvitati
 
   const handleCancelInvitation = async (invitation: EnhancedInvitation) => {
     try {
-      // Call cancel invitation function
-      const response = await fetch('/api/team/cancel-invitation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invitation_id: invitation.id,
-          reason: 'Cancelled by admin',
-        }),
-      });
-
-      const result = await response.json();
+      // Use the enhanced team service instead of direct API call
+      const result = await enhancedTeamService.cancelInvitation(
+        invitation.id,
+        'Cancelled by admin'
+      );
 
       if (result.success) {
         toast({
