@@ -2,13 +2,17 @@
 
 /**
  * Phase 4 Integration Test Environment Cleanup
- * 
+ *
  * This script cleans up the test environment after Phase 4 integration tests,
  * including test data removal and temporary file cleanup.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ANSI color codes for console output
 const colors = {
@@ -141,7 +145,7 @@ async function cleanupTestDatabase() {
   
   try {
     // Import Supabase client dynamically
-    const { createClient } = require('@supabase/supabase-js');
+    const { createClient } = await import('@supabase/supabase-js');
     
     const supabase = createClient(
       process.env.TEST_SUPABASE_URL,
@@ -344,11 +348,11 @@ for (let i = 0; i < args.length; i++) {
 }
 
 // Run cleanup if this script is executed directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = {
+export {
   cleanupTemporaryFiles,
   cleanupOldReports,
   cleanupTestDatabase,

@@ -2,14 +2,18 @@
 
 /**
  * Load Test Execution Script
- * 
+ *
  * This script runs the complete load testing suite for Phase 4 integration tests.
  * It can run individual test scenarios or the complete suite.
  */
 
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ANSI color codes for console output
 const colors = {
@@ -410,11 +414,11 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Run main function
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = {
+export {
   runLoadTestScenario,
   checkPrerequisites,
   setupTestEnvironment,

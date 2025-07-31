@@ -2,13 +2,17 @@
 
 /**
  * Phase 4 Integration Test Environment Setup
- * 
+ *
  * This script sets up the test environment for Phase 4 integration tests,
  * including test database initialization and mock service configuration.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ANSI color codes for console output
 const colors = {
@@ -295,11 +299,11 @@ async function main() {
 }
 
 // Run setup if this script is executed directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = {
+export {
   checkEnvironmentVariables,
   createTestDirectories,
   createTestConfiguration,
