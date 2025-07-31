@@ -658,7 +658,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Slack alert (if configured)
-        if: secrets.CRITICAL_ALERTS_WEBHOOK_URL != ''
+        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: failure
@@ -667,7 +667,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
 
       - name: Send fallback Slack alert (if main webhook not configured)
-        if: secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: failure
@@ -676,7 +676,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Log alert (if no Slack configured)
-        if: secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL == ''
+        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL == '' }}
         run: |
           echo "::error::CRITICAL ALERT - No Slack webhook configured!"
           echo "${{ steps.alert-message.outputs.message }}"
