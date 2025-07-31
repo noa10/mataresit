@@ -230,14 +230,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Make sure path starts with a slash
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
-    // Check if we're in a Vercel environment
-    const isVercel = window.location.hostname.includes('vercel.app');
+    // Check if we're in a production environment (mataresit.co or vercel.app)
+    const isProduction = window.location.hostname.includes('mataresit.co') || window.location.hostname.includes('vercel.app');
 
-    // For Vercel deployments, use the hardcoded production URL to ensure consistency
-    if (isVercel) {
-      const productionUrl = 'https://paperless-maverick.vercel.app';
+    // For production deployments, use the production URL to ensure consistency
+    if (isProduction) {
+      const productionUrl = 'https://mataresit.co';
       const redirectUrl = `${productionUrl}${normalizedPath}`;
-      console.log(`Using Vercel production redirect URL: ${redirectUrl}`);
+      console.log(`Using production redirect URL: ${redirectUrl}`);
       return redirectUrl;
     }
 

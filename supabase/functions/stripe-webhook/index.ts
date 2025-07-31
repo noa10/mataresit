@@ -1127,7 +1127,7 @@ async function sendPaymentConfirmationEmail(userId: string, paymentDetails: {
           <p>Your subscription is now active! You can start enjoying all the features of your ${planNames[paymentDetails.tier as keyof typeof planNames]}.</p>
 
           <div style="text-align: center;">
-            <a href="${Deno.env.get('SITE_URL') || 'https://paperless-maverick.vercel.app'}/dashboard" class="button">
+            <a href="${Deno.env.get('SITE_URL') || 'https://mataresit.co'}/dashboard" class="button">
               Go to Dashboard
             </a>
           </div>

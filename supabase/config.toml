@@ -59,13 +59,19 @@ port = 54337
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://paperless-maverick.vercel.app"
+site_url = "https://mataresit.co"
 
 # A list of URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://mataresit.co",
+  "https://mataresit.co/auth",
+  "https://mataresit.co/auth/",
+  "https://mataresit.co/auth/callback",
+  "https://mataresit.co/auth/reset-password",
+  "https://mataresit.co/auth?type=recovery",
   "https://paperless-maverick.vercel.app",
   "https://paperless-maverick.vercel.app/auth",
   "https://paperless-maverick.vercel.app/auth/",
