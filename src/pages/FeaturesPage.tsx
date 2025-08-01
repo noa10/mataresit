@@ -25,7 +25,13 @@ import {
   PieChart,
   Download,
   Clock,
-  Globe
+  Globe,
+  Bell,
+  MapPin,
+  Smartphone,
+  Monitor,
+  CreditCard,
+  HelpCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -37,14 +43,6 @@ export default function FeaturesPage() {
   // Generate core features with translations
   const coreFeatures = [
     {
-      icon: <Brain className="h-8 w-8 text-blue-500" />,
-      title: t('features.aiProcessing.title'),
-      description: t('features.aiProcessing.description'),
-      benefits: t('features.aiProcessing.benefits'),
-      available: true,
-      status: t('status.available')
-    },
-    {
       icon: <Upload className="h-8 w-8 text-green-500" />,
       title: t('features.batchProcessing.title'),
       description: t('features.batchProcessing.description'),
@@ -53,38 +51,10 @@ export default function FeaturesPage() {
       status: t('status.available')
     },
     {
-      icon: <Eye className="h-8 w-8 text-purple-500" />,
-      title: t('features.smartSearch.title'),
-      description: t('features.smartSearch.description'),
-      benefits: t('features.smartSearch.benefits'),
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <Search className="h-8 w-8 text-orange-500" />,
-      title: t('features.smartSearch.title'),
-      description: t('features.smartSearch.description'),
-      benefits: t('features.smartSearch.benefits'),
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  // Generate analytics features with translations
-  const analyticsFeatures = [
-    {
-      icon: <BarChart3 className="h-8 w-8 text-indigo-500" />,
-      title: t('features.exportOptions.title'),
-      description: t('features.exportOptions.description'),
-      benefits: t('features.exportOptions.benefits'),
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <FileText className="h-8 w-8 text-red-500" />,
-      title: t('features.exportOptions.title'),
-      description: t('features.exportOptions.description'),
-      benefits: t('features.exportOptions.benefits'),
+      icon: <Bell className="h-8 w-8 text-blue-500" />,
+      title: t('features.realTimeNotifications.title'),
+      description: t('features.realTimeNotifications.description'),
+      benefits: t('features.realTimeNotifications.benefits'),
       available: true,
       status: t('status.available')
     },
@@ -95,11 +65,7 @@ export default function FeaturesPage() {
       benefits: t('features.customCategories.benefits'),
       available: true,
       status: t('status.available')
-    }
-  ];
-
-  // Generate platform features with translations
-  const platformFeatures = [
+    },
     {
       icon: <Shield className="h-8 w-8 text-green-600" />,
       title: t('features.secureStorage.title'),
@@ -107,9 +73,49 @@ export default function FeaturesPage() {
       benefits: t('features.secureStorage.benefits'),
       available: true,
       status: t('status.available')
+    }
+  ];
+
+  // Generate AI features with translations
+  const aiFeatures = [
+    {
+      icon: <Brain className="h-8 w-8 text-blue-500" />,
+      title: t('features.aiProcessing.title'),
+      description: t('features.aiProcessing.description'),
+      benefits: t('features.aiProcessing.benefits'),
+      available: true,
+      status: t('status.available')
     },
     {
-      icon: <Settings className="h-8 w-8 text-gray-600" />,
+      icon: <Search className="h-8 w-8 text-purple-500" />,
+      title: t('features.smartSearch.title'),
+      description: t('features.smartSearch.description'),
+      benefits: t('features.smartSearch.benefits'),
+      available: true,
+      status: t('status.available')
+    },
+    {
+      icon: <MapPin className="h-8 w-8 text-red-500" />,
+      title: t('features.malaysianIntelligence.title'),
+      description: t('features.malaysianIntelligence.description'),
+      benefits: t('features.malaysianIntelligence.benefits'),
+      available: true,
+      status: t('status.available')
+    },
+    {
+      icon: <BarChart3 className="h-8 w-8 text-indigo-500" />,
+      title: t('features.advancedAnalytics.title'),
+      description: t('features.advancedAnalytics.description'),
+      benefits: t('features.advancedAnalytics.benefits'),
+      available: true,
+      status: t('status.available')
+    }
+  ];
+
+  // Generate collaboration features with translations
+  const collaborationFeatures = [
+    {
+      icon: <Users className="h-8 w-8 text-blue-600" />,
       title: t('features.teamCollaboration.title'),
       description: t('features.teamCollaboration.description'),
       benefits: t('features.teamCollaboration.benefits'),
@@ -117,10 +123,70 @@ export default function FeaturesPage() {
       status: t('status.available')
     },
     {
-      icon: <MessageSquare className="h-8 w-8 text-blue-600" />,
+      icon: <MessageSquare className="h-8 w-8 text-green-600" />,
       title: t('features.claimsManagement.title'),
       description: t('features.claimsManagement.description'),
       benefits: t('features.claimsManagement.benefits'),
+      available: true,
+      status: t('status.available')
+    }
+  ];
+
+  // Generate reporting features with translations
+  const reportingFeatures = [
+    {
+      icon: <FileText className="h-8 w-8 text-orange-500" />,
+      title: t('features.exportOptions.title'),
+      description: t('features.exportOptions.description'),
+      benefits: t('features.exportOptions.benefits'),
+      available: true,
+      status: t('status.available')
+    }
+  ];
+
+  // Generate platform features with translations
+  const platformFeatures = [
+    {
+      icon: <Smartphone className="h-8 w-8 text-purple-600" />,
+      title: t('features.progressiveWebApp.title'),
+      description: t('features.progressiveWebApp.description'),
+      benefits: t('features.progressiveWebApp.benefits'),
+      available: true,
+      status: t('status.available')
+    },
+    {
+      icon: <Monitor className="h-8 w-8 text-teal-600" />,
+      title: t('features.mobileResponsive.title'),
+      description: t('features.mobileResponsive.description'),
+      benefits: t('features.mobileResponsive.benefits'),
+      available: true,
+      status: t('status.available')
+    },
+    {
+      icon: <CreditCard className="h-8 w-8 text-indigo-600" />,
+      title: t('features.subscriptionManagement.title'),
+      description: t('features.subscriptionManagement.description'),
+      benefits: t('features.subscriptionManagement.benefits'),
+      available: true,
+      status: t('status.available')
+    },
+    {
+      icon: <HelpCircle className="h-8 w-8 text-yellow-600" />,
+      title: t('features.helpCenter.title'),
+      description: t('features.helpCenter.description'),
+      benefits: t('features.helpCenter.benefits'),
+      available: true,
+      status: t('status.available')
+    }
+  ];
+
+  // Generate integration features with translations
+  const integrationFeatures = [
+    {
+      icon: <Globe className="h-8 w-8 text-gray-600" />,
+      title: t('features.apiAccess.title'),
+      description: t('features.apiAccess.description'),
+      benefits: t('features.apiAccess.benefits'),
       available: true,
       status: t('status.available')
     }
@@ -230,7 +296,7 @@ export default function FeaturesPage() {
           </div>
         </motion.section>
 
-        {/* Analytics & Reporting Section */}
+        {/* AI Features Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -243,12 +309,12 @@ export default function FeaturesPage() {
               {t('categories.ai.description')}
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {analyticsFeatures.map((feature, index) => renderFeatureCard(feature, index))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {aiFeatures.map((feature, index) => renderFeatureCard(feature, index))}
           </div>
         </motion.section>
 
-        {/* Platform Features Section */}
+        {/* Team Collaboration Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -261,8 +327,62 @@ export default function FeaturesPage() {
               {t('categories.collaboration.description')}
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {collaborationFeatures.map((feature, index) => renderFeatureCard(feature, index))}
+          </div>
+        </motion.section>
+
+        {/* Export & Reporting Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="mb-16"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-4">{t('categories.reporting.title')}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {t('categories.reporting.description')}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6">
+            {reportingFeatures.map((feature, index) => renderFeatureCard(feature, index))}
+          </div>
+        </motion.section>
+
+        {/* Platform Features Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 1.0 }}
+          className="mb-16"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-4">{t('categories.platform.title')}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {t('categories.platform.description')}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {platformFeatures.map((feature, index) => renderFeatureCard(feature, index))}
+          </div>
+        </motion.section>
+
+        {/* Integration Features Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 1.2 }}
+          className="mb-16"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-4">{t('categories.integration.title')}</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {t('categories.integration.description')}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6">
+            {integrationFeatures.map((feature, index) => renderFeatureCard(feature, index))}
           </div>
         </motion.section>
 
@@ -270,7 +390,7 @@ export default function FeaturesPage() {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
+          transition={{ duration: 0.6, delay: 1.4 }}
           className="mb-16"
         >
           <div className="text-center mb-8">
@@ -395,7 +515,7 @@ export default function FeaturesPage() {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
+          transition={{ duration: 0.6, delay: 1.6 }}
           className="text-center"
         >
           <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5">
@@ -435,41 +555,28 @@ export default function FeaturesPage() {
           </Card>
         </motion.section>
 
-        {/* Coming Soon Section */}
+        {/* Future Enhancements Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.2 }}
+          transition={{ duration: 0.6, delay: 1.8 }}
           className="mt-16 text-center"
         >
-          <h2 className="text-2xl font-bold mb-4 text-muted-foreground">{t('status.coming_soon')}</h2>
+          <h2 className="text-2xl font-bold mb-4 text-muted-foreground">Future Enhancements</h2>
           <p className="text-muted-foreground mb-6">
-            {t('cta.subtitle')}
+            We're continuously improving Mataresit with new features and capabilities
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="opacity-60">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">{t('features.apiAccess.title')}</CardTitle>
+                  <Camera className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-sm">Native Mobile Apps</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  {t('features.apiAccess.description')}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">{t('features.teamCollaboration.title')}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  {t('features.teamCollaboration.description')}
+                  Dedicated iOS and Android apps with offline capabilities
                 </p>
               </CardContent>
             </Card>
@@ -477,12 +584,25 @@ export default function FeaturesPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Download className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">{t('features.exportOptions.title')}</CardTitle>
+                  <CardTitle className="text-sm">Advanced Integrations</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  {t('features.exportOptions.description')}
+                  Direct connections with accounting software and ERP systems
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="opacity-60">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-sm">AI Insights</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Predictive analytics and spending pattern insights
                 </p>
               </CardContent>
             </Card>

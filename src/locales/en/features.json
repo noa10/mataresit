@@ -20,6 +20,14 @@
       "title": "Team Collaboration",
       "description": "Work together seamlessly"
     },
+    "reporting": {
+      "title": "Export & Reporting",
+      "description": "Comprehensive data export and analytics"
+    },
+    "platform": {
+      "title": "Platform Features",
+      "description": "Advanced platform capabilities"
+    },
     "integration": {
       "title": "Integrations",
       "description": "Connect with your existing tools"
@@ -27,40 +35,88 @@
   },
   "features": {
     "aiProcessing": {
-      "title": "AI Receipt Processing",
-      "description": "Extract data from receipts automatically with 99% accuracy using advanced AI technology.",
+      "title": "AI Vision Processing",
+      "description": "Advanced AI vision technology directly analyzes receipt images with 99% accuracy, confidence scoring, and real-time feedback.",
       "benefits": [
-        "Automatic data extraction",
-        "99% accuracy rate",
-        "Support for multiple languages",
-        "Handles various receipt formats"
+        "Direct vision analysis (no OCR)",
+        "99% accuracy with confidence scoring",
+        "Real-time processing feedback",
+        "Multi-language support including Malay"
       ],
       "status": "available",
       "category": "ai"
     },
     "smartSearch": {
-      "title": "Smart Search",
-      "description": "Find any receipt instantly using natural language queries powered by AI.",
+      "title": "Semantic Search & AI Discovery",
+      "description": "Powerful semantic search with natural language queries across receipts, claims, and business directory.",
       "benefits": [
-        "Natural language search",
-        "Instant results",
-        "Search by content, date, or amount",
-        "Advanced filtering options"
+        "Semantic search with AI embeddings",
+        "Natural language queries",
+        "Unified search across all data",
+        "Advanced filtering and suggestions"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "malaysianIntelligence": {
+      "title": "Malaysian Business Intelligence",
+      "description": "Specialized recognition for 500+ Malaysian businesses with local tax system support (GST/SST).",
+      "benefits": [
+        "500+ Malaysian business directory",
+        "GST/SST tax system support",
+        "Local payment method recognition",
+        "MYR currency optimization"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "advancedAnalytics": {
+      "title": "Advanced Analytics Dashboard",
+      "description": "Comprehensive team analytics with expense tracking, trends analysis, and exportable insights.",
+      "benefits": [
+        "Team expense analytics",
+        "Trend analysis and reporting",
+        "Exportable analytics data",
+        "Visual charts and insights"
       ],
       "status": "available",
       "category": "ai"
     },
     "batchProcessing": {
       "title": "Batch Processing",
-      "description": "Upload and process multiple receipts simultaneously to save time.",
+      "description": "Upload and process multiple receipts simultaneously with tier-based limits and real-time progress tracking.",
       "benefits": [
-        "Process up to 100 receipts at once",
-        "Real-time progress tracking",
-        "Bulk categorization",
-        "Error handling and retry"
+        "Free: 5 receipts per batch",
+        "Pro: 50 receipts per batch",
+        "Max: 100 receipts per batch",
+        "Real-time progress tracking"
       ],
       "status": "available",
       "category": "core"
+    },
+    "realTimeNotifications": {
+      "title": "Real-Time Notifications",
+      "description": "Stay informed with instant push notifications for receipt processing, team activities, and claim updates.",
+      "benefits": [
+        "Browser push notifications",
+        "Real-time processing updates",
+        "Team collaboration alerts",
+        "Customizable notification preferences"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "progressiveWebApp": {
+      "title": "Progressive Web App",
+      "description": "App-like experience with offline capabilities, push notifications, and responsive design.",
+      "benefits": [
+        "Offline functionality",
+        "App-like experience",
+        "Cross-device synchronization",
+        "Responsive mobile design"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "customCategories": {
       "title": "Custom Categories",
@@ -75,40 +131,52 @@
       "category": "core"
     },
     "teamCollaboration": {
-      "title": "Team Collaboration",
-      "description": "Work together with your team on receipt management and expense tracking.",
+      "title": "Enhanced Team Management",
+      "description": "Advanced team collaboration with bulk operations, audit trails, and comprehensive member management.",
       "benefits": [
-        "Team workspaces",
-        "Role-based permissions",
-        "Shared categories",
-        "Collaborative workflows"
+        "Team workspaces with role-based permissions",
+        "Bulk member operations",
+        "Audit trail and activity tracking",
+        "Advanced invitation system"
       ],
       "status": "available",
       "category": "collaboration"
     },
     "claimsManagement": {
-      "title": "Claims Management",
-      "description": "Submit and manage expense claims with integrated receipt attachments.",
+      "title": "Advanced Claims System",
+      "description": "Complete expense claims management with receipt integration, approval workflows, and priority levels.",
       "benefits": [
-        "Easy claim submission",
-        "Approval workflows",
-        "Receipt attachments",
-        "Status tracking"
+        "Receipt-to-claim conversion",
+        "Multi-level approval workflows",
+        "Priority levels and status tracking",
+        "Real-time collaboration notifications"
       ],
       "status": "available",
       "category": "collaboration"
     },
     "exportOptions": {
-      "title": "Export Options",
-      "description": "Export your data in multiple formats for accounting and reporting.",
+      "title": "Advanced Export & Reporting",
+      "description": "Comprehensive export system with multiple formats, analytics export, and filter-aware reporting.",
       "benefits": [
-        "PDF reports",
-        "Excel/CSV exports",
-        "Custom date ranges",
-        "Filtered exports"
+        "CSV, Excel, PDF exports",
+        "Analytics data export",
+        "Filter-aware exports",
+        "Daily expense reports"
       ],
       "status": "available",
-      "category": "core"
+      "category": "reporting"
+    },
+    "subscriptionManagement": {
+      "title": "Subscription Management",
+      "description": "Complete billing system with Stripe integration, auto-renewal, and multi-language support.",
+      "benefits": [
+        "Secure Stripe payment processing",
+        "Auto-renewal with preferences",
+        "Multi-language billing support",
+        "Payment history and invoices"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "secureStorage": {
       "title": "Secure Storage",
@@ -122,28 +190,40 @@
       "status": "available",
       "category": "core"
     },
-    "mobileApp": {
-      "title": "Mobile App",
-      "description": "Capture and process receipts on the go with our mobile application.",
+    "mobileResponsive": {
+      "title": "Mobile Responsive Design",
+      "description": "Fully responsive web application optimized for mobile devices with touch-friendly interfaces.",
       "benefits": [
-        "Camera capture",
-        "Offline processing",
-        "Sync across devices",
-        "Push notifications"
+        "Mobile-optimized interface",
+        "Touch-friendly controls",
+        "Responsive across all devices",
+        "Mobile-specific adaptations"
       ],
-      "status": "coming_soon",
-      "category": "core"
+      "status": "available",
+      "category": "platform"
+    },
+    "helpCenter": {
+      "title": "Comprehensive Help Center",
+      "description": "Complete support system with FAQ, search functionality, and categorized help topics.",
+      "benefits": [
+        "Searchable FAQ system",
+        "Categorized help topics",
+        "Multi-language support",
+        "User-friendly interface"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "apiAccess": {
-      "title": "API Access",
-      "description": "Integrate Mataresit with your existing business systems and workflows.",
+      "title": "Full API Access",
+      "description": "Complete REST API access with authentication, rate limiting, and comprehensive documentation for Max tier users.",
       "benefits": [
-        "RESTful API",
-        "Webhook support",
-        "Developer documentation",
-        "Rate limiting"
+        "RESTful API endpoints",
+        "Secure API key management",
+        "Rate limiting by subscription tier",
+        "Comprehensive documentation"
       ],
-      "status": "beta",
+      "status": "available",
       "category": "integration"
     }
   },

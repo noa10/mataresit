@@ -20,6 +20,14 @@
       "title": "Kerjasama Pasukan",
       "description": "Bekerja bersama dengan lancar"
     },
+    "reporting": {
+      "title": "Eksport & Pelaporan",
+      "description": "Eksport data dan analitik menyeluruh"
+    },
+    "platform": {
+      "title": "Ciri Platform",
+      "description": "Keupayaan platform lanjutan"
+    },
     "integration": {
       "title": "Integrasi",
       "description": "Sambung dengan alat sedia ada anda"
@@ -27,40 +35,88 @@
   },
   "features": {
     "aiProcessing": {
-      "title": "Pemprosesan Resit AI",
-      "description": "Ekstrak data dari resit secara automatik dengan ketepatan 99% menggunakan teknologi AI canggih.",
+      "title": "Pemprosesan Visi AI",
+      "description": "Teknologi visi AI canggih menganalisis imej resit secara langsung dengan ketepatan 99%, pemarkahan keyakinan, dan maklum balas masa nyata.",
       "benefits": [
-        "Ekstraksi data automatik",
-        "Kadar ketepatan 99%",
-        "Sokongan pelbagai bahasa",
-        "Mengendalikan pelbagai format resit"
+        "Analisis visi langsung (tanpa OCR)",
+        "Ketepatan 99% dengan pemarkahan keyakinan",
+        "Maklum balas pemprosesan masa nyata",
+        "Sokongan pelbagai bahasa termasuk Melayu"
       ],
       "status": "available",
       "category": "ai"
     },
     "smartSearch": {
-      "title": "Carian Pintar",
-      "description": "Cari mana-mana resit dengan serta-merta menggunakan pertanyaan bahasa semula jadi berkuasa AI.",
+      "title": "Carian Semantik & Penemuan AI",
+      "description": "Carian semantik berkuasa dengan pertanyaan bahasa semula jadi merentas resit, tuntutan, dan direktori perniagaan.",
       "benefits": [
-        "Carian bahasa semula jadi",
-        "Hasil segera",
-        "Cari mengikut kandungan, tarikh, atau jumlah",
-        "Pilihan penapisan lanjutan"
+        "Carian semantik dengan AI embeddings",
+        "Pertanyaan bahasa semula jadi",
+        "Carian bersatu merentas semua data",
+        "Penapisan lanjutan dan cadangan"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "malaysianIntelligence": {
+      "title": "Kecerdasan Perniagaan Malaysia",
+      "description": "Pengecaman khusus untuk 500+ perniagaan Malaysia dengan sokongan sistem cukai tempatan (GST/SST).",
+      "benefits": [
+        "Direktori 500+ perniagaan Malaysia",
+        "Sokongan sistem cukai GST/SST",
+        "Pengecaman kaedah pembayaran tempatan",
+        "Pengoptimuman mata wang MYR"
+      ],
+      "status": "available",
+      "category": "ai"
+    },
+    "advancedAnalytics": {
+      "title": "Papan Pemuka Analitik Lanjutan",
+      "description": "Analitik pasukan menyeluruh dengan penjejakan perbelanjaan, analisis trend, dan wawasan boleh eksport.",
+      "benefits": [
+        "Analitik perbelanjaan pasukan",
+        "Analisis trend dan pelaporan",
+        "Data analitik boleh eksport",
+        "Carta visual dan wawasan"
       ],
       "status": "available",
       "category": "ai"
     },
     "batchProcessing": {
       "title": "Pemprosesan Kelompok",
-      "description": "Muat naik dan proses berbilang resit serentak untuk menjimatkan masa.",
+      "description": "Muat naik dan proses berbilang resit serentak dengan had berdasarkan peringkat dan penjejakan kemajuan masa nyata.",
       "benefits": [
-        "Proses sehingga 100 resit sekaligus",
-        "Penjejakan kemajuan masa nyata",
-        "Pengkategorian pukal",
-        "Pengendalian ralat dan cuba semula"
+        "Percuma: 5 resit setiap kelompok",
+        "Pro: 50 resit setiap kelompok",
+        "Max: 100 resit setiap kelompok",
+        "Penjejakan kemajuan masa nyata"
       ],
       "status": "available",
       "category": "core"
+    },
+    "realTimeNotifications": {
+      "title": "Pemberitahuan Masa Nyata",
+      "description": "Kekal termaklum dengan pemberitahuan tolak segera untuk pemprosesan resit, aktiviti pasukan, dan kemaskini tuntutan.",
+      "benefits": [
+        "Pemberitahuan tolak pelayar",
+        "Kemaskini pemprosesan masa nyata",
+        "Amaran kerjasama pasukan",
+        "Keutamaan pemberitahuan boleh disesuaikan"
+      ],
+      "status": "available",
+      "category": "core"
+    },
+    "progressiveWebApp": {
+      "title": "Aplikasi Web Progresif",
+      "description": "Pengalaman seperti aplikasi dengan keupayaan luar talian, pemberitahuan tolak, dan reka bentuk responsif.",
+      "benefits": [
+        "Fungsi luar talian",
+        "Pengalaman seperti aplikasi",
+        "Penyegerakan merentas peranti",
+        "Reka bentuk mudah alih responsif"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "customCategories": {
       "title": "Kategori Tersuai",
@@ -75,40 +131,52 @@
       "category": "core"
     },
     "teamCollaboration": {
-      "title": "Kerjasama Pasukan",
-      "description": "Bekerja bersama dengan pasukan anda dalam pengurusan resit dan penjejakan perbelanjaan.",
+      "title": "Pengurusan Pasukan Dipertingkat",
+      "description": "Kerjasama pasukan lanjutan dengan operasi pukal, jejak audit, dan pengurusan ahli menyeluruh.",
       "benefits": [
-        "Ruang kerja pasukan",
-        "Kebenaran berdasarkan peranan",
-        "Kategori dikongsi",
-        "Aliran kerja kolaboratif"
+        "Ruang kerja pasukan dengan kebenaran berdasarkan peranan",
+        "Operasi ahli pukal",
+        "Jejak audit dan penjejakan aktiviti",
+        "Sistem jemputan lanjutan"
       ],
       "status": "available",
       "category": "collaboration"
     },
     "claimsManagement": {
-      "title": "Pengurusan Tuntutan",
-      "description": "Hantar dan urus tuntutan perbelanjaan dengan lampiran resit bersepadu.",
+      "title": "Sistem Tuntutan Lanjutan",
+      "description": "Pengurusan tuntutan perbelanjaan lengkap dengan integrasi resit, aliran kerja kelulusan, dan tahap keutamaan.",
       "benefits": [
-        "Penyerahan tuntutan mudah",
-        "Aliran kerja kelulusan",
-        "Lampiran resit",
-        "Penjejakan status"
+        "Penukaran resit-ke-tuntutan",
+        "Aliran kerja kelulusan berbilang peringkat",
+        "Tahap keutamaan dan penjejakan status",
+        "Pemberitahuan kerjasama masa nyata"
       ],
       "status": "available",
       "category": "collaboration"
     },
     "exportOptions": {
-      "title": "Pilihan Eksport",
-      "description": "Eksport data anda dalam pelbagai format untuk perakaunan dan pelaporan.",
+      "title": "Eksport & Pelaporan Lanjutan",
+      "description": "Sistem eksport menyeluruh dengan pelbagai format, eksport analitik, dan pelaporan sedar penapis.",
       "benefits": [
-        "Laporan PDF",
-        "Eksport Excel/CSV",
-        "Julat tarikh tersuai",
-        "Eksport bertapis"
+        "Eksport CSV, Excel, PDF",
+        "Eksport data analitik",
+        "Eksport sedar penapis",
+        "Laporan perbelanjaan harian"
       ],
       "status": "available",
-      "category": "core"
+      "category": "reporting"
+    },
+    "subscriptionManagement": {
+      "title": "Pengurusan Langganan",
+      "description": "Sistem pengebilan lengkap dengan integrasi Stripe, pembaharuan automatik, dan sokongan pelbagai bahasa.",
+      "benefits": [
+        "Pemprosesan pembayaran Stripe selamat",
+        "Pembaharuan automatik dengan keutamaan",
+        "Sokongan pengebilan pelbagai bahasa",
+        "Sejarah pembayaran dan invois"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "secureStorage": {
       "title": "Storan Selamat",
@@ -122,28 +190,40 @@
       "status": "available",
       "category": "core"
     },
-    "mobileApp": {
-      "title": "Aplikasi Mudah Alih",
-      "description": "Tangkap dan proses resit semasa dalam perjalanan dengan aplikasi mudah alih kami.",
+    "mobileResponsive": {
+      "title": "Reka Bentuk Responsif Mudah Alih",
+      "description": "Aplikasi web responsif sepenuhnya yang dioptimumkan untuk peranti mudah alih dengan antara muka mesra sentuhan.",
       "benefits": [
-        "Tangkapan kamera",
-        "Pemprosesan luar talian",
-        "Segerak merentas peranti",
-        "Pemberitahuan tolak"
+        "Antara muka dioptimumkan mudah alih",
+        "Kawalan mesra sentuhan",
+        "Responsif merentas semua peranti",
+        "Adaptasi khusus mudah alih"
       ],
-      "status": "coming_soon",
-      "category": "core"
+      "status": "available",
+      "category": "platform"
+    },
+    "helpCenter": {
+      "title": "Pusat Bantuan Menyeluruh",
+      "description": "Sistem sokongan lengkap dengan FAQ, fungsi carian, dan topik bantuan berkategori.",
+      "benefits": [
+        "Sistem FAQ boleh dicari",
+        "Topik bantuan berkategori",
+        "Sokongan pelbagai bahasa",
+        "Antara muka mesra pengguna"
+      ],
+      "status": "available",
+      "category": "platform"
     },
     "apiAccess": {
-      "title": "Akses API",
-      "description": "Integrasikan Mataresit dengan sistem perniagaan dan aliran kerja sedia ada anda.",
+      "title": "Akses API Penuh",
+      "description": "Akses API REST lengkap dengan pengesahan, pengehadan kadar, dan dokumentasi menyeluruh untuk pengguna peringkat Max.",
       "benefits": [
-        "API RESTful",
-        "Sokongan webhook",
-        "Dokumentasi pembangun",
-        "Pengehadan kadar"
+        "Titik akhir API RESTful",
+        "Pengurusan kunci API selamat",
+        "Pengehadan kadar mengikut peringkat langganan",
+        "Dokumentasi menyeluruh"
       ],
-      "status": "beta",
+      "status": "available",
       "category": "integration"
     }
   },
