@@ -96,18 +96,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           .from('theme_preferences')
           .select('theme_mode, theme_variant')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
+
+        // Handle any database errors
+        if (dbError) {
+          // This is an actual error (network, permission, etc.)
+          throw dbError;
+        }
 
         // Handle the case where no theme preferences exist yet (normal for new users)
-        if (dbError) {
-          if (dbError.code === 'PGRST116') {
-            // No rows returned - this is normal for new users, not an error
-            console.log('No theme preferences found for user, using defaults');
-            return;
-          } else {
-            // This is an actual error (network, permission, etc.)
-            throw dbError;
-          }
+        if (!data) {
+          console.log('No theme preferences found for user, using defaults');
+          return;
         }
 
         if (data) {
