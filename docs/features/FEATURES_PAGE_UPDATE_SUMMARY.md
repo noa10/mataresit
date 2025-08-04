@@ -161,3 +161,33 @@ I have successfully updated the Mataresit features page to accurately reflect al
 The Mataresit features page now accurately represents the sophisticated, enterprise-ready platform that has been built. Users can now understand the full scope of capabilities available, from advanced AI vision processing to comprehensive team collaboration and mobile-optimized experiences.
 
 The update transforms the features page from understating the platform's capabilities to properly showcasing Mataresit as the comprehensive, AI-powered receipt management solution it has become.
+
+## 🔧 Bug Fix: Feature Benefits Display Issue
+
+### **Issue Identified**
+After the initial implementation, feature cards were displaying `[object Object]` instead of the actual benefit text. This occurred because:
+- The `t()` translation function returns arrays as objects when accessed directly
+- React was trying to render the array object as a string, resulting in `[object Object]`
+
+### **Solution Implemented**
+Updated the FeaturesPage.tsx component to properly handle array translations:
+
+1. **Changed from `benefits` to `benefitsList`** in all feature definitions
+2. **Individual array access** using indexed translation keys:
+   ```typescript
+   benefitsList: [
+     t('features.aiProcessing.benefits.0'),
+     t('features.aiProcessing.benefits.1'),
+     t('features.aiProcessing.benefits.2'),
+     t('features.aiProcessing.benefits.3')
+   ]
+   ```
+3. **Updated rendering logic** to use `feature.benefitsList` directly
+
+### **Files Modified for Bug Fix**
+- `src/pages/FeaturesPage.tsx` - Updated all feature definitions and rendering logic
+
+### **Result**
+✅ Feature benefits now display correctly as individual bullet points
+✅ All feature cards show proper benefit lists in both English and Malay
+✅ No more `[object Object]` display issues

@@ -46,7 +46,12 @@ export default function FeaturesPage() {
       icon: <Upload className="h-8 w-8 text-green-500" />,
       title: t('features.batchProcessing.title'),
       description: t('features.batchProcessing.description'),
-      benefits: t('features.batchProcessing.benefits'),
+      benefitsList: [
+        t('features.batchProcessing.benefits.0'),
+        t('features.batchProcessing.benefits.1'),
+        t('features.batchProcessing.benefits.2'),
+        t('features.batchProcessing.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -54,7 +59,12 @@ export default function FeaturesPage() {
       icon: <Bell className="h-8 w-8 text-blue-500" />,
       title: t('features.realTimeNotifications.title'),
       description: t('features.realTimeNotifications.description'),
-      benefits: t('features.realTimeNotifications.benefits'),
+      benefitsList: [
+        t('features.realTimeNotifications.benefits.0'),
+        t('features.realTimeNotifications.benefits.1'),
+        t('features.realTimeNotifications.benefits.2'),
+        t('features.realTimeNotifications.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -62,7 +72,12 @@ export default function FeaturesPage() {
       icon: <PieChart className="h-8 w-8 text-teal-500" />,
       title: t('features.customCategories.title'),
       description: t('features.customCategories.description'),
-      benefits: t('features.customCategories.benefits'),
+      benefitsList: [
+        t('features.customCategories.benefits.0'),
+        t('features.customCategories.benefits.1'),
+        t('features.customCategories.benefits.2'),
+        t('features.customCategories.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -70,7 +85,12 @@ export default function FeaturesPage() {
       icon: <Shield className="h-8 w-8 text-green-600" />,
       title: t('features.secureStorage.title'),
       description: t('features.secureStorage.description'),
-      benefits: t('features.secureStorage.benefits'),
+      benefitsList: [
+        t('features.secureStorage.benefits.0'),
+        t('features.secureStorage.benefits.1'),
+        t('features.secureStorage.benefits.2'),
+        t('features.secureStorage.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -82,7 +102,12 @@ export default function FeaturesPage() {
       icon: <Brain className="h-8 w-8 text-blue-500" />,
       title: t('features.aiProcessing.title'),
       description: t('features.aiProcessing.description'),
-      benefits: t('features.aiProcessing.benefits'),
+      benefitsList: [
+        t('features.aiProcessing.benefits.0'),
+        t('features.aiProcessing.benefits.1'),
+        t('features.aiProcessing.benefits.2'),
+        t('features.aiProcessing.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -90,7 +115,12 @@ export default function FeaturesPage() {
       icon: <Search className="h-8 w-8 text-purple-500" />,
       title: t('features.smartSearch.title'),
       description: t('features.smartSearch.description'),
-      benefits: t('features.smartSearch.benefits'),
+      benefitsList: [
+        t('features.smartSearch.benefits.0'),
+        t('features.smartSearch.benefits.1'),
+        t('features.smartSearch.benefits.2'),
+        t('features.smartSearch.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -98,7 +128,12 @@ export default function FeaturesPage() {
       icon: <MapPin className="h-8 w-8 text-red-500" />,
       title: t('features.malaysianIntelligence.title'),
       description: t('features.malaysianIntelligence.description'),
-      benefits: t('features.malaysianIntelligence.benefits'),
+      benefitsList: [
+        t('features.malaysianIntelligence.benefits.0'),
+        t('features.malaysianIntelligence.benefits.1'),
+        t('features.malaysianIntelligence.benefits.2'),
+        t('features.malaysianIntelligence.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -106,7 +141,12 @@ export default function FeaturesPage() {
       icon: <BarChart3 className="h-8 w-8 text-indigo-500" />,
       title: t('features.advancedAnalytics.title'),
       description: t('features.advancedAnalytics.description'),
-      benefits: t('features.advancedAnalytics.benefits'),
+      benefitsList: [
+        t('features.advancedAnalytics.benefits.0'),
+        t('features.advancedAnalytics.benefits.1'),
+        t('features.advancedAnalytics.benefits.2'),
+        t('features.advancedAnalytics.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -118,7 +158,12 @@ export default function FeaturesPage() {
       icon: <Users className="h-8 w-8 text-blue-600" />,
       title: t('features.teamCollaboration.title'),
       description: t('features.teamCollaboration.description'),
-      benefits: t('features.teamCollaboration.benefits'),
+      benefitsList: [
+        t('features.teamCollaboration.benefits.0'),
+        t('features.teamCollaboration.benefits.1'),
+        t('features.teamCollaboration.benefits.2'),
+        t('features.teamCollaboration.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -126,7 +171,12 @@ export default function FeaturesPage() {
       icon: <MessageSquare className="h-8 w-8 text-green-600" />,
       title: t('features.claimsManagement.title'),
       description: t('features.claimsManagement.description'),
-      benefits: t('features.claimsManagement.benefits'),
+      benefitsList: [
+        t('features.claimsManagement.benefits.0'),
+        t('features.claimsManagement.benefits.1'),
+        t('features.claimsManagement.benefits.2'),
+        t('features.claimsManagement.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -138,7 +188,12 @@ export default function FeaturesPage() {
       icon: <FileText className="h-8 w-8 text-orange-500" />,
       title: t('features.exportOptions.title'),
       description: t('features.exportOptions.description'),
-      benefits: t('features.exportOptions.benefits'),
+      benefitsList: [
+        t('features.exportOptions.benefits.0'),
+        t('features.exportOptions.benefits.1'),
+        t('features.exportOptions.benefits.2'),
+        t('features.exportOptions.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -150,7 +205,12 @@ export default function FeaturesPage() {
       icon: <Smartphone className="h-8 w-8 text-purple-600" />,
       title: t('features.progressiveWebApp.title'),
       description: t('features.progressiveWebApp.description'),
-      benefits: t('features.progressiveWebApp.benefits'),
+      benefitsList: [
+        t('features.progressiveWebApp.benefits.0'),
+        t('features.progressiveWebApp.benefits.1'),
+        t('features.progressiveWebApp.benefits.2'),
+        t('features.progressiveWebApp.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -158,7 +218,12 @@ export default function FeaturesPage() {
       icon: <Monitor className="h-8 w-8 text-teal-600" />,
       title: t('features.mobileResponsive.title'),
       description: t('features.mobileResponsive.description'),
-      benefits: t('features.mobileResponsive.benefits'),
+      benefitsList: [
+        t('features.mobileResponsive.benefits.0'),
+        t('features.mobileResponsive.benefits.1'),
+        t('features.mobileResponsive.benefits.2'),
+        t('features.mobileResponsive.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -166,7 +231,12 @@ export default function FeaturesPage() {
       icon: <CreditCard className="h-8 w-8 text-indigo-600" />,
       title: t('features.subscriptionManagement.title'),
       description: t('features.subscriptionManagement.description'),
-      benefits: t('features.subscriptionManagement.benefits'),
+      benefitsList: [
+        t('features.subscriptionManagement.benefits.0'),
+        t('features.subscriptionManagement.benefits.1'),
+        t('features.subscriptionManagement.benefits.2'),
+        t('features.subscriptionManagement.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     },
@@ -174,7 +244,12 @@ export default function FeaturesPage() {
       icon: <HelpCircle className="h-8 w-8 text-yellow-600" />,
       title: t('features.helpCenter.title'),
       description: t('features.helpCenter.description'),
-      benefits: t('features.helpCenter.benefits'),
+      benefitsList: [
+        t('features.helpCenter.benefits.0'),
+        t('features.helpCenter.benefits.1'),
+        t('features.helpCenter.benefits.2'),
+        t('features.helpCenter.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -186,7 +261,12 @@ export default function FeaturesPage() {
       icon: <Globe className="h-8 w-8 text-gray-600" />,
       title: t('features.apiAccess.title'),
       description: t('features.apiAccess.description'),
-      benefits: t('features.apiAccess.benefits'),
+      benefitsList: [
+        t('features.apiAccess.benefits.0'),
+        t('features.apiAccess.benefits.1'),
+        t('features.apiAccess.benefits.2'),
+        t('features.apiAccess.benefits.3')
+      ],
       available: true,
       status: t('status.available')
     }
@@ -223,7 +303,7 @@ export default function FeaturesPage() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {(Array.isArray(feature.benefits) ? feature.benefits : [feature.benefits]).map((benefit: string, idx: number) => (
+            {feature.benefitsList.map((benefit: string, idx: number) => (
               <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                 {benefit}
