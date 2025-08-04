@@ -58,6 +58,8 @@ const PricingPage = lazy(() => import("./pages/PricingPage"));
 const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const NewDocumentationPage = lazy(() => import("./pages/NewDocumentationPage"));
+const GuideDetailPage = lazy(() => import("./pages/GuideDetailPage"));
 const StatusPage = lazy(() => import("./pages/StatusPage"));
 const BlogIndexPage = lazy(() => import("./pages/BlogIndexPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
@@ -133,6 +135,16 @@ const App = () => (
                 </Suspense>
               } />
               <Route path="/docs" element={
+                <Suspense fallback={<PageLoading />}>
+                  <NewDocumentationPage />
+                </Suspense>
+              } />
+              <Route path="/docs/guide/:guideId" element={
+                <Suspense fallback={<PageLoading />}>
+                  <GuideDetailPage />
+                </Suspense>
+              } />
+              <Route path="/docs/legacy" element={
                 <Suspense fallback={<PageLoading />}>
                   <DocumentationPage />
                 </Suspense>
