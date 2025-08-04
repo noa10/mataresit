@@ -1,12 +1,22 @@
-# Documentation
+# Mataresit Documentation
 
-This directory contains all documentation for the Paperless Maverick project.
+This directory contains comprehensive documentation for the Mataresit (formerly Paperless Maverick) project, including user guides, technical documentation, and system administration resources.
+
+## 🧭 Navigation
+- **[Complete Documentation Navigation](NAVIGATION.md)** - Find any documentation quickly
+- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Comprehensive documentation catalog
 
 ## Structure
 
-### 📚 **Guides**
-User guides and tutorials for using the application.
-- `paperless-maverick-documentation.md` - Main user documentation
+### 📚 **User Guides**
+Comprehensive user guides and tutorials for using the application.
+- **[User Guides Collection](user-guides/README.md)** - Complete user documentation index
+- **[English User Guides](user-guides/en/README.md)** - English documentation
+- **[Getting Started](user-guides/en/onboarding/quick-start-5min.md)** - 5-minute quick start
+- **[Core Features](user-guides/en/core-features/quick-start-core-features.md)** - Essential functionality
+- **[Team Collaboration](user-guides/en/team-collaboration/quick-start-team-collaboration.md)** - Team setup
+- **[AI Intelligence](user-guides/en/ai-intelligence/quick-start-ai-intelligence.md)** - AI features
+- `paperless-maverick-documentation.md` - Technical system documentation
 
 ### 🔧 **Development**
 Development-related documentation and setup guides.
@@ -75,6 +85,16 @@ Troubleshooting guides and debugging information.
 - `OpenRouter-Integration-Fix.md` - OpenRouter integration fixes
 
 ## Quick Navigation
+
+### For New Users
+1. Start with **[5-Minute Quick Start](user-guides/en/onboarding/quick-start-5min.md)**
+2. Follow **[New User Guide](user-guides/en/onboarding/new-user-guide.md)**
+3. Explore **[Core Features](user-guides/en/core-features/quick-start-core-features.md)**
+
+### For Team Administrators
+1. Begin with **[Team Setup Guide](user-guides/en/team-collaboration/team-setup.md)**
+2. Configure **[Role & Permissions](user-guides/en/team-collaboration/role-permissions.md)**
+3. Implement **[Claims Management](user-guides/en/team-collaboration/claims-management.md)**
 
 ### For New Developers
 1. Start with `guides/paperless-maverick-documentation.md`

@@ -1,29 +1,37 @@
-# Mataresit Billing System - Documentation Index
+# Mataresit - Complete Documentation Index
 
 ## 📚 Complete Documentation Suite
 
-**Last Updated**: 2025-07-22  
-**Version**: 1.0.0  
+**Last Updated**: 2025-08-02
+**Version**: 2.0.0
 **Status**: ✅ Complete and Current
 
 ---
 
 ## 🎯 Quick Start Guides
 
+### For End Users
+1. **[5-Minute Quick Start](user-guides/en/onboarding/quick-start-5min.md)** - Get started immediately
+2. **[New User Guide](user-guides/en/onboarding/new-user-guide.md)** - Complete setup walkthrough
+3. **[Core Features](user-guides/en/core-features/quick-start-core-features.md)** - Essential functionality
+4. **[Team Setup](user-guides/en/team-collaboration/quick-start-team-collaboration.md)** - Team collaboration basics
+
+### For Team Administrators
+1. **[Team Setup Guide](user-guides/en/team-collaboration/team-setup.md)** - Create and manage teams
+2. **[Role & Permissions](user-guides/en/team-collaboration/role-permissions.md)** - Access control
+3. **[Claims Management](user-guides/en/team-collaboration/claims-management.md)** - Expense workflows
+4. **[Team Analytics](user-guides/en/team-collaboration/team-analytics.md)** - Performance insights
+
 ### For Developers
-1. **[System Architecture](BILLING_SYSTEM_DOCUMENTATION.md#system-architecture)** - High-level system overview
-2. **[API Reference](BILLING_SYSTEM_DOCUMENTATION.md#api-reference)** - Complete API documentation
-3. **[Database Schema](BILLING_SYSTEM_DOCUMENTATION.md#database-schema)** - Database structure and relationships
+1. **[System Architecture](guides/paperless-maverick-documentation.md#architecture)** - High-level system overview
+2. **[API Reference](api/openapi.yaml)** - Complete API documentation
+3. **[Local Development](development/LOCAL_DEVELOPMENT_GUIDE.md)** - Development setup guide
+4. **[Database Schema](guides/paperless-maverick-documentation.md#database-schema)** - Database structure
 
 ### For Operations
-1. **[Deployment Guide](DEPLOYMENT_GUIDE.md)** - Step-by-step deployment instructions
-2. **[Monitoring Setup](MONITORING_SETUP_GUIDE.md)** - Monitoring configuration
-3. **[Troubleshooting Guide](TROUBLESHOOTING_GUIDE.md)** - Common issues and solutions
-
-### For Users
-1. **[UI Integration Guide](BILLING_UI_INTEGRATION_VERIFICATION.md)** - How to access billing features
-2. **[Feature Documentation](BILLING_SYSTEM_DOCUMENTATION.md#user-interface-components)** - Feature descriptions
-3. **[Settings Guide](BILLING_SYSTEM_DOCUMENTATION.md#billingpreferences-component)** - Billing preferences usage
+1. **[Deployment Guide](deployment/production-config.md)** - Production deployment
+2. **[Monitoring Setup](monitoring/ARCHITECTURE_MONITORING.md)** - System monitoring
+3. **[Troubleshooting Guide](troubleshooting/WEBHOOK_DEBUGGING_GUIDE.md)** - Issue resolution
 
 ---
 
@@ -132,15 +140,31 @@
 
 ## 📱 User Guides
 
-### End User Documentation
-- **[Billing Preferences Guide](USER_INTERFACE_GUIDE.md#billing-preferences)** - User preference management
-- **[Payment Management](USER_INTERFACE_GUIDE.md#payment-management)** - Payment method management
-- **[Subscription Management](USER_INTERFACE_GUIDE.md#subscription-management)** - Subscription lifecycle
+### 🚀 Getting Started
+- **[User Guides Collection](user-guides/README.md)** - Complete user documentation index
+- **[5-Minute Quick Start](user-guides/en/onboarding/quick-start-5min.md)** - Immediate start guide
+- **[New User Onboarding](user-guides/en/onboarding/new-user-guide.md)** - Complete setup walkthrough
+- **[Account Setup](user-guides/en/onboarding/account-setup.md)** - Account configuration
+- **[Dashboard Navigation](user-guides/en/onboarding/dashboard-navigation.md)** - Interface overview
 
-### Administrator Guides
-- **[System Administration](BILLING_SYSTEM_DOCUMENTATION.md#administration)** - System administration
-- **[User Management](BILLING_SYSTEM_DOCUMENTATION.md#user-management)** - User account management
-- **[Billing Management](BILLING_SYSTEM_DOCUMENTATION.md#billing-management)** - Billing administration
+### 🔧 Core Features
+- **[AI Vision Processing](user-guides/en/core-features/ai-vision-processing.md)** - Smart receipt processing
+- **[Batch Processing](user-guides/en/core-features/batch-processing.md)** - Bulk upload operations
+- **[Semantic Search](user-guides/en/core-features/semantic-search.md)** - Advanced search capabilities
+- **[Export & Reporting](user-guides/en/core-features/export-reporting.md)** - Data analysis and export
+- **[Platform Features](user-guides/en/core-features/platform-features.md)** - Cross-platform capabilities
+
+### 🤖 AI & Intelligence
+- **[Advanced Analytics](user-guides/en/ai-intelligence/advanced-analytics.md)** - Business intelligence
+- **[Malaysian Business Intelligence](user-guides/en/ai-intelligence/malaysian-business-intelligence.md)** - Local intelligence
+- **[Personalization Features](user-guides/en/ai-intelligence/personalization-features.md)** - Customized experience
+- **[Real-time Notifications](user-guides/en/ai-intelligence/real-time-notifications.md)** - Smart alerts
+
+### 👥 Team Collaboration
+- **[Team Setup](user-guides/en/team-collaboration/team-setup.md)** - Create and manage teams
+- **[Role & Permissions](user-guides/en/team-collaboration/role-permissions.md)** - Access control management
+- **[Claims Management](user-guides/en/team-collaboration/claims-management.md)** - Expense workflow management
+- **[Team Analytics](user-guides/en/team-collaboration/team-analytics.md)** - Team performance insights
 
 ---
 
