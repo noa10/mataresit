@@ -421,7 +421,7 @@ export function DataTableComponent({
                       >
                         {visibleColumnsData.map((column) => (
                           <TableCell
-                            key={column.key}
+                            key={`${row.id}-${column.key}`}
                             className={cn(
                               "py-3 text-sm",
                               column.align === 'center' ? 'text-center' :
