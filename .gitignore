@@ -54,3 +54,6 @@ tools/testing/logs/
 .cursor/rules/pdf-report-generation.mdc
 .augment
 .kiro
+
+# Ignore generated test results
+test-results/
