@@ -574,7 +574,7 @@ async function generatePDF(receipts, selectedDay, supabaseClient, mode) {
       pdf.text(`Generated: ${timestamp}`, 20, 287)
 
       // Add app name at bottom right
-      pdf.text('Paperless Maverick', 190, 287, { align: 'right' })
+      pdf.text('Mataresit', 190, 287, { align: 'right' })
     }
   }
 

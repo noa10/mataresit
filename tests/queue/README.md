@@ -321,4 +321,4 @@ For issues with the test suite:
 
 ## License
 
-This test suite is part of the Paperless Maverick project and follows the same license terms.
+This test suite is part of the Mataresit project (formerly Paperless Maverick) and follows the same license terms.

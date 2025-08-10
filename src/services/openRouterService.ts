@@ -122,7 +122,7 @@ export class OpenRouterService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Paperless Maverick Receipt Processing'
+          'X-Title': 'Mataresit Receipt Processing'
         },
         body: JSON.stringify(request)
       });
@@ -360,7 +360,7 @@ Return only the JSON object, no explanations or formatting.`;
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Paperless Maverick Connection Test'
+          'X-Title': 'Mataresit Connection Test'
         },
         body: JSON.stringify(testRequest)
       });

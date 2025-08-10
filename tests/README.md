@@ -1,6 +1,6 @@
 # Tests
 
-This directory contains all test files for the Paperless Maverick project.
+This directory contains all test files for the Mataresit project (formerly Paperless Maverick).
 
 ## Structure
 

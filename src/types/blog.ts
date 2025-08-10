@@ -1,4 +1,4 @@
-// Blog-related type definitions for the paperless-maverick application
+// Blog-related type definitions for the Mataresit application (formerly Paperless Maverick)
 
 export interface Post {
   id: string;

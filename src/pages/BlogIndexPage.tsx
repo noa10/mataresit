@@ -82,7 +82,7 @@ export default function BlogIndexPage() {
         <div className="flex items-center justify-center gap-2 mb-4">
           <Rss className="h-8 w-8 text-primary" />
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            The Paperless Maverick Blog
+            The Mataresit Blog
           </h1>
         </div>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -237,7 +237,7 @@ export default function BlogIndexPage() {
           <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-2xl font-semibold mb-2">No blog posts yet</h2>
           <p className="text-muted-foreground">
-            Check back soon for insights and updates from the Paperless Maverick team.
+            Check back soon for insights and updates from the Mataresit team.
           </p>
         </div>
       ) : filteredPosts.length === 0 && (searchTerm || selectedTag !== 'all') ? (
