@@ -90,7 +90,7 @@ export function SearchPageSidebarContent({
         aria-label="Search page sidebar with navigation and chat history"
       >
       {/* Header - Enhanced styling with flex-shrink-0 */}
-      <div className="flex-shrink-0 flex items-center justify-between p-4 border-b bg-background/50">
+      <div className="flex-shrink-0 flex items-center justify-between h-16 px-4 border-b border-border bg-background/50">
         {(isSidebarOpen || !isDesktop) && (
           <h2 className="font-semibold text-foreground">Navigation & Chat</h2>
         )}

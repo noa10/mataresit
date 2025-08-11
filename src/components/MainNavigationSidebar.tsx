@@ -69,7 +69,7 @@ export function MainNavigationSidebar({
       )}
     >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
           {isOpen && (
             <h2 className="font-semibold">{tNav('sidebar.navigation')}</h2>
           )}

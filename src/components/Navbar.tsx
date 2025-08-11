@@ -72,8 +72,8 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
   };
 
   return (
-    <header className="w-full bg-background border-b relative z-30">
-      <div className="container mx-auto flex items-center justify-between py-4 px-6">
+    <header className="w-full bg-background border-b border-border relative z-30 h-16">
+      <div className="container mx-auto flex items-center justify-between h-full px-6">
         {/* Left Side: Logo & Brand */}
         <div className="flex items-center space-x-3">
           {/* Unified Sidebar Toggle (only show on protected pages and desktop) */}
