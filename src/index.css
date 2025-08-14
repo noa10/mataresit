@@ -1,7 +1,121 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
- 
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@theme {
+  /* Screens (breakpoints) */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* Container */
+  --container-center: true;
+  --container-padding: 2rem;
+  --container-2xl: 1400px;
+
+  /* Tailwind v4 color tokens mapped to existing HSL variables */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Sidebar color tokens for shadcn/ui sidebar components */
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  /* Border radius */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-fade-out: fade-out 0.3s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-scale-out: scale-out 0.2s ease-out;
+  --animate-slide-in: slide-in 0.3s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  /* Define keyframes for animations */
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+
+  @keyframes fade-in {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fade-out {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+  }
+
+  @keyframes scale-in {
+    0% { transform: scale(0.95); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes scale-out {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(0.95); opacity: 0; }
+  }
+
+  @keyframes slide-in {
+    0% { transform: translateX(20px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slide-up {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -45,7 +159,7 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Layout vars and helpers */
-    --nav-width: 0px;
+    --nav-width: var(--sidebar-width, 0px);
     --chat-width: 0px;
   }
 
@@ -109,7 +223,9 @@
  
 @layer base {
   body {
-    @apply bg-background text-foreground border-border;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
     /* Ensure proper scrolling on mobile devices */
     overflow-x: hidden;
     overflow-y: auto;
@@ -130,607 +246,41 @@
   }
 }
 
-.glass-card {
-  @apply bg-background/80 backdrop-blur-sm border border-border/40 rounded-xl shadow-sm;
+/* Define utility classes using standard CSS instead of @apply */
+@utility glass-card {
+  background-color: color-mix(in srgb, hsl(var(--background)) 80%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, hsl(var(--border)) 40%, transparent);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
-.receipt-container {
-  @apply grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+@utility receipt-container {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
-/* Custom category badge styling - Simplified and Consistent */
-.category-badge {
-  @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium border-transparent bg-secondary text-secondary-foreground shrink-0;
-  border-radius: 0.375rem !important;
-  max-width: 120px;
-}
-
-.category-badge-sm {
-  @apply category-badge;
-  max-width: 100px;
-}
-
-.category-badge-md {
-  @apply category-badge;
-  max-width: 120px;
-}
-
-.category-badge-lg {
-  @apply category-badge text-sm px-2.5 py-1;
-  max-width: 140px;
-}
-
-/* Add this for theme script */
-@layer utilities {
-  .dark-theme-toggle {
-    @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-  }
-
-  
-  /* This ensures the rules load AFTER Tailwind utilities and take precedence */
-
-  /* Base category badge oval shape - highest priority */
-  div[class*="category-badge-sm"],
-  div[class*="category-badge-md"],
-  div[class*="category-badge-lg"] {
-    border-radius: 0.375rem !important;
-  }
-
-  /* Ultra-specific selectors for uncategorized badges */
-  div.category-badge-sm.border.border-border.text-muted-foreground,
-  div.category-badge-md.border.border-border.text-muted-foreground,
-  div.category-badge-lg.border.border-border.text-muted-foreground,
-  div.category-badge-sm.border.text-muted-foreground,
-  div.category-badge-md.border.text-muted-foreground,
-  div.category-badge-lg.border.text-muted-foreground,
-  div.category-badge-sm.border,
-  div.category-badge-md.border,
-  div.category-badge-lg.border {
-    border-radius: 0.375rem !important;
-    background-color: hsl(var(--muted) / 0.5) !important;
-    color: hsl(var(--muted-foreground)) !important;
-    border-color: hsl(var(--border)) !important;
-  }
-
-  /* Responsive adjustments with consistent oval shape */
-  @media (max-width: 1024px) {
-    .category-badge-sm,
-    .category-badge-md,
-    .category-badge-lg {
-      max-width: 100px !important;
-      font-size: 0.75rem !important;
-      padding: 0.125rem 0.5rem !important;
-    }
-
-    /* Ensure uncategorized badges maintain oval shape on tablet */
-    div.category-badge-sm.border,
-    div.category-badge-md.border,
-    div.category-badge-lg.border {
-      border-radius: 0.375rem !important;
-      max-width: 100px !important;
-      font-size: 0.75rem !important;
-      padding: 0.125rem 0.5rem !important;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .category-badge-sm,
-    .category-badge-md,
-    .category-badge-lg {
-      max-width: 90px !important;
-      font-size: 0.7rem !important;
-      padding: 0.1rem 0.4rem !important;
-    }
-
-    /* Ensure uncategorized badges maintain oval shape on mobile */
-    div.category-badge-sm.border,
-    div.category-badge-md.border,
-    div.category-badge-lg.border {
-      border-radius: 0.375rem !important;
-      max-width: 90px !important;
-      font-size: 0.7rem !important;
-      padding: 0.1rem 0.4rem !important;
-    }
+@media (min-width: 640px) {
+  .receipt-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* Responsive Table Styles for Mobile (max-width: 640px) */
-@media (max-width: 640px) {
-  .responsive-table {
-    @apply block w-full;
-  }
-  .responsive-table thead {
-    @apply hidden; /* Hide table headers on mobile */
-  }
-  .responsive-table tbody,
-  .responsive-table tr,
-  .responsive-table td {
-    @apply block w-full;
-  }
-  .responsive-table tr {
-    @apply mb-4 rounded-lg border border-border p-2;
-  }
-  .responsive-table td {
-    @apply flex items-center justify-between border-b border-border px-0 py-2 text-left;
-    /* Remove bottom border for the last cell in a row */
-    &:last-child {
-      @apply border-b-0;
-    }
-  }
-  /* Add data-label content before the cell data */
-  .responsive-table td::before {
-    content: attr(data-label);
-    @apply mr-2 font-semibold text-muted-foreground;
-  }
-  /* Ensure text alignment works correctly */
-  .responsive-table td[data-label="Total Spent"] {
-     @apply justify-end;
-     /* Keep the text content on the right side */
-     &::before {
-        @apply mr-auto; /* Push label to the left */
-     }
-  }
-  .responsive-table td[data-label="Receipts"] {
-     @apply justify-end;
-     &::before {
-        @apply mr-auto;
-     }
+@media (min-width: 768px) {
+  .receipt-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* Shiftable content wrapper */
-.layout-shift {
-  margin-left: calc(var(--nav-width) + var(--chat-width));
-  transition: margin-left 0.3s ease-in-out;
-}
-
-/* Fixed chat input alignment */
-.fixed-chat-input {
-  left: calc(var(--nav-width) + var(--chat-width));
-  transition: left 0.3s ease-in-out;
-}
-
-/* Motion-safe overrides */
-@media (prefers-reduced-motion: reduce) {
-  .layout-shift,
-  .fixed-chat-input,
-  .transition-all {
-    transition: none !important;
+@media (min-width: 1024px) {
+  .receipt-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Cross-Browser Mobile Dialog Improvements */
-@media (max-width: 640px) {
-  /* Ensure dialogs don't exceed viewport on mobile - Cross-browser fallbacks */
-  [data-radix-dialog-content] {
-    /* Fallback for older browsers */
-    height: 100vh !important;
-    max-height: 100vh !important;
-    max-width: 100vw !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    transform: none !important;
-    position: fixed !important;
-
-    /* Modern browsers with dvh support */
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-  }
-
-  /* Ensure proper scrolling on mobile */
-  [data-radix-dialog-content] > * {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
-  }
-}
-
-/* Progressive enhancement for modern viewport units */
-@supports (height: 100dvh) {
-  @media (max-width: 640px) {
-    [data-radix-dialog-content] {
-      height: 100dvh !important;
-      max-height: 100dvh !important;
-    }
-  }
-}
-
-/* Fallback for browsers without dvh support */
-@supports not (height: 100dvh) {
-  @media (max-width: 640px) {
-    [data-radix-dialog-content] {
-      height: 100vh !important;
-      max-height: 100vh !important;
-      /* Account for mobile browser UI */
-      min-height: calc(100vh - 60px) !important;
-    }
-  }
-}
-
-/* Mobile Upload Modal Specific Styles */
-@media (max-width: 640px) {
-  .mobile-upload-modal {
-    padding: 1rem !important;
-  }
-
-  .mobile-upload-modal [data-radix-dialog-close] {
-    top: 0.75rem !important;
-    right: 0.75rem !important;
-  }
-}
-
-/* Extra small screens (xs breakpoint) */
-@media (max-width: 475px) {
-  .xs\:hidden {
-    display: none !important;
-  }
-
-  .xs\:inline {
-    display: inline !important;
-  }
-}
-
-/* Mobile List View Horizontal Scrolling */
-@media (max-width: 1024px) {
-  .list-view-container {
-    /* Enable smooth horizontal scrolling on mobile */
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
-    /* Add padding for better touch interaction */
-    padding-bottom: 8px;
-  }
-
-  /* Ensure checkbox buttons are not affected by row min-height */
-  .list-view-container [role="checkbox"] {
-    min-height: 0 !important;
-  }
-
-  /* Ensure list items maintain proper width on mobile */
-  .list-view-container > div {
-    min-width: max-content;
-  }
-
-  /* Hide scrollbar on mobile for cleaner look */
-  .list-view-container::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  .list-view-container::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.1);
-  }
-
-  /* Improve touch interaction for list items on mobile */
-  .list-view-container > .border {
-    /* Ensure proper touch targets */
-    min-height: 60px; /* row height */
-    /* Prevent content from being cut off */
-    overflow: visible;
-  }
-
-  /* Ensure proper spacing for horizontal scroll content */
-  .list-view-container .min-w-max {
-    /* Add minimum width to prevent content compression */
-    min-width: max-content;
-  }
-}
-
-/* Mobile Dashboard Scrolling Improvements */
-@media (max-width: 1024px) {
-  /* Ensure dashboard content can scroll properly on mobile/tablet */
-  .dashboard-container {
-    height: 100vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    position: relative;
-  }
-
-  /* Fix main content area for mobile scrolling */
-  main {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    height: calc(100vh - 4rem); /* Account for navbar height */
-    position: relative;
-  }
-
-  /* Ensure receipt grids don't break mobile scrolling */
-  .receipt-container,
-  .grid {
-    overflow: visible;
-  }
-
-  /* Improve touch scrolling for mobile devices */
-  .glass-card {
-    overflow: visible;
-  }
-
-  /* Prevent body scroll when sidebar is open on mobile */
-  body.sidebar-open {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-  }
-
-  /* Ensure main content area scrolls properly when sidebar is closed */
-  body:not(.sidebar-open) main {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Support for modern viewport units */
-  @supports (height: 100dvh) {
-    .dashboard-container {
-      height: 100dvh;
-    }
-
-    main {
-      height: calc(100dvh - 4rem);
-    }
-  }
-
-  /* List View Horizontal Scrolling */
-  .list-view-container {
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
-  }
-
-  /* Custom scrollbar for webkit browsers */
-  .list-view-container::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  .list-view-container::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .list-view-container::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
-
-  .list-view-container::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0.3);
-  }
-}
-
-/* Enhanced Cross-Browser Mobile Dialog Fixes with Higher Specificity */
-@media (max-width: 768px) {
-  /* Target all Radix Dialog content on mobile with cross-browser support */
-  [data-radix-dialog-content],
-  [data-state="open"][data-radix-dialog-content] {
-    position: fixed !important;
-    /* Cross-browser inset support */
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    inset: 0 !important; /* Modern browsers */
-
-    width: 100vw !important;
-    /* Fallback height for older browsers */
-    height: 100vh !important;
-    min-height: 100vh !important;
-    /* Modern viewport height */
-    height: 100dvh !important;
-    min-height: 100dvh !important;
-
-    max-width: none !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 1rem !important;
-    border-radius: 0 !important;
-
-    /* Cross-browser transform reset */
-    -webkit-transform: none !important;
-    -moz-transform: none !important;
-    -ms-transform: none !important;
-    transform: none !important;
-  }
-
-  /* Ensure proper overflow handling with vendor prefixes */
-  [data-radix-dialog-content] {
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch !important; /* iOS smooth scrolling */
-    overscroll-behavior: contain !important; /* Prevent pull-to-refresh */
-  }
-
-  /* Fix close button positioning on mobile with cross-browser support */
-  [data-radix-dialog-content] button[data-radix-dialog-close] {
-    position: absolute !important;
-    top: 1rem !important;
-    right: 1rem !important;
-    z-index: 10 !important;
-    /* Ensure touch target size */
-    min-width: 44px !important;
-    min-height: 44px !important;
-  }
-}
-
-/* Cross-browser body scroll prevention when modal is open */
-@media (max-width: 768px) {
-  /* Modern browsers with :has() support */
-  body:has([data-state="open"][data-radix-dialog-content]) {
-    overflow: hidden !important;
-    position: fixed !important;
-    width: 100% !important;
-    height: 100% !important;
-  }
-
-  /* Fallback for browsers without :has() support (Firefox < 121) */
-  body.modal-open {
-    overflow: hidden !important;
-    position: fixed !important;
-    width: 100% !important;
-    height: 100% !important;
-    /* Prevent iOS bounce */
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: none !important;
-  }
-}
-
-/* Safe area handling for mobile devices */
-@supports (padding: env(safe-area-inset-top)) {
-  :root {
-    --safe-area-inset-top: env(safe-area-inset-top);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom);
-    --safe-area-inset-left: env(safe-area-inset-left);
-    --safe-area-inset-right: env(safe-area-inset-right);
-  }
-
-  @media (max-width: 768px) {
-    [data-radix-dialog-content] {
-      padding-top: max(1rem, env(safe-area-inset-top)) !important;
-      padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
-      padding-left: max(1rem, env(safe-area-inset-left)) !important;
-      padding-right: max(1rem, env(safe-area-inset-right)) !important;
-    }
-  }
-}
-
-/* Cross-browser mobile optimizations */
-@media (max-width: 768px) {
-  /* Ensure touch targets are large enough - cross-browser */
-  [data-radix-dialog-content] button {
-    min-height: 44px !important;
-    min-width: 44px !important;
-    /* Improve touch responsiveness */
-    touch-action: manipulation !important;
-    -webkit-tap-highlight-color: transparent !important;
-  }
-
-  /* Improve text readability on mobile - cross-browser */
-  [data-radix-dialog-content] {
-    font-size: 16px !important; /* Prevents zoom on iOS */
-    -webkit-text-size-adjust: 100% !important; /* Prevent text scaling */
-    -moz-text-size-adjust: 100% !important;
-    -ms-text-size-adjust: 100% !important;
-    text-size-adjust: 100% !important;
-  }
-
-  /* REMOVED DUPLICATE RULES - These are already handled above at lines 202-219 */
-}
-
-
-
-/* Handle landscape orientation - cross-browser */
-@media (orientation: landscape) and (max-height: 500px) {
-  [data-radix-dialog-content] {
-    padding: 0.5rem !important;
-  }
-}
-
-/* Firefox-specific fixes */
-@-moz-document url-prefix() {
-  [data-radix-dialog-content] {
-    /* Firefox doesn't support 100dvh, use 100vh */
-    height: 100vh !important;
-    max-height: 100vh !important;
-  }
-}
-
-/* Chrome/WebKit-specific optimizations */
-@supports (-webkit-appearance: none) {
-  [data-radix-dialog-content] {
-    /* Better scrolling on WebKit */
-    -webkit-overflow-scrolling: touch !important;
-  }
-}
-
-/* Edge-specific fixes */
-@supports (-ms-ime-align: auto) {
-  [data-radix-dialog-content] {
-    /* Edge legacy support */
-    -ms-overflow-style: -ms-autohiding-scrollbar !important;
-  }
-}
-
-
-/* Simplified category badge styles with consistent border radius */
-.category-badge-sm,
-.category-badge-md,
-.category-badge-lg,
-.uncategorized-badge-fix,
-[data-debug="uncategorized-badge"] {
-  border-radius: 0.375rem !important;
-}
-
-/* Uncategorized badge specific styles */
-.uncategorized-badge-fix,
-[data-debug="uncategorized-badge"] {
-  background-color: hsl(var(--muted) / 0.5) !important;
-  color: hsl(var(--muted-foreground)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-
-/* Simplified border styles for category badges */
-.category-badge-sm.border,
-.category-badge-md.border,
-.category-badge-lg.border {
-  border-radius: 0.375rem !important;
-  background-color: hsl(var(--muted) / 0.5) !important;
-  color: hsl(var(--muted-foreground)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-
-@media (max-width: 1024px) {
-  .category-badge-sm,
-  .category-badge-md,
-  .category-badge-lg {
-    max-width: 100px !important;
-    font-size: 0.75rem !important;
-    padding: 0.125rem 0.5rem !important;
-    border-radius: 0.375rem !important;
-  }
-}
-
-@media (max-width: 768px) {
-  /* Receipt selection UI improvements for mobile */
-  /* Apply only to the receipt row container (has cursor-pointer) */
-  .list-view-container .flex.items-center.cursor-pointer {
-    padding: 0.5rem !important; /* Tighter padding on mobile */
-    gap: 0.5rem !important; /* Smaller gap on mobile */
-  }
-
-  /* Ensure the small square checkbox wrapper keeps zero padding */
-  .list-view-container .flex.items-center.flex-shrink-0 {
-    padding: 0 !important;
-  }
-
-
-
-  /* Additional mobile list view optimizations */
-  .list-view-container {
-    font-size: 0.75rem !important; /* Smaller base font size on mobile */
-  }
-
-  /* Make receipt images smaller on mobile */
-  .list-view-container img {
-    width: 2rem !important; /* 32px */
-    height: 2rem !important; /* 32px */
-  }
-
-  .category-badge-sm,
-  .category-badge-md,
-  .category-badge-lg,
-  .uncategorized-badge-fix,
-  [data-debug="uncategorized-badge"] {
-    max-width: 90px !important;
-    font-size: 0.7rem !important;
-    padding: 0.1rem 0.4rem !important;
-    border-radius: 0.375rem !important;
-  }
-
-  .uncategorized-badge-fix,
-  [data-debug="uncategorized-badge"] {
-    background-color: hsl(var(--muted) / 0.5) !important;
-    color: hsl(var(--muted-foreground)) !important;
-    border-color: hsl(var(--border)) !important;
+@media (min-width: 1280px) {
+  .receipt-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
