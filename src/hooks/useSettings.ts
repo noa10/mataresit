@@ -15,6 +15,7 @@ export interface ProcessingSettings {
     maxRetries: number;
   };
   userApiKeys: UserApiKeys;
+  skipUploadOptimization: boolean;
 }
 
 const defaultSettings: ProcessingSettings = {
@@ -27,6 +28,7 @@ const defaultSettings: ProcessingSettings = {
     maxRetries: 2,
   },
   userApiKeys: {},
+  skipUploadOptimization: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'receiptProcessingSettings';

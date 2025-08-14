@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { HelpCircle, Zap, Brain, DollarSign, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AVAILABLE_MODELS, getModelsByProvider, getModelsByCapability, ModelProvider } from "@/config/modelProviders";
+import { useSettings } from "@/hooks/useSettings";
 
 // Provider information
 const PROVIDER_INFO = {
@@ -38,6 +39,7 @@ export function ReceiptProcessingOptions({
   defaultBatchModel,
   showBatchModelSelection = false
 }: ReceiptProcessingOptionsProps) {
+  const { settings, updateSettings } = useSettings();
   const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
   const [selectedBatchModel, setSelectedBatchModel] = useState<string>(
     defaultBatchModel || defaultModel
@@ -307,6 +309,24 @@ export function ReceiptProcessingOptions({
           </Select>
         </div>
       )}
+
+      {/* Image Quality Settings */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <label className="text-sm font-medium">Preserve Original Image Quality</label>
+            <p className="text-xs text-muted-foreground">
+              Skip image compression during upload for maximum quality in reports
+            </p>
+          </div>
+          <Switch
+            checked={settings.skipUploadOptimization}
+            onCheckedChange={(checked) => 
+              updateSettings({ skipUploadOptimization: checked })
+            }
+          />
+        </div>
+      </div>
     </div>
   );
 }

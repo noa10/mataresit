@@ -411,8 +411,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       // Optimize the image before uploading
       let fileToUpload = file;
 
-      // Only optimize images, not PDFs
-      if (file.type.startsWith('image/')) {
+      // Only optimize images, not PDFs, and only if optimization is not disabled
+      if (file.type.startsWith("image/") && !settings.skipUploadOptimization) {
         addLocalLog('START', 'Optimizing image for better processing...');
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = `Optimizing image for better processing`;
@@ -438,9 +438,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             ariaLiveRegion.textContent = `Optimization skipped, uploading original file`;
           }
         }
-      } else {
-        addLocalLog('START', 'PDF file detected, skipping optimization');
-      }
+        } else if (file.type.startsWith("image/") && settings.skipUploadOptimization) {
+          addLocalLog("START", "Image optimization disabled - preserving original quality");
+        } else {
+          addLocalLog("START", "PDF file detected, skipping optimization");
+        }
 
       console.log("Starting upload process with bucket: receipt-images");
       addLocalLog('FETCH', 'Starting file upload to cloud storage...');
