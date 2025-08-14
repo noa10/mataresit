@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DayPicker } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth, parseISO, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, isSameDay, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,44 +9,31 @@ import { downloadDailyExpenseReport } from '@/lib/export/dailyExpenseReportDownl
 
 import 'react-day-picker/dist/style.css';
 
-// Define a completely custom day component
-interface CustomDayProps {
-  date: Date;
-  displayMonth?: Date;
+// Define a custom Day cell component compatible with react-day-picker v9
+import type { DayProps as RDPDayProps } from 'react-day-picker';
+
+interface CustomDayProps extends RDPDayProps {
   receiptDates?: Date[];
-  selected?: Date;
-  disabled?: boolean;
-  onSelect?: (date: Date) => void;
 }
 
 function CustomDay(props: CustomDayProps) {
-  const { date, displayMonth, receiptDates = [], selected, disabled, onSelect } = props;
-  const isOutsideMonth = displayMonth && date.getMonth() !== displayMonth.getMonth();
-  const hasReceipt = receiptDates.some((d: Date) => isSameDay(d, date));
-  const isSelected = selected && isSameDay(date, selected);
-  
-  // Handle day click
-  const handleClick = () => {
-    if (!disabled && onSelect) {
-      onSelect(date);
-    }
-  };
-  
+  const { day, modifiers, receiptDates = [], className, children, ...tdProps } = props as any;
+
+  const date: Date | undefined = day?.date;
+  const hasReceipt = date instanceof Date && isValid(date)
+    ? receiptDates.some((d: Date) => d instanceof Date && isValid(d) && isSameDay(d, date))
+    : false;
+
   return (
-    <div 
-      onClick={handleClick}
-      className={`relative flex flex-col items-center justify-center p-2 cursor-pointer rounded-md
-        ${isOutsideMonth ? 'text-muted-foreground/50' : ''}
-        ${isSelected ? 'bg-primary text-primary-foreground' : ''}
-        ${hasReceipt && !isSelected ? 'hover:bg-primary/10' : ''}
-        ${!hasReceipt && !isSelected ? 'hover:bg-muted' : ''}
-      `}
+    <td
+      {...tdProps}
+      className={`relative align-top p-0 ${className ?? ''}`}
     >
-      <div>{format(date, 'd')}</div>
-      {hasReceipt && !isOutsideMonth && (
-        <CircleDot className={`absolute bottom-0 w-3 h-3 ${isSelected ? 'text-primary-foreground' : 'text-primary'}`} />
+      {children}
+      {hasReceipt && !modifiers?.hidden && !day?.outside && (
+        <CircleDot className={`pointer-events-none absolute bottom-1 w-3 h-3 ${modifiers?.selected ? 'text-primary-foreground' : 'text-primary'}`} />
       )}
-    </div>
+    </td>
   );
 }
 
@@ -99,17 +86,18 @@ export function DailyPDFReportGenerator() {
         // Convert to Date objects
         const dates = uniqueDates
           .map(dateStr => {
-            try {
-              return parseISO(dateStr);
-            } catch (e) {
-              console.error(`Error parsing date: ${dateStr}`, e);
-              return null;
-            }
+            if (!dateStr) return null;
+            const parsed = parseISO(dateStr);
+            return isValid(parsed) ? parsed : null;
           })
           .filter((date): date is Date => date !== null);
-        
+
         setReceiptDates(dates);
-        console.log('Receipt dates found:', dates.map(d => format(d, 'yyyy-MM-dd')));
+        if (dates.length > 0) {
+          console.log('Receipt dates found:', dates.map(d => format(d, 'yyyy-MM-dd')));
+        } else {
+          console.log('Receipt dates found: none');
+        }
       } else {
         console.log('No receipt dates found for the current month');
         setReceiptDates([]);
@@ -130,7 +118,7 @@ export function DailyPDFReportGenerator() {
   // Handle day selection
   const handleDaySelect = (day: Date | undefined) => {
     console.log("Day selected:", day);
-    setSelectedDay(day);
+    setSelectedDay(day && isValid(day) ? day : undefined);
   };
 
 
@@ -172,12 +160,12 @@ export function DailyPDFReportGenerator() {
             month={currentMonth}
             onMonthChange={setCurrentMonth}
             components={{
-              Day: (props) => CustomDay({ 
-                ...props, 
-                receiptDates, 
-                selected: selectedDay,
-                onSelect: handleDaySelect
-              })
+              Day: (props) => (
+                <CustomDay
+                  {...props}
+                  receiptDates={receiptDates}
+                />
+              )
             }}
             className="mx-auto"
             showOutsideDays={true}
@@ -204,7 +192,7 @@ export function DailyPDFReportGenerator() {
             </>
           )}
         </Button>
-        {selectedDay && (
+        {selectedDay && isValid(selectedDay) && (
           <p className="text-xs text-muted-foreground mt-2 text-center">
             Report for {format(selectedDay, 'MMMM d, yyyy')} using category summary.
           </p>

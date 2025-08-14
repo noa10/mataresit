@@ -115,6 +115,7 @@ serve(async (req) => {
       .from('receipts')
       .select(`
         *,
+    image_url,
         thumbnail_url,
         line_items!line_items_receipt_id_fkey(*),
         custom_categories (
@@ -302,6 +303,7 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
   receipts.forEach((receipt, index) => {
     console.log(`Receipt ${index + 1}: ${receipt.id}`);
     console.log(`  - merchant: ${receipt.merchant}`);
+    console.log(`  - image_url: ${receipt.image_url}`);
     console.log(`  - thumbnail_url: ${receipt.thumbnail_url}`);
     console.log(`  - has thumbnail: ${!!receipt.thumbnail_url}`);
     console.log(`  - custom_category_id: ${receipt.custom_category_id}`);
@@ -345,24 +347,22 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
     }
   }
 
-  // Helper function to get full-size image URL from thumbnail URL
-  function getFullSizeImageUrl(thumbnailUrl) {
-    if (!thumbnailUrl) return null;
-
-    // If it's already a full URL, try to get the original image
-    // Replace thumbnail path with full image path if needed
-    if (thumbnailUrl.includes('thumbnail_')) {
-      return thumbnailUrl.replace('thumbnail_', '');
+  // Helper function to choose the best available image URL (prefer original image_url)
+  function getPreferredImageUrl(receipt) {
+    if (receipt.image_url && receipt.image_url.trim() !== "") {
+      return receipt.image_url;
     }
-
-    // Return the URL as-is if it doesn't appear to be a thumbnail
-    return thumbnailUrl;
+    if (receipt.thumbnail_url && receipt.thumbnail_url.trim() !== "") {
+      return receipt.thumbnail_url;
+    }
+    return null;
   }
 
   const imageFetchPromises = receipts.map(async (receipt, index) => {
     console.log(`Processing receipt ${index + 1}/${receipts.length}: ${receipt.id}`);
     console.log(`  - includeImages: ${includeImages}`);
     console.log(`  - thumbnail_url: ${receipt.thumbnail_url}`);
+    console.log(`  - image_url: ${receipt.image_url}`);
     console.log(`  - imageCount: ${imageCount}/${MAX_IMAGES}`);
 
     if (!includeImages) {
@@ -370,8 +370,9 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
       return { index, imageData: null };
     }
 
-    if (!receipt.thumbnail_url || receipt.thumbnail_url.trim() === "") {
-      console.log(`  - Skipping: no thumbnail_url`);
+    const preferredUrl = getPreferredImageUrl(receipt);
+    if (!preferredUrl) {
+      console.log(`  - Skipping: no image_url or thumbnail_url available`);
       return { index, imageData: null };
     }
 
@@ -382,14 +383,12 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
 
     imageCount++;
     try {
-      // Try to get full-size image first, fallback to thumbnail
-      const fullSizeUrl = getFullSizeImageUrl(receipt.thumbnail_url);
-      console.log(`  - Trying full-size URL: ${fullSizeUrl}`);
-      let buffer = await getCachedImage(fullSizeUrl);
+      // Try preferred URL first (original image when available), then fallback to thumbnail
+      console.log(`  - Trying preferred URL: ${preferredUrl}`);
+      let buffer = await getCachedImage(preferredUrl);
 
-      // If full-size image fails, try thumbnail
-      if (!buffer && fullSizeUrl !== receipt.thumbnail_url) {
-        console.log(`  - Full-size image failed for receipt ${receipt.id}, trying thumbnail: ${receipt.thumbnail_url}`);
+      if (!buffer && receipt.thumbnail_url && preferredUrl !== receipt.thumbnail_url) {
+        console.log(`  - Preferred URL failed, trying thumbnail URL for receipt ${receipt.id}`);
         buffer = await getCachedImage(receipt.thumbnail_url);
       }
 
@@ -400,10 +399,14 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
 
       console.log(`  - Successfully fetched image, buffer size: ${buffer.byteLength} bytes`);
 
-      // Detect content type from buffer or URL
+      // Detect content type from URL
+      const urlForType = buffer ? (preferredUrl || receipt.thumbnail_url || "") : "";
       let contentType = "image/jpeg"; // Default
-      if (receipt.thumbnail_url.toLowerCase().includes('.png')) {
+      const lower = (urlForType || "").toLowerCase();
+      if (lower.includes(".png")) {
         contentType = "image/png";
+      } else if (lower.includes(".webp")) {
+        contentType = "image/webp";
       }
 
       const base64Image = encodeBase64(buffer); // From Deno std
@@ -438,9 +441,9 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
     console.log(`  - Receipt ${index} (${receipt?.id}): ${imageData ? 'SUCCESS' : 'FAILED'}`);
   });
 
-  // Define fixed dimensions for images (optimized for auditing readability)
-  const fixedWidth = 140; // mm - significantly increased for audit readability
-  const fixedHeight = 100; // mm - significantly increased for audit readability
+  // Define image dimensions for maximum readability (use full width, preserve aspect ratio)
+  const imageWidth = 170; // mm - near full page width for maximum readability
+  // Height will be calculated automatically to preserve aspect ratio
 
   // Process each receipt
   for (const receipt of receipts) {
@@ -525,12 +528,12 @@ async function generatePDF(receipts, selectedDay, includeImages = true) {
       if (imageData) {
         try {
           // Check if we need a page break for the image
-          yPosition = checkPageBreak(yPosition, fixedHeight + 10);
+          yPosition = checkPageBreak(yPosition, 120); // Estimate space needed for image
 
           const dataUri = `data:${imageData.contentType};base64,${imageData.base64Image}`;
-          console.log(`Adding image to PDF: format=${imageData.format}, position=(20, ${yPosition}), size=(${fixedWidth}x${fixedHeight})`);
-          pdf.addImage(dataUri, imageData.format, 20, yPosition, fixedWidth, fixedHeight);
-          yPosition += fixedHeight + 5;
+          console.log(`Adding image to PDF: format=${imageData.format}, position=(20, ${yPosition}), width=${imageWidth}mm (height auto)`);
+          pdf.addImage(dataUri, imageData.format, 20, yPosition, imageWidth, 0); // 0 height preserves aspect ratio
+          yPosition += 110; // Estimated space for image + margin
           console.log(`Image added successfully for receipt ${receipt.id}`);
         } catch (e) {
           console.error(`Error adding image to PDF for receipt ${receipt.id}:`, e.message);

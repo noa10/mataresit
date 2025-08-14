@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /**
  * Interface for the download result
@@ -76,16 +78,17 @@ export const downloadDailyExpenseReport = async (
         // Ignore JSON parsing errors for error response
       }
       
-      throw new Error(errorMessage);
+      console.warn("Edge function failed, falling back to client-side PDF:", errorMessage);
+      await generateClientDailyReport(date, { includeImages });
+      return { success: true };
     }
 
     // Validate content type to ensure we got a PDF
     const contentType = response.headers.get('Content-Type');
-    if (!contentType || !contentType.includes('application/pdf')) {
-      console.warn('Response is not a PDF:', contentType);
-      const text = await response.text();
-      console.error('Response content:', text);
-      throw new Error('Server did not return a PDF file');
+    if (!contentType || !contentType.includes("application/pdf")) {
+      console.warn("Edge PDF failed, falling back to client-side PDF");
+      await generateClientDailyReport(date, { includeImages });
+      return { success: true };
     }
     
     // Get PDF as ArrayBuffer
@@ -186,3 +189,197 @@ export const formatDateForDownload = (date: Date | string): string => {
     return 'Invalid Date';
   }
 };
+
+/**
+ * Helper function to convert ArrayBuffer to base64
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Client-side PDF generation as fallback when Edge function fails
+ */
+async function generateClientDailyReport(
+  date: Date, 
+  options: { includeImages: boolean }
+): Promise<void> {
+  const { includeImages } = options;
+  
+  try {
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Authentication required');
+    }
+
+    // Format date range for query
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // Fetch receipts for the selected day
+    const { data: receipts, error } = await supabase
+      .from('receipts')
+      .select(`
+        *,
+        line_items(*),
+        custom_categories (
+          id,
+          name,
+          color,
+          icon
+        )
+      `)
+      .eq('user_id', session.user.id)
+      .gte('date', dateStr)
+      .lte('date', dateStr)
+      .order('date', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch receipts: ${error.message}`);
+    }
+
+    const receiptList = receipts || [];
+    console.log(`Client-side PDF: Found ${receiptList.length} receipts for ${dateStr}`);
+
+    // Create PDF document
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Add header
+    pdf.setFillColor(41, 98, 255);
+    pdf.rect(0, 0, 210, 25, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Daily Expense Report', 105, 15, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(14);
+    pdf.text(format(date, 'MMMM d, yyyy'), 105, 40, { align: 'center' });
+
+    let yPosition = 60;
+
+    // Add summary
+    const grandTotal = receiptList.reduce((sum, r) => sum + (r?.total || 0), 0);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Total Receipts: ${receiptList.length}`, 20, yPosition);
+    yPosition += 7;
+    pdf.text(`Total Amount: RM ${grandTotal.toFixed(2)}`, 20, yPosition);
+    yPosition += 15;
+
+    // Process each receipt
+    for (const receipt of receiptList) {
+      // Check page break
+      if (yPosition > 240) {
+        pdf.addPage();
+        yPosition = 30;
+      }
+
+      // Receipt header
+      pdf.setFillColor(240, 240, 250);
+      pdf.rect(15, yPosition - 5, 180, 15, 'F');
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Merchant: ${receipt.merchant}`, 20, yPosition + 5);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.text(`Receipt ID: ${receipt.id.substring(0, 8)}...`, 170, yPosition + 5, { align: 'right' });
+      yPosition += 20;
+
+      // Receipt details
+      pdf.setFontSize(11);
+      pdf.text(`Date: ${format(new Date(receipt.date), 'MMMM d, yyyy')}`, 20, yPosition);
+      yPosition += 6;
+      pdf.text(`Payment Method: ${receipt.payment_method || 'Not specified'}`, 20, yPosition);
+      yPosition += 6;
+      if (receipt.currency) {
+        pdf.text(`Currency: ${receipt.currency}`, 20, yPosition);
+        yPosition += 6;
+      }
+      yPosition += 5;
+
+      // Line items table
+      if (receipt.line_items && receipt.line_items.length > 0) {
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Item Description', 'Amount (RM)']],
+          body: receipt.line_items.map((item: any) => [
+            item.description,
+            item.amount.toFixed(2)
+          ]),
+          styles: { fontSize: 10, cellPadding: 3 },
+          headStyles: { fillColor: [41, 98, 255], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 250] },
+          margin: { left: 20, right: 20 }
+        });
+        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+      }
+
+      // Add receipt image if available and requested
+      if (includeImages) {
+        const imageUrl = receipt.image_url || receipt.thumbnail_url;
+        if (imageUrl) {
+          try {
+            console.log(`Client-side PDF: Fetching image for receipt ${receipt.id}`);
+            const imageResponse = await fetch(imageUrl);
+            if (imageResponse.ok) {
+              const imageBuffer = await imageResponse.arrayBuffer();
+              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+              const base64Image = arrayBufferToBase64(imageBuffer);
+              const dataUri = `data:${contentType};base64,${base64Image}`;
+              
+              // Check page break for image
+              if (yPosition > 180) {
+                pdf.addPage();
+                yPosition = 30;
+              }
+              
+              // Add image with full width and preserved aspect ratio
+              const imageFormat = contentType.includes('png') ? 'PNG' : 'JPEG';
+              pdf.addImage(dataUri, imageFormat, 20, yPosition, 170, 0); // 0 height preserves aspect ratio
+              yPosition += 110; // Estimated space for image
+              console.log(`Client-side PDF: Added image for receipt ${receipt.id}`);
+            } else {
+              console.warn(`Client-side PDF: Failed to fetch image for receipt ${receipt.id}`);
+            }
+          } catch (imageError) {
+            console.error(`Client-side PDF: Error processing image for receipt ${receipt.id}:`, imageError);
+          }
+        }
+      }
+
+      // Receipt total
+      pdf.setFillColor(230, 230, 250);
+      pdf.rect(120, yPosition - 5, 70, 10, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Total: RM ${receipt.total.toFixed(2)}`, 170, yPosition, { align: 'right' });
+      pdf.setFont('helvetica', 'normal');
+      yPosition += 15;
+
+      // Add divider
+      if (receiptList.indexOf(receipt) < receiptList.length - 1) {
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(20, yPosition, 190, yPosition);
+        yPosition += 10;
+      }
+    }
+
+    // Generate filename and save
+    const filename = `expense-report-${dateStr}-client-generated.pdf`;
+    pdf.save(filename);
+
+    console.log(`Client-side PDF generated successfully: ${filename}`);
+  } catch (error) {
+    console.error('Client-side PDF generation failed:', error);
+    throw error;
+  }
+}
