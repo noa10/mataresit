@@ -3,13 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
 import { supabase } from '@/integrations/supabase/client';
 import ReceiptViewer from '@/components/ReceiptViewer';
 import { formatCurrencySafe } from '@/utils/currency';
 import { useTeam } from '@/contexts/TeamContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import './receipt-calendar.css';
 
@@ -34,6 +36,7 @@ interface DailyReceiptBrowserModalProps {
 const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted }) => {
   const queryClient = useQueryClient();
   const { currentTeam } = useTeam();
+  const isMobile = useIsMobile();
 
   // Fetch all receipts for the given IDs
   const { data: receiptsData, isLoading, error } = useQuery<ReceiptWithDetails[], Error>({
@@ -47,7 +50,24 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [localReceiptsData, setLocalReceiptsData] = useState<ReceiptWithDetails[] | undefined>(receiptsData);
   // State for collapsible sidebar in mobile view
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      const teamKey = currentTeam?.id ? `dailyReceiptSidebarCollapsed:${currentTeam.id}` : 'dailyReceiptSidebarCollapsed';
+      const stored = localStorage.getItem(teamKey);
+      return stored ? stored === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  // Persist preference across sessions, namespaced by team
+  useEffect(() => {
+    try {
+      const teamKey = currentTeam?.id ? `dailyReceiptSidebarCollapsed:${currentTeam.id}` : 'dailyReceiptSidebarCollapsed';
+      localStorage.setItem(teamKey, String(isSidebarCollapsed));
+    } catch {}
+  }, [isSidebarCollapsed, currentTeam?.id]);
+
 
   // Sync local data with fetched data
   useEffect(() => {
@@ -87,7 +107,8 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
           schema: 'public',
           table: 'receipts',
           // OPTIMIZATION: Only listen for meaningful status changes and data updates
-          filter: `id=in.(${receiptIds.join(',')})&(processing_status=in.(complete,failed,failed_ocr,failed_ai)|merchant=not.is.null|total=not.is.null)`
+          // Simplified filter to avoid Realtime binding mismatches - do complex filtering client-side
+          filter: `id=in.(${receiptIds.join(',')})`
         },
         (payload) => {
           console.log('📝 Receipt update in modal:', payload.new);
@@ -172,7 +193,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] md:h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-6xl w-[95vw] h-[90dvh] md:h-[90dvh] max-h-[100dvh] overflow-y-auto flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
           <DialogTitle>
@@ -189,7 +210,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
         {/* Main content area: Sidebar (Thumbnails/List) + Viewer */}
         <div className="flex flex-1 min-h-0 flex-col md:flex-row">
           {/* Sidebar for Receipt List/Thumbnails */}
-          <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border flex flex-col">
+          <div className={`relative w-full ${isSidebarCollapsed ? "md:w-10" : "md:w-64"} border-b md:border-b-0 md:border-r border-border flex flex-col transition-all duration-200 overflow-hidden`}>
             {/* Mobile collapsible header */}
             <div className="md:hidden">
               <Button
@@ -202,19 +223,29 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
               </Button>
             </div>
 
-            {/* Desktop header */}
-            <div className="hidden md:block p-4 text-sm font-medium text-muted-foreground border-b border-border">
-              {localReceiptsData?.length || 0} Receipt{localReceiptsData?.length !== 1 ? 's' : ''}
-            </div>
+            {/* Desktop header with toggle (md+) */}
+          <div className={`hidden md:flex items-center justify-between p-4 text-sm font-medium text-muted-foreground border-b border-border`}>
+            <span className={isSidebarCollapsed ? 'sr-only' : ''}>{localReceiptsData?.length || 0} Receipt{localReceiptsData?.length !== 1 ? 's' : ''}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarCollapsed(prev => !prev)}
+              aria-label={isSidebarCollapsed ? 'Expand receipt list' : 'Collapse receipt list'}
+              aria-pressed={isSidebarCollapsed ? 'true' : 'false'}
+              aria-expanded={!isSidebarCollapsed}
+            >
+              {isSidebarCollapsed ? (<ChevronRight className="h-4 w-4" />) : (<ChevronLeft className="h-4 w-4" />)}
+            </Button>
+          </div>
 
             {/* Collapsible content */}
-            <div className={`flex flex-col flex-1 min-h-0 ${isSidebarCollapsed ? 'hidden md:flex' : 'flex'}`}>
+            <div className={`flex flex-col flex-1 min-h-0 ${isSidebarCollapsed ? 'hidden' : 'flex'}`}>
               {isLoading ? (
                 <div className="p-4 text-center text-muted-foreground text-sm">Loading receipts...</div>
               ) : error ? (
                 <div className="p-4 text-center text-destructive text-sm">Error: {(error as Error).message}</div>
               ) : localReceiptsData && localReceiptsData.length > 0 ? (
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 h-full">
                   <div className="p-2 space-y-1">
                     {localReceiptsData.map((receipt) => (
                       <Button
@@ -225,7 +256,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
                         onClick={() => {
                           setSelectedReceiptId(receipt.id);
                           // Auto-collapse sidebar on mobile after selection
-                          setIsSidebarCollapsed(true);
+                          if (isMobile) { setIsSidebarCollapsed(true); }
                         }}
                       >
                         <div className="flex flex-col items-start">

@@ -188,18 +188,23 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   showCount = false,
   size = "md",
 }) => {
-  const sizeClass = `category-badge-${size}`;
+  // Define size-specific classes using Tailwind utilities
+  const sizeClasses = {
+    sm: "text-[0.7rem] px-1.5 py-0.5 max-w-[90px]",
+    md: "text-xs px-2 py-0.5 max-w-[120px]",
+    lg: "text-sm px-2.5 py-1 max-w-[140px]",
+  } as const;
+
+  // Base pill styling with proper centering and background
+  const basePill = `inline-flex items-center justify-center gap-1 font-medium rounded-md shrink-0 border leading-none ${sizeClasses[size]}`;
 
   if (!category) {
-    // ULTIMATE FIX: Use the same base class as categorized badges but with explicit styling
-    // This ensures consistent rounded corners across all devices
-
+    // Uncategorized badge with muted styling
     return (
       <div
-        className={`${sizeClass} uncategorized-badge-fix`}
+        className={`${basePill} bg-muted/50 text-muted-foreground border-border`}
         data-debug="uncategorized-badge"
         data-size={size}
-        data-size-class={sizeClass}
       >
         <Tag size={12} />
         <span className="truncate">Uncategorized</span>
@@ -207,8 +212,9 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
     );
   }
 
+  // Categorized badge with secondary styling
   return (
-    <div className={`${sizeClass} rounded-md`}>
+    <div className={`${basePill} bg-secondary text-secondary-foreground border-transparent`}>
       <div
         className="w-2 h-2 rounded-full shrink-0"
         style={{ backgroundColor: category.color }}

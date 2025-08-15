@@ -373,8 +373,8 @@ export function ConversationSidebar({
         )}
         style={{
           width: isDesktop ? `${sidebarWidth}px` : '280px',
-          // Align with nav var to avoid gaps
-          left: isDesktop ? 'var(--nav-width)' : '0px',
+          // Align with main sidebar CSS variable to avoid gaps
+          left: isDesktop ? 'var(--sidebar-width, var(--nav-width))' : '0px',
           height: '100vh'
         }}
         role="complementary"

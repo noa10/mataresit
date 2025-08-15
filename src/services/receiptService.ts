@@ -1892,10 +1892,8 @@ const setupReceiptSubscription = (
   subscription: UnifiedReceiptSubscription,
   statusFilter?: string[]
 ): void => {
-  let filter = `id=eq.${receiptId}`;
-  if (statusFilter && statusFilter.length > 0) {
-    filter += `&processing_status=in.(${statusFilter.join(',')})`;
-  }
+  // Keep server-side binding simple to avoid Realtime binding mismatches; do status filtering client-side
+  const filter = `id=eq.${receiptId}`;
 
   subscription.receiptChannel = supabase.channel(`unified-receipt-${receiptId}`)
     .on(

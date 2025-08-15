@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { DailyPDFReportGenerator } from "@/components/DailyPDFReportGenerator";
+
 import { cn } from "@/lib/utils";
 // Import Shadcn UI Tabs
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -932,10 +932,7 @@ const AnalysisPage = () => {
                   />
                 </div>
 
-                {/* PDF Report Generator - Full width on mobile, 1 col on tablet+ */}
-                <div className="md:col-span-1 lg:col-span-1">
-                  <DailyPDFReportGenerator />
-                </div>
+
               </div>
             </div>
           </TabsContent>

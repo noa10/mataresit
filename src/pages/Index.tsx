@@ -111,7 +111,7 @@ export default function Index() {
           <div className="w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background"></div>
         </div>
 
-        <main className="relative z-10 container py-16 space-y-32">
+        <main className="relative z-10 container mx-auto py-16 space-y-32 px-4 sm:px-6 lg:px-8">
           {/* Enhanced Hero Section with business focus */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center pt-8">
             <motion.div
@@ -428,7 +428,7 @@ export default function Index() {
 
       {/* Keep existing footer */}
       <footer className="border-t py-12 bg-background/80 backdrop-blur-sm">
-        <div className="container">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div className="space-y-4">
               <div className="flex items-center gap-2">

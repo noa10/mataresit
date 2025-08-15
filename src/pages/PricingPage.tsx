@@ -235,7 +235,7 @@ const FeatureComparisonTable = ({ tiers, t }: { tiers: PricingTier[], t: (key: s
 export default function PricingPage() {
   const { user } = useAuth();
   const { createCheckoutSession, downgradeSubscription, isLoading, subscriptionData } = useStripe();
-  const { t } = usePricingTranslation();
+  const { t, language } = usePricingTranslation();
   const { formatCurrency } = useMalaysianCulture();
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
@@ -384,24 +384,24 @@ export default function PricingPage() {
           }}
           className="flex justify-center mb-12"
         >
-          <div className="relative bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-1.5 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 backdrop-blur-sm">
+          <div className="relative bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-2 md:p-2.5 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 backdrop-blur-sm">
             {/* Sliding Background Indicator */}
             <motion.div
-              className="absolute top-1.5 h-[calc(100%-12px)] bg-gradient-to-r from-white to-slate-50 dark:from-slate-700 dark:to-slate-600 rounded-xl shadow-lg border border-slate-200 dark:border-slate-500"
+              className="absolute top-2 md:top-2.5 h-[calc(100%-16px)] md:h-[calc(100%-20px)] bg-gradient-to-r from-white to-slate-50 dark:from-slate-700 dark:to-slate-600 rounded-xl shadow-lg border border-slate-200 dark:border-slate-500"
               style={{
                 boxShadow: billingInterval === 'annual'
-                  ? '0 4px 20px rgba(34, 197, 94, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)'
-                  : '0 4px 15px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05)'
+                  ? '0 4px 24px rgba(34, 197, 94, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12)'
+                  : '0 4px 18px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06)'
               }}
               initial={false}
               animate={{
-                left: billingInterval === 'monthly' ? '6px' : '50%',
-                width: billingInterval === 'monthly' ? 'calc(50% - 6px)' : 'calc(50% - 6px)',
+                left: billingInterval === 'monthly' ? '8px' : '50%',
+                width: billingInterval === 'monthly' ? 'calc(50% - 8px)' : 'calc(50% - 8px)',
               }}
               transition={{
                 type: "spring",
-                stiffness: 300,
-                damping: 30,
+                stiffness: 320,
+                damping: 28,
               }}
             />
 
@@ -410,9 +410,9 @@ export default function PricingPage() {
               {/* Monthly Button */}
               <motion.button
                 onClick={() => setBillingInterval('monthly')}
-                className={`relative z-10 flex items-center justify-center px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[140px] h-[52px] ${
+                className={`relative z-10 flex items-center justify-center px-6 md:px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[150px] md:min-w-[170px] h-[60px] ${
                   billingInterval === 'monthly'
-                    ? 'text-slate-900 dark:text-slate-100 shadow-sm'
+                    ? 'text-slate-900 dark:text-slate-100 shadow-sm ring-1 ring-slate-300/30'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
                 whileHover={{
@@ -441,9 +441,9 @@ export default function PricingPage() {
               {/* Yearly Button */}
               <motion.button
                 onClick={() => setBillingInterval('annual')}
-                className={`relative z-10 flex items-center justify-center px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[140px] h-[52px] ${
+                className={`relative z-10 flex items-center justify-center px-6 md:px-8 py-2.5 md:py-3.5 pb-7 md:pb-6 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[150px] md:min-w-[170px] h-[60px] ${
                   billingInterval === 'annual'
-                    ? 'text-slate-900 dark:text-slate-100 shadow-sm'
+                    ? 'text-slate-900 dark:text-slate-100 shadow-sm ring-1 ring-emerald-300/30'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
                 whileHover={{
@@ -456,51 +456,39 @@ export default function PricingPage() {
                   fontWeight: billingInterval === 'annual' ? 600 : 500,
                 }}
               >
-                {/* Main text container - centered */}
-                <div className="flex flex-col items-center justify-center">
-                  <motion.span
-                    initial={false}
-                    animate={{
-                      textShadow: billingInterval === 'annual'
-                        ? '0 1px 2px rgba(0, 0, 0, 0.1)'
-                        : '0 0 0px rgba(0, 0, 0, 0)'
-                    }}
-                    className="text-center leading-none"
-                  >
-                    {t('hero.annualBilling')}
-                  </motion.span>
+                {/* Label centered; badge absolutely anchored to bottom to avoid layout shifts */}
+                <motion.span
+                  initial={false}
+                  animate={{
+                    textShadow: billingInterval === 'annual'
+                      ? '0 1px 2px rgba(0, 0, 0, 0.1)'
+                      : '0 0 0px rgba(0, 0, 0, 0)'
+                  }}
+                  className="text-center leading-none"
+                >
+                  {t('hero.annualBilling')}
+                </motion.span>
 
-                  {/* Badge positioned below text */}
+                {/* Discount badge: absolute, centered, non-wrapping for consistent alignment */}
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.25, type: 'spring', stiffness: 220, damping: 20 }}
+                  whileHover={{ scale: 1.05 }}
+                  className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2"
+                >
                   <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{
-                      scale: 1,
-                      opacity: 1,
-                    }}
-                    transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-                    whileHover={{ scale: 1.05 }}
-                    className="mt-1"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
                   >
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.05, 1],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        repeatType: "reverse",
-                        ease: "easeInOut",
-                      }}
+                    <Badge
+                      variant="outline"
+                      className="whitespace-nowrap text-[9px] xs:text-[10px] bg-gradient-to-r from-emerald-500 to-green-500 text-white border-emerald-400 shadow-[0_4px_12px_rgba(16,185,129,0.25)] font-semibold px-2 py-0.5 xs:px-2.5 leading-none rounded-full"
                     >
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] bg-gradient-to-r from-green-500 to-emerald-500 text-white border-green-400 shadow-sm font-medium px-1.5 py-0.5 leading-none"
-                      >
-                        {t('hero.annualDiscount')}
-                      </Badge>
-                    </motion.div>
+                      {language === 'ms' ? 'Jimat 20%' : 'Save 20%'}
+                    </Badge>
                   </motion.div>
-                </div>
+                </motion.div>
               </motion.button>
             </div>
           </div>
