@@ -18,10 +18,12 @@ interface BatchUploadSettingsProps {
   autoStart: boolean;
   timeoutSeconds: number;
   maxRetries: number;
+  preserveImageQuality: boolean;
   onMaxConcurrentChange: (value: number) => void;
   onAutoStartChange: (value: boolean) => void;
   onTimeoutChange: (value: number) => void;
   onMaxRetriesChange: (value: number) => void;
+  onPreserveImageQualityChange: (value: boolean) => void;
 }
 
 export function BatchUploadSettings({
@@ -29,10 +31,12 @@ export function BatchUploadSettings({
   autoStart,
   timeoutSeconds,
   maxRetries,
+  preserveImageQuality,
   onMaxConcurrentChange,
   onAutoStartChange,
   onTimeoutChange,
   onMaxRetriesChange,
+  onPreserveImageQualityChange,
 }: BatchUploadSettingsProps) {
   const [concurrentValue, setConcurrentValue] = useState(maxConcurrent);
   const [timeoutValue, setTimeoutValue] = useState(timeoutSeconds);
@@ -259,6 +263,38 @@ export function BatchUploadSettings({
           id="auto-start"
           checked={autoStart}
           onCheckedChange={onAutoStartChange}
+        />
+      </div>
+
+      {/* Image Quality Preservation Setting */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="preserve-quality" className="text-sm font-medium">
+              Preserve Original Image Quality
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>
+                    When enabled, images will be uploaded without compression to preserve maximum quality for reports and analysis.
+                    This may result in larger file sizes and longer upload times.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Skip image compression during batch uploads for maximum quality
+          </p>
+        </div>
+        <Switch
+          id="preserve-quality"
+          checked={preserveImageQuality}
+          onCheckedChange={onPreserveImageQualityChange}
         />
       </div>
     </div>

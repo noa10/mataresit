@@ -28,7 +28,7 @@ const defaultSettings: ProcessingSettings = {
     maxRetries: 2,
   },
   userApiKeys: {},
-  skipUploadOptimization: false,
+  skipUploadOptimization: true, // Default to preserving original image quality
 };
 
 const SETTINGS_STORAGE_KEY = 'receiptProcessingSettings';

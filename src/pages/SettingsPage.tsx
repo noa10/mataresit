@@ -265,6 +265,7 @@ export default function SettingsPage() {
                     autoStart={settings?.batchUpload?.autoStart || false}
                     timeoutSeconds={settings?.batchUpload?.timeoutSeconds || 120}
                     maxRetries={settings?.batchUpload?.maxRetries || 2}
+                    preserveImageQuality={settings?.skipUploadOptimization || true}
                     onMaxConcurrentChange={(value) =>
                       updateSettings({
                         batchUpload: {
@@ -296,6 +297,9 @@ export default function SettingsPage() {
                           maxRetries: value
                         }
                       })
+                    }
+                    onPreserveImageQualityChange={(value) =>
+                      updateSettings({ skipUploadOptimization: value })
                     }
                   />
                 </div>
