@@ -57,3 +57,15 @@ tools/testing/logs/
 
 # Ignore generated test results
 test-results/
+
+# Backup files and temporary development files
+*.bak
+*.backup
+*-backup
+*-original
+backups/
+
+# Temporary verification and test files
+*-verification.html
+test-*.html
+verify-*.html
