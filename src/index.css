@@ -120,32 +120,32 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
- 
+
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
- 
+
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
- 
+
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
- 
+
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
- 
+
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
- 
+
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
- 
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
- 
+
     --radius: 0.5rem;
 
     /* Sidebar variables */
@@ -220,7 +220,7 @@
     /* Sunset theme - will be dynamically updated by theme manager */
   }
 }
- 
+
 @layer base {
   body {
     background-color: hsl(var(--background));
@@ -277,6 +277,43 @@
   .receipt-container {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* Calendar - styling for react-day-picker v9 with proper date range selection */
+
+/* Ensure range selection works properly with our design system colors */
+.rdp [aria-selected="true"] {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Range middle styling for v9 */
+.rdp [aria-selected="true"].rdp-range_middle {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Selected day styling */
+.rdp .rdp-selected {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Range middle days */
+.rdp .rdp-range_middle {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Improve navigation button visibility in dark mode */
+.dark .rdp-button_previous,
+.dark .rdp-button_next {
+  opacity: 0.7;
+}
+
+.dark .rdp-button_previous:hover,
+.dark .rdp-button_next:hover {
+  opacity: 1;
 }
 
 @media (min-width: 1280px) {
