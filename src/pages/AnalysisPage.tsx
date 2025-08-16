@@ -3,10 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -29,7 +28,8 @@ import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, R
 
 // Import services and types
 import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
-import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar, RadialBarChart, RadialBar } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 // Import ReceiptViewer and related types/functions
 import ReceiptViewer from '@/components/ReceiptViewer';
@@ -99,6 +99,13 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
     ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
     : 'All time';
 
+  // Handle date selection
+  const handleDateSelect = React.useCallback((range: DateRange | undefined) => {
+    if (onDateRangeClick) {
+      onDateRangeClick(range);
+    }
+  }, [onDateRangeClick]);
+
   const stats = [
     {
       title: "Total Expenses",
@@ -142,14 +149,30 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={dateRange?.from}
-              selected={dateRange}
-              onSelect={onDateRangeClick}
-              numberOfMonths={2}
-            />
+            <div className="p-3">
+              <Calendar
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={(range) => {
+                  console.log('Calendar onSelect called with:', range);
+                  console.log('Current dateRange:', dateRange);
+                  handleDateSelect(range);
+                }}
+                numberOfMonths={2}
+                showOutsideDays={true}
+              />
+              {dateRange?.from && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => handleDateSelect(undefined)}
+                >
+                  Clear Selection
+                </Button>
+              )}
+            </div>
           </PopoverContent>
         </Popover>
       </CardHeader>
@@ -183,14 +206,22 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
 interface CategoryPieChartProps {
   categoryData: CategoryExpenseData[];
   isLoading?: boolean;
+  dateCaption?: string;
 }
 
-const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading }) => {
+const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading, dateCaption }) => {
   if (isLoading) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Expenses by Category</CardTitle>
+          <div>
+            <CardTitle>Expenses by Category</CardTitle>
+            {dateCaption && (
+              <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
+                {dateCaption}
+              </CardDescription>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[300px]">
           <p className="text-muted-foreground">Loading...</p>
@@ -208,12 +239,19 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader>
-        <CardTitle>Expenses by Category</CardTitle>
+        <div>
+          <CardTitle>Expenses by Category</CardTitle>
+          {dateCaption && (
+            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
+              {dateCaption}
+            </CardDescription>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[250px] sm:h-[300px]">
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={{}} className="h-full w-full" style={{ aspectRatio: 'auto' }}>
               <PieChart>
                 <Pie
                   data={chartData}
@@ -228,19 +266,133 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  formatter={(value) => formatCurrency(value as number)}
-                  contentStyle={{ background: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)' }}
+                <ChartTooltip
+                  content={<ChartTooltipContent className="bg-background text-foreground" />}
+                  formatter={(value: any, name: any, item: any) => [
+                    formatCurrency(value as number),
+                    item?.payload?.name ?? name
+                  ]}
+                  labelFormatter={(label: any) => label}
                 />
                 <Legend verticalAlign="bottom" height={36} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
               <p className="text-muted-foreground">No category data available</p>
             </div>
           )}
         </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// CategoryRadialChart Component (Shadcn UI pattern)
+interface CategoryRadialChartProps {
+  categoryData: CategoryExpenseData[];
+  isLoading?: boolean;
+  dateCaption?: string;
+}
+
+const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData, isLoading, dateCaption }) => {
+  // Use same date caption as Financial Summary for consistency
+  const formatDateRangeForCaption = dateCaption || ''
+  if (isLoading) {
+    return (
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Category Analysis</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[300px]">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Transform category data for stacked radial: top 3 concentric rings
+  const sorted = [...categoryData].sort((a, b) => b.total_spent - a.total_spent)
+  const top3 = sorted.slice(0, 3)
+  const total = categoryData.reduce((s, c) => s + c.total_spent, 0)
+
+  const ringData = top3.map((c, idx) => ({
+    name: c.category || 'Uncategorized',
+    value: total > 0 ? Math.round((c.total_spent / total) * 100) : 0,
+    color: COLORS[idx % COLORS.length]
+  }))
+
+  // Individual arrays for each ring (one datum per RadialBar)
+  const ring1 = ringData[0] ? [{ ...ringData[0], index: 0 }] : []
+  const ring2 = ringData[1] ? [{ ...ringData[1], index: 1 }] : []
+  const ring3 = ringData[2] ? [{ ...ringData[2], index: 2 }] : []
+
+  const radialChartConfig = {
+    ring1: { label: ringData[0]?.name, color: ringData[0]?.color },
+    ring2: { label: ringData[1]?.name, color: ringData[1]?.color },
+    ring3: { label: ringData[2]?.name, color: ringData[2]?.color },
+  } as const;
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader>
+        <div>
+          <CardTitle>Category Analysis</CardTitle>
+          <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
+            {formatDateRangeForCaption}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[250px] sm:h-[300px]">
+          {categoryData.length > 0 ? (
+            <ChartContainer className="h-full w-full" style={{ aspectRatio: 'auto' }} config={radialChartConfig}>
+              <RadialBarChart data={ringData} cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" startAngle={90} endAngle={-270}>
+                {/* Center label */}
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm">
+                  Top 3
+                </text>
+                {/* Ring 1: Top category */}
+                <RadialBar data={ring1} dataKey="value" nameKey="name" cornerRadius={10}
+                  innerRadius="65%" outerRadius="90%"
+                  fill={ringData[0]?.color || 'hsl(var(--primary))'} />
+                {/* Ring 2: Second top category */}
+                <RadialBar data={ring2} dataKey="value" nameKey="name" cornerRadius={10}
+                  innerRadius="45%" outerRadius="65%"
+                  fill={ringData[1]?.color || 'hsl(var(--muted-foreground))'} />
+                {/* Ring 3: Third top category */}
+                <RadialBar data={ring3} dataKey="value" nameKey="name" cornerRadius={10}
+                  innerRadius="25%" outerRadius="45%"
+                  fill={ringData[2]?.color || 'hsl(var(--accent))'} />
+                <ChartTooltip
+                  content={<ChartTooltipContent className="bg-background text-foreground" />}
+                  formatter={(value: any, _name: any, item: any) => [
+                    `${value}%`, item?.payload?.name ?? 'Category'
+                  ]}
+                  labelFormatter={() => ''}
+                />
+              </RadialBarChart>
+            </ChartContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No category data available</p>
+            </div>
+          )}
+        </div>
+
+        {/* Legend */}
+        {ringData.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2 text-xs">
+            {ringData.map((r, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
+                <span className="text-foreground truncate">{r.name}</span>
+                <span className="ml-auto font-mono tabular-nums text-muted-foreground">{r.value}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
       </CardContent>
     </Card>
   );
@@ -750,6 +902,11 @@ const AnalysisPage = () => {
     };
   });
 
+  // Handle date change
+  const handleDateChange = React.useCallback((newDate: DateRange | undefined) => {
+    setDate(newDate);
+  }, []);
+
   // State for managing the active tab
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
 
@@ -867,8 +1024,16 @@ const AnalysisPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      {/* Apply container, padding, and spacing consistent with Index.tsx */}
-      <main className="container px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8">
+      {/* Responsive layout that adapts to sidebar width */}
+      <main
+        className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8"
+        style={{
+          width: 'calc(100vw - var(--sidebar-width, 0px))',
+          maxWidth: 'calc(1400px + var(--sidebar-width, 0px))',
+          marginLeft: 'auto',
+          marginRight: 'auto'
+        }}
+      >
         {/* Dashboard Header */}
         <div className="mb-4 sm:mb-6">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
@@ -901,38 +1066,45 @@ const AnalysisPage = () => {
           <TabsContent value="overview">
             {/* Responsive Grid Layout */}
             <div className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
-              {/* Mobile: Stack vertically, Tablet+: Grid layout */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* First Row: Expense Chart */}
+              <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                <ExpenseChart
+                  dailyData={aggregatedChartData}
+                  isLoading={isLoadingDaily}
+                  dateRange={date}
+                />
+              </div>
 
-                {/* Expense Chart - Takes full width on mobile, 2 cols on tablet, 2 cols on desktop */}
-                <div className="md:col-span-2 lg:col-span-2">
-                  <ExpenseChart
-                    dailyData={aggregatedChartData}
-                    isLoading={isLoadingDaily}
-                    dateRange={date}
-                  />
-                </div>
-
-                {/* Category Pie Chart - Full width on mobile, 1 col on tablet+ */}
-                <div className="md:col-span-1 lg:col-span-1">
+              {/* Second Row: Category Charts and Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                {/* Category Pie Chart */}
+                <div className="lg:col-span-1">
                   <CategoryPieChart
                     categoryData={categoryData || []}
                     isLoading={isLoadingCategories}
+                    dateCaption={formattedDateRange}
                   />
                 </div>
 
-                {/* Expense Stats - Full width on mobile, 2 cols on tablet, 2 cols on desktop */}
+                {/* Category Radial Chart (Shadcn pattern) */}
+                <div className="lg:col-span-1">
+                  <CategoryRadialChart
+                    categoryData={categoryData || []}
+                    isLoading={isLoadingCategories}
+                    dateCaption={formattedDateRange}
+                  />
+                </div>
+
+                {/* Expense Stats - Takes 2 columns on large screens */}
                 <div className="md:col-span-2 lg:col-span-2">
                   <ExpenseStats
                     totalExpenses={totalExpenses}
                     totalReceipts={enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
                     averagePerReceipt={averagePerReceipt}
                     dateRange={date}
-                    onDateRangeClick={setDate}
+                    onDateRangeClick={handleDateChange}
                   />
                 </div>
-
-
               </div>
             </div>
           </TabsContent>

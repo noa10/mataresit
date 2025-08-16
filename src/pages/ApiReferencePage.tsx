@@ -2342,7 +2342,7 @@ Retry-After: 60`}
                       </div>
                     </div>
 
-                    <div className="text-center p-6 border rounded-lg bg-blue-50">
+                    <div className="text-center p-6 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                       <h3 className="font-semibold text-lg mb-2">Pro</h3>
                       <div className="space-y-2 text-sm">
                         <div>
@@ -2363,7 +2363,7 @@ Retry-After: 60`}
                       </div>
                     </div>
 
-                    <div className="text-center p-6 border rounded-lg bg-purple-50">
+                    <div className="text-center p-6 border rounded-lg bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
                       <h3 className="font-semibold text-lg mb-2">Max</h3>
                       <div className="space-y-2 text-sm">
                         <div>
@@ -2490,11 +2490,11 @@ if (remaining < 10) {
                   </CardContent>
                 </Card>
 
-                <Card className="border-blue-200 bg-blue-50">
+                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       Pro
-                      <Badge className="bg-blue-100 text-blue-800">$10/month</Badge>
+                      <Badge className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100">$10/month</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -2521,11 +2521,11 @@ if (remaining < 10) {
                   </CardContent>
                 </Card>
 
-                <Card className="border-purple-200 bg-purple-50">
+                <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       Max
-                      <Badge className="bg-purple-100 text-purple-800">$20/month</Badge>
+                      <Badge className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100">$20/month</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -2625,9 +2625,11 @@ if (remaining < 10) {
                       <p className="text-sm text-muted-foreground mb-2">
                         Comprehensive guides and tutorials
                       </p>
-                      <Button variant="outline" size="sm">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Docs
+                      <Button variant="outline" size="sm" asChild>
+                        <a href="/docs" target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Docs
+                        </a>
                       </Button>
                     </div>
 
@@ -2639,9 +2641,11 @@ if (remaining < 10) {
                       <p className="text-sm text-muted-foreground mb-2">
                         Get help from our support team
                       </p>
-                      <Button variant="outline" size="sm">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Contact Support
+                      <Button variant="outline" size="sm" asChild>
+                        <a href="mailto:support@mataresit.com">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Contact Support
+                        </a>
                       </Button>
                     </div>
                   </div>
