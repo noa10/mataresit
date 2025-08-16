@@ -27,7 +27,6 @@ import { ProcessingLogs } from "./upload/ProcessingLogs";
 import { ErrorState } from "./upload/ErrorState";
 import { FileAnalyzer } from "./upload/FileAnalyzer";
 import { useFileUpload } from "@/hooks/useFileUpload";
-import { ReceiptProcessingOptions } from "./upload/ReceiptProcessingOptions";
 
 import { ProcessingRecommendation, analyzeFile, getProcessingRecommendation } from "@/utils/processingOptimizer";
 import { CategorySelector } from "./categories/CategorySelector";
@@ -438,11 +437,11 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             ariaLiveRegion.textContent = `Optimization skipped, uploading original file`;
           }
         }
-        } else if (file.type.startsWith("image/") && settings.skipUploadOptimization) {
-          addLocalLog("START", "Image optimization disabled - preserving original quality");
-        } else {
-          addLocalLog("START", "PDF file detected, skipping optimization");
-        }
+      } else if (file.type.startsWith("image/") && settings.skipUploadOptimization) {
+        addLocalLog("START", "Image optimization disabled - preserving original quality");
+      } else {
+        addLocalLog("START", "PDF file detected, skipping optimization");
+      }
 
       console.log("Starting upload process with bucket: receipt-images");
       addLocalLog('FETCH', 'Starting file upload to cloud storage...');
@@ -953,17 +952,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         </div>
       )}
 
-      {/* Processing Options Section - Collapsible footer */}
-      {!isUploading && (
-        <div className="w-full flex-shrink-0">
-          <ReceiptProcessingOptions
-            defaultModel={settings.selectedModel}
-            onModelChange={(model) => {
-              updateSettings({ selectedModel: model });
-            }}
-          />
-        </div>
-      )}
+
     </div>
   );
 }
