@@ -1030,10 +1030,10 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         addLocalLog(upload.id, 'START', `Detected PDF file: ${upload.file.name}`);
       }
 
-      // Optimize the image before uploading (if it's an image)
+      // Optimize the image before uploading (if it's an image and optimization is enabled)
       let fileToUpload = upload.file;
 
-      if (upload.file.type.startsWith('image/')) {
+      if (upload.file.type.startsWith('image/') && !settings.skipUploadOptimization) {
         try {
           // Using the directly imported optimizeImageForUpload function
           addLocalLog(upload.id, 'START', 'Optimizing image for better processing...');
@@ -1069,6 +1069,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           // Continue with original file if optimization fails
           console.log(`Using original file for ${upload.file.name} due to optimization error`);
         }
+      } else if (upload.file.type.startsWith('image/') && settings.skipUploadOptimization) {
+        addLocalLog(upload.id, 'START', 'Image optimization disabled - preserving original quality');
       } else {
         addLocalLog(upload.id, 'START', 'PDF file detected, skipping optimization');
       }
