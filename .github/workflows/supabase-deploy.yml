@@ -108,8 +108,11 @@ jobs:
 
       - name: Run database migrations
         run: |
+          set -e  # Exit on any error
+
           ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          
+          echo "🚀 Starting database migration for environment: $ENVIRONMENT"
+
           if [[ "$ENVIRONMENT" == "production" ]]; then
             SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
             SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
@@ -119,21 +122,48 @@ jobs:
             SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
             PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
           fi
-          
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
-            echo "Error: Missing Supabase credentials for $ENVIRONMENT"
+
+          # Validate credentials
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ] || [ -z "$PROJECT_ID" ]; then
+            echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
+            echo "SUPABASE_URL: ${SUPABASE_URL:+SET}"
+            echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET}"
+            echo "PROJECT_ID: ${PROJECT_ID:+SET}"
             exit 1
           fi
-          
-          # Link to project
-          echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"
-          
-          # Run migrations
-          if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations)" ]; then
-            echo "Running database migrations..."
-            supabase db push
+
+          echo "✅ Credentials validated for project: $PROJECT_ID"
+
+          # Link to project with error handling
+          echo "🔗 Linking to Supabase project..."
+          if ! echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"; then
+            echo "❌ Failed to link to Supabase project"
+            exit 1
+          fi
+          echo "✅ Successfully linked to project"
+
+          # Check migrations directory
+          if [ ! -d "supabase/migrations" ]; then
+            echo "❌ Error: supabase/migrations directory not found"
+            exit 1
+          fi
+
+          # List migration files for debugging
+          echo "📋 Available migration files:"
+          ls -la supabase/migrations/ || echo "No files found"
+
+          # Run migrations with error handling
+          if [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
+            echo "🔄 Running database migrations..."
+            if ! supabase db push --debug; then
+              echo "❌ Database migration failed"
+              echo "🔍 Checking migration status..."
+              supabase migration list || echo "Failed to list migrations"
+              exit 1
+            fi
+            echo "✅ Database migrations completed successfully"
           else
-            echo "No migrations to run"
+            echo "ℹ️ No migrations to run"
           fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -156,8 +186,11 @@ jobs:
 
       - name: Deploy Edge Functions
         run: |
+          set -e  # Exit on any error
+
           ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          
+          echo "🚀 Starting Edge Functions deployment for environment: $ENVIRONMENT"
+
           if [[ "$ENVIRONMENT" == "production" ]]; then
             PROJECT_ID="${{ secrets.SUPABASE_PROJECT_ID }}"
             SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
@@ -165,16 +198,43 @@ jobs:
             PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
             SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
           fi
-          
-          # Link to project
-          echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"
-          
-          # Deploy functions
-          if [ -d "supabase/functions" ] && [ "$(ls -A supabase/functions)" ]; then
-            echo "Deploying Edge Functions..."
-            supabase functions deploy
+
+          # Validate credentials
+          if [ -z "$PROJECT_ID" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
+            exit 1
+          fi
+
+          # Link to project with error handling
+          echo "🔗 Linking to Supabase project..."
+          if ! echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"; then
+            echo "❌ Failed to link to Supabase project"
+            exit 1
+          fi
+          echo "✅ Successfully linked to project"
+
+          # Check functions directory
+          if [ ! -d "supabase/functions" ]; then
+            echo "ℹ️ No supabase/functions directory found"
+            exit 0
+          fi
+
+          # List available functions for debugging
+          echo "📋 Available Edge Functions:"
+          find supabase/functions -name "index.ts" -type f | sed 's|supabase/functions/||' | sed 's|/index.ts||' | sort || echo "No functions found"
+
+          # Deploy functions with error handling
+          if [ "$(find supabase/functions -name "index.ts" -type f | wc -l)" -gt 0 ]; then
+            echo "🔄 Deploying Edge Functions..."
+            if ! supabase functions deploy --debug; then
+              echo "❌ Edge Functions deployment failed"
+              echo "🔍 Checking function status..."
+              supabase functions list || echo "Failed to list functions"
+              exit 1
+            fi
+            echo "✅ Edge Functions deployed successfully"
           else
-            echo "No Edge Functions to deploy"
+            echo "ℹ️ No Edge Functions to deploy (no index.ts files found)"
           fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -201,8 +261,11 @@ jobs:
 
       - name: Test Supabase connectivity
         run: |
+          set -e  # Exit on any error
+
           ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          
+          echo "🧪 Testing Supabase connectivity for environment: $ENVIRONMENT"
+
           if [[ "$ENVIRONMENT" == "production" ]]; then
             SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
             SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
@@ -210,34 +273,51 @@ jobs:
             SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
             SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
           fi
-          
-          echo "Testing Supabase connectivity for $ENVIRONMENT..."
-          
-          # Test health endpoint
-          if curl -f "$SUPABASE_URL/health" > /dev/null 2>&1; then
+
+          # Validate credentials
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
+            exit 1
+          fi
+
+          echo "🔍 Testing Supabase URL: $SUPABASE_URL"
+
+          # Test health endpoint with detailed error reporting
+          echo "🏥 Testing health endpoint..."
+          if curl -f -s --max-time 30 "$SUPABASE_URL/health" > /dev/null; then
             echo "✅ Supabase health check passed"
           else
             echo "❌ Supabase health check failed"
+            echo "🔍 Attempting to get more details..."
+            curl -v "$SUPABASE_URL/health" || true
             exit 1
           fi
-          
-          # Test database connectivity
-          DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+
+          # Test database connectivity with detailed error reporting
+          echo "🗄️ Testing database connectivity..."
+          DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "apikey: $SUPABASE_ANON_KEY")
-          
+            -H "apikey: $SUPABASE_ANON_KEY" || echo "000")
+
+          echo "Database response code: $DB_RESPONSE"
+
           if [ "$DB_RESPONSE" = "200" ] || [ "$DB_RESPONSE" = "404" ]; then
-            echo "✅ Database connectivity test passed"
+            echo "✅ Database connectivity test passed (HTTP $DB_RESPONSE)"
           else
             echo "❌ Database connectivity test failed (HTTP $DB_RESPONSE)"
+            echo "🔍 Attempting detailed request..."
+            curl -v "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "apikey: $SUPABASE_ANON_KEY" || true
             exit 1
           fi
 
       - name: Test Edge Functions
         run: |
           ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          
+          echo "🧪 Testing Edge Functions for environment: $ENVIRONMENT"
+
           if [[ "$ENVIRONMENT" == "production" ]]; then
             SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
             SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
@@ -245,24 +325,51 @@ jobs:
             SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
             SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
           fi
-          
+
           # Test key Edge Functions if they exist
-          FUNCTIONS_TO_TEST=("stripe-webhook" "process-receipt" "manage-api-keys")
-          
+          FUNCTIONS_TO_TEST=("stripe-webhook" "process-receipt" "manage-api-keys" "unified-search")
+          FAILED_FUNCTIONS=()
+          SUCCESSFUL_FUNCTIONS=()
+
           for func in "${FUNCTIONS_TO_TEST[@]}"; do
-            echo "Testing function: $func"
-            FUNC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            echo "🔍 Testing function: $func"
+
+            FUNC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
               -X POST "$SUPABASE_URL/functions/v1/$func" \
               -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
               -H "Content-Type: application/json" \
-              -d '{"test": true}' || echo "000")
-            
-            if [ "$FUNC_RESPONSE" = "200" ] || [ "$FUNC_RESPONSE" = "400" ] || [ "$FUNC_RESPONSE" = "401" ]; then
+              -d '{"test": true}' 2>/dev/null || echo "000")
+
+            echo "Function $func response: HTTP $FUNC_RESPONSE"
+
+            # Consider various response codes as success (function is deployed and responding)
+            if [ "$FUNC_RESPONSE" = "200" ] || [ "$FUNC_RESPONSE" = "400" ] || [ "$FUNC_RESPONSE" = "401" ] || [ "$FUNC_RESPONSE" = "403" ]; then
               echo "✅ Function $func is responding (HTTP $FUNC_RESPONSE)"
+              SUCCESSFUL_FUNCTIONS+=("$func")
             else
-              echo "⚠️ Function $func may not be deployed (HTTP $FUNC_RESPONSE)"
+              echo "⚠️ Function $func may not be deployed or accessible (HTTP $FUNC_RESPONSE)"
+              FAILED_FUNCTIONS+=("$func")
             fi
           done
+
+          # Summary
+          echo ""
+          echo "📊 Edge Functions Test Summary:"
+          echo "✅ Responding functions: ${#SUCCESSFUL_FUNCTIONS[@]}"
+          echo "⚠️ Non-responding functions: ${#FAILED_FUNCTIONS[@]}"
+
+          if [ ${#SUCCESSFUL_FUNCTIONS[@]} -gt 0 ]; then
+            echo "✅ Successful: ${SUCCESSFUL_FUNCTIONS[*]}"
+          fi
+
+          if [ ${#FAILED_FUNCTIONS[@]} -gt 0 ]; then
+            echo "⚠️ Failed: ${FAILED_FUNCTIONS[*]}"
+            echo "ℹ️ Note: Some functions may not be deployed or may require specific authentication"
+          fi
+
+          # Don't fail the workflow if some functions are not responding
+          # This allows for partial deployments and optional functions
+          echo "✅ Edge Functions validation completed"
 
   # Notification
   notify:
@@ -273,13 +380,13 @@ jobs:
     
     steps:
       - name: Notify success
-        if: needs.validate-deployment.result == 'success'
+        if: needs.validate-deployment.result == 'success' && secrets.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: success
           text: |
             🚀 Supabase deployment successful!
-            
+
             **Environment:** ${{ needs.validate.outputs.environment }}
             **Migrations:** ${{ needs.migrate.result }}
             **Functions:** ${{ needs.deploy-functions.result }}
@@ -288,18 +395,38 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify failure
-        if: needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure'
+        if: (needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: failure
           text: |
             ❌ Supabase deployment failed!
-            
+
             **Environment:** ${{ needs.validate.outputs.environment }}
             **Validation:** ${{ needs.validate.result }}
             **Migrations:** ${{ needs.migrate.result }}
             **Functions:** ${{ needs.deploy-functions.result }}
-            
+
             Check workflow logs for details.
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Log deployment status (fallback)
+        if: always()
+        run: |
+          echo "=== Deployment Summary ==="
+          echo "Environment: ${{ needs.validate.outputs.environment }}"
+          echo "Validation: ${{ needs.validate.result }}"
+          echo "Migrations: ${{ needs.migrate.result }}"
+          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Validation: ${{ needs.validate-deployment.result }}"
+
+          if [[ "${{ secrets.SLACK_WEBHOOK_URL }}" == "" ]]; then
+            echo "ℹ️ Slack notifications disabled (SLACK_WEBHOOK_URL not configured)"
+          fi
+
+          if [[ "${{ needs.validate-deployment.result }}" == "success" ]]; then
+            echo "🚀 Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed. Check logs above for details."
+          fi
