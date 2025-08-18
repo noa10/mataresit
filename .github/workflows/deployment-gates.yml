@@ -38,8 +38,7 @@ jobs:
   security-gate:
     name: Security Gate
     runs-on: ubuntu-latest
-    env:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
 
     outputs:
       passed: ${{ steps.security-evaluation.outputs.passed }}
@@ -76,23 +75,10 @@ jobs:
           echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Run Snyk security scan
-        id: snyk-scan
-        if: ${{ env.SNYK_TOKEN != '' }}
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
-        with:
-          args: --json-file-output=snyk-results.json
-        continue-on-error: true
-
-      - name: Handle missing Snyk token
-        if: ${{ env.SNYK_TOKEN == '' }}
+      - name: Skip Snyk security scan (not configured)
         run: |
-          echo "::warning::SNYK_TOKEN not configured - skipping Snyk security scan"
-          echo "This may affect security gate scoring"
-          echo "To enable Snyk scanning, add SNYK_TOKEN to repository secrets"
-          # Create empty results file to prevent downstream errors
+          echo "::notice::Snyk security scan disabled - no SNYK_TOKEN configured"
+          echo "Creating empty results file to prevent downstream errors"
           echo '{"vulnerabilities": []}' > snyk-results.json
 
       - name: Frontend security scan

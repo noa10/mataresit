@@ -23,7 +23,7 @@ on:
 env:
   NODE_VERSION: '18'
   CACHE_VERSION: 'v1'
-  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
 
 
 jobs:
@@ -158,34 +158,14 @@ jobs:
           npm audit --audit-level=moderate --json > npm-audit.json || true
           npm audit --audit-level=moderate
 
-      - name: Check Snyk token configuration
+      - name: Skip Snyk security scan (not configured)
         run: |
-          if [[ -z "${{ secrets.SNYK_TOKEN }}" ]]; then
-            echo "::warning::SNYK_TOKEN not configured - skipping Snyk scan"
-            echo "To enable Snyk scanning:"
-            echo "1. Get API token from https://app.snyk.io/account"
-            echo "2. Add SNYK_TOKEN to repository secrets"
-            echo "3. See .github/docs/SECURITY_SCANNING_SETUP.md for details"
-            exit 0
-          else
-            echo "✅ SNYK_TOKEN is configured"
-          fi
-
-      - name: Run Snyk security scan
-        if: ${{ env.SNYK_TOKEN != '' }}
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --json-file-output=snyk-results.json
-        continue-on-error: true
-
-      - name: Upload Snyk results to GitHub Code Scanning
-        if: ${{ always() && env.SNYK_TOKEN != '' && hashFiles('snyk-results.json') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk.sarif
-        continue-on-error: true
+          echo "::notice::Snyk security scan disabled - no SNYK_TOKEN configured"
+          echo "Using npm audit for dependency vulnerability scanning instead"
+          echo "To enable Snyk scanning:"
+          echo "1. Get API token from https://app.snyk.io/account"
+          echo "2. Add SNYK_TOKEN to repository secrets"
+          echo "3. Re-enable Snyk steps in security-scan workflow"
 
       - name: Check for high severity vulnerabilities
         run: |

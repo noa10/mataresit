@@ -24,7 +24,7 @@ on:
 
 env:
   SUPABASE_CLI_VERSION: '1.127.4'
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
 
 
 jobs:
@@ -381,37 +381,24 @@ jobs:
     if: always()
 
     steps:
-      - name: Notify success
-        if: ${{ needs.validate-deployment.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          text: |
-            🚀 Supabase deployment successful!
+      - name: Log deployment success
+        if: ${{ needs.validate-deployment.result == 'success' }}
+        run: |
+          echo "🚀 Supabase deployment successful!"
+          echo "Environment: ${{ needs.validate.outputs.environment }}"
+          echo "Migrations: ${{ needs.migrate.result }}"
+          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Validation: ${{ needs.validate-deployment.result }}"
 
-            **Environment:** ${{ needs.validate.outputs.environment }}
-            **Migrations:** ${{ needs.migrate.result }}
-            **Functions:** ${{ needs.deploy-functions.result }}
-            **Validation:** ${{ needs.validate-deployment.result }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Notify failure
-        if: ${{ (needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure') && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: |
-            ❌ Supabase deployment failed!
-
-            **Environment:** ${{ needs.validate.outputs.environment }}
-            **Validation:** ${{ needs.validate.result }}
-            **Migrations:** ${{ needs.migrate.result }}
-            **Functions:** ${{ needs.deploy-functions.result }}
-
-            Check workflow logs for details.
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Log deployment failure
+        if: ${{ needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure' }}
+        run: |
+          echo "❌ Supabase deployment failed!"
+          echo "Environment: ${{ needs.validate.outputs.environment }}"
+          echo "Validation: ${{ needs.validate.result }}"
+          echo "Migrations: ${{ needs.migrate.result }}"
+          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Check workflow logs for details."
 
       - name: Log deployment status (fallback)
         if: always()
@@ -423,9 +410,7 @@ jobs:
           echo "Functions: ${{ needs.deploy-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
-          if [[ "${{ secrets.SLACK_WEBHOOK_URL }}" == "" ]]; then
-            echo "ℹ️ Slack notifications disabled (SLACK_WEBHOOK_URL not configured)"
-          fi
+          echo "ℹ️ Slack notifications disabled"
 
           if [[ "${{ needs.validate-deployment.result }}" == "success" ]]; then
             echo "🚀 Deployment completed successfully!"

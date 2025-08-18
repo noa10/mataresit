@@ -33,8 +33,7 @@ env:
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
   CACHE_VERSION: 'v1'
 
-  SLACK_WEBHOOK_URL_PRIMARY: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
-  SLACK_WEBHOOK_URL_FALLBACK: ${{ secrets.SLACK_WEBHOOK_URL }}
+
 
 jobs:
   # System Health Monitoring
@@ -660,35 +659,14 @@ jobs:
           echo "$ALERT_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Send Slack alert (if configured)
-        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY != '' }}
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: ${{ steps.alert-message.outputs.message }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL_PRIMARY }}
-
-      - name: Send fallback Slack alert (if main webhook not configured)
-        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY == '' && env.SLACK_WEBHOOK_URL_FALLBACK != '' }}
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: ${{ steps.alert-message.outputs.message }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL_FALLBACK }}
-
-      - name: Log alert (if no Slack configured)
-        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY == '' && env.SLACK_WEBHOOK_URL_FALLBACK == '' }}
+      - name: Log critical alert
         run: |
-          echo "::error::CRITICAL ALERT - No Slack webhook configured!"
+          echo "::error::CRITICAL ALERT - Slack notifications disabled"
           echo "${{ steps.alert-message.outputs.message }}"
           echo ""
-          echo "🔧 WEBHOOK SETUP INSTRUCTIONS:"
-          echo "1. Run: npm run setup:slack-webhooks"
-          echo "2. Follow the interactive setup guide"
-          echo "3. Add the webhook URLs to GitHub repository secrets"
-          echo "4. Documentation: docs/monitoring/SLACK_WEBHOOK_SETUP.md"
+          echo "ℹ️ To enable Slack notifications:"
+          echo "1. Configure SLACK_WEBHOOK_URL in repository secrets"
+          echo "2. Re-enable Slack steps in monitoring workflow"
           echo ""
           echo "::notice::Please configure CRITICAL_ALERTS_WEBHOOK_URL or SLACK_WEBHOOK_URL secret for proper alerting"
 
