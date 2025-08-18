@@ -131,27 +131,75 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate, build]
     if: needs.build.outputs.build-success == 'true'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate Vercel secrets
+        id: secrets-check
+        run: |
+          echo "Checking Vercel deployment secrets..."
+
+          MISSING_SECRETS=()
+
+          if [[ -z "${{ secrets.VERCEL_TOKEN }}" ]]; then
+            MISSING_SECRETS+=("VERCEL_TOKEN")
+          fi
+
+          if [[ -z "${{ secrets.VERCEL_ORG_ID }}" ]]; then
+            MISSING_SECRETS+=("VERCEL_ORG_ID")
+          fi
+
+          if [[ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]]; then
+            MISSING_SECRETS+=("VERCEL_PROJECT_ID")
+          fi
+
+          if [[ ${#MISSING_SECRETS[@]} -gt 0 ]]; then
+            echo "::error::Missing required Vercel secrets: ${MISSING_SECRETS[*]}"
+            echo ""
+            echo "To enable Vercel deployment, please configure the following secrets in your repository:"
+            echo ""
+            for secret in "${MISSING_SECRETS[@]}"; do
+              echo "- $secret"
+            done
+            echo ""
+            echo "📚 Setup Instructions:"
+            echo "1. Go to https://vercel.com/account/tokens to create a VERCEL_TOKEN"
+            echo "2. Find your VERCEL_ORG_ID in your Vercel team settings"
+            echo "3. Find your VERCEL_PROJECT_ID in your Vercel project settings"
+            echo "4. Add these as secrets in GitHub: Settings → Secrets and variables → Actions"
+            echo ""
+            echo "🔧 Alternative: Use Vercel's GitHub integration for automatic deployments"
+            echo "   Visit: https://vercel.com/docs/deployments/git"
+            echo ""
+            echo "secrets-configured=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All Vercel secrets are configured"
+            echo "secrets-configured=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup Node.js
+        if: steps.secrets-check.outputs.secrets-configured == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: Download build artifacts
+        if: steps.secrets-check.outputs.secrets-configured == 'true'
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ github.run_number }}
 
       - name: Install dependencies
+        if: steps.secrets-check.outputs.secrets-configured == 'true'
         run: npm ci
 
       - name: Deploy to Vercel
         id: deploy
+        if: steps.secrets-check.outputs.secrets-configured == 'true'
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -162,19 +210,20 @@ jobs:
           vercel-args: ${{ needs.validate.outputs.environment == 'production' && '--prod' || '' }}
 
       - name: Verify deployment
+        if: steps.secrets-check.outputs.secrets-configured == 'true'
         run: |
           echo "Waiting for deployment to propagate..."
           sleep 30
-          
+
           # Determine domain based on environment
           if [[ "${{ needs.validate.outputs.environment }}" == "production" ]]; then
             DOMAIN="mataresit.com"
           else
             DOMAIN="staging.mataresit.com"
           fi
-          
+
           echo "Testing deployment at https://$DOMAIN"
-          
+
           # Test main domain with retries
           for i in {1..5}; do
             if curl -f -s "https://$DOMAIN" > /dev/null; then
@@ -185,47 +234,67 @@ jobs:
               sleep 10
             fi
           done
-          
+
           echo "❌ Deployment verification failed - site is not accessible after 5 attempts"
           exit 1
+
+      - name: Log deployment skipped
+        if: steps.secrets-check.outputs.secrets-configured != 'true'
+        run: |
+          echo "⚠️ Vercel deployment was skipped due to missing secrets"
+          echo ""
+          echo "The application build completed successfully, but deployment to Vercel"
+          echo "requires the following secrets to be configured:"
+          echo "- VERCEL_TOKEN"
+          echo "- VERCEL_ORG_ID"
+          echo "- VERCEL_PROJECT_ID"
+          echo ""
+          echo "Please configure these secrets to enable automatic Vercel deployment."
 
   # Post-deployment validation
   post-deploy:
     name: Post-deployment Validation
     runs-on: ubuntu-latest
     needs: [validate, deploy]
-    if: always() && needs.deploy.result == 'success'
+    if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run deployment health checks
+        if: needs.deploy.result == 'success'
         run: |
           echo "Running post-deployment health checks..."
-          
+
           # Determine domain
           if [[ "${{ needs.validate.outputs.environment }}" == "production" ]]; then
             DOMAIN="mataresit.com"
           else
             DOMAIN="staging.mataresit.com"
           fi
-          
+
           # Test key routes
           ROUTES=("/" "/pricing" "/login")
-          
+
           for route in "${ROUTES[@]}"; do
             echo "Testing route: $route"
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN$route" || echo "000")
-            
+
             if [[ "$STATUS" =~ ^(200|301|302)$ ]]; then
               echo "✅ Route $route: OK (HTTP $STATUS)"
             else
               echo "⚠️ Route $route: HTTP $STATUS"
             fi
           done
-          
+
           echo "✅ Post-deployment validation completed"
+
+      - name: Log validation skipped
+        if: needs.deploy.result != 'success'
+        run: |
+          echo "ℹ️ Post-deployment validation skipped"
+          echo "Reason: Deployment was not successful or was skipped due to missing Vercel secrets"
 
       - name: Log deployment success
         run: |

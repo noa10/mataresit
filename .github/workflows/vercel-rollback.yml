@@ -137,6 +137,16 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Check Vercel secrets
+        id: vercel-check
+        run: |
+          if [[ -z "${{ secrets.VERCEL_TOKEN }}" || -z "${{ secrets.VERCEL_ORG_ID }}" || -z "${{ secrets.VERCEL_PROJECT_ID }}" ]]; then
+            echo "::error::Missing required Vercel secrets for rollback"
+            echo "Required secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID"
+            exit 1
+          fi
+          echo "✅ Vercel secrets are configured"
+
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
