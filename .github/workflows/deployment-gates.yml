@@ -38,10 +38,13 @@ jobs:
   security-gate:
     name: Security Gate
     runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
     outputs:
       passed: ${{ steps.security-evaluation.outputs.passed }}
       score: ${{ steps.security-evaluation.outputs.score }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -59,15 +62,15 @@ jobs:
         id: security-audit
         run: |
           echo "Running comprehensive security audit..."
-          
+
           # NPM audit
           npm audit --audit-level=moderate --json > npm-audit.json || true
-          
+
           # Count vulnerabilities by severity
           CRITICAL=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "critical")) | length' npm-audit.json 2>/dev/null || echo "0")
           HIGH=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "high")) | length' npm-audit.json 2>/dev/null || echo "0")
           MODERATE=$(jq '.vulnerabilities | to_entries | map(select(.value.severity == "moderate")) | length' npm-audit.json 2>/dev/null || echo "0")
-          
+
           echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
           echo "high=$HIGH" >> $GITHUB_OUTPUT
           echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
@@ -75,16 +78,16 @@ jobs:
 
       - name: Run Snyk security scan
         id: snyk-scan
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+        if: ${{ env.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
         with:
           args: --json-file-output=snyk-results.json
         continue-on-error: true
 
       - name: Handle missing Snyk token
-        if: ${{ secrets.SNYK_TOKEN == '' }}
+        if: ${{ env.SNYK_TOKEN == '' }}
         run: |
           echo "::warning::SNYK_TOKEN not configured - skipping Snyk security scan"
           echo "This may affect security gate scoring"
@@ -249,7 +252,7 @@ jobs:
     outputs:
       passed: ${{ steps.performance-evaluation.outputs.passed }}
       score: ${{ steps.performance-evaluation.outputs.score }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -270,7 +273,7 @@ jobs:
           docker run -d --name perf-test-app -p 3000:3000 \
             -e NODE_ENV=production \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
-          
+
           # Wait for application to be ready
           timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
 
@@ -281,12 +284,12 @@ jobs:
           # Install k6 for load testing
           curl -s https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar xz
           sudo mv k6-v0.47.0-linux-amd64/k6 /usr/local/bin/
-          
+
           # Create k6 test script
           cat > performance-test.js << 'EOF'
           import http from 'k6/http';
           import { check, sleep } from 'k6';
-          
+
           export let options = {
             stages: [
               { duration: '30s', target: 10 },
@@ -298,7 +301,7 @@ jobs:
               http_req_failed: ['rate<0.05'],
             },
           };
-          
+
           export default function() {
             let response = http.get('http://localhost:3000/health');
             check(response, {
@@ -308,17 +311,17 @@ jobs:
             sleep(1);
           }
           EOF
-          
+
           # Run performance test
           k6 run --out json=performance-results.json performance-test.js || true
-          
+
           # Parse results
           if [[ -f performance-results.json ]]; then
             # Extract key metrics
             AVG_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration.values.avg' performance-results.json 2>/dev/null || echo "0")
             P95_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration.values["p(95)"]' performance-results.json 2>/dev/null || echo "0")
             ERROR_RATE=$(jq -r '.metrics.http_req_failed.values.rate' performance-results.json 2>/dev/null || echo "0")
-            
+
             echo "avg_response_time=$AVG_RESPONSE_TIME" >> $GITHUB_OUTPUT
             echo "p95_response_time=$P95_RESPONSE_TIME" >> $GITHUB_OUTPUT
             echo "error_rate=$ERROR_RATE" >> $GITHUB_OUTPUT
@@ -342,34 +345,34 @@ jobs:
             echo "score=100" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           # Get performance metrics
           AVG_RESPONSE_TIME=${{ steps.performance-tests.outputs.avg_response_time || 0 }}
           P95_RESPONSE_TIME=${{ steps.performance-tests.outputs.p95_response_time || 0 }}
           ERROR_RATE=${{ steps.performance-tests.outputs.error_rate || 0 }}
-          
+
           # Calculate performance score (0-100)
           SCORE=100
-          
+
           # Deduct points based on response times
           if (( $(echo "$P95_RESPONSE_TIME > 2000" | bc -l) )); then
             SCORE=$((SCORE - 30))
           elif (( $(echo "$P95_RESPONSE_TIME > 1000" | bc -l) )); then
             SCORE=$((SCORE - 15))
           fi
-          
+
           # Deduct points based on error rate
           if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
             SCORE=$((SCORE - 40))
           elif (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
             SCORE=$((SCORE - 20))
           fi
-          
+
           # Ensure score doesn't go below 0
           if [[ $SCORE -lt 0 ]]; then
             SCORE=0
           fi
-          
+
           # Determine pass/fail based on environment
           PASSED=false
           if [[ "${{ inputs.environment }}" == "production" ]]; then
@@ -388,10 +391,10 @@ jobs:
               PASSED=true
             fi
           fi
-          
+
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "score=$SCORE" >> $GITHUB_OUTPUT
-          
+
           echo "Performance Gate Results:"
           echo "- Average response time: ${AVG_RESPONSE_TIME}ms"
           echo "- P95 response time: ${P95_RESPONSE_TIME}ms"
@@ -416,7 +419,7 @@ jobs:
     needs: [security-gate, performance-gate]
     outputs:
       passed: ${{ steps.gate-evaluation.outputs.passed }}
-    
+
     steps:
       - name: Evaluate deployment gate
         id: gate-evaluation
@@ -425,7 +428,7 @@ jobs:
           PERFORMANCE_PASSED=${{ needs.performance-gate.outputs.passed }}
           SECURITY_SCORE=${{ needs.security-gate.outputs.score }}
           PERFORMANCE_SCORE=${{ needs.performance-gate.outputs.score }}
-          
+
           # Overall gate passes if both security and performance pass
           if [[ "$SECURITY_PASSED" == "true" ]] && [[ "$PERFORMANCE_PASSED" == "true" ]]; then
             GATE_PASSED=true
@@ -434,9 +437,9 @@ jobs:
             GATE_PASSED=false
             GATE_STATUS="❌ Deployment gates failed"
           fi
-          
+
           echo "passed=$GATE_PASSED" >> $GITHUB_OUTPUT
-          
+
           echo "## 🚦 Deployment Gate Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Overall Status**: $GATE_STATUS" >> $GITHUB_STEP_SUMMARY

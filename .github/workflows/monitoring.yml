@@ -33,6 +33,9 @@ env:
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
   CACHE_VERSION: 'v1'
 
+  SLACK_WEBHOOK_URL_PRIMARY: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
+  SLACK_WEBHOOK_URL_FALLBACK: ${{ secrets.SLACK_WEBHOOK_URL }}
+
 jobs:
   # System Health Monitoring
   health-monitoring:
@@ -296,7 +299,7 @@ jobs:
     name: Performance Monitoring
     runs-on: ubuntu-latest
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'performance' || github.event_name == 'schedule'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -465,7 +468,7 @@ jobs:
     name: Alert System Check
     runs-on: ubuntu-latest
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'alerts' || github.event_name == 'schedule'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -556,19 +559,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: [health-monitoring, supabase-monitoring, performance-monitoring, security-monitoring, alert-monitoring]
     if: always()
-    
+
     steps:
       - name: Generate monitoring summary
         run: |
           cat > monitoring-report.md << 'EOF'
           # Production Monitoring Report
-          
+
           **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           **Environment:** ${{ github.event.inputs.environment || 'production' }}
           **Triggered by:** ${{ github.event_name }}
-          
+
           ## System Status Summary
-          
+
           | Component | Status | Details |
           |-----------|--------|---------|
           | Health Check | ${{ needs.health-monitoring.result }} | System health and endpoints |
@@ -576,21 +579,21 @@ jobs:
           | Performance | ${{ needs.performance-monitoring.result }} | Resource usage and performance |
           | Security | ${{ needs.security-monitoring.result }} | Security policies and vulnerabilities |
           | Alerts | ${{ needs.alert-monitoring.result }} | Alert system functionality |
-          
+
           ## Health Status
           - **Overall Health:** ${{ needs.health-monitoring.outputs.health-status || 'unknown' }}
-          
+
           ## Recommendations
-          
+
           ${{ needs.health-monitoring.result == 'failure' && '⚠️ **CRITICAL**: Health check failed - immediate investigation required' || '' }}
           ${{ needs.performance-monitoring.result == 'failure' && '⚠️ **WARNING**: Performance issues detected - review resource usage' || '' }}
           ${{ needs.security-monitoring.result == 'failure' && '🔒 **SECURITY**: Security issues found - review and fix immediately' || '' }}
           ${{ needs.alert-monitoring.result == 'failure' && '📢 **ALERTS**: Alert system issues - verify notification channels' || '' }}
-          
+
           ## Next Monitoring Check
           - **Scheduled:** Every 15 minutes
           - **Manual:** Use workflow_dispatch to run specific checks
-          
+
           EOF
 
       - name: Upload monitoring report
@@ -658,25 +661,25 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Slack alert (if configured)
-        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL != '' }}
+        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: failure
           text: ${{ steps.alert-message.outputs.message }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL_PRIMARY }}
 
       - name: Send fallback Slack alert (if main webhook not configured)
-        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY == '' && env.SLACK_WEBHOOK_URL_FALLBACK != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: failure
           text: ${{ steps.alert-message.outputs.message }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL_FALLBACK }}
 
       - name: Log alert (if no Slack configured)
-        if: ${{ secrets.CRITICAL_ALERTS_WEBHOOK_URL == '' && secrets.SLACK_WEBHOOK_URL == '' }}
+        if: ${{ env.SLACK_WEBHOOK_URL_PRIMARY == '' && env.SLACK_WEBHOOK_URL_FALLBACK == '' }}
         run: |
           echo "::error::CRITICAL ALERT - No Slack webhook configured!"
           echo "${{ steps.alert-message.outputs.message }}"
@@ -699,7 +702,7 @@ jobs:
               repo: context.repo.repo,
               title: `🚨 System Health Alert - ${context.payload.inputs?.environment || 'production'}`,
               body: `## 🚨 Critical System Health Alert
-              
+
               **Environment:** ${context.payload.inputs?.environment || 'production'}
               **Time:** ${new Date().toISOString()}
               **Health Status:** ${{ needs.health-monitoring.outputs.health-status }}
@@ -711,14 +714,14 @@ jobs:
               - Performance: ${{ needs.performance-monitoring.result }}
               - Security: ${{ needs.security-monitoring.result }}
               - Alerts: ${{ needs.alert-monitoring.result }}
-              
+
               ### Immediate Actions Required:
               1. Check system dashboard
               2. Review application and worker logs
               3. Verify database connectivity
               4. Check resource utilization
               5. Escalate if service is down
-              
+
               ### Links:
               - [Monitoring Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
               - [Production Dashboard](https://grafana.mataresit.com)

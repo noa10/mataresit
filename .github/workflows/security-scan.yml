@@ -23,6 +23,8 @@ on:
 env:
   NODE_VERSION: '18'
   CACHE_VERSION: 'v1'
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
 
 jobs:
   # Setup for Security Scans
@@ -137,7 +139,7 @@ jobs:
   dependency-security:
     name: Dependency Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -170,16 +172,16 @@ jobs:
           fi
 
       - name: Run Snyk security scan
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+        if: ${{ env.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high --json-file-output=snyk-results.json
         continue-on-error: true
 
       - name: Upload Snyk results to GitHub Code Scanning
-        if: ${{ always() && secrets.SNYK_TOKEN != '' && hashFiles('snyk-results.json') != '' }}
+        if: ${{ always() && env.SNYK_TOKEN != '' && hashFiles('snyk-results.json') != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif
@@ -190,7 +192,7 @@ jobs:
           if [ -f npm-audit.json ]; then
             HIGH_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.high // 0')
             CRITICAL_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.critical // 0')
-            
+
             if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
               echo "::error::Found $CRITICAL_VULNS critical and $HIGH_VULNS high severity vulnerabilities"
               exit 1
@@ -319,7 +321,7 @@ jobs:
   secrets-scan:
     name: Secrets Scanning
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -426,7 +428,7 @@ jobs:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('security-report.md', 'utf8');
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
