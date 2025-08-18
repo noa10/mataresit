@@ -13,28 +13,7 @@
       "destination": "/index.html"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/docs/(.*)",
-      "dest": "/docs/$1"
-    },
-    {
-      "src": "/(favicon\\.ico|robots\\.txt|.*\\.(png|jpg|jpeg|gif|svg|ico|css|js|json))",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
+
   "headers": [
     {
       "source": "/docs/(.*\\.md)",
