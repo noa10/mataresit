@@ -131,8 +131,8 @@ export default defineConfig({
     // Enable source maps for production debugging
     sourcemap: false,
 
-    // Optimize chunk size warnings - reduced from 1000 to 500 for better performance
-    chunkSizeWarningLimit: 500,
+    // Optimize chunk size warnings - set to 1000 to reduce build warnings while maintaining performance
+    chunkSizeWarningLimit: 1000,
   },
 
   // Optimize dependencies
