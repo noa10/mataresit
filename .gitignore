@@ -69,3 +69,6 @@ backups/
 *-verification.html
 test-*.html
 verify-*.html
+
+# Vercel deployment configuration
+.vercel/

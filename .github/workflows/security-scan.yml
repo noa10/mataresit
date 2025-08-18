@@ -170,7 +170,7 @@ jobs:
           fi
 
       - name: Run Snyk security scan
-        if: secrets.SNYK_TOKEN != ''
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -179,7 +179,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Snyk results to GitHub Code Scanning
-        if: always() && secrets.SNYK_TOKEN != '' && hashFiles('snyk-results.json') != ''
+        if: ${{ always() && secrets.SNYK_TOKEN != '' && hashFiles('snyk-results.json') != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif

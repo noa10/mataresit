@@ -380,7 +380,7 @@ jobs:
     
     steps:
       - name: Notify success
-        if: needs.validate-deployment.result == 'success' && secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ needs.validate-deployment.result == 'success' && secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: success
@@ -395,7 +395,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify failure
-        if: (needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ (needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure') && secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: failure
