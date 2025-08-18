@@ -545,6 +545,36 @@ jobs:
 
           if [[ "${{ steps.gate-check.outputs.ready }}" == "true" ]]; then
             echo "🎉 **Ready for deployment!**" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              echo "🚀 **Production deployment will be triggered automatically**" >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "🚫 **Not ready for deployment. Please fix the failing checks.**" >> $GITHUB_STEP_SUMMARY
           fi
+
+  # Trigger production deployment (for main branch)
+  trigger-deployment:
+    name: Trigger Production Deployment
+    runs-on: ubuntu-latest
+    needs: [deployment-gate]
+    if: github.ref == 'refs/heads/main' && needs.deployment-gate.outputs.deployment-ready == 'true'
+
+    steps:
+      - name: Trigger Vercel deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'vercel-deploy.yml',
+              ref: 'main',
+              inputs: {
+                environment: 'production'
+              }
+            });
+
+            console.log('✅ Vercel deployment workflow triggered');
+            console.log(`Workflow dispatch ID: ${result.data.id || 'N/A'}`);
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

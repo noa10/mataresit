@@ -261,46 +261,40 @@ jobs:
     if: always()
     
     steps:
-      - name: Notify rollback success
+      - name: Log rollback success
         if: needs.post-rollback-validation.result == 'success'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          text: |
-            ✅ VERCEL + SUPABASE ROLLBACK COMPLETED
-            
-            **Environment:** ${{ github.event.inputs.environment }}
-            **Type:** ${{ github.event.inputs.rollback_type }}
-            **Reason:** ${{ github.event.inputs.reason }}
-            **Executed by:** ${{ github.actor }}
-            
-            **Rollback Details:**
-            - Target commit: ${{ needs.pre-rollback.outputs.target-commit }}
-            - Frontend: ${{ needs.frontend-rollback.result }}
-            - Supabase: ${{ needs.supabase-rollback.result }}
-            - Validation: ${{ needs.post-rollback-validation.result }}
-            
-            ✅ System is operational after rollback
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "✅ VERCEL + SUPABASE ROLLBACK COMPLETED"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Type: ${{ github.event.inputs.rollback_type }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Executed by: ${{ github.actor }}"
+          echo ""
+          echo "Rollback Details:"
+          echo "- Target commit: ${{ needs.pre-rollback.outputs.target-commit }}"
+          echo "- Frontend: ${{ needs.frontend-rollback.result }}"
+          echo "- Supabase: ${{ needs.supabase-rollback.result }}"
+          echo "- Validation: ${{ needs.post-rollback-validation.result }}"
+          echo ""
+          echo "✅ System is operational after rollback"
 
-      - name: Notify rollback failure
+      - name: Log rollback failure
         if: needs.frontend-rollback.result == 'failure' || needs.supabase-rollback.result == 'failure' || needs.post-rollback-validation.result == 'failure'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: |
-            🚨 VERCEL + SUPABASE ROLLBACK FAILED
-            
-            **Environment:** ${{ github.event.inputs.environment }}
-            **Type:** ${{ github.event.inputs.rollback_type }}
-            **Reason:** ${{ github.event.inputs.reason }}
-            
-            **Results:**
-            - Frontend: ${{ needs.frontend-rollback.result }}
-            - Supabase: ${{ needs.supabase-rollback.result }}
-            - Validation: ${{ needs.post-rollback-validation.result }}
-            
-            🚨 IMMEDIATE MANUAL INTERVENTION REQUIRED
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "🚨 VERCEL + SUPABASE ROLLBACK FAILED"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Type: ${{ github.event.inputs.rollback_type }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo ""
+          echo "Results:"
+          echo "- Frontend: ${{ needs.frontend-rollback.result }}"
+          echo "- Supabase: ${{ needs.supabase-rollback.result }}"
+          echo "- Validation: ${{ needs.post-rollback-validation.result }}"
+          echo ""
+          echo "🚨 IMMEDIATE MANUAL INTERVENTION REQUIRED"
+          echo ""
+          echo "ℹ️ To enable Slack notifications:"
+          echo "1. Configure SLACK_WEBHOOK_URL in repository secrets"
+          echo "2. Re-enable Slack steps in rollback workflow"
