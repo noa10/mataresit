@@ -427,75 +427,7 @@ jobs:
             build-output.txt
           retention-days: 7
 
-  # Vercel Preview Deployment (for PRs)
-  vercel-preview:
-    name: Vercel Preview Deployment
-    runs-on: ubuntu-latest
-    needs: [setup, build]
-    if: github.event_name == 'pull_request' && needs.build.outputs.build-success == 'true'
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            node_modules
-          key: ${{ needs.setup.outputs.node-cache-key }}
-
-      - name: Restore build output
-        uses: actions/cache@v3
-        with:
-          path: dist/
-          key: ${{ needs.build.outputs.build-cache-key }}
-
-      - name: Install dependencies (if cache miss)
-        if: needs.setup.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Build (if cache miss)
-        if: steps.restore-build.outputs.cache-hit != 'true'
-        run: npm run build
-
-      - name: Check Vercel secrets
-        id: vercel-check
-        run: |
-          if [[ -n "${{ secrets.VERCEL_TOKEN }}" && -n "${{ secrets.VERCEL_ORG_ID }}" && -n "${{ secrets.VERCEL_PROJECT_ID }}" ]]; then
-            echo "vercel-configured=true" >> $GITHUB_OUTPUT
-            echo "✅ Vercel secrets are configured"
-          else
-            echo "vercel-configured=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Vercel secrets not configured - skipping preview deployment"
-            echo ""
-            echo "To enable Vercel preview deployments, configure these secrets:"
-            echo "- VERCEL_TOKEN"
-            echo "- VERCEL_ORG_ID"
-            echo "- VERCEL_PROJECT_ID"
-          fi
-
-      - name: Deploy to Vercel Preview
-        if: steps.vercel-check.outputs.vercel-configured == 'true'
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./
-          scope: ${{ secrets.VERCEL_ORG_ID }}
-
-      - name: Log preview deployment skipped
-        if: steps.vercel-check.outputs.vercel-configured != 'true'
-        run: |
-          echo "ℹ️ Vercel preview deployment skipped due to missing secrets"
-          echo "The build completed successfully, but preview deployment requires Vercel configuration."
 
   # Deployment Readiness Gate
   deployment-gate:
@@ -569,35 +501,10 @@ jobs:
           if [[ "${{ steps.gate-check.outputs.ready }}" == "true" ]]; then
             echo "🎉 **Ready for deployment!**" >> $GITHUB_STEP_SUMMARY
             if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              echo "🚀 **Production deployment will be triggered automatically**" >> $GITHUB_STEP_SUMMARY
+              echo "🚀 **Vercel GitHub integration will handle automatic deployment**" >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "🚫 **Not ready for deployment. Please fix the failing checks.**" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Trigger production deployment (for main branch)
-  trigger-deployment:
-    name: Trigger Production Deployment
-    runs-on: ubuntu-latest
-    needs: [deployment-gate]
-    if: github.ref == 'refs/heads/main' && needs.deployment-gate.outputs.deployment-ready == 'true'
 
-    steps:
-      - name: Trigger Vercel deployment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const result = await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'vercel-deploy.yml',
-              ref: 'main',
-              inputs: {
-                environment: 'production'
-              }
-            });
-
-            console.log('✅ Vercel deployment workflow triggered');
-            console.log(`Workflow dispatch ID: ${result.data.id || 'N/A'}`);
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -73,6 +73,16 @@ For detailed documentation, please visit the [docs](./docs) directory:
 └── public/             # Static assets
 ```
 
+## Deployment
+
+Mataresit uses **Vercel GitHub Integration** for automatic deployments:
+
+- 🚀 **Production**: Automatic deployment on pushes to `main` branch
+- 🔍 **Preview**: Automatic preview deployments for all pull requests
+- 🔧 **CI/CD**: GitHub Actions handles testing and validation
+
+For detailed deployment information, see [Deployment Documentation](./.github/docs/DEPLOYMENT.md).
+
 ## Contributing
 
 1. Fork the repository
