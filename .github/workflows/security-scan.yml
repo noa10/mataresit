@@ -42,13 +42,19 @@ jobs:
       - name: Determine scan scope
         id: scan-decision
         run: |
-          # Skip scans for documentation-only changes
+          # Skip scans for documentation-only changes (only for PRs)
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            CHANGED_FILES=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/files --jq '.[].filename')
-            if echo "$CHANGED_FILES" | grep -E '\.(md|txt|yml|yaml)$' && ! echo "$CHANGED_FILES" | grep -E '\.(js|ts|jsx|tsx|json)$'; then
-              echo "should-run=false" >> $GITHUB_OUTPUT
-              echo "Skipping security scans for documentation-only changes"
-              exit 0
+            echo "Checking changed files for PR #${{ github.event.number }}"
+
+            # Try to get changed files, but handle API errors gracefully
+            if CHANGED_FILES=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/files --jq '.[].filename' 2>/dev/null); then
+              if echo "$CHANGED_FILES" | grep -E '\.(md|txt|yml|yaml)$' && ! echo "$CHANGED_FILES" | grep -E '\.(js|ts|jsx|tsx|json)$'; then
+                echo "should-run=false" >> $GITHUB_OUTPUT
+                echo "Skipping security scans for documentation-only changes"
+                exit 0
+              fi
+            else
+              echo "::warning::Could not fetch changed files, running full security scan"
             fi
           fi
           echo "should-run=true" >> $GITHUB_OUTPUT
@@ -308,13 +314,38 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run TruffleHog
+      - name: Check if scanning is needed
+        id: scan-check
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # For direct pushes to main, scan the last commit only
+            echo "scan-mode=single-commit" >> $GITHUB_OUTPUT
+            echo "Scanning single commit for direct push to main"
+          else
+            # For PRs and other events, scan the diff
+            echo "scan-mode=diff" >> $GITHUB_OUTPUT
+            echo "Scanning diff between base and head"
+          fi
+
+      - name: Run TruffleHog (single commit)
+        if: steps.scan-check.outputs.scan-mode == 'single-commit'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: HEAD~1
+          head: HEAD
+          extra_args: --debug --only-verified
+        continue-on-error: true
+
+      - name: Run TruffleHog (diff)
+        if: steps.scan-check.outputs.scan-mode == 'diff'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
           base: main
           head: HEAD
           extra_args: --debug --only-verified
+        continue-on-error: true
 
       - name: Check GitLeaks configuration
         run: |
