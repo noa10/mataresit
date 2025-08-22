@@ -153,8 +153,21 @@ export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { su
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
-        .button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .button:hover { background: #5a6fd8; }
+        .button {
+          display: inline-block;
+          background: #667eea;
+          color: #ffffff !important;
+          padding: 12px 24px;
+          text-decoration: none !important;
+          border-radius: 6px;
+          font-weight: 600;
+          margin: 20px 0;
+          border: none;
+          font-size: 16px;
+        }
+        .button:hover { background: #5a6fd8; color: #ffffff !important; }
+        .button:visited { color: #ffffff !important; }
+        .button:active { color: #ffffff !important; }
         .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
         .role-badge { background: #e3f2fd; color: #1976d2; padding: 4px 12px; border-radius: 16px; font-size: 14px; font-weight: 500; }
       </style>
@@ -169,9 +182,9 @@ export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { su
           <p>Hi there!</p>
           
           <p><strong>${data.inviterName}</strong> has invited you to join <strong>${data.teamName}</strong> on Mataresit as a <span class="role-badge">${data.role}</span>.</p>
-          
+
           <p>Mataresit is a powerful receipt management and expense tracking platform that helps teams collaborate on financial data and streamline their expense workflows.</p>
-          
+
           <p>As a team member, you'll be able to:</p>
           <ul>
             <li>📄 Upload and manage receipts</li>
@@ -179,9 +192,15 @@ export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { su
             <li>👥 Collaborate with team members</li>
             <li>📊 Access team financial insights</li>
           </ul>
-          
-          <div style="text-align: center;">
-            <a href="${data.acceptUrl}" class="button">Accept Invitation</a>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.acceptUrl}" class="button" style="background: #667eea; color: #ffffff !important; text-decoration: none !important;">Accept Invitation</a>
+          </div>
+
+          <div style="background: #e8f4fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #1565c0;">
+              <strong>💡 Getting Started:</strong> When you click the invitation link, we'll guide you through the process based on whether you already have a Mataresit account or need to create one.
+            </p>
           </div>
           
           <p><small><strong>Note:</strong> This invitation will expire on ${new Date(data.expiresAt).toLocaleDateString('en-US', { 
@@ -882,8 +901,21 @@ function generateTeamInvitationEmailMalay(data: TeamInvitationEmailData): { subj
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
-        .button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .button:hover { background: #5a6fd8; }
+        .button {
+          display: inline-block;
+          background: #667eea;
+          color: #ffffff !important;
+          padding: 12px 24px;
+          text-decoration: none !important;
+          border-radius: 6px;
+          font-weight: 600;
+          margin: 20px 0;
+          border: none;
+          font-size: 16px;
+        }
+        .button:hover { background: #5a6fd8; color: #ffffff !important; }
+        .button:visited { color: #ffffff !important; }
+        .button:active { color: #ffffff !important; }
         .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
         .role-badge { background: #e3f2fd; color: #1976d2; padding: 4px 12px; border-radius: 16px; font-size: 14px; font-weight: 500; }
       </style>
@@ -909,8 +941,14 @@ function generateTeamInvitationEmailMalay(data: TeamInvitationEmailData): { subj
             <li>📊 Mengakses pandangan kewangan pasukan</li>
           </ul>
 
-          <div style="text-align: center;">
-            <a href="${data.acceptUrl}" class="button">Terima Jemputan</a>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.acceptUrl}" class="button" style="background: #667eea; color: #ffffff !important; text-decoration: none !important;">Terima Jemputan</a>
+          </div>
+
+          <div style="background: #e8f4fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #1565c0;">
+              <strong>💡 Memulakan:</strong> Apabila anda klik pautan jemputan, kami akan membimbing anda melalui proses berdasarkan sama ada anda sudah mempunyai akaun Mataresit atau perlu membuat satu.
+            </p>
           </div>
 
           <p><small><strong>Nota:</strong> Jemputan ini akan tamat tempoh pada ${new Date(data.expiresAt).toLocaleDateString('ms-MY', {
