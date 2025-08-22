@@ -4,6 +4,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { AppRole, UserWithRole, AuthState } from "@/types/auth";
+import { invitationFlowService } from "@/services/invitationFlowService";
 
 type AuthContextType = {
   user: UserWithRole | null;
@@ -27,6 +28,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+
+  // Process pending invitations after authentication
+  const processPendingInvitation = async (userId: string) => {
+    try {
+      const pendingInvitationData = localStorage.getItem('pending_invitation');
+      if (!pendingInvitationData) {
+        return;
+      }
+
+      const pendingInvitation = JSON.parse(pendingInvitationData);
+      const { token, teamId, teamName, sessionId } = pendingInvitation;
+
+      if (!token) {
+        console.warn('No invitation token found in pending invitation data');
+        localStorage.removeItem('pending_invitation');
+        return;
+      }
+
+      console.log('Processing pending invitation for user:', userId);
+
+      // Process the invitation acceptance
+      const result = await invitationFlowService.processPostAuthInvitation(
+        token,
+        userId,
+        'existing_session', // User just authenticated
+        invitationFlowService.generateBrowserFingerprint()
+      );
+
+      if (result.success) {
+        const { team_name, redirect_url } = result.data!;
+
+        toast({
+          title: 'Welcome to the Team!',
+          description: `You've successfully joined ${team_name}.`,
+          duration: 5000,
+        });
+
+        // Clear the pending invitation
+        localStorage.removeItem('pending_invitation');
+
+        // Redirect to the team or specified URL after a short delay
+        setTimeout(() => {
+          window.location.href = redirect_url || '/teams';
+        }, 2000);
+      } else {
+        console.error('Failed to process pending invitation:', result.error);
+        toast({
+          title: 'Invitation Processing Failed',
+          description: result.error || 'Failed to join team. Please try accepting the invitation again.',
+          variant: 'destructive',
+        });
+        localStorage.removeItem('pending_invitation');
+      }
+    } catch (error) {
+      console.error('Error processing pending invitation:', error);
+      toast({
+        title: 'Invitation Processing Error',
+        description: 'An error occurred while processing your team invitation.',
+        variant: 'destructive',
+      });
+      localStorage.removeItem('pending_invitation');
+    }
+  };
 
   // Fetch user roles
   const fetchUserRoles = async (userId: string) => {
@@ -96,6 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userWithRole);
       setIsAdmin(roles.includes('admin'));
+
+      // Process pending invitation if user just authenticated
+      if (currentSession && !shouldSetLoading) {
+        // Only process invitations for new sessions, not initial session checks
+        await processPendingInvitation(currentUser.id);
+      }
     } catch (error) {
       console.error('Error updating user with roles:', error);
       setUser({...currentUser, roles: ['user'], subscription_tier: 'free'} as UserWithRole);
