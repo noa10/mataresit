@@ -6,6 +6,10 @@ export type TeamMemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 
+export type UserType = 'unregistered' | 'logged_out' | 'logged_in' | 'cross_team';
+
+export type AuthenticationMethod = 'password' | 'magic_link' | 'oauth' | 'existing_session';
+
 export interface Team {
   id: string;
   name: string;
@@ -44,6 +48,11 @@ export interface TeamInvitation {
   accepted_at?: string;
   created_at: string;
   updated_at: string;
+  permissions?: Record<string, any>;
+  custom_message?: string;
+  authentication_method?: AuthenticationMethod;
+  acceptance_ip_address?: string;
+  acceptance_user_agent?: string;
   // Joined data
   team_name?: string;
   invited_by_name?: string;
@@ -381,6 +390,228 @@ export interface ServiceResponse<T = any> {
   error?: string;
   error_code?: string;
   metadata?: Record<string, any>;
+}
+
+// ============================================================================
+// ENHANCED INVITATION ONBOARDING SYSTEM TYPES (Phase 1)
+// ============================================================================
+
+// Invitation state types for pre-authentication tracking
+export type InvitationStateStatus = 'pending' | 'authenticating' | 'authenticated' | 'accepted' | 'expired' | 'cancelled';
+
+export interface InvitationState {
+  id: string;
+  invitation_token: string;
+  invitation_id: string;
+  target_email: string;
+  user_id?: string;
+  state: InvitationStateStatus;
+  authentication_method?: AuthenticationMethod;
+  user_type: UserType;
+  redirect_after_auth?: string;
+  session_data: Record<string, any>;
+  browser_fingerprint?: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+  authenticated_at?: string;
+  expires_at: string;
+  updated_at: string;
+}
+
+// Onboarding progress tracking types
+export type OnboardingType = 'team_invitation' | 'self_signup' | 'admin_created';
+export type OnboardingStep = 'profile_setup' | 'team_introduction' | 'first_upload' | 'dashboard_tour' | 'preferences_setup' | 'completed';
+
+export interface OnboardingProgress {
+  id: string;
+  user_id: string;
+  onboarding_type: OnboardingType;
+  team_id?: string;
+  invitation_id?: string;
+  current_step: OnboardingStep;
+  completed_steps: string[];
+  total_steps: number;
+  completion_percentage: number;
+  profile_completed: boolean;
+  team_introduction_viewed: boolean;
+  first_receipt_uploaded: boolean;
+  dashboard_tour_completed: boolean;
+  preferences_configured: boolean;
+  onboarding_data: Record<string, any>;
+  skip_reasons: Record<string, any>;
+  is_completed: boolean;
+  completed_at?: string;
+  started_at: string;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Team onboarding configuration types
+export interface TeamOnboardingConfig {
+  id: string;
+  team_id: string;
+  enabled: boolean;
+  welcome_message?: string;
+  introduction_video_url?: string;
+  custom_steps: OnboardingCustomStep[];
+  require_profile_completion: boolean;
+  require_team_introduction: boolean;
+  require_first_upload: boolean;
+  require_dashboard_tour: boolean;
+  require_preferences_setup: boolean;
+  brand_colors: Record<string, string>;
+  custom_resources: OnboardingResource[];
+  mentor_assignments: Record<string, any>;
+  notify_admins_on_join: boolean;
+  notify_team_on_completion: boolean;
+  created_by: string;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OnboardingCustomStep {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  component?: string;
+  required: boolean;
+  order: number;
+  config: Record<string, any>;
+}
+
+export interface OnboardingResource {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  type: 'video' | 'document' | 'link' | 'tutorial';
+  category: string;
+}
+
+// Enhanced team invitation with onboarding support
+export interface EnhancedTeamInvitationWithOnboarding extends EnhancedTeamInvitation {
+  onboarding_required: boolean;
+  onboarding_completed: boolean;
+  onboarding_completed_at?: string;
+  user_type_detected?: UserType;
+  authentication_method?: AuthenticationMethod;
+  acceptance_ip_address?: string;
+  acceptance_user_agent?: string;
+}
+
+// Request/Response types for new functionality
+export interface CreateInvitationStateRequest {
+  invitation_token: string;
+  target_email: string;
+  user_type: UserType;
+  redirect_after_auth?: string;
+  session_data?: Record<string, any>;
+  browser_fingerprint?: string;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export interface UpdateInvitationStateRequest {
+  invitation_token: string;
+  user_id: string;
+  authentication_method: AuthenticationMethod;
+}
+
+export interface InitializeOnboardingRequest {
+  user_id: string;
+  onboarding_type: OnboardingType;
+  team_id?: string;
+  invitation_id?: string;
+}
+
+export interface UpdateOnboardingStepRequest {
+  user_id: string;
+  step_name: OnboardingStep;
+  step_data?: Record<string, any>;
+  team_id?: string;
+}
+
+export interface InvitationValidationResult {
+  success: boolean;
+  invitation?: {
+    id: string;
+    email: string;
+    role: TeamMemberRole;
+    team_id: string;
+    team_name: string;
+    expires_at: string;
+    custom_message?: string;
+  };
+  user_analysis?: {
+    user_type: UserType;
+    user_exists: boolean;
+    user_logged_in: boolean;
+    existing_membership?: {
+      role: TeamMemberRole;
+      joined_at: string;
+    };
+    cross_team_memberships: number;
+  };
+  error?: string;
+  error_code?: string;
+}
+
+export interface InvitationStateWithContext {
+  success: boolean;
+  data?: {
+    invitation_state: InvitationState;
+    invitation: EnhancedTeamInvitationWithOnboarding;
+    team: {
+      id: string;
+      name: string;
+      description?: string;
+      slug: string;
+    };
+    inviter: {
+      id: string;
+      email: string;
+      full_name?: string;
+    };
+    team_config?: TeamOnboardingConfig;
+  };
+  error?: string;
+  error_code?: string;
+}
+
+export interface OnboardingStatus {
+  success: boolean;
+  progress?: OnboardingProgress;
+  team_config?: TeamOnboardingConfig;
+  next_steps?: OnboardingStep[];
+  error?: string;
+  error_code?: string;
+}
+
+export interface InvitationAnalytics {
+  period_days: number;
+  team_id?: string;
+  invitations: {
+    total_invitations: number;
+    pending_invitations: number;
+    accepted_invitations: number;
+    expired_invitations: number;
+    unregistered_users: number;
+    logged_out_users: number;
+    logged_in_users: number;
+    cross_team_users: number;
+    avg_acceptance_hours?: number;
+  };
+  onboarding: {
+    total_onboarding: number;
+    completed_onboarding: number;
+    avg_completion_percentage: number;
+    avg_completion_hours?: number;
+  };
+  generated_at: string;
 }
 
 export interface BulkOperationResult {
@@ -1063,4 +1294,33 @@ export interface RescheduleOperationResult {
   status: 'scheduled';
   rescheduled_by: string;
   rescheduled_at: string;
+}
+
+// Enhanced Invitation Flow Types
+export interface InvitationValidationResult {
+  valid: boolean;
+  error?: string;
+  error_code?: string;
+  invitation?: TeamInvitation;
+  user_state?: UserStateDetectionResult;
+}
+
+export interface InvitationStateWithContext {
+  id: string;
+  invitation_token: string;
+  invitation_id: string;
+  target_email: string;
+  user_type: UserType;
+  state: 'pending' | 'authenticated' | 'accepted' | 'expired';
+  user_id?: string;
+  authentication_method?: AuthenticationMethod;
+  redirect_after_auth?: string;
+  session_data?: Record<string, any>;
+  browser_fingerprint?: string;
+  ip_address?: string;
+  user_agent?: string;
+  authenticated_at?: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
 }
