@@ -1132,7 +1132,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   });
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-full min-h-screen md:min-h-0">{/* Optimized for mobile scrolling */}
+    <div className="receipt-viewer-container receipt-viewer-layout flex flex-col md:flex-row gap-4 md:gap-6 h-full min-h-screen md:min-h-0">{/* Optimized for mobile scrolling */}
       {/* Image and controls column */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}

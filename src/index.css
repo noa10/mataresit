@@ -321,3 +321,24 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Receipt Viewer Responsive Optimizations */
+/* Optimize layout for tablet landscape (768px-1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Ensure receipt viewer uses full width in tablet landscape */
+  .receipt-viewer-container {
+    max-width: none;
+    width: 100%;
+  }
+
+  /* Optimize gap between columns for tablet landscape */
+  .receipt-viewer-layout {
+    gap: 1rem; /* Reduce gap slightly for better space utilization */
+  }
+
+  /* Ensure proper padding for tablet landscape */
+  .receipt-viewer-main {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}

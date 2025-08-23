@@ -84,8 +84,8 @@ export default function ViewReceipt() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-
-      <main className="container px-4 py-8">
+      {/* Header Section - Constrained to container width */}
+      <header className="container px-4 py-8 pb-4">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <motion.div
@@ -152,7 +152,10 @@ export default function ViewReceipt() {
             </Button>
           </motion.div>
         </div>
+      </header>
 
+      {/* Main Content Section - Full width for receipt viewer */}
+      <main className="receipt-viewer-main px-4 md:px-6 lg:px-8 pb-8">
         {/* Receipt Viewer */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
