@@ -2,8 +2,8 @@ name: Production Monitoring & Health Checks
 
 on:
   schedule:
-    # Run health checks every 15 minutes
-    - cron: '*/15 * * * *'
+    # Run health checks every 4 hours
+    - cron: '0 */4 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -624,7 +624,7 @@ jobs:
           ${{ needs.alert-monitoring.result == 'failure' && '📢 **ALERTS**: Alert system issues - verify notification channels' || '' }}
 
           ## Next Monitoring Check
-          - **Scheduled:** Every 15 minutes
+          - **Scheduled:** Every 4 hours
           - **Manual:** Use workflow_dispatch to run specific checks
 
           EOF
