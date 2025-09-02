@@ -48,6 +48,27 @@ import {
 // Define view mode types
 type ViewMode = "grid" | "list" | "table";
 
+// Helper function to normalize confidence scores (handles decimal/percentage format)
+const normalizeConfidence = (score?: number | null): number => {
+  if (score === undefined || score === null) return 50; // Default to 50% instead of 0
+  const numScore = Number(score);
+  if (isNaN(numScore)) return 50; // Default to 50% if invalid
+
+  // Handle different score formats:
+  // - If score is between 0 and 1 (exclusive of 1), treat as decimal (0.85 = 85%)
+  // - If score is exactly 1, treat as 1% (edge case)
+  // - If score is > 1, treat as already a percentage (85 = 85%)
+  let normalizedScore: number;
+  if (numScore < 1) {
+    normalizedScore = numScore * 100; // Convert decimal to percentage
+  } else {
+    normalizedScore = numScore; // Already a percentage (including 1 = 1%)
+  }
+
+  // Ensure the score is capped at 100% maximum
+  return Math.min(Math.round(normalizedScore), 100);
+};
+
 // Add this function before the Dashboard component
 const calculateAggregateConfidence = (receipt: Receipt) => {
   if (!receipt.confidence_scores) return 0;
@@ -67,7 +88,9 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
 
   for (const [field, weight] of Object.entries(weights)) {
     if (receipt.confidence_scores[field] !== undefined) {
-      weightedSum += (receipt.confidence_scores[field] * weight);
+      // Normalize each confidence score before using it in calculation
+      const normalizedScore = normalizeConfidence(receipt.confidence_scores[field]);
+      weightedSum += (normalizedScore * weight);
       totalWeight += weight;
     }
   }
@@ -75,8 +98,9 @@ const calculateAggregateConfidence = (receipt: Receipt) => {
   // If we have no valid scores, return 0
   if (totalWeight === 0) return 0;
 
-  // Return rounded percentage
-  return Math.round((weightedSum / totalWeight) * 100);
+  // Return rounded percentage (already normalized, so no need to multiply by 100)
+  // Also ensure the final result is capped at 100%
+  return Math.min(Math.round(weightedSum / totalWeight), 100);
 };
 
 export default function Dashboard() {

@@ -72,8 +72,20 @@ const normalizeConfidence = (score?: number | null): number => {
   if (score === undefined || score === null) return 50; // Default to 50% instead of 0
   const numScore = Number(score);
   if (isNaN(numScore)) return 50; // Default to 50% if invalid
-  // Assume scores > 1 are already percentages, otherwise convert decimal
-  return numScore > 1 ? Math.round(numScore) : Math.round(numScore * 100);
+
+  // Handle different score formats:
+  // - If score is between 0 and 1 (exclusive of 1), treat as decimal (0.85 = 85%)
+  // - If score is exactly 1, treat as 1% (edge case)
+  // - If score is > 1, treat as already a percentage (85 = 85%)
+  let normalizedScore: number;
+  if (numScore < 1) {
+    normalizedScore = numScore * 100; // Convert decimal to percentage
+  } else {
+    normalizedScore = numScore; // Already a percentage (including 1 = 1%)
+  }
+
+  // Ensure the score is capped at 100% maximum
+  return Math.min(Math.round(normalizedScore), 100);
 };
 
 // Enhanced Confidence indicator component with better visual feedback and tooltips

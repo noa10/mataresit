@@ -42,11 +42,34 @@ export default function ReceiptCard({
 }: ReceiptCardProps) {
   const { t } = useReceiptsTranslation();
   const [isHovered, setIsHovered] = useState(false);
-  
+
+  // Helper function to normalize confidence scores (handles decimal/percentage format)
+  const normalizeConfidence = (score: number): number => {
+    const numScore = Number(score);
+    if (isNaN(numScore)) return 50; // Default to 50% if invalid
+
+    // Handle different score formats:
+    // - If score is between 0 and 1 (exclusive of 1), treat as decimal (0.85 = 85%)
+    // - If score is exactly 1, treat as 1% (edge case)
+    // - If score is > 1, treat as already a percentage (85 = 85%)
+    let normalizedScore: number;
+    if (numScore < 1) {
+      normalizedScore = numScore * 100; // Convert decimal to percentage
+    } else {
+      normalizedScore = numScore; // Already a percentage (including 1 = 1%)
+    }
+
+    // Ensure the score is capped at 100% maximum
+    return Math.min(Math.round(normalizedScore), 100);
+  };
+
+  // Normalize the confidence score to ensure it's within 0-100% range
+  const normalizedConfidence = normalizeConfidence(confidence);
+
   const formatCurrency = (amount: number) => {
     return formatCurrencySafe(amount, currency, 'en-US', 'MYR');
   };
-  
+
   const getStatusColor = () => {
     switch (status) {
       case "reviewed": return "bg-blue-500";
@@ -54,10 +77,10 @@ export default function ReceiptCard({
       default: return "bg-green-500";
     }
   };
-  
+
   const getConfidenceColor = () => {
-    if (confidence >= 80) return "text-green-500";
-    if (confidence >= 60) return "text-yellow-500";
+    if (normalizedConfidence >= 80) return "text-green-500";
+    if (normalizedConfidence >= 60) return "text-yellow-500";
     return "text-red-500";
   };
 
@@ -175,7 +198,7 @@ export default function ReceiptCard({
               <>
                 <span className="text-xs">{t('confidence.label')}</span>
                 <span className={`text-xs font-semibold ${getConfidenceColor()}`}>
-                  {confidence}%
+                  {normalizedConfidence}%
                 </span>
               </>
             )}
