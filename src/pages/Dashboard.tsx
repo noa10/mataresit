@@ -73,6 +73,11 @@ const normalizeConfidence = (score?: number | null): number => {
 const calculateAggregateConfidence = (receipt: Receipt) => {
   if (!receipt.confidence_scores) return 0;
 
+  // Handle legacy format from Flutter app (backward compatibility)
+  if (receipt.confidence_scores.overall !== undefined) {
+    return normalizeConfidence(receipt.confidence_scores.overall);
+  }
+
   // Define weights for each field (total = 1.0)
   const weights = {
     merchant: 0.3,  // 30% weight for merchant name
