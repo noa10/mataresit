@@ -6,6 +6,7 @@ import { Upload, Loader2, XCircle, FileText, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createReceipt,
   uploadReceiptImage,
@@ -49,6 +50,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProgressUpdating, setIsProgressUpdating] = useState(false);
+
+  const queryClient = useQueryClient();
   const [startTime, setStartTime] = useState<number | null>(null);
   const [processingRecommendation, setProcessingRecommendation] = useState<ProcessingRecommendation | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -663,12 +666,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }, 5000);
 
       if (onUploadComplete) {
-        setTimeout(() => {
+        setTimeout(async () => {
+          // Force cache invalidation to ensure new receipt appears in lists
+          await queryClient.invalidateQueries({ queryKey: ['receipts'] });
           onUploadComplete();
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       } else {
-        setTimeout(() => {
+        setTimeout(async () => {
+          // Force cache invalidation to ensure new receipt appears in lists
+          await queryClient.invalidateQueries({ queryKey: ['receipts'] });
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 500);
       }
