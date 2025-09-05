@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
+import { CacheInvalidationService } from "@/services/cacheInvalidationService";
 
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
 import { PROCESSING_STAGES } from "./upload/ProcessingStages";
@@ -667,17 +668,19 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
 
       if (onUploadComplete) {
         setTimeout(async () => {
-          // Force cache invalidation to ensure new receipt appears in lists
-          await queryClient.invalidateQueries({ queryKey: ['receipts'] });
+          // Use comprehensive cache invalidation service
+          console.log('🔄 Using comprehensive cache invalidation after upload completion');
+          await CacheInvalidationService.invalidateReceipts(user.id, currentTeam?.id);
           onUploadComplete();
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
-        }, 500);
+        }, 1000); // Increased delay to ensure database consistency
       } else {
         setTimeout(async () => {
-          // Force cache invalidation to ensure new receipt appears in lists
-          await queryClient.invalidateQueries({ queryKey: ['receipts'] });
+          // Use comprehensive cache invalidation service
+          console.log('🔄 Using comprehensive cache invalidation after upload completion');
+          await CacheInvalidationService.invalidateReceipts(user.id, currentTeam?.id);
           if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
-        }, 500);
+        }, 1000); // Increased delay to ensure database consistency
       }
     } catch (error: unknown) {
       console.error("Upload error:", error);

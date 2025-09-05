@@ -372,6 +372,7 @@ function BatchUploadZone({
       // Call the onUploadComplete callback if provided
       // This will refresh the data but won't close the modal
       if (onUploadComplete) {
+        console.log('🔄 Batch upload complete, triggering refresh callback');
         onUploadComplete();
       }
 

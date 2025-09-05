@@ -93,7 +93,7 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
     });
 
     return unsubscribe;
-  }, [queryClient, date, receiptIds]);
+  }, [date, receiptIds]); // Removed queryClient to prevent potential infinite loops
 
   // Set up real-time subscription for receipt processing status updates
   useEffect(() => {
