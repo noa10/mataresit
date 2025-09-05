@@ -190,7 +190,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log("🔄 Team context changed, clearing receipt caches for fresh data");
     clearReceiptCaches(queryClient);
-  }, [state.currentTeam?.id, queryClient]);
+  }, [state.currentTeam?.id]); // Removed queryClient to prevent infinite loop
 
   // =============================================
   // TEAM MANAGEMENT

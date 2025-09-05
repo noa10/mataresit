@@ -289,7 +289,7 @@ export const useSubscription = () => {
     // Also invalidate related queries
     queryClient.invalidateQueries({ queryKey: ['receipts'] });
     queryClient.invalidateQueries({ queryKey: ['analytics'] });
-  }, [invalidateUsageCache, queryClient]);
+  }, [invalidateUsageCache]); // Removed queryClient to prevent potential infinite loops
 
   return {
     // Legacy API for backward compatibility
