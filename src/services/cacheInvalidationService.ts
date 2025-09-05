@@ -42,12 +42,30 @@ export class CacheInvalidationService {
   /**
    * Invalidate receipts cache when receipts are uploaded/modified/deleted
    */
-  static async invalidateReceipts(userId?: string) {
+  static async invalidateReceipts(userId?: string, teamId?: string) {
     const queryClient = this.getQueryClient();
 
-    console.log('🗑️ Invalidating receipts cache');
+    console.log('🗑️ Invalidating receipts cache comprehensively');
 
+    // Invalidate all receipt-related queries
     await queryClient.invalidateQueries({
+      queryKey: ['receipts']
+    });
+
+    // Invalidate team-specific receipt queries
+    if (teamId) {
+      await queryClient.invalidateQueries({
+        queryKey: ['receipts', teamId]
+      });
+    }
+
+    // Invalidate daily receipt queries
+    await queryClient.invalidateQueries({
+      queryKey: ['receiptsForDay']
+    });
+
+    // Force refetch instead of just invalidating
+    await queryClient.refetchQueries({
       queryKey: ['receipts']
     });
 
@@ -55,6 +73,8 @@ export class CacheInvalidationService {
     if (userId) {
       await this.invalidateUsageStats(userId);
     }
+
+    console.log('✅ Comprehensive receipts cache invalidation completed');
   }
 
   /**
