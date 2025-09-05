@@ -17,9 +17,10 @@ import { useTeam } from "@/contexts/TeamContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { ExportDropdown } from "@/components/export/ExportDropdown";
 import { ExportFilters } from "@/lib/export";
-import { useDashboardTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
+import { useDashboardTranslation, useCommonTranslation, useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { fetchReceipts } from "@/services/receiptService";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,7 @@ import { DateRange } from "react-day-picker";
 import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
 import { fetchUserCategories, fetchCategoriesForDisplay, bulkAssignCategory } from "@/services/categoryService";
 import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
+import { formatCurrencySafe } from "@/utils/currency";
 
 import {
   Table,
@@ -114,6 +116,7 @@ export default function Dashboard() {
   const { subscriptionData } = useStripe();
   const { t: tDash } = useDashboardTranslation();
   const { t: tCommon } = useCommonTranslation();
+  const { t: tReceipts } = useReceiptsTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -266,6 +269,13 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Debug function to manually refresh receipts
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered from Dashboard');
+    await refetch();
+    console.log('✅ Manual refresh completed');
+  };
+
   // TEAM COLLABORATION FIX: Include team context in categories query
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', currentTeam?.id],
@@ -329,7 +339,7 @@ export default function Dashboard() {
         setSelectedReceiptIds(validSelectedIds);
       }
     }
-  }, [processedReceipts, selectedReceiptIds]);
+  }, [processedReceipts]); // Removed selectedReceiptIds to prevent infinite loop
 
   const currencies = [...new Set(receipts.map(r => r.currency))];
 
@@ -596,9 +606,42 @@ export default function Dashboard() {
 
                     <div className="flex-grow min-w-0">
                       <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
-                        <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                        <div className="flex flex-col">
+                          <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                          {/* Confidence score below merchant name */}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs text-muted-foreground">Confidence:</span>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip onOpenChange={(open) => console.debug('[ListView SelectionMode ConfidenceTooltip] open change:', open)}>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`text-xs cursor-help font-medium ${
+                                      confidenceScore >= 80 ? 'text-green-600' :
+                                      confidenceScore >= 60 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}
+                                    onMouseEnter={() => console.debug('[ListView SelectionMode ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
+                                  >
+                                    {confidenceScore}%
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent forceMount side="top" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {tReceipts('confidence.tooltip.description')}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {tReceipts('confidence.tooltip.range')}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
                         <span className="font-semibold text-xs md:text-base whitespace-nowrap">
-                          {receipt.currency} {receipt.total.toFixed(2)}
+                          {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
                         </span>
                       </div>
 
@@ -617,13 +660,6 @@ export default function Dashboard() {
                             'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           }`}>
                             {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                          </span>
-                          <span className={`text-xs ${
-                            confidenceScore >= 80 ? 'text-green-600' :
-                            confidenceScore >= 60 ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
-                            {confidenceScore}% confidence
                           </span>
                         </div>
                       </div>
@@ -647,9 +683,42 @@ export default function Dashboard() {
 
                     <div className="flex-grow min-w-0">
                       <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
-                        <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                        <div className="flex flex-col">
+                          <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                          {/* Confidence score below merchant name */}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-xs text-muted-foreground">Confidence:</span>
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip onOpenChange={(open) => console.debug('[ListView ConfidenceTooltip] open change:', open)}>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`text-xs cursor-help font-medium ${
+                                      confidenceScore >= 80 ? 'text-green-600' :
+                                      confidenceScore >= 60 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}
+                                    onMouseEnter={() => console.debug('[ListView ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
+                                  >
+                                    {confidenceScore}%
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent forceMount side="top" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {tReceipts('confidence.tooltip.description')}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {tReceipts('confidence.tooltip.range')}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
                         <span className="font-semibold text-xs md:text-base whitespace-nowrap">
-                          {receipt.currency} {receipt.total.toFixed(2)}
+                          {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
                         </span>
                       </div>
 
@@ -668,13 +737,6 @@ export default function Dashboard() {
                             'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           }`}>
                             {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                          </span>
-                          <span className={`text-xs ${
-                            confidenceScore >= 80 ? 'text-green-600' :
-                            confidenceScore >= 60 ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
-                            {confidenceScore}% confidence
                           </span>
                         </div>
                       </div>
@@ -710,7 +772,6 @@ export default function Dashboard() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Confidence</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -742,9 +803,44 @@ export default function Dashboard() {
                         />
                       </TableCell>
                     )}
-                    <TableCell className="font-medium">{receipt.merchant}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{receipt.merchant}</span>
+                        {/* Confidence score below merchant name */}
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-muted-foreground">Confidence:</span>
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip onOpenChange={(open) => console.debug('[TableView ConfidenceTooltip] open change:', open)}>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className={`text-xs font-medium cursor-help ${
+                                    confidenceScore >= 80 ? 'text-green-600' :
+                                    confidenceScore >= 60 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}
+                                  onMouseEnter={() => console.debug('[TableView ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
+                                >
+                                  {confidenceScore}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent forceMount side="top" className="max-w-xs">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {tReceipts('confidence.tooltip.description')}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {tReceipts('confidence.tooltip.range')}
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>{formatDate(receipt.date)}</TableCell>
-                    <TableCell>{receipt.currency} {receipt.total.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}</TableCell>
                     <TableCell>
                       {(() => {
                         const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
@@ -758,15 +854,6 @@ export default function Dashboard() {
                         'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       }`}>
                         {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-sm font-medium ${
-                        confidenceScore >= 80 ? 'text-green-600' :
-                        confidenceScore >= 60 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {confidenceScore}%
                       </span>
                     </TableCell>
                   </TableRow>

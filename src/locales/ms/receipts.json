@@ -40,7 +40,12 @@
     "medium": "Keyakinan Sederhana",
     "low": "Keyakinan Rendah",
     "score": "{{score}}% keyakinan",
-    "label": "Keyakinan:"
+    "label": "Keyakinan:",
+    "tooltip": {
+      "title": "Skor Keyakinan AI",
+      "description": "Mengukur kepastian model AI dalam ketepatan pengekstrakan data berdasarkan kejelasan teks dan kelengkapan medan.",
+      "range": "Skala: 0-100% (Skor tinggi menunjukkan data lebih dipercayai)"
+    }
   },
   "actions": {
     "view": "Lihat Resit",

@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   ExternalLink,
   Calendar,
@@ -21,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrencySafe } from '@/utils/currency';
 import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
+import { useReceiptsTranslation } from '@/contexts/LanguageContext';
 
 // Line Item Card Data Interface
 export interface LineItemCardData {
@@ -49,6 +51,7 @@ export function LineItemCardComponent({
   className = ''
 }: LineItemCardComponentProps) {
   const navigate = useNavigate();
+  const { t } = useReceiptsTranslation();
   const [isHovered, setIsHovered] = useState(false);
 
   // Format amount with currency
@@ -175,10 +178,27 @@ export function LineItemCardComponent({
               </div>
             </div>
             {data.confidence && (
-              <Badge variant="outline" className={`${getConfidenceColor(data.confidence)} border-current`}>
-                <Star className="h-3 w-3 mr-1" />
-                {Math.round(data.confidence * 100)}%
-              </Badge>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className={`${getConfidenceColor(data.confidence)} border-current cursor-help`}>
+                      <Star className="h-3 w-3 mr-1" />
+                      {Math.round(data.confidence * 100)}%
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="space-y-1">
+                      <p className="font-medium text-sm">{t('confidence.tooltip.title')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('confidence.tooltip.description')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('confidence.tooltip.range')}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </CardHeader>

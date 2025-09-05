@@ -40,7 +40,12 @@
     "medium": "Medium Confidence",
     "low": "Low Confidence",
     "score": "{{score}}% confidence",
-    "label": "Confidence:"
+    "label": "Confidence:",
+    "tooltip": {
+      "title": "AI Confidence Score",
+      "description": "Measures the AI model's certainty in data extraction accuracy based on text clarity and field completeness.",
+      "range": "Scale: 0-100% (Higher scores indicate more reliable data)"
+    }
   },
   "actions": {
     "view": "View Receipt",

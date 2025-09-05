@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   ExternalLink,
   Calendar,
@@ -22,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrencySafe } from '@/utils/currency';
 import { handleReceiptClick, openReceiptInNewWindow } from '@/utils/navigationUtils';
+import { useReceiptsTranslation } from '@/contexts/LanguageContext';
 
 interface ReceiptCardComponentProps extends Omit<UIComponentProps, 'component'> {
   data: ReceiptCardData;
@@ -37,6 +39,7 @@ export function ReceiptCardComponent({
   compact = false
 }: ReceiptCardComponentProps) {
   const navigate = useNavigate();
+  const { t } = useReceiptsTranslation();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 
@@ -162,9 +165,26 @@ export function ReceiptCardComponent({
                   <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <h4 className="font-medium text-sm truncate">{data.merchant}</h4>
                   {data.confidence && (
-                    <Badge variant={getConfidenceColor(data.confidence)} className="text-xs">
-                      {Math.round(data.confidence * 100)}%
-                    </Badge>
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant={getConfidenceColor(data.confidence)} className="text-xs cursor-help">
+                            {Math.round(data.confidence * 100)}%
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm">{t('confidence.tooltip.title')}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('confidence.tooltip.description')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('confidence.tooltip.range')}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -250,10 +270,27 @@ export function ReceiptCardComponent({
               </div>
             </div>
             {data.confidence && (
-              <Badge variant={getConfidenceColor(data.confidence)} className="text-xs shadow-sm">
-                <Star className="h-3 w-3 mr-1" />
-                {getConfidenceText(data.confidence)}
-              </Badge>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant={getConfidenceColor(data.confidence)} className="text-xs shadow-sm cursor-help">
+                      <Star className="h-3 w-3 mr-1" />
+                      {getConfidenceText(data.confidence)}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="space-y-1">
+                      <p className="font-medium text-sm">{t('confidence.tooltip.title')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('confidence.tooltip.description')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('confidence.tooltip.range')}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </CardHeader>
