@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ReceiptStatus, ProcessingStatus, CustomCategory, Receipt } from "@/types/receipt";
@@ -84,14 +85,38 @@ export default function ReceiptCard({
     return "text-red-500";
   };
 
+  // Normalize processing status for cross-platform compatibility
+  const normalizeProcessingStatus = (status: string | null | undefined): ProcessingStatus => {
+    if (!status) return 'complete';
+
+    // Handle Flutter app status values
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'complete';
+      case 'pending':
+        return 'uploading';
+      case 'manual_review':
+        return 'complete';
+      default:
+        // If it's already a valid React status, return as-is
+        if (['uploading', 'uploaded', 'processing', 'failed', 'complete'].includes(status.toLowerCase())) {
+          return status.toLowerCase() as ProcessingStatus;
+        }
+        // Default to complete for unknown statuses to prevent infinite loading
+        return 'complete';
+    }
+  };
+
+  const normalizedStatus = normalizeProcessingStatus(processingStatus);
+
   const getProcessingInfo = () => {
-    if (!processingStatus || processingStatus === 'complete') return null;
+    if (!normalizedStatus || normalizedStatus === 'complete') return null;
 
     let statusText = t('processingStatus.processing');
     let icon = <Loader2 size={12} className="animate-spin mr-1" />;
     let colorClass = 'border-blue-500 text-blue-500';
 
-    switch (processingStatus) {
+    switch (normalizedStatus) {
       case 'uploading':
         statusText = t('processingStatus.uploading');
         colorClass = 'border-blue-500 text-blue-500';
@@ -146,11 +171,11 @@ export default function ReceiptCard({
         </div>
         
         {/* Processing indicator overlay */}
-        {processingStatus && processingStatus !== 'complete' && (
+        {normalizedStatus && normalizedStatus !== 'complete' && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10">
             <div className="text-white flex flex-col items-center">
-              {processingStatus === 'uploading' || processingStatus === 'uploaded' ||
-               processingStatus === 'processing' ? (
+              {normalizedStatus === 'uploading' || normalizedStatus === 'uploaded' ||
+               normalizedStatus === 'processing' ? (
                 <Loader2 size={32} className="animate-spin mb-3" />
               ) : (
                 <AlertTriangle size={32} className="mb-3 text-red-500" />
@@ -186,7 +211,7 @@ export default function ReceiptCard({
             <span className="text-sm font-medium truncate">{merchant}</span>
           </div>
           <div className="flex items-center gap-1">
-            {getProcessingInfo() ? (
+            {getProcessingInfo() && (
               <Badge
                 variant="outline"
                 className={`text-xs font-medium flex items-center ${getProcessingInfo()?.colorClass}`}
@@ -194,16 +219,39 @@ export default function ReceiptCard({
                 {getProcessingInfo()?.icon}
                 {getProcessingInfo()?.statusText}
               </Badge>
-            ) : (
-              <>
-                <span className="text-xs">{t('confidence.label')}</span>
-                <span className={`text-xs font-semibold ${getConfidenceColor()}`}>
-                  {normalizedConfidence}%
-                </span>
-              </>
             )}
           </div>
         </div>
+
+        {/* Confidence score below merchant name */}
+        {!getProcessingInfo() && (
+          <div className="mt-1 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">{t('confidence.label')}</span>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip onOpenChange={(open) => console.debug('[ReceiptCard ConfidenceTooltip] open change:', open, 'for receipt', id)}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={`text-xs font-semibold cursor-help ${getConfidenceColor()}`}
+                    onMouseEnter={() => console.debug('[ReceiptCard ConfidenceTooltip] mouse enter on trigger for receipt', id)}
+                  >
+                    {normalizedConfidence}%
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent forceMount side="top" className="max-w-xs">
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">{t('confidence.tooltip.title')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('confidence.tooltip.description')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('confidence.tooltip.range')}
+                    </p>
+                  </div>
+                </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+          </div>
+        )}
 
         {/* Category display */}
         <div className="mt-2 flex items-center gap-2">

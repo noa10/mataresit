@@ -184,8 +184,31 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
-    setProcessingStatus(receipt.processing_status || null);
+    const normalizedStatus = normalizeProcessingStatus(receipt.processing_status);
+    setProcessingStatus(normalizedStatus);
   }, [receipt.processing_status]);
+
+  // Normalize processing status for cross-platform compatibility
+  const normalizeProcessingStatus = (status: string | null | undefined): ProcessingStatus => {
+    if (!status) return 'complete';
+
+    // Handle Flutter app status values
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'complete';
+      case 'pending':
+        return 'uploading';
+      case 'manual_review':
+        return 'complete';
+      default:
+        // If it's already a valid React status, return as-is
+        if (['uploading', 'uploaded', 'processing', 'failed', 'complete'].includes(status.toLowerCase())) {
+          return status.toLowerCase() as ProcessingStatus;
+        }
+        // Default to complete for unknown statuses to prevent infinite loading
+        return 'complete';
+    }
+  };
 
   // Sync edited receipt with receipt prop changes (for fresh data after reprocessing)
   useEffect(() => {
@@ -293,7 +316,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     } else {
       setEditedConfidence(defaultConfidence);
     }
-    setProcessingStatus(receipt.processing_status || null);
+    const normalizedStatus = normalizeProcessingStatus(receipt.processing_status);
+    setProcessingStatus(normalizedStatus);
   }, [receipt, isSaving]);
 
   // Effect to update editedReceipt when debounced input values change
@@ -356,14 +380,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     if (import.meta.env.DEV) {
       console.log('📝 Receipt status update in viewer:', payload.new);
     }
-    const newStatus = payload.new.processing_status as ProcessingStatus;
+    const rawStatus = payload.new.processing_status;
+    const normalizedStatus = normalizeProcessingStatus(rawStatus);
     const newError = payload.new.processing_error;
 
-    setProcessingStatus(newStatus);
+    setProcessingStatus(normalizedStatus);
 
     if (newError) {
       toast.error(`Processing error: ${newError}`);
-    } else if (newStatus === 'complete') {
+    } else if (normalizedStatus === 'complete') {
       toast.success('Receipt processed successfully');
       // Refresh data - this will also re-run the first useEffect to update confidence
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
@@ -1344,13 +1369,19 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                               alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
                               className="receipt-image w-full h-full object-contain transition-transform"
                               style={{ transform: `rotate(${rotation}deg)` }}
-                              onError={() => setImageError(true)}
+                              onError={(e) => {
+                                console.error('Image failed to load:', receipt.image_url);
+                                console.error('Image error event:', e);
+                                setImageError(true);
+                              }}
                               onLoad={(e) => {
                                 const img = e.currentTarget;
+                                console.log('Image loaded successfully:', receipt.image_url);
                                 setImageDimensions({
                                   width: img.naturalWidth,
                                   height: img.naturalHeight
                                 });
+                                setImageError(false); // Reset error state on successful load
                               }}
                               showSkeleton={true}
                               showErrorState={false} // We handle error state separately
@@ -1436,7 +1467,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               <ScrollArea className="h-[200px] rounded-md border flex-shrink-0">
                 {processLogs.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
-                    No processing logs available
+                    {receipt.processing_status === 'complete' || receipt.processing_status === 'completed' ?
+                      'Receipt processed successfully (logs may not be available for mobile uploads)' :
+                      'No processing logs available'
+                    }
                   </div>
                 ) : (
                   <div className="p-4 space-y-2">
