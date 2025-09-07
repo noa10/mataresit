@@ -75,20 +75,23 @@ export function ReceiptProcessingOptions({
     return <Badge variant="outline" className="text-xs bg-red-100 text-red-700">$$$</Badge>;
   };
 
-  // Update parent when model changes
+  // Initialize parent with default model on mount only
   useEffect(() => {
     onModelChange(selectedModel);
-  }, [selectedModel, onModelChange]);
+  }, []); // Only run on mount
 
-  // Update parent when batch model changes
+  // Initialize parent with default batch model on mount only
   useEffect(() => {
     if (onBatchModelChange) {
       onBatchModelChange(selectedBatchModel);
     }
-  }, [selectedBatchModel, onBatchModelChange]);
+  }, []); // Only run on mount
 
   const handleBatchModelChange = (modelId: string) => {
     setSelectedBatchModel(modelId);
+    if (onBatchModelChange) {
+      onBatchModelChange(modelId);
+    }
   };
 
   return (
