@@ -1172,7 +1172,9 @@ export const processReceiptWithAI = async (
     const requestPayload = {
       receiptId,
       imageUrl,
-      modelId: processingOptions.modelId
+      modelId: processingOptions.modelId,
+      skipOptimization: true, // React has already optimized the image
+      clientOptimized: true, // Indicate client-side optimization was performed
     };
     const requestHeaders = {
       'Content-Type': 'application/json',

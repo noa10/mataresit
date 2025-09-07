@@ -957,7 +957,9 @@ async function validateAndExtractParams(req: Request) {
   const {
     imageUrl,
     receiptId,
-    modelId = '' // Use default model
+    modelId = '', // Use default model
+    skipOptimization = false, // Allow client to skip server-side optimization
+    clientOptimized = false // Track if client performed optimization
   } = requestData;
 
   if (!imageUrl) {
@@ -968,13 +970,17 @@ async function validateAndExtractParams(req: Request) {
     throw new Error('Missing required parameter: receiptId');
   }
 
-  return { imageUrl, receiptId, modelId };
+  return { imageUrl, receiptId, modelId, skipOptimization, clientOptimized };
 }
 
 /**
- * Fetches and optimizes image for processing
+ * Fetches and optionally optimizes image for processing
  */
-async function fetchAndOptimizeImage(imageUrl: string, logger: ProcessingLogger): Promise<Uint8Array> {
+async function fetchAndOptimizeImage(
+  imageUrl: string,
+  logger: ProcessingLogger,
+  skipOptimization: boolean = false
+): Promise<Uint8Array> {
   await logger.log("Fetching receipt image", "FETCH");
   console.log("Fetching image from URL:", imageUrl);
 
@@ -991,6 +997,13 @@ async function fetchAndOptimizeImage(imageUrl: string, logger: ProcessingLogger)
   const imageArrayBuffer = await imageResponse.arrayBuffer();
   const imageBytes = new Uint8Array(imageArrayBuffer);
   await logger.log(`Image fetched successfully, size: ${imageBytes.length} bytes`, "FETCH");
+
+  // Skip optimization if client has already optimized the image
+  if (skipOptimization) {
+    await logger.log("Skipping server-side optimization - client has already optimized the image", "OPTIMIZE");
+    console.log("🔍 OPTIMIZATION SKIPPED: Client-optimized image, using as-is");
+    return imageBytes;
+  }
 
   // Optimize image for AI processing
   await logger.log("Starting image optimization for AI processing", "OPTIMIZE");
@@ -1575,7 +1588,7 @@ serve(async (req: Request) => {
     }
 
     // 1. Validate and extract parameters
-    const { imageUrl, receiptId, modelId } =
+    const { imageUrl, receiptId, modelId, skipOptimization, clientOptimized } =
       await validateAndExtractParams(req);
 
     // 2. Initialize logger and Supabase client
@@ -1591,7 +1604,13 @@ serve(async (req: Request) => {
     await logger.log("Skipping processing started notification - filtered out for noise reduction", "NOTIFICATION");
 
     // 3. Fetch and optimize image
-    const optimizedImageBytes = await fetchAndOptimizeImage(imageUrl, logger);
+    const optimizedImageBytes = await fetchAndOptimizeImage(imageUrl, logger, skipOptimization);
+
+    // Log optimization details for debugging
+    if (clientOptimized) {
+      await logger.log("Client performed image optimization before upload", "DEBUG");
+      console.log("🔍 CLIENT OPTIMIZATION: Image was optimized by Flutter client");
+    }
 
     // 4. Generate thumbnail (fire-and-forget, don't block main processing)
     let thumbnailUrl: string | null = null;
