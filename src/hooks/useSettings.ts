@@ -19,8 +19,8 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  selectedModel: 'gemini-2.0-flash-lite',
-  batchModel: 'gemini-2.0-flash-lite', // Default to same model for batch
+  selectedModel: 'gemini-2.5-flash-lite',
+  batchModel: 'gemini-2.5-flash-lite', // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,
@@ -42,7 +42,7 @@ export function useSettings() {
         const parsed = JSON.parse(storedSettings);
 
         // Basic validation to ensure stored data has required fields
-        if (parsed.processingMethod && parsed.selectedModel && typeof parsed.compareWithAlternative === 'boolean') {
+        if (parsed.selectedModel && typeof parsed.selectedModel === 'string') {
           // Merge with default settings to ensure all properties exist
           // This handles cases where new properties were added to the settings structure
           return {
