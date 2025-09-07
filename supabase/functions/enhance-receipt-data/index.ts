@@ -1226,9 +1226,27 @@ CRITICAL INSTRUCTION: Return ONLY the JSON object above with actual extracted te
     let parseMethod = '';
 
     // Strategy 1: Check for bounding box format (Gemini 2.5 Flash Lite Preview format)
+    // DEBUGGING: Log the actual response structure for gemini-2.5-flash-lite
+    await logger.log(`🔍 DEBUG: Model ID: ${modelConfig.id}`, "AI");
+    await logger.log(`🔍 DEBUG: Response text preview (first 500 chars): ${responseText.substring(0, 500)}`, "AI");
+
     try {
       const boundingBoxData = JSON.parse(responseText.trim());
-      if (Array.isArray(boundingBoxData) && boundingBoxData.length > 0 && boundingBoxData[0].box_2d && boundingBoxData[0].label) {
+      await logger.log(`🔍 DEBUG: Parsed response type: ${Array.isArray(boundingBoxData) ? 'Array' : typeof boundingBoxData}`, "AI");
+
+      if (Array.isArray(boundingBoxData)) {
+        await logger.log(`🔍 DEBUG: Array length: ${boundingBoxData.length}`, "AI");
+        if (boundingBoxData.length > 0) {
+          await logger.log(`🔍 DEBUG: First element keys: ${Object.keys(boundingBoxData[0])}`, "AI");
+        }
+      } else {
+        await logger.log(`🔍 DEBUG: Object keys: ${Object.keys(boundingBoxData)}`, "AI");
+      }
+
+      // Only trigger bounding box fallback for the specific preview model
+      if (modelConfig.id === 'gemini-2.5-flash-lite-preview-06-17' &&
+          Array.isArray(boundingBoxData) && boundingBoxData.length > 0 &&
+          boundingBoxData[0].box_2d && boundingBoxData[0].label) {
         await logger.log("🎯 CRITICAL: Detected bounding box format from Gemini 2.5 Flash Lite Preview", "ERROR");
         await logger.log("🔄 FALLBACK REQUIRED: This format lacks text content needed for data extraction", "ERROR");
 
@@ -1242,8 +1260,14 @@ CRITICAL INSTRUCTION: Return ONLY the JSON object above with actual extracted te
           enhancedData = await parseBoundingBoxFormat(boundingBoxData, logger);
           parseMethod = 'bounding-box-fallback';
         }
+      } else if (modelConfig.id === 'gemini-2.5-flash-lite') {
+        // For regular gemini-2.5-flash-lite, treat as normal JSON response
+        await logger.log("✅ DEBUG: gemini-2.5-flash-lite detected - treating as normal JSON response", "AI");
+        enhancedData = boundingBoxData;
+        parseMethod = 'direct-parse-2.5-lite';
       }
     } catch (e) {
+      await logger.log(`🔍 DEBUG: JSON parse failed: ${e}`, "AI");
       // Not bounding box format, continue to other strategies
     }
 
