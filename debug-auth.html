@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Google OAuth</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-info { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; border-left: 4px solid #f44336; }
+        .success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Google OAuth Debug Tool</h1>
+    
+    <div class="debug-info">
+        <h3>Current Environment</h3>
+        <p><strong>URL:</strong> <span id="currentUrl"></span></p>
+        <p><strong>Origin:</strong> <span id="currentOrigin"></span></p>
+        <p><strong>Expected Redirect URL:</strong> <span id="expectedRedirect"></span></p>
+    </div>
+
+    <div class="debug-info">
+        <h3>URL Hash Analysis</h3>
+        <p><strong>Current Hash:</strong> <span id="currentHash"></span></p>
+        <p><strong>Contains access_token:</strong> <span id="hasAccessToken"></span></p>
+        <p><strong>Contains error:</strong> <span id="hasError"></span></p>
+    </div>
+
+    <div class="debug-info">
+        <h3>Supabase Configuration</h3>
+        <p><strong>Supabase URL:</strong> <span id="supabaseUrl"></span></p>
+        <p><strong>Environment:</strong> <span id="environment"></span></p>
+    </div>
+
+    <button onclick="testRedirectUrl()">Test Redirect URL Generation</button>
+    <button onclick="checkSupabaseConfig()">Check Supabase Config</button>
+    <button onclick="simulateOAuthReturn()">Simulate OAuth Return</button>
+
+    <div id="results"></div>
+
+    <script>
+        // Display current environment info
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('currentOrigin').textContent = window.location.origin;
+        document.getElementById('currentHash').textContent = window.location.hash || 'None';
+        document.getElementById('hasAccessToken').textContent = window.location.hash.includes('access_token') ? 'Yes' : 'No';
+        document.getElementById('hasError').textContent = window.location.hash.includes('error') ? 'Yes' : 'No';
+
+        // Simulate the redirect URL generation logic from AuthContext
+        function getRedirectUrl(path = '/auth') {
+            const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+            const isProduction = window.location.hostname.includes('mataresit.co') || window.location.hostname.includes('vercel.app');
+            
+            if (isProduction) {
+                const productionUrl = 'https://mataresit.co';
+                return `${productionUrl}${normalizedPath}`;
+            }
+            
+            const baseUrl = window.location.origin;
+            return `${baseUrl}${normalizedPath}`;
+        }
+
+        document.getElementById('expectedRedirect').textContent = getRedirectUrl();
+        document.getElementById('environment').textContent = window.location.hostname.includes('localhost') ? 'Development' : 'Production';
+
+        function testRedirectUrl() {
+            const redirectUrl = getRedirectUrl();
+            const allowedUrls = [
+                'http://localhost:8080/auth',
+                'http://localhost:5173/auth', 
+                'http://localhost:3000/auth',
+                'https://mataresit.co/auth',
+                'https://paperless-maverick.vercel.app/auth'
+            ];
+            
+            const isAllowed = allowedUrls.includes(redirectUrl);
+            const resultDiv = document.getElementById('results');
+            
+            resultDiv.innerHTML = `
+                <div class="debug-info ${isAllowed ? 'success' : 'error'}">
+                    <h3>Redirect URL Test</h3>
+                    <p><strong>Generated URL:</strong> ${redirectUrl}</p>
+                    <p><strong>Is Allowed:</strong> ${isAllowed ? 'YES ✓' : 'NO ✗'}</p>
+                    ${!isAllowed ? '<p><strong>Issue:</strong> This URL is not in the Supabase allowed redirect URLs list.</p>' : ''}
+                </div>
+            `;
+        }
+
+        function checkSupabaseConfig() {
+            // This would normally check environment variables, but we'll simulate
+            const supabaseUrl = 'https://mpmkbtsufihzdelrlszs.supabase.co'; // From the codebase
+            document.getElementById('supabaseUrl').textContent = supabaseUrl;
+            
+            const resultDiv = document.getElementById('results');
+            resultDiv.innerHTML = `
+                <div class="debug-info">
+                    <h3>Supabase Configuration</h3>
+                    <p><strong>Using Production Supabase:</strong> Yes</p>
+                    <p><strong>Project ID:</strong> mpmkbtsufihzdelrlszs</p>
+                    <p><strong>Note:</strong> Make sure Google OAuth is properly configured in the Supabase dashboard.</p>
+                </div>
+            `;
+        }
+
+        function simulateOAuthReturn() {
+            const resultDiv = document.getElementById('results');
+            resultDiv.innerHTML = `
+                <div class="debug-info">
+                    <h3>OAuth Return Simulation</h3>
+                    <p>To test OAuth return, add this to your URL hash:</p>
+                    <code>#access_token=test_token&refresh_token=test_refresh&type=recovery</code>
+                    <p>Then reload the page to see how the app handles the tokens.</p>
+                </div>
+            `;
+        }
+
+        // Auto-run tests on load
+        testRedirectUrl();
+        checkSupabaseConfig();
+    </script>
+</body>
+</html>

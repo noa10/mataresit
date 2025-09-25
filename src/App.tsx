@@ -36,6 +36,9 @@ import AuthCallback from "./pages/AuthCallback";
 import AdminRoute from "./components/admin/AdminRoute";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
+// Debug pages
+const AuthDebugPage = lazy(() => import("./pages/AuthDebugPage"));
+
 // Lazy load heavy components for better performance
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -197,6 +200,11 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/reset-password" element={<AuthCallback />} />
+            <Route path="/auth/debug" element={
+              <Suspense fallback={<PageLoading />}>
+                <AuthDebugPage />
+              </Suspense>
+            } />
 
             {/* Team Invitation Route (no layout) */}
             <Route path="/invite/:token" element={
