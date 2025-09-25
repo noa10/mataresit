@@ -125,12 +125,30 @@ jobs:
             PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
           fi
 
-          # Validate credentials
+          # Validate credentials with detailed debugging
+          echo "🔍 Debugging Supabase credentials for $ENVIRONMENT environment:"
+          echo "SUPABASE_URL: ${SUPABASE_URL:+SET (length: ${#SUPABASE_URL})}"
+          echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET (length: ${#SUPABASE_SERVICE_KEY})}"
+          echo "PROJECT_ID: ${PROJECT_ID:+SET (length: ${#PROJECT_ID})}"
+
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ] || [ -z "$PROJECT_ID" ]; then
             echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
-            echo "SUPABASE_URL: ${SUPABASE_URL:+SET}"
-            echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET}"
-            echo "PROJECT_ID: ${PROJECT_ID:+SET}"
+            echo ""
+            echo "🔧 TROUBLESHOOTING GUIDE:"
+            echo "1. Verify these secrets are configured in GitHub repository settings:"
+            if [ -z "$SUPABASE_URL" ]; then
+              echo "   ❌ Missing: SUPABASE_URL (for production) or STAGING_SUPABASE_URL (for staging)"
+            fi
+            if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+              echo "   ❌ Missing: SUPABASE_SERVICE_ROLE_KEY (for production) or STAGING_SUPABASE_SERVICE_ROLE_KEY (for staging)"
+            fi
+            if [ -z "$PROJECT_ID" ]; then
+              echo "   ❌ Missing: SUPABASE_PROJECT_ID (for production) or STAGING_SUPABASE_PROJECT_ID (for staging)"
+            fi
+            echo ""
+            echo "2. Ensure secrets are configured for the 'Production' environment"
+            echo "3. Check that secret values are not empty"
+            echo "4. Verify the workflow is running with the correct environment context"
             exit 1
           fi
 
@@ -201,9 +219,24 @@ jobs:
             SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
           fi
 
-          # Validate credentials
+          # Validate credentials with detailed debugging
+          echo "🔍 Debugging Edge Functions credentials for $ENVIRONMENT environment:"
+          echo "PROJECT_ID: ${PROJECT_ID:+SET (length: ${#PROJECT_ID})}"
+          echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET (length: ${#SUPABASE_SERVICE_KEY})}"
+
           if [ -z "$PROJECT_ID" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
             echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
+            echo ""
+            echo "🔧 TROUBLESHOOTING GUIDE:"
+            echo "1. Verify these secrets are configured in GitHub repository settings:"
+            if [ -z "$PROJECT_ID" ]; then
+              echo "   ❌ Missing: SUPABASE_PROJECT_ID (for production) or STAGING_SUPABASE_PROJECT_ID (for staging)"
+            fi
+            if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+              echo "   ❌ Missing: SUPABASE_SERVICE_ROLE_KEY (for production) or STAGING_SUPABASE_SERVICE_ROLE_KEY (for staging)"
+            fi
+            echo "2. Ensure secrets are configured for the 'Production' environment"
+            echo "3. Check that secret values are not empty"
             exit 1
           fi
 
@@ -276,9 +309,24 @@ jobs:
             SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
           fi
 
-          # Validate credentials
+          # Validate credentials with detailed debugging
+          echo "🔍 Debugging validation credentials for $ENVIRONMENT environment:"
+          echo "SUPABASE_URL: ${SUPABASE_URL:+SET (length: ${#SUPABASE_URL})}"
+          echo "SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:+SET (length: ${#SUPABASE_ANON_KEY})}"
+
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
+            echo ""
+            echo "🔧 TROUBLESHOOTING GUIDE:"
+            echo "1. Verify these secrets are configured in GitHub repository settings:"
+            if [ -z "$SUPABASE_URL" ]; then
+              echo "   ❌ Missing: SUPABASE_URL (for production) or STAGING_SUPABASE_URL (for staging)"
+            fi
+            if [ -z "$SUPABASE_ANON_KEY" ]; then
+              echo "   ❌ Missing: SUPABASE_ANON_KEY (for production) or STAGING_SUPABASE_ANON_KEY (for staging)"
+            fi
+            echo "2. Ensure secrets are configured for the 'Production' environment"
+            echo "3. Check that secret values are not empty"
             exit 1
           fi
 
