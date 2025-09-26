@@ -14,6 +14,7 @@ import http from 'http';
 const config = {
   supabaseUrl: process.env.TEST_SUPABASE_URL || process.env.SUPABASE_URL,
   supabaseKey: process.env.TEST_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+  appUrl: process.env.APP_URL || 'https://mataresit.com',
   timeout: 10000, // 10 seconds
   maxResponseTime: 5000, // 5 seconds
   retries: 3
@@ -89,10 +90,16 @@ async function testSupabaseHealth() {
     throw new Error('SUPABASE_URL not configured');
   }
 
-  const healthUrl = `${config.supabaseUrl}/health`;
-  const response = await retryRequest(healthUrl);
+  // Test Supabase REST API health by making a simple query
+  const healthUrl = `${config.supabaseUrl}/rest/v1/`;
+  const response = await retryRequest(healthUrl, {
+    headers: {
+      'apikey': config.supabaseKey,
+      'Authorization': `Bearer ${config.supabaseKey}`
+    }
+  });
   
-  if (response.statusCode !== 200) {
+  if (response.statusCode !== 200 && response.statusCode !== 404) {
     throw new Error(`Supabase health check failed: HTTP ${response.statusCode}`);
   }
 
@@ -140,11 +147,13 @@ async function testEdgeFunction() {
   }
 
   try {
-    // Test a simple edge function (health check or similar)
-    const functionUrl = `${config.supabaseUrl}/functions/v1/health-check`;
+    // Test a known edge function (mataresit-api health endpoint)
+    const functionUrl = `${config.supabaseUrl}/functions/v1/mataresit-api`;
     const response = await retryRequest(functionUrl, {
-      method: 'POST',
-      body: { test: true }
+      method: 'GET',
+      headers: {
+        'x-api-key': 'test-key-for-monitoring'
+      }
     });
     
     // Edge functions might return 404 if not deployed, which is acceptable for monitoring

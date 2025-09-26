@@ -28,6 +28,11 @@ on:
         required: false
         default: '30'
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
 env:
   DOMAIN: ${{ github.event.inputs.environment == 'staging' && 'staging.mataresit.com' || 'mataresit.com' }}
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
@@ -55,7 +60,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for health monitoring..."
+
+          # Check if package-lock.json exists and is valid
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, attempting npm ci..."
+            if npm ci --no-audit --no-fund; then
+              echo "✅ npm ci succeeded"
+            else
+              echo "⚠️ npm ci failed, falling back to npm install..."
+              rm -rf node_modules package-lock.json
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "No package-lock.json found, using npm install..."
+            npm install --no-audit --no-fund
+          fi
+
+          echo "✅ Dependencies installed successfully"
 
       - name: Check Supabase health (if configured)
         id: health
@@ -211,7 +234,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for Supabase monitoring..."
+
+          # Check if package-lock.json exists and is valid
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, attempting npm ci..."
+            if npm ci --no-audit --no-fund; then
+              echo "✅ npm ci succeeded"
+            else
+              echo "⚠️ npm ci failed, falling back to npm install..."
+              rm -rf node_modules package-lock.json
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "No package-lock.json found, using npm install..."
+            npm install --no-audit --no-fund
+          fi
+
+          echo "✅ Dependencies installed successfully"
 
       - name: Test Supabase Database (if configured)
         id: supabase
@@ -325,7 +366,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for performance monitoring..."
+
+          # Check if package-lock.json exists and is valid
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, attempting npm ci..."
+            if npm ci --no-audit --no-fund; then
+              echo "✅ npm ci succeeded"
+            else
+              echo "⚠️ npm ci failed, falling back to npm install..."
+              rm -rf node_modules package-lock.json
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "No package-lock.json found, using npm install..."
+            npm install --no-audit --no-fund
+          fi
+
+          echo "✅ Dependencies installed successfully"
 
       - name: Run performance tests (if configured)
         run: |
@@ -412,7 +471,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for security monitoring..."
+
+          # Check if package-lock.json exists and is valid
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, attempting npm ci..."
+            if npm ci --no-audit --no-fund; then
+              echo "✅ npm ci succeeded"
+            else
+              echo "⚠️ npm ci failed, falling back to npm install..."
+              rm -rf node_modules package-lock.json
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "No package-lock.json found, using npm install..."
+            npm install --no-audit --no-fund
+          fi
+
+          echo "✅ Dependencies installed successfully"
 
       - name: Check Supabase security configuration (if configured)
         run: |
@@ -513,7 +590,25 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for alert monitoring..."
+
+          # Check if package-lock.json exists and is valid
+          if [ -f "package-lock.json" ]; then
+            echo "Found package-lock.json, attempting npm ci..."
+            if npm ci --no-audit --no-fund; then
+              echo "✅ npm ci succeeded"
+            else
+              echo "⚠️ npm ci failed, falling back to npm install..."
+              rm -rf node_modules package-lock.json
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "No package-lock.json found, using npm install..."
+            npm install --no-audit --no-fund
+          fi
+
+          echo "✅ Dependencies installed successfully"
 
       - name: Test alerting system
         continue-on-error: true

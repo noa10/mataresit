@@ -1,0 +1,170 @@
+﻿2025-09-26T12:01:41.0236255Z Current runner version: '2.328.0'
+2025-09-26T12:01:41.0259315Z ##[group]Runner Image Provisioner
+2025-09-26T12:01:41.0260203Z Hosted Compute Agent
+2025-09-26T12:01:41.0260782Z Version: 20250912.392
+2025-09-26T12:01:41.0261491Z Commit: d921fda672a98b64f4f82364647e2f10b2267d0b
+2025-09-26T12:01:41.0262235Z Build Date: 2025-09-12T15:23:14Z
+2025-09-26T12:01:41.0262848Z ##[endgroup]
+2025-09-26T12:01:41.0263370Z ##[group]Operating System
+2025-09-26T12:01:41.0263964Z Ubuntu
+2025-09-26T12:01:41.0264417Z 24.04.3
+2025-09-26T12:01:41.0264875Z LTS
+2025-09-26T12:01:41.0265270Z ##[endgroup]
+2025-09-26T12:01:41.0265817Z ##[group]Runner Image
+2025-09-26T12:01:41.0266353Z Image: ubuntu-24.04
+2025-09-26T12:01:41.0266841Z Version: 20250922.53.1
+2025-09-26T12:01:41.0267903Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250922.53/images/ubuntu/Ubuntu2404-Readme.md
+2025-09-26T12:01:41.0269385Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250922.53
+2025-09-26T12:01:41.0270380Z ##[endgroup]
+2025-09-26T12:01:41.0271581Z ##[group]GITHUB_TOKEN Permissions
+2025-09-26T12:01:41.0273423Z Contents: read
+2025-09-26T12:01:41.0273969Z Metadata: read
+2025-09-26T12:01:41.0274425Z Packages: read
+2025-09-26T12:01:41.0274995Z ##[endgroup]
+2025-09-26T12:01:41.0277401Z Secret source: Actions
+2025-09-26T12:01:41.0278102Z Prepare workflow directory
+2025-09-26T12:01:41.0891037Z Prepare all required actions
+2025-09-26T12:01:41.0939619Z Getting action download info
+2025-09-26T12:01:41.5384698Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+2025-09-26T12:01:41.7132242Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2025-09-26T12:01:41.8682328Z Complete job name: Alert System Check
+2025-09-26T12:01:41.9293081Z ##[group]Run actions/checkout@v4
+2025-09-26T12:01:41.9293886Z with:
+2025-09-26T12:01:41.9294273Z   repository: noa10/mataresit
+2025-09-26T12:01:41.9294882Z   token: ***
+2025-09-26T12:01:41.9295271Z   ssh-strict: true
+2025-09-26T12:01:41.9295654Z   ssh-user: git
+2025-09-26T12:01:41.9296042Z   persist-credentials: true
+2025-09-26T12:01:41.9296481Z   clean: true
+2025-09-26T12:01:41.9296867Z   sparse-checkout-cone-mode: true
+2025-09-26T12:01:41.9297349Z   fetch-depth: 1
+2025-09-26T12:01:41.9297722Z   fetch-tags: false
+2025-09-26T12:01:41.9298107Z   show-progress: true
+2025-09-26T12:01:41.9298489Z   lfs: false
+2025-09-26T12:01:41.9298843Z   submodules: false
+2025-09-26T12:01:41.9299232Z   set-safe-directory: true
+2025-09-26T12:01:41.9299843Z env:
+2025-09-26T12:01:41.9300206Z   DOMAIN: mataresit.com
+2025-09-26T12:01:41.9300596Z   TIMEOUT: 30
+2025-09-26T12:01:41.9300964Z   CACHE_VERSION: v1
+2025-09-26T12:01:41.9301488Z ##[endgroup]
+2025-09-26T12:01:42.0363738Z Syncing repository: noa10/mataresit
+2025-09-26T12:01:42.0365386Z ##[group]Getting Git version info
+2025-09-26T12:01:42.0366094Z Working directory is '/home/runner/work/mataresit/mataresit'
+2025-09-26T12:01:42.0367010Z [command]/usr/bin/git version
+2025-09-26T12:01:42.0443506Z git version 2.51.0
+2025-09-26T12:01:42.0468849Z ##[endgroup]
+2025-09-26T12:01:42.0482904Z Temporarily overriding HOME='/home/runner/work/_temp/bf8e0679-f293-4cf1-9999-bd96477cbfe4' before making global git config changes
+2025-09-26T12:01:42.0484277Z Adding repository directory to the temporary git global config as a safe directory
+2025-09-26T12:01:42.0496388Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mataresit/mataresit
+2025-09-26T12:01:42.0556956Z Deleting the contents of '/home/runner/work/mataresit/mataresit'
+2025-09-26T12:01:42.0560414Z ##[group]Initializing the repository
+2025-09-26T12:01:42.0564604Z [command]/usr/bin/git init /home/runner/work/mataresit/mataresit
+2025-09-26T12:01:42.0756001Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-09-26T12:01:42.0758143Z hint: is subject to change. To configure the initial branch name to use in all
+2025-09-26T12:01:42.0759797Z hint: of your new repositories, which will suppress this warning, call:
+2025-09-26T12:01:42.0761298Z hint:
+2025-09-26T12:01:42.0762310Z hint: 	git config --global init.defaultBranch <name>
+2025-09-26T12:01:42.0763394Z hint:
+2025-09-26T12:01:42.0764478Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-09-26T12:01:42.0766201Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-09-26T12:01:42.0767413Z hint:
+2025-09-26T12:01:42.0768053Z hint: 	git branch -m <name>
+2025-09-26T12:01:42.0768776Z hint:
+2025-09-26T12:01:42.0769753Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2025-09-26T12:01:42.0771711Z Initialized empty Git repository in /home/runner/work/mataresit/mataresit/.git/
+2025-09-26T12:01:42.0774544Z [command]/usr/bin/git remote add origin https://github.com/noa10/mataresit
+2025-09-26T12:01:42.0814196Z ##[endgroup]
+2025-09-26T12:01:42.0815402Z ##[group]Disabling automatic garbage collection
+2025-09-26T12:01:42.0818912Z [command]/usr/bin/git config --local gc.auto 0
+2025-09-26T12:01:42.0849548Z ##[endgroup]
+2025-09-26T12:01:42.0850684Z ##[group]Setting up auth
+2025-09-26T12:01:42.0856943Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-09-26T12:01:42.0889564Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-09-26T12:01:42.1234073Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-09-26T12:01:42.1268122Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-09-26T12:01:42.1501119Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-09-26T12:01:42.1544662Z ##[endgroup]
+2025-09-26T12:01:42.1545411Z ##[group]Fetching the repository
+2025-09-26T12:01:42.1553253Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3e8508b471f37c8cb910ea45e4edd3fb06a60556:refs/remotes/origin/main
+2025-09-26T12:01:42.8287860Z From https://github.com/noa10/mataresit
+2025-09-26T12:01:42.8289554Z  * [new ref]         3e8508b471f37c8cb910ea45e4edd3fb06a60556 -> origin/main
+2025-09-26T12:01:42.8321744Z ##[endgroup]
+2025-09-26T12:01:42.8324765Z ##[group]Determining the checkout info
+2025-09-26T12:01:42.8326188Z ##[endgroup]
+2025-09-26T12:01:42.8330938Z [command]/usr/bin/git sparse-checkout disable
+2025-09-26T12:01:42.8370974Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-09-26T12:01:42.8401549Z ##[group]Checking out the ref
+2025-09-26T12:01:42.8407047Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2025-09-26T12:01:42.9740532Z Switched to a new branch 'main'
+2025-09-26T12:01:42.9742645Z branch 'main' set up to track 'origin/main'.
+2025-09-26T12:01:42.9752418Z ##[endgroup]
+2025-09-26T12:01:42.9790628Z [command]/usr/bin/git log -1 --format=%H
+2025-09-26T12:01:42.9812502Z 3e8508b471f37c8cb910ea45e4edd3fb06a60556
+2025-09-26T12:01:43.0074850Z ##[group]Run actions/setup-node@v4
+2025-09-26T12:01:43.0075955Z with:
+2025-09-26T12:01:43.0076746Z   node-version: 18
+2025-09-26T12:01:43.0077596Z   cache: npm
+2025-09-26T12:01:43.0078419Z   always-auth: false
+2025-09-26T12:01:43.0079308Z   check-latest: false
+2025-09-26T12:01:43.0080475Z   token: ***
+2025-09-26T12:01:43.0081268Z env:
+2025-09-26T12:01:43.0082265Z   DOMAIN: mataresit.com
+2025-09-26T12:01:43.0083172Z   TIMEOUT: 30
+2025-09-26T12:01:43.0084001Z   CACHE_VERSION: v1
+2025-09-26T12:01:43.0084853Z ##[endgroup]
+2025-09-26T12:01:43.1870171Z Found in cache @ /opt/hostedtoolcache/node/18.20.8/x64
+2025-09-26T12:01:43.1876150Z ##[group]Environment details
+2025-09-26T12:01:45.6031255Z node: v18.20.8
+2025-09-26T12:01:45.6032052Z npm: 10.8.2
+2025-09-26T12:01:45.6032437Z yarn: 1.22.22
+2025-09-26T12:01:45.6034157Z ##[endgroup]
+2025-09-26T12:01:45.6057538Z [command]/opt/hostedtoolcache/node/18.20.8/x64/bin/npm config get cache
+2025-09-26T12:01:45.9257597Z /home/runner/.npm
+2025-09-26T12:01:46.2034894Z Cache hit for: node-cache-Linux-x64-npm-b24800f86411fdc2319e4a7c5cfa68fe5202cd9a444cdd784478619bdfb9e3db
+2025-09-26T12:01:47.5216537Z Received 8388608 of 190186959 (4.4%), 8.0 MBs/sec
+2025-09-26T12:01:48.5225504Z Received 134217728 of 190186959 (70.6%), 64.0 MBs/sec
+2025-09-26T12:01:49.5230385Z Received 185992655 of 190186959 (97.8%), 59.1 MBs/sec
+2025-09-26T12:01:49.8670163Z Received 190186959 of 190186959 (100.0%), 54.2 MBs/sec
+2025-09-26T12:01:49.8670960Z Cache Size: ~181 MB (190186959 B)
+2025-09-26T12:01:49.8795318Z [command]/usr/bin/tar -xf /home/runner/work/_temp/03eb2845-c596-4a9d-b160-bf06d77f01a4/cache.tzst -P -C /home/runner/work/mataresit/mataresit --use-compress-program unzstd
+2025-09-26T12:01:50.3045245Z Cache restored successfully
+2025-09-26T12:01:50.3408718Z Cache restored from key: node-cache-Linux-x64-npm-b24800f86411fdc2319e4a7c5cfa68fe5202cd9a444cdd784478619bdfb9e3db
+2025-09-26T12:01:50.3554807Z ##[group]Run npm ci
+2025-09-26T12:01:50.3555096Z [36;1mnpm ci[0m
+2025-09-26T12:01:50.3665889Z shell: /usr/bin/bash -e {0}
+2025-09-26T12:01:50.3666155Z env:
+2025-09-26T12:01:50.3666335Z   DOMAIN: mataresit.com
+2025-09-26T12:01:50.3666543Z   TIMEOUT: 30
+2025-09-26T12:01:50.3666725Z   CACHE_VERSION: v1
+2025-09-26T12:01:50.3666908Z ##[endgroup]
+2025-09-26T12:01:56.7445103Z npm warn ERESOLVE overriding peer dependency
+2025-09-26T12:01:56.7445929Z npm warn While resolving: mataresit@0.0.0
+2025-09-26T12:01:56.7446437Z npm warn Found: jspdf@3.0.1
+2025-09-26T12:01:56.7446880Z npm warn node_modules/jspdf
+2025-09-26T12:01:56.7447397Z npm warn   jspdf@"^3.1.0" from the root project
+2025-09-26T12:01:56.7447964Z npm warn   1 more (jspdf-autotable)
+2025-09-26T12:01:56.7448369Z npm warn
+2025-09-26T12:01:56.7448774Z npm warn Could not resolve dependency:
+2025-09-26T12:01:56.7449415Z npm warn peer jspdf@"^2 || ^3" from jspdf-autotable@5.0.2
+2025-09-26T12:01:56.7450118Z npm warn node_modules/jspdf-autotable
+2025-09-26T12:01:56.7450754Z npm warn   jspdf-autotable@"^5.0.2" from the root project
+2025-09-26T12:01:56.8696484Z npm error code ETARGET
+2025-09-26T12:01:56.8697376Z npm error notarget No matching version found for artillery@^2.1.0.
+2025-09-26T12:01:56.8698412Z npm error notarget In most cases you or one of your dependencies are requesting
+2025-09-26T12:01:56.8699373Z npm error notarget a package version that doesn't exist.
+2025-09-26T12:01:56.8709006Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2025-09-26T12_01_50_440Z-debug-0.log
+2025-09-26T12:01:56.8925075Z ##[error]Process completed with exit code 1.
+2025-09-26T12:01:56.9034450Z Post job cleanup.
+2025-09-26T12:01:57.0033814Z [command]/usr/bin/git version
+2025-09-26T12:01:57.0069110Z git version 2.51.0
+2025-09-26T12:01:57.0113350Z Temporarily overriding HOME='/home/runner/work/_temp/2c41e35b-e9d2-4ba0-9c58-b9354ee37eb4' before making global git config changes
+2025-09-26T12:01:57.0114885Z Adding repository directory to the temporary git global config as a safe directory
+2025-09-26T12:01:57.0119970Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mataresit/mataresit
+2025-09-26T12:01:57.0154927Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-09-26T12:01:57.0187002Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-09-26T12:01:57.0412292Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-09-26T12:01:57.0435355Z http.https://github.com/.extraheader
+2025-09-26T12:01:57.0447753Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2025-09-26T12:01:57.0476876Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-09-26T12:01:57.0799008Z Cleaning up orphan processes

@@ -14,6 +14,7 @@ import http from 'http';
 const config = {
   supabaseUrl: process.env.TEST_SUPABASE_URL || process.env.SUPABASE_URL,
   supabaseKey: process.env.TEST_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+  appUrl: process.env.APP_URL || 'https://mataresit.com',
   timeout: 10000, // 10 seconds
   retries: 2
 };

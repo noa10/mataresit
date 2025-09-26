@@ -1,0 +1,94 @@
+﻿2025-09-26T12:02:02.9979695Z Current runner version: '2.328.0'
+2025-09-26T12:02:03.0002029Z ##[group]Runner Image Provisioner
+2025-09-26T12:02:03.0002786Z Hosted Compute Agent
+2025-09-26T12:02:03.0003436Z Version: 20250912.392
+2025-09-26T12:02:03.0003959Z Commit: d921fda672a98b64f4f82364647e2f10b2267d0b
+2025-09-26T12:02:03.0004610Z Build Date: 2025-09-12T15:23:14Z
+2025-09-26T12:02:03.0005161Z ##[endgroup]
+2025-09-26T12:02:03.0005624Z ##[group]Operating System
+2025-09-26T12:02:03.0006144Z Ubuntu
+2025-09-26T12:02:03.0006568Z 24.04.3
+2025-09-26T12:02:03.0006990Z LTS
+2025-09-26T12:02:03.0007354Z ##[endgroup]
+2025-09-26T12:02:03.0007829Z ##[group]Runner Image
+2025-09-26T12:02:03.0008298Z Image: ubuntu-24.04
+2025-09-26T12:02:03.0008740Z Version: 20250922.53.1
+2025-09-26T12:02:03.0009694Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250922.53/images/ubuntu/Ubuntu2404-Readme.md
+2025-09-26T12:02:03.0011047Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250922.53
+2025-09-26T12:02:03.0011909Z ##[endgroup]
+2025-09-26T12:02:03.0012879Z ##[group]GITHUB_TOKEN Permissions
+2025-09-26T12:02:03.0014799Z Contents: read
+2025-09-26T12:02:03.0015271Z Metadata: read
+2025-09-26T12:02:03.0015671Z Packages: read
+2025-09-26T12:02:03.0016152Z ##[endgroup]
+2025-09-26T12:02:03.0018068Z Secret source: Actions
+2025-09-26T12:02:03.0018660Z Prepare workflow directory
+2025-09-26T12:02:03.0574715Z Prepare all required actions
+2025-09-26T12:02:03.0611411Z Getting action download info
+2025-09-26T12:02:03.4181251Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2025-09-26T12:02:03.9961262Z Complete job name: Generate Monitoring Report
+2025-09-26T12:02:04.0505268Z ##[group]Run cat > monitoring-report.md << 'EOF'
+2025-09-26T12:02:04.0506222Z [36;1mcat > monitoring-report.md << 'EOF'[0m
+2025-09-26T12:02:04.0506926Z [36;1m# Production Monitoring Report[0m
+2025-09-26T12:02:04.0507607Z [36;1m[0m
+2025-09-26T12:02:04.0508172Z [36;1m**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")[0m
+2025-09-26T12:02:04.0508976Z [36;1m**Environment:** production[0m
+2025-09-26T12:02:04.0509638Z [36;1m**Triggered by:** schedule[0m
+2025-09-26T12:02:04.0510222Z [36;1m[0m
+2025-09-26T12:02:04.0510731Z [36;1m## System Status Summary[0m
+2025-09-26T12:02:04.0511286Z [36;1m[0m
+2025-09-26T12:02:04.0511845Z [36;1m| Component | Status | Details |[0m
+2025-09-26T12:02:04.0512478Z [36;1m|-----------|--------|---------|[0m
+2025-09-26T12:02:04.0513383Z [36;1m| Health Check | failure | System health and endpoints |[0m
+2025-09-26T12:02:04.0514406Z [36;1m| Supabase Services | failure | Database, Auth, Storage, Realtime |[0m
+2025-09-26T12:02:04.0515505Z [36;1m| Performance | failure | Resource usage and performance |[0m
+2025-09-26T12:02:04.0516487Z [36;1m| Security | failure | Security policies and vulnerabilities |[0m
+2025-09-26T12:02:04.0517349Z [36;1m| Alerts | failure | Alert system functionality |[0m
+2025-09-26T12:02:04.0518083Z [36;1m[0m
+2025-09-26T12:02:04.0518562Z [36;1m## Health Status[0m
+2025-09-26T12:02:04.0519182Z [36;1m- **Overall Health:** unknown[0m
+2025-09-26T12:02:04.0519773Z [36;1m[0m
+2025-09-26T12:02:04.0520272Z [36;1m## Recommendations[0m
+2025-09-26T12:02:04.0520822Z [36;1m[0m
+2025-09-26T12:02:04.0521958Z [36;1m⚠️ **CRITICAL**: Health check failed - immediate investigation required[0m
+2025-09-26T12:02:04.0523010Z [36;1m⚠️ **WARNING**: Performance issues detected - review resource usage[0m
+2025-09-26T12:02:04.0524199Z [36;1m🔒 **SECURITY**: Security issues found - review and fix immediately[0m
+2025-09-26T12:02:04.0525226Z [36;1m📢 **ALERTS**: Alert system issues - verify notification channels[0m
+2025-09-26T12:02:04.0526003Z [36;1m[0m
+2025-09-26T12:02:04.0526568Z [36;1m## Next Monitoring Check[0m
+2025-09-26T12:02:04.0527289Z [36;1m- **Scheduled:** Every 4 hours[0m
+2025-09-26T12:02:04.0528039Z [36;1m- **Manual:** Use workflow_dispatch to run specific checks[0m
+2025-09-26T12:02:04.0528829Z [36;1m[0m
+2025-09-26T12:02:04.0529276Z [36;1mEOF[0m
+2025-09-26T12:02:04.0554406Z shell: /usr/bin/bash -e {0}
+2025-09-26T12:02:04.0555391Z env:
+2025-09-26T12:02:04.0555864Z   DOMAIN: mataresit.com
+2025-09-26T12:02:04.0556510Z   TIMEOUT: 30
+2025-09-26T12:02:04.0557042Z   CACHE_VERSION: v1
+2025-09-26T12:02:04.0557509Z ##[endgroup]
+2025-09-26T12:02:04.0817650Z ##[group]Run actions/upload-artifact@v4
+2025-09-26T12:02:04.0818463Z with:
+2025-09-26T12:02:04.0818951Z   name: monitoring-report-1543
+2025-09-26T12:02:04.0819559Z   path: monitoring-report.md
+2025-09-26T12:02:04.0820102Z   retention-days: 30
+2025-09-26T12:02:04.0820722Z   if-no-files-found: warn
+2025-09-26T12:02:04.0821290Z   compression-level: 6
+2025-09-26T12:02:04.0821789Z   overwrite: false
+2025-09-26T12:02:04.0822394Z   include-hidden-files: false
+2025-09-26T12:02:04.0822934Z env:
+2025-09-26T12:02:04.0823813Z   DOMAIN: mataresit.com
+2025-09-26T12:02:04.0824371Z   TIMEOUT: 30
+2025-09-26T12:02:04.0824890Z   CACHE_VERSION: v1
+2025-09-26T12:02:04.0825383Z ##[endgroup]
+2025-09-26T12:02:04.2973614Z With the provided path, there will be 1 file uploaded
+2025-09-26T12:02:04.2978447Z Artifact name is valid!
+2025-09-26T12:02:04.2979773Z Root directory input is valid!
+2025-09-26T12:02:04.5448098Z Beginning upload of artifact content to blob storage
+2025-09-26T12:02:04.7902716Z Uploaded bytes 721
+2025-09-26T12:02:04.8539976Z Finished uploading artifact content to blob storage!
+2025-09-26T12:02:04.8543699Z SHA256 digest of uploaded artifact zip is c047a7a7883fc97a3bbb807955d15ef4cf2e43caf1e55beebc7b2b58deb751e8
+2025-09-26T12:02:04.8546542Z Finalizing artifact upload
+2025-09-26T12:02:04.9866222Z Artifact monitoring-report-1543.zip successfully finalized. Artifact ID 4114628657
+2025-09-26T12:02:04.9869689Z Artifact monitoring-report-1543 has been successfully uploaded! Final size is 721 bytes. Artifact ID is 4114628657
+2025-09-26T12:02:04.9873878Z Artifact download URL: https://github.com/noa10/mataresit/actions/runs/18037118216/artifacts/4114628657
+2025-09-26T12:02:05.0000999Z Cleaning up orphan processes

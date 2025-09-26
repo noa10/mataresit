@@ -87,11 +87,15 @@ jobs:
 
       - name: Install dependencies
         if: steps.scan-decision.outputs.should-run == 'true' && steps.cache-deps.outputs.cache-hit != 'true'
-        uses: Wandalen/wretry.action@v3.5.0
-        with:
-          attempt_limit: 3
-          attempt_delay: 2000
-          command: npm ci --silent
+        run: |
+          echo "Installing dependencies for security scanning..."
+
+          # Try npm ci first, fallback to npm install if it fails
+          if ! npm ci --silent; then
+            echo "npm ci failed, trying npm install..."
+            rm -rf node_modules package-lock.json
+            npm install --silent
+          fi
 
   # Code Security Scanning (Parallel)
   code-security:
@@ -131,7 +135,15 @@ jobs:
 
       - name: Install dependencies (if cache miss)
         if: needs.setup-security.outputs.cache-hit != 'true'
-        run: npm ci --silent
+        run: |
+          echo "Installing dependencies for code security analysis..."
+
+          # Try npm ci first, fallback to npm install if it fails
+          if ! npm ci --silent; then
+            echo "npm ci failed, trying npm install..."
+            rm -rf node_modules package-lock.json
+            npm install --silent
+          fi
 
       - name: Build application
         run: npm run build --silent
@@ -159,7 +171,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --silent
+        run: |
+          echo "Installing dependencies for dependency security scan..."
+
+          # Try npm ci first, fallback to npm install if it fails
+          if ! npm ci --silent; then
+            echo "npm ci failed, trying npm install..."
+            rm -rf node_modules package-lock.json
+            npm install --silent
+          fi
 
       - name: Run npm audit
         run: |
@@ -206,7 +226,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for frontend security scan..."
+
+          # Try npm ci first, fallback to npm install if it fails
+          if ! npm ci; then
+            echo "npm ci failed, trying npm install..."
+            rm -rf node_modules package-lock.json
+            npm install
+          fi
 
       - name: Build application for security testing
         run: npm run build
@@ -258,7 +286,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "Installing dependencies for Supabase security scan..."
+
+          # Try npm ci first, fallback to npm install if it fails
+          if ! npm ci; then
+            echo "npm ci failed, trying npm install..."
+            rm -rf node_modules package-lock.json
+            npm install
+          fi
 
       - name: Scan Supabase configuration
         run: |

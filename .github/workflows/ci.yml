@@ -120,12 +120,9 @@ jobs:
       - name: Security audit
         id: security-audit
         run: |
-          echo "Running npm audit with automatic fixes..."
+          echo "Running npm audit..."
 
-          # First try to fix automatically fixable vulnerabilities
-          npm audit fix --audit-level=moderate || echo "Some vulnerabilities could not be auto-fixed"
-
-          # Then run audit to check remaining issues
+          # Run audit to check for vulnerabilities
           npm audit --audit-level=high 2>&1 | tee security-audit.txt
           AUDIT_EXIT_CODE=${PIPESTATUS[0]}
 
@@ -135,6 +132,11 @@ jobs:
           else
             echo "⚠️ Security vulnerabilities found, but continuing workflow"
             echo "Check security-audit.txt for details"
+
+            # Show vulnerability summary
+            echo "Vulnerability summary:"
+            npm audit --audit-level=high --json | jq -r '.metadata.vulnerabilities | to_entries[] | "\(.key): \(.value)"' || echo "Could not parse vulnerability details"
+
             echo "passed=false" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
