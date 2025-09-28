@@ -159,6 +159,39 @@ jobs:
           echo "🌐 Configuring network preferences..."
           export GODEBUG=netdns=go+1
 
+          # Force IPv4 by disabling IPv6 temporarily
+          echo "🔧 Disabling IPv6 to force IPv4 connections..."
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+
+          # Verify IPv6 is disabled
+          echo "📊 Network configuration:"
+          ip addr show | grep -E "(inet|inet6)" | head -5
+
+          # Add IPv4-only DNS resolution for Supabase hosts
+          echo "🌐 Configuring IPv4-only DNS resolution..."
+          PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
+
+          # Resolve and cache IPv4 addresses
+          DB_HOST="db.${PROJECT_REF}.supabase.co"
+          API_HOST="api.supabase.com"
+
+          echo "🔍 Resolving IPv4 addresses..."
+          DB_IPV4=$(dig +short A "$DB_HOST" | head -1)
+          API_IPV4=$(dig +short A "$API_HOST" | head -1)
+
+          echo "Database IPv4: $DB_IPV4"
+          echo "API IPv4: $API_IPV4"
+
+          # Add to /etc/hosts to force IPv4 resolution
+          if [ -n "$DB_IPV4" ]; then
+            echo "$DB_IPV4 $DB_HOST" | sudo tee -a /etc/hosts
+          fi
+          if [ -n "$API_IPV4" ]; then
+            echo "$API_IPV4 $API_HOST" | sudo tee -a /etc/hosts
+          fi
+
           # Try linking to project with proper database password
           echo "🔗 Attempting to link to Supabase project..."
           if supabase link --project-ref "$PROJECT_ID" --debug; then
@@ -205,20 +238,48 @@ jobs:
             if [ "$LINK_SUCCESS" = "false" ]; then
               echo "🔄 Using direct database URL for migrations..."
 
-              # Construct database URL from Supabase URL
-              DB_HOST=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||').supabase.co
-              DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${DB_HOST}:5432/postgres"
+              # Extract project ID from URL for connection
+              PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
 
-              echo "Database host: db.${DB_HOST}"
-              echo "Attempting migration with direct connection..."
+              # Configure PostgreSQL client for IPv4 and timeouts
+              export PGCONNECT_TIMEOUT=30
+              export PGCOMMAND_TIMEOUT=300
 
-              if ! supabase db push --db-url "$DB_URL" --debug; then
-                echo "❌ Database migration failed with direct URL"
-                echo "🔍 Checking migration status..."
-                supabase migration list --db-url "$DB_URL" || echo "Failed to list migrations"
-                exit 1
+              # Try multiple connection methods with IPv4 addresses
+              echo "🔗 Attempting connection method 1: Direct PostgreSQL with IPv4"
+
+              # Get IPv4 address for database host
+              DB_IPV4=$(dig +short A "db.${PROJECT_REF}.supabase.co" | head -1)
+              if [ -n "$DB_IPV4" ]; then
+                echo "Using IPv4 address: $DB_IPV4"
+                DB_URL_DIRECT="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_IPV4}:5432/postgres?connect_timeout=30"
+              else
+                echo "Could not resolve IPv4, using hostname"
+                DB_URL_DIRECT="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres?connect_timeout=30"
               fi
-              echo "✅ Database migrations completed successfully with direct connection"
+
+              if timeout 300 supabase db push --db-url "$DB_URL_DIRECT" --debug; then
+                echo "✅ Database migrations completed successfully with direct connection"
+              else
+                echo "⚠️ Direct connection failed, trying pgbouncer..."
+
+                # Try pgbouncer connection (port 6543) with IPv4
+                echo "🔗 Attempting connection method 2: PgBouncer with IPv4"
+                if [ -n "$DB_IPV4" ]; then
+                  DB_URL_PGBOUNCER="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_IPV4}:6543/postgres?connect_timeout=30"
+                else
+                  DB_URL_PGBOUNCER="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:6543/postgres?connect_timeout=30"
+                fi
+
+                if timeout 300 supabase db push --db-url "$DB_URL_PGBOUNCER" --debug; then
+                  echo "✅ Database migrations completed successfully with pgbouncer"
+                else
+                  echo "❌ All connection methods failed"
+                  echo "🔍 Checking migration status..."
+                  timeout 60 supabase migration list --db-url "$DB_URL_DIRECT" || echo "Failed to list migrations"
+                  exit 1
+                fi
+              fi
             fi
             echo "✅ Database migrations completed successfully"
           else
@@ -287,6 +348,39 @@ jobs:
           # Configure network preferences for IPv4 (avoid IPv6 issues)
           echo "🌐 Configuring network preferences..."
           export GODEBUG=netdns=go+1
+
+          # Force IPv4 by disabling IPv6 temporarily
+          echo "🔧 Disabling IPv6 to force IPv4 connections..."
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+
+          # Verify IPv6 is disabled
+          echo "📊 Network configuration:"
+          ip addr show | grep -E "(inet|inet6)" | head -5
+
+          # Add IPv4-only DNS resolution for Supabase hosts
+          echo "🌐 Configuring IPv4-only DNS resolution..."
+          PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
+
+          # Resolve and cache IPv4 addresses
+          DB_HOST="db.${PROJECT_REF}.supabase.co"
+          API_HOST="api.supabase.com"
+
+          echo "🔍 Resolving IPv4 addresses..."
+          DB_IPV4=$(dig +short A "$DB_HOST" | head -1)
+          API_IPV4=$(dig +short A "$API_HOST" | head -1)
+
+          echo "Database IPv4: $DB_IPV4"
+          echo "API IPv4: $API_IPV4"
+
+          # Add to /etc/hosts to force IPv4 resolution
+          if [ -n "$DB_IPV4" ]; then
+            echo "$DB_IPV4 $DB_HOST" | sudo tee -a /etc/hosts
+          fi
+          if [ -n "$API_IPV4" ]; then
+            echo "$API_IPV4 $API_HOST" | sudo tee -a /etc/hosts
+          fi
 
           # Try linking to project for function deployment
           echo "🔗 Attempting to link to Supabase project..."
