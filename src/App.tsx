@@ -17,6 +17,8 @@ import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
 import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
 import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { SaveStatusProvider } from "@/contexts/SaveStatusContext";
+import { SaveStatusToastManager } from "@/components/SaveStatusToastManager";
 import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
@@ -43,6 +45,7 @@ const AuthDebugPage = lazy(() => import("./pages/AuthDebugPage"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const PerformanceTestPage = lazy(() => import("./pages/PerformanceTestPage"));
+const AsyncSaveTestPage = lazy(() => import("./pages/AsyncSaveTestPage"));
 const AdminLayoutPage = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
@@ -120,9 +123,11 @@ const App = () => (
                     <ChatControlsProvider>
                       <NotificationProvider>
                         <PushNotificationProvider>
-                      <TooltipProvider>
-            <Toaster />
-            <Sonner />
+                          <SaveStatusProvider>
+                            <TooltipProvider>
+                              <Toaster />
+                              <Sonner />
+                              <SaveStatusToastManager />
             {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
             <BrowserRouter>
           <Routes>
@@ -233,6 +238,11 @@ const App = () => (
                 <Route path="/performance-test" element={
                   <Suspense fallback={<PageLoading />}>
                     <PerformanceTestPage />
+                  </Suspense>
+                } />
+                <Route path="/async-save-test" element={
+                  <Suspense fallback={<PageLoading />}>
+                    <AsyncSaveTestPage />
                   </Suspense>
                 } />
                 <Route path="/receipt/:id" element={
@@ -371,17 +381,18 @@ const App = () => (
             </Route>
           </Routes>
           </BrowserRouter>
-                      </TooltipProvider>
-                    </PushNotificationProvider>
-                  </NotificationProvider>
-                </ChatControlsProvider>
-                </BackgroundSearchProvider>
-              </PersonalizationProvider>
-            </StripeProvider>
-          </TeamProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </AuthProvider>
+                            </TooltipProvider>
+                          </SaveStatusProvider>
+                        </PushNotificationProvider>
+                      </NotificationProvider>
+                    </ChatControlsProvider>
+                  </BackgroundSearchProvider>
+                </PersonalizationProvider>
+              </StripeProvider>
+            </TeamProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
     <Analytics />
     <SpeedInsights />

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown } from "lucide-react";
+import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -16,6 +16,8 @@ import { CategorySelector } from "@/components/categories/CategorySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { useSaveStatus, useReceiptSaveStatus } from "@/contexts/SaveStatusContext";
+import { SaveStatusIndicator } from "@/components/SaveStatusToastManager";
 import { useTeam } from "@/contexts/TeamContext";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
@@ -179,8 +181,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     predicted_category: receipt.predicted_category || "",
     custom_category_id: receipt.custom_category_id || null
   });
-  // Add a flag to track if we're in the middle of a save operation
-  const [isSaving, setIsSaving] = useState(false);
+  // Use save status context for background save operations
+  const { saveReceipt } = useSaveStatus();
+  const { isSaving, status: saveStatus } = useReceiptSaveStatus(receipt.id);
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
@@ -443,166 +446,95 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     setImageError(false);
   }, [receipt.image_url]);
 
-  const updateMutation = useMutation({
-    // Update mutation only handles the 'receipts' table update
+  // Background save function - non-blocking
+  const performBackgroundSave = () => {
+    // Format the date properly if it's a string
+    let formattedDate = editedReceipt.date;
+    if (typeof formattedDate === 'string' && formattedDate.includes('T')) {
+      formattedDate = formattedDate.split('T')[0];
+    }
+
+    // Ensure line items are properly formatted
+    const formattedLineItems = editedReceipt.lineItems?.map(item => ({
+      description: item.description || '',
+      amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0
+    }));
+
+    // Prepare the receipt data for background save
+    const receiptDataForUpdate = {
+      merchant: editedReceipt.merchant,
+      date: formattedDate,
+      total: typeof editedReceipt.total === 'number' ? editedReceipt.total : parseFloat(editedReceipt.total) || 0,
+      tax: typeof editedReceipt.tax === 'number' ? editedReceipt.tax : parseFloat(editedReceipt.tax) || 0,
+      currency: editedReceipt.currency,
+      payment_method: editedReceipt.payment_method,
+      predicted_category: editedReceipt.predicted_category,
+      custom_category_id: editedReceipt.custom_category_id,
+      status: "reviewed" as const,
+    };
+
+    // Log the data being sent for debugging
+    if (import.meta.env.DEV) {
+      console.log("Sending data to background save:", {
+        id: receipt.id,
+        receiptData: receiptDataForUpdate,
+        lineItems: formattedLineItems
+      });
+    }
+
+    // Add to background save queue
+    return saveReceipt(
+      receipt.id,
+      receiptDataForUpdate,
+      formattedLineItems,
+      {
+        maxRetries: 3,
+        onSuccess: (result) => {
+          // Update local state optimistically
+          const updatedReceipt: ReceiptWithDetails = {
+            ...receipt,
+            ...receiptDataForUpdate,
+            updated_at: new Date().toISOString(),
+            lineItems: formattedLineItems
+          };
+
+          setEditedReceipt(updatedReceipt);
+
+          // Notify parent component of the update
+          if (onUpdate) {
+            onUpdate(updatedReceipt);
+          }
+
+          // Invalidate queries to refresh data
+          queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+          queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+          queryClient.invalidateQueries({ queryKey: ['receipts'] });
+
+          // Fix processing status if needed
+          if (receipt.processing_status !== 'complete') {
+            fixProcessingStatus(receipt.id);
+          }
+        },
+        onError: (error) => {
+          console.error("Background save failed:", error);
+          // Error handling is managed by the toast manager
+        }
+      }
+    );
+  };
+
+  // Legacy mutation for AI processing only
+  const processingMutation = useMutation({
     mutationFn: async () => {
-      // Show a toast to indicate saving has started
-      toast.loading(t('viewer.savingDetails'));
-
-      try {
-        // Format the date properly if it's a string
-        let formattedDate = editedReceipt.date;
-        if (typeof formattedDate === 'string' && formattedDate.includes('T')) {
-          formattedDate = formattedDate.split('T')[0];
-        }
-
-        // Ensure line items are properly formatted
-        const formattedLineItems = editedReceipt.lineItems?.map(item => ({
-          description: item.description || '',
-          amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0
-        }));
-
-        // Log the data being sent to the server for debugging
-        if (import.meta.env.DEV) {
-          console.log("Sending data to updateReceipt:", {
-          id: receipt.id,
-          receipt: {
-            merchant: editedReceipt.merchant,
-            date: formattedDate,
-            total: typeof editedReceipt.total === 'number' ? editedReceipt.total : parseFloat(editedReceipt.total) || 0,
-            tax: typeof editedReceipt.tax === 'number' ? editedReceipt.tax : parseFloat(editedReceipt.tax) || 0,
-            currency: editedReceipt.currency,
-            payment_method: editedReceipt.payment_method,
-            predicted_category: editedReceipt.predicted_category,
-            status: "reviewed",
-          },
-          lineItems: formattedLineItems
-        });
-        }
-
-        return await updateReceiptWithLineItems(
-          receipt.id,
-          {
-            merchant: editedReceipt.merchant,
-            date: formattedDate,
-            total: typeof editedReceipt.total === 'number' ? editedReceipt.total : parseFloat(editedReceipt.total) || 0,
-            tax: typeof editedReceipt.tax === 'number' ? editedReceipt.tax : parseFloat(editedReceipt.tax) || 0,
-            currency: editedReceipt.currency,
-            payment_method: editedReceipt.payment_method,
-            predicted_category: editedReceipt.predicted_category,
-            custom_category_id: editedReceipt.custom_category_id,
-            status: "reviewed",
-          },
-          formattedLineItems,
-          { skipEmbeddings: false }
-        );
-      } catch (error) {
-        console.error("Error preparing data for update:", error);
-        toast.dismiss();
-        toast.error("Failed to prepare data for update: " + (error.message || "Unknown error"));
-        throw error;
-      }
+      return await processReceiptWithAI(receipt.id, { modelId: 'gemini-2.0-flash-exp' });
     },
-    onSuccess: async () => {
-      // Reset saving flag
-      setIsSaving(false);
-
-      // Dismiss the loading toast
-      toast.dismiss();
-
-      // Show success message
-      toast.success("Receipt updated successfully");
-
-      // Invalidate the receipt query to force a refresh (include all team contexts)
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
-      queryClient.invalidateQueries({ queryKey: ['receipts'] });
-
-      // Update the local state to reflect the changes
-      // This ensures the UI shows the updated data immediately
-      const updatedReceipt: ReceiptWithDetails = {
-        ...receipt,
-        merchant: editedReceipt.merchant,
-        date: editedReceipt.date,
-        total: editedReceipt.total,
-        tax: editedReceipt.tax,
-        currency: editedReceipt.currency,
-        payment_method: editedReceipt.payment_method,
-        predicted_category: editedReceipt.predicted_category,
-        custom_category_id: editedReceipt.custom_category_id,
-        status: "reviewed",
-        updated_at: new Date().toISOString(),
-        lineItems: editedReceipt.lineItems // Include updated line items
-      };
-
-      // Force update the UI with the new data
-      setEditedReceipt(updatedReceipt);
-
-      // Notify parent component of the update
-      if (onUpdate) {
-        onUpdate(updatedReceipt);
-      }
-
-      // Save confidence scores as part of the receipt update
-      // This is now handled by the update_receipt_final function
-      // We're keeping this code for reference, but it's not needed anymore
-      if (import.meta.env.DEV) {
-        console.log("Confidence scores are now saved as part of the receipt update");
-      }
-
-      // Update the local state to reflect the new confidence scores
-      const confidenceToSave = {
-        merchant: editedConfidence.merchant || 0,
-        date: editedConfidence.date || 0,
-        total: editedConfidence.total || 0,
-        tax: editedConfidence.tax || 0,
-        payment_method: editedConfidence.payment_method || 0,
-        line_items: editedConfidence.line_items || 0,
-      };
-
-      if (import.meta.env.DEV) {
-        console.log("Updated confidence scores:", confidenceToSave);
-      }
-
-      // Invalidate queries to refetch data including updated confidence
-      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-      queryClient.invalidateQueries({ queryKey: ['receipts'] });
-      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
-      toast.success("Receipt updated successfully!");
-
-      // If the receipt was in a failed state, try to mark it as fixed
-      if (processingStatus === 'failed_ocr' || processingStatus === 'failed_ai') {
-        fixProcessingStatus(receipt.id);
-      }
+      toast.success("Receipt processed successfully");
     },
     onError: (error: Error) => {
-      // Reset saving flag
-      setIsSaving(false);
-
-      // Dismiss the loading toast
-      toast.dismiss();
-
-      console.error("Failed to update receipt:", error);
-
-      // Provide more detailed error message
-      let errorMessage = "Failed to update receipt";
-
-      if (error.message) {
-        errorMessage += ": " + error.message;
-      } else if (error.code) {
-        errorMessage += ` (Error code: ${error.code})`;
-      }
-
-      // Log additional details for debugging
-      const errorObj = error as Record<string, unknown>;
-      if (errorObj.details || errorObj.hint) {
-        console.error("Additional error details:", {
-          details: errorObj.details,
-          hint: errorObj.hint
-        });
-      }
-
-      toast.error(errorMessage);
+      console.error("Failed to process receipt:", error);
+      toast.error("Failed to process receipt: " + error.message);
     }
   });
 
@@ -728,17 +660,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       return;
     }
 
-    // Set saving flag to prevent input values reset during save operation
-    setIsSaving(true);
+    // Perform background save - non-blocking
+    const operationId = performBackgroundSave();
 
-    // Show a loading toast
-    toast.loading("Saving receipt details...");
+    if (import.meta.env.DEV) {
+      console.log("Started background save operation:", operationId);
+    }
 
-    // Proceed with the update
-    updateMutation.mutate();
-
-    // Removed optimistic update - we'll rely on the mutation's onSuccess callback
-    // and query invalidation to update the UI after successful save
+    // No need to block UI or show loading toast - the SaveStatusToastManager handles this
+    // Users can immediately navigate away or continue editing other receipts
   };
 
   const handleAddLineItem = () => {
@@ -1794,18 +1724,30 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               <History size={16} />
               View History
             </Button>
-            <Button
-              variant="default"
-              onClick={handleSaveChanges}
-              disabled={updateMutation.isPending}
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : "Save Changes"}
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                variant="default"
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : saveStatus === 'saved' ? (
+                  <>
+                    <CheckCircle size={16} className="mr-2 text-green-500" />
+                    Saved
+                  </>
+                ) : saveStatus === 'failed' ? (
+                  "Retry Save"
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+              <SaveStatusIndicator receiptId={receipt.id} />
+            </div>
           </div>
         </div>
 
