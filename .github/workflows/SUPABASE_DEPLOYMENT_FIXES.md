@@ -29,6 +29,16 @@
 - **Root Cause**: Deprecated config field in supabase/config.toml
 - **Solution**: Removed `openai_api_key` field from `[studio]` section
 
+### **5. IPv6 Connectivity Issue** ✅ **FIXED**
+- **Problem**: `dial tcp [IPv6]:5432: connect: network is unreachable`
+- **Root Cause**: GitHub Actions runners have limited IPv6 connectivity to Supabase
+- **Solution**: Added `GODEBUG=netdns=go+1` to prefer IPv4 connections
+
+### **6. Database Connection Method** ✅ **IMPROVED**
+- **Problem**: CLI direct PostgreSQL connections failing while HTTP API works
+- **Root Cause**: Different connection methods have different reliability in CI/CD
+- **Solution**: Added fallback from linked project to direct database URL
+
 ## 📋 **Files Modified**
 
 ### **Workflow Files**
@@ -47,11 +57,20 @@ All secrets must be configured as **Environment Secrets** under "Production" env
 
 ```
 SUPABASE_ACCESS_TOKEN     # Supabase CLI access token
-SUPABASE_URL              # Production Supabase URL  
+SUPABASE_URL              # Production Supabase URL
 SUPABASE_ANON_KEY         # Production anonymous key
 SUPABASE_SERVICE_ROLE_KEY # Production service role key
 SUPABASE_PROJECT_ID       # Production project ID
+SUPABASE_DB_PASSWORD      # PostgreSQL database password (NEW - REQUIRED)
 ```
+
+### **🔑 How to Obtain SUPABASE_DB_PASSWORD**
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard/project/mpmkbtsufihzdelrlszs)
+2. Navigate to **Settings** → **Database** → **Connection parameters**
+3. Copy the **Password** field (NOT the service role key)
+4. Add to GitHub: **Repository** → **Settings** → **Environments** → **Production** → **Add secret**
+   - Name: `SUPABASE_DB_PASSWORD`
+   - Value: `[your-database-password]`
 
 ### **How to Obtain SUPABASE_ACCESS_TOKEN**
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
@@ -123,9 +142,26 @@ SUPABASE_PROJECT_ID       # Production project ID
 - [GitHub Actions Environment Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets#creating-encrypted-secrets-for-an-environment)
 - [Supabase Project Settings](https://supabase.com/dashboard/project/_/settings/api)
 
+## ❓ **Answers to Your Specific Questions**
+
+### **Q1: Why is the CLI prompting for database password despite setting `SUPABASE_DB_PASSWORD=""`?**
+**A**: Setting an empty string doesn't provide the actual password. The CLI needs the real PostgreSQL database password for direct database connections. The empty string just prevents interactive prompts but doesn't authenticate.
+
+### **Q2: Should we add the database password as a GitHub environment secret?**
+**A**: Yes, absolutely. Add `SUPABASE_DB_PASSWORD` with your actual database password from the Supabase dashboard (Settings → Database → Connection parameters).
+
+### **Q3: Is the IPv6 connectivity issue causing the database connection failures?**
+**A**: Yes, the error `dial tcp [IPv6]:5432: connect: network is unreachable` indicates GitHub Actions runners can't reach Supabase's IPv6 database servers. Fixed with `GODEBUG=netdns=go+1` to prefer IPv4.
+
+### **Q4: Are there alternative authentication methods for CI/CD environments?**
+**A**: Yes, the workflow now includes:
+- **Primary**: Linked project authentication (preferred)
+- **Fallback**: Direct database URL with explicit credentials
+- **Network**: IPv4 preference for better connectivity
+
 ## 🎯 **Next Steps**
 
-1. **Test the deployment workflow** with a small change to verify fixes
-2. **Monitor workflow logs** for any remaining issues
-3. **Update team documentation** with new authentication requirements
-4. **Set up monitoring alerts** for deployment failures
+1. **Add SUPABASE_DB_PASSWORD** to GitHub environment secrets (see instructions above)
+2. **Test the deployment workflow** with a small change to verify fixes
+3. **Monitor workflow logs** for successful database connections
+4. **Update team documentation** with new authentication requirements
