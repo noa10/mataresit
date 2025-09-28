@@ -32,6 +32,7 @@ This directory contains GitHub Actions workflows optimized for the Mataresit app
   - Edge Function deployment
   - Environment-specific deployments
   - Post-deployment validation
+  - Configured for GitHub Environment secrets access
 
 #### `security-scan.yml` - Security Scanning
 - **Purpose**: Comprehensive security analysis
@@ -53,14 +54,7 @@ This directory contains GitHub Actions workflows optimized for the Mataresit app
   - Security header validation
   - Alert system testing
 
-#### `deployment-gates.yml` - Deployment Quality Gates
-- **Purpose**: Reusable quality gates for deployments
-- **Triggers**: Called by other workflows
-- **Features**:
-  - Security scoring system
-  - Frontend security validation
-  - Lighthouse audits
-  - Environment-specific thresholds
+
 
 #### `vercel-rollback.yml` - Emergency Rollback
 - **Purpose**: Emergency rollback for production issues
@@ -80,6 +74,7 @@ The following workflows were removed as they were incompatible with Vercel + Sup
 - `deploy-production.yml` - Kubernetes deployment
 - `deploy-staging.yml` - Kubernetes deployment
 - `rollback.yml` - Kubernetes rollback
+- `deployment-gates.yml` - Containerized deployment gates incompatible with serverless architecture
 
 ## 🔧 **Required Secrets**
 
@@ -200,6 +195,12 @@ EMERGENCY_APPROVERS - GitHub usernames for emergency approvals
 - Verify Vercel deployment status
 - Use new validation scripts for debugging
 - Review migration documentation for architecture issues
+
+### **Environment Secrets Configuration**
+- Ensure secrets are configured as "Environment secrets" in GitHub repository settings
+- All Supabase deployment jobs require `environment: Production` to access environment secrets
+- Repository secrets are accessible without environment specification
+- Environment secrets provide additional security and access control
 
 ### **Infrastructure Management**
 ```bash
