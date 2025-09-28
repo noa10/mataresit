@@ -274,7 +274,7 @@ export function shouldShowNotificationWithPreferences(
     'receipt_processing_failed': 'push_receipt_processing_failed',
     'receipt_ready_for_review': 'push_receipt_ready_for_review', // Restored - but won't be created anyway
     'receipt_batch_completed': 'push_receipt_batch_completed',
-    'receipt_batch_failed': 'push_receipt_batch_failed',
+    'receipt_batch_failed': 'push_receipt_processing_failed', // Use processing failed preference
 
     // Team collaboration notifications
     'team_invitation_sent': 'push_team_invitations',
@@ -326,12 +326,12 @@ export interface NotificationPreferences {
   email_receipt_processing_failed: boolean;
   email_receipt_ready_for_review: boolean;
   email_receipt_batch_completed: boolean;
-  email_receipt_batch_failed: boolean;
   email_team_invitations: boolean;
   email_team_activity: boolean;
   email_billing_updates: boolean;
   email_security_alerts: boolean;
   email_weekly_reports: boolean;
+  email_team_member_removed: boolean;
 
   // Push notification preferences
   push_enabled: boolean;
@@ -339,11 +339,11 @@ export interface NotificationPreferences {
   push_receipt_processing_failed: boolean;
   push_receipt_ready_for_review: boolean;
   push_receipt_batch_completed: boolean;
-  push_receipt_batch_failed: boolean;
   push_team_invitations: boolean;
   push_team_activity: boolean;
   push_receipt_comments: boolean;
   push_receipt_shared: boolean;
+  push_team_member_removed: boolean;
 
   // Browser notification preferences
   browser_permission_granted: boolean;
