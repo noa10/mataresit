@@ -155,10 +155,12 @@ jobs:
 
           echo "✅ Credentials validated for project: $PROJECT_ID"
 
-          # Try linking to project, but continue if it fails (use direct DB URL instead)
+          # Configure network preferences for IPv4 (avoid IPv6 issues)
+          echo "🌐 Configuring network preferences..."
+          export GODEBUG=netdns=go+1
+
+          # Try linking to project with proper database password
           echo "🔗 Attempting to link to Supabase project..."
-          # Set database password to avoid interactive prompt
-          export SUPABASE_DB_PASSWORD=""
           if supabase link --project-ref "$PROJECT_ID" --debug; then
             echo "✅ Successfully linked to project"
             LINK_SUCCESS=true
@@ -166,6 +168,7 @@ jobs:
             echo "⚠️ Link failed, will use direct database URL for migrations"
             echo "🔍 Debugging CLI authentication..."
             echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
+            echo "DB password configured: ${SUPABASE_DB_PASSWORD:+YES}"
             echo "Project ref: $PROJECT_ID"
             echo "CLI version:"
             supabase --version
@@ -186,19 +189,36 @@ jobs:
           if [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
             echo "🔄 Running database migrations..."
 
-            # Use linked project for migrations
+            # Try migrations with linked project first, then fallback to direct URL
             if [ "$LINK_SUCCESS" = "true" ]; then
               echo "Using linked project for migrations"
               if ! supabase db push --debug; then
-                echo "❌ Database migration failed"
+                echo "❌ Database migration failed with linked project"
+                echo "🔄 Trying alternative connection method..."
+                LINK_SUCCESS=false
+              else
+                echo "✅ Database migrations completed successfully"
+              fi
+            fi
+
+            # Fallback to direct database URL if linking failed
+            if [ "$LINK_SUCCESS" = "false" ]; then
+              echo "🔄 Using direct database URL for migrations..."
+
+              # Construct database URL from Supabase URL
+              DB_HOST=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||').supabase.co
+              DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${DB_HOST}:5432/postgres"
+
+              echo "Database host: db.${DB_HOST}"
+              echo "Attempting migration with direct connection..."
+
+              if ! supabase db push --db-url "$DB_URL" --debug; then
+                echo "❌ Database migration failed with direct URL"
                 echo "🔍 Checking migration status..."
-                supabase migration list || echo "Failed to list migrations"
+                supabase migration list --db-url "$DB_URL" || echo "Failed to list migrations"
                 exit 1
               fi
-            else
-              echo "❌ Cannot run migrations without successful project link"
-              echo "Please check SUPABASE_ACCESS_TOKEN configuration"
-              exit 1
+              echo "✅ Database migrations completed successfully with direct connection"
             fi
             echo "✅ Database migrations completed successfully"
           else
@@ -206,6 +226,10 @@ jobs:
           fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
   # Deploy Edge Functions
   deploy-functions:
@@ -260,10 +284,12 @@ jobs:
             exit 1
           fi
 
+          # Configure network preferences for IPv4 (avoid IPv6 issues)
+          echo "🌐 Configuring network preferences..."
+          export GODEBUG=netdns=go+1
+
           # Try linking to project for function deployment
           echo "🔗 Attempting to link to Supabase project..."
-          # Set database password to avoid interactive prompt
-          export SUPABASE_DB_PASSWORD=""
           if supabase link --project-ref "$PROJECT_ID" --debug; then
             echo "✅ Successfully linked to project"
             LINK_SUCCESS=true
@@ -271,6 +297,7 @@ jobs:
             echo "❌ Failed to link to Supabase project"
             echo "🔍 Debugging CLI authentication..."
             echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
+            echo "DB password configured: ${SUPABASE_DB_PASSWORD:+YES}"
             echo "Project ref: $PROJECT_ID"
             echo "CLI version:"
             supabase --version
@@ -303,6 +330,10 @@ jobs:
           fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
   # Post-deployment validation
   validate-deployment:
