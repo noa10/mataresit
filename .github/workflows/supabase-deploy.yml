@@ -155,13 +155,22 @@ jobs:
 
           echo "✅ Credentials validated for project: $PROJECT_ID"
 
-          # Link to project with error handling
-          echo "🔗 Linking to Supabase project..."
-          if ! echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"; then
-            echo "❌ Failed to link to Supabase project"
-            exit 1
+          # Try linking to project, but continue if it fails (use direct DB URL instead)
+          echo "🔗 Attempting to link to Supabase project..."
+          # Set database password to avoid interactive prompt
+          export SUPABASE_DB_PASSWORD=""
+          if supabase link --project-ref "$PROJECT_ID" --debug; then
+            echo "✅ Successfully linked to project"
+            LINK_SUCCESS=true
+          else
+            echo "⚠️ Link failed, will use direct database URL for migrations"
+            echo "🔍 Debugging CLI authentication..."
+            echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
+            echo "Project ref: $PROJECT_ID"
+            echo "CLI version:"
+            supabase --version
+            LINK_SUCCESS=false
           fi
-          echo "✅ Successfully linked to project"
 
           # Check migrations directory
           if [ ! -d "supabase/migrations" ]; then
@@ -176,10 +185,19 @@ jobs:
           # Run migrations with error handling
           if [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
             echo "🔄 Running database migrations..."
-            if ! supabase db push --debug; then
-              echo "❌ Database migration failed"
-              echo "🔍 Checking migration status..."
-              supabase migration list || echo "Failed to list migrations"
+
+            # Use linked project for migrations
+            if [ "$LINK_SUCCESS" = "true" ]; then
+              echo "Using linked project for migrations"
+              if ! supabase db push --debug; then
+                echo "❌ Database migration failed"
+                echo "🔍 Checking migration status..."
+                supabase migration list || echo "Failed to list migrations"
+                exit 1
+              fi
+            else
+              echo "❌ Cannot run migrations without successful project link"
+              echo "Please check SUPABASE_ACCESS_TOKEN configuration"
               exit 1
             fi
             echo "✅ Database migrations completed successfully"
@@ -242,13 +260,23 @@ jobs:
             exit 1
           fi
 
-          # Link to project with error handling
-          echo "🔗 Linking to Supabase project..."
-          if ! echo "$SUPABASE_SERVICE_KEY" | supabase link --project-ref "$PROJECT_ID"; then
+          # Try linking to project for function deployment
+          echo "🔗 Attempting to link to Supabase project..."
+          # Set database password to avoid interactive prompt
+          export SUPABASE_DB_PASSWORD=""
+          if supabase link --project-ref "$PROJECT_ID" --debug; then
+            echo "✅ Successfully linked to project"
+            LINK_SUCCESS=true
+          else
             echo "❌ Failed to link to Supabase project"
+            echo "🔍 Debugging CLI authentication..."
+            echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
+            echo "Project ref: $PROJECT_ID"
+            echo "CLI version:"
+            supabase --version
+            echo "Cannot deploy functions without successful project link"
             exit 1
           fi
-          echo "✅ Successfully linked to project"
 
           # Check functions directory
           if [ ! -d "supabase/functions" ]; then
@@ -337,12 +365,14 @@ jobs:
 
           # Test health endpoint with detailed error reporting
           echo "🏥 Testing health endpoint..."
-          if curl -f -s --max-time 30 "$SUPABASE_URL/health" > /dev/null; then
+          if curl -f -s --max-time 30 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/health" > /dev/null; then
             echo "✅ Supabase health check passed"
           else
             echo "❌ Supabase health check failed"
             echo "🔍 Attempting to get more details..."
-            curl -v "$SUPABASE_URL/health" || true
+            curl -v -H "apikey: $SUPABASE_ANON_KEY" "$SUPABASE_URL/health" || true
             exit 1
           fi
 
