@@ -1,5 +1,0 @@
-2025-09-26T12:01:37.4110000Z Requested labels: ubuntu-latest
-2025-09-26T12:01:37.4110000Z Job defined at: noa10/mataresit/.github/workflows/monitoring.yml@refs/heads/main
-2025-09-26T12:01:37.4110000Z Waiting for a runner to pick up this job...
-2025-09-26T12:01:37.8860000Z Job is about to start running on the hosted runner: GitHub Actions 1000008298
-2025-09-26T12:01:37.8860000Z Job is waiting for a hosted runner to come online.
