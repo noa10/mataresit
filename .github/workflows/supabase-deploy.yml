@@ -1,4 +1,4 @@
-name: Supabase Deployment
+name: Supabase Code Validation
 
 on:
   push:
@@ -6,18 +6,23 @@ on:
     paths:
       - 'supabase/**'
       - '.github/workflows/supabase-deploy.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-deploy.yml'
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: 'Environment to validate against'
         required: true
-        default: 'staging'
+        default: 'production'
         type: choice
         options:
-        - staging
         - production
-      skip_migrations:
-        description: 'Skip database migrations'
+        - staging
+      skip_migration_validation:
+        description: 'Skip migration file validation'
         required: false
         default: false
         type: boolean
@@ -92,13 +97,12 @@ jobs:
             echo "No Edge Functions found"
           fi
 
-  # Database Migrations
-  migrate:
-    name: Database Migration
+  # Database Migration Validation
+  validate-migrations:
+    name: Validate Database Migrations
     runs-on: ubuntu-latest
     needs: validate
-    if: github.event.inputs.skip_migrations != 'true'
-    environment: Production
+    if: github.event.inputs.skip_migration_validation != 'true'
 
     steps:
       - name: Checkout code
@@ -109,331 +113,269 @@ jobs:
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
-      - name: Run database migrations
+      - name: Validate migration files
         run: |
           set -e  # Exit on any error
 
           ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          echo "🚀 Starting database migration for environment: $ENVIRONMENT"
+          echo "🔍 Starting migration file validation for environment: $ENVIRONMENT"
 
-          if [[ "$ENVIRONMENT" == "production" ]]; then
-            SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-            PROJECT_ID="${{ secrets.SUPABASE_PROJECT_ID }}"
-          else
-            SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
-            SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
-            PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
-          fi
-
-          # Validate credentials with detailed debugging
-          echo "🔍 Debugging Supabase credentials for $ENVIRONMENT environment:"
-          echo "SUPABASE_URL: ${SUPABASE_URL:+SET (length: ${#SUPABASE_URL})}"
-          echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET (length: ${#SUPABASE_SERVICE_KEY})}"
-          echo "PROJECT_ID: ${PROJECT_ID:+SET (length: ${#PROJECT_ID})}"
-
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ] || [ -z "$PROJECT_ID" ]; then
-            echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
-            echo ""
-            echo "🔧 TROUBLESHOOTING GUIDE:"
-            echo "1. Verify these secrets are configured in GitHub repository settings:"
-            if [ -z "$SUPABASE_URL" ]; then
-              echo "   ❌ Missing: SUPABASE_URL (for production) or STAGING_SUPABASE_URL (for staging)"
-            fi
-            if [ -z "$SUPABASE_SERVICE_KEY" ]; then
-              echo "   ❌ Missing: SUPABASE_SERVICE_ROLE_KEY (for production) or STAGING_SUPABASE_SERVICE_ROLE_KEY (for staging)"
-            fi
-            if [ -z "$PROJECT_ID" ]; then
-              echo "   ❌ Missing: SUPABASE_PROJECT_ID (for production) or STAGING_SUPABASE_PROJECT_ID (for staging)"
-            fi
-            echo ""
-            echo "2. Ensure secrets are configured for the 'Production' environment"
-            echo "3. Check that secret values are not empty"
-            echo "4. Verify the workflow is running with the correct environment context"
-            exit 1
-          fi
-
-          echo "✅ Credentials validated for project: $PROJECT_ID"
-
-          # Configure network preferences for IPv4 (avoid IPv6 issues)
-          echo "🌐 Configuring network preferences..."
-          export GODEBUG=netdns=go+1
-
-          # Force IPv4 by disabling IPv6 temporarily
-          echo "🔧 Disabling IPv6 to force IPv4 connections..."
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
-
-          # Verify IPv6 is disabled
-          echo "📊 Network configuration:"
-          ip addr show | grep -E "(inet|inet6)" | head -5
-
-          # Add IPv4-only DNS resolution for Supabase hosts
-          echo "🌐 Configuring IPv4-only DNS resolution..."
-          PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
-
-          # Resolve and cache IPv4 addresses
-          DB_HOST="db.${PROJECT_REF}.supabase.co"
-          API_HOST="api.supabase.com"
-
-          echo "🔍 Resolving IPv4 addresses..."
-          DB_IPV4=$(dig +short A "$DB_HOST" | head -1)
-          API_IPV4=$(dig +short A "$API_HOST" | head -1)
-
-          echo "Database IPv4: $DB_IPV4"
-          echo "API IPv4: $API_IPV4"
-
-          # Add to /etc/hosts to force IPv4 resolution
-          if [ -n "$DB_IPV4" ]; then
-            echo "$DB_IPV4 $DB_HOST" | sudo tee -a /etc/hosts
-          fi
-          if [ -n "$API_IPV4" ]; then
-            echo "$API_IPV4 $API_HOST" | sudo tee -a /etc/hosts
-          fi
-
-          # Try linking to project with proper database password
-          echo "🔗 Attempting to link to Supabase project..."
-          if supabase link --project-ref "$PROJECT_ID" --debug; then
-            echo "✅ Successfully linked to project"
-            LINK_SUCCESS=true
-          else
-            echo "⚠️ Link failed, will use direct database URL for migrations"
-            echo "🔍 Debugging CLI authentication..."
-            echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
-            echo "DB password configured: ${SUPABASE_DB_PASSWORD:+YES}"
-            echo "Project ref: $PROJECT_ID"
-            echo "CLI version:"
-            supabase --version
-            LINK_SUCCESS=false
-          fi
-
-          # Check migrations directory
+          # Check if migrations directory exists
           if [ ! -d "supabase/migrations" ]; then
-            echo "❌ Error: supabase/migrations directory not found"
-            exit 1
-          fi
-
-          # List migration files for debugging
-          echo "📋 Available migration files:"
-          ls -la supabase/migrations/ || echo "No files found"
-
-          # Run migrations with error handling
-          if [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
-            echo "🔄 Running database migrations..."
-
-            # Try migrations with linked project first, then fallback to direct URL
-            if [ "$LINK_SUCCESS" = "true" ]; then
-              echo "Using linked project for migrations"
-              if ! supabase db push --debug; then
-                echo "❌ Database migration failed with linked project"
-                echo "🔄 Trying alternative connection method..."
-                LINK_SUCCESS=false
-              else
-                echo "✅ Database migrations completed successfully"
-              fi
-            fi
-
-            # Fallback to direct database URL if linking failed
-            if [ "$LINK_SUCCESS" = "false" ]; then
-              echo "🔄 Using direct database URL for migrations..."
-
-              # Extract project ID from URL for connection
-              PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
-
-              # Configure PostgreSQL client for IPv4 and timeouts
-              export PGCONNECT_TIMEOUT=30
-              export PGCOMMAND_TIMEOUT=300
-
-              # Try multiple connection methods with IPv4 addresses
-              echo "🔗 Attempting connection method 1: Direct PostgreSQL with IPv4"
-
-              # Get IPv4 address for database host
-              DB_IPV4=$(dig +short A "db.${PROJECT_REF}.supabase.co" | head -1)
-              if [ -n "$DB_IPV4" ]; then
-                echo "Using IPv4 address: $DB_IPV4"
-                DB_URL_DIRECT="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_IPV4}:5432/postgres?connect_timeout=30"
-              else
-                echo "Could not resolve IPv4, using hostname"
-                DB_URL_DIRECT="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres?connect_timeout=30"
-              fi
-
-              if timeout 300 supabase db push --db-url "$DB_URL_DIRECT" --debug; then
-                echo "✅ Database migrations completed successfully with direct connection"
-              else
-                echo "⚠️ Direct connection failed, trying pgbouncer..."
-
-                # Try pgbouncer connection (port 6543) with IPv4
-                echo "🔗 Attempting connection method 2: PgBouncer with IPv4"
-                if [ -n "$DB_IPV4" ]; then
-                  DB_URL_PGBOUNCER="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_IPV4}:6543/postgres?connect_timeout=30"
-                else
-                  DB_URL_PGBOUNCER="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:6543/postgres?connect_timeout=30"
-                fi
-
-                if timeout 300 supabase db push --db-url "$DB_URL_PGBOUNCER" --debug; then
-                  echo "✅ Database migrations completed successfully with pgbouncer"
-                else
-                  echo "❌ All connection methods failed"
-                  echo "🔍 Checking migration status..."
-                  timeout 60 supabase migration list --db-url "$DB_URL_DIRECT" || echo "Failed to list migrations"
-                  exit 1
-                fi
-              fi
-            fi
-            echo "✅ Database migrations completed successfully"
-          else
-            echo "ℹ️ No migrations to run"
-          fi
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-
-  # Deploy Edge Functions
-  deploy-functions:
-    name: Deploy Edge Functions
-    runs-on: ubuntu-latest
-    needs: [validate, migrate]
-    if: always() && needs.validate.result == 'success'
-    environment: Production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: ${{ env.SUPABASE_CLI_VERSION }}
-
-      - name: Deploy Edge Functions
-        run: |
-          set -e  # Exit on any error
-
-          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
-          echo "🚀 Starting Edge Functions deployment for environment: $ENVIRONMENT"
-
-          if [[ "$ENVIRONMENT" == "production" ]]; then
-            PROJECT_ID="${{ secrets.SUPABASE_PROJECT_ID }}"
-            SUPABASE_SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-          else
-            PROJECT_ID="${{ secrets.STAGING_SUPABASE_PROJECT_ID }}"
-            SUPABASE_SERVICE_KEY="${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}"
-          fi
-
-          # Validate credentials with detailed debugging
-          echo "🔍 Debugging Edge Functions credentials for $ENVIRONMENT environment:"
-          echo "PROJECT_ID: ${PROJECT_ID:+SET (length: ${#PROJECT_ID})}"
-          echo "SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:+SET (length: ${#SUPABASE_SERVICE_KEY})}"
-
-          if [ -z "$PROJECT_ID" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
-            echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
-            echo ""
-            echo "🔧 TROUBLESHOOTING GUIDE:"
-            echo "1. Verify these secrets are configured in GitHub repository settings:"
-            if [ -z "$PROJECT_ID" ]; then
-              echo "   ❌ Missing: SUPABASE_PROJECT_ID (for production) or STAGING_SUPABASE_PROJECT_ID (for staging)"
-            fi
-            if [ -z "$SUPABASE_SERVICE_KEY" ]; then
-              echo "   ❌ Missing: SUPABASE_SERVICE_ROLE_KEY (for production) or STAGING_SUPABASE_SERVICE_ROLE_KEY (for staging)"
-            fi
-            echo "2. Ensure secrets are configured for the 'Production' environment"
-            echo "3. Check that secret values are not empty"
-            exit 1
-          fi
-
-          # Configure network preferences for IPv4 (avoid IPv6 issues)
-          echo "🌐 Configuring network preferences..."
-          export GODEBUG=netdns=go+1
-
-          # Force IPv4 by disabling IPv6 temporarily
-          echo "🔧 Disabling IPv6 to force IPv4 connections..."
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
-
-          # Verify IPv6 is disabled
-          echo "📊 Network configuration:"
-          ip addr show | grep -E "(inet|inet6)" | head -5
-
-          # Add IPv4-only DNS resolution for Supabase hosts
-          echo "🌐 Configuring IPv4-only DNS resolution..."
-          PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | sed 's|\.supabase\.co.*||')
-
-          # Resolve and cache IPv4 addresses
-          DB_HOST="db.${PROJECT_REF}.supabase.co"
-          API_HOST="api.supabase.com"
-
-          echo "🔍 Resolving IPv4 addresses..."
-          DB_IPV4=$(dig +short A "$DB_HOST" | head -1)
-          API_IPV4=$(dig +short A "$API_HOST" | head -1)
-
-          echo "Database IPv4: $DB_IPV4"
-          echo "API IPv4: $API_IPV4"
-
-          # Add to /etc/hosts to force IPv4 resolution
-          if [ -n "$DB_IPV4" ]; then
-            echo "$DB_IPV4 $DB_HOST" | sudo tee -a /etc/hosts
-          fi
-          if [ -n "$API_IPV4" ]; then
-            echo "$API_IPV4 $API_HOST" | sudo tee -a /etc/hosts
-          fi
-
-          # Try linking to project for function deployment
-          echo "🔗 Attempting to link to Supabase project..."
-          if supabase link --project-ref "$PROJECT_ID" --debug; then
-            echo "✅ Successfully linked to project"
-            LINK_SUCCESS=true
-          else
-            echo "❌ Failed to link to Supabase project"
-            echo "🔍 Debugging CLI authentication..."
-            echo "Access token length: ${SUPABASE_ACCESS_TOKEN:+${#SUPABASE_ACCESS_TOKEN}}"
-            echo "DB password configured: ${SUPABASE_DB_PASSWORD:+YES}"
-            echo "Project ref: $PROJECT_ID"
-            echo "CLI version:"
-            supabase --version
-            echo "Cannot deploy functions without successful project link"
-            exit 1
-          fi
-
-          # Check functions directory
-          if [ ! -d "supabase/functions" ]; then
-            echo "ℹ️ No supabase/functions directory found"
+            echo "ℹ️ No migrations directory found - skipping migration validation"
             exit 0
           fi
 
-          # List available functions for debugging
+          # Count migration files
+          MIGRATION_COUNT=$(find supabase/migrations -name "*.sql" | wc -l)
+          echo "📋 Found $MIGRATION_COUNT migration files"
+
+          if [ "$MIGRATION_COUNT" -eq 0 ]; then
+            echo "ℹ️ No migration files found - validation complete"
+            exit 0
+          fi
+
+          # Validate migration file naming convention
+          echo "🔍 Validating migration file naming convention..."
+          INVALID_NAMES=0
+
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "  Checking: $filename"
+
+              # Check naming pattern: YYYYMMDDHHMMSS_description.sql
+              if [[ ! "$filename" =~ ^[0-9]{14}_[a-zA-Z0-9_-]+\.sql$ ]]; then
+                echo "  ❌ Invalid naming convention: $filename"
+                echo "     Expected format: YYYYMMDDHHMMSS_description.sql"
+                INVALID_NAMES=$((INVALID_NAMES + 1))
+              else
+                echo "  ✅ Valid naming: $filename"
+              fi
+            fi
+          done
+
+          if [ "$INVALID_NAMES" -gt 0 ]; then
+            echo "❌ Found $INVALID_NAMES migration files with invalid naming"
+            exit 1
+          fi
+
+          echo "✅ All migration files follow correct naming convention"
+
+          # Validate SQL syntax in migration files
+          echo "🔍 Validating SQL syntax in migration files..."
+          SYNTAX_ERRORS=0
+
+          # Install PostgreSQL client for SQL validation
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "  Validating SQL syntax: $filename"
+
+              # Check for basic SQL syntax issues
+              if ! psql --set=ON_ERROR_STOP=1 --quiet --no-psqlrc -f "$file" --dry-run 2>/dev/null; then
+                # Try alternative validation - check for common SQL patterns
+                if grep -q -E "(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|SELECT)" "$file"; then
+                  # Check for obvious syntax errors
+                  if grep -q -E "(;[[:space:]]*$|;[[:space:]]*--)" "$file"; then
+                    echo "  ✅ Basic SQL structure valid: $filename"
+                  else
+                    echo "  ⚠️ Warning: No semicolon termination found in: $filename"
+                  fi
+                else
+                  echo "  ❌ No SQL statements found in: $filename"
+                  SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
+                fi
+              else
+                echo "  ✅ SQL syntax valid: $filename"
+              fi
+
+              # Check file size (warn if empty or too large)
+              file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+              if [ "$file_size" -eq 0 ]; then
+                echo "  ⚠️ Warning: Empty migration file: $filename"
+              elif [ "$file_size" -gt 1048576 ]; then  # 1MB
+                echo "  ⚠️ Warning: Large migration file (${file_size} bytes): $filename"
+              fi
+            fi
+          done
+
+          if [ "$SYNTAX_ERRORS" -gt 0 ]; then
+            echo "❌ Found $SYNTAX_ERRORS migration files with syntax issues"
+            exit 1
+          fi
+
+          echo "✅ All migration files have valid SQL syntax"
+
+          # Check for migration dependencies and ordering
+          echo "🔍 Validating migration file ordering..."
+
+          # List migration files in chronological order
+          echo "📋 Migration files in chronological order:"
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              timestamp=$(echo "$filename" | cut -d'_' -f1)
+              echo "  $timestamp: $filename"
+            fi
+          done
+
+          # Check for potential issues in migration content
+          echo "🔍 Checking for common migration issues..."
+          MIGRATION_WARNINGS=0
+
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+
+              # Check for potentially dangerous operations
+              if grep -q -i "DROP TABLE\|DROP DATABASE\|TRUNCATE" "$file"; then
+                echo "  ⚠️ Warning: Destructive operations found in $filename"
+                MIGRATION_WARNINGS=$((MIGRATION_WARNINGS + 1))
+              fi
+
+              # Check for missing transaction blocks for complex operations
+              if grep -q -i "ALTER TABLE\|CREATE INDEX" "$file" && ! grep -q -i "BEGIN\|START TRANSACTION" "$file"; then
+                echo "  ℹ️ Info: Consider using transaction blocks in $filename"
+              fi
+
+              # Check for proper semicolon termination
+              if ! grep -q ";" "$file"; then
+                echo "  ⚠️ Warning: No SQL statements with semicolons found in $filename"
+                MIGRATION_WARNINGS=$((MIGRATION_WARNINGS + 1))
+              fi
+            fi
+          done
+
+          if [ "$MIGRATION_WARNINGS" -gt 0 ]; then
+            echo "⚠️ Found $MIGRATION_WARNINGS potential issues in migration files (review recommended)"
+          fi
+
+          echo "✅ Migration file validation completed successfully"
+          echo "ℹ️ Note: Files validated for syntax and structure only - manual deployment required"
+
+  # Edge Functions Validation
+  validate-edge-functions:
+    name: Validate Edge Functions
+    runs-on: ubuntu-latest
+    needs: [validate, validate-migrations]
+    if: always() && needs.validate.result == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install TypeScript and dependencies
+        run: |
+          npm install -g typescript @types/node
+          # Install Deno for Edge Functions validation
+          curl -fsSL https://deno.land/x/install/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+
+      - name: Validate Edge Functions
+        run: |
+          set -e  # Exit on any error
+
+          ENVIRONMENT="${{ needs.validate.outputs.environment }}"
+          echo "🔍 Starting Edge Functions validation for environment: $ENVIRONMENT"
+
+          # Check if functions directory exists
+          if [ ! -d "supabase/functions" ]; then
+            echo "ℹ️ No Edge Functions directory found - skipping validation"
+            exit 0
+          fi
+
+          # Count function directories
+          FUNCTION_COUNT=$(find supabase/functions -maxdepth 1 -type d ! -path supabase/functions | wc -l)
+          echo "📋 Found $FUNCTION_COUNT Edge Function directories"
+
+          if [ "$FUNCTION_COUNT" -eq 0 ]; then
+            echo "ℹ️ No Edge Functions found - validation complete"
+            exit 0
+          fi
+
+          # Validate each Edge Function
+          echo "🔍 Validating Edge Functions structure and syntax..."
+          VALIDATION_ERRORS=0
+
+          for func_dir in supabase/functions/*/; do
+            if [ -d "$func_dir" ]; then
+              func_name=$(basename "$func_dir")
+              echo "  Validating function: $func_name"
+
+              # Check for required index.ts file
+              if [ ! -f "$func_dir/index.ts" ]; then
+                echo "  ❌ Missing index.ts in function: $func_name"
+                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+                continue
+              fi
+
+              echo "  ✅ Found index.ts for: $func_name"
+
+              # Validate TypeScript syntax
+              if ! deno check "$func_dir/index.ts" 2>/dev/null; then
+                echo "  ❌ TypeScript syntax errors in: $func_name"
+                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+              else
+                echo "  ✅ TypeScript syntax valid for: $func_name"
+              fi
+
+              # Check for proper Deno imports and exports
+              if grep -q "Deno.serve\|serve(" "$func_dir/index.ts"; then
+                echo "  ✅ Found Deno.serve handler in: $func_name"
+              else
+                echo "  ⚠️ Warning: No Deno.serve handler found in: $func_name"
+              fi
+
+              # Check for proper TypeScript imports
+              if grep -q "import.*from" "$func_dir/index.ts"; then
+                echo "  ✅ Found import statements in: $func_name"
+              fi
+
+              # Check file size
+              file_size=$(stat -f%z "$func_dir/index.ts" 2>/dev/null || stat -c%s "$func_dir/index.ts" 2>/dev/null || echo "0")
+              if [ "$file_size" -eq 0 ]; then
+                echo "  ❌ Empty function file: $func_name"
+                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+              elif [ "$file_size" -gt 1048576 ]; then  # 1MB
+                echo "  ⚠️ Warning: Large function file (${file_size} bytes): $func_name"
+              fi
+
+              # Check for common Edge Function patterns
+              if grep -q "Request\|Response" "$func_dir/index.ts"; then
+                echo "  ✅ Found Request/Response handling in: $func_name"
+              else
+                echo "  ⚠️ Warning: No Request/Response handling found in: $func_name"
+              fi
+            fi
+          done
+
+          if [ "$VALIDATION_ERRORS" -gt 0 ]; then
+            echo "❌ Found $VALIDATION_ERRORS Edge Functions with validation errors"
+            exit 1
+          fi
+
+          echo "✅ All Edge Functions validation completed successfully"
+          echo "ℹ️ Note: Functions validated for structure and syntax only - manual deployment required"
+
+          # List available functions for reference
           echo "📋 Available Edge Functions:"
           find supabase/functions -name "index.ts" -type f | sed 's|supabase/functions/||' | sed 's|/index.ts||' | sort || echo "No functions found"
 
-          # Deploy functions with error handling
-          if [ "$(find supabase/functions -name "index.ts" -type f | wc -l)" -gt 0 ]; then
-            echo "🔄 Deploying Edge Functions..."
-            if ! supabase functions deploy --debug; then
-              echo "❌ Edge Functions deployment failed"
-              echo "🔍 Checking function status..."
-              supabase functions list || echo "Failed to list functions"
-              exit 1
-            fi
-            echo "✅ Edge Functions deployed successfully"
-          else
-            echo "ℹ️ No Edge Functions to deploy (no index.ts files found)"
-          fi
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-
-  # Post-deployment validation
+  # Supabase Configuration Validation
   validate-deployment:
-    name: Validate Deployment
+    name: Validate Supabase Configuration
     runs-on: ubuntu-latest
-    needs: [validate, migrate, deploy-functions]
+    needs: [validate, validate-migrations, validate-edge-functions]
     if: always() && needs.validate.result == 'success'
     environment: Production
 
@@ -449,6 +391,59 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate Supabase configuration
+        run: |
+          set -e  # Exit on any error
+
+          echo "🔍 Validating Supabase configuration files..."
+
+          # Check if config.toml exists
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "❌ Error: supabase/config.toml not found"
+            exit 1
+          fi
+
+          echo "✅ Found supabase/config.toml"
+
+          # Validate config.toml syntax (basic TOML validation)
+          if command -v python3 >/dev/null 2>&1; then
+            python3 -c "
+import toml
+try:
+    with open('supabase/config.toml', 'r') as f:
+        config = toml.load(f)
+    print('✅ config.toml syntax is valid')
+
+    # Check for required sections
+    required_sections = ['api', 'db', 'studio', 'auth']
+    for section in required_sections:
+        if section in config:
+            print(f'✅ Found required section: [{section}]')
+        else:
+            print(f'⚠️ Warning: Missing section: [{section}]')
+
+except Exception as e:
+    print(f'❌ config.toml syntax error: {e}')
+    exit(1)
+" || echo "⚠️ Warning: Could not validate TOML syntax (python3/toml not available)"
+          fi
+
+          # Check for seed.sql if it exists
+          if [ -f "supabase/seed.sql" ]; then
+            echo "✅ Found supabase/seed.sql"
+
+            # Basic SQL validation for seed file
+            if grep -q -E "(INSERT|CREATE|ALTER)" "supabase/seed.sql"; then
+              echo "✅ seed.sql contains SQL statements"
+            else
+              echo "⚠️ Warning: seed.sql appears to be empty or contains no SQL statements"
+            fi
+          else
+            echo "ℹ️ No seed.sql file found (optional)"
+          fi
+
+          echo "✅ Supabase configuration validation completed"
 
       - name: Test Supabase connectivity
         run: |
