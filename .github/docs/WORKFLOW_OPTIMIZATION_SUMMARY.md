@@ -146,11 +146,12 @@ if: contains(github.event.head_commit.modified, 'supabase/')
 - ✅ **Performance metrics** collection
 - ✅ **Intelligent alerting** with thresholds
 
-### **Supabase Deployment (`supabase-deploy.yml`)**
-- ✅ **Environment validation** before deployment
-- ✅ **Conditional deployment** based on changes
-- ✅ **Post-deployment validation** with health checks
-- ✅ **Rollback capabilities** for failed deployments
+### **Supabase Validation (`supabase-validate.yml`)**
+- ✅ **Migration file validation** (syntax and naming conventions)
+- ✅ **Edge Function validation** (TypeScript syntax and structure)
+- ✅ **Configuration validation** (config.toml and seed.sql)
+- ✅ **HTTP API connectivity testing** (no direct database connections)
+- ℹ️ **Manual deployment required** after validation passes
 
 ## 🛠️ **Tools and Scripts Created**
 

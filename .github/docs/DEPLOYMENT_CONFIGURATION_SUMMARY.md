@@ -66,10 +66,11 @@ Trigger: Git push to main/develop branches
 Steps:
   1. Code quality and security checks
   2. Build validation
-  3. Supabase deployment (if needed)
-  4. Vercel automatic deployment
-  5. Post-deployment validation
-  6. Health monitoring
+  3. Supabase validation (migrations and functions)
+  4. Manual Supabase deployment (if needed)
+  5. Vercel automatic deployment
+  6. Post-deployment validation
+  7. Health monitoring
 ```
 
 ## 🛠️ **Tools and Scripts Created**
@@ -135,7 +136,7 @@ Steps:
 
 ### **Active Workflows**
 - ✅ **`ci.yml`** - Code quality, testing, build validation
-- ✅ **`supabase-deploy.yml`** - Database and function deployment
+- ✅ **`supabase-validate.yml`** - Supabase code validation (validation-only, no deployment)
 - ✅ **`monitoring.yml`** - Health checks and system monitoring
 - ✅ **`security-scan.yml`** - Security validation
 - ✅ **`vercel-rollback.yml`** - Emergency rollback procedures

@@ -44,7 +44,7 @@
 ### **Workflow Files**
 - ✅ **Removed**: `.github/workflows/deployment-gates.yml` (incompatible with Vercel + Supabase)
 - ✅ **Modified**: `.github/workflows/monitoring.yml` (removed Kubernetes sections)
-- ✅ **Fixed**: `.github/workflows/supabase-deploy.yml` (authentication and environment issues)
+- ✅ **Transformed**: `.github/workflows/supabase-validate.yml` (formerly supabase-deploy.yml, now validation-only)
 - ✅ **Updated**: `.github/workflows/README.md` (documentation updates)
 
 ### **Configuration Files**

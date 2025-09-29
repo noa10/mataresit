@@ -71,7 +71,7 @@ The comprehensive GitHub Actions workflow transformation for the Mataresit proje
 ## 📊 **Files Created and Modified**
 
 ### **New Workflows Created**
-- `.github/workflows/supabase-deploy.yml` - Supabase-specific deployment
+- `.github/workflows/supabase-validate.yml` - Supabase code validation (validation-only, no deployment)
 - `.github/workflows/vercel-rollback.yml` - Emergency rollback procedures
 
 ### **Workflows Optimized**

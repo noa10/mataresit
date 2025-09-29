@@ -5,12 +5,12 @@ on:
     branches: [ main, develop ]
     paths:
       - 'supabase/**'
-      - '.github/workflows/supabase-deploy.yml'
+      - '.github/workflows/supabase-validate.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'supabase/**'
-      - '.github/workflows/supabase-deploy.yml'
+      - '.github/workflows/supabase-validate.yml'
   workflow_dispatch:
     inputs:
       environment:

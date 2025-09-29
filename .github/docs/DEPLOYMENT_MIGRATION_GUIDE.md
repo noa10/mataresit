@@ -92,7 +92,7 @@ infrastructure/production/config/
 
 ### **Deployment Workflows**
 1. **`ci.yml`** - Code quality, testing, build validation
-2. **`supabase-deploy.yml`** - Database and function deployment
+2. **`supabase-validate.yml`** - Supabase code validation (validation-only, no deployment)
 3. **`monitoring.yml`** - Health checks and validation
 4. **`vercel-rollback.yml`** - Emergency rollback procedures
 

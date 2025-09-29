@@ -24,15 +24,15 @@ This directory contains GitHub Actions workflows optimized for the Mataresit app
   - Vercel preview deployments for PRs
   - Deployment readiness gates
 
-#### `supabase-deploy.yml` - Supabase Deployment
-- **Purpose**: Deploy Supabase migrations and Edge Functions
+#### `supabase-validate.yml` - Supabase Code Validation
+- **Purpose**: Validate Supabase migrations and Edge Functions (validation-only, no deployment)
 - **Triggers**: Push to main/develop (supabase/ changes), manual dispatch
 - **Features**:
-  - Database migration deployment
-  - Edge Function deployment
-  - Environment-specific deployments
-  - Post-deployment validation
-  - Configured for GitHub Environment secrets access
+  - Migration file syntax and naming validation
+  - Edge Function TypeScript validation
+  - Supabase configuration validation
+  - HTTP API connectivity testing
+  - Manual deployment required after validation passes
 
 #### `security-scan.yml` - Security Scanning
 - **Purpose**: Comprehensive security analysis
@@ -128,9 +128,10 @@ EMERGENCY_APPROVERS - GitHub usernames for emergency approvals
 ### **Production Flow**
 1. Develop → Main branch (via PR)
 2. CI workflow validates changes
-3. Supabase deployment (if needed)
-4. Vercel automatically deploys to production
-5. Monitoring validates deployment
+3. Supabase validation workflow checks migrations and functions
+4. Manual Supabase deployment (if needed)
+5. Vercel automatically deploys to production
+6. Monitoring validates deployment
 
 ### **Emergency Rollback**
 1. Manual trigger of `vercel-rollback.yml`
