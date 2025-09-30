@@ -408,25 +408,25 @@ jobs:
 
           # Validate config.toml syntax (basic TOML validation)
           if command -v python3 >/dev/null 2>&1; then
-            python3 -c "
-            import toml
-            try:
-                with open('supabase/config.toml', 'r') as f:
-                    config = toml.load(f)
-                print('✅ config.toml syntax is valid')
+            python3 <<'PYTHON_SCRIPT' || echo "⚠️ Warning: Could not validate TOML syntax (python3/toml not available)"
+          import toml
+          try:
+              with open('supabase/config.toml', 'r') as f:
+                  config = toml.load(f)
+              print('✅ config.toml syntax is valid')
 
-                # Check for required sections
-                required_sections = ['api', 'db', 'studio', 'auth']
-                for section in required_sections:
-                    if section in config:
-                        print(f'✅ Found required section: [{section}]')
-                    else:
-                        print(f'⚠️ Warning: Missing section: [{section}]')
+              # Check for required sections
+              required_sections = ['api', 'db', 'studio', 'auth']
+              for section in required_sections:
+                  if section in config:
+                      print(f'✅ Found required section: [{section}]')
+                  else:
+                      print(f'⚠️ Warning: Missing section: [{section}]')
 
-            except Exception as e:
-                print(f'❌ config.toml syntax error: {e}')
-                exit(1)
-" || echo "⚠️ Warning: Could not validate TOML syntax (python3/toml not available)"
+          except Exception as e:
+              print(f'❌ config.toml syntax error: {e}')
+              exit(1)
+          PYTHON_SCRIPT
           fi
 
           # Check for seed.sql if it exists
