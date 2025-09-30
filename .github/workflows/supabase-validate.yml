@@ -409,23 +409,23 @@ jobs:
           # Validate config.toml syntax (basic TOML validation)
           if command -v python3 >/dev/null 2>&1; then
             python3 -c "
-import toml
-try:
-    with open('supabase/config.toml', 'r') as f:
-        config = toml.load(f)
-    print('✅ config.toml syntax is valid')
+            import toml
+            try:
+                with open('supabase/config.toml', 'r') as f:
+                    config = toml.load(f)
+                print('✅ config.toml syntax is valid')
 
-    # Check for required sections
-    required_sections = ['api', 'db', 'studio', 'auth']
-    for section in required_sections:
-        if section in config:
-            print(f'✅ Found required section: [{section}]')
-        else:
-            print(f'⚠️ Warning: Missing section: [{section}]')
+                # Check for required sections
+                required_sections = ['api', 'db', 'studio', 'auth']
+                for section in required_sections:
+                    if section in config:
+                        print(f'✅ Found required section: [{section}]')
+                    else:
+                        print(f'⚠️ Warning: Missing section: [{section}]')
 
-except Exception as e:
-    print(f'❌ config.toml syntax error: {e}')
-    exit(1)
+            except Exception as e:
+                print(f'❌ config.toml syntax error: {e}')
+                exit(1)
 " || echo "⚠️ Warning: Could not validate TOML syntax (python3/toml not available)"
           fi
 
@@ -578,7 +578,7 @@ except Exception as e:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [validate, migrate, deploy-functions, validate-deployment]
+    needs: [validate, validate-migrations, validate-edge-functions, validate-deployment]
     if: always()
 
     steps:
@@ -587,18 +587,18 @@ except Exception as e:
         run: |
           echo "🚀 Supabase deployment successful!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
-          echo "Migrations: ${{ needs.migrate.result }}"
-          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
       - name: Log deployment failure
-        if: ${{ needs.validate.result == 'failure' || needs.migrate.result == 'failure' || needs.deploy-functions.result == 'failure' }}
+        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
         run: |
           echo "❌ Supabase deployment failed!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Validation: ${{ needs.validate.result }}"
-          echo "Migrations: ${{ needs.migrate.result }}"
-          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Check workflow logs for details."
 
       - name: Log deployment status (fallback)
@@ -607,8 +607,8 @@ except Exception as e:
           echo "=== Deployment Summary ==="
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Validation: ${{ needs.validate.result }}"
-          echo "Migrations: ${{ needs.migrate.result }}"
-          echo "Functions: ${{ needs.deploy-functions.result }}"
+          echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
           echo "ℹ️ Slack notifications disabled"
