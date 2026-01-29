@@ -45,6 +45,8 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
   // Check if we're on the search/chat page
   const isSearchPage = location.pathname === '/search';
 
+  const isAdminMenuVisible = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
+
   // Check if we're on a public page (outside AppLayout)
   const isPublicPage = ['/', '/pricing', '/help', '/docs', '/status', '/auth', '/auth/callback', '/auth/reset-password', '/payment-success', '/features'].includes(location.pathname);
 
@@ -558,7 +560,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
                     </Link>
                   </DropdownMenuItem>
 
-                  {isAdmin && (
+                  {isAdminMenuVisible && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>

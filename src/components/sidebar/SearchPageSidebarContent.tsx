@@ -34,10 +34,12 @@ export function SearchPageSidebarContent({
   currentConversationId,
   className
 }: SearchPageSidebarContentProps) {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t: tNav } = useNavigationTranslation();
   const { isSidebarOpen, toggleSidebar } = useAppSidebar();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  const isAdminUser = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
 
 
   React.useEffect(() => {
@@ -182,7 +184,7 @@ export function SearchPageSidebarContent({
                       <span>{tNav('mainMenu.settings')}</span>
                     </NavLink>
                   </li>
-                  {isAdmin && (
+                  {isAdminUser && (
                     <li>
                       <NavLink
                         to="/admin"

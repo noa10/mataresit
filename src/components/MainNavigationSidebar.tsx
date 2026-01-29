@@ -22,10 +22,12 @@ export function MainNavigationSidebar({
   onToggle,
   className
 }: MainNavigationSidebarProps) {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t: tNav } = useNavigationTranslation();
   const location = useLocation();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  const isAdminUser = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
 
   // Enhanced accessibility support
   const { sidebarProps } = useSidebarAccessibility({
@@ -202,7 +204,7 @@ export function MainNavigationSidebar({
                 {isOpen && <span>{tNav('mainMenu.settings')}</span>}
               </NavLink>
             </li>
-            {isAdmin && (
+            {isAdminUser && (
               <li>
                 <NavLink
                   to="/admin"

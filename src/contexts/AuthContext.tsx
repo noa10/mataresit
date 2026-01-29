@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AppRole, UserWithRole, AuthState } from "@/types/auth";
 import { invitationFlowService } from "@/services/invitationFlowService";
 
+const ADMIN_EMAIL = "k.anwarbakar@gmail.com";
+
 type AuthContextType = {
   user: UserWithRole | null;
   session: Session | null;
@@ -95,23 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user roles
   const fetchUserRoles = async (userId: string) => {
     try {
-      // Using RPC function to check if user has admin role
-      const { data, error } = await supabase.rpc('has_role', {
-        _user_id: userId,
-        _role: 'admin'
-      });
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
 
       if (error) {
         console.error('Error fetching user roles:', error);
-        return [];
+        return [] as AppRole[];
       }
 
-      // If has_role returns true, user is admin, otherwise regular user
-      const roles: AppRole[] = data ? ['admin'] : ['user'];
-      return roles;
+      if (!data || data.length === 0) {
+        return [] as AppRole[];
+      }
+
+      return data.map((row) => row.role as AppRole);
     } catch (error) {
       console.error('Error in fetchUserRoles:', error);
-      return ['user'] as AppRole[];
+      return [] as AppRole[];
     }
   };
 
@@ -125,7 +128,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const roles = await fetchUserRoles(currentUser.id);
+      const fetchedRoles = await fetchUserRoles(currentUser.id);
+      let roles = Array.isArray(fetchedRoles) ? [...fetchedRoles] : [];
+
+      if (currentUser.email === ADMIN_EMAIL && !roles.includes('admin')) {
+        roles.push('admin');
+      }
+
+      if (roles.length === 0) {
+        roles = ['user'];
+      }
 
       // Fetch subscription data from profiles table
       const { data: profile } = await supabase
@@ -168,8 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error updating user with roles:', error);
-      setUser({...currentUser, roles: ['user'], subscription_tier: 'free'} as UserWithRole);
-      setIsAdmin(false);
+      const fallbackRoles: AppRole[] = currentUser.email === ADMIN_EMAIL ? ['admin'] : ['user'];
+      setUser({
+        ...currentUser,
+        roles: fallbackRoles,
+        subscription_tier: 'free'
+      } as UserWithRole);
+      setIsAdmin(fallbackRoles.includes('admin'));
     } finally {
       if (shouldSetLoading) setLoading(false);
     }
