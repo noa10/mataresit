@@ -1222,7 +1222,7 @@ export const processReceiptWithAI = async (
 
       // Check for resource limit errors
       const isResourceLimitError = errorText.includes("WORKER_LIMIT") ||
-                                  errorText.includes("compute resources");
+        errorText.includes("compute resources");
 
       if (isResourceLimitError) {
         console.error("Resource limit error during processing:", errorText);
@@ -1270,19 +1270,19 @@ export const processReceiptWithAI = async (
 
     // Update the receipt with the processed data
     const updateData: any = {
-        merchant: result.merchant || '',
-        date: result.date || new Date().toISOString().split('T')[0], // Use today's date as fallback
-        total: result.total || 0,
-        tax: result.tax || 0,
-        currency: result.currency || 'MYR',
-        payment_method: result.payment_method || '',
-        fullText: result.fullText || '',
-        ai_suggestions: result.ai_suggestions || {},
-        predicted_category: result.predicted_category || null,
-        status: 'unreviewed',
-        processing_status: 'complete',
-        model_used: result.modelUsed || processingOptions.modelId
-      };
+      merchant: result.merchant || '',
+      date: result.date || new Date().toISOString().split('T')[0], // Use today's date as fallback
+      total: result.total || 0,
+      tax: result.tax || 0,
+      currency: result.currency || 'MYR',
+      payment_method: result.payment_method || '',
+      fullText: result.fullText || '',
+      ai_suggestions: result.ai_suggestions || {},
+      predicted_category: result.predicted_category || null,
+      status: 'unreviewed',
+      processing_status: 'complete',
+      model_used: result.modelUsed || processingOptions.modelId
+    };
 
     // Update the receipt with the data
     const { error: updateError } = await supabase
@@ -1834,7 +1834,7 @@ export const subscribeToReceiptAll = (
   // Circuit breaker: prevent excessive subscription creation
   if (!existing && !canCreateSubscription(receiptId)) {
     // Return a no-op cleanup function
-    return () => {};
+    return () => { };
   }
 
   if (existing && !existing.isCleaningUp) {
@@ -2135,7 +2135,7 @@ export const getReceiptSubscriptionStats = (): {
   };
 
   const totalCallbacks = legacyStats.subscriptions.reduce((sum, sub) => sum + sub.callbackCount, 0) +
-                        unifiedStats.subscriptions.reduce((sum, sub) => sum + sub.callbackCount, 0);
+    unifiedStats.subscriptions.reduce((sum, sub) => sum + sub.callbackCount, 0);
 
   return {
     legacy: legacyStats,
@@ -2251,24 +2251,30 @@ export const updateReceiptProcessingStatus = async (
 };
 
 // Fix processing status from failed to complete when a receipt is manually edited
+// Fix processing status from failed to complete when a receipt is manually edited
 export const fixProcessingStatus = async (id: string): Promise<boolean> => {
   try {
-    // Use any to bypass TypeScript until the database types are updated
-    const supabaseAny = supabase as any;
-    if (supabaseAny.rpc) {
-      try {
-        await supabaseAny.rpc('update_processing_status_if_failed', {
-          receipt_id: id
-        });
-      } catch (rpcError) {
-        // Ignore errors - likely the function doesn't exist yet
-        console.log('Note: Function to fix processing status not available yet');
-      }
+    const { error } = await supabase
+      .from("receipts")
+      .update({
+        processing_status: 'complete',
+        processing_error: null,
+        status: 'reviewed',
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error fixing processing status:", error);
+      toast.error("Failed to update status");
+      return false;
     }
 
+    toast.success("Receipt marked as fixed");
     return true;
   } catch (error) {
     console.error("Error fixing processing status:", error);
+    toast.error("An unexpected error occurred");
     return false;
   }
 };
