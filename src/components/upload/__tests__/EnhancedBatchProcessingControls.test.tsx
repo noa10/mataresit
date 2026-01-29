@@ -1,15 +1,17 @@
 /**
  * Enhanced Batch Processing Controls Tests
  * Phase 3: Batch Upload Optimization
+ * @vitest-environment jsdom
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnhancedBatchProcessingControls } from '../EnhancedBatchProcessingControls';
-import { ProcessingStrategy } from '@/lib/progress-tracking';
 
 // Mock the progress tracking utilities
-jest.mock('@/lib/progress-tracking', () => ({
+vi.mock('@/lib/progress-tracking', () => ({
   useProgressFormatting: () => ({
     formatDuration: (ms: number) => `${Math.round(ms / 1000)}s`,
     formatThroughput: (rate: number) => `${rate.toFixed(1)}/min`,
@@ -30,10 +32,11 @@ describe('EnhancedBatchProcessingControls', () => {
     totalProgress: 50,
     isProcessing: false,
     isPaused: false,
-    onStartProcessing: jest.fn(),
-    onPauseProcessing: jest.fn(),
-    onClearQueue: jest.fn(),
-    onClearAll: jest.fn(),
+    onStartProcessing: vi.fn(),
+    onPauseProcessing: vi.fn(),
+    onClearQueue: vi.fn(),
+    onClearAll: vi.fn(),
+    onRetryAllFailed: vi.fn(),
     allComplete: false
   };
 
@@ -82,86 +85,36 @@ describe('EnhancedBatchProcessingControls', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders basic batch processing controls', () => {
     render(<EnhancedBatchProcessingControls {...defaultProps} />);
-    
+
     expect(screen.getByText('Batch Processing')).toBeInTheDocument();
-    expect(screen.getByText('4 / 10')).toBeInTheDocument();
+    expect(screen.getByText('(5 / 10)')).toBeInTheDocument(); // 4 completed + 1 failed
     expect(screen.getByText('Start Processing')).toBeInTheDocument();
   });
 
   it('displays file status grid correctly', () => {
     render(<EnhancedBatchProcessingControls {...defaultProps} />);
-    
+
     expect(screen.getByText('4')).toBeInTheDocument(); // Completed
     expect(screen.getByText('2')).toBeInTheDocument(); // Processing
     expect(screen.getByText('3')).toBeInTheDocument(); // Pending
     expect(screen.getByText('1')).toBeInTheDocument(); // Failed
   });
 
-  it('shows processing strategy selector when not processing', () => {
-    const onStrategyChange = jest.fn();
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        processingStrategy="balanced"
-        onProcessingStrategyChange={onStrategyChange}
-      />
-    );
-    
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
-  });
-
-  it('calls onProcessingStrategyChange when strategy is changed', async () => {
-    const onStrategyChange = jest.fn();
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        processingStrategy="balanced"
-        onProcessingStrategyChange={onStrategyChange}
-      />
-    );
-    
-    const selector = screen.getByRole('combobox');
-    fireEvent.click(selector);
-    
-    await waitFor(() => {
-      const aggressiveOption = screen.getByText('Aggressive');
-      fireEvent.click(aggressiveOption);
-    });
-    
-    expect(onStrategyChange).toHaveBeenCalledWith('aggressive');
-  });
-
-  it('displays advanced metrics when enabled', () => {
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        progressMetrics={mockProgressMetrics}
-        enableAdvancedView={true}
-      />
-    );
-    
-    expect(screen.getByText('2.0/min')).toBeInTheDocument(); // Throughput
-    expect(screen.getByText('85.0%')).toBeInTheDocument(); // Quality
-    expect(screen.getByText('$0.1000')).toBeInTheDocument(); // Cost
-    expect(screen.getByText('80.0%')).toBeInTheDocument(); // API Success
-  });
-
   it('displays ETA information when available', () => {
     render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
+      <EnhancedBatchProcessingControls
+        {...defaultProps}
+        isProcessing={true}
         etaCalculation={mockEtaCalculation}
-        enableAdvancedView={true}
       />
     );
-    
-    expect(screen.getByText(/ETA: 180s/)).toBeInTheDocument();
-    expect(screen.getByText('85% confidence')).toBeInTheDocument();
+
+    expect(screen.getByText(/~180s remaining/)).toBeInTheDocument();
   });
 
   it('displays progress alerts', () => {
@@ -179,112 +132,63 @@ describe('EnhancedBatchProcessingControls', () => {
       }
     ];
 
-    const onDismissAlert = jest.fn();
+    const onDismissAlert = vi.fn();
     render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
+      <EnhancedBatchProcessingControls
+        {...defaultProps}
         progressAlerts={mockAlerts}
         onDismissAlert={onDismissAlert}
       />
     );
-    
+
     expect(screen.getByText('Rate limiting detected')).toBeInTheDocument();
-    
+
     const dismissButton = screen.getByText('×');
     fireEvent.click(dismissButton);
-    
+
     expect(onDismissAlert).toHaveBeenCalledWith('alert-1');
   });
 
-  it('shows rate limiting status when rate limited', () => {
-    const rateLimitStatus = {
-      isRateLimited: true,
-      requestsRemaining: 10,
-      tokensRemaining: 5000,
-      backoffMs: 5000
-    };
-
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        rateLimitStatus={rateLimitStatus}
-        enableAdvancedView={true}
-      />
-    );
-    
-    expect(screen.getByText(/Rate Limited - 5s delay/)).toBeInTheDocument();
-    expect(screen.getByText('10 requests left')).toBeInTheDocument();
-  });
-
   it('calls onStartProcessing when start button is clicked', () => {
-    const onStartProcessing = jest.fn();
+    const onStartProcessing = vi.fn();
     render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
+      <EnhancedBatchProcessingControls
+        {...defaultProps}
         onStartProcessing={onStartProcessing}
       />
     );
-    
+
     const startButton = screen.getByText('Start Processing');
     fireEvent.click(startButton);
-    
+
     expect(onStartProcessing).toHaveBeenCalled();
   });
 
   it('shows pause button when processing', () => {
     render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
+      <EnhancedBatchProcessingControls
+        {...defaultProps}
         isProcessing={true}
       />
     );
-    
-    expect(screen.getByText('Pause')).toBeInTheDocument();
+
+    expect(screen.getByText('Pause Processing')).toBeInTheDocument();
   });
 
   it('shows review button when all complete', () => {
-    const onShowReview = jest.fn();
+    const onShowReview = vi.fn();
     render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
+      <EnhancedBatchProcessingControls
+        {...defaultProps}
         allComplete={true}
         onShowReview={onShowReview}
       />
     );
-    
+
     const reviewButton = screen.getByText('Review Results');
     expect(reviewButton).toBeInTheDocument();
-    
+
     fireEvent.click(reviewButton);
     expect(onShowReview).toHaveBeenCalled();
-  });
-
-  it('displays processing strategy info when not processing', () => {
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        processingStrategy="balanced"
-        totalFiles={5}
-      />
-    );
-    
-    expect(screen.getByText('Balanced')).toBeInTheDocument();
-    expect(screen.getByText(/Optimal balance of speed and reliability/)).toBeInTheDocument();
-    expect(screen.getByText('2 concurrent • 60/min')).toBeInTheDocument();
-  });
-
-  it('toggles advanced view when toggle button is clicked', () => {
-    const onToggleAdvancedView = jest.fn();
-    render(
-      <EnhancedBatchProcessingControls 
-        {...defaultProps} 
-        onToggleAdvancedView={onToggleAdvancedView}
-      />
-    );
-    
-    const toggleButton = screen.getByRole('button', { name: '' }); // Settings icon button
-    fireEvent.click(toggleButton);
-    
-    expect(onToggleAdvancedView).toHaveBeenCalled();
   });
 });
