@@ -30,12 +30,13 @@ Object.defineProperty(window, 'HTMLCanvasElement', {
   }
 });
 
+const originalCreateElement = document.createElement.bind(document);
 Object.defineProperty(document, 'createElement', {
   value: (tagName: string) => {
     if (tagName === 'canvas') {
       return new window.HTMLCanvasElement();
     }
-    return document.createElement(tagName);
+    return originalCreateElement(tagName);
   }
 });
 
@@ -43,7 +44,7 @@ Object.defineProperty(document, 'createElement', {
 global.File = class File extends Blob {
   name: string;
   lastModified: number;
-  
+
   constructor(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag) {
     super(fileBits, options);
     this.name = fileName;
@@ -68,7 +69,7 @@ Object.defineProperty(global, 'performance', {
 Object.defineProperty(global, 'crypto', {
   value: {
     randomUUID: () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -215,10 +216,10 @@ process.on('uncaughtException', (error) => {
 beforeEach(() => {
   // Clear all mocks before each test
   vi.clearAllMocks();
-  
+
   // Reset fetch mock
   (global.fetch as any).mockClear?.();
-  
+
   // Clear localStorage and sessionStorage
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -241,11 +242,11 @@ export const testUtils = {
       headers: new Map()
     });
   },
-  
+
   mockFetchError: (error: Error) => {
     (global.fetch as any).mockRejectedValueOnce(error);
   },
-  
+
   waitFor: async (condition: () => boolean, timeout: number = 5000) => {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
@@ -256,7 +257,7 @@ export const testUtils = {
     }
     throw new Error(`Condition not met within ${timeout}ms`);
   },
-  
+
   sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 };
 
