@@ -3,6 +3,8 @@
  * Phase 3: Batch Upload Optimization
  */
 
+export type ProcessingStrategy = 'conservative' | 'balanced' | 'aggressive' | 'adaptive';
+
 export interface ProgressMetrics {
   // Basic progress
   totalFiles: number;
@@ -87,8 +89,8 @@ export interface PerformanceSnapshot {
 }
 
 export interface ProgressEvent {
-  type: 'progress_update' | 'eta_update' | 'throughput_change' | 'rate_limit_change' | 
-        'performance_alert' | 'milestone_reached' | 'quality_change';
+  type: 'progress_update' | 'eta_update' | 'throughput_change' | 'rate_limit_change' |
+  'performance_alert' | 'milestone_reached' | 'quality_change';
   sessionId: string;
   timestamp: Date;
   data: any;
@@ -97,8 +99,8 @@ export interface ProgressEvent {
 
 export interface ProgressAlert {
   id: string;
-  type: 'slow_processing' | 'high_error_rate' | 'rate_limiting' | 'quality_degradation' | 
-        'eta_deviation' | 'resource_exhaustion';
+  type: 'slow_processing' | 'high_error_rate' | 'rate_limiting' | 'quality_degradation' |
+  'eta_deviation' | 'resource_exhaustion';
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
   timestamp: Date;
@@ -135,13 +137,13 @@ export interface FileProgressDetail {
   progress: number; // 0-100
   stage: 'uploading' | 'processing' | 'embedding' | 'storing' | 'completed';
   stageProgress: number; // 0-100 for current stage
-  
+
   // Performance data
   apiCalls: number;
   tokensUsed: number;
   retryCount: number;
   rateLimited: boolean;
-  
+
   // Quality data
   qualityScore?: number;
   errorMessage?: string;

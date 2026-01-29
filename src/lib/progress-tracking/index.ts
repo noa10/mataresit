@@ -23,8 +23,16 @@ export {
 } from './hooks';
 
 // Types and interfaces
+import {
+  ProgressMetrics,
+  ProcessingStrategy,
+  ThroughputDataPoint,
+  ETACalculation
+} from './types';
+
 export type {
   ProgressMetrics,
+  ProcessingStrategy,
   ThroughputDataPoint,
   ETACalculation,
   PerformanceSnapshot,
@@ -37,6 +45,7 @@ export type {
   ProgressTrackingMode,
   ProgressTrackingOptions
 } from './types';
+
 
 // Utility functions
 export const createProgressTrackingService = (config?: {
@@ -91,11 +100,11 @@ export const calculateQualityScore = (
   const successWeight = 0.5;
   const errorWeight = 0.3;
   const retryWeight = 0.2;
-  
+
   const successScore = successRate;
   const errorScore = Math.max(0, 1 - (errorRate * 2));
   const retryScore = Math.max(0, 1 - (retryRate * 1.5));
-  
+
   return (successScore * successWeight) + (errorScore * errorWeight) + (retryScore * retryWeight);
 };
 
@@ -103,7 +112,7 @@ export const formatProgressTime = (ms: number): string => {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m`;
   } else if (minutes > 0) {
@@ -125,10 +134,10 @@ export const formatThroughput = (throughputPerMinute: number): string => {
 export const formatFileSize = (bytes: number): string => {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   if (bytes === 0) return '0 B';
-  
+
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const size = bytes / Math.pow(1024, i);
-  
+
   return `${size.toFixed(1)} ${sizes[i]}`;
 };
 
@@ -168,13 +177,13 @@ export const getThroughputTrend = (
   windowSize: number = 5
 ): 'increasing' | 'decreasing' | 'stable' => {
   if (throughputHistory.length < windowSize) return 'stable';
-  
+
   const recent = throughputHistory.slice(-windowSize);
   const first = recent[0].throughput;
   const last = recent[recent.length - 1].throughput;
-  
+
   const change = (last - first) / Math.max(first, 0.1);
-  
+
   if (change > 0.15) return 'increasing';
   if (change < -0.15) return 'decreasing';
   return 'stable';
@@ -182,42 +191,42 @@ export const getThroughputTrend = (
 
 export const generateProgressInsights = (metrics: ProgressMetrics): string[] => {
   const insights: string[] = [];
-  
+
   // Performance insights
   if (metrics.currentThroughput > metrics.peakThroughput * 0.9) {
     insights.push('Processing at peak efficiency');
   } else if (metrics.currentThroughput < metrics.peakThroughput * 0.5) {
     insights.push('Processing speed has decreased significantly');
   }
-  
+
   // Quality insights
   if (metrics.qualityScore > 0.9) {
     insights.push('Excellent processing quality');
   } else if (metrics.qualityScore < 0.7) {
     insights.push('Processing quality could be improved');
   }
-  
+
   // Cost insights
   if (metrics.apiEfficiency > 1000) {
     insights.push('High API efficiency - good token utilization');
   } else if (metrics.apiEfficiency < 500) {
     insights.push('Low API efficiency - consider optimizing requests');
   }
-  
+
   // Rate limiting insights
   if (metrics.rateLimitHits === 0) {
     insights.push('No rate limiting encountered');
   } else if (metrics.rateLimitHits > 10) {
     insights.push('Frequent rate limiting - consider reducing concurrency');
   }
-  
+
   // Progress insights
   if (metrics.progressPercentage > 75) {
     insights.push('Nearing completion');
   } else if (metrics.progressPercentage < 25 && metrics.elapsedTimeMs > 300000) {
     insights.push('Progress is slower than expected');
   }
-  
+
   return insights;
 };
 
@@ -226,32 +235,32 @@ export const validateProgressMetrics = (metrics: ProgressMetrics): {
   errors: string[];
 } => {
   const errors: string[] = [];
-  
+
   // Basic validation
   if (metrics.totalFiles < 0) errors.push('Total files cannot be negative');
   if (metrics.filesCompleted < 0) errors.push('Completed files cannot be negative');
   if (metrics.filesFailed < 0) errors.push('Failed files cannot be negative');
   if (metrics.filesPending < 0) errors.push('Pending files cannot be negative');
-  
+
   // Consistency validation
   const totalProcessed = metrics.filesCompleted + metrics.filesFailed + metrics.filesPending + metrics.filesProcessing;
   if (totalProcessed !== metrics.totalFiles) {
     errors.push('File counts do not add up to total files');
   }
-  
+
   // Range validation
   if (metrics.progressPercentage < 0 || metrics.progressPercentage > 100) {
     errors.push('Progress percentage must be between 0 and 100');
   }
-  
+
   if (metrics.qualityScore < 0 || metrics.qualityScore > 1) {
     errors.push('Quality score must be between 0 and 1');
   }
-  
+
   if (metrics.apiSuccessRate < 0 || metrics.apiSuccessRate > 1) {
     errors.push('API success rate must be between 0 and 1');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors
