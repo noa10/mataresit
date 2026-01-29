@@ -51,7 +51,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
         <p className="text-muted-foreground">
@@ -82,53 +82,53 @@ export default function AdminDashboard() {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-4 w-4" />
-                  <span>{t("dashboard.stats.totalUsers")}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{systemStats?.userCount || 0}</div>
-                <p className="text-sm text-muted-foreground">
-                  {systemStats?.activeUsersCount !== undefined
-                    ? `${systemStats.activeUsersCount} active in last 30 days`
-                    : t("dashboard.descriptions.totalUsers")
-                  }
-                </p>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Users className="h-4 w-4" />
+                    <span>{t("dashboard.stats.totalUsers")}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{systemStats?.userCount || 0}</div>
+                  <p className="text-sm text-muted-foreground">
+                    {systemStats?.activeUsersCount !== undefined
+                      ? `${systemStats.activeUsersCount} active in last 30 days`
+                      : t("dashboard.descriptions.totalUsers")
+                    }
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <ShoppingBag className="h-4 w-4" />
-                  <span>{t("dashboard.stats.totalReceipts")}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{systemStats?.receiptCount}</div>
-                <p className="text-sm text-muted-foreground">
-                  {t("dashboard.descriptions.totalReceipts")}
-                </p>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <ShoppingBag className="h-4 w-4" />
+                    <span>{t("dashboard.stats.totalReceipts")}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{systemStats?.receiptCount}</div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("dashboard.descriptions.totalReceipts")}
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{t("dashboard.stats.recentActivity")}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{systemStats?.recentActivity.length}</div>
-                <p className="text-sm text-muted-foreground">
-                  {t("dashboard.descriptions.recentActivity")}
-                </p>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{t("dashboard.stats.recentActivity")}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{systemStats?.recentActivity.length}</div>
+                  <p className="text-sm text-muted-foreground">
+                    {t("dashboard.descriptions.recentActivity")}
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
 

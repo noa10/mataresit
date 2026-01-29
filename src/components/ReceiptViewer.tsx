@@ -108,13 +108,13 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
 
   // More granular color scale with 4 levels
   const color = normalizedScore >= 80 ? 'bg-green-500' :
-                normalizedScore >= 60 ? 'bg-yellow-500' :
-                normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
+    normalizedScore >= 60 ? 'bg-yellow-500' :
+      normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
   // Add confidence labels for accessibility
   const label = normalizedScore >= 80 ? t('viewer.highConfidence') :
-               normalizedScore >= 60 ? t('viewer.mediumConfidence') :
-               normalizedScore >= 40 ? t('viewer.lowConfidence') : t('viewer.veryLowConfidence');
+    normalizedScore >= 60 ? t('viewer.mediumConfidence') :
+      normalizedScore >= 40 ? t('viewer.lowConfidence') : t('viewer.veryLowConfidence');
 
   return (
     <div className="flex items-center gap-1 group relative">
@@ -589,8 +589,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
     const updatedLineItems = [...(editedReceipt.lineItems || [])];
     // Ensure the item exists before updating
-    if(updatedLineItems[index]) {
-        updatedLineItems[index] = {
+    if (updatedLineItems[index]) {
+      updatedLineItems[index] = {
         ...updatedLineItems[index],
         [field]: value
       };
@@ -632,16 +632,16 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     // Log what we're about to save for debugging
     if (import.meta.env.DEV) {
       console.log("Saving receipt details:", {
-      id: receipt.id,
-      merchant: editedReceipt.merchant,
-      date: editedReceipt.date,
-      total: editedReceipt.total,
-      tax: editedReceipt.tax,
-      currency: editedReceipt.currency,
-      payment_method: editedReceipt.payment_method,
-      predicted_category: editedReceipt.predicted_category,
-      lineItems: editedReceipt.lineItems
-    });
+        id: receipt.id,
+        merchant: editedReceipt.merchant,
+        date: editedReceipt.date,
+        total: editedReceipt.total,
+        tax: editedReceipt.tax,
+        currency: editedReceipt.currency,
+        payment_method: editedReceipt.payment_method,
+        predicted_category: editedReceipt.predicted_category,
+        lineItems: editedReceipt.lineItems
+      });
     }
 
     // Validate required fields before saving
@@ -685,7 +685,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       ...prev,
       lineItems: [...(prev.lineItems || []), newLineItem]
     }));
-     // Set line_items confidence to 100 when adding items
+    // Set line_items confidence to 100 when adding items
     setEditedConfidence(prev => ({
       ...prev,
       line_items: 100
@@ -700,7 +700,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       ...prev,
       lineItems: updatedLineItems
     }));
-     // Set line_items confidence to 100 when removing items
+    // Set line_items confidence to 100 when removing items
     setEditedConfidence(prev => ({
       ...prev,
       line_items: 100
@@ -842,8 +842,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const getSuggestionConfidence = (field: string): number => {
     // Confidence for suggestions might be structured differently, adjust as needed
     if (!receipt.ai_suggestions ||
-        !receipt.ai_suggestions.confidence ||
-        !receipt.ai_suggestions.confidence.suggestions) {
+      !receipt.ai_suggestions.confidence ||
+      !receipt.ai_suggestions.confidence.suggestions) {
       return 0;
     }
     // Use keyof ConfidenceScore for type safety if suggestions map to these fields
@@ -866,11 +866,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       <div className="mt-1 flex items-center gap-2">
         <Badge
           variant="outline"
-          className={`flex items-center gap-1 ${
-            confidence >= 80 ? 'border-green-500 text-green-700' :
+          className={`flex items-center gap-1 ${confidence >= 80 ? 'border-green-500 text-green-700' :
             confidence >= 60 ? 'border-yellow-500 text-yellow-700' :
-            'border-red-500 text-red-700'
-          }`}
+              'border-red-500 text-red-700'
+            }`}
         >
           <Sparkles size={12} />
           <span>Suggested {label}: {suggestion.toString()}</span>
@@ -962,6 +961,79 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     toast.info(`Selected block: ${blockId}`);
   };
 
+  // Handle manual fix with validation and full save
+  const handleMarkAsFixed = async () => {
+    // Validate required fields
+    if (!inputValues.merchant || inputValues.merchant.trim() === '') {
+      toast.error("Please enter a merchant name");
+      return;
+    }
+    if (!inputValues.date) {
+      toast.error("Please enter a date");
+      return;
+    }
+    if (inputValues.total === undefined || inputValues.total === null) {
+      toast.error("Please enter a total amount");
+      return;
+    }
+
+    try {
+      toast.loading("Saving changes...", { id: "mark-fixed" });
+
+      // Prepare update data using current input values
+      const updateData = {
+        merchant: inputValues.merchant,
+        date: typeof inputValues.date === 'string' && inputValues.date.includes('T')
+          ? inputValues.date.split('T')[0]
+          : inputValues.date,
+        total: typeof inputValues.total === 'number' ? inputValues.total : parseFloat(inputValues.total) || 0,
+        tax: typeof inputValues.tax === 'number' ? inputValues.tax : parseFloat(inputValues.tax) || 0,
+        currency: inputValues.currency,
+        payment_method: inputValues.payment_method,
+        predicted_category: inputValues.predicted_category,
+        custom_category_id: inputValues.custom_category_id,
+        status: 'reviewed' as const,
+        processing_status: 'complete' as const,
+        processing_error: null
+      };
+
+      // Prepare line items
+      const formattedLineItems = editedReceipt.lineItems?.map(item => ({
+        id: item.id || `temp-${Math.random()}`,
+        description: item.description || '',
+        amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0,
+        receipt_id: receipt.id
+      })) || [];
+
+      // Save everything
+      await updateReceiptWithLineItems(receipt.id, updateData, formattedLineItems);
+
+      // Success feedback
+      toast.success("Receipt marked as fixed", { id: "mark-fixed" });
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+
+      // Notify parent
+      if (onUpdate) {
+        onUpdate({
+          ...receipt,
+          ...updateData,
+          lineItems: formattedLineItems
+        } as ReceiptWithDetails);
+      }
+
+      // Optimistic update
+      setProcessingStatus('complete');
+
+    } catch (error) {
+      console.error("Failed to mark as fixed:", error);
+      toast.error("Failed to save changes", { id: "mark-fixed" });
+    }
+  };
+
   // Add helper to render processing status indicator
   const renderProcessingStatus = () => {
     // Use processingStatus state, not receipt.processing_status
@@ -998,8 +1070,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     const hasErrorDetails = receipt.processing_error && receipt.processing_error.length > 0;
     const isResourceLimitError = hasErrorDetails &&
       (receipt.processing_error.includes("WORKER_LIMIT") ||
-       receipt.processing_error.includes("compute resources") ||
-       receipt.processing_error.includes("too complex to process"));
+        receipt.processing_error.includes("compute resources") ||
+        receipt.processing_error.includes("too complex to process"));
 
     return (
       <div className="mb-4 flex flex-col gap-2">
@@ -1013,7 +1085,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               size="sm"
               variant="outline"
               className="h-7"
-              onClick={() => fixProcessingStatus(receipt.id)}
+              onClick={handleMarkAsFixed}
             >
               <Check className="h-3.5 w-3.5 mr-1" />
               Mark as fixed
@@ -1441,7 +1513,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
                 {showFullTextData && (
                   <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm max-h-[150px] overflow-auto whitespace-pre-wrap">
-                      {receipt.fullText}
+                    {receipt.fullText}
                   </div>
                 )}
               </div>
@@ -1468,242 +1540,242 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         )}
 
         <div className="flex-grow pr-3 min-h-0 overflow-auto">
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="merchant">Merchant</Label>
+                <ConfidenceIndicator score={editedConfidence?.merchant} loading={isProcessing} />
+              </div>
+              <Input
+                id="merchant"
+                value={inputValues.merchant}
+                onChange={(e) => handleInputChange('merchant', e.target.value)}
+                className="bg-background/50"
+                onMouseEnter={() => handleFieldHover('merchant')}
+                onMouseLeave={() => handleFieldHover(null)}
+              />
+              {renderSuggestion('merchant', 'merchant name')}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="category">Category</Label>
+              </div>
+              <CategorySelector
+                value={inputValues.custom_category_id}
+                onChange={handleCustomCategoryChange}
+                placeholder="Select category..."
+                className="bg-background/50"
+              />
+              {renderSuggestion('predicted_category', 'category')}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <Label htmlFor="merchant">Merchant</Label>
-                  <ConfidenceIndicator score={editedConfidence?.merchant} loading={isProcessing} />
+                  <Label htmlFor="date">Date</Label>
+                  <ConfidenceIndicator score={editedConfidence?.date} loading={isProcessing} />
                 </div>
-                <Input
-                  id="merchant"
-                  value={inputValues.merchant}
-                  onChange={(e) => handleInputChange('merchant', e.target.value)}
-                  className="bg-background/50"
-                  onMouseEnter={() => handleFieldHover('merchant')}
-                  onMouseLeave={() => handleFieldHover(null)}
-                />
-                {renderSuggestion('merchant', 'merchant name')}
-              </div>
-
-              <div className="space-y-2">
-                 <div className="flex justify-between">
-                   <Label htmlFor="category">Category</Label>
-                 </div>
-                <CategorySelector
-                  value={inputValues.custom_category_id}
-                  onChange={handleCustomCategoryChange}
-                  placeholder="Select category..."
-                  className="bg-background/50"
-                />
-                {renderSuggestion('predicted_category', 'category')}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="date">Date</Label>
-                     <ConfidenceIndicator score={editedConfidence?.date} loading={isProcessing} />
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="date"
-                      type="date"
-                      value={typeof inputValues.date === 'string' ? inputValues.date.split('T')[0] : ''}
-                      onChange={(e) => handleInputChange('date', e.target.value)}
-                      className="bg-background/50 pl-9"
-                      onMouseEnter={() => handleFieldHover('date')}
-                      onMouseLeave={() => handleFieldHover(null)}
-                    />
-                    <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary dark:text-primary" />
-                  </div>
-                  {renderSuggestion('date', 'date')}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="total">Total Amount</Label>
-                      {isManualTotal && (
-                        <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                          Manual Override
-                        </Badge>
-                      )}
-                      {!isManualTotal && lineItemsTotal > 0 && (
-                        <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
-                          Auto-calculated
-                        </Badge>
-                      )}
-                    </div>
-                     <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="total"
-                      type="number"
-                      step="0.01"
-                      value={inputValues.total || 0}
-                      onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
-                      className={`bg-background/50 pl-9 ${isManualTotal ? 'border-amber-300 focus:border-amber-500' : ''}`}
-                      onMouseEnter={() => handleFieldHover('total')}
-                      onMouseLeave={() => handleFieldHover(null)}
-                    />
-                    <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
-                  </div>
-                  {isManualTotal && lineItemsTotal > 0 && (
-                    <div className="flex items-center justify-between text-xs text-amber-600">
-                      <span>Total manually overridden. Line items sum: {formatCurrency(lineItemsTotal)}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 text-xs"
-                        onClick={handleSyncTotalWithLineItems}
-                      >
-                        Sync with Line Items
-                      </Button>
-                    </div>
-                  )}
-                  {renderSuggestion('total', 'total amount')}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="currency">Currency</Label>
-                  </div>
+                <div className="relative">
                   <Input
-                    id="currency"
-                    value={inputValues.currency}
-                    onChange={(e) => {
-                      // Allow common currency symbols and letters, limit to 3 characters for final code
-                      const value = e.target.value.replace(/[^A-Za-z$€£¥₱₫฿]/g, '').slice(0, 5);
-                      // Normalize the currency code as the user types
-                      const normalizedValue = normalizeCurrencyCode(value, inputValues.currency);
-                      handleInputChange('currency', normalizedValue);
-                    }}
-                    className="bg-background/50"
-                    maxLength={5}
-                    placeholder="MYR, RM, USD, $"
+                    id="date"
+                    type="date"
+                    value={typeof inputValues.date === 'string' ? inputValues.date.split('T')[0] : ''}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    className="bg-background/50 pl-9"
+                    onMouseEnter={() => handleFieldHover('date')}
+                    onMouseLeave={() => handleFieldHover(null)}
                   />
-                   {renderSuggestion('currency', 'currency')}
+                  <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary dark:text-primary" />
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="paymentMethod">Payment Method</Label>
-                     <ConfidenceIndicator score={editedConfidence?.payment_method} loading={isProcessing} />
-                  </div>
-                  <div className="relative">
-                    <Input
-                      id="paymentMethod"
-                      value={inputValues.payment_method}
-                      onChange={(e) => handleInputChange('payment_method', e.target.value)}
-                      className="bg-background/50 pl-9"
-                      onMouseEnter={() => handleFieldHover('payment_method')}
-                      onMouseLeave={() => handleFieldHover(null)}
-                    />
-                    <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
-                  </div>
-                   {renderSuggestion('payment_method', 'payment method')}
-                </div>
+                {renderSuggestion('date', 'date')}
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <Label>Line Items</Label>
-                     <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
+                    <Label htmlFor="total">Total Amount</Label>
+                    {isManualTotal && (
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                        Manual Override
+                      </Badge>
+                    )}
+                    {!isManualTotal && lineItemsTotal > 0 && (
+                      <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
+                        Auto-calculated
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
+                </div>
+                <div className="relative">
+                  <Input
+                    id="total"
+                    type="number"
+                    step="0.01"
+                    value={inputValues.total || 0}
+                    onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
+                    className={`bg-background/50 pl-9 ${isManualTotal ? 'border-amber-300 focus:border-amber-500' : ''}`}
+                    onMouseEnter={() => handleFieldHover('total')}
+                    onMouseLeave={() => handleFieldHover(null)}
+                  />
+                  <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                </div>
+                {isManualTotal && lineItemsTotal > 0 && (
+                  <div className="flex items-center justify-between text-xs text-amber-600">
+                    <span>Total manually overridden. Line items sum: {formatCurrency(lineItemsTotal)}</span>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1 h-7"
-                      onClick={handleAddLineItem}
+                      className="h-6 text-xs"
+                      onClick={handleSyncTotalWithLineItems}
                     >
-                      <Plus size={14} />
-                      Add Item
+                      Sync with Line Items
                     </Button>
                   </div>
-                </div>
-
-                <Card className="bg-background/50 border border-border/50">
-                  <div className="p-3 max-h-[250px] overflow-auto">
-                    <div className="space-y-2">
-                        {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
-                        editedReceipt.lineItems.map((item, index) => (
-                            <div
-                            key={item.id || `temp-${index}`}
-                            className="flex justify-between items-center py-2 border-b border-border/50 last:border-0"
-                            >
-                            <Input
-                                value={item.description || ""}
-                                onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
-                                className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm flex-1 mr-2"
-                                placeholder="Item description"
-                            />
-                            <div className="flex items-center gap-2">
-                                <Input
-                                type="number"
-                                step="0.01"
-                                value={item.amount || 0}
-                                onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value) || 0)}
-                                className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right w-24"
-                                placeholder="Amount"
-                                />
-                                <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleRemoveLineItem(index)}
-                                >
-                                <Minus size={14} />
-                                </Button>
-                            </div>
-                            </div>
-                        ))
-                        ) : (
-                        <div className="py-6 text-center text-muted-foreground">
-                            <Receipt size={24} className="mx-auto mb-2 opacity-30" />
-                            <p className="text-sm">No line items detected</p>
-                        </div>
-                        )}
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              <div className="pt-4 border-t border-border/50">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span>{formatCurrency((editedReceipt.total || 0) - (editedReceipt.tax || 0))}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm mt-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-muted-foreground">Tax:</span>
-                     <ConfidenceIndicator score={editedConfidence?.tax} loading={isProcessing} />
-                  </div>
-                  <div className="relative w-24">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={inputValues.tax || 0}
-                      onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)}
-                      className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
-                      placeholder="Tax"
-                      onMouseEnter={() => handleFieldHover('tax')}
-                      onMouseLeave={() => handleFieldHover(null)}
-                    />
-                  </div>
-                   {renderSuggestion('tax', 'tax amount')}
-                </div>
-                <Separator className="my-2" />
-                <div className="flex justify-between items-center font-semibold mt-2">
-                  <span>Total:</span>
-                  <span>{formatCurrency(editedReceipt.total || 0)}</span>
-                </div>
+                )}
+                {renderSuggestion('total', 'total amount')}
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="currency">Currency</Label>
+                </div>
+                <Input
+                  id="currency"
+                  value={inputValues.currency}
+                  onChange={(e) => {
+                    // Allow common currency symbols and letters, limit to 3 characters for final code
+                    const value = e.target.value.replace(/[^A-Za-z$€£¥₱₫฿]/g, '').slice(0, 5);
+                    // Normalize the currency code as the user types
+                    const normalizedValue = normalizeCurrencyCode(value, inputValues.currency);
+                    handleInputChange('currency', normalizedValue);
+                  }}
+                  className="bg-background/50"
+                  maxLength={5}
+                  placeholder="MYR, RM, USD, $"
+                />
+                {renderSuggestion('currency', 'currency')}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <ConfidenceIndicator score={editedConfidence?.payment_method} loading={isProcessing} />
+                </div>
+                <div className="relative">
+                  <Input
+                    id="paymentMethod"
+                    value={inputValues.payment_method}
+                    onChange={(e) => handleInputChange('payment_method', e.target.value)}
+                    className="bg-background/50 pl-9"
+                    onMouseEnter={() => handleFieldHover('payment_method')}
+                    onMouseLeave={() => handleFieldHover(null)}
+                  />
+                  <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                </div>
+                {renderSuggestion('payment_method', 'payment method')}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Label>Line Items</Label>
+                  <ConfidenceIndicator score={editedConfidence?.line_items} loading={isProcessing} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 h-7"
+                    onClick={handleAddLineItem}
+                  >
+                    <Plus size={14} />
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="bg-background/50 border border-border/50">
+                <div className="p-3 max-h-[250px] overflow-auto">
+                  <div className="space-y-2">
+                    {editedReceipt.lineItems && editedReceipt.lineItems.length > 0 ? (
+                      editedReceipt.lineItems.map((item, index) => (
+                        <div
+                          key={item.id || `temp-${index}`}
+                          className="flex justify-between items-center py-2 border-b border-border/50 last:border-0"
+                        >
+                          <Input
+                            value={item.description || ""}
+                            onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
+                            className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm flex-1 mr-2"
+                            placeholder="Item description"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.amount || 0}
+                              onChange={(e) => handleLineItemChange(index, 'amount', parseFloat(e.target.value) || 0)}
+                              className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right w-24"
+                              placeholder="Amount"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveLineItem(index)}
+                            >
+                              <Minus size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-muted-foreground">
+                        <Receipt size={24} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No line items detected</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="pt-4 border-t border-border/50">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Subtotal:</span>
+                <span>{formatCurrency((editedReceipt.total || 0) - (editedReceipt.tax || 0))}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">Tax:</span>
+                  <ConfidenceIndicator score={editedConfidence?.tax} loading={isProcessing} />
+                </div>
+                <div className="relative w-24">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={inputValues.tax || 0}
+                    onChange={(e) => handleInputChange('tax', parseFloat(e.target.value) || 0)}
+                    className="bg-transparent border-0 focus-visible:ring-0 px-0 text-sm text-right"
+                    placeholder="Tax"
+                    onMouseEnter={() => handleFieldHover('tax')}
+                    onMouseLeave={() => handleFieldHover(null)}
+                  />
+                </div>
+                {renderSuggestion('tax', 'tax amount')}
+              </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between items-center font-semibold mt-2">
+                <span>Total:</span>
+                <span>{formatCurrency(editedReceipt.total || 0)}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="pt-4 mt-auto space-y-3 flex-shrink-0">

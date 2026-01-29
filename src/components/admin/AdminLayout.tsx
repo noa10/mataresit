@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Check if the current route matches the given path
   const isActivePath = (path: string) => {
     return location.pathname === path ||
-           (path !== '/admin' && location.pathname.startsWith(path));
+      (path !== '/admin' && location.pathname.startsWith(path));
   };
 
   // Navigation items
