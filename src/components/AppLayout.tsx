@@ -13,7 +13,7 @@ function AppLayoutContent() {
   const { chatControls } = useChatControls();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Route-aware sidebar manager for automatic content switching */}
       <RouteAwareSidebarManager />
 
