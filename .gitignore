@@ -54,6 +54,7 @@ tools/testing/logs/
 .cursor/rules/pdf-report-generation.mdc
 .augment
 .kiro
+.env.test
 
 # Ignore generated test results
 test-results/
@@ -72,3 +73,6 @@ verify-*.html
 
 # Vercel deployment configuration
 .vercel/
+
+# Windsurf
+conversation_log.md
