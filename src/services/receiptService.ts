@@ -837,6 +837,12 @@ const isOpenRouterModel = (modelId: string): boolean => {
   return modelId.startsWith('openrouter/');
 };
 
+// Helper function to check if a model is a Gemini model
+const isGeminiModel = (modelId: string): boolean => {
+  const modelConfig = getModelConfig(modelId);
+  return !!modelConfig && modelConfig.provider === 'gemini';
+};
+
 // Helper function to get user's OpenRouter API key from settings
 const getOpenRouterApiKey = (): string | null => {
   try {
@@ -849,6 +855,42 @@ const getOpenRouterApiKey = (): string | null => {
     console.error('Error reading OpenRouter API key from settings:', error);
   }
   return null;
+};
+
+// Helper function to get user's Gemini API key from settings
+const getGeminiApiKey = (): string | null => {
+  try {
+    const storedSettings = localStorage.getItem('receiptProcessingSettings');
+    if (storedSettings) {
+      const settings = JSON.parse(storedSettings);
+      return settings.userApiKeys?.gemini || null;
+    }
+  } catch (error) {
+    console.error('Error reading Gemini API key from settings:', error);
+  }
+  return null;
+};
+
+const parseGeminiResponse = (content: string): any => {
+  const cleaned = content.replace(/```json|```/g, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw error;
+  }
+};
+
+const toBase64 = (data: Uint8Array) => {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < data.length; i += chunkSize) {
+    binary += String.fromCharCode(...data.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 };
 
 // Process receipt using client-side OpenRouter service
@@ -976,6 +1018,141 @@ const processReceiptWithOpenRouter = async (
   return aiResult;
 };
 
+// Process receipt using client-side Gemini service
+const processReceiptWithGemini = async (
+  receiptId: string,
+  imageUrl: string,
+  options: ProcessingOptions,
+  onProgress?: ProgressCallback
+): Promise<AIResult> => {
+  const logger = new ClientProcessingLogger(receiptId);
+
+  await logger.start();
+  onProgress?.('START', 'Initializing Gemini processing');
+
+  const modelConfig = getModelConfig(options.modelId!);
+  if (!modelConfig) {
+    const errorMsg = `Model configuration not found for ${options.modelId}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  await logger.log(`🤖 MODEL SELECTED: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`📊 Provider: ${modelConfig.provider.toUpperCase()}`, "AI");
+
+  onProgress?.('START', 'Validating API key');
+  await logger.log('🔑 Validating Gemini API key', "START");
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    const errorMsg = 'Gemini API key not configured. Please set it in the settings.';
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+  await logger.log('✅ API key validated for Gemini', "START");
+
+  onProgress?.('START', 'Fetching image data');
+  await logger.log('📥 Fetching image data from storage', "START");
+  const imageResponse = await fetch(imageUrl);
+  if (!imageResponse.ok) {
+    const errorMsg = `Failed to fetch image: ${imageResponse.status}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  onProgress?.('START', 'Preparing image data');
+  await logger.log('🔧 Preparing image data for processing', "START");
+  const imageArrayBuffer = await imageResponse.arrayBuffer();
+  const imageData = new Uint8Array(imageArrayBuffer);
+  const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+  await logger.log(`🖼️ Image size: ${imageData.length} bytes (${mimeType})`, "AI");
+
+  const prompt = `You are an AI assistant specialized in analyzing receipt images. Return ONLY valid JSON with these fields:
+{
+  "merchant": "string",
+  "date": "YYYY-MM-DD",
+  "total": number,
+  "tax": number,
+  "currency": "MYR",
+  "payment_method": "string",
+  "predicted_category": "string",
+  "line_items": [{"description": "string", "amount": number}]
+}`;
+
+  const payload = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType,
+            data: toBase64(imageData)
+          }
+        }
+      ]
+    }]
+  };
+
+  onProgress?.('AI', 'Calling Gemini API');
+  await logger.ai('🚀 GEMINI API REQUEST: Initiating call');
+
+  const response = await fetch(`${modelConfig.endpoint}?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const errorMsg = `Gemini API error: ${response.status} - ${errorText}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  const responseData = await response.json();
+  const responseText = responseData?.candidates?.[0]?.content?.parts
+    ?.map((part: { text?: string }) => part.text || '')
+    .join('')
+    .trim();
+
+  if (!responseText) {
+    const errorMsg = 'Gemini response missing content text.';
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  let result: any;
+  try {
+    result = parseGeminiResponse(responseText);
+  } catch (error) {
+    const errorMsg = `Failed to parse Gemini response as JSON: ${error.message}`;
+    await logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  onProgress?.('PROCESSING', 'Formatting receipt information');
+  await logger.processing('📋 Formatting receipt information');
+  const aiResult: AIResult = {
+    merchant: result.merchant || '',
+    date: result.date || new Date().toISOString().split('T')[0],
+    total: parseFloat(result.total || '0') || 0,
+    tax: parseFloat(result.tax || '0') || 0,
+    currency: result.currency || 'MYR',
+    payment_method: result.payment_method || '',
+    fullText: result.fullText || '',
+    line_items: result.line_items || [],
+    confidence_scores: result.confidence || {},
+    ai_suggestions: result.suggestions || result.ai_suggestions || {},
+    predicted_category: result.predicted_category || null,
+    modelUsed: modelConfig.id
+  };
+
+  await logger.complete();
+  return aiResult;
+};
+
 // Process a receipt with AI Vision
 export const processReceiptWithAI = async (
   receiptId: string,
@@ -987,9 +1164,17 @@ export const processReceiptWithAI = async (
       modelId: options?.modelId || ''
     };
 
-    // Check if this is an OpenRouter model and handle it client-side
-    if (processingOptions.modelId && isOpenRouterModel(processingOptions.modelId)) {
-      console.log(`Detected OpenRouter model: ${processingOptions.modelId}, processing client-side`);
+    const shouldUseOpenRouter = processingOptions.modelId && isOpenRouterModel(processingOptions.modelId);
+    const shouldUseGeminiClient = processingOptions.modelId && isGeminiModel(processingOptions.modelId) && !!getGeminiApiKey();
+    const clientProcessor = shouldUseOpenRouter
+      ? { name: 'OpenRouter', handler: processReceiptWithOpenRouter }
+      : shouldUseGeminiClient
+        ? { name: 'Gemini', handler: processReceiptWithGemini }
+        : null;
+
+    // Check if this is an OpenRouter/Gemini model and handle it client-side
+    if (clientProcessor) {
+      console.log(`Detected ${clientProcessor.name} model: ${processingOptions.modelId}, processing client-side`);
 
       // Update status to start processing
       await updateReceiptProcessingStatus(receiptId, 'processing');
@@ -1009,12 +1194,12 @@ export const processReceiptWithAI = async (
 
       let result: AIResult;
       try {
-        // Process with OpenRouter client-side
-        result = await processReceiptWithOpenRouter(receiptId, receipt.image_url, processingOptions, options?.onProgress);
+        // Process with client-side provider
+        result = await clientProcessor.handler(receiptId, receipt.image_url, processingOptions, options?.onProgress);
       } catch (processingError) {
         // Log error to database using client logger
         const logger = new ClientProcessingLogger(receiptId);
-        await logger.error(`OpenRouter processing failed: ${processingError.message}`);
+        await logger.error(`${clientProcessor.name} processing failed: ${processingError.message}`);
 
         // Update status to failed
         await updateReceiptProcessingStatus(receiptId, 'failed', processingError.message);
