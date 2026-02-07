@@ -52,6 +52,8 @@ export interface Receipt {
   predicted_category?: string;
   // Custom category support
   custom_category_id?: string | null;
+  // Payer (who paid) support
+  paid_by_id?: string | null;
   // Team collaboration support
   team_id?: string | null;
   // New fields for real-time status updates
@@ -154,6 +156,8 @@ export interface ReceiptWithDetails extends Receipt {
   model_used?: string;
   // Custom category details
   custom_category?: CustomCategory | null;
+  // Payer details
+  paid_by?: PaidBy | null;
   // New fields for bounding box visualization
   field_geometry?: FieldGeometry;
   document_structure?: DocumentStructure;
@@ -224,6 +228,24 @@ export interface CustomCategory {
   receipt_count?: number; // Optional, included when fetching with counts
   team_id?: string | null; // Team ID for team-shared categories, null for personal
   is_team_category?: boolean; // Whether this is a team category
+}
+
+// Interface for payers (who paid for receipts)
+export interface PaidBy {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  archived?: boolean;
+  receipt_count?: number; // Optional, included when fetching with counts
+  team_id?: string | null; // Team ID for team-shared payers, null for personal
+  is_team_payer?: boolean; // Whether this is a team payer
+}
+
+// Interface for payer creation
+export interface CreatePayerRequest {
+  name: string;
 }
 
 // Interface for category creation/update

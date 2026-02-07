@@ -134,6 +134,7 @@ export interface ReceiptSummary {
   total: number | null;
   merchant: string | null;
   payment_method: string | null;
+  paid_by_id: string | null;
 }
 
 // Fetch detailed receipt summaries for a date range
@@ -141,7 +142,7 @@ export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, 
   let query = supabase
     .from('receipts')
     // Select necessary fields
-    .select('id, date, total, merchant, payment_method');
+    .select('id, date, total, merchant, payment_method, paid_by_id');
 
   if (startDateISO) {
     query = query.gte('date', startDateISO);

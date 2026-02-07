@@ -168,6 +168,10 @@ export const fetchReceipts = async (teamContext?: { currentTeam: { id: string } 
         name,
         color,
         icon
+      ),
+      paid_by (
+        id,
+        name
       )
     `);
 
@@ -239,6 +243,11 @@ export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: 
         name,
         color,
         icon
+      ),
+      paid_by (
+        id,
+        name,
+        team_id
       )
     `)
     .eq("id", id);
@@ -273,6 +282,11 @@ export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: 
           name,
           color,
           icon
+        ),
+        paid_by (
+          id,
+          name,
+          team_id
         )
       `)
       .eq("id", id)
@@ -366,6 +380,8 @@ export const fetchReceiptById = async (id: string, teamContext?: { currentTeam: 
     }, // Provide default if missing
     // Include custom category information
     custom_category: (receiptData as any).custom_categories || null,
+    // Include payer information
+    paid_by: (receiptData as any).paid_by || null,
     // Explicitly type cast ai_suggestions if needed (already casted here)
     ai_suggestions: receipt.ai_suggestions ? (receipt.ai_suggestions as unknown as AISuggestions) : undefined
   };
