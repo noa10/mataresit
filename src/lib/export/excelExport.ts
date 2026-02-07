@@ -6,7 +6,7 @@ import { ExportFilters } from './csvExport';
 /**
  * Converts receipt data to Excel format and triggers download
  */
-export const exportToExcel = (receipts: Receipt[], filters?: ExportFilters): void => {
+export const exportToExcel = (receipts: Receipt[], filters?: ExportFilters, payerNameMap?: Record<string, string>): void => {
   if (receipts.length === 0) {
     throw new Error('No receipts to export');
   }
@@ -20,6 +20,7 @@ export const exportToExcel = (receipts: Receipt[], filters?: ExportFilters): voi
     'Currency': receipt.currency,
     'Tax': receipt.tax || '',
     'Payment Method': receipt.payment_method,
+    'Payer': receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : '',
     'Status': receipt.status,
     'Category': receipt.predicted_category || '',
     'Processing Status': receipt.processing_status || '',
@@ -43,6 +44,7 @@ export const exportToExcel = (receipts: Receipt[], filters?: ExportFilters): voi
     { wch: 8 },  // Currency
     { wch: 8 },  // Tax
     { wch: 15 }, // Payment Method
+    { wch: 15 }, // Payer
     { wch: 12 }, // Status
     { wch: 15 }, // Category
     { wch: 15 }, // Processing Status

@@ -7,7 +7,7 @@ import { ExportFilters } from './csvExport';
 /**
  * Converts receipt data to PDF format and triggers download
  */
-export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters): void => {
+export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters, payerNameMap?: Record<string, string>): void => {
   if (receipts.length === 0) {
     throw new Error('No receipts to export');
   }
@@ -69,6 +69,7 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters): void 
     receipt.merchant.length > 25 ? receipt.merchant.substring(0, 22) + '...' : receipt.merchant,
     `${receipt.total.toFixed(2)} ${receipt.currency}`,
     receipt.payment_method,
+    receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : 'N/A',
     receipt.status,
     receipt.predicted_category || 'N/A'
   ]);
@@ -76,7 +77,7 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters): void 
   // Add receipts table
   autoTable(pdf, {
     startY: yPosition,
-    head: [['Date', 'Merchant', 'Amount', 'Payment', 'Status', 'Category']],
+    head: [['Date', 'Merchant', 'Amount', 'Payment', 'Payer', 'Status', 'Category']],
     body: tableData,
     styles: {
       fontSize: 9,
@@ -91,12 +92,13 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters): void 
       fillColor: [245, 245, 250]
     },
     columnStyles: {
-      0: { cellWidth: 25 }, // Date
-      1: { cellWidth: 45 }, // Merchant
-      2: { cellWidth: 25 }, // Amount
-      3: { cellWidth: 25 }, // Payment
-      4: { cellWidth: 20 }, // Status
-      5: { cellWidth: 25 }  // Category
+      0: { cellWidth: 22 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 18 },
+      6: { cellWidth: 22 }
     },
     margin: { left: 20, right: 20 },
     tableWidth: 'auto'
@@ -146,6 +148,23 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters): void 
   yPosition += 7;
   Object.entries(categoryCounts).forEach(([category, count]) => {
     pdf.text(`  ${category}: ${count}`, 25, yPosition);
+    yPosition += 6;
+  });
+
+  yPosition += 5;
+
+  const payerCounts = receipts.reduce((acc, receipt) => {
+    const payer = receipt.paid_by_id
+      ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown')
+      : 'No Payer';
+    acc[payer] = (acc[payer] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  pdf.text('Payer Breakdown:', 20, yPosition);
+  yPosition += 7;
+  Object.entries(payerCounts).forEach(([payer, count]) => {
+    pdf.text(`  ${payer}: ${count}`, 25, yPosition);
     yPosition += 6;
   });
 

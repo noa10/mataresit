@@ -16,7 +16,7 @@ export interface ExportFilters {
 /**
  * Converts receipt data to CSV format and triggers download
  */
-export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters): void => {
+export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters, payerNameMap?: Record<string, string>): void => {
   if (receipts.length === 0) {
     throw new Error('No receipts to export');
   }
@@ -30,6 +30,7 @@ export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters): void 
     'Currency',
     'Tax',
     'Payment Method',
+    'Payer',
     'Status',
     'Category',
     'Processing Status',
@@ -49,6 +50,7 @@ export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters): void 
     receipt.currency,
     receipt.tax?.toString() || '',
     receipt.payment_method,
+    receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : '',
     receipt.status,
     receipt.predicted_category || receipt.custom_category_id || '',
     receipt.processing_status || '',

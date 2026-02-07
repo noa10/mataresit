@@ -11,6 +11,8 @@ import {
 import { Download, FileText, FileSpreadsheet, FileImage, Loader2 } from 'lucide-react';
 import { Receipt } from '@/types/receipt';
 import { exportToCSV, exportToExcel, exportToPDF, ExportFilters } from '@/lib/export';
+import { buildPayerNameMap } from '@/lib/export/payerNameResolver';
+import { useTeam } from '@/contexts/TeamContext';
 import { toast } from 'sonner';
 
 interface ExportDropdownProps {
@@ -26,6 +28,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<string | null>(null);
+  const { currentTeam } = useTeam();
 
   const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (receipts.length === 0) {
@@ -37,17 +40,19 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
     setExportingFormat(format);
 
     try {
+      const payerNameMap = await buildPayerNameMap(receipts, { currentTeam });
+
       switch (format) {
         case 'csv':
-          exportToCSV(receipts, filters);
+          exportToCSV(receipts, filters, payerNameMap);
           toast.success(`CSV file exported successfully (${receipts.length} receipts)`);
           break;
         case 'excel':
-          exportToExcel(receipts, filters);
+          exportToExcel(receipts, filters, payerNameMap);
           toast.success(`Excel file exported successfully (${receipts.length} receipts)`);
           break;
         case 'pdf':
-          exportToPDF(receipts, filters);
+          exportToPDF(receipts, filters, payerNameMap);
           toast.success(`PDF file exported successfully (${receipts.length} receipts)`);
           break;
         default:
