@@ -161,6 +161,9 @@
     /* Layout vars and helpers */
     --nav-width: var(--sidebar-width, 0px);
     --chat-width: 0px;
+
+    /* Date picker icon (light mode) */
+    --date-picker-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
   }
 
   .dark {
@@ -201,6 +204,9 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Date picker icon (dark mode) */
+    --date-picker-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e2e8f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
   }
 
   /* Theme variant classes - these will be dynamically updated by the theme manager */
@@ -314,6 +320,28 @@
 .dark .rdp-button_previous:hover,
 .dark .rdp-button_next:hover {
   opacity: 1;
+}
+
+/* Date input calendar icon visibility */
+input[type="date"] {
+  color-scheme: light;
+  background-image: var(--date-picker-icon);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem 1rem;
+  padding-right: 2.25rem;
+}
+
+.dark input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+
+input[type="date"]::-moz-calendar-picker-indicator {
+  opacity: 0;
 }
 
 @media (min-width: 1280px) {
