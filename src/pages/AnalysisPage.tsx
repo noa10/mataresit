@@ -28,6 +28,8 @@ import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, R
 
 // Import services and types
 import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
+import { fetchUserPayers } from '@/services/paidByService';
+import { PaidBy } from '@/types/receipt';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar, RadialBarChart, RadialBar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
@@ -888,6 +890,90 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   );
 };
 
+interface PayerExpenseData {
+  payer_name: string;
+  total_spent: number;
+  receipt_count: number;
+}
+
+interface PayerPieChartProps {
+  payerData: PayerExpenseData[];
+  isLoading: boolean;
+  dateCaption: string;
+}
+
+const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dateCaption }) => {
+  if (isLoading) {
+    return (
+      <Card className="border border-border/40 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Spending by Payer</CardTitle>
+          <CardDescription>{dateCaption}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[250px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!payerData || payerData.length === 0) {
+    return (
+      <Card className="border border-border/40 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Spending by Payer</CardTitle>
+          <CardDescription>{dateCaption}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[250px]">
+          <p className="text-muted-foreground text-sm">No payer data available</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalSpent = payerData.reduce((sum, p) => sum + p.total_spent, 0);
+
+  return (
+    <Card className="border border-border/40 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Spending by Payer</CardTitle>
+        <CardDescription>{dateCaption}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={payerData}
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={80}
+                paddingAngle={2}
+                dataKey="total_spent"
+                nameKey="payer_name"
+              >
+                {payerData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+              />
+              <Legend
+                formatter={(value: string) => (
+                  <span className="text-xs">{value}</span>
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const AnalysisPage = () => {
   const queryClient = useQueryClient();
 
@@ -966,6 +1052,41 @@ const AnalysisPage = () => {
   });
 
   const totalCategoryExpenses = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
+
+  const { data: payers = [] } = useQuery<PaidBy[]>({
+    queryKey: ['payers-analysis'],
+    queryFn: () => fetchUserPayers(),
+  });
+
+  const payerExpenseData = React.useMemo(() => {
+    if (!enhancedDailyExpenseData) return [];
+    
+    const rawReceipts = queryClient.getQueryData<any[]>(['dailyExpenseDetails', startDateISO, endDateISO]);
+    if (!rawReceipts) return [];
+
+    const payerMap = new Map<string, { total: number; count: number }>();
+    for (const r of rawReceipts) {
+      const key = r.paid_by_id ?? '__none__';
+      const curr = payerMap.get(key) ?? { total: 0, count: 0 };
+      curr.total += Number(r.total) || 0;
+      curr.count += 1;
+      payerMap.set(key, curr);
+    }
+
+    const payerNameMap: Record<string, string> = {};
+    for (const p of payers) payerNameMap[p.id] = p.name;
+
+    const result: PayerExpenseData[] = [];
+    payerMap.forEach((val, key) => {
+      result.push({
+        payer_name: key === '__none__' ? 'No Payer' : (payerNameMap[key] ?? 'Unknown'),
+        total_spent: val.total,
+        receipt_count: val.count,
+      });
+    });
+
+    return result.sort((a, b) => b.total_spent - a.total_spent);
+  }, [enhancedDailyExpenseData, payers, queryClient, startDateISO, endDateISO]);
 
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
@@ -1076,7 +1197,7 @@ const AnalysisPage = () => {
               </div>
 
               {/* Second Row: Category Charts and Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
                 {/* Category Pie Chart */}
                 <div className="lg:col-span-1">
                   <CategoryPieChart
@@ -1091,6 +1212,14 @@ const AnalysisPage = () => {
                   <CategoryRadialChart
                     categoryData={categoryData || []}
                     isLoading={isLoadingCategories}
+                    dateCaption={formattedDateRange}
+                  />
+                </div>
+
+                <div className="lg:col-span-1">
+                  <PayerPieChart
+                    payerData={payerExpenseData}
+                    isLoading={isLoadingDaily}
                     dateCaption={formattedDateRange}
                   />
                 </div>

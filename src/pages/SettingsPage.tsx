@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { CategoryManager } from "@/components/categories/CategoryManager";
+import { PayerManager } from "@/components/payers/PayerManager";
 import { CompactSubscriptionLimitError } from "@/components/SubscriptionLimitError";
 import { Link, useSearchParams } from "react-router-dom";
 import { Crown, Key, Zap, ArrowRight, Bell, Palette, CreditCard } from "lucide-react";
@@ -195,9 +196,10 @@ export default function SettingsPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full mb-8 max-w-5xl grid-cols-8">
+            <TabsList className="grid w-full mb-8 max-w-5xl grid-cols-9">
               <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
               <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>
+              <TabsTrigger value="payers">Payers</TabsTrigger>
               <TabsTrigger value="billing">
                 <CreditCard className="h-4 w-4 mr-1" />
                 {t('tabs.billing')}
@@ -328,6 +330,10 @@ export default function SettingsPage() {
 
           <TabsContent value="categories">
             <CategoryManager />
+          </TabsContent>
+
+          <TabsContent value="payers">
+            <PayerManager />
           </TabsContent>
 
           <TabsContent value="billing">
