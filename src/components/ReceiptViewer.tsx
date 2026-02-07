@@ -13,6 +13,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCategoriesForDisplay } from "@/services/categoryService";
 import { CategorySelector } from "@/components/categories/CategorySelector";
+import { PaidBySelector } from "@/components/paidby/PaidBySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -179,7 +180,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     currency: normalizeCurrencyCode(receipt.currency, "MYR"),
     payment_method: receipt.payment_method || "",
     predicted_category: receipt.predicted_category || "",
-    custom_category_id: receipt.custom_category_id || null
+    custom_category_id: receipt.custom_category_id || null,
+    paid_by_id: receipt.paid_by_id || null
   });
   // Use save status context for background save operations
   const { saveReceipt } = useSaveStatus();
@@ -227,7 +229,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         currency: normalizeCurrencyCode(receipt.currency, "MYR"),
         payment_method: receipt.payment_method || "",
         predicted_category: receipt.predicted_category || "",
-        custom_category_id: receipt.custom_category_id || null
+        custom_category_id: receipt.custom_category_id || null,
+        paid_by_id: receipt.paid_by_id || null
       });
     }
   }, [receipt, isSaving]);
@@ -300,7 +303,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         currency: receipt.currency || "MYR",
         payment_method: receipt.payment_method || "",
         predicted_category: receipt.predicted_category || "",
-        custom_category_id: receipt.custom_category_id || null
+        custom_category_id: receipt.custom_category_id || null,
+        paid_by_id: receipt.paid_by_id || null
       });
     }
 
@@ -337,7 +341,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       currency: validatedCurrency,
       payment_method: debouncedInputValues.payment_method,
       predicted_category: debouncedInputValues.predicted_category,
-      custom_category_id: debouncedInputValues.custom_category_id
+      custom_category_id: debouncedInputValues.custom_category_id,
+      paid_by_id: debouncedInputValues.paid_by_id
     }));
 
     // Update confidence scores for fields that have been edited
@@ -470,6 +475,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       payment_method: editedReceipt.payment_method,
       predicted_category: editedReceipt.predicted_category,
       custom_category_id: editedReceipt.custom_category_id,
+      paid_by_id: editedReceipt.paid_by_id,
       status: "reviewed" as const,
     };
 
@@ -1568,6 +1574,22 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 className="bg-background/50"
               />
               {renderSuggestion('predicted_category', 'category')}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="paid_by">Paid By</Label>
+              </div>
+              <PaidBySelector
+                value={inputValues.paid_by_id}
+                onSelect={(payerId) => {
+                  setInputValues(prev => ({
+                    ...prev,
+                    paid_by_id: payerId
+                  }));
+                }}
+                className="bg-background/50"
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
