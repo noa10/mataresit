@@ -13,6 +13,17 @@ export interface ExportFilters {
   };
 }
 
+type ReceiptWithCategoryName = Receipt & {
+  custom_category?: { name?: string | null } | null;
+  custom_categories?: { name?: string | null } | null;
+};
+
+const resolveCategoryLabel = (receipt: Receipt): string => {
+  const receiptWithCategory = receipt as ReceiptWithCategoryName;
+  const customCategoryName = receiptWithCategory.custom_category?.name || receiptWithCategory.custom_categories?.name;
+  return customCategoryName || receipt.predicted_category || '';
+};
+
 /**
  * Converts receipt data to CSV format and triggers download
  */
@@ -52,7 +63,7 @@ export const exportToCSV = (receipts: Receipt[], filters?: ExportFilters, payerN
     receipt.payment_method,
     receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : '',
     receipt.status,
-    receipt.predicted_category || receipt.custom_category_id || '',
+    resolveCategoryLabel(receipt),
     receipt.processing_status || '',
     receipt.model_used || '',
     receipt.primary_method || '',

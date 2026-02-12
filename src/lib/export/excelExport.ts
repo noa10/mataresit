@@ -3,6 +3,17 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { ExportFilters } from './csvExport';
 
+type ReceiptWithCategoryName = Receipt & {
+  custom_category?: { name?: string | null } | null;
+  custom_categories?: { name?: string | null } | null;
+};
+
+const resolveCategoryLabel = (receipt: Receipt): string => {
+  const receiptWithCategory = receipt as ReceiptWithCategoryName;
+  const customCategoryName = receiptWithCategory.custom_category?.name || receiptWithCategory.custom_categories?.name;
+  return customCategoryName || receipt.predicted_category || 'Uncategorized';
+};
+
 /**
  * Converts receipt data to Excel format and triggers download
  */
@@ -22,7 +33,7 @@ export const exportToExcel = (receipts: Receipt[], filters?: ExportFilters, paye
     'Payment Method': receipt.payment_method,
     'Payer': receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : '',
     'Status': receipt.status,
-    'Category': receipt.predicted_category || '',
+    'Category': resolveCategoryLabel(receipt),
     'Processing Status': receipt.processing_status || '',
     'Model Used': receipt.model_used || '',
     'Processing Method': receipt.primary_method || '',
@@ -113,7 +124,7 @@ const generateSummaryData = (receipts: Receipt[], filters?: ExportFilters) => {
   }, {} as Record<string, number>);
 
   const categoryCounts = receipts.reduce((acc, receipt) => {
-    const category = receipt.predicted_category || 'Uncategorized';
+    const category = resolveCategoryLabel(receipt);
     acc[category] = (acc[category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);

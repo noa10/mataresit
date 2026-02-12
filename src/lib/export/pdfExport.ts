@@ -4,6 +4,17 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ExportFilters } from './csvExport';
 
+type ReceiptWithCategoryName = Receipt & {
+  custom_category?: { name?: string | null } | null;
+  custom_categories?: { name?: string | null } | null;
+};
+
+const resolveCategoryLabel = (receipt: Receipt): string => {
+  const receiptWithCategory = receipt as ReceiptWithCategoryName;
+  const customCategoryName = receiptWithCategory.custom_category?.name || receiptWithCategory.custom_categories?.name;
+  return customCategoryName || receipt.predicted_category || 'Uncategorized';
+};
+
 /**
  * Converts receipt data to PDF format and triggers download
  */
@@ -71,7 +82,7 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters, payerN
     receipt.payment_method,
     receipt.paid_by_id ? (payerNameMap?.[receipt.paid_by_id] ?? 'Unknown') : 'N/A',
     receipt.status,
-    receipt.predicted_category || 'N/A'
+    resolveCategoryLabel(receipt)
   ]);
 
   // Add receipts table
@@ -139,7 +150,7 @@ export const exportToPDF = (receipts: Receipt[], filters?: ExportFilters, payerN
 
   // Category breakdown
   const categoryCounts = receipts.reduce((acc, receipt) => {
-    const category = receipt.predicted_category || 'Uncategorized';
+    const category = resolveCategoryLabel(receipt);
     acc[category] = (acc[category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
