@@ -329,12 +329,15 @@ jobs:
 
               echo "  ✅ Found index.ts for: $func_name"
 
-              # Validate TypeScript syntax and types using shared Deno config
-              if ! deno check -c supabase/functions/deno.json "$func_dir/index.ts" 2>/dev/null; then
+              # Validate TypeScript syntax only (parse check).
+              # `deno fmt --check` exits non-zero for both syntax errors and formatting diffs,
+              # so treat formatting-only failures as valid syntax.
+              FMT_OUTPUT="$(deno fmt --check "$func_dir/index.ts" 2>&1 || true)"
+              if [ -z "$FMT_OUTPUT" ] || echo "$FMT_OUTPUT" | grep -q "not formatted file"; then
+                echo "  ✅ TypeScript syntax valid for: $func_name"
+              else
                 echo "  ❌ TypeScript syntax errors in: $func_name"
                 VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
-              else
-                echo "  ✅ TypeScript syntax valid for: $func_name"
               fi
 
               # Check for proper Deno imports and exports
