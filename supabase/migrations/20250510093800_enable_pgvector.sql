@@ -1,80 +1,80 @@
 -- Enable the pgvector extension
-create extension if not exists vector with schema public;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 -- Create table for storing embeddings
-create table if not exists public.receipt_embeddings (
-  id uuid primary key default gen_random_uuid(),
-  receipt_id uuid not null references public.receipts(id) on delete cascade,
-  content_type text not null, -- 'full_text', 'merchant', 'items', etc.
+CREATE TABLE IF NOT EXISTS public.receipt_embeddings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_id uuid NOT NULL REFERENCES public.receipts(id) ON DELETE CASCADE,
+  content_type text NOT NULL, -- 'full_text', 'merchant', 'items', etc.
   embedding vector(1536), -- Standard Gemini embedding dimension
   metadata jsonb,
-  created_at timestamp with time zone default now(),
+  created_at timestamp WITH time zone DEFAULT now(),
   
-  constraint fk_receipt
-    foreign key (receipt_id)
-    references receipts(id)
-    on delete cascade
+  CONSTRAINT fk_receipt
+    FOREIGN KEY (receipt_id)
+    REFERENCES receipts(id)
+    ON DELETE CASCADE
 );
 
 -- Create indexes for vector similarity search
-create index on receipt_embeddings using ivfflat (embedding vector_cosine_ops)
-  with (lists = 100);
+CREATE INDEX ON receipt_embeddings USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100);
 
 -- Create a function to search for similar receipts based on vector similarity
-create or replace function search_receipts(
+CREATE OR REPLACE FUNCTION search_receipts(
   query_embedding vector(1536),
-  similarity_threshold float default 0.5,
-  match_count int default 10,
-  content_type text default 'full_text'
-) returns table (
+  similarity_threshold float DEFAULT 0.5,
+  match_count int DEFAULT 10,
+  content_type text DEFAULT 'full_text'
+) RETURNS TABLE (
   id uuid,
   receipt_id uuid,
   similarity float
 )
-language plpgsql
-as $$
-begin
-  return query
-  select
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
     re.id,
     re.receipt_id,
-    1 - (re.embedding <=> query_embedding) as similarity
-  from receipt_embeddings re
-  where
+    1 - (re.embedding <=> query_embedding) AS similarity
+  FROM receipt_embeddings re
+  WHERE
     re.content_type = search_receipts.content_type
-    and 1 - (re.embedding <=> query_embedding) > similarity_threshold
-  order by similarity desc
-  limit match_count;
-end;
+    AND 1 - (re.embedding <=> query_embedding) > similarity_threshold
+  ORDER BY similarity DESC
+  LIMIT match_count;
+END;
 $$;
 
 -- Create a helper function to check pgvector status
-create or replace function check_pgvector_status()
-returns json
-language plpgsql
-security definer
-as $$
-declare
+CREATE OR REPLACE FUNCTION check_pgvector_status()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
   extension_exists boolean;
   vector_table_exists boolean;
   api_key_exists boolean;
   result json;
-begin
+BEGIN
   -- Check if pgvector extension is installed
-  select exists(
-    select 1 from pg_catalog.pg_extension where extname = 'vector'
-  ) into extension_exists;
+  SELECT exists(
+    SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'vector'
+  ) INTO extension_exists;
 
   -- Check if receipt_embeddings table exists
-  select exists(
-    select 1 from information_schema.tables 
-    where table_schema = 'public' and table_name = 'receipt_embeddings'
-  ) into vector_table_exists;
+  SELECT exists(
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'receipt_embeddings'
+  ) INTO vector_table_exists;
   
   -- Check if Gemini API key is set
-  select exists(
-    select 1 from pg_settings where name = 'app.settings.gemini_api_key' and setting is not null and setting != ''
-  ) into api_key_exists;
+  SELECT exists(
+    SELECT 1 FROM pg_settings WHERE name = 'app.settings.gemini_api_key' AND setting IS NOT NULL AND setting != ''
+  ) INTO api_key_exists;
 
   -- Return results as JSON
   result := json_build_object(
@@ -83,54 +83,54 @@ begin
     'api_key_exists', api_key_exists
   );
 
-  return result;
-end;
+  RETURN result;
+END;
 $$;
 
 -- Create a hybrid search function (combines full-text and vector search)
-create or replace function hybrid_search_receipts(
+CREATE OR REPLACE FUNCTION hybrid_search_receipts(
   search_text text,
   query_embedding vector(1536),
-  content_type text default 'full_text',
-  similarity_weight float default 0.7,
-  text_weight float default 0.3,
-  match_count int default 10
+  content_type text DEFAULT 'full_text',
+  similarity_weight float DEFAULT 0.7,
+  text_weight float DEFAULT 0.3,
+  match_count int DEFAULT 10
 )
-returns table (
+RETURNS TABLE (
   receipt_id uuid,
   score float
 )
-language plpgsql
-as $$
-begin
-  return query
-  with vector_results as (
-    select 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH vector_results AS (
+    SELECT 
       e.receipt_id,
-      1 - (e.embedding <=> query_embedding) as similarity
-    from receipt_embeddings e
-    where e.content_type = hybrid_search_receipts.content_type
+      1 - (e.embedding <=> query_embedding) AS similarity
+    FROM receipt_embeddings e
+    WHERE e.content_type = hybrid_search_receipts.content_type
   ),
-  text_results as (
-    select 
-      r.id as receipt_id,
+  text_results AS (
+    SELECT 
+      r.id AS receipt_id,
       ts_rank_cd(to_tsvector('english', coalesce(r.merchant, '') || ' ' || 
                 coalesce(r.notes, '') || ' ' || 
                 coalesce(r.raw_text, '')), 
-                plainto_tsquery('english', search_text)) as text_similarity
-    from receipts r
+                plainto_tsquery('english', search_text)) AS text_similarity
+    FROM receipts r
   ),
-  combined_results as (
-    select 
-      coalesce(v.receipt_id, t.receipt_id) as receipt_id,
+  combined_results AS (
+    SELECT 
+      coalesce(v.receipt_id, t.receipt_id) AS receipt_id,
       (coalesce(v.similarity, 0) * similarity_weight) + 
-      (coalesce(t.text_similarity, 0) * text_weight) as score
-    from vector_results v
-    full outer join text_results t on v.receipt_id = t.receipt_id
+      (coalesce(t.text_similarity, 0) * text_weight) AS score
+    FROM vector_results v
+    FULL OUTER JOIN text_results t ON v.receipt_id = t.receipt_id
   )
-  select * from combined_results
-  where score > 0
-  order by score desc
-  limit match_count;
-end;
+  SELECT * FROM combined_results
+  WHERE score > 0
+  ORDER BY score DESC
+  LIMIT match_count;
+END;
 $$;
