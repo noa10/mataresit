@@ -177,7 +177,7 @@ class EmbeddingQueueWorker {
           this.processedCount++
         } catch (error) {
           console.error(`Error processing item ${item.id}:`, error)
-          await this.completeItem(item.id, false, null, error.message)
+          await this.completeItem(item.id, false, undefined, error.message)
           this.errorCount++
         }
       }
