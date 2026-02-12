@@ -43,6 +43,7 @@ import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 import { useSettings } from "@/hooks/useSettings";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
+import { upsertCategoryRule } from "@/services/categoryRuleService";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -278,6 +279,38 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const saveRuleMutation = useMutation({
+    mutationFn: async () => {
+      const merchant = (inputValues.merchant || "").trim();
+      const categoryId = inputValues.custom_category_id;
+      if (!merchant || !categoryId) {
+        throw new Error("Merchant and category are required");
+      }
+
+      const result = await upsertCategoryRule(
+        {
+          matchType: "merchant_exact",
+          pattern: merchant,
+          categoryId,
+          priority: 0,
+        },
+        { currentTeam }
+      );
+
+      if (!result) {
+        throw new Error("Failed to save category rule");
+      }
+    },
+    onSuccess: () => {
+      toast.success("Merchant rule saved");
+      queryClient.invalidateQueries({ queryKey: ["categoryRules", currentTeam?.id] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Failed to save merchant rule";
+      toast.error(message);
+    },
+  });
 
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -910,6 +943,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       ...prev,
       custom_category_id: categoryId
     }));
+  };
+
+  const handleSaveMerchantRule = () => {
+    if (!inputValues.merchant?.trim()) {
+      toast.error("Merchant is required");
+      return;
+    }
+    if (!inputValues.custom_category_id) {
+      toast.error("Select a category first");
+      return;
+    }
+    saveRuleMutation.mutate();
   };
 
   // Function to handle field hover for bounding box highlighting (removed highlight functionality)
@@ -1573,6 +1618,17 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 placeholder="Select category..."
                 className="bg-background/50"
               />
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveMerchantRule}
+                  disabled={!inputValues.merchant?.trim() || !inputValues.custom_category_id || saveRuleMutation.isPending}
+                >
+                  {saveRuleMutation.isPending ? "Saving..." : "Save Rule for Merchant"}
+                </Button>
+              </div>
               {renderSuggestion('predicted_category', 'category')}
             </div>
 
