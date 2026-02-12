@@ -203,16 +203,20 @@ async function processPaymentRetries() {
         profiles!inner(id, email, full_name, stripe_subscription_id)
       `)
       .eq('status', 'pending')
-      .lte('next_retry_at', new Date().toISOString())
-      .lt('attempt_number', supabaseClient.raw('max_attempts'));
+      .lte('next_retry_at', new Date().toISOString());
 
     if (error) {
       throw new Error(`Failed to get due retries: ${error.message}`);
     }
 
     const results = [];
+    const retriesToProcess = (dueRetries || []).filter((retry) => {
+      const attemptNumber = Number(retry.attempt_number ?? 0);
+      const maxAttempts = Number(retry.max_attempts ?? 0);
+      return attemptNumber < maxAttempts;
+    });
 
-    for (const retry of dueRetries || []) {
+    for (const retry of retriesToProcess) {
       try {
         const { data, error: retryError } = await supabaseClient.functions.invoke('billing-auto-renewal', {
           body: {
@@ -317,7 +321,7 @@ async function dailyBillingHealthCheck() {
   console.log('Running daily billing health check...');
   
   try {
-    const healthReport = {
+    const healthReport: { timestamp: string; checks: Array<Record<string, unknown>> } = {
       timestamp: new Date().toISOString(),
       checks: []
     };

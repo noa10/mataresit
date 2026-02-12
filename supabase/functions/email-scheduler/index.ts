@@ -198,7 +198,7 @@ async function processScheduledEmails() {
     for (let i = 0; i < (pendingReminders?.length || 0); i += batchSize) {
       const batch = pendingReminders!.slice(i, i + batchSize);
       
-      const batchPromises = batch.map(async (reminder) => {
+      const batchPromises = batch.map(async (reminder: any) => {
         try {
           // Check if we should respect quiet hours
           const shouldRespectQuietHours = await checkQuietHours(reminder.user_id);
@@ -230,11 +230,12 @@ async function processScheduledEmails() {
 
             // Update with provider message ID for tracking
             if (emailResult.messageId) {
+              const nextDeliveryAttempts = Number(reminder.delivery_attempts ?? 0) + 1;
               await supabaseClient
                 .from('billing_email_schedule')
                 .update({ 
                   delivered_at: new Date().toISOString(),
-                  delivery_attempts: supabaseClient.raw('delivery_attempts + 1')
+                  delivery_attempts: nextDeliveryAttempts
                 })
                 .eq('id', reminder.schedule_id);
             }
@@ -246,18 +247,19 @@ async function processScheduledEmails() {
             };
           } else {
             // Handle failure with retry logic
-            const shouldRetry = await handleEmailFailure(reminder, emailResult.error);
+            const failureMessage = emailResult.error ?? 'Unknown email delivery failure';
+            const shouldRetry = await handleEmailFailure(reminder, failureMessage);
             
             await supabaseClient.rpc('mark_billing_reminder_sent', {
               p_schedule_id: reminder.schedule_id,
               p_success: false,
-              p_error_message: emailResult.error
+              p_error_message: failureMessage
             });
 
             return {
               schedule_id: reminder.schedule_id,
               status: shouldRetry ? 'retry_scheduled' : 'failed',
-              error: emailResult.error
+              error: failureMessage
             };
           }
 
