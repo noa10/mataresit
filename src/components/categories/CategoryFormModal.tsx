@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Check, Palette, Tag } from "lucide-react";
 
@@ -22,6 +22,7 @@ import {
   DEFAULT_CATEGORY_COLORS,
   DEFAULT_CATEGORY_ICONS,
 } from "@/services/categoryService";
+import { fetchUserPayers } from "@/services/paidByService";
 import { CustomCategory, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/receipt";
 import { useTeam } from "@/contexts/TeamContext";
 
@@ -46,6 +47,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     icon: DEFAULT_CATEGORY_ICONS[0],
   });
   const [errors, setErrors] = useState<string[]>([]);
+  const { data: payers = [] } = useQuery({
+    queryKey: ["paidBy", currentTeam?.id],
+    queryFn: () => fetchUserPayers({ currentTeam }),
+    enabled: isOpen,
+  });
 
   // Reset form when modal opens/closes or category changes
   useEffect(() => {
@@ -95,6 +101,13 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     const validationErrors = validateCategoryData(formData);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
+      return;
+    }
+
+    const normalizedName = formData.name.trim().toLowerCase();
+    const payerNameConflict = payers.some((payer) => payer.name.trim().toLowerCase() === normalizedName);
+    if (payerNameConflict) {
+      setErrors(["Category name cannot match an existing payer name"]);
       return;
     }
 
