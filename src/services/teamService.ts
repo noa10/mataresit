@@ -311,7 +311,7 @@ export class TeamService {
         .eq('team_id', teamId),
       supabase
         .from('receipts')
-        .select('id, total, date, predicted_category')
+        .select('id, total, date, predicted_category, custom_categories(name)')
         .eq('team_id', teamId),
     ]);
 
@@ -340,7 +340,7 @@ export class TeamService {
 
     // Calculate top categories
     const categoryStats = receipts.reduce((acc, receipt) => {
-      const category = receipt.predicted_category || 'Uncategorized';
+      const category = (receipt as any).custom_categories?.name || receipt.predicted_category || 'Uncategorized';
       if (!acc[category]) {
         acc[category] = { count: 0, amount: 0 };
       }

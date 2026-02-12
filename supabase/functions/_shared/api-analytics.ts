@@ -283,7 +283,7 @@ async function getCategoryAnalytics(req: Request, context: ApiContext): Promise<
 
     const { data: receipts } = await context.supabase
       .from('receipts')
-      .select('predicted_category, total')
+      .select('predicted_category, total, custom_categories(name)')
       .eq('user_id', context.userId)
       .gte('date', startDate)
       .lte('date', endDate);
@@ -293,7 +293,7 @@ async function getCategoryAnalytics(req: Request, context: ApiContext): Promise<
     let totalAmount = 0;
 
     for (const receipt of receipts || []) {
-      const category = receipt.predicted_category || 'Uncategorized';
+      const category = (receipt as any).custom_categories?.name || receipt.predicted_category || 'Uncategorized';
       const amount = receipt.total || 0;
       
       if (!categoryMap.has(category)) {
