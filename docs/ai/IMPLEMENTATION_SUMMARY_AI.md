@@ -55,7 +55,7 @@ To test the implementation:
 ## Database Migration Troubleshooting
 
 - Identified that local migration files were out of sync with the remote Supabase database schema (missing initial `receipts` table migration).
-- Resolved Git conflict markers within an existing migration file (`20240804_fix_receipt_storage_bucket.sql`).
+- Resolved Git conflict markers within an existing migration file (`20240804000000_fix_receipt_storage_bucket.sql`).
 - Used `supabase migration repair` multiple times to synchronize the remote migration history table (`supabase_migrations.schema_migrations`) with the local migration files.
 - Used `supabase db pull` to generate a new migration file (`YYYYMMDDHHMMSS_remote_schema.sql`) containing the missing `CREATE TABLE` statements based on the remote database structure.
 - Ensured the new migration file has the earliest timestamp to guarantee correct execution order.
