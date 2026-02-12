@@ -272,3 +272,30 @@ export interface DeleteCategoryRequest {
   category_id: string;
   reassign_to_category_id?: string | null;
 }
+
+export type CategoryRuleMatchType = "merchant_exact" | "merchant_contains";
+
+export interface CategoryRule {
+  id: string;
+  user_id: string;
+  team_id?: string | null;
+  match_type: CategoryRuleMatchType;
+  pattern: string;
+  category_id: string;
+  category_name?: string;
+  priority: number;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryAlias {
+  id: string;
+  user_id: string;
+  team_id?: string | null;
+  alias: string;
+  category_id: string;
+  category_name?: string;
+  created_at: string;
+  updated_at: string;
+}

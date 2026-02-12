@@ -642,6 +642,125 @@ export type Database = {
         }
         Relationships: []
       }
+      category_aliases: {
+        Row: {
+          alias: string
+          category_id: string
+          created_at: string
+          id: string
+          normalized_alias: string
+          team_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alias: string
+          category_id: string
+          created_at?: string
+          id?: string
+          normalized_alias: string
+          team_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alias?: string
+          category_id?: string
+          created_at?: string
+          id?: string
+          normalized_alias?: string
+          team_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_aliases_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "custom_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_aliases_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "mv_team_advanced_analytics"
+            referencedColumns: ["team_id"]
+          },
+          {
+            foreignKeyName: "category_aliases_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      category_rules: {
+        Row: {
+          archived: boolean
+          category_id: string
+          created_at: string
+          id: string
+          match_type: Database["public"]["Enums"]["category_rule_match_type"]
+          normalized_pattern: string
+          pattern: string
+          priority: number
+          team_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          category_id: string
+          created_at?: string
+          id?: string
+          match_type: Database["public"]["Enums"]["category_rule_match_type"]
+          normalized_pattern: string
+          pattern: string
+          priority?: number
+          team_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          category_id?: string
+          created_at?: string
+          id?: string
+          match_type?: Database["public"]["Enums"]["category_rule_match_type"]
+          normalized_pattern?: string
+          pattern?: string
+          priority?: number
+          team_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "custom_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_rules_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "mv_team_advanced_analytics"
+            referencedColumns: ["team_id"]
+          },
+          {
+            foreignKeyName: "category_rules_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_contexts: {
         Row: {
           context_data: Json
@@ -4659,6 +4778,7 @@ export type Database = {
         Args: { _claim_id: string; _comment?: string }
         Returns: boolean
       }
+      archive_category_rule: { Args: { p_rule_id: string }; Returns: boolean }
       archive_notification: {
         Args: { _notification_id: string }
         Returns: boolean
@@ -4889,6 +5009,7 @@ export type Database = {
         Args: { _description?: string; _name: string; _slug?: string }
         Returns: string
       }
+      delete_category_alias: { Args: { p_alias_id: string }; Returns: boolean }
       delete_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -5155,6 +5276,35 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_category_aliases: {
+        Args: { p_team_id?: string }
+        Returns: {
+          alias: string
+          category_id: string
+          category_name: string
+          created_at: string
+          id: string
+          team_id: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      get_category_rules: {
+        Args: { p_team_id?: string }
+        Returns: {
+          archived: boolean
+          category_id: string
+          category_name: string
+          created_at: string
+          id: string
+          match_type: Database["public"]["Enums"]["category_rule_match_type"]
+          pattern: string
+          priority: number
+          team_id: string
+          updated_at: string
+          user_id: string
+        }[]
       }
       get_chat_statistics: {
         Args: { p_days?: number; p_user_id?: string }
@@ -6144,6 +6294,16 @@ export type Database = {
         Args: { _notification_id: string }
         Returns: boolean
       }
+      match_category_for_receipt: {
+        Args: {
+          p_line_items?: Json
+          p_merchant: string
+          p_predicted_category?: string
+          p_team_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       migrate_receipt_embeddings_to_unified: {
         Args: never
         Returns: {
@@ -6157,6 +6317,7 @@ export type Database = {
         Args: { input_currency: string }
         Returns: string
       }
+      normalize_text: { Args: { p_input: string }; Returns: string }
       parse_malaysian_address: { Args: { address_text: string }; Returns: Json }
       process_post_auth_invitation: {
         Args: {
@@ -6709,6 +6870,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      upsert_category_alias: {
+        Args: {
+          p_alias?: string
+          p_alias_id?: string
+          p_category_id?: string
+          p_team_id?: string
+        }
+        Returns: string
+      }
+      upsert_category_rule: {
+        Args: {
+          p_category_id?: string
+          p_match_type?: Database["public"]["Enums"]["category_rule_match_type"]
+          p_pattern?: string
+          p_priority?: number
+          p_rule_id?: string
+          p_team_id?: string
+        }
+        Returns: string
+      }
       upsert_exchange_rate: {
         Args: {
           base_curr: string
@@ -6869,6 +7050,7 @@ export type Database = {
         | "teams:read"
         | "admin:all"
       app_role: "admin" | "user"
+      category_rule_match_type: "merchant_exact" | "merchant_contains"
       claim_priority: "low" | "medium" | "high" | "urgent"
       claim_status:
         | "draft"
@@ -7068,6 +7250,7 @@ export const Constants = {
         "admin:all",
       ],
       app_role: ["admin", "user"],
+      category_rule_match_type: ["merchant_exact", "merchant_contains"],
       claim_priority: ["low", "medium", "high", "urgent"],
       claim_status: [
         "draft",
