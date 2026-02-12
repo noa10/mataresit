@@ -621,6 +621,7 @@ export const createReceipt = async (
 
     // Determine team_id based on team context
     const teamId = teamContext?.currentTeam?.id || receipt.team_id || null;
+    let matchedCategoryId = receipt.custom_category_id || null;
 
     console.log("Creating receipt with team context:", {
       teamId,
@@ -628,9 +629,35 @@ export const createReceipt = async (
       receiptTeamId: receipt.team_id
     });
 
+    if (!matchedCategoryId) {
+      try {
+        const lineItemsPayload = (lineItems || []).map((item) => ({
+          description: item.description,
+          amount: item.amount,
+        }));
+
+        const { data: autoCategoryId, error: matchError } = await supabase.rpc("match_category_for_receipt", {
+          p_user_id: user.user.id,
+          p_team_id: teamId,
+          p_merchant: receipt.merchant || null,
+          p_line_items: lineItemsPayload,
+          p_predicted_category: receipt.predicted_category || null,
+        });
+
+        if (matchError) {
+          console.warn("Category auto-match failed:", matchError);
+        } else {
+          matchedCategoryId = autoCategoryId || null;
+        }
+      } catch (error) {
+        console.warn("Category auto-match exception:", error);
+      }
+    }
+
     // Ensure the processing status is set, defaulting to 'uploading' if not provided
     const receiptWithStatus = {
       ...receipt,
+      custom_category_id: matchedCategoryId,
       user_id: user.user.id, // Add user_id here
       team_id: teamId, // Add team_id based on context
       processing_status: receipt.processing_status || 'uploading' as ProcessingStatus
@@ -1856,6 +1883,7 @@ interface UnifiedReceiptSubscription {
   lastActivity: number;
   subscriptionTypes: Set<'receipt' | 'logs' | 'comments'>;
   isCleaningUp?: boolean; // Flag to prevent race conditions during cleanup
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
 // OPTIMIZATION: Unified connection pooling for all receipt-related subscriptions
@@ -2038,14 +2066,20 @@ export const subscribeToReceiptAll = (
     return () => { };
   }
 
-  if (existing && !existing.isCleaningUp) {
+  if (existing) {
     // Only log in development
     if (import.meta.env.DEV) {
-      console.log(`🔄 Adding callbacks to existing unified subscription for receipt ${receiptId}`);
+      console.log(`🔄 Reusing unified subscription for receipt ${receiptId}`);
     }
+
+    if (existing.cleanupTimer) {
+      clearTimeout(existing.cleanupTimer);
+      existing.cleanupTimer = undefined;
+    }
+
     existing.callbacks.set(callbackId, callbacks);
     existing.lastActivity = Date.now();
-    existing.isCleaningUp = false; // Reset cleanup flag
+    existing.isCleaningUp = false; // Cancel cleanup when a new callback is added
 
     // Add new subscription types if needed
     if (options?.subscribeToLogs && !existing.subscriptionTypes.has('logs')) {
@@ -2087,6 +2121,18 @@ export const subscribeToReceiptAll = (
   unifiedReceiptSubscriptions.set(subscriptionKey, subscription);
 
   return () => cleanupUnifiedCallback(receiptId, callbackId);
+};
+
+const removeUnifiedChannels = (subscription: UnifiedReceiptSubscription): void => {
+  if (subscription.receiptChannel) {
+    void supabase.removeChannel(subscription.receiptChannel);
+  }
+  if (subscription.logChannel) {
+    void supabase.removeChannel(subscription.logChannel);
+  }
+  if (subscription.commentChannel) {
+    void supabase.removeChannel(subscription.commentChannel);
+  }
 };
 
 // Helper function to set up receipt status subscription
@@ -2226,20 +2272,28 @@ const cleanupUnifiedCallback = (receiptId: string, callbackId: string): void => 
     // Set cleanup flag to prevent race conditions
     subscription.isCleaningUp = true;
 
+    if (subscription.cleanupTimer) {
+      clearTimeout(subscription.cleanupTimer);
+      subscription.cleanupTimer = undefined;
+    }
+
     // Only log cleanup in development
     if (import.meta.env.DEV) {
       console.log(`🧹 Cleaning up unified subscription for receipt ${receiptId} (no more callbacks)`);
     }
 
     // Use setTimeout to debounce cleanup and prevent rapid create/destroy cycles
-    setTimeout(() => {
+    subscription.cleanupTimer = setTimeout(() => {
+      subscription.cleanupTimer = undefined;
+
       // Double-check that no new callbacks were added during the timeout
       if (subscription.callbacks.size === 0) {
-        subscription.receiptChannel?.unsubscribe();
-        subscription.logChannel?.unsubscribe();
-        subscription.commentChannel?.unsubscribe();
+        removeUnifiedChannels(subscription);
 
-        unifiedReceiptSubscriptions.delete(subscriptionKey);
+        // Only remove the map entry if this is still the active subscription object.
+        if (unifiedReceiptSubscriptions.get(subscriptionKey) === subscription) {
+          unifiedReceiptSubscriptions.delete(subscriptionKey);
+        }
       } else {
         // Reset cleanup flag if new callbacks were added
         subscription.isCleaningUp = false;
@@ -2269,9 +2323,11 @@ export const cleanupUnifiedReceiptSubscriptions = (): void => {
 
   for (const [key, subscription] of unifiedReceiptSubscriptions) {
     try {
-      subscription.receiptChannel?.unsubscribe();
-      subscription.logChannel?.unsubscribe();
-      subscription.commentChannel?.unsubscribe();
+      if (subscription.cleanupTimer) {
+        clearTimeout(subscription.cleanupTimer);
+        subscription.cleanupTimer = undefined;
+      }
+      removeUnifiedChannels(subscription);
       console.log(`✅ Cleaned up unified receipt subscription: ${key}`);
     } catch (error) {
       console.error(`❌ Error cleaning up unified receipt subscription ${key}:`, error);
