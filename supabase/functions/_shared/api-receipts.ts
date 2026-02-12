@@ -441,6 +441,7 @@ async function createReceipt(req: Request, context: ApiContext): Promise<Respons
       imageUrl,
       fullText,
       teamId,
+      customCategoryId,
       lineItems = []
     } = body;
 
@@ -497,6 +498,30 @@ async function createReceipt(req: Request, context: ApiContext): Promise<Respons
       }
     }
 
+    let resolvedCategoryId = customCategoryId || null;
+    if (!resolvedCategoryId) {
+      const lineItemsPayload = Array.isArray(lineItems)
+        ? lineItems.map((item: any) => ({
+            description: item?.description || '',
+            amount: item?.totalPrice || item?.unitPrice || 0
+          }))
+        : [];
+
+      const { data: matchedCategoryId, error: matchError } = await context.supabase.rpc('match_category_for_receipt', {
+        p_user_id: context.userId,
+        p_team_id: teamId || null,
+        p_merchant: merchant?.trim() || null,
+        p_line_items: lineItemsPayload,
+        p_predicted_category: category?.trim() || null,
+      });
+
+      if (matchError) {
+        console.warn('Category matching failed in createReceipt:', matchError);
+      } else {
+        resolvedCategoryId = matchedCategoryId || null;
+      }
+    }
+
     // Create receipt
     const { data: receipt, error: receiptError } = await context.supabase
       .from('receipts')
@@ -510,6 +535,7 @@ async function createReceipt(req: Request, context: ApiContext): Promise<Respons
         currency,
         payment_method: paymentMethod?.trim() || null,
         predicted_category: category?.trim() || null,
+        custom_category_id: resolvedCategoryId,
         status,
         image_url: imageUrl || null,
         fullText: fullText?.trim() || null,
@@ -604,6 +630,30 @@ async function createReceiptsBatch(req: Request, context: ApiContext): Promise<R
           continue;
         }
 
+        let resolvedCategoryId = receiptData.customCategoryId || null;
+        if (!resolvedCategoryId) {
+          const lineItemsPayload = Array.isArray(receiptData.lineItems)
+            ? receiptData.lineItems.map((item: any) => ({
+                description: item?.description || '',
+                amount: item?.totalPrice || item?.unitPrice || 0
+              }))
+            : [];
+
+          const { data: matchedCategoryId, error: matchError } = await context.supabase.rpc('match_category_for_receipt', {
+            p_user_id: context.userId,
+            p_team_id: receiptData.teamId || null,
+            p_merchant: receiptData.merchant?.trim() || null,
+            p_line_items: lineItemsPayload,
+            p_predicted_category: receiptData.category?.trim() || null,
+          });
+
+          if (matchError) {
+            console.warn(`Category matching failed for batch item ${i}:`, matchError);
+          } else {
+            resolvedCategoryId = matchedCategoryId || null;
+          }
+        }
+
         // Create receipt
         const { data: receipt, error } = await context.supabase
           .from('receipts')
@@ -617,6 +667,7 @@ async function createReceiptsBatch(req: Request, context: ApiContext): Promise<R
             currency: receiptData.currency || 'USD',
             payment_method: receiptData.paymentMethod?.trim() || null,
             predicted_category: receiptData.category?.trim() || null,
+            custom_category_id: resolvedCategoryId,
             status: receiptData.status || 'unreviewed',
             image_url: receiptData.imageUrl || null,
             fullText: receiptData.fullText?.trim() || null,

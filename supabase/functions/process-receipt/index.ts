@@ -1218,6 +1218,42 @@ async function saveResultsToDatabase(
     processing_version: '2.2' // Track which version of extraction was used
   };
 
+  // Resolve custom category via shared matching function when no explicit category exists yet.
+  try {
+    const { data: existingReceipt, error: receiptLookupError } = await supabase
+      .from('receipts')
+      .select('user_id, team_id, custom_category_id')
+      .eq('id', receiptId)
+      .single();
+
+    if (receiptLookupError) {
+      await logger.log(`Category match precheck failed: ${receiptLookupError.message}`, "WARNING");
+    } else if (!existingReceipt?.custom_category_id) {
+      const lineItemsPayload = Array.isArray(extractedData.line_items)
+        ? extractedData.line_items.map((item: any) => ({
+            description: item?.description || '',
+            amount: item?.amount || 0,
+          }))
+        : [];
+
+      const { data: matchedCategoryId, error: matchError } = await supabase.rpc('match_category_for_receipt', {
+        p_user_id: existingReceipt.user_id,
+        p_team_id: existingReceipt.team_id,
+        p_merchant: extractedData.merchant || null,
+        p_line_items: lineItemsPayload,
+        p_predicted_category: extractedData.predicted_category || null,
+      });
+
+      if (matchError) {
+        await logger.log(`Category auto-match failed: ${matchError.message}`, "WARNING");
+      } else if (matchedCategoryId) {
+        updateData.custom_category_id = matchedCategoryId;
+      }
+    }
+  } catch (matchException: any) {
+    await logger.log(`Category auto-match exception: ${matchException.message}`, "WARNING");
+  }
+
   // Feature flag to control whether to use the new columns
   const ENABLE_GEOMETRY_COLUMNS = true;
 
