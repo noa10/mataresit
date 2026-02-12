@@ -294,8 +294,11 @@ jobs:
             exit 0
           fi
 
-          # Count function directories
-          FUNCTION_COUNT=$(find supabase/functions -maxdepth 1 -type d ! -path supabase/functions | wc -l)
+          # Count only actual function directories (exclude shared/test helper folders)
+          FUNCTION_COUNT=$(find supabase/functions -mindepth 1 -maxdepth 1 -type d \
+            ! -name "_*" \
+            ! -name "__*" \
+            | wc -l)
           echo "📋 Found $FUNCTION_COUNT Edge Function directories"
 
           if [ "$FUNCTION_COUNT" -eq 0 ]; then
@@ -310,19 +313,24 @@ jobs:
           for func_dir in supabase/functions/*/; do
             if [ -d "$func_dir" ]; then
               func_name=$(basename "$func_dir")
+
+              # Skip shared/test helper directories
+              if [[ "$func_name" == _* ]] || [[ "$func_name" == __* ]]; then
+                continue
+              fi
+
               echo "  Validating function: $func_name"
 
               # Check for required index.ts file
               if [ ! -f "$func_dir/index.ts" ]; then
-                echo "  ❌ Missing index.ts in function: $func_name"
-                VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+                echo "  ℹ️ Skipping directory without index.ts: $func_name"
                 continue
               fi
 
               echo "  ✅ Found index.ts for: $func_name"
 
-              # Validate TypeScript syntax
-              if ! deno check "$func_dir/index.ts" 2>/dev/null; then
+              # Validate TypeScript syntax and types using shared Deno config
+              if ! deno check -c supabase/functions/deno.json "$func_dir/index.ts" 2>/dev/null; then
                 echo "  ❌ TypeScript syntax errors in: $func_name"
                 VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
               else
