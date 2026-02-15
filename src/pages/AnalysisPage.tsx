@@ -67,13 +67,13 @@ const formatChartDate = (dateString: string) => {
 
 // Date formatting function for table (full format)
 const formatFullDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch (e) {
-      return dateString;
-    }
-  };
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (e) {
+    return dateString;
+  }
+};
 
 // Define color constants for charts and UI elements
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D'];
@@ -101,13 +101,6 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
   const formattedDateRange = dateRange?.from && dateRange?.to
     ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
     : 'All time';
-
-  // Handle date selection
-  const handleDateSelect = React.useCallback((range: DateRange | undefined) => {
-    if (onDateRangeClick) {
-      onDateRangeClick(range);
-    }
-  }, [onDateRangeClick]);
 
   const stats = [
     {
@@ -137,47 +130,9 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
   ];
 
   return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader className="flex flex-row justify-between items-start pb-2">
-        <CardTitle className="text-lg">Financial Summary</CardTitle>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <CalendarIcon className="w-4 h-4" />
-              <span>{formattedDateRange}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <div className="p-3">
-              <Calendar
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={(range) => {
-                  console.log('Calendar onSelect called with:', range);
-                  console.log('Current dateRange:', dateRange);
-                  handleDateSelect(range);
-                }}
-                numberOfMonths={2}
-                showOutsideDays={true}
-              />
-              {dateRange?.from && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() => handleDateSelect(undefined)}
-                >
-                  Clear Selection
-                </Button>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+    <Card className="border border-border/40 shadow-sm h-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base sm:text-lg">Financial Summary</CardTitle>
       </CardHeader>
       <CardContent className="p-4 sm:p-6 pt-2">
         <div className="grid gap-4 sm:gap-6">
@@ -240,10 +195,10 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
   }));
 
   return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader>
+    <Card className="border border-border/40 shadow-sm h-full">
+      <CardHeader className="pb-3">
         <div>
-          <CardTitle>Expenses by Category</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Expenses by Category</CardTitle>
           {dateCaption && (
             <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
               {dateCaption}
@@ -337,10 +292,10 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
   } as const;
 
   return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader>
+    <Card className="border border-border/40 shadow-sm h-full">
+      <CardHeader className="pb-3">
         <div>
-          <CardTitle>Category Analysis</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Category Analysis</CardTitle>
           <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
             {formatDateRangeForCaption}
           </CardDescription>
@@ -405,12 +360,26 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
 interface ExpenseChartProps {
   dailyData: EnhancedDailyExpenseData[];
   isLoading?: boolean;
-  dateRange: DateRange | undefined; // Add dateRange prop
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (range: DateRange | undefined) => void;
 }
 
-const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange }) => {
+const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange, onDateRangeChange }) => {
   // Add state for chart type toggle
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+
+  // Format date range for display (must be before any early returns to maintain hooks order)
+  const formattedDateRange = dateRange?.from && dateRange?.to
+    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+    : 'Filter Date Range';
+
+  // Handle date selection
+  const handleDateSelect = React.useCallback((range: DateRange | undefined) => {
+    if (onDateRangeChange) {
+      onDateRangeChange(range);
+    }
+  }, [onDateRangeChange]);
+
   if (isLoading) {
     return (
       <Card className="border border-border/40 shadow-sm">
@@ -474,11 +443,13 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
     setChartType(prev => prev === 'line' ? 'bar' : 'line');
   };
 
+
+
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
-          <CardTitle className="text-lg sm:text-xl">Daily Expense Trend</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Daily Expense Trend</CardTitle>
           {chartData.length > 0 && (
             <p className="text-xs text-muted-foreground mt-1 break-words">
               Average daily expenses: {formatCurrency(avgExpenses)}
@@ -490,25 +461,65 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
             </p>
           )}
         </div>
-        {/* Add chart type toggle button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleChartType}
-          className="flex items-center gap-1 flex-shrink-0 self-start sm:self-auto"
-        >
-          {chartType === 'line' ? (
-            <>
-              <BarChart2 className="h-4 w-4" />
-              <span className="text-xs hidden xs:inline">Bar View</span>
-            </>
-          ) : (
-            <>
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-xs hidden xs:inline">Line View</span>
-            </>
-          )}
-        </Button>
+        {/* Date Range Picker and Chart Type Toggle */}
+        <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <CalendarIcon className="w-4 h-4" />
+                <span className="text-xs hidden xs:inline">{formattedDateRange}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3">
+                <Calendar
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    console.log('Calendar onSelect called with:', range);
+                    console.log('Current dateRange:', dateRange);
+                    handleDateSelect(range);
+                  }}
+                  numberOfMonths={2}
+                  showOutsideDays={true}
+                />
+                {dateRange?.from && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 w-full"
+                    onClick={() => handleDateSelect(undefined)}
+                  >
+                    Clear Selection
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleChartType}
+            className="flex items-center gap-1"
+          >
+            {chartType === 'line' ? (
+              <>
+                <BarChart2 className="h-4 w-4" />
+                <span className="text-xs hidden xs:inline">Bar View</span>
+              </>
+            ) : (
+              <>
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-xs hidden xs:inline">Line View</span>
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] sm:h-[350px]">
@@ -522,8 +533,8 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                 >
                   <defs>
                     <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -540,7 +551,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     stroke="var(--muted-foreground)"
                     fontSize={12}
                     tickLine={false}
-                    axisLine={{stroke: 'var(--border)'}}
+                    axisLine={{ stroke: 'var(--border)' }}
                     padding={{ left: 10, right: 10 }}
                     tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
                     className="dark:stroke-gray-500"
@@ -550,7 +561,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     stroke="var(--muted-foreground)"
                     fontSize={12}
                     tickLine={false}
-                    axisLine={{stroke: 'var(--border)'}}
+                    axisLine={{ stroke: 'var(--border)' }}
                     tickFormatter={(value) => `MYR ${value}`}
                     tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
                     className="dark:stroke-gray-500"
@@ -649,7 +660,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     stroke="var(--muted-foreground)"
                     fontSize={12}
                     tickLine={false}
-                    axisLine={{stroke: 'var(--border)'}}
+                    axisLine={{ stroke: 'var(--border)' }}
                     tick={{
                       fill: 'var(--foreground)',
                       className: 'fill-foreground fill-opacity-100 dark:fill-gray-300'
@@ -660,7 +671,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     stroke="var(--muted-foreground)"
                     fontSize={12}
                     tickLine={false}
-                    axisLine={{stroke: 'var(--border)'}}
+                    axisLine={{ stroke: 'var(--border)' }}
                     tickFormatter={(value) => `MYR ${value}`}
                     tick={{
                       fill: 'var(--foreground)',
@@ -781,7 +792,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader>
-        <CardTitle>Daily Expense Details</CardTitle>
+        <CardTitle className="text-base sm:text-lg">Daily Expense Details</CardTitle>
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
         <div className="rounded-md border overflow-x-auto">
@@ -906,10 +917,12 @@ interface PayerPieChartProps {
 const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dateCaption }) => {
   if (isLoading) {
     return (
-      <Card className="border border-border/40 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Spending by Payer</CardTitle>
-          <CardDescription>{dateCaption}</CardDescription>
+      <Card className="border border-border/40 shadow-sm h-full">
+        <CardHeader className="pb-3">
+          <div>
+            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[250px]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -920,10 +933,12 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
 
   if (!payerData || payerData.length === 0) {
     return (
-      <Card className="border border-border/40 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Spending by Payer</CardTitle>
-          <CardDescription>{dateCaption}</CardDescription>
+      <Card className="border border-border/40 shadow-sm h-full">
+        <CardHeader className="pb-3">
+          <div>
+            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[250px]">
           <p className="text-muted-foreground text-sm">No payer data available</p>
@@ -934,42 +949,60 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
 
   const totalSpent = payerData.reduce((sum, p) => sum + p.total_spent, 0);
 
+  // Build chart data with explicit color assignment for consistent legend
+  const chartData = payerData.map((p, index) => ({
+    ...p,
+    fill: COLORS[index % COLORS.length],
+  }));
+
   return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Spending by Payer</CardTitle>
-        <CardDescription>{dateCaption}</CardDescription>
+    <Card className="border border-border/40 shadow-sm h-full">
+      <CardHeader className="pb-3">
+        <div>
+          <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+          <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[220px]">
+          <ChartContainer config={{}} className="h-full w-full" style={{ aspectRatio: 'auto' }}>
             <PieChart>
               <Pie
-                data={payerData}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={40}
-                outerRadius={80}
+                outerRadius={75}
                 paddingAngle={2}
                 dataKey="total_spent"
                 nameKey="payer_name"
               >
-                {payerData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-              />
-              <Legend
-                formatter={(value: string) => (
-                  <span className="text-xs">{value}</span>
-                )}
+              <ChartTooltip
+                content={<ChartTooltipContent className="bg-background text-foreground" />}
+                formatter={(value: any, name: any, item: any) => [
+                  formatCurrency(value as number),
+                  item?.payload?.payer_name ?? name
+                ]}
+                labelFormatter={(label: any) => label}
               />
             </PieChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
+        {/* Custom legend below the chart to prevent cut-off */}
+        {chartData.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5 text-xs">
+            {chartData.map((entry, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 rounded-[2px] flex-shrink-0" style={{ backgroundColor: entry.fill }} />
+                <span className="text-foreground truncate">{entry.payer_name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1211,13 +1244,14 @@ const AnalysisPage = () => {
                   dailyData={aggregatedChartData}
                   isLoading={isLoadingDaily}
                   dateRange={date}
+                  onDateRangeChange={handleDateChange}
                 />
               </div>
 
               {/* Second Row: Category Charts and Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {/* Category Pie Chart */}
-                <div className="lg:col-span-1">
+                <div className="min-w-0">
                   <CategoryPieChart
                     categoryData={categoryData || []}
                     isLoading={isLoadingCategories}
@@ -1226,7 +1260,7 @@ const AnalysisPage = () => {
                 </div>
 
                 {/* Category Radial Chart (Shadcn pattern) */}
-                <div className="lg:col-span-1">
+                <div className="min-w-0">
                   <CategoryRadialChart
                     categoryData={categoryData || []}
                     isLoading={isLoadingCategories}
@@ -1234,16 +1268,17 @@ const AnalysisPage = () => {
                   />
                 </div>
 
-                <div className="lg:col-span-1">
+                {/* Spending by Payer */}
+                <div className="min-w-0">
                   <PayerPieChart
                     payerData={payerExpenseData}
-                    isLoading={isLoadingDaily}
+                    isLoading={isLoadingDaily && !payersLoaded}
                     dateCaption={formattedDateRange}
                   />
                 </div>
 
-                {/* Expense Stats - Takes 2 columns on large screens */}
-                <div className="md:col-span-2 lg:col-span-2">
+                {/* Financial Summary */}
+                <div className="min-w-0">
                   <ExpenseStats
                     totalExpenses={totalExpenses}
                     totalReceipts={enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
