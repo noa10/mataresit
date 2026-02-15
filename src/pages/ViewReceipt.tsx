@@ -126,7 +126,7 @@ export default function ViewReceipt() {
             <div>
               <h1 className="text-2xl font-bold">{receipt.merchant || "Unnamed Receipt"}</h1>
               <p className="text-muted-foreground">
-                {receipt.date ? new Date(receipt.date).toLocaleDateString() : "No date"} • {receipt.total ? formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR') : formatCurrencySafe(0, 'MYR')}
+                {receipt.date ? new Date(receipt.date).toLocaleDateString('en-GB') : "No date"} • {receipt.total ? formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR') : formatCurrencySafe(0, 'MYR')}
               </p>
             </div>
           </motion.div>

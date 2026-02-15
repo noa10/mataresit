@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -44,6 +44,9 @@ import { useSettings } from "@/hooks/useSettings";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { upsertCategoryRule } from "@/services/categoryRuleService";
+import { format, isValid, parse } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -157,6 +160,39 @@ const useDebounce = <T,>(value: T, delay: number): T => {
   return debouncedValue;
 };
 
+const DISPLAY_DATE_FORMAT = "dd/MM/yyyy";
+const STORAGE_DATE_FORMAT = "yyyy-MM-dd";
+
+const stripToISODate = (value: string) => (value.includes("T") ? value.split("T")[0] : value);
+
+const parseDateInput = (value: string): Date | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const isoCandidate = parse(stripToISODate(trimmed), STORAGE_DATE_FORMAT, new Date());
+  if (isValid(isoCandidate) && format(isoCandidate, STORAGE_DATE_FORMAT) === stripToISODate(trimmed)) {
+    return isoCandidate;
+  }
+
+  const displayCandidate = parse(trimmed, DISPLAY_DATE_FORMAT, new Date());
+  if (isValid(displayCandidate) && format(displayCandidate, DISPLAY_DATE_FORMAT) === trimmed) {
+    return displayCandidate;
+  }
+
+  return null;
+};
+
+const toStorageDate = (value: string): string | null => {
+  const parsed = parseDateInput(value);
+  return parsed ? format(parsed, STORAGE_DATE_FORMAT) : null;
+};
+
+const toDisplayDate = (value: string): string => {
+  if (!value) return "";
+  const parsed = parseDateInput(value);
+  return parsed ? format(parsed, DISPLAY_DATE_FORMAT) : "";
+};
+
 export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
   // Get user settings for processing method
   const { settings } = useSettings();
@@ -184,6 +220,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     custom_category_id: receipt.custom_category_id || null,
     paid_by_id: receipt.paid_by_id || null
   });
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [dateDisplayValue, setDateDisplayValue] = useState(toDisplayDate(receipt.date || ""));
   // Use save status context for background save operations
   const { saveReceipt } = useSaveStatus();
   const { isSaving, status: saveStatus } = useReceiptSaveStatus(receipt.id);
@@ -233,8 +271,14 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         custom_category_id: receipt.custom_category_id || null,
         paid_by_id: receipt.paid_by_id || null
       });
+      setDateDisplayValue(toDisplayDate(receipt.date || ""));
     }
   }, [receipt, isSaving]);
+
+  useEffect(() => {
+    const current = typeof inputValues.date === "string" ? inputValues.date : String(inputValues.date ?? "");
+    setDateDisplayValue(toDisplayDate(current));
+  }, [inputValues.date]);
 
   // State for tracking manual total override
   const [isManualTotal, setIsManualTotal] = useState(false);
@@ -623,6 +667,32 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
     // The actual editedReceipt update and confidence score update
     // will happen in the useEffect that watches debouncedInputValues
+  };
+
+  const commitTypedDate = () => {
+    if (!dateDisplayValue.trim()) {
+      handleInputChange("date", "");
+      return;
+    }
+
+    const normalized = toStorageDate(dateDisplayValue);
+    if (!normalized) {
+      toast.error("Invalid date. Use DD/MM/YYYY.");
+      const fallback = typeof inputValues.date === "string" ? inputValues.date : "";
+      setDateDisplayValue(toDisplayDate(fallback));
+      return;
+    }
+
+    handleInputChange("date", normalized);
+    setDateDisplayValue(toDisplayDate(normalized));
+  };
+
+  const handleCalendarDateSelect = (selected?: Date) => {
+    if (!selected) return;
+    const normalized = format(selected, STORAGE_DATE_FORMAT);
+    handleInputChange("date", normalized);
+    setDateDisplayValue(format(selected, DISPLAY_DATE_FORMAT));
+    setIsDatePickerOpen(false);
   };
 
   const handleLineItemChange = (index: number, field: string, value: string | number) => {
@@ -1333,7 +1403,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                               }}
                               title="Reset View"
                             >
-                              <RotateCw size={16} />
+                              <RefreshCw size={16} />
                             </Button>
                           </div>
 
@@ -1381,7 +1451,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                               className="h-8 w-8 bg-background/80 backdrop-blur-sm"
                               onClick={() => {
                                 const link = document.createElement('a');
-                                link.href = imageSource; // Use the already processed image URL from state
+                                link.href = receipt.image_url || ''; // Use the receipt image URL
                                 link.download = `receipt-${receipt.id}.jpg`;
                                 document.body.appendChild(link);
                                 link.click();
@@ -1473,7 +1543,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                       The image URL may be invalid or the image may no longer exist.
                     </p>
                     <p className="text-xs break-all text-muted-foreground mb-4">
-                      URL: {imageSource || "No URL provided"}
+                      URL: {receipt.image_url || "No URL provided"}
                     </p>
                   </>
                 ) : (
@@ -1657,14 +1727,74 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 <div className="relative">
                   <Input
                     id="date"
-                    type="date"
-                    value={typeof inputValues.date === 'string' ? inputValues.date.split('T')[0] : ''}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                    className="bg-background/50 pl-9"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="DD/MM/YYYY"
+                    value={dateDisplayValue}
+                    onChange={(e) => setDateDisplayValue(e.target.value)}
+                    onBlur={commitTypedDate}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitTypedDate();
+                      }
+                    }}
+                    className="bg-background/50 pl-9 pr-11"
                     onMouseEnter={() => handleFieldHover('date')}
                     onMouseLeave={() => handleFieldHover(null)}
                   />
-                  <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary dark:text-primary" />
+                  <CalendarIcon
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200 pointer-events-none"
+                  />
+                  <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Open calendar date picker"
+                        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 border border-input bg-background/70 hover:bg-accent"
+                      >
+                        <CalendarIcon size={16} className="text-muted-foreground dark:text-blue-200" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto overflow-hidden p-0" align="end">
+                      <DatePickerCalendar
+                        mode="single"
+                        selected={parseDateInput(dateDisplayValue) ?? undefined}
+                        defaultMonth={parseDateInput(dateDisplayValue) ?? undefined}
+                        onSelect={handleCalendarDateSelect}
+                        captionLayout="dropdown"
+                        navLayout="after"
+                        startMonth={new Date(1970, 0)}
+                        endMonth={new Date(new Date().getFullYear() + 5, 11)}
+                        classNames={{
+                          months: "flex flex-col",
+                          month: "space-y-4",
+                          month_caption: "flex items-center justify-between gap-2 px-1",
+                          dropdowns: "flex items-center gap-2",
+                          dropdown_root: "relative",
+                          dropdown: "absolute inset-0 z-10 h-9 w-full cursor-pointer opacity-0",
+                          months_dropdown: "min-w-[5.5rem]",
+                          years_dropdown: "min-w-[4.75rem]",
+                          caption_label: "flex h-9 min-w-[5.5rem] items-center justify-between rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground",
+                          nav: "flex items-center gap-1",
+                          button_previous: "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100",
+                          button_next: "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100",
+                          weekdays: "mt-2 flex w-full",
+                          weekday: "w-9 text-center text-[0.8rem] font-normal text-muted-foreground",
+                          week: "mt-2 flex w-full",
+                          day: "w-9 text-center text-sm p-0",
+                          day_button: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+                        }}
+                        formatters={{
+                          formatMonthDropdown: (month) => format(month, "MMM"),
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 {renderSuggestion('date', 'date')}
               </div>
