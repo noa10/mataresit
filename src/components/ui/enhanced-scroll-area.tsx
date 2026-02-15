@@ -11,7 +11,7 @@ interface EnhancedScrollAreaProps extends React.ComponentPropsWithoutRef<typeof 
 const EnhancedScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   EnhancedScrollAreaProps
->(({ className, children, showScrollIndicator = true, fadeEdges = true, maxHeight, ...props }, ref) => {
+>(({ className, children, showScrollIndicator = true, fadeEdges = true, maxHeight, type = "auto", ...props }, ref) => {
   const [isScrollable, setIsScrollable] = React.useState(false);
   const [showTopFade, setShowTopFade] = React.useState(false);
   const [showBottomFade, setShowBottomFade] = React.useState(false);
@@ -41,14 +41,42 @@ const EnhancedScrollArea = React.forwardRef<
 
     // Check on scroll
     const handleScroll = () => checkScrollable();
-    viewport.addEventListener('scroll', handleScroll);
+    viewport.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Check on resize
+    // Check on viewport and content resize
     const resizeObserver = new ResizeObserver(checkScrollable);
     resizeObserver.observe(viewport);
+    let observedContent: Element | null = null;
+
+    const observeContent = () => {
+      const contentElement = viewport.firstElementChild;
+      if (!contentElement || contentElement === observedContent) return;
+
+      if (observedContent) {
+        resizeObserver.unobserve(observedContent);
+      }
+      resizeObserver.observe(contentElement);
+      observedContent = contentElement;
+    };
+
+    observeContent();
+
+    // Watch for dynamic content changes that alter scroll height
+    const mutationObserver = new MutationObserver(() => {
+      observeContent();
+      checkScrollable();
+    });
+    mutationObserver.observe(viewport, { childList: true, subtree: true });
+
+    const frameId = requestAnimationFrame(checkScrollable);
 
     return () => {
+      cancelAnimationFrame(frameId);
       viewport.removeEventListener('scroll', handleScroll);
+      mutationObserver.disconnect();
+      if (observedContent) {
+        resizeObserver.unobserve(observedContent);
+      }
       resizeObserver.disconnect();
     };
   }, [checkScrollable]);
@@ -57,6 +85,7 @@ const EnhancedScrollArea = React.forwardRef<
     <div className="relative">
       <ScrollAreaPrimitive.Root
         ref={ref}
+        type={type}
         className={cn("relative overflow-hidden", className)}
         style={{ maxHeight }}
         {...props}
@@ -79,7 +108,9 @@ const EnhancedScrollArea = React.forwardRef<
           className={cn(
             "flex touch-none select-none transition-all duration-300",
             "h-full w-2.5 border-l border-l-transparent p-[1px]",
-            isScrollable && showScrollIndicator ? "opacity-100" : "opacity-0 hover:opacity-100"
+            isScrollable && showScrollIndicator
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
           )}
         >
           <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border hover:bg-border/80 transition-colors" />
