@@ -30,6 +30,7 @@ import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, R
 import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
 import { fetchUserPayers } from '@/services/paidByService';
 import { PaidBy } from '@/types/receipt';
+import { useTeam } from '@/contexts/TeamContext';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar, RadialBarChart, RadialBar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
@@ -976,6 +977,7 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
 
 const AnalysisPage = () => {
   const queryClient = useQueryClient();
+  const { currentTeam } = useTeam();
 
   // State for date range picker
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
@@ -1053,14 +1055,22 @@ const AnalysisPage = () => {
 
   const totalCategoryExpenses = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
 
-  const { data: payers = [] } = useQuery<PaidBy[]>({
-    queryKey: ['payers-analysis'],
-    queryFn: () => fetchUserPayers(),
+  // Fetch all user payers (uses RPC with proper permissions)
+  const { data: allPayers = [], isSuccess: payersLoaded } = useQuery<PaidBy[]>({
+    queryKey: ['user-payers', currentTeam?.id],
+    queryFn: () => fetchUserPayers({ currentTeam }),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const payerExpenseData = React.useMemo(() => {
     if (!enhancedDailyExpenseData) return [];
-    
+
+    // Wait for payers to load before computing
+    if (!payersLoaded) {
+      console.log('[PayerData] Waiting for payers to load...', { payersLoaded });
+      return [];
+    }
+
     const rawReceipts = queryClient.getQueryData<any[]>(['dailyExpenseDetails', startDateISO, endDateISO]);
     if (!rawReceipts) return [];
 
@@ -1074,19 +1084,27 @@ const AnalysisPage = () => {
     }
 
     const payerNameMap: Record<string, string> = {};
-    for (const p of payers) payerNameMap[p.id] = p.name;
+    for (const p of allPayers) payerNameMap[p.id] = p.name;
+
+    console.log('[PayerData] Building expense data', {
+      payerMap: Array.from(payerMap.keys()),
+      payerNameMap,
+      allPayers
+    });
 
     const result: PayerExpenseData[] = [];
     payerMap.forEach((val, key) => {
+      const payerName = key === '__none__' ? 'No Payer' : (payerNameMap[key] ?? 'Unknown Payer');
+      console.log(`[PayerData] Mapping ${key} -> ${payerName}`);
       result.push({
-        payer_name: key === '__none__' ? 'No Payer' : (payerNameMap[key] ?? 'Unknown'),
+        payer_name: payerName,
         total_spent: val.total,
         receipt_count: val.count,
       });
     });
 
     return result.sort((a, b) => b.total_spent - a.total_spent);
-  }, [enhancedDailyExpenseData, payers, queryClient, startDateISO, endDateISO]);
+  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, startDateISO, endDateISO]);
 
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
