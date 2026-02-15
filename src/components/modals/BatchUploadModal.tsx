@@ -78,7 +78,7 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
             value="single"
             className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden"
           >
-            <div className={`flex-grow min-h-0 overflow-y-auto overflow-x-hidden ${isMobile ? "h-full" : ""}`}>
+            <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
               <UploadZone
                 onUploadComplete={handleUploadComplete}
               />
@@ -89,7 +89,7 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
             value="batch"
             className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden"
           >
-            <div className={`flex-grow min-h-0 overflow-y-auto overflow-x-hidden ${isMobile ? "h-full" : ""}`}>
+            <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
               <BatchUploadZone
                 onUploadComplete={handleUploadComplete}
               />

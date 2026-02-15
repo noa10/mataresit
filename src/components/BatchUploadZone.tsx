@@ -11,8 +11,6 @@ import { EnhancedBatchProcessingControls } from "@/components/upload/EnhancedBat
 import { EnhancedUploadQueueItem } from "@/components/upload/EnhancedUploadQueueItem";
 import { BatchUploadReview } from "@/components/upload/BatchUploadReview";
 import { DropZoneIllustrations } from "./upload/DropZoneIllustrations";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { EnhancedScrollArea } from "@/components/ui/enhanced-scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 import imageCompression from "browser-image-compression";
@@ -403,23 +401,44 @@ function BatchUploadZone({
     return "border-border bg-background/50";
   };
 
-  // Auto-scroll to bottom when new files are added (but not during progress updates)
+  // Resolve the active queue scroll container (Radix viewport or root fallback).
+  const getQueueScrollContainer = useCallback((): HTMLElement | null => {
+    return scrollAreaRef.current;
+  }, []);
+
+  // Enable wheel scrolling from anywhere in the batch area once files exist.
+  const handleContainerWheelCapture = useCallback((e: React.WheelEvent) => {
+    if (batchUploads.length === 0) return;
+
+    const scrollContainer = getQueueScrollContainer();
+    if (!scrollContainer) return;
+    if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) return;
+
+    scrollContainer.scrollBy({
+      top: e.deltaY,
+      left: 0,
+      behavior: 'auto'
+    });
+    e.preventDefault();
+  }, [batchUploads.length, getQueueScrollContainer]);
+
+  // Keep file rows visible immediately when files are added.
   useEffect(() => {
     if (batchUploads.length > previousFileCount && scrollAreaRef.current && !preserveScrollPosition) {
       // Small delay to ensure the new items are rendered
       setTimeout(() => {
-        const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        const scrollContainer = getQueueScrollContainer();
         if (scrollContainer) {
-          // Smooth scroll to bottom
+          // Ensure users land on visible rows after attaching files.
           scrollContainer.scrollTo({
-            top: scrollContainer.scrollHeight,
-            behavior: 'smooth'
+            top: 0,
+            behavior: 'auto'
           });
         }
       }, 150);
     }
     setPreviousFileCount(batchUploads.length);
-  }, [batchUploads.length, previousFileCount, preserveScrollPosition]);
+  }, [batchUploads.length, previousFileCount, preserveScrollPosition, getQueueScrollContainer]);
 
   // Preserve scroll position during progress updates
   useEffect(() => {
@@ -431,7 +450,7 @@ function BatchUploadZone({
   useEffect(() => {
     if (isProcessing && activeUploads.length > 0 && scrollAreaRef.current) {
       setTimeout(() => {
-        const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        const scrollContainer = getQueueScrollContainer();
         if (scrollContainer) {
           // Find the first active upload element and scroll to it
           const activeUploadElement = scrollContainer.querySelector(`[data-upload-status="uploading"], [data-upload-status="processing"]`);
@@ -444,13 +463,18 @@ function BatchUploadZone({
         }
       }, 200);
     }
-  }, [isProcessing, activeUploads.length]);
+  }, [isProcessing, activeUploads.length, getQueueScrollContainer]);
+
+  // Focus queue container when files are present so keyboard/wheel interaction works immediately.
+  useEffect(() => {
+    if (batchUploads.length > 0 && scrollAreaRef.current) {
+      scrollAreaRef.current.focus({ preventScroll: true });
+    }
+  }, [batchUploads.length]);
 
   // Keyboard navigation for scroll area
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!scrollAreaRef.current) return;
-
-    const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+    const scrollContainer = getQueueScrollContainer();
     if (!scrollContainer) return;
 
     switch (e.key) {
@@ -471,7 +495,7 @@ function BatchUploadZone({
         scrollContainer.scrollBy({ top: scrollContainer.clientHeight * 0.8, behavior: 'smooth' });
         break;
     }
-  }, []);
+  }, [getQueueScrollContainer]);
 
   // Log component state for debugging
   useEffect(() => {
@@ -598,9 +622,9 @@ function BatchUploadZone({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleCustomDrop}
+        onWheelCapture={handleContainerWheelCapture}
         ref={uploadZoneRef}
-        tabIndex={0}
-        role="button"
+        role="region"
         aria-label="Upload multiple receipt files: JPEG, PNG, or PDF (up to 5MB each)"
         aria-describedby="batch-upload-zone-description batch-upload-status"
       >
@@ -893,7 +917,7 @@ function BatchUploadZone({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-0 flex flex-col"
+              className="w-full flex-1 min-h-[220px] flex flex-col overflow-hidden"
               ref={fileQueueRef}
             >
               <div className="flex justify-between items-center mb-3 flex-shrink-0">
@@ -912,15 +936,14 @@ function BatchUploadZone({
                   </Button>
                 )}
               </div>
-              <EnhancedScrollArea
-                className="flex-1 w-full rounded-md border focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                showScrollIndicator={true}
-                fadeEdges={true}
+              <div
+                className="flex-1 min-h-0 w-full rounded-md border focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
                 ref={scrollAreaRef}
                 tabIndex={0}
                 onKeyDown={handleKeyDown}
                 role="region"
                 aria-label="File upload queue"
+                data-batch-queue-scroll="true"
               >
                 <div className="p-3 space-y-2">
                   {batchUploads.map((upload, index) => (
@@ -960,7 +983,7 @@ function BatchUploadZone({
                     </motion.div>
                   ))}
                 </div>
-              </EnhancedScrollArea>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

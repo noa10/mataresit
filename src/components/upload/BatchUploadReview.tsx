@@ -9,7 +9,6 @@ import {
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EnhancedScrollArea } from "@/components/ui/enhanced-scroll-area";
 import {
   Card,
   CardContent,
@@ -97,7 +96,7 @@ export function BatchUploadReview({
 
   return (
     <>
-      <Card className="w-full max-w-4xl mx-auto flex flex-col h-full">
+      <Card className="w-full max-w-4xl mx-auto flex flex-col h-full overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Batch Upload Results</span>
@@ -136,12 +135,7 @@ export function BatchUploadReview({
           </button>
         </div>
 
-        <EnhancedScrollArea
-          className="flex-1 w-full min-h-0"
-          showScrollIndicator={true}
-          fadeEdges={true}
-          maxHeight="400px"
-        >
+        <div className="flex-1 w-full min-h-[260px] overflow-y-auto overflow-x-auto overscroll-contain [scrollbar-gutter:stable]">
           {selectedTab === 'completed' && completedUploads.length > 0 && (
             <Table>
               <TableHeader>
@@ -243,7 +237,7 @@ export function BatchUploadReview({
               )}
             </div>
           )}
-        </EnhancedScrollArea>
+        </div>
       </CardContent>
 
       <CardFooter className="flex justify-between border-t pt-4 relative z-20 bg-card flex-shrink-0">
