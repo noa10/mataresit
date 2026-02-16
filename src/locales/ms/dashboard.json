@@ -27,6 +27,38 @@
     "clear": "Kosongkan Penapis",
     "apply": "Gunakan Penapis"
   },
+  "filtersSheet": {
+    "subtitle": "Perincikan paparan anda dengan penapis yang lebih fokus.",
+    "activeCount": "aktif",
+    "all": "Semua",
+    "allDates": "Semua tarikh",
+    "fromPrefix": "Dari",
+    "done": "Selesai",
+    "uncategorized": "Tidak Dikategorikan",
+    "categorySearchPlaceholder": "Cari kategori...",
+    "noCategories": "Tiada kategori sepadan dengan carian anda.",
+    "datePresets": {
+      "today": "Hari ini",
+      "last7": "7 hari terakhir",
+      "month": "Bulan ini",
+      "quarter": "Suku ini",
+      "year": "Tahun ini"
+    },
+    "groups": {
+      "team": "Pasukan",
+      "personal": "Peribadi"
+    },
+    "aria": {
+      "sortNewest": "Susun mengikut paling baharu",
+      "sortOldest": "Susun mengikut paling lama",
+      "sortHighest": "Susun mengikut jumlah tertinggi",
+      "sortLowest": "Susun mengikut jumlah terendah",
+      "currencyAll": "Tunjukkan semua mata wang",
+      "categorySearch": "Cari kategori",
+      "categoryAll": "Tunjukkan semua kategori",
+      "categoryUncategorized": "Tunjukkan resit tidak dikategorikan"
+    }
+  },
   "stats": {
     "totalReceipts": "Jumlah Resit",
     "totalReceipts_admin": "Jumlah Resit Sistem",

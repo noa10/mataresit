@@ -27,6 +27,38 @@
     "clear": "Clear Filters",
     "apply": "Apply Filters"
   },
+  "filtersSheet": {
+    "subtitle": "Refine what you see with focused filters.",
+    "activeCount": "active",
+    "all": "All",
+    "allDates": "All dates",
+    "fromPrefix": "From",
+    "done": "Done",
+    "uncategorized": "Uncategorized",
+    "categorySearchPlaceholder": "Search categories...",
+    "noCategories": "No categories match your search.",
+    "datePresets": {
+      "today": "Today",
+      "last7": "Last 7 days",
+      "month": "This month",
+      "quarter": "This quarter",
+      "year": "This year"
+    },
+    "groups": {
+      "team": "Team",
+      "personal": "Personal"
+    },
+    "aria": {
+      "sortNewest": "Sort by newest",
+      "sortOldest": "Sort by oldest",
+      "sortHighest": "Sort by highest amount",
+      "sortLowest": "Sort by lowest amount",
+      "currencyAll": "Show all currencies",
+      "categorySearch": "Search categories",
+      "categoryAll": "Show all categories",
+      "categoryUncategorized": "Show uncategorized receipts"
+    }
+  },
   "stats": {
     "totalReceipts": "Total Receipts",
     "totalReceipts_admin": "System Total Receipts",

@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
-  Upload, Search, Filter, SlidersHorizontal,
-  PlusCircle, XCircle, Calendar as CalendarIcon, DollarSign, X,
+  Upload, Search, SlidersHorizontal,
+  PlusCircle, XCircle, Calendar as CalendarIcon, X,
   LayoutGrid, LayoutList, Table as TableIcon,
   Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag
 } from "lucide-react";
@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -37,6 +36,7 @@ import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
 import { fetchUserCategories, fetchCategoriesForDisplay, bulkAssignCategory } from "@/services/categoryService";
 import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
 import { formatCurrencySafe } from "@/utils/currency";
+import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet";
 
 import {
   Table,
@@ -132,8 +132,13 @@ export default function Dashboard() {
   const [filterByCategory, setFilterByCategory] = useState<string | null>(
     searchParams.get('category') || null
   );
+  const sortParam = searchParams.get('sort');
+  const initialSortOrder: "newest" | "oldest" | "highest" | "lowest" =
+    sortParam === "oldest" || sortParam === "highest" || sortParam === "lowest"
+      ? sortParam
+      : "newest";
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
-    (searchParams.get('sort') as any) || "newest"
+    initialSortOrder
   );
 
   // Date range filter state
@@ -247,6 +252,7 @@ export default function Dashboard() {
   });
 
   const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
+  const [isFiltersSheetOpen, setIsFiltersSheetOpen] = useState(false);
 
   // Helper function to update search parameters
   const updateSearchParams = (newValues: { [key: string]: string | null }) => {
@@ -353,14 +359,14 @@ export default function Dashboard() {
   };
 
   // Format date range for display
-  const formatDateRange = () => {
-    if (!dateRange?.from) return "All dates";
+  const formatDateRange = (range: DateRange | undefined = dateRange) => {
+    if (!range?.from) return tDash("filtersSheet.allDates");
 
-    if (!dateRange.to) {
-      return `From ${format(dateRange.from, "MMM d, yyyy")}`;
+    if (!range.to) {
+      return `${tDash("filtersSheet.fromPrefix")} ${format(range.from, "MMM d, yyyy")}`;
     }
 
-    return `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
+    return `${format(range.from, "MMM d, yyyy")} - ${format(range.to, "MMM d, yyyy")}`;
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,7 +389,36 @@ export default function Dashboard() {
     }
   };
 
-  const clearFilters = () => {
+  const handleSortOrderChange = (newSort: "newest" | "oldest" | "highest" | "lowest") => {
+    setSortOrder(newSort);
+    updateSearchParams({ sort: newSort === "newest" ? null : newSort });
+  };
+
+  const handleCurrencyFilterChange = (value: string | null) => {
+    setFilterByCurrency(value);
+    updateSearchParams({ currency: value });
+  };
+
+  const handleCategoryFilterChange = (value: string | null) => {
+    setFilterByCategory(value);
+    updateSearchParams({ category: value });
+  };
+
+  const resetFilterControls = () => {
+    setFilterByCurrency(null);
+    setFilterByCategory(null);
+    setSortOrder("newest");
+    setDateRange(undefined);
+    updateSearchParams({
+      sort: null,
+      currency: null,
+      category: null,
+      from: null,
+      to: null,
+    });
+  };
+
+  const clearAllSearchAndFilters = () => {
     setSearchQuery("");
     setActiveTab("all");
     setFilterByCurrency(null);
@@ -395,6 +430,16 @@ export default function Dashboard() {
     // Clear all search params except view if it's not the default
     setSearchParams(currentViewMode ? { view: currentViewMode } : {}, { replace: true });
   };
+
+  const activeFilterCount =
+    (sortOrder !== "newest" ? 1 : 0) +
+    (filterByCurrency ? 1 : 0) +
+    (filterByCategory ? 1 : 0) +
+    (dateRange?.from ? 1 : 0);
+
+  const categoryFilterLabel = filterByCategory === "uncategorized"
+    ? tDash("filtersSheet.uncategorized")
+    : categories.find((category) => category.id === filterByCategory)?.name;
 
   // Prepare export filters
   const exportFilters: ExportFilters = {
@@ -481,7 +526,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-6">
             {tDash('empty.description')}
           </p>
-          <Button variant="outline" onClick={clearFilters}>
+          <Button variant="outline" onClick={clearAllSearchAndFilters} data-testid="dashboard-empty-clear-all">
             {tDash('filters.clear')}
           </Button>
         </motion.div>
@@ -1078,119 +1123,24 @@ export default function Dashboard() {
                 </PopoverContent>
               </Popover>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2 whitespace-nowrap">
-                    <SlidersHorizontal size={16} />
-                    {tDash('filters.title')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] bg-background/95 backdrop-blur-sm border border-border">
-                  <div className="space-y-4">
-                    {/* Sort By */}
-                    <h4 className="font-medium">{tDash('sort.title')}</h4>
-                    <ToggleGroup
-                      type="single"
-                      value={sortOrder}
-                      onValueChange={(value) => {
-                        if (value) {
-                          const newSort = value as any;
-                          setSortOrder(newSort);
-                          updateSearchParams({ sort: newSort === 'newest' ? null : newSort });
-                        }
-                      }}
-                      className="flex flex-wrap justify-start gap-2"
-                    >
-                      <ToggleGroupItem value="newest" aria-label="Sort by newest first" className="flex-grow-0">
-                        <CalendarIcon className="h-4 w-4 mr-2" /> {tDash('sort.newest')}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="oldest" aria-label="Sort by oldest first" className="flex-grow-0">
-                        <CalendarIcon className="h-4 w-4 mr-2" /> {tDash('sort.oldest')}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="highest" aria-label="Sort by highest amount" className="flex-grow-0">
-                        <DollarSign className="h-4 w-4 mr-2" /> {tDash('sort.highest')}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="lowest" aria-label="Sort by lowest amount" className="flex-grow-0">
-                        <DollarSign className="h-4 w-4 mr-2" /> {tDash('sort.lowest')}
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-
-                    {/* Filter by Currency */}
-                    {currencies.length > 0 && (
-                      <>
-                        <h4 className="font-medium pt-2">{tDash('filters.currency')}</h4>
-                        <ToggleGroup
-                          type="single"
-                          value={filterByCurrency || "all"}
-                          onValueChange={(value) => {
-                            const newCurrency = value === "all" ? null : value;
-                            setFilterByCurrency(newCurrency);
-                            updateSearchParams({ currency: newCurrency });
-                          }}
-                          className="flex flex-wrap justify-start gap-2"
-                        >
-                          <ToggleGroupItem value="all" aria-label="Show all currencies" className="flex-grow-0">
-                            All
-                          </ToggleGroupItem>
-                          {currencies.map(currency => (
-                            <ToggleGroupItem
-                              key={currency}
-                              value={currency}
-                              aria-label={`Filter by ${currency}`}
-                              className="flex-grow-0"
-                            >
-                              {currency}
-                            </ToggleGroupItem>
-                          ))}
-                        </ToggleGroup>
-                      </>
-                    )}
-
-                    {/* Filter by Category */}
-                    <h4 className="font-medium pt-2">{tDash('filters.category')}</h4>
-                    <ToggleGroup
-                      type="single"
-                      value={filterByCategory || "all"}
-                      onValueChange={(value) => {
-                        const newCategory = value === "all" ? null : value;
-                        setFilterByCategory(newCategory);
-                        updateSearchParams({ category: newCategory });
-                      }}
-                      className="flex flex-wrap justify-start gap-2"
-                    >
-                      <ToggleGroupItem value="all" aria-label="Show all categories" className="flex-grow-0">
-                        All
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="uncategorized" aria-label="Show uncategorized receipts" className="flex-grow-0">
-                        Uncategorized
-                      </ToggleGroupItem>
-                      {categories.map(category => (
-                        <ToggleGroupItem
-                          key={category.id}
-                          value={category.id}
-                          aria-label={`Filter by ${category.name}`}
-                          className="flex-grow-0"
-                        >
-                          <div className="flex items-center gap-1">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            {category.name}
-                          </div>
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-
-                    {/* Clear Filters Button */}
-                    <div className="pt-2">
-                      <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
-                        {tDash('filters.clear')}
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <Button
+                variant={activeFilterCount > 0 ? "default" : "outline"}
+                className="gap-2 whitespace-nowrap"
+                onClick={() => setIsFiltersSheetOpen(true)}
+                data-testid="dashboard-filters-trigger"
+              >
+                <SlidersHorizontal size={16} />
+                {tDash('filters.title')}
+                {activeFilterCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 rounded-full bg-background/15 px-2 py-0.5 text-[11px] text-current"
+                    data-testid="dashboard-filters-active-count"
+                  >
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
 
               {/* Export Dropdown */}
               <ExportDropdown
@@ -1200,6 +1150,71 @@ export default function Dashboard() {
               />
             </div>
           </div>
+          {activeFilterCount > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="dashboard-active-filter-chips">
+              {sortOrder !== "newest" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => handleSortOrderChange("newest")}
+                  data-testid="dashboard-chip-sort"
+                >
+                  {tDash("sort.title")}: {tDash(`sort.${sortOrder}`)}
+                  <X className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              {filterByCurrency && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => handleCurrencyFilterChange(null)}
+                  data-testid="dashboard-chip-currency"
+                >
+                  {tDash("filters.currency")}: {filterByCurrency}
+                  <X className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              {filterByCategory && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => handleCategoryFilterChange(null)}
+                  data-testid="dashboard-chip-category"
+                >
+                  {tDash("filters.category")}: {categoryFilterLabel || tDash("filtersSheet.uncategorized")}
+                  <X className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              {dateRange?.from && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => handleDateRangeChange(undefined)}
+                  data-testid="dashboard-chip-date"
+                >
+                  {tDash("filters.dateRange")}: {formatDateRange(dateRange)}
+                  <X className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full"
+                onClick={resetFilterControls}
+                data-testid="dashboard-clear-filter-controls"
+              >
+                {tDash("filters.clear")}
+              </Button>
+            </div>
+          )}
           {/* Status Tabs */}
           <div className="mt-4">
             <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
@@ -1215,6 +1230,23 @@ export default function Dashboard() {
             </Tabs>
           </div>
         </motion.div>
+        <ReceiptFiltersSheet
+          open={isFiltersSheetOpen}
+          onOpenChange={setIsFiltersSheetOpen}
+          sortOrder={sortOrder}
+          onSortChange={handleSortOrderChange}
+          filterByCurrency={filterByCurrency}
+          onCurrencyChange={handleCurrencyFilterChange}
+          filterByCategory={filterByCategory}
+          onCategoryChange={handleCategoryFilterChange}
+          currencies={currencies}
+          categories={categories}
+          dateRange={dateRange}
+          onDateRangeChange={handleDateRangeChange}
+          onResetFilters={resetFilterControls}
+          activeFilterCount={activeFilterCount}
+          tDash={tDash}
+        />
 
         {/* Main Content Area */}
         {renderReceiptContent()}
