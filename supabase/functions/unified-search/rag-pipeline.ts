@@ -41,6 +41,12 @@ import {
   generateZeroResultsMessage,
   type DateAnalysis
 } from '../_shared/smart-date-suggestions.ts';
+import {
+  hybridRankResults,
+  executeFallbackChain,
+  createRankingConfig,
+  type HybridRankingConfig
+} from './hybrid-ranking.ts';
 
 // Pipeline stage interfaces
 export interface RAGPipelineContext {
@@ -669,12 +675,48 @@ export class RAGPipeline {
       };
 
     } catch (error) {
-      console.error('❌ Stage 3 failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        processingTime: Date.now() - stageStart
-      };
+      console.error('❌ Stage 3 failed, trying fallback chain:', error);
+
+      // Try fallback chain: vector → full-text → fuzzy → keyword
+      try {
+        const queryEmbedding = this.context.metadata.queryEmbedding;
+        if (!queryEmbedding) {
+          throw new Error('No query embedding available for fallback chain');
+        }
+
+        console.log('🔄 Executing fallback chain...');
+        const fallbackResult = await executeFallbackChain(
+          this.context.supabase,
+          this.context.params,
+          this.context.user.id,
+          queryEmbedding
+        );
+
+        console.log(`✅ Fallback chain succeeded using method: ${fallbackResult.method}`, {
+          resultsCount: fallbackResult.results.length,
+          success: fallbackResult.success
+        });
+
+        // Store fallback info in metadata
+        this.context.metadata.fallbacksUsed.push(fallbackResult.method);
+
+        return {
+          success: true,
+          data: fallbackResult.results,
+          processingTime: Date.now() - stageStart,
+          metadata: {
+            fallbackMethod: fallbackResult.method,
+            candidatesFound: fallbackResult.results.length
+          }
+        };
+      } catch (fallbackError) {
+        console.error('❌ Fallback chain also failed:', fallbackError);
+        return {
+          success: false,
+          error: `Search failed: ${error.message}, Fallback failed: ${fallbackError.message}`,
+          processingTime: Date.now() - stageStart
+        };
+      }
     }
   }
 
@@ -2161,20 +2203,48 @@ export class RAGPipeline {
         }
 
       } catch (reRankError) {
-        console.error('❌ Re-ranking failed, creating fallback result:', reRankError);
+        console.error('❌ Re-ranking failed, trying hybrid ranking:', reRankError);
 
-        // Create a fallback result with proper structure
-        const fallbackLimit = this.getEffectiveLimit();
-        reRankingResult = {
-          rerankedResults: searchResults.slice(0, fallbackLimit),
-          reRankingMetadata: {
-            modelUsed: 'fallback-error',
-            processingTime: 0,
-            candidatesCount: searchResults.length,
-            reRankingScore: 0.3,
-            confidenceLevel: 'low' as const
-          }
-        };
+        // Try hybrid ranking as fallback
+        try {
+          const rankingConfig = createRankingConfig(this.context.params);
+          console.log('🔍 Using hybrid ranking with config:', rankingConfig);
+          
+          const effectiveLimit = this.getEffectiveLimit();
+          const hybridResults = await hybridRankResults(
+            searchResults,
+            this.context.supabase,
+            this.context.user.id,
+            rankingConfig
+          );
+          
+          reRankingResult = {
+            rerankedResults: hybridResults.slice(0, effectiveLimit),
+            reRankingMetadata: {
+              modelUsed: 'hybrid-ranking',
+              processingTime: Date.now() - stageStart,
+              candidatesCount: searchResults.length,
+              reRankingScore: 0.7,
+              confidenceLevel: 'medium' as const
+            }
+          };
+          console.log('✅ Hybrid ranking succeeded');
+        } catch (hybridError) {
+          console.error('❌ Hybrid ranking also failed, using simple fallback:', hybridError);
+          
+          // Final fallback: use simple slice
+          const fallbackLimit = this.getEffectiveLimit();
+          reRankingResult = {
+            rerankedResults: searchResults.slice(0, fallbackLimit),
+            reRankingMetadata: {
+              modelUsed: 'fallback-error',
+              processingTime: 0,
+              candidatesCount: searchResults.length,
+              reRankingScore: 0.3,
+              confidenceLevel: 'low' as const
+            }
+          };
+        }
       }
 
       // Store re-ranking metadata (now guaranteed to exist)
