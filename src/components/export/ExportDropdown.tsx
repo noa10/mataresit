@@ -19,19 +19,24 @@ interface ExportDropdownProps {
   receipts: Receipt[];
   filters?: ExportFilters;
   disabled?: boolean;
+  totalCount?: number;
+  getReceiptsForExport?: () => Promise<Receipt[]>;
 }
 
 export const ExportDropdown: React.FC<ExportDropdownProps> = ({
   receipts,
   filters,
-  disabled = false
+  disabled = false,
+  totalCount,
+  getReceiptsForExport,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<string | null>(null);
   const { currentTeam } = useTeam();
+  const availableReceipts = totalCount ?? receipts.length;
 
   const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
-    if (receipts.length === 0) {
+    if (availableReceipts === 0) {
       toast.error('No receipts to export');
       return;
     }
@@ -40,20 +45,29 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
     setExportingFormat(format);
 
     try {
-      const payerNameMap = await buildPayerNameMap(receipts, { currentTeam });
+      const receiptsToExport = getReceiptsForExport
+        ? await getReceiptsForExport()
+        : receipts;
+
+      if (receiptsToExport.length === 0) {
+        toast.error('No receipts to export');
+        return;
+      }
+
+      const payerNameMap = await buildPayerNameMap(receiptsToExport, { currentTeam });
 
       switch (format) {
         case 'csv':
-          exportToCSV(receipts, filters, payerNameMap);
-          toast.success(`CSV file exported successfully (${receipts.length} receipts)`);
+          exportToCSV(receiptsToExport, filters, payerNameMap);
+          toast.success(`CSV file exported successfully (${receiptsToExport.length} receipts)`);
           break;
         case 'excel':
-          exportToExcel(receipts, filters, payerNameMap);
-          toast.success(`Excel file exported successfully (${receipts.length} receipts)`);
+          exportToExcel(receiptsToExport, filters, payerNameMap);
+          toast.success(`Excel file exported successfully (${receiptsToExport.length} receipts)`);
           break;
         case 'pdf':
-          exportToPDF(receipts, filters, payerNameMap);
-          toast.success(`PDF file exported successfully (${receipts.length} receipts)`);
+          exportToPDF(receiptsToExport, filters, payerNameMap);
+          toast.success(`PDF file exported successfully (${receiptsToExport.length} receipts)`);
           break;
         default:
           throw new Error('Unsupported export format');
@@ -87,7 +101,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
         <Button
           variant="outline"
           size="sm"
-          disabled={disabled || isExporting || receipts.length === 0}
+          disabled={disabled || isExporting || availableReceipts === 0}
           className="gap-2"
         >
           {getButtonIcon()}
@@ -140,11 +154,11 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
           </div>
         </DropdownMenuItem>
 
-        {receipts.length > 0 && (
+        {availableReceipts > 0 && (
           <>
             <DropdownMenuSeparator />
             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              {receipts.length} receipt{receipts.length !== 1 ? 's' : ''} to export
+              {availableReceipts} receipt{availableReceipts !== 1 ? 's' : ''} to export
             </div>
           </>
         )}
