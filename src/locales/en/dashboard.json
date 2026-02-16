@@ -142,6 +142,13 @@
     "highest": "Highest",
     "lowest": "Lowest"
   },
+  "pagination": {
+    "showing": "Showing {{start}}-{{end}} of {{total}}",
+    "pageOf": "Page {{page}} of {{totalPages}}",
+    "perPage": "Per page",
+    "previous": "Previous",
+    "next": "Next"
+  },
   "contextual": {
     "title": "Dashboard",
     "title_admin": "Admin Dashboard - System Overview",

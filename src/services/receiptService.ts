@@ -150,6 +150,198 @@ const validateStatus = (status: string): ReceiptStatus => {
   return "unreviewed"; // Default fallback
 };
 
+export type ReceiptSortOrder = "newest" | "oldest" | "highest" | "lowest";
+
+export interface ReceiptListParams {
+  page?: number;
+  limit?: number;
+  searchQuery?: string;
+  status?: "all" | ReceiptStatus;
+  currency?: string | null;
+  categoryId?: string | null;
+  fromDate?: string | null;
+  toDate?: string | null;
+  sortOrder?: ReceiptSortOrder;
+}
+
+export interface ReceiptListResult {
+  receipts: Receipt[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+const normalizePageNumber = (page?: number): number => {
+  const parsed = Number(page ?? 1);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+  return Math.floor(parsed);
+};
+
+const normalizePageLimit = (limit?: number): 10 | 25 | 50 => {
+  const parsed = Number(limit ?? 25);
+  if (parsed === 10 || parsed === 25 || parsed === 50) {
+    return parsed;
+  }
+  return 25;
+};
+
+// Fetch paginated receipts with server-side filters and sort
+export const fetchReceiptsPage = async (
+  params: ReceiptListParams,
+  teamContext?: { currentTeam: { id: string } | null }
+): Promise<ReceiptListResult> => {
+  const page = normalizePageNumber(params.page);
+  const limit = normalizePageLimit(params.limit);
+  const offset = (page - 1) * limit;
+
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) {
+    return {
+      receipts: [],
+      page,
+      limit,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+    };
+  }
+
+  let query = supabase
+    .from("receipts")
+    .select(
+      `
+      *,
+      processing_time,
+      custom_categories (
+        id,
+        name,
+        color,
+        icon
+      ),
+      paid_by (
+        id,
+        name
+      )
+    `,
+      { count: "exact" }
+    );
+
+  if (teamContext?.currentTeam?.id) {
+    query = query.eq("team_id", teamContext.currentTeam.id);
+  } else {
+    query = query.eq("user_id", user.user.id).is("team_id", null);
+  }
+
+  if (params.searchQuery?.trim()) {
+    query = query.ilike("merchant", `%${params.searchQuery.trim()}%`);
+  }
+
+  if (params.status && params.status !== "all") {
+    query = query.eq("status", params.status);
+  }
+
+  if (params.currency) {
+    query = query.eq("currency", params.currency);
+  }
+
+  if (params.categoryId === "uncategorized") {
+    query = query.is("custom_category_id", null);
+  } else if (params.categoryId) {
+    query = query.eq("custom_category_id", params.categoryId);
+  }
+
+  if (params.fromDate) {
+    query = query.gte("date", params.fromDate);
+  }
+
+  if (params.toDate) {
+    query = query.lte("date", params.toDate);
+  }
+
+  const sortOrder = params.sortOrder || "newest";
+  if (sortOrder === "newest") {
+    query = query.order("date", { ascending: false });
+  } else if (sortOrder === "oldest") {
+    query = query.order("date", { ascending: true });
+  } else if (sortOrder === "highest") {
+    query = query.order("total", { ascending: false });
+  } else {
+    query = query.order("total", { ascending: true });
+  }
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error("Error fetching paginated receipts:", error);
+    toast.error("Failed to load receipts");
+    return {
+      receipts: [],
+      page,
+      limit,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+    };
+  }
+
+  const total = count ?? 0;
+  const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+  const receipts = (data || []).map((item) => {
+    const receipt = item as unknown as Receipt;
+    return {
+      ...receipt,
+      status: validateStatus(receipt.status || "unreviewed"),
+    };
+  });
+
+  return {
+    receipts,
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+};
+
+// Fetch available currencies for filter options.
+export const fetchReceiptCurrencies = async (
+  teamContext?: { currentTeam: { id: string } | null }
+): Promise<string[]> => {
+  const { data: user } = await supabase.auth.getUser();
+
+  if (!user.user) {
+    return [];
+  }
+
+  let query = supabase.from("receipts").select("currency");
+
+  if (teamContext?.currentTeam?.id) {
+    query = query.eq("team_id", teamContext.currentTeam.id);
+  } else {
+    query = query.eq("user_id", user.user.id).is("team_id", null);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching receipt currencies:", error);
+    return [];
+  }
+
+  return Array.from(
+    new Set((data || []).map((item) => item.currency).filter(Boolean))
+  ).sort();
+};
+
 // Fetch all receipts for the current user or team
 export const fetchReceipts = async (teamContext?: { currentTeam: { id: string } | null }): Promise<Receipt[]> => {
   const { data: user } = await supabase.auth.getUser();

@@ -8,7 +8,8 @@ import Dashboard from "@/pages/Dashboard";
 import { Receipt } from "@/types/receipt";
 
 const mocks = vi.hoisted(() => ({
-  fetchReceipts: vi.fn(),
+  fetchReceiptsPage: vi.fn(),
+  fetchReceiptCurrencies: vi.fn(),
   deleteReceipt: vi.fn(),
   fetchUserCategories: vi.fn(),
   fetchCategoriesForDisplay: vi.fn(),
@@ -73,6 +74,9 @@ const translationMap: Record<string, string> = {
   "filtersSheet.aria.categorySearch": "Search categories",
   "filtersSheet.aria.categoryAll": "Show all categories",
   "filtersSheet.aria.categoryUncategorized": "Show uncategorized receipts",
+  "pagination.showing": "Showing {{start}}-{{end}} of {{total}}",
+  "pagination.pageOf": "Page {{page}} of {{totalPages}}",
+  "pagination.perPage": "Per page",
   "buttons.cancel": "Cancel",
 };
 
@@ -85,7 +89,8 @@ vi.mock("@/contexts/LanguageContext", () => ({
 }));
 
 vi.mock("@/services/receiptService", () => ({
-  fetchReceipts: mocks.fetchReceipts,
+  fetchReceiptsPage: mocks.fetchReceiptsPage,
+  fetchReceiptCurrencies: mocks.fetchReceiptCurrencies,
   deleteReceipt: mocks.deleteReceipt,
 }));
 
@@ -181,7 +186,72 @@ function renderDashboard(initialEntry = "/dashboard?view=table") {
 
 describe("Dashboard filters UI", () => {
   beforeEach(() => {
-    mocks.fetchReceipts.mockResolvedValue(mockReceipts);
+    mocks.fetchReceiptsPage.mockImplementation(async (params: any = {}) => {
+      const {
+        page = 1,
+        limit = 25,
+        searchQuery = "",
+        status = "all",
+        currency = null,
+        categoryId = null,
+        sortOrder = "newest",
+        fromDate = null,
+        toDate = null,
+      } = params;
+
+      let filtered = [...mockReceipts];
+
+      if (searchQuery) {
+        filtered = filtered.filter((receipt) =>
+          receipt.merchant.toLowerCase().includes(String(searchQuery).toLowerCase())
+        );
+      }
+
+      if (status !== "all") {
+        filtered = filtered.filter((receipt) => receipt.status === status);
+      }
+
+      if (currency) {
+        filtered = filtered.filter((receipt) => receipt.currency === currency);
+      }
+
+      if (categoryId === "uncategorized") {
+        filtered = filtered.filter((receipt) => !receipt.custom_category_id);
+      } else if (categoryId) {
+        filtered = filtered.filter((receipt) => receipt.custom_category_id === categoryId);
+      }
+
+      if (fromDate) {
+        filtered = filtered.filter((receipt) => receipt.date >= fromDate);
+      }
+
+      if (toDate) {
+        filtered = filtered.filter((receipt) => receipt.date <= toDate);
+      }
+
+      filtered.sort((a, b) => {
+        if (sortOrder === "oldest") return new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (sortOrder === "highest") return b.total - a.total;
+        if (sortOrder === "lowest") return a.total - b.total;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+
+      const total = filtered.length;
+      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+      const offset = (page - 1) * limit;
+      const paged = filtered.slice(offset, offset + limit);
+
+      return {
+        receipts: paged,
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      };
+    });
+    mocks.fetchReceiptCurrencies.mockResolvedValue(["MYR", "USD"]);
     mocks.deleteReceipt.mockResolvedValue(true);
     mocks.fetchUserCategories.mockResolvedValue(mockCategories);
     mocks.fetchCategoriesForDisplay.mockResolvedValue(mockCategories);
@@ -244,6 +314,32 @@ describe("Dashboard filters UI", () => {
       const search = screen.getByTestId("location-search").textContent ?? "";
       expect(search).toContain("from=");
       expect(search).toContain("to=");
+    });
+  });
+
+  it("reads page and limit from URL params", async () => {
+    renderDashboard("/dashboard?view=table&page=2&limit=10");
+
+    await waitFor(() => {
+      expect(mocks.fetchReceiptsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 2, limit: 10 }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it("resets page to 1 when search changes", async () => {
+    const user = userEvent.setup();
+    renderDashboard("/dashboard?view=table&page=2&limit=10");
+
+    await user.type(await screen.findByPlaceholderText("Search receipts..."), "speed");
+
+    await waitFor(() => {
+      expect(mocks.fetchReceiptsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1, limit: 10, searchQuery: "speed" }),
+        expect.anything(),
+      );
+      expect(screen.getByTestId("location-search").textContent).toContain("page=1");
     });
   });
 

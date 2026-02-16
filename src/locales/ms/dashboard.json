@@ -142,6 +142,13 @@
     "highest": "Tertinggi",
     "lowest": "Terendah"
   },
+  "pagination": {
+    "showing": "Memaparkan {{start}}-{{end}} daripada {{total}}",
+    "pageOf": "Halaman {{page}} daripada {{totalPages}}",
+    "perPage": "Setiap halaman",
+    "previous": "Sebelumnya",
+    "next": "Seterusnya"
+  },
   "contextual": {
     "title": "Papan Pemuka",
     "title_admin": "Papan Pemuka Admin - Gambaran Keseluruhan Sistem",

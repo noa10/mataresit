@@ -18,7 +18,7 @@ import { useStripe } from "@/contexts/StripeContext";
 import { ExportDropdown } from "@/components/export/ExportDropdown";
 import { ExportFilters } from "@/lib/export";
 import { useDashboardTranslation, useCommonTranslation, useReceiptsTranslation } from "@/contexts/LanguageContext";
-import { fetchReceipts } from "@/services/receiptService";
+import { fetchReceiptsPage, fetchReceiptCurrencies, ReceiptSortOrder } from "@/services/receiptService";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Receipt, ReceiptStatus } from "@/types/receipt";
@@ -32,11 +32,12 @@ import { deleteReceipt } from "@/services/receiptService";
 import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
-import { format, isAfter, isBefore, isValid, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { fetchUserCategories, fetchCategoriesForDisplay, bulkAssignCategory } from "@/services/categoryService";
 import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
 import { formatCurrencySafe } from "@/utils/currency";
 import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet";
+import { ReceiptsPagination } from "@/components/dashboard/ReceiptsPagination";
 
 import {
   Table,
@@ -49,6 +50,21 @@ import {
 
 // Define view mode types
 type ViewMode = "grid" | "list" | "table";
+type PageLimit = 10 | 25 | 50;
+
+const parsePageParam = (value: string | null): number => {
+  const parsed = Number(value ?? "1");
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+};
+
+const parseLimitParam = (value: string | null): PageLimit => {
+  const parsed = Number(value ?? "25");
+  if (parsed === 10 || parsed === 25 || parsed === 50) {
+    return parsed;
+  }
+  return 25;
+};
 
 // Helper function to normalize confidence scores (handles decimal/percentage format)
 const normalizeConfidence = (score?: number | null): number => {
@@ -140,6 +156,8 @@ export default function Dashboard() {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "highest" | "lowest">(
     initialSortOrder
   );
+  const [page, setPage] = useState<number>(() => parsePageParam(searchParams.get("page")));
+  const [limit, setLimit] = useState<PageLimit>(() => parseLimitParam(searchParams.get("limit")));
 
   // Date range filter state
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -269,18 +287,85 @@ export default function Dashboard() {
     setSearchParams(currentParams, { replace: true });
   };
 
-  const { data: receipts = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['receipts', currentTeam?.id],
-    queryFn: () => fetchReceipts({ currentTeam }),
-    enabled: !!user,
-  });
+  useEffect(() => {
+    const nextPage = parsePageParam(searchParams.get("page"));
+    const nextLimit = parseLimitParam(searchParams.get("limit"));
 
-  // Debug function to manually refresh receipts
-  const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh triggered from Dashboard');
-    await refetch();
-    console.log('✅ Manual refresh completed');
+    setPage((currentPage) => (currentPage === nextPage ? currentPage : nextPage));
+    setLimit((currentLimit) => (currentLimit === nextLimit ? currentLimit : nextLimit));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!searchParams.get("page") || !searchParams.get("limit")) {
+      updateSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+    }
+  }, [searchParams, page, limit]);
+
+  const setPageAndSync = (nextPage: number) => {
+    const normalizedPage = Math.max(1, Math.floor(nextPage));
+    setPage(normalizedPage);
+    updateSearchParams({ page: String(normalizedPage), limit: String(limit) });
   };
+
+  const setLimitAndSync = (nextLimit: PageLimit) => {
+    setLimit(nextLimit);
+    setPage(1);
+    updateSearchParams({ page: "1", limit: String(nextLimit) });
+  };
+
+  const resetPageAndSync = (overrides: Record<string, string | null>) => {
+    setPage(1);
+    updateSearchParams({
+      ...overrides,
+      page: "1",
+      limit: String(limit),
+    });
+  };
+
+  const fromDate = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null;
+  const toDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null;
+
+  const {
+    data: receiptsPage,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      "receipts",
+      currentTeam?.id ?? null,
+      page,
+      limit,
+      searchQuery,
+      activeTab,
+      filterByCurrency,
+      filterByCategory,
+      sortOrder,
+      fromDate,
+      toDate,
+    ],
+    queryFn: () =>
+      fetchReceiptsPage(
+        {
+          page,
+          limit,
+          searchQuery,
+          status: activeTab,
+          currency: filterByCurrency,
+          categoryId: filterByCategory,
+          sortOrder: sortOrder as ReceiptSortOrder,
+          fromDate,
+          toDate,
+        },
+        { currentTeam }
+      ),
+    enabled: !!user,
+    placeholderData: (previousData) => previousData,
+  });
 
   // TEAM COLLABORATION FIX: Include team context in categories query
   const { data: categories = [] } = useQuery({
@@ -296,42 +381,14 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  const processedReceipts = receipts
-    .filter(receipt => {
-      const matchesSearch = receipt.merchant.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTab = activeTab === "all" || receipt.status === activeTab;
-      const matchesCurrency = !filterByCurrency || receipt.currency === filterByCurrency;
+  const { data: currencies = [] } = useQuery({
+    queryKey: ["receiptCurrencies", currentTeam?.id ?? null],
+    queryFn: () => fetchReceiptCurrencies({ currentTeam }),
+    enabled: !!user,
+  });
 
-      // Category filtering
-      const matchesCategory = !filterByCategory ||
-        (filterByCategory === 'uncategorized' ? !receipt.custom_category_id : receipt.custom_category_id === filterByCategory);
-
-      // Date range filtering
-      let matchesDateRange = true;
-      if (dateRange?.from) {
-        const receiptDate = new Date(receipt.date);
-        // Check if receipt date is after or equal to the start date
-        matchesDateRange = isValid(receiptDate) && !isBefore(receiptDate, dateRange.from);
-
-        // If end date is specified, check if receipt date is before or equal to the end date
-        if (matchesDateRange && dateRange.to) {
-          matchesDateRange = !isAfter(receiptDate, dateRange.to);
-        }
-      }
-
-      return matchesSearch && matchesTab && matchesCurrency && matchesCategory && matchesDateRange;
-    })
-    .sort((a, b) => {
-      if (sortOrder === "newest") {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      } else if (sortOrder === "oldest") {
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-      } else if (sortOrder === "highest") {
-        return b.total - a.total;
-      } else {
-        return a.total - b.total;
-      }
-    });
+  const processedReceipts = receiptsPage?.receipts ?? [];
+  const totalReceipts = receiptsPage?.total ?? 0;
 
   // Clean up selected receipt IDs when filters change
   // Remove any selected receipts that are no longer visible in the filtered results
@@ -347,7 +404,20 @@ export default function Dashboard() {
     }
   }, [processedReceipts]); // Removed selectedReceiptIds to prevent infinite loop
 
-  const currencies = [...new Set(receipts.map(r => r.currency))];
+  useEffect(() => {
+    const totalPages = receiptsPage?.totalPages ?? 0;
+
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+      updateSearchParams({ page: String(totalPages), limit: String(limit) });
+      return;
+    }
+
+    if (totalPages === 0 && page !== 1) {
+      setPage(1);
+      updateSearchParams({ page: "1", limit: String(limit) });
+    }
+  }, [receiptsPage?.totalPages, page, limit]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -372,7 +442,7 @@ export default function Dashboard() {
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setSearchQuery(newQuery);
-    updateSearchParams({ q: newQuery || null });
+    resetPageAndSync({ q: newQuery || null });
   };
 
   // Handle date range selection
@@ -381,27 +451,27 @@ export default function Dashboard() {
 
     // Update URL parameters
     if (!range || !range.from) {
-      updateSearchParams({ from: null, to: null });
+      resetPageAndSync({ from: null, to: null });
     } else {
       const fromParam = format(range.from, "yyyy-MM-dd");
       const toParam = range.to ? format(range.to, "yyyy-MM-dd") : null;
-      updateSearchParams({ from: fromParam, to: toParam });
+      resetPageAndSync({ from: fromParam, to: toParam });
     }
   };
 
   const handleSortOrderChange = (newSort: "newest" | "oldest" | "highest" | "lowest") => {
     setSortOrder(newSort);
-    updateSearchParams({ sort: newSort === "newest" ? null : newSort });
+    resetPageAndSync({ sort: newSort === "newest" ? null : newSort });
   };
 
   const handleCurrencyFilterChange = (value: string | null) => {
     setFilterByCurrency(value);
-    updateSearchParams({ currency: value });
+    resetPageAndSync({ currency: value });
   };
 
   const handleCategoryFilterChange = (value: string | null) => {
     setFilterByCategory(value);
-    updateSearchParams({ category: value });
+    resetPageAndSync({ category: value });
   };
 
   const resetFilterControls = () => {
@@ -415,7 +485,10 @@ export default function Dashboard() {
       category: null,
       from: null,
       to: null,
+      page: "1",
+      limit: String(limit),
     });
+    setPage(1);
   };
 
   const clearAllSearchAndFilters = () => {
@@ -425,10 +498,16 @@ export default function Dashboard() {
     setFilterByCategory(null);
     setSortOrder("newest");
     setDateRange(undefined);
+    setPage(1);
     // Don't reset view mode when clearing filters, just keep current value if any
     const currentViewMode = viewMode !== 'grid' ? viewMode : null;
-    // Clear all search params except view if it's not the default
-    setSearchParams(currentViewMode ? { view: currentViewMode } : {}, { replace: true });
+    const nextParams = new URLSearchParams();
+    nextParams.set("page", "1");
+    nextParams.set("limit", String(limit));
+    if (currentViewMode) {
+      nextParams.set("view", currentViewMode);
+    }
+    setSearchParams(nextParams, { replace: true });
   };
 
   const activeFilterCount =
@@ -450,6 +529,46 @@ export default function Dashboard() {
     sortOrder: sortOrder !== 'newest' ? sortOrder : undefined,
     dateRange: dateRange || undefined
   };
+
+  const fetchAllFilteredReceiptsForExport = async (): Promise<Receipt[]> => {
+    const receiptsForExport: Receipt[] = [];
+    const exportLimit: PageLimit = 50;
+    let exportPage = 1;
+    let hasNextPage = true;
+    let safetyCounter = 0;
+
+    while (hasNextPage && safetyCounter < 1000) {
+      const result = await fetchReceiptsPage(
+        {
+          page: exportPage,
+          limit: exportLimit,
+          searchQuery,
+          status: activeTab,
+          currency: filterByCurrency,
+          categoryId: filterByCategory,
+          sortOrder: sortOrder as ReceiptSortOrder,
+          fromDate,
+          toDate,
+        },
+        { currentTeam }
+      );
+
+      receiptsForExport.push(...result.receipts);
+      hasNextPage = result.hasNextPage;
+      exportPage += 1;
+      safetyCounter += 1;
+    }
+
+    return receiptsForExport;
+  };
+
+  const hasActiveQueryState =
+    searchQuery.trim().length > 0 ||
+    activeTab !== "all" ||
+    !!filterByCurrency ||
+    !!filterByCategory ||
+    sortOrder !== "newest" ||
+    !!dateRange?.from;
 
   // Render different view modes
   const renderReceiptContent = () => {
@@ -486,7 +605,7 @@ export default function Dashboard() {
       );
     }
 
-    if (receipts.length === 0) {
+    if (totalReceipts === 0 && !hasActiveQueryState) {
       return (
         <motion.div
           initial={{ opacity: 0 }}
@@ -511,7 +630,7 @@ export default function Dashboard() {
       );
     }
 
-    if (processedReceipts.length === 0) {
+    if (totalReceipts === 0 || processedReceipts.length === 0) {
       return (
         <motion.div
           initial={{ opacity: 0 }}
@@ -1146,7 +1265,9 @@ export default function Dashboard() {
               <ExportDropdown
                 receipts={processedReceipts}
                 filters={exportFilters}
-                disabled={isLoading}
+                disabled={isLoading || isFetching}
+                totalCount={totalReceipts}
+                getReceiptsForExport={fetchAllFilteredReceiptsForExport}
               />
             </div>
           </div>
@@ -1220,7 +1341,7 @@ export default function Dashboard() {
             <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => {
               const newTab = value as "all" | ReceiptStatus;
               setActiveTab(newTab);
-              updateSearchParams({ tab: newTab === 'all' ? null : newTab });
+              resetPageAndSync({ tab: newTab === 'all' ? null : newTab });
             }}>
               <TabsList className="bg-background/50">
                 <TabsTrigger value="all">{tDash('filters.all')}</TabsTrigger>
@@ -1250,6 +1371,19 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         {renderReceiptContent()}
+        {totalReceipts > 0 && (
+          <ReceiptsPagination
+            page={page}
+            limit={limit}
+            total={totalReceipts}
+            totalPages={receiptsPage?.totalPages ?? 0}
+            hasNextPage={receiptsPage?.hasNextPage ?? false}
+            hasPrevPage={receiptsPage?.hasPrevPage ?? false}
+            onPageChange={setPageAndSync}
+            onLimitChange={setLimitAndSync}
+            isLoading={isFetching}
+          />
+        )}
       </main>
 
       {/* Batch Upload Modal - Now handles both single and batch uploads */}
