@@ -79,3 +79,20 @@ conversation_log.md
 
 # Project planning
 plans/
+
+# Non-essential directories (build artifacts, documentation, auxiliary tools)
+archive/
+reports/
+integration_test/
+config/
+docs/
+scripts/
+
+# Additional build artifacts and caches
+.env*
+.vite/
+.cache/
+*.tsbuildinfo
+.nyc_output/
+.supabase/
+Thumbs.db
