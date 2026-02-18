@@ -152,7 +152,6 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
     "vaul": "^0.9.3",
-    "vercel": "^50.15.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.23.8"
   },
@@ -171,7 +170,6 @@
     "@vitejs/plugin-react-swc": "^4.0.0",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
-    "artillery": "^2.0.26",
     "autoprefixer": "^10.4.21",
     "chai": "^5.2.0",
     "eslint": "^9.33.0",
