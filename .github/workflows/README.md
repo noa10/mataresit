@@ -164,6 +164,7 @@ EMERGENCY_APPROVERS - GitHub usernames for emergency approvals
 ### **Code Security**
 - CodeQL analysis for vulnerabilities
 - Dependency scanning with npm audit and Snyk
+- Blocking npm audit gates evaluate production/runtime dependencies (`--omit=dev`) at high/critical severity; full dependency audit remains informational
 - Secret scanning with TruffleHog
 - Frontend bundle security analysis
 

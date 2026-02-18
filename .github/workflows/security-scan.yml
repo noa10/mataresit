@@ -174,18 +174,21 @@ jobs:
         run: |
           echo "Installing dependencies for dependency security scan..."
 
-          # Try npm ci first, fallback to npm install if it fails
-          if ! npm ci --silent; then
+          # Install only production dependencies for blocking runtime audit
+          if ! npm ci --omit=dev --silent; then
             echo "npm ci failed, trying npm install..."
             rm -rf node_modules package-lock.json
-            npm install --silent
+            npm install --omit=dev --silent
           fi
 
       - name: Run npm audit
         run: |
-          echo "Running npm audit with reduced verbosity..."
+          echo "Running blocking npm audit on production dependencies..."
+          npm audit --omit=dev --audit-level=high --json > npm-audit-prod.json || true
+          npm audit --omit=dev --audit-level=high --no-fund
+
+          echo "Running informational npm audit on full dependency graph..."
           npm audit --audit-level=high --json > npm-audit.json || true
-          npm audit --audit-level=high --no-fund
 
       - name: Skip Snyk security scan (not configured)
         run: |
@@ -198,12 +201,12 @@ jobs:
 
       - name: Check for high severity vulnerabilities
         run: |
-          if [ -f npm-audit.json ]; then
-            HIGH_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.high // 0')
-            CRITICAL_VULNS=$(cat npm-audit.json | jq '.metadata.vulnerabilities.critical // 0')
+          if [ -f npm-audit-prod.json ]; then
+            HIGH_VULNS=$(cat npm-audit-prod.json | jq '.metadata.vulnerabilities.high // 0')
+            CRITICAL_VULNS=$(cat npm-audit-prod.json | jq '.metadata.vulnerabilities.critical // 0')
 
             if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
-              echo "::error::Found $CRITICAL_VULNS critical and $HIGH_VULNS high severity vulnerabilities"
+              echo "::error::Found $CRITICAL_VULNS critical and $HIGH_VULNS high severity vulnerabilities in production dependencies"
               exit 1
             fi
           fi

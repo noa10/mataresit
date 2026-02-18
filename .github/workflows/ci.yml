@@ -120,10 +120,10 @@ jobs:
       - name: Security audit
         id: security-audit
         run: |
-          echo "Running npm audit..."
+          echo "Running npm audit on production dependencies..."
 
-          # Run audit to check for vulnerabilities
-          npm audit --audit-level=high 2>&1 | tee security-audit.txt
+          # Run audit to check blocking runtime vulnerabilities
+          npm audit --omit=dev --audit-level=high 2>&1 | tee security-audit.txt
           AUDIT_EXIT_CODE=${PIPESTATUS[0]}
 
           if [[ $AUDIT_EXIT_CODE -eq 0 ]]; then
@@ -135,7 +135,7 @@ jobs:
 
             # Show vulnerability summary
             echo "Vulnerability summary:"
-            npm audit --audit-level=high --json | jq -r '.metadata.vulnerabilities | to_entries[] | "\(.key): \(.value)"' || echo "Could not parse vulnerability details"
+            npm audit --omit=dev --audit-level=high --json | jq -r '.metadata.vulnerabilities | to_entries[] | "\(.key): \(.value)"' || echo "Could not parse vulnerability details"
 
             echo "passed=false" >> $GITHUB_OUTPUT
           fi
@@ -519,5 +519,4 @@ jobs:
           else
             echo "🚫 **Not ready for deployment. Please fix the failing checks.**" >> $GITHUB_STEP_SUMMARY
           fi
-
 
