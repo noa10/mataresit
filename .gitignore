@@ -96,3 +96,6 @@ scripts/
 .nyc_output/
 .supabase/
 Thumbs.db
+
+# Local telemetry
+telemetry-id
