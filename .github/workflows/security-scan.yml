@@ -89,13 +89,7 @@ jobs:
         if: steps.scan-decision.outputs.should-run == 'true' && steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           echo "Installing dependencies for security scanning..."
-
-          # Try npm ci first, fallback to npm install if it fails
-          if ! npm ci --silent; then
-            echo "npm ci failed, trying npm install..."
-            rm -rf node_modules package-lock.json
-            npm install --silent
-          fi
+          npm ci --silent
 
   # Code Security Scanning (Parallel)
   code-security:
@@ -138,12 +132,7 @@ jobs:
         run: |
           echo "Installing dependencies for code security analysis..."
 
-          # Try npm ci first, fallback to npm install if it fails
-          if ! npm ci --silent; then
-            echo "npm ci failed, trying npm install..."
-            rm -rf node_modules package-lock.json
-            npm install --silent
-          fi
+          npm ci --silent
 
       - name: Build application
         run: npm run build --silent
@@ -232,12 +221,7 @@ jobs:
         run: |
           echo "Installing dependencies for frontend security scan..."
 
-          # Try npm ci first, fallback to npm install if it fails
-          if ! npm ci; then
-            echo "npm ci failed, trying npm install..."
-            rm -rf node_modules package-lock.json
-            npm install
-          fi
+          npm ci --silent
 
       - name: Build application for security testing
         run: npm run build
@@ -292,12 +276,7 @@ jobs:
         run: |
           echo "Installing dependencies for Supabase security scan..."
 
-          # Try npm ci first, fallback to npm install if it fails
-          if ! npm ci; then
-            echo "npm ci failed, trying npm install..."
-            rm -rf node_modules package-lock.json
-            npm install
-          fi
+          npm ci --silent
 
       - name: Scan Supabase configuration
         run: |
