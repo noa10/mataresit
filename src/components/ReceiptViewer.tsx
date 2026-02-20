@@ -1660,7 +1660,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           </div>
         )}
 
-        <div className="flex-grow pr-3 min-h-0 overflow-auto">
+        <div className="flex-grow pr-3 pl-1 -ml-1 py-1 -my-1 min-h-0 overflow-auto">
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between">
