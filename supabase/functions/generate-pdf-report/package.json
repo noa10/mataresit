@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Edge function to generate PDF reports for receipts",
   "main": "index.ts",
-  "dependencies": {
+   "dependencies": {
     "date-fns": "^2.30.0",
-    "jspdf": "^3.0.1",
-    "jspdf-autotable": "^3.5.31"
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.2"
   }
 }
