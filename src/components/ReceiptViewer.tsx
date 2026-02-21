@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -17,6 +17,7 @@ import { PaidBySelector } from "@/components/paidby/PaidBySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useSaveStatus, useReceiptSaveStatus } from "@/contexts/SaveStatusContext";
 import { SaveStatusIndicator } from "@/components/SaveStatusToastManager";
 import { useTeam } from "@/contexts/TeamContext";
@@ -1801,17 +1802,27 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Label htmlFor="total">Total Amount</Label>
                     {isManualTotal && (
-                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                        Manual Override
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Pencil size={14} className="text-amber-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Manual override</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {!isManualTotal && lineItemsTotal > 0 && (
-                      <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
-                        Auto-calculated
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Calculator size={14} className="text-green-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Auto calculated price from line items</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                   <ConfidenceIndicator score={editedConfidence?.total} loading={isProcessing} />
