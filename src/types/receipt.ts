@@ -63,6 +63,7 @@ export interface Receipt {
     merchant?: number;
     date?: number;
     total?: number;
+    subtotal?: number;
     tax?: number;
     line_items?: number;
     payment_method?: number;
@@ -97,6 +98,7 @@ export interface ConfidenceScore {
   merchant: number;
   date: number;
   total: number;
+  subtotal?: number;
   tax?: number;
   line_items?: number;
   payment_method?: number;
@@ -175,6 +177,7 @@ export interface AIResult {
     merchant?: number;
     date?: number;
     total?: number;
+    subtotal?: number;
     tax?: number;
     line_items?: number;
     payment_method?: number;
