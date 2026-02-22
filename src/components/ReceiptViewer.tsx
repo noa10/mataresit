@@ -17,7 +17,7 @@ import { PaidBySelector } from "@/components/paidby/PaidBySelector";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useSaveStatus, useReceiptSaveStatus } from "@/contexts/SaveStatusContext";
 import { SaveStatusIndicator } from "@/components/SaveStatusToastManager";
 import { useTeam } from "@/contexts/TeamContext";
@@ -60,6 +60,7 @@ type ReceiptConfidence = {
   merchant?: number;
   date?: number;
   total?: number;
+  subtotal?: number;
   tax?: number;
   line_items?: number;
   payment_method?: number;
@@ -70,6 +71,7 @@ const defaultConfidence: ReceiptConfidence = {
   merchant: 0,
   date: 0,
   total: 0,
+  subtotal: 0,
   tax: 0,
   payment_method: 0,
   line_items: 0,
@@ -96,8 +98,80 @@ const normalizeConfidence = (score?: number | null): number => {
   return Math.min(Math.round(normalizedScore), 100);
 };
 
+const getSafeTranslation = (
+  t: (key: string, options?: Record<string, unknown>) => string | undefined | object,
+  key: string,
+  fallback: string,
+  options?: Record<string, unknown>
+): string => {
+  const translated = t(key, options);
+  if (!translated || typeof translated !== "string") return fallback;
+  const trimmed = translated.trim();
+  if (!trimmed || trimmed === key) return fallback;
+  return trimmed;
+};
+
+export const normalizeReceiptConfidence = (rawConfidence: unknown): ReceiptConfidence => {
+  let parsed: unknown = rawConfidence;
+  if (typeof rawConfidence === "string") {
+    try {
+      parsed = JSON.parse(rawConfidence);
+    } catch {
+      parsed = {};
+    }
+  }
+
+  const normalized: ReceiptConfidence = { ...defaultConfidence, subtotal: undefined };
+
+  if (!parsed || typeof parsed !== "object") {
+    normalized.subtotal = normalized.total ?? defaultConfidence.total ?? 0;
+    return normalized;
+  }
+
+  const confidenceRecord = parsed as Record<string, unknown>;
+  const fields: Array<keyof ReceiptConfidence> = [
+    "merchant",
+    "date",
+    "total",
+    "subtotal",
+    "tax",
+    "line_items",
+    "payment_method",
+  ];
+
+  for (const field of fields) {
+    const rawValue = confidenceRecord[field];
+    if (rawValue === null || rawValue === undefined || rawValue === "") {
+      continue;
+    }
+    const numericValue = Number(rawValue);
+    if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
+      normalized[field] = numericValue;
+    }
+  }
+
+  const hasSubtotal = Object.prototype.hasOwnProperty.call(confidenceRecord, "subtotal");
+  if (!hasSubtotal || normalized.subtotal === undefined || normalized.subtotal === null) {
+    normalized.subtotal = normalized.total ?? defaultConfidence.total ?? 0;
+  }
+
+  return normalized;
+};
+
 // Enhanced Confidence indicator component with better visual feedback and tooltips
-function ConfidenceIndicator({ score, loading = false }: { score?: number, loading?: boolean }) {
+type ConfidenceTooltipAlign = "start" | "center" | "end";
+
+export function ConfidenceIndicator({
+  score,
+  loading = false,
+  align = "end",
+  fieldKey,
+}: {
+  score?: number;
+  loading?: boolean;
+  align?: ConfidenceTooltipAlign;
+  fieldKey?: string;
+}) {
   const { t } = useReceiptsTranslation();
 
   // Show loading state while processing
@@ -117,32 +191,65 @@ function ConfidenceIndicator({ score, loading = false }: { score?: number, loadi
     normalizedScore >= 60 ? 'bg-yellow-500' :
       normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
-  // Add confidence labels for accessibility
-  const label = normalizedScore >= 80 ? t('viewer.highConfidence') :
-    normalizedScore >= 60 ? t('viewer.mediumConfidence') :
-      normalizedScore >= 40 ? t('viewer.lowConfidence') : t('viewer.veryLowConfidence');
+  const labelKey = normalizedScore >= 80
+    ? "viewer.highConfidence"
+    : normalizedScore >= 60
+      ? "viewer.mediumConfidence"
+      : normalizedScore >= 40
+        ? "viewer.lowConfidence"
+        : "viewer.veryLowConfidence";
+  const fallbackLabel = normalizedScore >= 80
+    ? "High"
+    : normalizedScore >= 60
+      ? "Medium"
+      : normalizedScore >= 40
+        ? "Low"
+        : "Very Low";
+  const label = getSafeTranslation(t, labelKey, fallbackLabel);
+  const normalizedLabel = label.toLowerCase();
+  const verifiedByUser = getSafeTranslation(t, "viewer.verifiedByUser", "Verified by user");
+  const aiDetectionText = getSafeTranslation(
+    t,
+    "viewer.aiDetection",
+    `AI detection with ${normalizedLabel} confidence`,
+    { level: normalizedLabel }
+  );
+  const editToVerify = getSafeTranslation(t, "viewer.editToVerify", "Edit this field to verify.");
+  const headingText = `${label} confidence`;
 
   return (
-    <div className="flex items-center gap-1 group relative">
-      <span className={`inline-block w-4 h-1 rounded ${color}`}></span>
-      <span className="text-xs">{normalizedScore}%</span>
-
-      {/* Tooltip showing confidence explanation */}
-      <div className="absolute bottom-full right-0 mb-2 p-2 bg-gray-800 text-white text-xs rounded
-                    opacity-0 group-hover:opacity-100 transition-opacity w-48 z-10 pointer-events-none shadow-lg">
-        <p className="font-medium">{label} confidence</p>
-        <p className="text-gray-300 text-[10px] mt-1">
-          {normalizedScore === 100
-            ? t('viewer.verifiedByUser')
-            : t('viewer.aiDetection', { level: label.toLowerCase() })}
-        </p>
-        {normalizedScore < 100 && (
-          <p className="text-gray-300 text-[10px] mt-1">{t('viewer.editToVerify')}</p>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className="flex items-center gap-1 cursor-help"
+          data-testid={fieldKey ? `confidence-indicator-${fieldKey}` : undefined}
+          tabIndex={0}
+        >
+          <span className={`inline-block w-4 h-1 rounded ${color}`}></span>
+          <span className="text-xs">{normalizedScore}%</span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        align={align}
+        collisionPadding={8}
+        className="max-w-48 p-2 text-xs"
+        data-testid={fieldKey ? `confidence-tooltip-${fieldKey}` : undefined}
+      >
+        {headingText && <p className="font-medium">{headingText}</p>}
+        {(normalizedScore === 100 ? verifiedByUser : aiDetectionText) && (
+          <p className="text-muted-foreground text-[10px] mt-1">
+            {normalizedScore === 100 ? verifiedByUser : aiDetectionText}
+          </p>
         )}
-      </div>
-    </div>
+        {normalizedScore < 100 && editToVerify && (
+          <p className="text-muted-foreground text-[10px] mt-1">{editToVerify}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
+
 
 // Debounce function to delay state updates
 const useDebounce = <T,>(value: T, delay: number): T => {
