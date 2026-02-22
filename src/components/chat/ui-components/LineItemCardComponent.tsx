@@ -186,7 +186,7 @@ export function LineItemCardComponent({
                       {Math.round(data.confidence * 100)}%
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
+                  <TooltipContent side="bottom" sideOffset={5} avoidCollisions={true} className="max-w-xs">
                     <div className="space-y-1">
                       <p className="font-medium text-sm">{t('confidence.tooltip.title')}</p>
                       <p className="text-xs text-muted-foreground">
