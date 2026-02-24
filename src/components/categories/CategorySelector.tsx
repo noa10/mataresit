@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Plus, Tag, X } from "lucide-react";
 
@@ -44,6 +44,8 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { currentTeam } = useTeam();
 
   // TEAM COLLABORATION FIX: Include team context in categories query
@@ -68,6 +70,16 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     setIsCreateModalOpen(false);
   };
 
+  useEffect(() => {
+    if (!open) {
+      setPopoverContainer(null);
+      return;
+    }
+
+    const dialogContainer = triggerRef.current?.closest('[role="dialog"]');
+    setPopoverContainer(dialogContainer instanceof HTMLElement ? dialogContainer : null);
+  }, [open]);
+
   if (isLoading) {
     return <Skeleton className="h-10 w-full" />;
   }
@@ -77,6 +89,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
+            ref={triggerRef}
             variant="outline"
             role="combobox"
             aria-expanded={open}
@@ -97,7 +110,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
             <Tag className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
+        <PopoverContent className="w-full p-0" align="start" container={popoverContainer}>
           <Command>
             <CommandInput placeholder="Search categories..." />
             <CommandList>
