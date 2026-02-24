@@ -21,6 +21,7 @@ import { ProcessingStrategy } from "@/lib/progress-tracking";
 import { useRateLimitMonitoring } from "@/hooks/useRateLimitMonitoring";
 import { useAPIQuotaMonitoring } from "@/hooks/useAPIQuotaMonitoring";
 import { useProcessingEfficiencyMonitoring } from "@/hooks/useProcessingEfficiencyMonitoring";
+import { shouldCaptureBatchQueueWheel } from "@/components/upload/wheelCaptureGuard";
 
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
@@ -408,11 +409,16 @@ function BatchUploadZone({
 
   // Enable wheel scrolling from anywhere in the batch area once files exist.
   const handleContainerWheelCapture = useCallback((e: React.WheelEvent) => {
-    if (batchUploads.length === 0) return;
-
     const scrollContainer = getQueueScrollContainer();
+    if (!shouldCaptureBatchQueueWheel({
+      uploadCount: batchUploads.length,
+      scrollContainer,
+      currentTarget: e.currentTarget,
+      target: e.target,
+    })) {
+      return;
+    }
     if (!scrollContainer) return;
-    if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) return;
 
     scrollContainer.scrollBy({
       top: e.deltaY,
