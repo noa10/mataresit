@@ -11,16 +11,20 @@ import { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Files } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
 
 interface BatchUploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
   onUploadComplete?: () => void;
 }
 
-export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUploadModalProps) {
+export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
   const [activeTab, setActiveTab] = useState<string>("single");
   const isMobile = useIsMobile();
+
+  // Consume upload state & modal control from the background context.
+  // The context persists state across modal open/close cycles.
+  const backgroundUpload = useBackgroundUpload();
+  const { isModalOpen, closeModal } = backgroundUpload;
 
   // Create a custom upload complete handler that doesn't close the modal
   const handleUploadComplete = useCallback(() => {
@@ -36,7 +40,7 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
   }, [onUploadComplete]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogContent className={`
         ${isMobile
           ? "w-full h-full max-w-none max-h-none p-4"
@@ -92,6 +96,7 @@ export function BatchUploadModal({ isOpen, onClose, onUploadComplete }: BatchUpl
             <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
               <BatchUploadZone
                 onUploadComplete={handleUploadComplete}
+                backgroundUpload={backgroundUpload}
               />
             </div>
           </TabsContent>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, FileUp, RotateCcw, ClipboardList, Settings, BarChart3 } from "lucide-react";
@@ -23,12 +23,19 @@ import { useAPIQuotaMonitoring } from "@/hooks/useAPIQuotaMonitoring";
 import { useProcessingEfficiencyMonitoring } from "@/hooks/useProcessingEfficiencyMonitoring";
 import { shouldCaptureBatchQueueWheel } from "@/components/upload/wheelCaptureGuard";
 
+import type { BatchUploadHookReturn } from "@/contexts/BackgroundUploadContext";
+
 interface BatchUploadZoneProps {
   onUploadComplete?: () => void;
+  /** When provided, use this shared upload state from BackgroundUploadContext
+   *  instead of calling useBatchFileUpload() internally. This allows the
+   *  upload to persist when the modal is closed. */
+  backgroundUpload?: BatchUploadHookReturn;
 }
 
 function BatchUploadZone({
-  onUploadComplete
+  onUploadComplete,
+  backgroundUpload
 }: BatchUploadZoneProps) {
   const uploadZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef<number>(0);
@@ -60,6 +67,23 @@ function BatchUploadZone({
   const [enableEnhancedView, setEnableEnhancedView] = useState(true);
   const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
   const [selectedProcessingStrategy, setSelectedProcessingStrategy] = useState<ProcessingStrategy>('balanced');
+
+  // When backgroundUpload is provided (from BackgroundUploadContext), use it.
+  // Otherwise fall back to creating a local hook instance (for standalone / test usage).
+  const localUpload = useBatchFileUpload(backgroundUpload ? undefined : {
+    maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
+    autoStart: settings?.batchUpload?.autoStart || false,
+    processingStrategy: selectedProcessingStrategy,
+    enableRateLimiting: true,
+    enableSessionTracking: true,
+    enableProgressTracking: true,
+    progressTrackingMode: enableEnhancedView ? 'enhanced' : 'basic',
+    enableETACalculation: true,
+    enablePerformanceAlerts: true,
+    enableQualityTracking: showAdvancedMetrics
+  });
+
+  const uploadState = backgroundUpload || localUpload;
 
   const {
     isDragging,
@@ -98,19 +122,7 @@ function BatchUploadZone({
     dismissProgressAlert,
     updateProcessingStrategy,
     rateLimitingManager
-  } = useBatchFileUpload({
-    maxConcurrent: settings?.batchUpload?.maxConcurrent || 2,
-    autoStart: settings?.batchUpload?.autoStart || false,
-    // Phase 3: Enhanced batch upload options
-    processingStrategy: selectedProcessingStrategy,
-    enableRateLimiting: true,
-    enableSessionTracking: true,
-    enableProgressTracking: true,
-    progressTrackingMode: enableEnhancedView ? 'enhanced' : 'basic',
-    enableETACalculation: true,
-    enablePerformanceAlerts: true,
-    enableQualityTracking: showAdvancedMetrics
-  });
+  } = uploadState;
 
   // Phase 3: Rate limit monitoring
   const rateLimitMonitoring = useRateLimitMonitoring(rateLimitingManager, {
@@ -133,9 +145,9 @@ function BatchUploadZone({
     enablePredictions: true,
     quotaLimits: {
       requestsPerMinute: selectedProcessingStrategy === 'conservative' ? 60 :
-                        selectedProcessingStrategy === 'aggressive' ? 120 : 90,
+        selectedProcessingStrategy === 'aggressive' ? 120 : 90,
       tokensPerMinute: selectedProcessingStrategy === 'conservative' ? 100000 :
-                      selectedProcessingStrategy === 'aggressive' ? 200000 : 150000
+        selectedProcessingStrategy === 'aggressive' ? 200000 : 150000
     }
   });
 
@@ -634,391 +646,390 @@ function BatchUploadZone({
         aria-label="Upload multiple receipt files: JPEG, PNG, or PDF (up to 5MB each)"
         aria-describedby="batch-upload-zone-description batch-upload-status"
       >
-      <input
-        type="file"
-        className="hidden"
-        ref={fileInputRef}
-        onChange={(e) => {
-          console.log('File input change in BatchUploadZone:', e.target.files);
-          compressAndAddFiles(e.target.files);
-          if (e.target) {
-            e.target.value = '';
-          }
-        }}
-        multiple
-        accept="image/jpeg,image/png,application/pdf"
-        aria-hidden="true"
-      />
+        <input
+          type="file"
+          className="hidden"
+          ref={fileInputRef}
+          onChange={(e) => {
+            console.log('File input change in BatchUploadZone:', e.target.files);
+            compressAndAddFiles(e.target.files);
+            if (e.target) {
+              e.target.value = '';
+            }
+          }}
+          multiple
+          accept="image/jpeg,image/png,application/pdf"
+          aria-hidden="true"
+        />
 
-      <div
-        id="batch-upload-status"
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {isCompressing
-          ? `Compressing images...`
-          : isProcessing
-            ? `Processing batch upload: ${completedUploads.length} of ${batchUploads.length} complete`
-            : 'Ready to upload multiple receipt files'}
-      </div>
+        <div
+          id="batch-upload-status"
+          className="sr-only"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {isCompressing
+            ? `Compressing images...`
+            : isProcessing
+              ? `Processing batch upload: ${completedUploads.length} of ${batchUploads.length} complete`
+              : 'Ready to upload multiple receipt files'}
+        </div>
 
-      {/* Header Section - Only show when no files are present */}
-      <AnimatePresence>
-        {batchUploads.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col items-center text-center gap-2 sm:gap-3"
-          >
+        {/* Header Section - Only show when no files are present */}
+        <AnimatePresence>
+          {batchUploads.length === 0 && (
             <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{
-                scale: isDragging ? 1.1 : 1,
-                rotate: isDragging ? [0, -5, 5, -5, 0] : 0
-              }}
-              whileHover={{ scale: 1.05 }}
-              transition={{
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
-                rotate: { duration: 0.5, ease: "easeInOut" }
-              }}
-              className={`relative rounded-full p-2 sm:p-3 ${
-                isDragging ? "bg-primary/10" : "bg-secondary"
-              }`}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex flex-col items-center text-center gap-2 sm:gap-3"
             >
-              {isDragging ? (
-                <Upload size={20} className="sm:w-6 sm:h-6 text-primary" />
-              ) : (
-                <FileUp size={20} className="sm:w-6 sm:h-6 text-primary" />
-              )}
-            </motion.div>
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{
+                  scale: isDragging ? 1.1 : 1,
+                  rotate: isDragging ? [0, -5, 5, -5, 0] : 0
+                }}
+                whileHover={{ scale: 1.05 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 20,
+                  rotate: { duration: 0.5, ease: "easeInOut" }
+                }}
+                className={`relative rounded-full p-2 sm:p-3 ${isDragging ? "bg-primary/10" : "bg-secondary"
+                  }`}
+              >
+                {isDragging ? (
+                  <Upload size={20} className="sm:w-6 sm:h-6 text-primary" />
+                ) : (
+                  <FileUp size={20} className="sm:w-6 sm:h-6 text-primary" />
+                )}
+              </motion.div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-center gap-2">
-                <h3 className="text-base sm:text-lg font-medium">
-                  {isDragging
-                    ? "Drop Files Here"
-                    : "Batch Upload Receipts"}
-                </h3>
-                {/* Phase 3: Enhanced view toggle */}
-                {batchUploads.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEnableEnhancedView(!enableEnhancedView)}
-                    className="h-6 w-6 p-0 ml-2"
-                    title={enableEnhancedView ? "Switch to basic view" : "Switch to enhanced view"}
-                  >
-                    {enableEnhancedView ? (
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                    ) : (
-                      <Settings className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
+              <div className="space-y-1">
+                <div className="flex items-center justify-center gap-2">
+                  <h3 className="text-base sm:text-lg font-medium">
+                    {isDragging
+                      ? "Drop Files Here"
+                      : "Batch Upload Receipts"}
+                  </h3>
+                  {/* Phase 3: Enhanced view toggle */}
+                  {batchUploads.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEnableEnhancedView(!enableEnhancedView)}
+                      className="h-6 w-6 p-0 ml-2"
+                      title={enableEnhancedView ? "Switch to basic view" : "Switch to enhanced view"}
+                    >
+                      {enableEnhancedView ? (
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Settings className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+                <p
+                  id="batch-upload-zone-description"
+                  className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
+                >
+                  {isCompressing
+                    ? "Compressing selected images..."
+                    : isInvalidFile
+                      ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
+                      : isDragging
+                        ? "Release to add files to the queue"
+                        : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Content Section - Flexible height with proper spacing */}
+        <div className="flex flex-col items-center gap-6 flex-1 min-h-0 overflow-x-hidden">
+
+          {/* Illustration when empty */}
+          <AnimatePresence>
+            {batchUploads.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-shrink-0"
+              >
+                {isInvalidFile
+                  ? DropZoneIllustrations.error
+                  : isDragging
+                    ? DropZoneIllustrations.drag
+                    : DropZoneIllustrations.default}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 1. Batch upload status indicator (Processing controls) */}
+          <AnimatePresence>
+            {batchUploads.length > 0 && (
+              <div className="flex-shrink-0 w-full">
+                {enableEnhancedView ? (
+                  <EnhancedBatchProcessingControls
+                    totalFiles={batchUploads.length}
+                    pendingFiles={queuedUploads.length}
+                    activeFiles={activeUploads.length}
+                    completedFiles={completedUploads.length}
+                    failedFiles={failedUploads.length}
+                    totalProgress={totalProgress}
+                    isProcessing={isProcessing}
+                    isPaused={isPaused}
+                    onStartProcessing={startBatchProcessing}
+                    onPauseProcessing={pauseBatchProcessing}
+                    onClearQueue={clearBatchQueue}
+                    onClearAll={clearAllUploads}
+                    onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+                    onShowReview={() => setShowReview(true)}
+                    allComplete={allProcessingComplete}
+                    // Phase 3: Enhanced features
+                    processingStrategy={selectedProcessingStrategy}
+                    onProcessingStrategyChange={handleProcessingStrategyChange}
+                    progressMetrics={progressMetrics}
+                    etaCalculation={etaCalculation}
+                    progressAlerts={progressAlerts}
+                    rateLimitStatus={rateLimitMonitoring.status || rateLimitStatus}
+                    rateLimitMetrics={rateLimitMonitoring.metrics}
+                    rateLimitEvents={rateLimitMonitoring.events}
+                    rateLimitAlerts={rateLimitMonitoring.alerts}
+                    quotaData={quotaMonitoring.quotaData}
+                    quotaAlerts={quotaMonitoring.alerts}
+                    efficiencyData={efficiencyMonitoring.efficiencyData}
+                    efficiencyRecommendations={efficiencyMonitoring.getOptimizationRecommendations()}
+                    performanceGrade={efficiencyMonitoring.getPerformanceGrade()}
+                    onDismissAlert={handleDismissAlert}
+                    onDismissRateLimitAlert={rateLimitMonitoring.dismissAlert}
+                    onDismissQuotaAlert={quotaMonitoring.dismissAlert}
+                    onRefreshQuota={quotaMonitoring.refreshData}
+                    onStrategyRecommendation={handleProcessingStrategyChange}
+                    onOptimizationRecommendation={(rec) => console.log('Optimization:', rec)}
+                    enableAdvancedView={showAdvancedMetrics}
+                    onToggleAdvancedView={handleToggleAdvancedView}
+                  />
+                ) : (
+                  <BatchProcessingControls
+                    totalFiles={batchUploads.length}
+                    pendingFiles={queuedUploads.length}
+                    activeFiles={activeUploads.length}
+                    completedFiles={completedUploads.length}
+                    failedFiles={failedUploads.length}
+                    totalProgress={totalProgress}
+                    isProcessing={isProcessing}
+                    isPaused={isPaused}
+                    onStartProcessing={startBatchProcessing}
+                    onPauseProcessing={pauseBatchProcessing}
+                    onClearQueue={clearBatchQueue}
+                    onClearAll={clearAllUploads}
+                    onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
+                    onShowReview={() => setShowReview(true)}
+                    allComplete={allProcessingComplete}
+                    isProgressUpdating={Object.values(progressUpdating).some(Boolean)}
+                  />
                 )}
               </div>
-              <p
-                id="batch-upload-zone-description"
-                className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto px-2"
+            )}
+          </AnimatePresence>
+
+          {/* 2. Category selection options */}
+          <AnimatePresence>
+            {batchUploads.length > 0 && !isProcessing && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="w-full max-w-md mx-auto space-y-2 flex-shrink-0 p-4 bg-muted/30 rounded-lg border"
               >
-                {isCompressing
-                  ? "Compressing selected images..."
-                  : isInvalidFile
-                    ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
-                    : isDragging
-                      ? "Release to add files to the queue"
-                      : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content Section - Flexible height with proper spacing */}
-      <div className="flex flex-col items-center gap-6 flex-1 min-h-0 overflow-x-hidden">
-
-        {/* Illustration when empty */}
-        <AnimatePresence>
-          {batchUploads.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex-shrink-0"
-            >
-              {isInvalidFile
-                ? DropZoneIllustrations.error
-                : isDragging
-                  ? DropZoneIllustrations.drag
-                  : DropZoneIllustrations.default}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 1. Batch upload status indicator (Processing controls) */}
-        <AnimatePresence>
-          {batchUploads.length > 0 && (
-            <div className="flex-shrink-0 w-full">
-              {enableEnhancedView ? (
-                <EnhancedBatchProcessingControls
-                  totalFiles={batchUploads.length}
-                  pendingFiles={queuedUploads.length}
-                  activeFiles={activeUploads.length}
-                  completedFiles={completedUploads.length}
-                  failedFiles={failedUploads.length}
-                  totalProgress={totalProgress}
-                  isProcessing={isProcessing}
-                  isPaused={isPaused}
-                  onStartProcessing={startBatchProcessing}
-                  onPauseProcessing={pauseBatchProcessing}
-                  onClearQueue={clearBatchQueue}
-                  onClearAll={clearAllUploads}
-                  onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
-                  onShowReview={() => setShowReview(true)}
-                  allComplete={allProcessingComplete}
-                  // Phase 3: Enhanced features
-                  processingStrategy={selectedProcessingStrategy}
-                  onProcessingStrategyChange={handleProcessingStrategyChange}
-                  progressMetrics={progressMetrics}
-                  etaCalculation={etaCalculation}
-                  progressAlerts={progressAlerts}
-                  rateLimitStatus={rateLimitMonitoring.status || rateLimitStatus}
-                  rateLimitMetrics={rateLimitMonitoring.metrics}
-                  rateLimitEvents={rateLimitMonitoring.events}
-                  rateLimitAlerts={rateLimitMonitoring.alerts}
-                  quotaData={quotaMonitoring.quotaData}
-                  quotaAlerts={quotaMonitoring.alerts}
-                  efficiencyData={efficiencyMonitoring.efficiencyData}
-                  efficiencyRecommendations={efficiencyMonitoring.getOptimizationRecommendations()}
-                  performanceGrade={efficiencyMonitoring.getPerformanceGrade()}
-                  onDismissAlert={handleDismissAlert}
-                  onDismissRateLimitAlert={rateLimitMonitoring.dismissAlert}
-                  onDismissQuotaAlert={quotaMonitoring.dismissAlert}
-                  onRefreshQuota={quotaMonitoring.refreshData}
-                  onStrategyRecommendation={handleProcessingStrategyChange}
-                  onOptimizationRecommendation={(rec) => console.log('Optimization:', rec)}
-                  enableAdvancedView={showAdvancedMetrics}
-                  onToggleAdvancedView={handleToggleAdvancedView}
+                <Label htmlFor="batch-category-selector" className="text-sm font-medium">
+                  Category (Optional)
+                </Label>
+                <CategorySelector
+                  value={selectedCategoryId}
+                  onChange={setSelectedCategoryId}
+                  placeholder="Select a category for all receipts..."
+                  className="w-full"
                 />
-              ) : (
-                <BatchProcessingControls
-                  totalFiles={batchUploads.length}
-                  pendingFiles={queuedUploads.length}
-                  activeFiles={activeUploads.length}
-                  completedFiles={completedUploads.length}
-                  failedFiles={failedUploads.length}
-                  totalProgress={totalProgress}
-                  isProcessing={isProcessing}
-                  isPaused={isPaused}
-                  onStartProcessing={startBatchProcessing}
-                  onPauseProcessing={pauseBatchProcessing}
-                  onClearQueue={clearBatchQueue}
-                  onClearAll={clearAllUploads}
-                  onRetryAllFailed={failedUploads.length > 0 ? retryAllFailed : undefined}
-                  onShowReview={() => setShowReview(true)}
-                  allComplete={allProcessingComplete}
-                  isProgressUpdating={Object.values(progressUpdating).some(Boolean)}
-                />
-              )}
-            </div>
-          )}
-        </AnimatePresence>
+                <p className="text-xs text-muted-foreground text-center">
+                  This category will be applied to all receipts in this batch
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* 2. Category selection options */}
-        <AnimatePresence>
-          {batchUploads.length > 0 && !isProcessing && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full max-w-md mx-auto space-y-2 flex-shrink-0 p-4 bg-muted/30 rounded-lg border"
-            >
-              <Label htmlFor="batch-category-selector" className="text-sm font-medium">
-                Category (Optional)
-              </Label>
-              <CategorySelector
-                value={selectedCategoryId}
-                onChange={setSelectedCategoryId}
-                placeholder="Select a category for all receipts..."
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground text-center">
-                This category will be applied to all receipts in this batch
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 3. Add files button */}
-        <AnimatePresence>
-          {batchUploads.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex-shrink-0"
-            >
-              <Button
-                onClick={() => {
-                  console.log('Select Files button clicked');
-                  handleFileSelection();
-                }}
-                variant="default"
-                className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-shrink-0 flex-col sm:flex-row gap-1 sm:gap-0"
-                size="default"
+          {/* 3. Add files button */}
+          <AnimatePresence>
+            {batchUploads.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-shrink-0"
               >
-                <span className="sm:mr-2">Select Files</span>
-                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
-                  JPG, PNG, PDF
-                </span>
-              </Button>
-            </motion.div>
-          )}
-          {batchUploads.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col sm:flex-row gap-3 flex-shrink-0 w-full sm:w-auto justify-center"
-            >
-              <Button
-                onClick={() => {
-                  console.log('Add More Files button clicked');
-                  handleFileSelection();
-                }}
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto min-w-[140px]"
-              >
-                <FileUp className="h-3 w-3 mr-2" />
-                Add More Files
-              </Button>
-
-              {/* Manual review button when all processing is complete */}
-              {allProcessingComplete && (
                 <Button
                   onClick={() => {
-                    console.log('Review Results button clicked');
-                    setShowReview(true);
+                    console.log('Select Files button clicked');
+                    handleFileSelection();
                   }}
                   variant="default"
+                  className="px-4 sm:px-6 py-2 text-sm sm:text-base group flex-shrink-0 flex-col sm:flex-row gap-1 sm:gap-0"
+                  size="default"
+                >
+                  <span className="sm:mr-2">Select Files</span>
+                  <span className="text-xs text-muted-foreground group-hover:text-primary-foreground transition-colors">
+                    JPG, PNG, PDF
+                  </span>
+                </Button>
+              </motion.div>
+            )}
+            {batchUploads.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex flex-col sm:flex-row gap-3 flex-shrink-0 w-full sm:w-auto justify-center"
+              >
+                <Button
+                  onClick={() => {
+                    console.log('Add More Files button clicked');
+                    handleFileSelection();
+                  }}
+                  variant="outline"
                   size="sm"
                   className="w-full sm:w-auto min-w-[140px]"
                 >
-                  <ClipboardList className="h-3 w-3 mr-2" />
-                  Review Results
+                  <FileUp className="h-3 w-3 mr-2" />
+                  Add More Files
                 </Button>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* 4. Files list section with improved scrolling */}
-        <AnimatePresence>
-          {batchUploads.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex-1 min-h-[220px] flex flex-col overflow-hidden"
-              ref={fileQueueRef}
-            >
-              <div className="flex justify-between items-center mb-3 flex-shrink-0">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  Files ({batchUploads.length})
-                </h4>
-                {failedUploads.length > 0 && (
+                {/* Manual review button when all processing is complete */}
+                {allProcessingComplete && (
                   <Button
-                    variant="outline"
+                    onClick={() => {
+                      console.log('Review Results button clicked');
+                      setShowReview(true);
+                    }}
+                    variant="default"
                     size="sm"
-                    onClick={retryAllFailed}
-                    className="flex items-center gap-1"
+                    className="w-full sm:w-auto min-w-[140px]"
                   >
-                    <RotateCcw className="h-3 w-3" />
-                    Retry All Failed ({failedUploads.length})
+                    <ClipboardList className="h-3 w-3 mr-2" />
+                    Review Results
                   </Button>
                 )}
-              </div>
-              <div
-                className="flex-1 min-h-0 w-full rounded-md border focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
-                ref={scrollAreaRef}
-                tabIndex={0}
-                onKeyDown={handleKeyDown}
-                role="region"
-                aria-label="File upload queue"
-                data-batch-queue-scroll="true"
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 4. Files list section with improved scrolling */}
+          <AnimatePresence>
+            {batchUploads.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 min-h-[220px] flex flex-col overflow-hidden"
+                ref={fileQueueRef}
               >
-                <div className="p-3 space-y-2">
-                  {batchUploads.map((upload, index) => (
-                    <motion.div
-                      key={upload.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                <div className="flex justify-between items-center mb-3 flex-shrink-0">
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Files ({batchUploads.length})
+                  </h4>
+                  {failedUploads.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={retryAllFailed}
+                      className="flex items-center gap-1"
                     >
-                      {enableEnhancedView ? (
-                        <EnhancedUploadQueueItem
-                          upload={upload}
-                          receiptId={receiptIds[upload.id]}
-                          onRemove={removeFromBatchQueue}
-                          onCancel={cancelUpload}
-                          onRetry={retryUpload}
-                          onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
-                          isProgressUpdating={progressUpdating[upload.id] || false}
-                          // Phase 3: Enhanced features
-                          fileProgressDetail={fileProgressDetails[upload.id]}
-                          showDetailedProgress={showAdvancedMetrics}
-                          rateLimited={rateLimitStatus?.isRateLimited || false}
-                          estimatedCost={progressMetrics?.costPerFile}
-                          processingTimeMs={fileProgressDetails[upload.id]?.processingTimeMs}
-                        />
-                      ) : (
-                        <UploadQueueItem
-                          upload={upload}
-                          receiptId={receiptIds[upload.id]}
-                          onRemove={removeFromBatchQueue}
-                          onCancel={cancelUpload}
-                          onRetry={retryUpload}
-                          onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
-                          isProgressUpdating={progressUpdating[upload.id] || false}
-                        />
-                      )}
-                    </motion.div>
-                  ))}
+                      <RotateCcw className="h-3 w-3" />
+                      Retry All Failed ({failedUploads.length})
+                    </Button>
+                  )}
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <div
+                  className="flex-1 min-h-0 w-full rounded-md border focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
+                  ref={scrollAreaRef}
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                  role="region"
+                  aria-label="File upload queue"
+                  data-batch-queue-scroll="true"
+                >
+                  <div className="p-3 space-y-2">
+                    {batchUploads.map((upload, index) => (
+                      <motion.div
+                        key={upload.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        {enableEnhancedView ? (
+                          <EnhancedUploadQueueItem
+                            upload={upload}
+                            receiptId={receiptIds[upload.id]}
+                            onRemove={removeFromBatchQueue}
+                            onCancel={cancelUpload}
+                            onRetry={retryUpload}
+                            onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
+                            isProgressUpdating={progressUpdating[upload.id] || false}
+                            // Phase 3: Enhanced features
+                            fileProgressDetail={fileProgressDetails[upload.id]}
+                            showDetailedProgress={showAdvancedMetrics}
+                            rateLimited={rateLimitStatus?.isRateLimited || false}
+                            estimatedCost={progressMetrics?.costPerFile}
+                            processingTimeMs={fileProgressDetails[upload.id]?.processingTimeMs}
+                          />
+                        ) : (
+                          <UploadQueueItem
+                            upload={upload}
+                            receiptId={receiptIds[upload.id]}
+                            onRemove={removeFromBatchQueue}
+                            onCancel={cancelUpload}
+                            onRetry={retryUpload}
+                            onViewReceipt={(receiptId) => navigate(`/receipt/${receiptId}`)}
+                            isProgressUpdating={progressUpdating[upload.id] || false}
+                          />
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
 
-      </div>
-
-      {/* Footer Section - Auto height */}
-      <div className="flex flex-col items-center gap-2 flex-shrink-0">
-        <div className="flex flex-wrap gap-2 justify-center">
-          <div className="text-xs px-2 py-1 bg-muted rounded-full">
-            Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
-          </div>
-          <div className="text-xs px-2 py-1 bg-muted rounded-full">
-            Auto-start: {settings?.batchUpload?.autoStart ? "On" : "Off"}
-          </div>
         </div>
-        <p className="text-xs text-muted-foreground text-center">
-          Configure batch upload settings in the{" "}
-          <Button
-            variant="link"
-            className="h-auto p-0 text-xs"
-            onClick={() => navigate("/settings")}
-          >
-            Settings Page
-          </Button>
-        </p>
+
+        {/* Footer Section - Auto height */}
+        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap gap-2 justify-center">
+            <div className="text-xs px-2 py-1 bg-muted rounded-full">
+              Max concurrent: {settings?.batchUpload?.maxConcurrent || 2}
+            </div>
+            <div className="text-xs px-2 py-1 bg-muted rounded-full">
+              Auto-start: {settings?.batchUpload?.autoStart ? "On" : "Off"}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Configure batch upload settings in the{" "}
+            <Button
+              variant="link"
+              className="h-auto p-0 text-xs"
+              onClick={() => navigate("/settings")}
+            >
+              Settings Page
+            </Button>
+          </p>
+        </div>
       </div>
-    </div>
     </>
   );
 }
