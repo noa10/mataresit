@@ -27,6 +27,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
+import { BackgroundUploadIndicator } from "@/components/upload/BackgroundUploadIndicator";
+import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
 import { Checkbox } from "@/components/ui/checkbox";
 import { deleteReceipt } from "@/services/receiptService";
 import { toast } from "sonner";
@@ -269,8 +271,19 @@ export default function Dashboard() {
     return (searchParams.get('view') as ViewMode) || (localStorage.getItem('dashboardViewMode') as ViewMode) || "grid";
   });
 
-  const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
+  const { openModal: openUploadModal, onUploadCompleteCallback } = useBackgroundUpload();
   const [isFiltersSheetOpen, setIsFiltersSheetOpen] = useState(false);
+
+  // Register the dashboard's refetch callback with the background upload context
+  // so that when background uploads complete, the receipt list auto-refreshes.
+  useEffect(() => {
+    onUploadCompleteCallback.current = () => {
+      // The refetch function will be available via closure once useQuery runs.
+      // We use queryClient.invalidateQueries as a more robust alternative.
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    };
+    return () => { onUploadCompleteCallback.current = null; };
+  }, [onUploadCompleteCallback, queryClient]);
 
   // Helper function to update search parameters
   const updateSearchParams = (newValues: { [key: string]: string | null }) => {
@@ -616,16 +629,16 @@ export default function Dashboard() {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <PlusCircle size={24} className="text-primary" />
           </div>
-                        <h3 className="text-xl font-medium mb-2">{tDash('empty.title')}</h3>
-              <p className="text-muted-foreground mb-6">
-                {tDash('empty.description')}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button onClick={() => setIsBatchUploadModalOpen(true)} className="gap-2">
-                  <PlusCircle size={16} />
-                  {tDash('upload.button')}
-                </Button>
-              </div>
+          <h3 className="text-xl font-medium mb-2">{tDash('empty.title')}</h3>
+          <p className="text-muted-foreground mb-6">
+            {tDash('empty.description')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={() => openUploadModal()} className="gap-2">
+              <PlusCircle size={16} />
+              {tDash('upload.button')}
+            </Button>
+          </div>
         </motion.div>
       );
     }
@@ -728,188 +741,184 @@ export default function Dashboard() {
       return (
         <div className="list-view-container overflow-x-auto overflow-y-visible">
           <div className="flex flex-col gap-3 min-w-full">
-          {processedReceipts.map((receipt, index) => {
-            const confidenceScore = calculateAggregateConfidence(receipt);
-            const isSelected = selectedReceiptIds.includes(receipt.id);
+            {processedReceipts.map((receipt, index) => {
+              const confidenceScore = calculateAggregateConfidence(receipt);
+              const isSelected = selectedReceiptIds.includes(receipt.id);
 
-            return (
-              <motion.div
-                key={receipt.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
-                className={`m-1 border rounded-lg overflow-visible relative z-10 bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''} min-w-0`}
-              >
-                {selectionMode ? (
-                  <div
-                    className="flex items-center p-2 md:p-4 gap-2 md:gap-4 cursor-pointer w-full md:min-w-max"
-                    onClick={() => handleSelectReceipt(receipt.id, !isSelected)}
-                  >
-                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                      <Checkbox
-                        checked={isSelected}
-                        size="sm"
-                        className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectReceipt(receipt.id, !isSelected);
-                        }}
-                      />
-                    </div>
-
-                    <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
-                      <img
-                        src={receipt.image_url || "/placeholder.svg"}
-                        alt={receipt.merchant}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder.svg";
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
-                        <div className="flex flex-col">
-                          <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
-                          {/* Confidence score below merchant name */}
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-xs text-muted-foreground">Confidence:</span>
-                            <TooltipProvider delayDuration={200}>
-                              <Tooltip onOpenChange={(open) => console.debug('[ListView SelectionMode ConfidenceTooltip] open change:', open)}>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`text-xs cursor-help font-medium ${
-                                      confidenceScore >= 80 ? 'text-green-600' :
-                                      confidenceScore >= 60 ? 'text-yellow-600' :
-                                      'text-red-600'
-                                    }`}
-                                    onMouseEnter={() => console.debug('[ListView SelectionMode ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
-                                  >
-                                    {confidenceScore}%
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent forceMount side="top" className="max-w-xs">
-                                  <div className="space-y-1">
-                                    <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {tReceipts('confidence.tooltip.description')}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {tReceipts('confidence.tooltip.range')}
-                                    </p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </div>
-                        <span className="font-semibold text-xs md:text-base whitespace-nowrap">
-                          {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
-                        </span>
+              return (
+                <motion.div
+                  key={receipt.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: 0.1 + index * 0.03 }}
+                  className={`m-1 border rounded-lg overflow-visible relative z-10 bg-card hover:bg-accent/5 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''} min-w-0`}
+                >
+                  {selectionMode ? (
+                    <div
+                      className="flex items-center p-2 md:p-4 gap-2 md:gap-4 cursor-pointer w-full md:min-w-max"
+                      onClick={() => handleSelectReceipt(receipt.id, !isSelected)}
+                    >
+                      <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                        <Checkbox
+                          checked={isSelected}
+                          size="sm"
+                          className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectReceipt(receipt.id, !isSelected);
+                          }}
+                        />
                       </div>
 
-                      <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span>{formatDate(receipt.date)}</span>
-                          {(() => {
-                            const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
-                            return <CategoryDisplay category={category} size="sm" />;
-                          })()}
-                        </div>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                            receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          }`}>
-                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                      <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
+                        <img
+                          src={receipt.image_url || "/placeholder.svg"}
+                          alt={receipt.merchant}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder.svg";
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex-grow min-w-0">
+                        <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
+                          <div className="flex flex-col">
+                            <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                            {/* Confidence score below merchant name */}
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-xs text-muted-foreground">Confidence:</span>
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip onOpenChange={(open) => console.debug('[ListView SelectionMode ConfidenceTooltip] open change:', open)}>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className={`text-xs cursor-help font-medium ${confidenceScore >= 80 ? 'text-green-600' :
+                                        confidenceScore >= 60 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}
+                                      onMouseEnter={() => console.debug('[ListView SelectionMode ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
+                                    >
+                                      {confidenceScore}%
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent forceMount side="top" className="max-w-xs">
+                                    <div className="space-y-1">
+                                      <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {tReceipts('confidence.tooltip.description')}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {tReceipts('confidence.tooltip.range')}
+                                      </p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                          <span className="font-semibold text-xs md:text-base whitespace-nowrap">
+                            {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <Link
-                    to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
-                    className="flex items-center p-2 md:p-4 gap-2 md:gap-4 min-w-max"
-                  >
-                    <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
-                      <img
-                        src={receipt.image_url || "/placeholder.svg"}
-                        alt={receipt.merchant}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder.svg";
-                        }}
-                      />
-                    </div>
 
-                    <div className="flex-grow min-w-0">
-                      <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
-                        <div className="flex flex-col">
-                          <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
-                          {/* Confidence score below merchant name */}
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-xs text-muted-foreground">Confidence:</span>
-                            <TooltipProvider delayDuration={200}>
-                              <Tooltip onOpenChange={(open) => console.debug('[ListView ConfidenceTooltip] open change:', open)}>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`text-xs cursor-help font-medium ${
-                                      confidenceScore >= 80 ? 'text-green-600' :
-                                      confidenceScore >= 60 ? 'text-yellow-600' :
-                                      'text-red-600'
-                                    }`}
-                                    onMouseEnter={() => console.debug('[ListView ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
-                                  >
-                                    {confidenceScore}%
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent forceMount side="top" className="max-w-xs">
-                                  <div className="space-y-1">
-                                    <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {tReceipts('confidence.tooltip.description')}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {tReceipts('confidence.tooltip.range')}
-                                    </p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                        <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span>{formatDate(receipt.date)}</span>
+                            {(() => {
+                              const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
+                              return <CategoryDisplay category={category} size="sm" />;
+                            })()}
+                          </div>
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                              receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              }`}>
+                              {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                            </span>
                           </div>
                         </div>
-                        <span className="font-semibold text-xs md:text-base whitespace-nowrap">
-                          {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span>{formatDate(receipt.date)}</span>
-                          {(() => {
-                            const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
-                            return <CategoryDisplay category={category} size="sm" />;
-                          })()}
-                        </div>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                            receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          }`}>
-                            {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
-                          </span>
-                        </div>
                       </div>
                     </div>
-                  </Link>
-                )}
-              </motion.div>
-            );
-          })}
+                  ) : (
+                    <Link
+                      to={`/receipt/${receipt.id}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
+                      className="flex items-center p-2 md:p-4 gap-2 md:gap-4 min-w-max"
+                    >
+                      <div className="w-8 h-8 md:w-12 md:h-12 rounded overflow-hidden flex-shrink-0">
+                        <img
+                          src={receipt.image_url || "/placeholder.svg"}
+                          alt={receipt.merchant}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder.svg";
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex-grow min-w-0">
+                        <div className="flex justify-between items-start gap-2 md:gap-4 min-w-max">
+                          <div className="flex flex-col">
+                            <h3 className="font-medium text-xs md:text-base whitespace-nowrap">{receipt.merchant}</h3>
+                            {/* Confidence score below merchant name */}
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-xs text-muted-foreground">Confidence:</span>
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip onOpenChange={(open) => console.debug('[ListView ConfidenceTooltip] open change:', open)}>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className={`text-xs cursor-help font-medium ${confidenceScore >= 80 ? 'text-green-600' :
+                                        confidenceScore >= 60 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}
+                                      onMouseEnter={() => console.debug('[ListView ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
+                                    >
+                                      {confidenceScore}%
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent forceMount side="top" className="max-w-xs">
+                                    <div className="space-y-1">
+                                      <p className="font-medium text-sm">{tReceipts('confidence.tooltip.title')}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {tReceipts('confidence.tooltip.description')}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {tReceipts('confidence.tooltip.range')}
+                                      </p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                          <span className="font-semibold text-xs md:text-base whitespace-nowrap">
+                            {formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR')}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1 gap-2 md:gap-4 min-w-max">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span>{formatDate(receipt.date)}</span>
+                            {(() => {
+                              const category = displayCategories.find(cat => cat.id === receipt.custom_category_id);
+                              return <CategoryDisplay category={category} size="sm" />;
+                            })()}
+                          </div>
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                              receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              }`}>
+                              {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       );
@@ -977,11 +986,10 @@ export default function Dashboard() {
                             <Tooltip onOpenChange={(open) => console.debug('[TableView ConfidenceTooltip] open change:', open)}>
                               <TooltipTrigger asChild>
                                 <span
-                                  className={`text-xs font-medium cursor-help ${
-                                    confidenceScore >= 80 ? 'text-green-600' :
+                                  className={`text-xs font-medium cursor-help ${confidenceScore >= 80 ? 'text-green-600' :
                                     confidenceScore >= 60 ? 'text-yellow-600' :
-                                    'text-red-600'
-                                  }`}
+                                      'text-red-600'
+                                    }`}
                                   onMouseEnter={() => console.debug('[TableView ConfidenceTooltip] mouse enter on trigger for receipt', receipt.id)}
                                 >
                                   {confidenceScore}%
@@ -1012,11 +1020,10 @@ export default function Dashboard() {
                       })()}
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${receipt.status === 'unreviewed' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                         receipt.status === 'reviewed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
+                          'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        }`}>
                         {receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1)}
                       </span>
                     </TableCell>
@@ -1042,11 +1049,10 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{tDash('title')}</h1>
               {subscriptionData?.tier && subscriptionData.tier !== 'free' && (
-                <Badge className={`${
-                  subscriptionData.tier === 'pro'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-purple-500 text-white'
-                } text-sm px-2 py-1`}>
+                <Badge className={`${subscriptionData.tier === 'pro'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-purple-500 text-white'
+                  } text-sm px-2 py-1`}>
                   {subscriptionData.tier === 'pro' ? (
                     <>
                       <Zap className="h-3 w-3 mr-1" />
@@ -1098,7 +1104,7 @@ export default function Dashboard() {
 
             <Button
               className="gap-2"
-              onClick={() => setIsBatchUploadModalOpen(true)}
+              onClick={() => openUploadModal()}
             >
               <Upload size={16} />
               Upload
@@ -1388,13 +1394,14 @@ export default function Dashboard() {
 
       {/* Batch Upload Modal - Now handles both single and batch uploads */}
       <BatchUploadModal
-        isOpen={isBatchUploadModalOpen}
-        onClose={() => setIsBatchUploadModalOpen(false)}
         onUploadComplete={() => {
           // Don't close the modal, just refresh the data
           refetch();
         }}
       />
+
+      {/* Floating indicator for background uploads */}
+      <BackgroundUploadIndicator />
 
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">
