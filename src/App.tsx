@@ -18,6 +18,7 @@ import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
 import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { SaveStatusProvider } from "@/contexts/SaveStatusContext";
+import { BackgroundUploadProvider } from "@/contexts/BackgroundUploadContext";
 import { SaveStatusToastManager } from "@/components/SaveStatusToastManager";
 import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
@@ -119,274 +120,276 @@ const App = () => (
             <TeamProvider>
               <StripeProvider>
                 <PersonalizationProvider>
-                  <BackgroundSearchProvider>
-                    <ChatControlsProvider>
-                      <NotificationProvider>
-                        <PushNotificationProvider>
-                          <SaveStatusProvider>
-                            <TooltipProvider>
-                              <Toaster />
-                              <Sonner />
-                              <SaveStatusToastManager />
-            {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
-            <BrowserRouter>
-          <Routes>
-            {/* Public Routes with Layout */}
-            <Route element={<PublicLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/pricing" element={
-                <Suspense fallback={<PageLoading />}>
-                  <PricingPage />
-                </Suspense>
-              } />
-              <Route path="/help" element={
-                <Suspense fallback={<PageLoading />}>
-                  <HelpCenter />
-                </Suspense>
-              } />
-              <Route path="/docs" element={
-                <Suspense fallback={<PageLoading />}>
-                  <NewDocumentationPage />
-                </Suspense>
-              } />
-              <Route path="/docs/guide/:guideId" element={
-                <Suspense fallback={<PageLoading />}>
-                  <GuideDetailPage />
-                </Suspense>
-              } />
-              <Route path="/docs/legacy" element={
-                <Suspense fallback={<PageLoading />}>
-                  <DocumentationPage />
-                </Suspense>
-              } />
-              <Route path="/api-reference" element={
-                <Suspense fallback={<PageLoading />}>
-                  <ApiReferencePage />
-                </Suspense>
-              } />
-              <Route path="/status" element={
-                <Suspense fallback={<PageLoading />}>
-                  <StatusPage />
-                </Suspense>
-              } />
-              <Route path="/blog" element={
-                <Suspense fallback={<PageLoading />}>
-                  <BlogIndexPage />
-                </Suspense>
-              } />
-              <Route path="/blog/:slug" element={
-                <Suspense fallback={<PageLoading />}>
-                  <BlogPostPage />
-                </Suspense>
-              } />
-              <Route path="/payment-success" element={
-                <Suspense fallback={<PageLoading />}>
-                  <PaymentSuccessPage />
-                </Suspense>
-              } />
-              <Route path="/features" element={
-                <Suspense fallback={<PageLoading />}>
-                  <FeaturesPage />
-                </Suspense>
-              } />
-              <Route path="/privacy-policy" element={
-                <Suspense fallback={<PageLoading />}>
-                  <PrivacyPolicyPage />
-                </Suspense>
-              } />
-              <Route path="/terms-conditions" element={
-                <Suspense fallback={<PageLoading />}>
-                  <TermsConditionsPage />
-                </Suspense>
-              } />
-            </Route>
+                  <BackgroundUploadProvider>
+                    <BackgroundSearchProvider>
+                      <ChatControlsProvider>
+                        <NotificationProvider>
+                          <PushNotificationProvider>
+                            <SaveStatusProvider>
+                              <TooltipProvider>
+                                <Toaster />
+                                <Sonner />
+                                <SaveStatusToastManager />
+                                {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
+                                <BrowserRouter>
+                                  <Routes>
+                                    {/* Public Routes with Layout */}
+                                    <Route element={<PublicLayout />}>
+                                      <Route path="/" element={<Index />} />
+                                      <Route path="/pricing" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <PricingPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/help" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <HelpCenter />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/docs" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <NewDocumentationPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/docs/guide/:guideId" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <GuideDetailPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/docs/legacy" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <DocumentationPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/api-reference" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <ApiReferencePage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/status" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <StatusPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/blog" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <BlogIndexPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/blog/:slug" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <BlogPostPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/payment-success" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <PaymentSuccessPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/features" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <FeaturesPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/privacy-policy" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <PrivacyPolicyPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/terms-conditions" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <TermsConditionsPage />
+                                        </Suspense>
+                                      } />
+                                    </Route>
 
-            {/* Auth Routes (no layout) */}
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/auth/reset-password" element={<AuthCallback />} />
-            <Route path="/auth/debug" element={
-              <Suspense fallback={<PageLoading />}>
-                <AuthDebugPage />
-              </Suspense>
-            } />
+                                    {/* Auth Routes (no layout) */}
+                                    <Route path="/auth" element={<Auth />} />
+                                    <Route path="/auth/callback" element={<AuthCallback />} />
+                                    <Route path="/auth/reset-password" element={<AuthCallback />} />
+                                    <Route path="/auth/debug" element={
+                                      <Suspense fallback={<PageLoading />}>
+                                        <AuthDebugPage />
+                                      </Suspense>
+                                    } />
 
-            {/* Team Invitation Route (no layout) */}
-            <Route path="/invite/:token" element={
-              <Suspense fallback={<PageLoading />}>
-                <TeamInvitation />
-              </Suspense>
-            } />
+                                    {/* Team Invitation Route (no layout) */}
+                                    <Route path="/invite/:token" element={
+                                      <Suspense fallback={<PageLoading />}>
+                                        <TeamInvitation />
+                                      </Suspense>
+                                    } />
 
-            <Route path="*" element={<NotFound />} />
+                                    <Route path="*" element={<NotFound />} />
 
-            {/* Protected Routes - Require Authentication */}
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <Dashboard />
-                  </Suspense>
-                } />
-                <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/settings" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <SettingsPage />
-                  </Suspense>
-                } />
-                <Route path="/account/billing" element={<Navigate to="/settings?tab=billing" replace />} />
-                <Route path="/performance-test" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <PerformanceTestPage />
-                  </Suspense>
-                } />
-                <Route path="/async-save-test" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AsyncSaveTestPage />
-                  </Suspense>
-                } />
-                <Route path="/receipt/:id" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ViewReceipt />
-                  </Suspense>
-                } />
-                <Route path="/profile" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <Profile />
-                  </Suspense>
-                } />
-                <Route path="/analysis" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AnalysisPage />
-                  </Suspense>
-                } />
-                <Route path="/search" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <SemanticSearch />
-                  </Suspense>
-                } />
-                <Route path="/unified-search" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <UnifiedSearchPage />
-                  </Suspense>
-                } />
-                <Route path="/teams" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TeamManagement />
-                  </Suspense>
-                } />
-                <Route path="/claims" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ClaimsManagement />
-                  </Suspense>
-                } />
-                <Route path="/claims/:claimId" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ClaimDetailsPage />
-                  </Suspense>
-                } />
-                <Route path="/test/ui-components" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <UIComponentTest />
-                  </Suspense>
-                } />
-                <Route path="/test/cache" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <CacheTest />
-                  </Suspense>
-                } />
-                <Route path="/test/integration" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <PersonalizationIntegrationTest />
-                  </Suspense>
-                } />
-                <Route path="/test/notifications" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <NotificationTestingPage />
-                  </Suspense>
-                } />
-                <Route path="/test/notification-filtering" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <NotificationFilteringTestPage />
-                  </Suspense>
-                } />
+                                    {/* Protected Routes - Require Authentication */}
+                                    <Route element={<ProtectedRoute />}>
+                                      <Route element={<AppLayout />}>
+                                        <Route path="/dashboard" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <Dashboard />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
+                                        <Route path="/settings" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <SettingsPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/account/billing" element={<Navigate to="/settings?tab=billing" replace />} />
+                                        <Route path="/performance-test" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <PerformanceTestPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/async-save-test" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <AsyncSaveTestPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/receipt/:id" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <ViewReceipt />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/profile" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <Profile />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/analysis" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <AnalysisPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/search" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <SemanticSearch />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/unified-search" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <UnifiedSearchPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/teams" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <TeamManagement />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/claims" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <ClaimsManagement />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/claims/:claimId" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <ClaimDetailsPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/ui-components" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <UIComponentTest />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/cache" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <CacheTest />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/integration" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <PersonalizationIntegrationTest />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/notifications" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <NotificationTestingPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/notification-filtering" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <NotificationFilteringTestPage />
+                                          </Suspense>
+                                        } />
 
-                <Route path="/test/enhanced-search" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <TestEnhancedSearch />
-                  </Suspense>
-                } />
-                <Route path="/test/batch-session-service" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <BatchSessionServiceTestPage />
-                  </Suspense>
-                } />
-                <Route path="/test/batch-upload" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <BatchUploadTestPage />
-                  </Suspense>
-                } />
-                <Route path="/test/component-fixes" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ComponentFixTestPage />
-                  </Suspense>
-                } />
+                                        <Route path="/test/enhanced-search" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <TestEnhancedSearch />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/batch-session-service" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <BatchSessionServiceTestPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/batch-upload" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <BatchUploadTestPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="/test/component-fixes" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <ComponentFixTestPage />
+                                          </Suspense>
+                                        } />
 
-              </Route>
-            </Route>
+                                      </Route>
+                                    </Route>
 
-            {/* Admin Routes - Require Admin Role */}
-            <Route element={<AdminRoute />}>
-              <Route path="/admin" element={
-                <Suspense fallback={<PageLoading />}>
-                  <AdminLayoutPage />
-                </Suspense>
-              }>
-                <Route index element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AdminDashboard />
-                  </Suspense>
-                } />
-                <Route path="users" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <UsersManagement />
-                  </Suspense>
-                } />
-                <Route path="receipts" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <ReceiptsManagement />
-                  </Suspense>
-                } />
-                <Route path="analytics" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AnalyticsPage />
-                  </Suspense>
-                } />
-                <Route path="embedding-metrics" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <EmbeddingMetricsPage />
-                  </Suspense>
-                } />
-                <Route path="blog" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <BlogManagement />
-                  </Suspense>
-                } />
-                <Route path="settings" element={
-                  <Suspense fallback={<PageLoading />}>
-                    <AdminSettingsPage />
-                  </Suspense>
-                } />
-              </Route>
-            </Route>
-          </Routes>
-          </BrowserRouter>
-                            </TooltipProvider>
-                          </SaveStatusProvider>
-                        </PushNotificationProvider>
-                      </NotificationProvider>
-                    </ChatControlsProvider>
-                  </BackgroundSearchProvider>
+                                    {/* Admin Routes - Require Admin Role */}
+                                    <Route element={<AdminRoute />}>
+                                      <Route path="/admin" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <AdminLayoutPage />
+                                        </Suspense>
+                                      }>
+                                        <Route index element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <AdminDashboard />
+                                          </Suspense>
+                                        } />
+                                        <Route path="users" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <UsersManagement />
+                                          </Suspense>
+                                        } />
+                                        <Route path="receipts" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <ReceiptsManagement />
+                                          </Suspense>
+                                        } />
+                                        <Route path="analytics" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <AnalyticsPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="embedding-metrics" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <EmbeddingMetricsPage />
+                                          </Suspense>
+                                        } />
+                                        <Route path="blog" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <BlogManagement />
+                                          </Suspense>
+                                        } />
+                                        <Route path="settings" element={
+                                          <Suspense fallback={<PageLoading />}>
+                                            <AdminSettingsPage />
+                                          </Suspense>
+                                        } />
+                                      </Route>
+                                    </Route>
+                                  </Routes>
+                                </BrowserRouter>
+                              </TooltipProvider>
+                            </SaveStatusProvider>
+                          </PushNotificationProvider>
+                        </NotificationProvider>
+                      </ChatControlsProvider>
+                    </BackgroundSearchProvider>
+                  </BackgroundUploadProvider>
                 </PersonalizationProvider>
               </StripeProvider>
             </TeamProvider>
