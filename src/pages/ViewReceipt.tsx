@@ -12,6 +12,19 @@ import { toast } from "sonner";
 import { formatCurrencySafe } from "@/utils/currency";
 import { useEffect, useState, useCallback } from "react";
 
+const DASHBOARD_PARAM_KEYS = [
+  "q",
+  "tab",
+  "currency",
+  "category",
+  "sort",
+  "page",
+  "limit",
+  "from",
+  "to",
+  "view"
+] as const;
+
 export default function ViewReceipt() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -24,7 +37,20 @@ export default function ViewReceipt() {
   // Track if we have history to go back to
   const [canGoBack, setCanGoBack] = useState(false);
 
+  const getDashboardPathWithFilters = useCallback(() => {
+    const currentParams = new URLSearchParams(location.search);
+    const dashboardParams = new URLSearchParams();
 
+    DASHBOARD_PARAM_KEYS.forEach((key) => {
+      const value = currentParams.get(key);
+      if (value) {
+        dashboardParams.set(key, value);
+      }
+    });
+
+    const queryString = dashboardParams.toString();
+    return queryString ? `/dashboard?${queryString}` : "/dashboard";
+  }, [location.search]);
 
   // Determine if there's a history entry to go back to
   useEffect(() => {
@@ -40,9 +66,9 @@ export default function ViewReceipt() {
       navigate(-1);
     } else {
       // Fallback to dashboard if no history (direct access/bookmark)
-      navigate("/dashboard");
+      navigate(getDashboardPathWithFilters());
     }
-  }, [canGoBack, navigate]);
+  }, [canGoBack, navigate, getDashboardPathWithFilters]);
 
   const { data: receipt, isLoading, error } = useQuery({
     queryKey: ['receipt', id, currentTeam?.id], // Include team context in cache key
@@ -59,7 +85,7 @@ export default function ViewReceipt() {
         toast.success("Receipt deleted successfully");
         // Invalidate the receipts query to refresh the dashboard data
         queryClient.invalidateQueries({ queryKey: ['receipts'] });
-        navigate("/dashboard");
+        navigate(getDashboardPathWithFilters());
       }
     },
     onError: (error) => {
@@ -168,7 +194,7 @@ export default function ViewReceipt() {
               toast.success("Receipt deleted successfully");
               // Invalidate the receipts query to refresh the dashboard data
               queryClient.invalidateQueries({ queryKey: ['receipts'] });
-              navigate("/dashboard");
+              navigate(getDashboardPathWithFilters());
             }}
           />
         </motion.div>
