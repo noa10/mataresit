@@ -71,6 +71,29 @@ const categories: CustomCategory[] = [
   },
 ];
 
+const payers = [
+  {
+    id: "payer-team",
+    user_id: "user-1",
+    name: "Company",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    receipt_count: 15,
+    team_id: "team-1",
+    is_team_payer: true,
+  },
+  {
+    id: "payer-personal",
+    user_id: "user-1",
+    name: "Personal",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    receipt_count: 8,
+    team_id: null,
+    is_team_payer: false,
+  },
+];
+
 const baseProps = {
   open: true,
   onOpenChange: vi.fn(),
@@ -80,8 +103,11 @@ const baseProps = {
   onCurrencyChange: vi.fn(),
   filterByCategory: null,
   onCategoryChange: vi.fn(),
+  filterByPayer: null,
+  onPayerChange: vi.fn(),
   currencies: ["MYR", "USD"],
   categories,
+  payers,
   dateRange: undefined,
   onDateRangeChange: vi.fn(),
   onResetFilters: vi.fn(),
@@ -145,9 +171,12 @@ describe("ReceiptFiltersSheet", () => {
 
     render(<ReceiptFiltersSheet {...baseProps} onCategoryChange={onCategoryChange} />);
 
-    const teamSection = screen.getByText("Team").closest("div");
-    expect(teamSection).toBeTruthy();
-    await user.click(within(teamSection as HTMLElement).getByRole("button", { name: "Category: Groceries" }));
+    // Find all "Team" sections and select the first one (which should be categories)
+    const teamSections = screen.getAllByText("Team");
+    expect(teamSections.length).toBeGreaterThan(0);
+    const categoryTeamSection = teamSections[0].closest("div");
+    expect(categoryTeamSection).toBeTruthy();
+    await user.click(within(categoryTeamSection as HTMLElement).getByRole("button", { name: "Category: Groceries" }));
 
     expect(onCategoryChange).toHaveBeenCalledWith("cat-team");
   });

@@ -159,6 +159,7 @@ export interface ReceiptListParams {
   status?: "all" | ReceiptStatus;
   currency?: string | null;
   categoryId?: string | null;
+  paidById?: string | null;
   fromDate?: string | null;
   toDate?: string | null;
   sortOrder?: ReceiptSortOrder;
@@ -254,6 +255,12 @@ export const fetchReceiptsPage = async (
     query = query.is("custom_category_id", null);
   } else if (params.categoryId) {
     query = query.eq("custom_category_id", params.categoryId);
+  }
+
+  if (params.paidById === "unassigned") {
+    query = query.is("paid_by_id", null);
+  } else if (params.paidById) {
+    query = query.eq("paid_by_id", params.paidById);
   }
 
   if (params.fromDate) {
@@ -1076,6 +1083,46 @@ const isOpenRouterModel = (modelId: string): boolean => {
 const isGeminiModel = (modelId: string): boolean => {
   const modelConfig = getModelConfig(modelId);
   return !!modelConfig && modelConfig.provider === 'gemini';
+};
+
+// Helper function to check if a model is a Kilo Gateway model
+const isKiloModel = (modelId: string): boolean => {
+  const modelConfig = getModelConfig(modelId);
+  return !!modelConfig && modelConfig.provider === 'kilo';
+};
+
+// Helper function to check if a model is an OpenCode Zen model
+const isOpenCodeModel = (modelId: string): boolean => {
+  const modelConfig = getModelConfig(modelId);
+  return !!modelConfig && modelConfig.provider === 'opencode';
+};
+
+// Helper function to get user's Kilo Gateway API key from settings
+const getKiloApiKey = (): string | null => {
+  try {
+    const storedSettings = localStorage.getItem('receiptProcessingSettings');
+    if (storedSettings) {
+      const settings = JSON.parse(storedSettings);
+      return settings.userApiKeys?.kilo || null;
+    }
+  } catch (error) {
+    console.error('Error reading Kilo API key from settings:', error);
+  }
+  return null;
+};
+
+// Helper function to get user's OpenCode Zen API key from settings
+const getOpenCodeApiKey = (): string | null => {
+  try {
+    const storedSettings = localStorage.getItem('receiptProcessingSettings');
+    if (storedSettings) {
+      const settings = JSON.parse(storedSettings);
+      return settings.userApiKeys?.opencode || null;
+    }
+  } catch (error) {
+    console.error('Error reading OpenCode Zen API key from settings:', error);
+  }
+  return null;
 };
 
 // Helper function to get user's OpenRouter API key from settings

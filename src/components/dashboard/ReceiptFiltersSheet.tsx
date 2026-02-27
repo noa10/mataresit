@@ -15,7 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { CustomCategory } from "@/types/receipt";
+import { CustomCategory, PaidBy } from "@/types/receipt";
 import { cn } from "@/lib/utils";
 
 type SortOrder = "newest" | "oldest" | "highest" | "lowest";
@@ -29,8 +29,11 @@ interface ReceiptFiltersSheetProps {
   onCurrencyChange: (value: string | null) => void;
   filterByCategory: string | null;
   onCategoryChange: (value: string | null) => void;
+  filterByPayer: string | null;
+  onPayerChange: (value: string | null) => void;
   currencies: string[];
   categories: CustomCategory[];
+  payers: PaidBy[];
   dateRange: DateRange | undefined;
   onDateRangeChange: (range: DateRange | undefined) => void;
   onResetFilters: () => void;
@@ -75,8 +78,11 @@ export function ReceiptFiltersSheet({
   onCurrencyChange,
   filterByCategory,
   onCategoryChange,
+  filterByPayer,
+  onPayerChange,
   currencies,
   categories,
+  payers,
   dateRange,
   onDateRangeChange,
   onResetFilters,
@@ -414,6 +420,121 @@ export function ReceiptFiltersSheet({
                 {!hasGroupedCategories && (
                   <p className="rounded-xl border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
                     {tDash("filtersSheet.noCategories")}
+                  </p>
+                )}
+              </div>
+            </motion.section>
+
+            <motion.section {...sectionMotion} transition={{ duration: 0.22, delay: 0.16 }} className="rounded-2xl border border-border/60 bg-card/50 p-4 backdrop-blur-sm">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">{tDash("filters.paidBy")}</h3>
+
+              <div className="mb-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  aria-label={tDash("filtersSheet.aria.paidByAll")}
+                  className={cn(
+                    optionButtonBase,
+                    !filterByPayer
+                      ? "border-primary/55 bg-primary/15 text-foreground"
+                      : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                  )}
+                  onClick={() => onPayerChange(null)}
+                >
+                  {tDash("filtersSheet.all")}
+                </button>
+                <button
+                  type="button"
+                  aria-label={tDash("filtersSheet.aria.paidByUnassigned")}
+                  className={cn(
+                    optionButtonBase,
+                    filterByPayer === "unassigned"
+                      ? "border-primary/55 bg-primary/15 text-foreground"
+                      : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                  )}
+                  onClick={() => onPayerChange("unassigned")}
+                >
+                  {tDash("filtersSheet.unassigned")}
+                </button>
+              </div>
+
+              <div className="max-h-[300px] space-y-3 overflow-y-auto pr-1">
+                {payers.length > 0 ? (
+                  <>
+                    {payers.filter(payer => payer.is_team_payer).length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {tDash("filtersSheet.groups.team")}
+                        </p>
+                        <div className="space-y-1.5">
+                          {payers.filter(payer => payer.is_team_payer).map((payer) => {
+                            const selected = filterByPayer === payer.id;
+
+                            return (
+                              <button
+                                key={payer.id}
+                                type="button"
+                                aria-label={`${tDash("filters.paidBy")}: ${payer.name}`}
+                                className={cn(
+                                  "flex w-full min-h-10 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                  selected
+                                    ? "border-primary/55 bg-primary/15 text-foreground"
+                                    : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                                )}
+                                onClick={() => onPayerChange(payer.id)}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{payer.name}</span>
+                                </span>
+                                <span className="flex items-center gap-2 text-xs">
+                                  {payer.receipt_count ?? 0}
+                                  {selected && <Check className="h-4 w-4" />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {payers.filter(payer => !payer.is_team_payer).length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {tDash("filtersSheet.groups.personal")}
+                        </p>
+                        <div className="space-y-1.5">
+                          {payers.filter(payer => !payer.is_team_payer).map((payer) => {
+                            const selected = filterByPayer === payer.id;
+
+                            return (
+                              <button
+                                key={payer.id}
+                                type="button"
+                                aria-label={`${tDash("filters.paidBy")}: ${payer.name}`}
+                                className={cn(
+                                  "flex w-full min-h-10 items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                  selected
+                                    ? "border-primary/55 bg-primary/15 text-foreground"
+                                    : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                                )}
+                                onClick={() => onPayerChange(payer.id)}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{payer.name}</span>
+                                </span>
+                                <span className="flex items-center gap-2 text-xs">
+                                  {payer.receipt_count ?? 0}
+                                  {selected && <Check className="h-4 w-4" />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-border/70 px-3 py-4 text-sm text-muted-foreground">
+                    {tDash("filtersSheet.noPayers")}
                   </p>
                 )}
               </div>

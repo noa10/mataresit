@@ -23,6 +23,7 @@
     "amount": "Jumlah",
     "currency": "Mata Wang",
     "status": "Status",
+    "paidBy": "Dibayar Oleh",
     "search": "Cari resit...",
     "clear": "Kosongkan Penapis",
     "apply": "Gunakan Penapis"
@@ -56,8 +57,12 @@
       "currencyAll": "Tunjukkan semua mata wang",
       "categorySearch": "Cari kategori",
       "categoryAll": "Tunjukkan semua kategori",
-      "categoryUncategorized": "Tunjukkan resit tidak dikategorikan"
-    }
+      "categoryUncategorized": "Tunjukkan resit tidak dikategorikan",
+      "paidByAll": "Tunjukkan semua pembayar",
+      "paidByUnassigned": "Tunjukkan resit tidak ditetapkan"
+    },
+    "unassigned": "Tidak Ditetapkan",
+    "noPayers": "Tiada pembayar dijumpai"
   },
   "stats": {
     "totalReceipts": "Jumlah Resit",

@@ -218,6 +218,10 @@ const formatFiltersForPDF = (filters: ExportFilters): string => {
     parts.push(`Category: ${filters.filterByCategory}`);
   }
 
+  if (filters.filterByPayer) {
+    parts.push(`Paid By: ${filters.filterByPayer}`);
+  }
+
   if (filters.dateRange?.from) {
     const fromDate = format(filters.dateRange.from, 'yyyy-MM-dd');
     const toDate = filters.dateRange.to ? format(filters.dateRange.to, 'yyyy-MM-dd') : 'now';

@@ -36,6 +36,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { format, isValid, parseISO } from "date-fns";
 import { fetchUserCategories, fetchCategoriesForDisplay, bulkAssignCategory } from "@/services/categoryService";
+import { fetchUserPayers } from "@/services/paidByService";
 import { CategorySelector, CategoryDisplay } from "@/components/categories/CategorySelector";
 import { formatCurrencySafe } from "@/utils/currency";
 import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet";
@@ -149,6 +150,9 @@ export default function Dashboard() {
   );
   const [filterByCategory, setFilterByCategory] = useState<string | null>(
     searchParams.get('category') || null
+  );
+  const [filterByPayer, setFilterByPayer] = useState<string | null>(
+    searchParams.get('paidBy') || null
   );
   const sortParam = searchParams.get('sort');
   const initialSortOrder: "newest" | "oldest" | "highest" | "lowest" =
@@ -357,6 +361,7 @@ export default function Dashboard() {
       activeTab,
       filterByCurrency,
       filterByCategory,
+      filterByPayer,
       sortOrder,
       fromDate,
       toDate,
@@ -368,6 +373,7 @@ export default function Dashboard() {
           limit,
           searchQuery,
           status: activeTab,
+          paidById: filterByPayer,
           currency: filterByCurrency,
           categoryId: filterByCategory,
           sortOrder: sortOrder as ReceiptSortOrder,
@@ -397,6 +403,12 @@ export default function Dashboard() {
   const { data: currencies = [] } = useQuery({
     queryKey: ["receiptCurrencies", currentTeam?.id ?? null],
     queryFn: () => fetchReceiptCurrencies({ currentTeam }),
+    enabled: !!user,
+  });
+
+  const { data: payers = [] } = useQuery({
+    queryKey: ["payers", currentTeam?.id ?? null],
+    queryFn: () => fetchUserPayers({ currentTeam }),
     enabled: !!user,
   });
 
@@ -487,15 +499,22 @@ export default function Dashboard() {
     resetPageAndSync({ category: value });
   };
 
+  const handlePayerFilterChange = (value: string | null) => {
+    setFilterByPayer(value);
+    resetPageAndSync({ paidBy: value });
+  };
+
   const resetFilterControls = () => {
     setFilterByCurrency(null);
     setFilterByCategory(null);
+    setFilterByPayer(null);
     setSortOrder("newest");
     setDateRange(undefined);
     updateSearchParams({
       sort: null,
       currency: null,
       category: null,
+      paidBy: null,
       from: null,
       to: null,
       page: "1",
@@ -509,6 +528,7 @@ export default function Dashboard() {
     setActiveTab("all");
     setFilterByCurrency(null);
     setFilterByCategory(null);
+    setFilterByPayer(null);
     setSortOrder("newest");
     setDateRange(undefined);
     setPage(1);
@@ -527,6 +547,7 @@ export default function Dashboard() {
     (sortOrder !== "newest" ? 1 : 0) +
     (filterByCurrency ? 1 : 0) +
     (filterByCategory ? 1 : 0) +
+    (filterByPayer ? 1 : 0) +
     (dateRange?.from ? 1 : 0);
 
   const categoryFilterLabel = filterByCategory === "uncategorized"
@@ -539,6 +560,7 @@ export default function Dashboard() {
     activeTab: activeTab !== 'all' ? activeTab : undefined,
     filterByCurrency: filterByCurrency || undefined,
     filterByCategory: filterByCategory || undefined,
+    filterByPayer: filterByPayer || undefined,
     sortOrder: sortOrder !== 'newest' ? sortOrder : undefined,
     dateRange: dateRange || undefined
   };
@@ -559,6 +581,7 @@ export default function Dashboard() {
           status: activeTab,
           currency: filterByCurrency,
           categoryId: filterByCategory,
+          paidById: filterByPayer,
           sortOrder: sortOrder as ReceiptSortOrder,
           fromDate,
           toDate,
@@ -1366,8 +1389,11 @@ export default function Dashboard() {
           onCurrencyChange={handleCurrencyFilterChange}
           filterByCategory={filterByCategory}
           onCategoryChange={handleCategoryFilterChange}
+          filterByPayer={filterByPayer}
+          onPayerChange={handlePayerFilterChange}
           currencies={currencies}
           categories={categories}
+          payers={payers}
           dateRange={dateRange}
           onDateRangeChange={handleDateRangeChange}
           onResetFilters={resetFilterControls}

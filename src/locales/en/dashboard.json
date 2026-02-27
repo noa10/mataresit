@@ -23,6 +23,7 @@
     "amount": "Amount",
     "currency": "Currency",
     "status": "Status",
+    "paidBy": "Paid By",
     "search": "Search receipts...",
     "clear": "Clear Filters",
     "apply": "Apply Filters"
@@ -56,8 +57,12 @@
       "currencyAll": "Show all currencies",
       "categorySearch": "Search categories",
       "categoryAll": "Show all categories",
-      "categoryUncategorized": "Show uncategorized receipts"
-    }
+      "categoryUncategorized": "Show uncategorized receipts",
+      "paidByAll": "Show all payers",
+      "paidByUnassigned": "Show unassigned receipts"
+    },
+    "unassigned": "Unassigned",
+    "noPayers": "No payers found"
   },
   "stats": {
     "totalReceipts": "Total Receipts",

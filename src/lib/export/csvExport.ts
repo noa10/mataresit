@@ -6,6 +6,7 @@ export interface ExportFilters {
   activeTab?: string;
   filterByCurrency?: string;
   filterByCategory?: string;
+  filterByPayer?: string;
   sortOrder?: string;
   dateRange?: {
     from?: Date;
@@ -108,6 +109,10 @@ export const generateFilterInfo = (filters?: ExportFilters): string => {
 
   if (filters.filterByCategory) {
     parts.push(`category-${filters.filterByCategory}`);
+  }
+
+  if (filters.filterByPayer) {
+    parts.push(`paidBy-${filters.filterByPayer}`);
   }
 
   if (filters.dateRange?.from) {
