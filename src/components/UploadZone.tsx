@@ -672,14 +672,14 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           console.log('🔄 Using comprehensive cache invalidation after upload completion');
           await CacheInvalidationService.invalidateReceipts(user.id, currentTeam?.id);
           onUploadComplete();
-          if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
+          if (currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 1000); // Increased delay to ensure database consistency
       } else {
         setTimeout(async () => {
           // Use comprehensive cache invalidation service
           console.log('🔄 Using comprehensive cache invalidation after upload completion');
           await CacheInvalidationService.invalidateReceipts(user.id, currentTeam?.id);
-          if(currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
+          if (currentStage !== 'ERROR') navigate(`/receipt/${newReceiptId}`);
         }, 1000); // Increased delay to ensure database consistency
       }
     } catch (error: unknown) {
@@ -747,7 +747,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   return (
     <div className="w-full h-full grid grid-rows-[1fr_auto] gap-2 sm:gap-4 p-2 sm:p-4">
       <div
-        className={`relative w-full flex flex-col rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
+        className={`relative w-full min-h-0 flex flex-col rounded-md p-3 sm:p-6 border-2 border-dashed transition-all duration-300 ${getBorderStyle()}`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -758,24 +758,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         aria-label="Upload receipt files: JPEG, PNG, or PDF (up to 5MB)"
         aria-describedby="upload-zone-description upload-status"
       >
-      <input
-        type="file"
-        className="hidden"
-        ref={fileInputRef}
-        onChange={handleFileInputChange}
-        multiple
-        accept="image/jpeg,image/png,application/pdf"
-        aria-hidden="true"
-      />
+        <input
+          type="file"
+          className="hidden"
+          ref={fileInputRef}
+          onChange={handleFileInputChange}
+          multiple
+          accept="image/jpeg,image/png,application/pdf"
+          aria-hidden="true"
+        />
 
-      <div
-        id="upload-status"
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
-      </div>
+        <div
+          id="upload-status"
+          className="sr-only"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {isUploading ? 'Uploading receipt files' : 'Ready to upload receipt files'}
+        </div>
 
         <div className="flex flex-col h-full overflow-hidden">
           {/* Header Section */}
@@ -785,9 +785,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className={`relative rounded-full p-3 sm:p-4 ${
-                isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
-              }`}
+              className={`relative rounded-full p-3 sm:p-4 ${isDragging ? "bg-primary/10" : (isUploading ? "bg-secondary/80" : "bg-secondary")
+                }`}
             >
               {isUploading ? (
                 <Loader2 size={24} className="sm:w-8 sm:h-8 text-primary animate-spin" />
@@ -833,7 +832,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           </div>
 
           {/* Content Section - Scrollable */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-0 overflow-y-auto px-4">
+          <div className={`flex-1 flex flex-col items-center gap-4 min-h-0 overflow-y-auto px-4 py-2 ${receiptUploads.length > 0 || isUploading ? "justify-start" : "justify-center"}`}>
 
             <AnimatePresence>
               {receiptUploads.length > 0 && !isUploading && !error && (

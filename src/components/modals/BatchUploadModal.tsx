@@ -80,9 +80,9 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
 
           <TabsContent
             value="single"
-            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden"
+            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-y-auto overflow-x-hidden"
           >
-            <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
+            <div className="flex-grow min-h-0 h-full overflow-x-hidden overflow-y-auto">
               <UploadZone
                 onUploadComplete={handleUploadComplete}
               />
