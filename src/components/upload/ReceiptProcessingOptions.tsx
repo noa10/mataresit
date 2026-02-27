@@ -21,6 +21,18 @@ const PROVIDER_INFO = {
     description: 'Access to multiple AI providers',
     icon: '🌐',
     color: 'bg-purple-100 text-purple-800'
+  },
+  kilo: {
+    name: 'Kilo Gateway',
+    description: 'Unified API for hundreds of AI models',
+    icon: '⚡',
+    color: 'bg-orange-100 text-orange-800'
+  },
+  opencode: {
+    name: 'OpenCode Zen',
+    description: 'Curated models from OpenCode',
+    icon: '✨',
+    color: 'bg-indigo-100 text-indigo-800'
   }
 };
 

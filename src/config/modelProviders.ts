@@ -3,7 +3,7 @@
  * Supports Google Gemini, OpenRouter, and other AI model providers
  */
 
-export type ModelProvider = 'gemini' | 'openrouter';
+export type ModelProvider = 'gemini' | 'openrouter' | 'kilo' | 'opencode';
 
 export interface ModelConfig {
   id: string;
@@ -407,6 +407,328 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       supportedFormats: ['image/jpeg', 'image/png'],
       contextWindow: 8192
     }
+  },
+
+  // Additional OpenRouter Free Vision Models (Updated 2024)
+  'openrouter/google/gemini-2.5-flash-preview-05-20:free': {
+    id: 'openrouter/google/gemini-2.5-flash-preview-05-20:free',
+    name: 'Gemini 2.5 Flash Preview',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google\'s latest Gemini 2.5 Flash preview with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'excellent',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 1000000
+    }
+  },
+  'openrouter/meta-llama/llama-3.2-11b-vision-instruct:free': {
+    id: 'openrouter/meta-llama/llama-3.2-11b-vision-instruct:free',
+    name: 'Llama 3.2 11B Vision',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Meta\'s Llama 3.2 11B with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.87
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
+  },
+  'openrouter/qwen/qwen-2.5-72b-instruct:free': {
+    id: 'openrouter/qwen/qwen-2.5-72b-instruct:free',
+    name: 'Qwen 2.5 72B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false,
+    description: 'Qwen 2.5 72B instruct model - excellent for text analysis (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 0,
+      supportedFormats: [],
+      contextWindow: 32768
+    }
+  },
+  'openrouter/deepseek/deepseek-chat-v3-0324:free': {
+    id: 'openrouter/deepseek/deepseek-chat-v3-0324:free',
+    name: 'DeepSeek Chat V3',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: false,
+    description: 'DeepSeek V3 chat model - strong reasoning capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'excellent',
+      reliability: 0.89
+    },
+    capabilities: {
+      maxImageSize: 0,
+      supportedFormats: [],
+      contextWindow: 64000
+    }
+  },
+
+  // ==========================================
+  // Kilo Gateway Models (Vision-Capable)
+  // ==========================================
+  'kilo/google/gemma-3-27b-it': {
+    id: 'kilo/google/gemma-3-27b-it',
+    name: 'Gemma 3 27B Instruct',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google Gemma 3 27B with vision capabilities (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
+  'kilo/qwen/qwen2.5-vl-72b-instruct': {
+    id: 'kilo/qwen/qwen2.5-vl-72b-instruct',
+    name: 'Qwen 2.5 VL 72B Instruct',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Qwen 2.5 Vision-Language 72B model (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 32768
+    }
+  },
+  'kilo/moonshotai/kimi-k2.5': {
+    id: 'kilo/moonshotai/kimi-k2.5',
+    name: 'Kimi K2.5',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Moonshot Kimi K2.5 with vision capabilities (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
+  },
+
+  // ==========================================
+  // OpenCode Zen Models (Free Vision-Capable)
+  // ==========================================
+  'opencode/gpt-5-nano': {
+    id: 'opencode/gpt-5-nano',
+    name: 'GPT 5 Nano',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: false,
+    description: 'OpenAI GPT 5 Nano (chat-completions path used as text-only for stability)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.95
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/kimi-k2.5-free': {
+    id: 'opencode/kimi-k2.5-free',
+    name: 'Kimi K2.5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Moonshot AI Kimi K2.5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.92
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
+  },
+  'opencode/minimax-m2.5-free': {
+    id: 'opencode/minimax-m2.5-free',
+    name: 'MiniMax M2.5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'MiniMax M2.5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/glm-5-free': {
+    id: 'opencode/glm-5-free',
+    name: 'GLM 5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Zhipu AI GLM 5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/big-pickle': {
+    id: 'opencode/big-pickle',
+    name: 'Big Pickle',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Stealth model by OpenCode - free with vision (beta)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'good',
+      reliability: 0.85
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
   }
 };
 
@@ -457,7 +779,13 @@ export function getRecommendedModels(criteria: {
  * Get model configuration by ID
  */
 export function getModelConfig(modelId: string): ModelConfig | undefined {
-  return AVAILABLE_MODELS[modelId];
+  const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
+    'kilo/google/gemma-3-27b-it:free': 'kilo/google/gemma-3-27b-it',
+    'kilo/qwen/qwen2-vl-72b-instruct:free': 'kilo/qwen/qwen2.5-vl-72b-instruct',
+    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5'
+  };
+  const resolvedModelId = LEGACY_MODEL_ID_ALIASES[modelId] || modelId;
+  return AVAILABLE_MODELS[resolvedModelId];
 }
 
 /**
@@ -471,3 +799,72 @@ export function isModelAvailable(modelId: string): boolean {
   // For now, we'll assume all models are available
   return true;
 }
+
+/**
+ * Get all free models (pricing = 0)
+ */
+export function getFreeModels(): ModelConfig[] {
+  return Object.values(AVAILABLE_MODELS).filter(model =>
+    model.pricing?.inputTokens === 0 && model.pricing?.outputTokens === 0
+  );
+}
+
+/**
+ * Get all free vision-capable models
+ */
+export function getFreeVisionModels(): ModelConfig[] {
+  return Object.values(AVAILABLE_MODELS).filter(model =>
+    model.supportsVision &&
+    model.pricing?.inputTokens === 0 &&
+    model.pricing?.outputTokens === 0
+  );
+}
+
+/**
+ * Get the best free vision model for a given provider
+ * Returns the model with highest reliability score
+ */
+export function getBestFreeVisionModel(provider?: ModelProvider): ModelConfig | undefined {
+  const freeVisionModels = getFreeVisionModels()
+    .filter(model => !provider || model.provider === provider)
+    .sort((a, b) => b.performance.reliability - a.performance.reliability);
+
+  return freeVisionModels[0];
+}
+
+/**
+ * OpenRouter account requirements notice
+ * Even free models require a payment method or credits on file
+ */
+export const OPENROUTER_REQUIREMENTS = {
+  requiresPaymentMethod: true,
+  minimumCredits: 0,
+  setupUrl: 'https://openrouter.ai/settings/payment',
+  creditsUrl: 'https://openrouter.ai/credits',
+  keysUrl: 'https://openrouter.ai/keys',
+  note: 'OpenRouter requires a payment method or credits on file even for free models. This is for fraud prevention.'
+};
+
+/**
+ * Kilo Gateway account requirements notice
+ * Free models available with API key
+ */
+export const KILO_REQUIREMENTS = {
+  requiresPaymentMethod: false,
+  minimumCredits: 0,
+  setupUrl: 'https://app.kilo.ai',
+  keysUrl: 'https://app.kilo.ai/api-keys',
+  note: 'Kilo Gateway offers free tiers with API key registration.'
+};
+
+/**
+ * OpenCode Zen account requirements notice
+ * Several free models available
+ */
+export const OPENCODE_ZEN_REQUIREMENTS = {
+  requiresPaymentMethod: false,
+  minimumCredits: 0,
+  setupUrl: 'https://opencode.ai/auth',
+  keysUrl: 'https://opencode.ai/zen',
+  note: 'OpenCode Zen offers several free models including GPT-5 Nano, Kimi K2.5 Free, MiniMax M2.5 Free, GLM 5 Free, and Big Pickle.'
+};

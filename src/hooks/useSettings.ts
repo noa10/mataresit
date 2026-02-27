@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 export interface UserApiKeys {
   openrouter?: string;
   gemini?: string;
-  // Future API keys can be added here
+  kilo?: string;
+  opencode?: string;
 }
 
 export interface ProcessingSettings {
