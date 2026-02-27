@@ -4,6 +4,14 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { ProcessingLogger } from '../_shared/db-logger.ts'
 import { encodeBase64, decodeBase64 } from "jsr:@std/encoding/base64";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import {
+  executeWithFallback,
+  getOpenCodeRetryEndpoint,
+  ProviderRequestError,
+  resolveKiloGatewayChatEndpoint,
+  selectImageFallbackCandidates,
+  shouldRetryOpenCodeImageRequest
+} from '../_shared/provider-routing.ts'
 
 // Initialize Supabase client for tax processing
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -24,7 +32,7 @@ const corsHeaders = {
 interface ModelConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter';
+  provider: 'gemini' | 'openrouter' | 'kilo' | 'opencode';
   endpoint: string;
   apiKeyEnvVar: string;
   temperature: number;
@@ -443,6 +451,222 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       supportedFormats: ['image/jpeg', 'image/png'],
       contextWindow: 200000
     }
+  },
+
+  // ==========================================
+  // Kilo Gateway Models (Vision-Capable)
+  // ==========================================
+  'kilo/google/gemma-3-27b-it': {
+    id: 'kilo/google/gemma-3-27b-it',
+    name: 'Gemma 3 27B Instruct',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google Gemma 3 27B with vision capabilities (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
+  'kilo/qwen/qwen2.5-vl-72b-instruct': {
+    id: 'kilo/qwen/qwen2.5-vl-72b-instruct',
+    name: 'Qwen 2.5 VL 72B Instruct',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Qwen 2.5 Vision-Language 72B model (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'excellent',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 32768
+    }
+  },
+  'kilo/moonshotai/kimi-k2.5': {
+    id: 'kilo/moonshotai/kimi-k2.5',
+    name: 'Kimi K2.5',
+    provider: 'kilo',
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
+    apiKeyEnvVar: 'KILO_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Moonshot Kimi K2.5 with vision capabilities (via Kilo)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
+  },
+
+  // ==========================================
+  // OpenCode Zen Models (Free Vision-Capable)
+  // ==========================================
+  'opencode/gpt-5-nano': {
+    id: 'opencode/gpt-5-nano',
+    name: 'GPT 5 Nano',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: false,
+    description: 'OpenAI GPT 5 Nano (chat-completions path used as text-only for stability)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.95
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/kimi-k2.5-free': {
+    id: 'opencode/kimi-k2.5-free',
+    name: 'Kimi K2.5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Moonshot AI Kimi K2.5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.92
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 128000
+    }
+  },
+  'opencode/minimax-m2.5-free': {
+    id: 'opencode/minimax-m2.5-free',
+    name: 'MiniMax M2.5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'MiniMax M2.5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.90
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/glm-5-free': {
+    id: 'opencode/glm-5-free',
+    name: 'GLM 5 Free',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Zhipu AI GLM 5 with vision capabilities (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.88
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
+  },
+  'opencode/big-pickle': {
+    id: 'opencode/big-pickle',
+    name: 'Big Pickle',
+    provider: 'opencode',
+    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
+    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
+    temperature: 0.3,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Stealth model by OpenCode - free with vision (beta)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'good',
+      reliability: 0.85
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 100000
+    }
   }
 };
 
@@ -645,7 +869,13 @@ async function callAIModel(
   modelId: string,
   receiptId: string,
   logger: ProcessingLogger
-): Promise<{ result: any; modelUsed: string }> {
+): Promise<{
+  result: any;
+  modelUsed: string;
+  fallbackApplied: boolean;
+  fallbackFrom: string | null;
+  fallbackReason: string | null;
+}> {
   const modelSelectionStart = Date.now();
 
   // Enhanced model selection logging with timing
@@ -656,23 +886,34 @@ async function callAIModel(
   let modelConfig: ModelConfig;
   let wasDefaultUsed = false;
   let fallbackReason = '';
+  const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
+    'kilo/google/gemma-3-27b-it:free': 'kilo/google/gemma-3-27b-it',
+    'kilo/qwen/qwen2-vl-72b-instruct:free': 'kilo/qwen/qwen2.5-vl-72b-instruct',
+    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5'
+  };
+  const requestedModelId = modelId && LEGACY_MODEL_ID_ALIASES[modelId]
+    ? LEGACY_MODEL_ID_ALIASES[modelId]
+    : modelId;
+  if (modelId && requestedModelId !== modelId) {
+    await logger.log(`🔄 MODEL ID REMAP: ${modelId} -> ${requestedModelId}`, "AI");
+  }
 
   // Enhanced model validation and fallback logic
-  if (modelId && AVAILABLE_MODELS[modelId]) {
+  if (requestedModelId && AVAILABLE_MODELS[requestedModelId]) {
     // Requested model exists
-    modelConfig = AVAILABLE_MODELS[modelId];
+    modelConfig = AVAILABLE_MODELS[requestedModelId];
     await logger.log(`✅ Requested model found: ${modelConfig.name}`, "AI");
-  } else if (modelId) {
+  } else if (requestedModelId) {
     // Requested model doesn't exist - log detailed error and use fallback
     const availableModels = Object.keys(AVAILABLE_MODELS);
-    await logger.log(`❌ Model '${modelId}' not found in registry`, "ERROR");
+    await logger.log(`❌ Model '${requestedModelId}' not found in registry`, "ERROR");
     await logger.log(`📋 Available models: ${availableModels.join(', ')}`, "ERROR");
 
     // Use default fallback
     const defaultModelId = input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL;
     modelConfig = AVAILABLE_MODELS[defaultModelId];
     wasDefaultUsed = true;
-    fallbackReason = `Model '${modelId}' not found`;
+    fallbackReason = `Model '${requestedModelId}' not found`;
 
     await logger.log(`🔄 FALLBACK: Using default ${input.type} model: ${modelConfig.name}`, "AI");
   } else {
@@ -693,36 +934,6 @@ async function callAIModel(
   // Log comprehensive model information
   await logModelInfo(modelConfig, input.type, logger);
 
-  // Enhanced input compatibility validation
-  const compatibilityCheckStart = Date.now();
-  await logger.log(`🔍 COMPATIBILITY CHECK: Validating ${input.type} input with ${modelConfig.name}`, "AI");
-
-  if (input.type === 'text' && !modelConfig.supportsText) {
-    await logger.log(`❌ COMPATIBILITY ERROR: Model ${modelConfig.id} does not support text input`, "ERROR");
-    await logger.log(`💡 SUGGESTION: Use a text-capable model like ${DEFAULT_TEXT_MODEL}`, "ERROR");
-    throw new Error(`Model ${modelConfig.id} does not support text input`);
-  }
-
-  if (input.type === 'image' && !modelConfig.supportsVision) {
-    await logger.log(`❌ COMPATIBILITY ERROR: Model ${modelConfig.id} does not support vision input`, "ERROR");
-    await logger.log(`💡 SUGGESTION: Use a vision-capable model like ${DEFAULT_VISION_MODEL}`, "ERROR");
-    throw new Error(`Model ${modelConfig.id} does not support vision input`);
-  }
-
-  const compatibilityCheckEnd = Date.now();
-  const compatibilityCheckDuration = (compatibilityCheckEnd - compatibilityCheckStart) / 1000;
-  await logger.log(`✅ Compatibility check passed in ${compatibilityCheckDuration.toFixed(3)} seconds`, "AI");
-
-  // Enhanced API key validation
-  await logger.log(`🔑 API KEY VALIDATION: Checking ${modelConfig.apiKeyEnvVar}`, "AI");
-  const apiKey = Deno.env.get(modelConfig.apiKeyEnvVar);
-  if (!apiKey) {
-    await logger.log(`❌ API KEY ERROR: ${modelConfig.apiKeyEnvVar} not found in environment variables`, "ERROR");
-    await logger.log(`💡 SOLUTION: Set ${modelConfig.apiKeyEnvVar} in Supabase dashboard secrets`, "ERROR");
-    throw new Error(`${modelConfig.apiKeyEnvVar} not found in environment variables`);
-  }
-  await logger.log(`✅ API key validated for ${modelConfig.provider.toUpperCase()}`, "AI");
-
   // Log final model selection summary
   if (wasDefaultUsed) {
     await logger.log(`📋 SELECTION SUMMARY: Using ${modelConfig.name} (${fallbackReason})`, "AI");
@@ -730,35 +941,134 @@ async function callAIModel(
     await logger.log(`📋 SELECTION SUMMARY: Using requested ${modelConfig.name}`, "AI");
   }
 
-  // Enhanced provider routing with validation
-  await logger.log(`🚀 PROVIDER ROUTING: Calling ${modelConfig.provider.toUpperCase()} API`, "AI");
-  const providerCallStart = Date.now();
+  const validateCompatibility = async (config: ModelConfig) => {
+    const compatibilityCheckStart = Date.now();
+    await logger.log(`🔍 COMPATIBILITY CHECK: Validating ${input.type} input with ${config.name}`, "AI");
 
-  try {
-    let result: any;
-    switch (modelConfig.provider) {
-      case 'gemini':
-        result = await callGeminiAPI(input, modelConfig, apiKey, logger);
-        break;
-      case 'openrouter':
-        result = await callOpenRouterAPI(input, modelConfig, apiKey, logger);
-        break;
-      default:
-        await logger.log(`❌ PROVIDER ERROR: Unsupported provider '${modelConfig.provider}'`, "ERROR");
-        await logger.log(`💡 SUPPORTED: gemini, openrouter`, "ERROR");
-        throw new Error(`Unsupported model provider: ${modelConfig.provider}`);
+    if (input.type === 'text' && !config.supportsText) {
+      await logger.log(`❌ COMPATIBILITY ERROR: Model ${config.id} does not support text input`, "ERROR");
+      throw new Error(`Model ${config.id} does not support text input`);
     }
 
-    const providerCallEnd = Date.now();
-    const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ Provider call completed in ${providerCallDuration.toFixed(2)} seconds`, "AI");
+    if (input.type === 'image' && !config.supportsVision) {
+      await logger.log(`❌ COMPATIBILITY ERROR: Model ${config.id} does not support vision input`, "ERROR");
+      throw new Error(`Model ${config.id} does not support vision input`);
+    }
 
-    return { result, modelUsed: modelConfig.id };
+    const compatibilityCheckDuration = (Date.now() - compatibilityCheckStart) / 1000;
+    await logger.log(`✅ Compatibility check passed in ${compatibilityCheckDuration.toFixed(3)} seconds`, "AI");
+  };
+
+  const callProvider = async (config: ModelConfig, apiKey: string): Promise<any> => {
+    switch (config.provider) {
+      case 'gemini':
+        return await callGeminiAPI(input, config, apiKey, logger);
+      case 'openrouter':
+        return await callOpenRouterAPI(input, config, apiKey, logger);
+      case 'kilo':
+        return await callKiloGatewayAPI(input, config, apiKey, logger);
+      case 'opencode':
+        return await callOpenCodeZenAPI(input, config, apiKey, logger);
+      default:
+        throw new Error(`Unsupported model provider: ${config.provider}`);
+    }
+  };
+
+  const attemptModelCall = async (targetModelId: string): Promise<any> => {
+    const targetConfig = AVAILABLE_MODELS[targetModelId];
+    if (!targetConfig) {
+      throw new Error(`Model ${targetModelId} not found for attempt`);
+    }
+
+    await validateCompatibility(targetConfig);
+
+    await logger.log(`🔑 API KEY VALIDATION: Checking ${targetConfig.apiKeyEnvVar}`, "AI");
+    const apiKey = Deno.env.get(targetConfig.apiKeyEnvVar);
+    if (!apiKey) {
+      await logger.log(`❌ API KEY ERROR: ${targetConfig.apiKeyEnvVar} not found`, "ERROR");
+      throw new Error(`${targetConfig.apiKeyEnvVar} not found in environment variables`);
+    }
+    await logger.log(`✅ API key validated for ${targetConfig.provider.toUpperCase()}`, "AI");
+
+    await logger.log(`🚀 PROVIDER ROUTING: Calling ${targetConfig.provider.toUpperCase()} API`, "AI");
+    const providerCallStart = Date.now();
+
+    try {
+      const result = await callProvider(targetConfig, apiKey);
+      const providerCallDuration = (Date.now() - providerCallStart) / 1000;
+      await logger.log(`✅ Provider call completed in ${providerCallDuration.toFixed(2)} seconds`, "AI");
+      return result;
+    } catch (error) {
+      const providerCallDuration = (Date.now() - providerCallStart) / 1000;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await logger.log(
+        `❌ Provider call failed after ${providerCallDuration.toFixed(2)} seconds: ${errorMessage}`,
+        "ERROR"
+      );
+      throw error;
+    }
+  };
+
+  const attemptedModelIds = new Set<string>([modelConfig.id]);
+  const fallbackCandidates = input.type === 'image'
+    ? selectImageFallbackCandidates({
+      requestedModelId: modelConfig.id,
+      requestedProvider: modelConfig.provider,
+      attemptedModelIds,
+      models: AVAILABLE_MODELS,
+      hasApiKey: (apiKeyEnvVar: string) => Boolean(Deno.env.get(apiKeyEnvVar))
+    })
+    : [];
+
+  if (input.type === 'image') {
+    await logger.log(
+      `🔁 FALLBACK CANDIDATES: ${fallbackCandidates.length > 0 ? fallbackCandidates.join(', ') : 'none'}`,
+      "AI"
+    );
+  }
+
+  try {
+    const orchestrationResult = await executeWithFallback({
+      primaryModelId: modelConfig.id,
+      fallbackModelIds: fallbackCandidates,
+      attempt: attemptModelCall,
+      onFallbackAttempt: async (candidateId, reason, attemptNumber) => {
+        await logger.log(
+          `🔄 FALLBACK ATTEMPT ${attemptNumber}: ${candidateId} (reason: ${reason})`,
+          "AI"
+        );
+      },
+      onFallbackFailure: async (candidateId, error, attemptNumber) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await logger.log(
+          `❌ FALLBACK FAILED ${attemptNumber}: ${candidateId} (${errorMessage})`,
+          "ERROR"
+        );
+      }
+    });
+
+    if (orchestrationResult.fallbackApplied) {
+      await logger.log(
+        `✅ FALLBACK SUCCESS: switched from ${orchestrationResult.fallbackFrom} to ${orchestrationResult.modelUsed}`,
+        "AI"
+      );
+      await logger.log(
+        `📋 FALLBACK CHAIN: ${orchestrationResult.attemptedModels.join(' -> ')}`,
+        "AI"
+      );
+    }
+
+    return {
+      result: orchestrationResult.result,
+      modelUsed: orchestrationResult.modelUsed,
+      fallbackApplied: orchestrationResult.fallbackApplied,
+      fallbackFrom: orchestrationResult.fallbackFrom,
+      fallbackReason: orchestrationResult.fallbackReason
+    };
   } catch (error) {
-    const providerCallEnd = Date.now();
-    const providerCallDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ Provider call failed after ${providerCallDuration.toFixed(2)} seconds: ${errorMessage}`, "ERROR");
+    const terminalReason = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ TERMINAL FAILURE: ${terminalReason}`, "ERROR");
+    await logger.log(`❌ FALLBACK CHAIN EXHAUSTED for ${modelConfig.id}`, "ERROR");
     throw error;
   }
 }
@@ -1750,13 +2060,503 @@ Return your findings in JSON format:
 }
 
 /**
+ * Call Kilo Gateway API for text or vision processing
+ * Kilo Gateway uses OpenAI-compatible API format
+ */
+async function callKiloGatewayAPI(
+  input: AIModelInput,
+  modelConfig: ModelConfig,
+  apiKey: string,
+  logger: ProcessingLogger
+): Promise<any> {
+  const providerCallStart = Date.now();
+
+  await logger.log(`🟠 KILO GATEWAY API CALL INITIATED`, "AI");
+  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
+  const resolvedEndpoint = resolveKiloGatewayChatEndpoint(modelConfig.endpoint);
+  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
+  await logger.log(`🌐 Resolved endpoint: ${resolvedEndpoint}`, "AI");
+
+  const payloadConstructionStart = Date.now();
+  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
+
+  // Extract model name from Kilo model ID (e.g., 'kilo/google/gemma-3-27b-it' -> 'google/gemma-3-27b-it')
+  const modelName = modelConfig.id.replace(/^kilo\//, '');
+  await logger.log(`🔧 Kilo model name: ${modelName}`, "AI");
+
+  // Build messages similar to OpenRouter
+  let messages: any[];
+
+  if (input.type === 'text') {
+    const prompt = `You are an AI assistant specialized in analyzing receipt data.
+
+RECEIPT TEXT:
+${input.fullText}
+
+EXTRACTED DATA:
+${JSON.stringify(input.extractedData, null, 2)}
+
+Based on the receipt text above, please:
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD including Malaysian-specific methods.
+3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+4. Recognize Malaysian business terminology and handle Malay language text.
+5. Provide SUGGESTIONS for potential extraction errors.
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name or business name",
+  "date": "Date in YYYY-MM-DD format",
+  "total": total amount as number,
+  "tax": tax amount as number,
+  "currency": "Currency code (e.g., MYR, USD)",
+  "payment_method": "Payment method used",
+  "predicted_category": "Category from the list above",
+  "line_items": [{"description": "Item description", "amount": price}],
+  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
+}`;
+
+    messages = [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+  } else {
+    // Vision-based processing - convert image to base64
+    const base64Image = encodeBase64(input.imageData.data);
+    const mimeType = input.imageData.mimeType;
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
+
+Analyze this receipt image and extract:
+1. MERCHANT - Store or business name
+2. DATE - Date in YYYY-MM-DD format
+3. TOTAL - Total amount as a number
+4. TAX - Tax amount as a number
+5. CURRENCY - Currency code (e.g., MYR, USD)
+6. PAYMENT_METHOD - Payment method used
+7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
+8. LINE_ITEMS - Array of items with description and amount
+9. CONFIDENCE - Object with confidence scores (0-100)
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name",
+  "date": "YYYY-MM-DD",
+  "total": 0.00,
+  "tax": 0.00,
+  "currency": "MYR",
+  "payment_method": "Cash",
+  "predicted_category": "Dining",
+  "line_items": [{"description": "Item", "amount": 0.00}],
+  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
+}`;
+
+    messages = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: dataUrl,
+              detail: 'high'
+            }
+          }
+        ]
+      }
+    ];
+  }
+
+  const payload = {
+    model: modelName,
+    messages: messages,
+    temperature: modelConfig.temperature,
+    max_tokens: modelConfig.maxTokens,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0
+  };
+
+  const payloadConstructionEnd = Date.now();
+  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
+  await logger.log(`✅ Kilo Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
+
+  await logger.log(`🚀 KILO GATEWAY API REQUEST: Initiating call to ${modelName}`, "AI");
+  const kiloCallStart = Date.now();
+  const response = await fetch(resolvedEndpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://mataresit.app',
+      'X-Title': 'Mataresit Receipt Processing'
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const kiloCallEnd = Date.now();
+  const kiloCallDuration = kiloCallEnd - kiloCallStart;
+
+  await logger.log(`⏱️ Kilo API call completed in ${(kiloCallDuration / 1000).toFixed(2)} seconds`, "AI");
+  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    await logger.log(`❌ KILO GATEWAY API ERROR: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
+    throw new ProviderRequestError({
+      provider: 'kilo',
+      modelId: modelConfig.id,
+      status: response.status,
+      statusText: response.statusText,
+      errorBodySnippet: errorText.substring(0, 500),
+      endpoint: resolvedEndpoint
+    });
+  }
+
+  const kiloResponse = await response.json();
+
+  // Parse the response
+  try {
+    const responseText = kiloResponse.choices[0]?.message?.content;
+    if (!responseText) {
+      throw new Error('No content in Kilo Gateway response');
+    }
+
+    await logger.log("Parsing Kilo Gateway response", "AI");
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : null;
+
+    if (!jsonStr) {
+      console.error('No valid JSON found in Kilo Gateway response');
+      await logger.log("No valid JSON found in Kilo Gateway response", "ERROR");
+      throw new Error('No valid JSON found in Kilo Gateway response');
+    }
+
+    const enhancedData = JSON.parse(jsonStr);
+
+    if (!enhancedData.currency) {
+      enhancedData.currency = 'MYR';
+      if (!enhancedData.confidence) enhancedData.confidence = {};
+      enhancedData.confidence.currency = 50;
+      await logger.log("Using default currency: MYR", "AI");
+    } else {
+      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
+    }
+
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ KILO GATEWAY PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+    return enhancedData;
+  } catch (error) {
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ KILO GATEWAY PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
+    throw error;
+  }
+}
+
+/**
+ * Call OpenCode Zen API for text or vision processing
+ * OpenCode Zen uses OpenAI-compatible API format for most models
+ */
+async function callOpenCodeZenAPI(
+  input: AIModelInput,
+  modelConfig: ModelConfig,
+  apiKey: string,
+  logger: ProcessingLogger
+): Promise<any> {
+  const providerCallStart = Date.now();
+
+  await logger.log(`🟣 OPENCODE ZEN API CALL INITIATED`, "AI");
+  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
+  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
+
+  const payloadConstructionStart = Date.now();
+  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
+
+  // Extract model name from OpenCode model ID (e.g., 'opencode/gpt-5-nano' -> 'gpt-5-nano')
+  const modelName = modelConfig.id.replace(/^opencode\//, '');
+  await logger.log(`🔧 OpenCode Zen model name: ${modelName}`, "AI");
+
+  const buildMessages = (includeImageDetail: boolean): any[] => {
+    if (input.type === 'text') {
+      const prompt = `You are an AI assistant specialized in analyzing receipt data.
+
+RECEIPT TEXT:
+${input.fullText}
+
+EXTRACTED DATA:
+${JSON.stringify(input.extractedData, null, 2)}
+
+Based on the receipt text above, please:
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD including Malaysian-specific methods.
+3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+4. Recognize Malaysian business terminology and handle Malay language text.
+5. Provide SUGGESTIONS for potential extraction errors.
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name or business name",
+  "date": "Date in YYYY-MM-DD format",
+  "total": total amount as number,
+  "tax": tax amount as number,
+  "currency": "Currency code (e.g., MYR, USD)",
+  "payment_method": "Payment method used",
+  "predicted_category": "Category from the list above",
+  "line_items": [{"description": "Item description", "amount": price}],
+  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
+}`;
+
+      return [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ];
+    }
+
+    // Vision-based processing
+    const base64Image = encodeBase64(input.imageData.data);
+    const mimeType = input.imageData.mimeType;
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
+
+Analyze this receipt image and extract:
+1. MERCHANT - Store or business name
+2. DATE - Date in YYYY-MM-DD format
+3. TOTAL - Total amount as a number
+4. TAX - Tax amount as a number
+5. CURRENCY - Currency code (e.g., MYR, USD)
+6. PAYMENT_METHOD - Payment method used
+7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
+8. LINE_ITEMS - Array of items with description and amount
+9. CONFIDENCE - Object with confidence scores (0-100)
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name",
+  "date": "YYYY-MM-DD",
+  "total": 0.00,
+  "tax": 0.00,
+  "currency": "MYR",
+  "payment_method": "Cash",
+  "predicted_category": "Dining",
+  "line_items": [{"description": "Item", "amount": 0.00}],
+  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
+}`;
+
+    const imageUrl: Record<string, any> = {
+      url: dataUrl
+    };
+    if (includeImageDetail) {
+      imageUrl.detail = 'high';
+    }
+
+    return [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: imageUrl
+          }
+        ]
+      }
+    ];
+  };
+
+  const buildPayload = (messages: any[], simplified: boolean): Record<string, any> => {
+    if (simplified) {
+      return {
+        model: modelName,
+        messages,
+        temperature: modelConfig.temperature,
+        max_tokens: modelConfig.maxTokens
+      };
+    }
+
+    return {
+      model: modelName,
+      messages,
+      temperature: modelConfig.temperature,
+      max_tokens: modelConfig.maxTokens,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0
+    };
+  };
+
+  const primaryMessages = buildMessages(true);
+  const primaryPayload = buildPayload(primaryMessages, false);
+
+  const payloadConstructionEnd = Date.now();
+  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
+  await logger.log(`✅ OpenCode Zen Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
+
+  await logger.log(`🚀 OPENCODE ZEN API REQUEST: Initiating call to ${modelName}`, "AI");
+  await logger.log(`🌐 OpenCode request endpoint: ${modelConfig.endpoint}`, "AI");
+
+  const opencodeCallStart = Date.now();
+  let response = await fetch(modelConfig.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(primaryPayload),
+  });
+
+  const opencodeCallEnd = Date.now();
+  const opencodeCallDuration = opencodeCallEnd - opencodeCallStart;
+
+  await logger.log(`⏱️ OpenCode Zen API call completed in ${(opencodeCallDuration / 1000).toFixed(2)} seconds`, "AI");
+  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
+
+  let endpointUsed = modelConfig.endpoint;
+  let retryCount = 0;
+  let opencodeResponse: any;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    await logger.log(`❌ OPENCODE ZEN API ERROR: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
+    const shouldRetry = shouldRetryOpenCodeImageRequest(input.type, response.status, errorText);
+
+    if (shouldRetry) {
+      retryCount = 1;
+      const retryEndpoint = getOpenCodeRetryEndpoint(modelConfig.endpoint);
+      const retryMessages = buildMessages(false);
+      const retryPayload = buildPayload(retryMessages, true);
+      // Some OpenCode routes resolve model by full ID on 404 paths.
+      if (response.status === 404) {
+        retryPayload.model = modelConfig.id;
+      }
+
+      await logger.log(
+        `🔄 OPENCODE RETRY: retrying with simplified payload at ${retryEndpoint}`,
+        "AI"
+      );
+      await logger.log(`🔧 OPENCODE RETRY MODEL: ${retryPayload.model}`, "AI");
+
+      const retryStart = Date.now();
+      const retryResponse = await fetch(retryEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(retryPayload),
+      });
+      const retryDuration = (Date.now() - retryStart) / 1000;
+
+      await logger.log(`⏱️ OpenCode retry call completed in ${retryDuration.toFixed(2)} seconds`, "AI");
+      await logger.log(`📡 Retry response status: ${retryResponse.status} ${retryResponse.statusText}`, "AI");
+
+      if (!retryResponse.ok) {
+        const retryErrorText = await retryResponse.text();
+        await logger.log(`❌ OPENCODE RETRY ERROR: ${retryResponse.status} ${retryResponse.statusText}`, "ERROR");
+        await logger.log(`📄 Retry error details: ${retryErrorText.substring(0, 500)}`, "ERROR");
+        throw new ProviderRequestError({
+          provider: 'opencode',
+          modelId: modelConfig.id,
+          status: retryResponse.status,
+          statusText: retryResponse.statusText,
+          errorBodySnippet: retryErrorText.substring(0, 500),
+          endpoint: retryEndpoint
+        });
+      }
+
+      endpointUsed = retryEndpoint;
+      response = retryResponse;
+      opencodeResponse = await retryResponse.json();
+      await logger.log(`✅ OpenCode retry succeeded (retry count: ${retryCount})`, "AI");
+    } else {
+      throw new ProviderRequestError({
+        provider: 'opencode',
+        modelId: modelConfig.id,
+        status: response.status,
+        statusText: response.statusText,
+        errorBodySnippet: errorText.substring(0, 500),
+        endpoint: modelConfig.endpoint
+      });
+    }
+  } else {
+    opencodeResponse = await response.json();
+  }
+
+  await logger.log(`🔁 OpenCode retry count: ${retryCount}`, "AI");
+  await logger.log(`🌐 OpenCode final endpoint used: ${endpointUsed}`, "AI");
+
+  // Parse the response
+  try {
+    const responseText = opencodeResponse.choices[0]?.message?.content;
+    if (!responseText) {
+      throw new Error('No content in OpenCode Zen response');
+    }
+
+    await logger.log("Parsing OpenCode Zen response", "AI");
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : null;
+
+    if (!jsonStr) {
+      console.error('No valid JSON found in OpenCode Zen response');
+      await logger.log("No valid JSON found in OpenCode Zen response", "ERROR");
+      throw new Error('No valid JSON found in OpenCode Zen response');
+    }
+
+    const enhancedData = JSON.parse(jsonStr);
+
+    if (!enhancedData.currency) {
+      enhancedData.currency = 'MYR';
+      if (!enhancedData.confidence) enhancedData.confidence = {};
+      enhancedData.confidence.currency = 50;
+      await logger.log("Using default currency: MYR", "AI");
+    } else {
+      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
+    }
+
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ OPENCODE ZEN PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+    return enhancedData;
+  } catch (error) {
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ OPENCODE ZEN PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
+    throw error;
+  }
+}
+
+/**
  * Primary function to enhance receipt data using selected AI model
  */
 async function enhanceReceiptData(
   input: AIModelInput,
   modelId: string,
   receiptId: string
-): Promise<{ data: any; modelUsed: string }> {
+): Promise<{
+  data: any;
+  modelUsed: string;
+  fallbackApplied: boolean;
+  fallbackFrom: string | null;
+  fallbackReason: string | null;
+}> {
   const logger = new ProcessingLogger(receiptId);
 
   // Use the specified model or default based on input type
@@ -1780,6 +2580,9 @@ async function enhanceReceiptData(
     const aiResult = await callAIModel(input, modelToUse, receiptId, logger);
     const enhancedData = aiResult.result;
     const actualModelUsed = aiResult.modelUsed;
+    const fallbackApplied = aiResult.fallbackApplied;
+    const fallbackFrom = aiResult.fallbackFrom;
+    const fallbackReason = aiResult.fallbackReason;
     const aiCallEndTime = Date.now();
     const aiCallDuration = (aiCallEndTime - aiCallStartTime) / 1000;
 
@@ -1836,12 +2639,18 @@ async function enhanceReceiptData(
     }
 
     await logger.log("AI processing complete", "AI");
-    return { data: enhancedData, modelUsed: actualModelUsed };
+    return {
+      data: enhancedData,
+      modelUsed: actualModelUsed,
+      fallbackApplied,
+      fallbackFrom,
+      fallbackReason
+    };
   } catch (error) {
     console.error("Error in enhanceReceiptData:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     await logger.log(`Error in AI enhancement: ${errorMessage}`, "ERROR");
-    return { data: {}, modelUsed: modelToUse }; // Return empty object on error to avoid breaking the flow
+    throw error;
   }
 }
 
@@ -1989,31 +2798,38 @@ serve(async (req) => {
         success: true,
         result: enhancementResult.data,
         model_used: enhancementResult.modelUsed,
-        model_requested: modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL)
+        model_requested: modelId || (input.type === 'text' ? DEFAULT_TEXT_MODEL : DEFAULT_VISION_MODEL),
+        fallback_applied: enhancementResult.fallbackApplied,
+        fallback_from: enhancementResult.fallbackFrom,
+        fallback_reason: enhancementResult.fallbackReason
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in enhance-receipt-data function:', error);
+    const errorMessage = (error instanceof Error ? error.message : String(error)) || 'Internal server error';
 
-    // Try to log the error if possible
-    try {
-      const { receiptId } = await req.json();
-      if (receiptId) {
-        const logger = new ProcessingLogger(receiptId);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        await logger.log(`Server error: ${errorMessage}`, "ERROR");
-      }
-    } catch (logError) {
-      // Ignore errors during error logging
+    let statusCode = 500;
+    let providerError: Record<string, any> | null = null;
+    if (error instanceof ProviderRequestError) {
+      statusCode = 502;
+      providerError = {
+        provider: error.provider,
+        model_id: error.modelId,
+        status: error.status,
+        status_text: error.statusText,
+        endpoint: error.endpoint,
+        error_body_snippet: error.errorBodySnippet
+      };
     }
 
     return new Response(
       JSON.stringify({
-        error: (error instanceof Error ? error.message : String(error)) || 'Internal server error',
+        error: errorMessage,
+        provider_error: providerError,
         success: false
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
