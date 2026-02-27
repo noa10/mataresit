@@ -65,6 +65,37 @@ export interface ProgressCallback {
 }
 
 /**
+ * OpenRouter error types with specific guidance
+ */
+export interface OpenRouterError {
+  type: 'invalid_key' | 'no_credits' | 'rate_limit' | 'model_unavailable' | 'network' | 'unknown';
+  message: string;
+  action: string;
+  statusCode?: number;
+  docsUrl?: string;
+}
+
+/**
+ * OpenRouter account status information
+ */
+export interface OpenRouterAccountStatus {
+  valid: boolean;
+  credits?: number;
+  hasPaymentMethod?: boolean;
+  isVerified?: boolean;
+  error?: string;
+}
+
+/**
+ * Result of connection test with detailed error information
+ */
+export interface ConnectionTestResult {
+  success: boolean;
+  error?: OpenRouterError;
+  accountStatus?: OpenRouterAccountStatus;
+}
+
+/**
  * OpenRouter API service class
  */
 export class OpenRouterService {
@@ -208,11 +239,11 @@ export class OpenRouterService {
    */
   private prepareMessages(input: ProcessingInput, modelConfig: ModelConfig): OpenRouterMessage[] {
     const systemPrompt = this.getSystemPrompt();
-    
+
     if (input.type === 'text') {
       // Text-based processing (OCR + AI)
       const userPrompt = this.getTextPrompt(input.textData!);
-      
+
       return [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -330,11 +361,152 @@ Return only the JSON object, no explanations or formatting.`;
   }
 
   /**
-   * Test API connection and model availability
+   * Parse OpenRouter API error and return structured error information
+   */
+  private parseError(response: Response, errorBody: string): OpenRouterError {
+    const statusCode = response.status;
+
+    // Try to parse the error body for more details
+    let errorData: any = {};
+    try {
+      errorData = JSON.parse(errorBody);
+    } catch {
+      // Ignore parse errors
+    }
+
+    const errorMessage = errorData.error?.message || errorData.message || response.statusText;
+    const errorCode = errorData.error?.code || errorData.code;
+
+    // Handle specific error cases
+    if (statusCode === 401) {
+      return {
+        type: 'invalid_key',
+        message: 'Invalid API key. Your key may be incorrect, expired, or revoked.',
+        action: 'Please verify your API key at openrouter.ai/keys',
+        statusCode,
+        docsUrl: 'https://openrouter.ai/keys'
+      };
+    }
+
+    if (statusCode === 402 || errorMessage?.toLowerCase().includes('credit') || errorMessage?.toLowerCase().includes('balance')) {
+      return {
+        type: 'no_credits',
+        message: 'Insufficient credits or no payment method on file. OpenRouter requires a payment method or credits even for free models.',
+        action: 'Add a payment method at openrouter.ai/settings/payment or add credits at openrouter.ai/credits',
+        statusCode,
+        docsUrl: 'https://openrouter.ai/credits'
+      };
+    }
+
+    if (statusCode === 429) {
+      return {
+        type: 'rate_limit',
+        message: 'Rate limit exceeded. You have made too many requests too quickly.',
+        action: 'Please wait a moment before trying again, or upgrade your account for higher limits.',
+        statusCode,
+        docsUrl: 'https://openrouter.ai/docs#rate-limits'
+      };
+    }
+
+    if (statusCode === 400 || errorCode === 'model_not_found' || errorMessage?.toLowerCase().includes('model')) {
+      return {
+        type: 'model_unavailable',
+        message: `Model unavailable or invalid. The model may have been deprecated or your account doesn't have access.`,
+        action: 'Try a different model or check available models at openrouter.ai/models',
+        statusCode,
+        docsUrl: 'https://openrouter.ai/models'
+      };
+    }
+
+    // Generic error fallback
+    return {
+      type: 'unknown',
+      message: `OpenRouter API error: ${errorMessage || response.statusText}`,
+      action: 'Please check the OpenRouter status page or try again later.',
+      statusCode,
+      docsUrl: 'https://status.openrouter.ai/'
+    };
+  }
+
+  /**
+   * Check OpenRouter account status including credits and payment method
+   */
+  async checkAccountStatus(): Promise<OpenRouterAccountStatus> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/key`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        return {
+          valid: false,
+          error: `Failed to verify account: ${response.status}`
+        };
+      }
+
+      const data = await response.json();
+
+      return {
+        valid: true,
+        credits: data.data?.limit_remaining || 0,
+        hasPaymentMethod: data.data?.has_payment_method || false,
+        isVerified: data.data?.is_verified || false
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error checking account status'
+      };
+    }
+  }
+
+  /**
+   * Test API connection and model availability with detailed error reporting
    */
   async testConnection(modelId: string, onProgress?: ProgressCallback): Promise<boolean> {
+    const result = await this.testConnectionDetailed(modelId, onProgress);
+    return result.success;
+  }
+
+  /**
+   * Test API connection with detailed error information
+   */
+  async testConnectionDetailed(modelId: string, onProgress?: ProgressCallback): Promise<ConnectionTestResult> {
     try {
       onProgress?.('START', 'Testing OpenRouter connection');
+
+      // First, check account status
+      onProgress?.('AI', 'Checking account status');
+      const accountStatus = await this.checkAccountStatus();
+
+      if (!accountStatus.valid) {
+        return {
+          success: false,
+          error: {
+            type: 'invalid_key',
+            message: 'Could not verify your OpenRouter account.',
+            action: 'Please check that your API key is valid at openrouter.ai/keys',
+            docsUrl: 'https://openrouter.ai/keys'
+          },
+          accountStatus
+        };
+      }
+
+      // Check if account has credits or payment method
+      if (!accountStatus.hasPaymentMethod && (accountStatus.credits === undefined || accountStatus.credits <= 0)) {
+        return {
+          success: false,
+          error: {
+            type: 'no_credits',
+            message: 'Your OpenRouter account has no credits and no payment method on file.',
+            action: 'Add a payment method (recommended - no charge for free models) or add credits at openrouter.ai/credits',
+            docsUrl: 'https://openrouter.ai/settings/payment'
+          },
+          accountStatus
+        };
+      }
 
       const testRequest: OpenRouterRequest = {
         model: this.extractModelName(modelId),
@@ -379,19 +551,30 @@ Return only the JSON object, no explanations or formatting.`;
           body: errorText
         });
 
-        // Try to parse error details
-        try {
-          const errorData = JSON.parse(errorText);
-          console.error('OpenRouter error details:', errorData);
-        } catch (parseError) {
-          console.error('Could not parse error response as JSON');
-        }
+        return {
+          success: false,
+          error: this.parseError(response, errorText),
+          accountStatus
+        };
       }
 
-      return response.ok;
+      return {
+        success: true,
+        accountStatus
+      };
     } catch (error) {
       console.error('OpenRouter connection test failed with exception:', error);
-      return false;
+
+      return {
+        success: false,
+        error: {
+          type: 'network',
+          message: 'Network error: Could not connect to OpenRouter API.',
+          action: 'Please check your internet connection and try again.',
+          docsUrl: 'https://status.openrouter.ai/'
+        },
+        accountStatus: undefined
+      };
     }
   }
 
@@ -415,6 +598,29 @@ Return only the JSON object, no explanations or formatting.`;
       return data.data || [];
     } catch (error) {
       console.error('Failed to fetch OpenRouter models:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get free vision-capable models from OpenRouter
+   */
+  async getFreeVisionModels(): Promise<any[]> {
+    try {
+      const models = await this.getAvailableModels();
+
+      return models.filter((model: any) => {
+        // Check if model is free (pricing is "0" or 0)
+        const isFree = model.pricing?.prompt === "0" || model.pricing?.prompt === 0;
+
+        // Check if model supports vision (image input)
+        const supportsVision = model.architecture?.modality?.includes('image') ||
+          model.architecture?.input_modalities?.includes('image');
+
+        return isFree && supportsVision;
+      });
+    } catch (error) {
+      console.error('Failed to fetch free vision models:', error);
       return [];
     }
   }

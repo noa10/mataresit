@@ -49,7 +49,8 @@ const PROVIDER_INFO = {
     keyRequired: false,
     keyOptional: true,
     serverSide: true,
-    features: ['Vision', 'Fast Processing', 'High Accuracy']
+    features: ['Vision', 'Fast Processing', 'High Accuracy'],
+    requirements: 'Free tier available with Google AI Studio account'
   },
   openrouter: {
     name: 'OpenRouter',
@@ -60,7 +61,8 @@ const PROVIDER_INFO = {
     keyRequired: true,
     keyOptional: false,
     serverSide: false,
-    features: ['Multiple Providers', 'Free Models', 'Pay-per-use']
+    features: ['Multiple Providers', 'Free Models', 'Pay-per-use'],
+    requirements: '⚠️ Requires payment method or credits on file (even for free models)'
   }
 };
 
@@ -195,13 +197,57 @@ export function ModelProviderStatus() {
                   // Test with a free vision-capable model
                   const testModelId = 'openrouter/google/gemini-2.0-flash-exp:free';
                   console.log('Testing OpenRouter with model:', testModelId);
-                  const connectionOk = await openRouterService.testConnection(testModelId);
-                  if (connectionOk) {
+
+                  // Use detailed connection test for better error messages
+                  const result = await openRouterService.testConnectionDetailed(testModelId);
+
+                  if (result.success) {
                     available = true;
                     console.log('OpenRouter connection successful');
+
+                    // Log account status if available
+                    if (result.accountStatus) {
+                      console.log('OpenRouter account status:', {
+                        credits: result.accountStatus.credits,
+                        hasPaymentMethod: result.accountStatus.hasPaymentMethod,
+                        isVerified: result.accountStatus.isVerified
+                      });
+                    }
                   } else {
                     available = false;
-                    error = 'API key test failed. Please verify your key is valid and has sufficient credits.';
+
+                    // Use detailed error message if available
+                    if (result.error) {
+                      const err = result.error;
+                      console.error('OpenRouter connection failed:', {
+                        type: err.type,
+                        message: err.message,
+                        action: err.action
+                      });
+
+                      // Provide specific error message based on error type
+                      switch (err.type) {
+                        case 'no_credits':
+                          error = 'OpenRouter requires a payment method or credits. Even free models need account verification. Add a payment method at openrouter.ai/settings/payment';
+                          break;
+                        case 'invalid_key':
+                          error = 'Invalid API key. Please verify your key at openrouter.ai/keys';
+                          break;
+                        case 'rate_limit':
+                          error = 'Rate limit exceeded. Please wait a moment and try again.';
+                          break;
+                        case 'model_unavailable':
+                          error = 'The test model is currently unavailable. Please try again later.';
+                          break;
+                        case 'network':
+                          error = 'Network error. Please check your internet connection.';
+                          break;
+                        default:
+                          error = err.message || 'API key test failed. Please verify your key is valid.';
+                      }
+                    } else {
+                      error = 'API key test failed. Please verify your key is valid and has sufficient credits.';
+                    }
                     console.error('OpenRouter connection test returned false');
                   }
                 } catch (e: any) {
@@ -389,11 +435,10 @@ export function ModelProviderStatus() {
           const showApiKeySection = info.keyRequired || info.keyOptional;
 
           return (
-            <Card key={status.provider} className={`relative transition-all duration-200 ${
-              status.available ? 'border-green-200 bg-green-50/30 dark:border-green-900/60 dark:bg-green-950/30' :
+            <Card key={status.provider} className={`relative transition-all duration-200 ${status.available ? 'border-green-200 bg-green-50/30 dark:border-green-900/60 dark:bg-green-950/30' :
               configured ? 'border-yellow-200 bg-yellow-50/30 dark:border-amber-900/60 dark:bg-amber-950/25' :
-              'border-gray-200 dark:border-slate-800/80 dark:bg-slate-950/40'
-            }`}>
+                'border-gray-200 dark:border-slate-800/80 dark:bg-slate-950/40'
+              }`}>
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -411,6 +456,9 @@ export function ModelProviderStatus() {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">{info.description}</p>
+                      {info.requirements && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{info.requirements}</p>
+                      )}
                       <div className="flex flex-wrap gap-1 mt-2">
                         {info.features.map((feature, idx) => (
                           <Badge key={idx} variant="outline" className="text-xs">
@@ -555,12 +603,28 @@ export function ModelProviderStatus() {
 
                 {/* Error Message */}
                 {status.error && (
-                  <div className="flex items-start gap-2 p-3 bg-red-50/80 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-md">
-                    <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-300 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-red-700 dark:text-red-200">
-                      <p className="font-medium">Connection Error</p>
-                      <p className="text-xs mt-1 text-red-600 dark:text-red-300">{status.error}</p>
+                  <div className="flex flex-col gap-2 p-3 bg-red-50/80 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-md">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-300 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-red-700 dark:text-red-200">
+                        <p className="font-medium">Connection Error</p>
+                        <p className="text-xs mt-1 text-red-600 dark:text-red-300">{status.error}</p>
+                      </div>
                     </div>
+
+                    {/* Special guidance for OpenRouter credit issues */}
+                    {status.provider === 'openrouter' && status.error.includes('payment method') && (
+                      <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded text-xs">
+                        <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                          💡 Quick Fix Options:
+                        </p>
+                        <ul className="text-amber-700 dark:text-amber-300 space-y-1 list-disc list-inside">
+                          <li>Add a payment method at <a href="https://openrouter.ai/settings/payment" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-100">openrouter.ai/settings/payment</a> (recommended - no charge for free models)</li>
+                          <li>Or add credits at <a href="https://openrouter.ai/credits" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-100">openrouter.ai/credits</a></li>
+                          <li>Or use Google Gemini directly (free tier, no payment required)</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
 
