@@ -8,7 +8,18 @@ import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt,
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
-import { updateReceipt, updateReceiptWithLineItems, processReceiptWithAI, logCorrections, fixProcessingStatus, subscribeToReceiptAll } from "@/services/receiptService";
+import {
+  updateReceipt,
+  updateReceiptWithLineItems,
+  processReceiptWithAI,
+  logCorrections,
+  fixProcessingStatus,
+  subscribeToReceiptAll,
+  cancelReceiptProcessing,
+  isActiveReceiptProcessingStatus,
+  normalizeReceiptProcessingStatus,
+  recoverStuckReceiptProcessing,
+} from "@/services/receiptService";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCategoriesForDisplay } from "@/services/categoryService";
@@ -336,31 +347,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
-    const normalizedStatus = normalizeProcessingStatus(receipt.processing_status);
+    const normalizedStatus = normalizeReceiptProcessingStatus(receipt.processing_status);
     setProcessingStatus(normalizedStatus);
   }, [receipt.processing_status]);
-
-  // Normalize processing status for cross-platform compatibility
-  const normalizeProcessingStatus = (status: string | null | undefined): ProcessingStatus => {
-    if (!status) return 'complete';
-
-    // Handle Flutter app status values
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'complete';
-      case 'pending':
-        return 'uploading';
-      case 'manual_review':
-        return 'complete';
-      default:
-        // If it's already a valid React status, return as-is
-        if (['uploading', 'uploaded', 'processing', 'failed', 'complete'].includes(status.toLowerCase())) {
-          return status.toLowerCase() as ProcessingStatus;
-        }
-        // Default to complete for unknown statuses to prevent infinite loading
-        return 'complete';
-    }
-  };
 
   // Sync edited receipt with receipt prop changes (for fresh data after reprocessing)
   useEffect(() => {
@@ -428,7 +417,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
-  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(receipt.processing_status || null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(
+    normalizeReceiptProcessingStatus(receipt.processing_status)
+  );
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -465,6 +456,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   });
 
   const imageRef = useRef<HTMLImageElement>(null);
+  const reprocessAbortControllerRef = useRef<AbortController | null>(null);
 
   // Define available expense categories
   const expenseCategories = [
@@ -508,7 +500,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     } else {
       setEditedConfidence(defaultConfidence);
     }
-    const normalizedStatus = normalizeProcessingStatus(receipt.processing_status);
+    const normalizedStatus = normalizeReceiptProcessingStatus(receipt.processing_status);
     setProcessingStatus(normalizedStatus);
   }, [receipt, isSaving]);
 
@@ -574,7 +566,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       console.log('📝 Receipt status update in viewer:', payload.new);
     }
     const rawStatus = payload.new.processing_status;
-    const normalizedStatus = normalizeProcessingStatus(rawStatus);
+    const normalizedStatus = normalizeReceiptProcessingStatus(rawStatus);
     const newError = payload.new.processing_error;
 
     setProcessingStatus(normalizedStatus);
@@ -623,13 +615,62 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       },
       {
         subscribeToLogs: true,
-        statusFilter: ['processing', 'complete', 'failed', 'failed_ocr', 'failed_ai']
+        statusFilter: ['uploading', 'uploaded', 'processing', 'complete', 'failed', 'failed_ocr', 'failed_ai', 'cancelled']
       }
     );
 
     // Clean up the unified subscription when component unmounts
     return unsubscribe;
   }, [receipt.id, handleReceiptUpdate, handleLogUpdate]); // Use stable callbacks
+
+  useEffect(() => {
+    if (!receipt.id) return;
+
+    const currentStatus = normalizeReceiptProcessingStatus(processingStatus ?? receipt.processing_status);
+    if (!isActiveReceiptProcessingStatus(currentStatus)) return;
+
+    let isCancelled = false;
+    const toRecoveryMessage = (reason?: string) => {
+      switch (reason) {
+        case 'error_on_receipt':
+        case 'error_log_detected':
+          return 'Recovered stuck processing from an error state.';
+        case 'stale_timeout':
+          return 'Recovered stuck processing after timeout.';
+        default:
+          return 'Recovered stuck processing.';
+      }
+    };
+
+    const runRecoveryCheck = async () => {
+      const result = await recoverStuckReceiptProcessing(receipt.id, { staleMs: 3 * 60 * 1000 });
+      if (!result.recovered || isCancelled) return;
+
+      setIsProcessing(false);
+      setProcessingStatus('failed');
+      toast.warning(toRecoveryMessage(result.reason));
+      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+      queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    };
+
+    void runRecoveryCheck();
+    const intervalId = window.setInterval(() => {
+      void runRecoveryCheck();
+    }, 30_000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [receipt.id, processingStatus, receipt.processing_status, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      reprocessAbortControllerRef.current?.abort();
+      reprocessAbortControllerRef.current = null;
+    };
+  }, []);
 
   // Reset image error state when receipt changes
   useEffect(() => {
@@ -714,24 +755,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     );
   };
 
-  // Legacy mutation for AI processing only
-  const processingMutation = useMutation({
-    mutationFn: async () => {
-      return await processReceiptWithAI(receipt.id, { modelId: 'gemini-2.0-flash-exp' });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-      toast.success("Receipt processed successfully");
-    },
-    onError: (error: Error) => {
-      console.error("Failed to process receipt:", error);
-      toast.error("Failed to process receipt: " + error.message);
-    }
-  });
-
   const reprocessMutation = useMutation({
-    mutationFn: () => processReceiptWithAI(receipt.id, {
-      modelId: settings.selectedModel
+    mutationFn: ({ signal }: { signal?: AbortSignal } = {}) => processReceiptWithAI(receipt.id, {
+      modelId: settings.selectedModel,
+      signal,
     }),
     onSuccess: (data) => {
       if (data) {
@@ -746,6 +773,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     onError: (error) => {
       console.error("Failed to process receipt:", error);
       toast.error(`Failed to process receipt with AI Vision`);
+    },
+    onSettled: () => {
+      reprocessAbortControllerRef.current = null;
+      setIsProcessing(false);
     }
   });
 
@@ -932,7 +963,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     setIsProcessing(true); // Show loading state in confidence indicators
 
     // Always use AI Vision processing status
-    setProcessingStatus('processing_ai');
+    setProcessingStatus('processing');
 
     // Reset confidence scores temporarily to show loading state
     setEditedConfidence(prev => ({
@@ -945,13 +976,30 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       line_items: 50
     }));
 
-    // Call the reprocess mutation with user's settings
-    reprocessMutation.mutate(undefined, {
-      onSettled: () => {
-        // Whether success or error, we're no longer processing
-        setIsProcessing(false);
-      }
-    });
+    reprocessAbortControllerRef.current = new AbortController();
+    reprocessMutation.mutate({ signal: reprocessAbortControllerRef.current.signal });
+  };
+
+  const handleStopProcessing = async () => {
+    if (!isActiveReceiptProcessingStatus(processingStatus)) return;
+
+    reprocessAbortControllerRef.current?.abort();
+    reprocessAbortControllerRef.current = null;
+
+    // Optimistic UI update so we exit loading immediately
+    setIsProcessing(false);
+    setProcessingStatus('failed');
+
+    const cancelled = await cancelReceiptProcessing(receipt.id, "Cancelled by user");
+    if (!cancelled) {
+      toast.error("Failed to stop processing");
+      return;
+    }
+
+    toast.info("Processing cancelled");
+    queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
+    queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
+    queryClient.invalidateQueries({ queryKey: ['receipts'] });
   };
 
   const handleToggleShowFullText = () => {
@@ -1267,6 +1315,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const renderProcessingStatus = () => {
     // Use processingStatus state, not receipt.processing_status
     const currentStatus = processingStatus;
+    const isFailedStatus =
+      currentStatus === 'failed' ||
+      currentStatus === 'failed_ai' ||
+      currentStatus === 'failed_ocr' ||
+      currentStatus === 'cancelled';
 
     // Don't render anything if complete
     if (!currentStatus || currentStatus === 'complete') return null;
@@ -1293,6 +1346,21 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
         colorClass = 'bg-red-500';
         break;
+      case 'failed_ai':
+        statusText = 'AI Processing Failed';
+        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+        colorClass = 'bg-red-500';
+        break;
+      case 'failed_ocr':
+        statusText = 'OCR Processing Failed';
+        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+        colorClass = 'bg-red-500';
+        break;
+      case 'cancelled':
+        statusText = 'Processing Cancelled';
+        icon = <AlertTriangle className="h-4 w-4 mr-2" />;
+        colorClass = 'bg-amber-500';
+        break;
     }
 
     // Check if there's a processing error message
@@ -1309,7 +1377,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             {icon}
             {statusText}
           </Badge>
-          {currentStatus === 'failed' && (
+          {isFailedStatus && (
             <Button
               size="sm"
               variant="outline"
@@ -1321,7 +1389,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             </Button>
           )}
 
-          {currentStatus === 'failed' && (
+          {isFailedStatus && (
             <Button
               size="sm"
               variant="outline"
@@ -1414,7 +1482,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             {renderProcessingStatus()}
           </div>
           <div className="flex-1 min-h-0 overflow-auto rounded-lg relative bg-secondary/30">
-            {processingStatus && !['complete', 'failed', 'failed_ai'].includes(processingStatus) && (
+            {isActiveReceiptProcessingStatus(processingStatus) && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
                 <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
                   <Loader2 size={40} className="animate-spin mb-2" />
@@ -1422,7 +1490,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     {processingStatus === 'uploading' && 'Uploading Receipt...'}
                     {processingStatus === 'uploaded' && 'Preparing for AI Processing...'}
                     {processingStatus === 'processing' && 'Running AI Analysis...'}
-                    {processingStatus === 'processing_ai' && 'AI Enhancement...'}
                   </span>
                 </div>
               </div>
@@ -1664,11 +1731,27 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             )}
           </div>
           <div className="mt-4 flex-grow flex flex-col gap-4 min-h-0">
+            {isActiveReceiptProcessingStatus(processingStatus) && (
+              <Button
+                variant="destructive"
+                className="w-full gap-2"
+                onClick={handleStopProcessing}
+                disabled={reprocessMutation.isPending}
+              >
+                <AlertTriangle size={16} />
+                Stop Processing
+              </Button>
+            )}
+
             <Button
               variant="outline"
               className="w-full gap-2"
               onClick={handleReprocessReceipt}
-              disabled={isProcessing || !receipt.image_url || (processingStatus && !['failed', 'failed_ai', 'complete'].includes(processingStatus))}
+              disabled={
+                isProcessing ||
+                !receipt.image_url ||
+                (processingStatus && !['failed', 'failed_ai', 'failed_ocr', 'cancelled', 'complete'].includes(processingStatus))
+              }
             >
               {isProcessing ? (
                 <>
@@ -1698,7 +1781,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               <ScrollArea className="h-[200px] rounded-md border flex-shrink-0">
                 {processLogs.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
-                    {receipt.processing_status === 'complete' || receipt.processing_status === 'completed' ?
+                    {processingStatus === 'complete' ?
                       'Receipt processed successfully (logs may not be available for mobile uploads)' :
                       'No processing logs available'
                     }

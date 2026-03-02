@@ -12,7 +12,8 @@ import {
   uploadReceiptImage,
   processReceiptWithAI,
   markReceiptUploaded,
-  subscribeToReceiptAll
+  subscribeToReceiptAll,
+  cancelReceiptProcessing
 } from "@/services/receiptService";
 import { ProcessingLog, ProcessingStatus, Receipt } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +80,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   } = useFileUpload();
 
   const uploadZoneRef = useRef<HTMLDivElement>(null);
+  const processingAbortControllerRef = useRef<AbortController | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentTeam } = useTeam();
@@ -253,6 +255,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [openFileDialog]);
+
+  useEffect(() => {
+    return () => {
+      processingAbortControllerRef.current?.abort();
+      processingAbortControllerRef.current = null;
+    };
+  }, []);
 
   // Progress mapping for granular log-based progress updates
   const LOG_PROGRESS_MAP: Record<string, Record<string, number>> = {
@@ -555,6 +564,9 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       }
 
       try {
+        processingAbortControllerRef.current = new AbortController();
+        const processingSignal = processingAbortControllerRef.current.signal;
+
         // ENHANCED MODEL SELECTION DEBUG - Track exact values
         console.log('🔍 MODEL SELECTION DEBUG - Raw values:', {
           'settings.selectedModel': settings.selectedModel,
@@ -608,14 +620,15 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           // Start OpenRouter progress tracking
           openRouterActions.startProcessing(newReceiptId);
 
-          // Process with OpenRouter progress tracking
-          try {
-            await processReceiptWithAI(newReceiptId, {
-              modelId: modelToUse,
-              uploadContext: 'single',
-              onProgress: (stepName: string, message: string, progress?: number) => {
-                console.log(`OpenRouter Progress: ${stepName} - ${message}${progress ? ` (${progress}%)` : ''}`);
-                openRouterActions.addLog(stepName, message, progress);
+            // Process with OpenRouter progress tracking
+            try {
+              const processedResult = await processReceiptWithAI(newReceiptId, {
+                modelId: modelToUse,
+                uploadContext: 'single',
+                signal: processingSignal,
+                onProgress: (stepName: string, message: string, progress?: number) => {
+                  console.log(`OpenRouter Progress: ${stepName} - ${message}${progress ? ` (${progress}%)` : ''}`);
+                  openRouterActions.addLog(stepName, message, progress);
 
                 // Also add to local logs for UI consistency
                 addLocalLog(stepName, message, progress);
@@ -623,12 +636,16 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
                 // Update ARIA live region
                 if (ariaLiveRegion) {
                   ariaLiveRegion.textContent = message;
+                  }
                 }
-              }
-            });
+              });
 
-            // Complete OpenRouter progress tracking
-            openRouterActions.completeProcessing();
+              if (!processedResult) {
+                throw new Error("Processing cancelled by user");
+              }
+
+              // Complete OpenRouter progress tracking
+              openRouterActions.completeProcessing();
             addLocalLog('COMPLETE', 'OpenRouter processing completed successfully');
           } catch (openRouterError: unknown) {
             console.error('OpenRouter processing failed:', openRouterError);
@@ -636,14 +653,19 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
             openRouterActions.failProcessing(errorMessage);
             throw openRouterError; // Re-throw to be handled by outer catch
           }
-        } else {
-          // Standard Edge Function processing
-          console.log('🚀 Calling processReceiptWithAI with Edge Function model:', modelToUse);
-          await processReceiptWithAI(newReceiptId, {
-            modelId: modelToUse,
-            uploadContext: 'single'
-          });
-        }
+          } else {
+            // Standard Edge Function processing
+            console.log('🚀 Calling processReceiptWithAI with Edge Function model:', modelToUse);
+            const processedResult = await processReceiptWithAI(newReceiptId, {
+              modelId: modelToUse,
+              uploadContext: 'single',
+              signal: processingSignal
+            });
+
+            if (!processedResult) {
+              throw new Error("Processing cancelled by user");
+            }
+          }
 
         addLocalLog('COMPLETE', 'Processing complete - receipt ready for review');
 
@@ -660,6 +682,8 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         if (ariaLiveRegion) {
           ariaLiveRegion.textContent = 'Processing failed. Please edit the receipt manually.';
         }
+      } finally {
+        processingAbortControllerRef.current = null;
       }
 
       setTimeout(() => {
@@ -721,6 +745,13 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
   };
 
   const retryUpload = () => {
+    processingAbortControllerRef.current?.abort();
+    processingAbortControllerRef.current = null;
+
+    if (receiptId && (processingStatus === 'uploading' || processingStatus === 'uploaded' || processingStatus === 'processing')) {
+      void cancelReceiptProcessing(receiptId, "Cancelled by user");
+    }
+
     setError(null);
     setIsUploading(false);
     setUploadProgress(0);

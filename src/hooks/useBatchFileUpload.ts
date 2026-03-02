@@ -6,7 +6,8 @@ import {
   createReceipt,
   uploadReceiptImage,
   processReceiptWithAI,
-  markReceiptUploaded
+  markReceiptUploaded,
+  cancelReceiptProcessing
 } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
@@ -523,6 +524,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     processingStrategy
   });
   const processingRef = useRef<boolean>(false);
+  const processingAbortControllersRef = useRef<Record<string, AbortController>>({});
 
   const { user } = useAuth();
   const { currentTeam } = useTeam();
@@ -1238,13 +1240,20 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         const recommendation = processingRecommendations[upload.id];
+        const controller = new AbortController();
+        processingAbortControllersRef.current[upload.id] = controller;
         let result: any;
 
         // Process with AI Vision
         result = await processReceiptWithAI(newReceiptId, {
           modelId: recommendation?.recommendedModel || settings.selectedModel,
-          uploadContext: 'batch'
+          uploadContext: 'batch',
+          signal: controller.signal
         });
+
+        if (!result) {
+          throw new Error("Cancelled by user");
+        }
 
         console.log(`Processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
 
@@ -1342,6 +1351,8 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           message: processError.message || "Failed to process receipt"
         });
         statusChannel.unsubscribe();
+      } finally {
+        delete processingAbortControllersRef.current[upload.id];
       }
 
       return newReceiptId;
@@ -1365,7 +1376,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       });
       return null;
     }
-  }, [user, settings, updateUploadStatus, enableRateLimiting, batchSessionService, batchSession, requestApiPermission, addLocalLog]);
+  }, [user, settings, updateUploadStatus, enableRateLimiting, batchSessionService, batchSession, requestApiPermission, addLocalLog, processingRecommendations, progressTrackingService, batchUploads, currentTeam]);
 
   // Process the next batch of files
   const processNextBatch = useCallback(async () => {
@@ -1623,6 +1634,12 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
 
     // If it's active, mark it as failed
     if (activeUploads.includes(uploadId)) {
+      const controller = processingAbortControllersRef.current[uploadId];
+      if (controller) {
+        controller.abort();
+        delete processingAbortControllersRef.current[uploadId];
+      }
+
       updateUploadStatus(uploadId, 'error', 0, {
         code: 'CANCELLED',
         message: 'Upload cancelled by user'
@@ -1631,23 +1648,13 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       // If we have a receipt ID, update its status
       const receiptId = receiptIds[uploadId];
       if (receiptId) {
-        // Update the receipt status to failed
         try {
-          const { error } = await supabase
-            .from('receipts')
-            .update({
-              processing_status: 'failed_ocr',
-              processing_error: 'Cancelled by user'
-            })
-            .eq('id', receiptId);
-
-          if (error) {
-            console.error(`Failed to update receipt ${receiptId} status:`, error);
-          } else {
-            console.log(`Updated receipt ${receiptId} status to failed_ocr`);
+          const cancelled = await cancelReceiptProcessing(receiptId, "Cancelled by user");
+          if (!cancelled) {
+            console.error(`Failed to update receipt ${receiptId} cancellation status`);
           }
         } catch (error) {
-          console.error(`Exception updating receipt ${receiptId} status:`, error);
+          console.error(`Exception updating receipt ${receiptId} cancellation status:`, error);
         }
       }
     } else {
@@ -1655,6 +1662,13 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
       removeFromBatchQueue(uploadId);
     }
   }, [batchUploads, activeUploads, receiptIds, removeFromBatchQueue, updateUploadStatus]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(processingAbortControllersRef.current).forEach(controller => controller.abort());
+      processingAbortControllersRef.current = {};
+    };
+  }, []);
 
   // Retry a failed upload
   const retryUpload = useCallback((uploadId: string) => {
