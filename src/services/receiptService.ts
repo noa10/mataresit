@@ -1074,6 +1074,80 @@ export interface ProcessingOptions {
   modelId?: string;
 }
 
+const ACTIVE_PROCESSING_STATUSES = new Set<ProcessingStatus>([
+  'uploading',
+  'uploaded',
+  'processing',
+]);
+
+const VALID_PROCESSING_STATUSES = new Set<ProcessingStatus>([
+  'uploading',
+  'uploaded',
+  'processing',
+  'failed',
+  'failed_ai',
+  'failed_ocr',
+  'cancelled',
+  'complete',
+  null,
+]);
+
+const PROCESSING_ERROR_PATTERN = /(error|failed|timeout|exception|internal server error|cancelled)/i;
+const DEFAULT_STUCK_PROCESSING_MS = 3 * 60 * 1000;
+
+const isAbortError = (error: unknown): boolean => {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') return true;
+    if (/aborted|aborterror|cancelled by user|canceled by user/i.test(error.message)) return true;
+  }
+
+  return false;
+};
+
+const toErrorMessage = (error: unknown, fallback = "Unknown processing error"): string => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  return fallback;
+};
+
+export const normalizeReceiptProcessingStatus = (
+  status: string | ProcessingStatus | null | undefined
+): ProcessingStatus => {
+  if (!status) return 'complete';
+
+  const normalized = String(status).toLowerCase();
+
+  switch (normalized) {
+    case 'completed':
+      return 'complete';
+    case 'pending':
+      return 'uploading';
+    case 'manual_review':
+      return 'complete';
+    case 'processing_ai':
+      return 'processing';
+    default:
+      return VALID_PROCESSING_STATUSES.has(normalized as ProcessingStatus)
+        ? (normalized as ProcessingStatus)
+        : 'complete';
+  }
+};
+
+export const isActiveReceiptProcessingStatus = (
+  status: string | ProcessingStatus | null | undefined
+): boolean => {
+  const normalized = normalizeReceiptProcessingStatus(status);
+  return normalized !== null && ACTIVE_PROCESSING_STATUSES.has(normalized);
+};
+
 // Helper function to check if a model is an OpenRouter model
 const isOpenRouterModel = (modelId: string): boolean => {
   return modelId.startsWith('openrouter/');
@@ -1180,7 +1254,8 @@ const processReceiptWithOpenRouter = async (
   receiptId: string,
   imageUrl: string,
   options: ProcessingOptions,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<AIResult> => {
   // Initialize client-side logger for database logging
   const logger = new ClientProcessingLogger(receiptId);
@@ -1215,7 +1290,7 @@ const processReceiptWithOpenRouter = async (
   onProgress?.('START', 'Fetching image data');
   await logger.log('📥 Fetching image data from storage', "START");
   console.log('Fetching image for OpenRouter processing:', imageUrl);
-  const imageResponse = await fetch(imageUrl);
+  const imageResponse = await fetch(imageUrl, { signal });
   if (!imageResponse.ok) {
     const errorMsg = `Failed to fetch image: ${imageResponse.status}`;
     await logger.error(errorMsg);
@@ -1252,7 +1327,7 @@ const processReceiptWithOpenRouter = async (
   console.log(`Processing receipt ${receiptId} with OpenRouter model ${modelConfig.name}`);
   await logger.log(`🚀 OPENROUTER API REQUEST: Initiating call to ${modelConfig.name}`, "AI");
 
-  const result = await openRouterService.callModel(modelConfig, input, receiptId, enhancedProgressCallback);
+  const result = await openRouterService.callModel(modelConfig, input, receiptId, enhancedProgressCallback, signal);
 
   console.log('🔍 OpenRouter service result:', {
     resultType: typeof result,
@@ -1305,7 +1380,8 @@ const processReceiptWithGemini = async (
   receiptId: string,
   imageUrl: string,
   options: ProcessingOptions,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
 ): Promise<AIResult> => {
   const logger = new ClientProcessingLogger(receiptId);
 
@@ -1334,7 +1410,7 @@ const processReceiptWithGemini = async (
 
   onProgress?.('START', 'Fetching image data');
   await logger.log('📥 Fetching image data from storage', "START");
-  const imageResponse = await fetch(imageUrl);
+  const imageResponse = await fetch(imageUrl, { signal });
   if (!imageResponse.ok) {
     const errorMsg = `Failed to fetch image: ${imageResponse.status}`;
     await logger.error(errorMsg);
@@ -1383,7 +1459,8 @@ const processReceiptWithGemini = async (
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 
   if (!response.ok) {
@@ -1438,7 +1515,11 @@ const processReceiptWithGemini = async (
 // Process a receipt with AI Vision
 export const processReceiptWithAI = async (
   receiptId: string,
-  options?: ProcessingOptions & { uploadContext?: string; onProgress?: ProgressCallback }
+  options?: ProcessingOptions & {
+    uploadContext?: string;
+    onProgress?: ProgressCallback;
+    signal?: AbortSignal;
+  }
 ): Promise<AIResult | null> => {
   try {
     // Use AI Vision as the processing method
@@ -1477,14 +1558,32 @@ export const processReceiptWithAI = async (
       let result: AIResult;
       try {
         // Process with client-side provider
-        result = await clientProcessor.handler(receiptId, receipt.image_url, processingOptions, options?.onProgress);
+        result = await clientProcessor.handler(
+          receiptId,
+          receipt.image_url,
+          processingOptions,
+          options?.onProgress,
+          options?.signal
+        );
       } catch (processingError) {
         // Log error to database using client logger
         const logger = new ClientProcessingLogger(receiptId);
-        await logger.error(`${clientProcessor.name} processing failed: ${processingError.message}`);
+        const errorMessage = toErrorMessage(processingError);
+        const cancelledByUser = isAbortError(processingError);
+
+        await logger.error(
+          cancelledByUser
+            ? `${clientProcessor.name} processing cancelled by user`
+            : `${clientProcessor.name} processing failed: ${errorMessage}`
+        );
+
+        if (cancelledByUser) {
+          await cancelReceiptProcessing(receiptId, "Cancelled by user");
+          throw new Error("Processing cancelled by user");
+        }
 
         // Update status to failed
-        await updateReceiptProcessingStatus(receiptId, 'failed', processingError.message);
+        await updateReceiptProcessingStatus(receiptId, 'failed', errorMessage);
         throw processingError;
       }
 
@@ -1674,9 +1773,14 @@ export const processReceiptWithAI = async (
       processingResponse = await fetch(processingUrl, {
         method: 'POST',
         headers: requestHeaders,
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: options?.signal,
       });
     } catch (fetchError) {
+      if (isAbortError(fetchError)) {
+        await cancelReceiptProcessing(receiptId, "Cancelled by user");
+        throw new Error("Processing cancelled by user");
+      }
       const errorMsg = `Processing API request failed: ${fetchError.message}`;
       console.error("Processing fetch error:", fetchError);
       await updateReceiptProcessingStatus(receiptId, 'failed', errorMsg);
@@ -1797,18 +1901,25 @@ export const processReceiptWithAI = async (
     return result;
   } catch (error) {
     console.error("Error in processReceiptWithAI:", error);
+    const cancelledByUser = isAbortError(error) || /cancelled by user/i.test(toErrorMessage(error, ""));
+    if (cancelledByUser) {
+      await cancelReceiptProcessing(receiptId, "Cancelled by user");
+      toast.info("Processing cancelled");
+      return null;
+    }
+
     // Try to update status to failed if not already done
     try {
       await updateReceiptProcessingStatus(
         receiptId,
         'failed',
-        error.message || "Unknown error during receipt processing"
+        toErrorMessage(error, "Unknown error during receipt processing")
       );
     } catch (statusError) {
       console.error("Failed to update error status:", statusError);
     }
 
-    toast.error("Failed to process receipt: " + (error.message || "Unknown error"));
+    toast.error("Failed to process receipt: " + toErrorMessage(error));
     return null;
   }
 };
@@ -2744,6 +2855,95 @@ export const updateReceiptProcessingStatus = async (
     console.error("Error in updateReceiptProcessingStatus:", error);
     return false;
   }
+};
+
+interface ProcessingRecoveryResult {
+  recovered: boolean;
+  reason?: string;
+}
+
+export const recoverStuckReceiptProcessing = async (
+  receiptId: string,
+  opts?: { staleMs?: number }
+): Promise<ProcessingRecoveryResult> => {
+  const staleMs = opts?.staleMs ?? DEFAULT_STUCK_PROCESSING_MS;
+
+  try {
+    const { data: receipt, error: receiptError } = await supabase
+      .from('receipts')
+      .select('processing_status, processing_error, updated_at')
+      .eq('id', receiptId)
+      .single();
+
+    if (receiptError || !receipt) {
+      if (receiptError) {
+        console.error("Failed to load receipt for stuck-processing recovery:", receiptError);
+      }
+      return { recovered: false, reason: 'receipt_not_found' };
+    }
+
+    const normalizedStatus = normalizeReceiptProcessingStatus(receipt.processing_status);
+    if (!isActiveReceiptProcessingStatus(normalizedStatus)) {
+      return { recovered: false, reason: 'terminal_status' };
+    }
+
+    if (typeof receipt.processing_error === 'string' && receipt.processing_error.trim().length > 0) {
+      const recovered = await updateReceiptProcessingStatus(receiptId, 'failed', receipt.processing_error.trim());
+      return { recovered, reason: recovered ? 'error_on_receipt' : 'recovery_update_failed' };
+    }
+
+    const { data: latestLog, error: latestLogError } = await supabase
+      .from('processing_logs')
+      .select('created_at, step_name, status_message')
+      .eq('receipt_id', receiptId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestLogError) {
+      console.warn("Failed to fetch latest processing log during recovery:", latestLogError);
+    }
+
+    const stepName = latestLog?.step_name?.toUpperCase() || null;
+    const statusMessage = latestLog?.status_message?.trim() || '';
+    const hasErrorLog = stepName === 'ERROR' || PROCESSING_ERROR_PATTERN.test(statusMessage);
+
+    if (hasErrorLog) {
+      const errorMessage = statusMessage || "Processing failed. Please retry.";
+      const recovered = await updateReceiptProcessingStatus(receiptId, 'failed', errorMessage);
+      return { recovered, reason: recovered ? 'error_log_detected' : 'recovery_update_failed' };
+    }
+
+    const receiptActivityMs = Date.parse(receipt.updated_at);
+    const logActivityMs = latestLog?.created_at ? Date.parse(latestLog.created_at) : Number.NaN;
+    const lastActivityMs = Math.max(
+      Number.isFinite(receiptActivityMs) ? receiptActivityMs : 0,
+      Number.isFinite(logActivityMs) ? logActivityMs : 0
+    );
+
+    if (lastActivityMs <= 0) {
+      return { recovered: false, reason: 'missing_activity' };
+    }
+
+    const idleTimeMs = Date.now() - lastActivityMs;
+    if (idleTimeMs <= staleMs) {
+      return { recovered: false, reason: 'fresh_activity' };
+    }
+
+    const staleMessage = "Processing appears to have been interrupted. Please retry.";
+    const recovered = await updateReceiptProcessingStatus(receiptId, 'failed', staleMessage);
+    return { recovered, reason: recovered ? 'stale_timeout' : 'recovery_update_failed' };
+  } catch (error) {
+    console.error("Unexpected stuck-processing recovery error:", error);
+    return { recovered: false, reason: 'recovery_exception' };
+  }
+};
+
+export const cancelReceiptProcessing = async (
+  receiptId: string,
+  reason = "Cancelled by user"
+): Promise<boolean> => {
+  return updateReceiptProcessingStatus(receiptId, 'failed', reason);
 };
 
 // Fix processing status from failed to complete when a receipt is manually edited
