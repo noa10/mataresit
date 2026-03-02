@@ -113,7 +113,8 @@ export class OpenRouterService {
     modelConfig: ModelConfig,
     input: ProcessingInput,
     receiptId: string,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    signal?: AbortSignal
   ): Promise<any> {
     console.log(`Calling OpenRouter model: ${modelConfig.name} for receipt ${receiptId}`);
 
@@ -155,7 +156,8 @@ export class OpenRouterService {
           'HTTP-Referer': window.location.origin,
           'X-Title': 'Mataresit Receipt Processing'
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
+        signal
       });
 
       if (!response.ok) {
