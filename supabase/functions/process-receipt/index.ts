@@ -1606,6 +1606,12 @@ serve(async (req: Request) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  let receiptId: string | null = null;
+  const serviceRoleSupabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
+
   try {
     console.log("Received request to process receipt");
 
@@ -1624,15 +1630,18 @@ serve(async (req: Request) => {
     }
 
     // 1. Validate and extract parameters
-    const { imageUrl, receiptId, modelId, skipOptimization, clientOptimized } =
-      await validateAndExtractParams(req);
+    const {
+      imageUrl,
+      receiptId: validatedReceiptId,
+      modelId,
+      skipOptimization,
+      clientOptimized
+    } = await validateAndExtractParams(req);
+    receiptId = validatedReceiptId;
 
     // 2. Initialize logger and Supabase client
     const logger = new ProcessingLogger(receiptId);
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabase = serviceRoleSupabase;
 
     await logger.log("Starting receipt processing", "START");
 
@@ -1733,25 +1742,31 @@ serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in process-receipt function:', error);
+    const safeErrorMessage = error instanceof Error ? error.message : 'Internal server error';
 
     // Try to log the error and send failure notification
-    let receiptId: string | null = null;
     try {
-      if (error.message && error.message.includes('Missing required parameter')) {
+      if (safeErrorMessage.includes('Missing required parameter')) {
         // For validation errors, return 400
         return new Response(
-          JSON.stringify({ error: error.message, success: false }),
+          JSON.stringify({ error: safeErrorMessage, success: false }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // For other errors, try to log and return 500
-      const params = await req.json().catch(() => ({}));
-      receiptId = params.receiptId;
-
+      // For other errors, guarantee receipt status is moved out of processing when possible
       if (receiptId) {
+        await serviceRoleSupabase
+          .from('receipts')
+          .update({
+            processing_status: 'failed',
+            processing_error: safeErrorMessage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', receiptId);
+
         const logger = new ProcessingLogger(receiptId);
-        await logger.log(`Server error: ${error.message}`, "ERROR");
+        await logger.log(`Server error: ${safeErrorMessage}`, "ERROR");
 
         // Processing failed notifications are now handled by database trigger only
         await logger.log("Processing failed notification will be handled by database trigger", "NOTIFICATION");
@@ -1762,7 +1777,7 @@ serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({
-        error: error.message || 'Internal server error',
+        error: safeErrorMessage,
         success: false
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
