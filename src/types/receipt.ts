@@ -6,6 +6,9 @@ export type ProcessingStatus =
   | 'uploaded'
   | 'processing'
   | 'failed'
+  | 'failed_ai'
+  | 'failed_ocr'
+  | 'cancelled'
   | 'complete'
   | null;
 
