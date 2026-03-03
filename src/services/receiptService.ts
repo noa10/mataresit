@@ -163,6 +163,13 @@ export interface ReceiptListParams {
   fromDate?: string | null;
   toDate?: string | null;
   sortOrder?: ReceiptSortOrder;
+  /**
+   * Preset filter for reprocessing candidates:
+   * - 'failed_ai': receipts that explicitly failed (failed / failed_ai / failed_ocr)
+   * - 'no_data': completed receipts with no merchant name extracted (fallback data)
+   * - 'needs_reprocessing': union of both above
+   */
+  reprocessingPreset?: 'failed_ai' | 'no_data' | 'needs_reprocessing' | null;
 }
 
 export interface ReceiptListResult {
@@ -261,6 +268,29 @@ export const fetchReceiptsPage = async (
     query = query.is("paid_by_id", null);
   } else if (params.paidById) {
     query = query.eq("paid_by_id", params.paidById);
+  }
+
+  // Reprocessing preset filter
+  // NOTE: Some receipts fail AI extraction but the edge function saves a fallback
+  // 'complete' record with empty merchant/total. We must catch both cases:
+  //   failed_ai  → explicit failure statuses
+  //   no_data    → complete status but merchant is null/empty
+  //   needs_reprocessing → union of both
+  if (params.reprocessingPreset) {
+    const failedStatuses = 'failed,failed_ai,failed_ocr';
+    const noDataCondition =
+      `and(processing_status.eq.complete,or(merchant.is.null,merchant.eq.))`;  // merchant = ''
+
+    if (params.reprocessingPreset === 'failed_ai') {
+      // Only explicit failure statuses
+      query = query.or(`processing_status.in.(${failedStatuses})`);
+    } else if (params.reprocessingPreset === 'no_data') {
+      // Complete receipts with empty merchant
+      query = query.or(noDataCondition);
+    } else if (params.reprocessingPreset === 'needs_reprocessing') {
+      // Both failure statuses AND complete-but-empty
+      query = query.or(`processing_status.in.(${failedStatuses}),${noDataCondition}`);
+    }
   }
 
   if (params.fromDate) {
@@ -3074,4 +3104,93 @@ export const getNormalizedMerchant = (merchant: string): string => {
     merchantCache.set(key, normalizeMerchant(merchant));
   }
   return merchantCache.get(key)!;
+};
+
+// ---------------------------------------------------------------------------
+// Bulk Reprocessing
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether a receipt is eligible for AI reprocessing.
+ * A receipt is eligible if:
+ * - it has an image_url
+ * - processing_status is failed / failed_ai / failed_ocr / cancelled / null
+ * - it is NOT currently being processed
+ */
+export const isReprocessEligible = (receipt: Receipt): boolean => {
+  if (!receipt.image_url) return false;
+  const status = receipt.processing_status ?? null;
+  // Cannot reprocess while already in progress
+  if (status === 'processing' || status === 'uploading' || status === 'uploaded') return false;
+  // Explicit failure statuses
+  const failedStatuses: (ProcessingStatus | null)[] = ['failed', 'failed_ai', 'failed_ocr', 'cancelled', null];
+  if (failedStatuses.includes(status)) return true;
+  // Also eligible: "complete" receipts where the edge function saved fallback empty data
+  // (the AI call failed but the function didn't set a failed status — merchant will be empty)
+  if (status === 'complete' && !receipt.merchant) return true;
+  return false;
+};
+
+export interface BulkReprocessCallbacks {
+  onItemStart?: (receiptId: string) => void;
+  onItemComplete?: (receiptId: string) => void;
+  onItemError?: (receiptId: string, error: string) => void;
+}
+
+export interface BulkReprocessResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
+/**
+ * Reprocess multiple receipts with AI extraction.
+ * Uses concurrency control to avoid overwhelming the API.
+ * Prevents duplicate processing via an internal tracking set.
+ */
+export const bulkReprocessReceipts = async (
+  receiptIds: string[],
+  options?: ProcessingOptions,
+  callbacks?: BulkReprocessCallbacks,
+  maxConcurrent = 2,
+): Promise<BulkReprocessResult> => {
+  const succeeded: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  const processing = new Set<string>();
+
+  // Deduplicate input IDs
+  const uniqueIds = [...new Set(receiptIds)];
+  if (uniqueIds.length === 0) return { succeeded, failed };
+
+  // Simple concurrency-limited runner
+  let index = 0;
+
+  const processNext = async (): Promise<void> => {
+    while (index < uniqueIds.length) {
+      const currentIndex = index++;
+      const id = uniqueIds[currentIndex];
+
+      // Skip if already being processed (idempotency guard)
+      if (processing.has(id)) continue;
+      processing.add(id);
+
+      callbacks?.onItemStart?.(id);
+      try {
+        await processReceiptWithAI(id, options);
+        succeeded.push(id);
+        callbacks?.onItemComplete?.(id);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        failed.push({ id, error: errorMsg });
+        callbacks?.onItemError?.(id, errorMsg);
+      } finally {
+        processing.delete(id);
+      }
+    }
+  };
+
+  // Launch up to maxConcurrent workers
+  const workers = Array.from({ length: Math.min(maxConcurrent, uniqueIds.length) }, () => processNext());
+  await Promise.all(workers);
+
+  return { succeeded, failed };
 };
