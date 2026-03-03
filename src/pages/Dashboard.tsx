@@ -10,7 +10,7 @@ import {
   Upload, Search, SlidersHorizontal,
   PlusCircle, XCircle, Calendar as CalendarIcon, X,
   LayoutGrid, LayoutList, Table as TableIcon,
-  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag
+  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag, RefreshCw
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
@@ -18,10 +18,10 @@ import { useStripe } from "@/contexts/StripeContext";
 import { ExportDropdown } from "@/components/export/ExportDropdown";
 import { ExportFilters } from "@/lib/export";
 import { useDashboardTranslation, useCommonTranslation, useReceiptsTranslation } from "@/contexts/LanguageContext";
-import { fetchReceiptsPage, fetchReceiptCurrencies, ReceiptSortOrder } from "@/services/receiptService";
+import { fetchReceiptsPage, fetchReceiptCurrencies, ReceiptSortOrder, isReprocessEligible } from "@/services/receiptService";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Receipt, ReceiptStatus } from "@/types/receipt";
+import { Receipt, ReceiptStatus, ProcessingStatus } from "@/types/receipt";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -41,6 +41,8 @@ import { CategorySelector, CategoryDisplay } from "@/components/categories/Categ
 import { formatCurrencySafe } from "@/utils/currency";
 import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet";
 import { ReceiptsPagination } from "@/components/dashboard/ReceiptsPagination";
+import { BulkReprocessProgressPanel } from "@/components/dashboard/BulkReprocessProgressPanel";
+import { useBulkReprocess } from "@/contexts/BulkReprocessContext";
 
 import {
   Table,
@@ -54,6 +56,13 @@ import {
 // Define view mode types
 type ViewMode = "grid" | "list" | "table";
 type PageLimit = 10 | 25 | 50;
+
+// Map processing status filter presets to display labels
+const PROCESSING_STATUS_FILTER_LABELS: Record<string, string> = {
+  failed_ai: 'Failed AI',
+  no_data: 'No data',
+  needs_reprocessing: 'Needs reprocessing',
+};
 
 const parsePageParam = (value: string | null): number => {
   const parsed = Number(value ?? "1");
@@ -186,6 +195,14 @@ export default function Dashboard() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<string[]>([]);
   const [bulkCategoryId, setBulkCategoryId] = useState<string | null>(null);
+
+  // Processing status filter state
+  const [processingStatusFilter, setProcessingStatusFilter] = useState<string | null>(
+    searchParams.get('ps') || null
+  );
+
+  // Bulk reprocessing context
+  const { enqueueReceipts, isProcessing: isBulkReprocessing } = useBulkReprocess();
 
   // Toggle selection mode
   const toggleSelectionMode = () => {
@@ -365,6 +382,7 @@ export default function Dashboard() {
       sortOrder,
       fromDate,
       toDate,
+      processingStatusFilter,
     ],
     queryFn: () =>
       fetchReceiptsPage(
@@ -379,6 +397,7 @@ export default function Dashboard() {
           sortOrder: sortOrder as ReceiptSortOrder,
           fromDate,
           toDate,
+          reprocessingPreset: processingStatusFilter as 'failed_ai' | 'no_data' | 'needs_reprocessing' | null || undefined,
         },
         { currentTeam }
       ),
@@ -510,6 +529,7 @@ export default function Dashboard() {
     setFilterByPayer(null);
     setSortOrder("newest");
     setDateRange(undefined);
+    setProcessingStatusFilter(null);
     updateSearchParams({
       sort: null,
       currency: null,
@@ -517,6 +537,7 @@ export default function Dashboard() {
       paidBy: null,
       from: null,
       to: null,
+      ps: null,
       page: "1",
       limit: String(limit),
     });
@@ -531,6 +552,7 @@ export default function Dashboard() {
     setFilterByPayer(null);
     setSortOrder("newest");
     setDateRange(undefined);
+    setProcessingStatusFilter(null);
     setPage(1);
     // Don't reset view mode when clearing filters, just keep current value if any
     const currentViewMode = viewMode !== 'grid' ? viewMode : null;
@@ -548,7 +570,8 @@ export default function Dashboard() {
     (filterByCurrency ? 1 : 0) +
     (filterByCategory ? 1 : 0) +
     (filterByPayer ? 1 : 0) +
-    (dateRange?.from ? 1 : 0);
+    (dateRange?.from ? 1 : 0) +
+    (processingStatusFilter ? 1 : 0);
 
   const categoryFilterLabel = filterByCategory === "uncategorized"
     ? tDash("filtersSheet.uncategorized")
@@ -604,7 +627,21 @@ export default function Dashboard() {
     !!filterByCurrency ||
     !!filterByCategory ||
     sortOrder !== "newest" ||
-    !!dateRange?.from;
+    !!dateRange?.from ||
+    !!processingStatusFilter;
+
+  // Processing status filter handler
+  const handleProcessingStatusFilterChange = (value: string | null) => {
+    setProcessingStatusFilter(value);
+    resetPageAndSync({ ps: value });
+  };
+
+  // Compute eligible selected receipts for reprocessing
+  const eligibleForReprocess = selectionMode
+    ? processedReceipts.filter(
+      r => selectedReceiptIds.includes(r.id) && isReprocessEligible(r)
+    )
+    : [];
 
   // Render different view modes
   const renderReceiptContent = () => {
@@ -1233,6 +1270,33 @@ export default function Dashboard() {
                       </>
                     )}
                   </Button>
+
+                  {/* Bulk Reprocess */}
+                  {eligibleForReprocess.length > 0 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 whitespace-nowrap"
+                      onClick={() => {
+                        enqueueReceipts(eligibleForReprocess.map(r => r.id));
+                        setSelectionMode(false);
+                        setSelectedReceiptIds([]);
+                      }}
+                      disabled={isBulkReprocessing}
+                      data-testid="bulk-reprocess-btn"
+                    >
+                      {isBulkReprocessing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Reprocessing…
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={16} />
+                          Reprocess ({eligibleForReprocess.length})
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </>
               )}
 
@@ -1354,6 +1418,19 @@ export default function Dashboard() {
                 </Button>
               )}
 
+              {processingStatusFilter && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => handleProcessingStatusFilterChange(null)}
+                  data-testid="dashboard-chip-processing-status"
+                >
+                  Status: {PROCESSING_STATUS_FILTER_LABELS[processingStatusFilter] || processingStatusFilter}
+                  <X className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -1391,6 +1468,8 @@ export default function Dashboard() {
           onCategoryChange={handleCategoryFilterChange}
           filterByPayer={filterByPayer}
           onPayerChange={handlePayerFilterChange}
+          processingStatusFilter={processingStatusFilter}
+          onProcessingStatusChange={handleProcessingStatusFilterChange}
           currencies={currencies}
           categories={categories}
           payers={payers}
@@ -1428,6 +1507,9 @@ export default function Dashboard() {
 
       {/* Floating indicator for background uploads */}
       <BackgroundUploadIndicator />
+
+      {/* Floating indicator for bulk reprocessing */}
+      <BulkReprocessProgressPanel />
 
       <footer className="border-t border-border/40 mt-12">
         <div className="container px-4 py-6">
