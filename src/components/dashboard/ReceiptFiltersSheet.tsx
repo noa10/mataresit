@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar as CalendarIcon, Check, DollarSign, Search, X } from "lucide-react";
+import { Calendar as CalendarIcon, Check, DollarSign, Search, X, AlertCircle } from "lucide-react";
 import { format, startOfMonth, startOfQuarter, startOfToday, startOfYear, subDays } from "date-fns";
 import { DateRange } from "react-day-picker";
 
@@ -31,6 +31,8 @@ interface ReceiptFiltersSheetProps {
   onCategoryChange: (value: string | null) => void;
   filterByPayer: string | null;
   onPayerChange: (value: string | null) => void;
+  processingStatusFilter: string | null;
+  onProcessingStatusChange: (value: string | null) => void;
   currencies: string[];
   categories: CustomCategory[];
   payers: PaidBy[];
@@ -80,6 +82,8 @@ export function ReceiptFiltersSheet({
   onCategoryChange,
   filterByPayer,
   onPayerChange,
+  processingStatusFilter,
+  onProcessingStatusChange,
   currencies,
   categories,
   payers,
@@ -537,6 +541,52 @@ export function ReceiptFiltersSheet({
                     {tDash("filtersSheet.noPayers")}
                   </p>
                 )}
+              </div>
+            </motion.section>
+
+            {/* Processing Status Filter */}
+            <motion.section {...sectionMotion} transition={{ duration: 0.22, delay: 0.2 }} className="rounded-2xl border border-border/60 bg-card/50 p-4 backdrop-blur-sm">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Processing Status</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  aria-label="Show all processing statuses"
+                  className={cn(
+                    optionButtonBase,
+                    !processingStatusFilter
+                      ? "border-primary/55 bg-primary/15 text-foreground"
+                      : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                  )}
+                  onClick={() => onProcessingStatusChange(null)}
+                >
+                  {tDash("filtersSheet.all")}
+                </button>
+                {[
+                  { value: "failed_ai", label: "Failed AI", icon: AlertCircle },
+                  { value: "no_data", label: "No data" },
+                  { value: "needs_reprocessing", label: "Needs reprocessing" },
+                ].map((option) => {
+                  const selected = processingStatusFilter === option.value;
+                  const Icon = (option as any).icon;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-label={`Processing status: ${option.label}`}
+                      data-testid={`filter-ps-${option.value}`}
+                      className={cn(
+                        optionButtonBase,
+                        selected
+                          ? "border-primary/55 bg-primary/15 text-foreground shadow-sm"
+                          : "border-border/70 bg-background/45 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                      )}
+                      onClick={() => onProcessingStatusChange(option.value)}
+                    >
+                      {Icon && <Icon className="h-4 w-4" />}
+                      <span>{option.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </motion.section>
           </div>
