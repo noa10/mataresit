@@ -35,36 +35,69 @@ const defaultSettings: ProcessingSettings = {
 
 const SETTINGS_STORAGE_KEY = 'receiptProcessingSettings';
 
-export function useSettings() {
-  const [settings, setSettings] = useState<ProcessingSettings>(() => {
-    try {
-      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (storedSettings) {
-        // Parse stored settings
-        const parsed = JSON.parse(storedSettings);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
-        // Basic validation to ensure stored data has required fields
-        if (parsed.selectedModel && typeof parsed.selectedModel === 'string') {
-          // Merge with default settings to ensure all properties exist
-          // This handles cases where new properties were added to the settings structure
-          return {
-            ...defaultSettings,
-            ...parsed,
-            // If batchUpload exists in parsed, use it, otherwise use default
-            batchUpload: parsed.batchUpload || defaultSettings.batchUpload,
-            // If userApiKeys exists in parsed, use it, otherwise use default
-            userApiKeys: parsed.userApiKeys || defaultSettings.userApiKeys
-          };
-        }
-      }
-    } catch (error) {
-      console.error("Error reading settings from localStorage:", error);
+const normalizeStoredSettings = (rawSettings: unknown): ProcessingSettings | null => {
+  if (!isRecord(rawSettings)) {
+    return null;
+  }
+
+  const selectedModel = rawSettings.selectedModel;
+  if (typeof selectedModel !== 'string' || !selectedModel.trim()) {
+    return null;
+  }
+
+  const batchModel = rawSettings.batchModel;
+  const batchUpload = isRecord(rawSettings.batchUpload) ? rawSettings.batchUpload : {};
+  const userApiKeys = isRecord(rawSettings.userApiKeys) ? rawSettings.userApiKeys : {};
+
+  return {
+    ...defaultSettings,
+    selectedModel: selectedModel.trim(),
+    batchModel: typeof batchModel === 'string' && batchModel.trim()
+      ? batchModel.trim()
+      : defaultSettings.batchModel,
+    batchUpload: {
+      ...defaultSettings.batchUpload,
+      ...batchUpload
+    },
+    userApiKeys: {
+      ...defaultSettings.userApiKeys,
+      ...userApiKeys
+    },
+    skipUploadOptimization: typeof rawSettings.skipUploadOptimization === 'boolean'
+      ? rawSettings.skipUploadOptimization
+      : defaultSettings.skipUploadOptimization
+  };
+};
+
+export function getStoredProcessingSettings(): ProcessingSettings | null {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return null;
     }
-    return defaultSettings;
-  });
+
+    const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!storedSettings) {
+      return null;
+    }
+
+    return normalizeStoredSettings(JSON.parse(storedSettings));
+  } catch (error) {
+    console.error("Error reading settings from localStorage:", error);
+    return null;
+  }
+}
+
+export function useSettings() {
+  const [settings, setSettings] = useState<ProcessingSettings>(() => getStoredProcessingSettings() || defaultSettings);
 
   useEffect(() => {
     try {
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error("Error saving settings to localStorage:", error);

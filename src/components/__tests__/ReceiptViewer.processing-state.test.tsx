@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   subscribeToReceiptAll: vi.fn(),
   cancelReceiptProcessing: vi.fn(),
   recoverStuckReceiptProcessing: vi.fn(),
+  getStoredProcessingSettings: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
@@ -71,6 +72,7 @@ vi.mock("@/hooks/useSettings", () => ({
       selectedModel: "gemini-2.5-flash-lite",
     },
   }),
+  getStoredProcessingSettings: mocks.getStoredProcessingSettings,
 }));
 
 vi.mock("@/contexts/SaveStatusContext", () => ({
@@ -203,6 +205,8 @@ function renderViewer(receipt: ReceiptWithDetails) {
 describe("ReceiptViewer processing state behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    mocks.getStoredProcessingSettings.mockReturnValue(null);
 
     mocks.fetchCategoriesForDisplay.mockResolvedValue([]);
     mocks.updateReceipt.mockResolvedValue(true);
@@ -282,4 +286,69 @@ describe("ReceiptViewer processing state behavior", () => {
       expect(screen.getByRole("button", { name: /Reprocess with AI Vision/i })).toBeEnabled();
     }
   );
+
+  it("uses latest persisted settings model for Reprocess with AI Vision", async () => {
+    const user = userEvent.setup();
+    renderViewer({ ...baseReceipt, processing_status: "complete" });
+    mocks.getStoredProcessingSettings.mockReturnValue({
+      selectedModel: "openrouter/meta-llama/llama-4-maverick:free",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Reprocess with AI Vision/i }));
+
+    await waitFor(() => {
+      expect(mocks.processReceiptWithAI).toHaveBeenCalled();
+    });
+
+    const [receiptId, options] = mocks.processReceiptWithAI.mock.calls.at(-1) || [];
+    expect(receiptId).toBe("receipt-1");
+    expect(mocks.getStoredProcessingSettings).toHaveBeenCalled();
+    expect(options).toEqual(
+      expect.objectContaining({
+        modelId: "openrouter/meta-llama/llama-4-maverick:free",
+      })
+    );
+  });
+
+  it("uses latest persisted settings model for failed-state Try Again", async () => {
+    const user = userEvent.setup();
+    renderViewer({ ...baseReceipt, processing_status: "failed" });
+    mocks.getStoredProcessingSettings.mockReturnValue({
+      selectedModel: "gemini-2.5-pro",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Try Again/i }));
+
+    await waitFor(() => {
+      expect(mocks.processReceiptWithAI).toHaveBeenCalled();
+    });
+
+    const [receiptId, options] = mocks.processReceiptWithAI.mock.calls.at(-1) || [];
+    expect(receiptId).toBe("receipt-1");
+    expect(mocks.getStoredProcessingSettings).toHaveBeenCalled();
+    expect(options).toEqual(
+      expect.objectContaining({
+        modelId: "gemini-2.5-pro",
+      })
+    );
+  });
+
+  it("falls back to hook selected model when persisted settings are missing or invalid", async () => {
+    const user = userEvent.setup();
+    renderViewer({ ...baseReceipt, processing_status: "complete" });
+
+    await user.click(screen.getByRole("button", { name: /Reprocess with AI Vision/i }));
+
+    await waitFor(() => {
+      expect(mocks.processReceiptWithAI).toHaveBeenCalled();
+    });
+
+    const [receiptId, options] = mocks.processReceiptWithAI.mock.calls.at(-1) || [];
+    expect(receiptId).toBe("receipt-1");
+    expect(options).toEqual(
+      expect.objectContaining({
+        modelId: "gemini-2.5-flash-lite",
+      })
+    );
+  });
 });
