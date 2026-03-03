@@ -52,7 +52,7 @@ import BoundingBoxOverlay from "@/components/receipts/BoundingBoxOverlay";
 import DocumentStructureViewer from "@/components/receipts/DocumentStructureViewer";
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 import { SimilarReceipts } from "@/components/search/SimilarReceipts";
-import { useSettings } from "@/hooks/useSettings";
+import { getStoredProcessingSettings, useSettings } from "@/hooks/useSettings";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { upsertCategoryRule } from "@/services/categoryRuleService";
@@ -755,9 +755,23 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     );
   };
 
+  const resolveReprocessModelId = useCallback(() => {
+    const persistedModelId = getStoredProcessingSettings()?.selectedModel?.trim();
+    if (persistedModelId) {
+      return persistedModelId;
+    }
+
+    const selectedModel = settings.selectedModel?.trim();
+    if (selectedModel) {
+      return selectedModel;
+    }
+
+    return "gemini-2.5-flash-lite";
+  }, [settings.selectedModel, getStoredProcessingSettings]);
+
   const reprocessMutation = useMutation({
-    mutationFn: ({ signal }: { signal?: AbortSignal } = {}) => processReceiptWithAI(receipt.id, {
-      modelId: settings.selectedModel,
+    mutationFn: ({ modelId, signal }: { modelId: string; signal?: AbortSignal }) => processReceiptWithAI(receipt.id, {
+      modelId,
       signal,
     }),
     onSuccess: (data) => {
@@ -960,6 +974,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const handleReprocessReceipt = () => {
     if (isProcessing) return; // Prevent multiple simultaneous processing
 
+    const modelId = resolveReprocessModelId();
+
     setIsProcessing(true); // Show loading state in confidence indicators
 
     // Always use AI Vision processing status
@@ -977,7 +993,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     }));
 
     reprocessAbortControllerRef.current = new AbortController();
-    reprocessMutation.mutate({ signal: reprocessAbortControllerRef.current.signal });
+    reprocessMutation.mutate({ modelId, signal: reprocessAbortControllerRef.current.signal });
   };
 
   const handleStopProcessing = async () => {
@@ -1394,7 +1410,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               size="sm"
               variant="outline"
               className="h-7"
-              onClick={() => reprocessMutation.mutate()}
+              onClick={handleReprocessReceipt}
             >
               <RefreshCw className="h-3.5 w-3.5 mr-1" />
               Try Again
