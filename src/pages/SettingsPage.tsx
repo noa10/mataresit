@@ -247,10 +247,8 @@ export default function SettingsPage() {
                   <h3 className="text-lg font-medium">{t('processing.aiModelConfig')}</h3>
                   <ReceiptProcessingOptions
                     defaultModel={settings.selectedModel}
-                    defaultBatchModel={settings.batchModel}
-                    showBatchModelSelection={true}
-                    onModelChange={(model) => updateSettings({ selectedModel: model })}
-                    onBatchModelChange={(model) => updateSettings({ batchModel: model })}
+                    showBatchModelSelection={false}
+                    onModelChange={(model) => updateSettings({ selectedModel: model, batchModel: model })}
                   />
                 </div>
 
