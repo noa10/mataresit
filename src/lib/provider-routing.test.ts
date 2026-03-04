@@ -64,6 +64,20 @@ describe('provider routing helpers', () => {
     expect(candidates).not.toContain('opencode/minimax-m2.5-free');
   });
 
+  it('supports groq provider in fallback selection without same-provider fallbacks', () => {
+    const candidates = selectImageFallbackCandidates({
+      requestedModelId: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+      requestedProvider: 'groq',
+      attemptedModelIds: new Set<string>(['groq/meta-llama/llama-4-scout-17b-16e-instruct']),
+      models: AVAILABLE_MODELS,
+      hasApiKey: () => true
+    });
+
+    expect(candidates).toContain('gemini-2.5-flash-lite');
+    expect(candidates).toContain('openrouter/google/gemini-2.0-flash-exp:free');
+    expect(candidates).not.toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
+  });
+
   it('detects OpenCode retry conditions for image failures', () => {
     expect(shouldRetryOpenCodeImageRequest('image', 500, 'Internal Server Error')).toBe(true);
     expect(shouldRetryOpenCodeImageRequest('image', 404, '{"message":"not found"}')).toBe(true);

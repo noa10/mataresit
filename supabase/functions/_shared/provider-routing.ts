@@ -1,4 +1,4 @@
-export type ProviderName = 'gemini' | 'openrouter' | 'kilo' | 'opencode';
+export type ProviderName = 'gemini' | 'openrouter' | 'kilo' | 'opencode' | 'groq';
 export type ModelInputType = 'text' | 'image';
 
 export interface ProviderRequestErrorOptions {
@@ -58,7 +58,8 @@ const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
     'opencode/kimi-k2.5-free',
     'opencode/glm-5-free',
     'opencode/big-pickle'
-  ]
+  ],
+  groq: []
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
