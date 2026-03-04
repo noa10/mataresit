@@ -3,7 +3,7 @@
  * Supports Google Gemini, OpenRouter, and other AI model providers
  */
 
-export type ModelProvider = 'gemini' | 'openrouter' | 'kilo' | 'opencode';
+export type ModelProvider = 'gemini' | 'openrouter' | 'kilo' | 'opencode' | 'groq';
 
 export interface ModelConfig {
   id: string;
@@ -516,6 +516,36 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   },
 
   // ==========================================
+  // Groq Models (Vision-Capable)
+  // ==========================================
+  'groq/meta-llama/llama-4-scout-17b-16e-instruct': {
+    id: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+    name: 'Llama 4 Scout 17B 16E Instruct',
+    provider: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    apiKeyEnvVar: 'GROQ_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Meta Llama 4 Scout via Groq chat completions with vision support',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.9
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      contextWindow: 131072
+    }
+  },
+
+  // ==========================================
   // Kilo Gateway Models (Vision-Capable)
   // ==========================================
   'kilo/google/gemma-3-27b-it': {
@@ -782,7 +812,8 @@ export function getModelConfig(modelId: string): ModelConfig | undefined {
   const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
     'kilo/google/gemma-3-27b-it:free': 'kilo/google/gemma-3-27b-it',
     'kilo/qwen/qwen2-vl-72b-instruct:free': 'kilo/qwen/qwen2.5-vl-72b-instruct',
-    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5'
+    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5',
+    'meta-llama/llama-4-scout-17b-16e-instruct': 'groq/meta-llama/llama-4-scout-17b-16e-instruct'
   };
   const resolvedModelId = LEGACY_MODEL_ID_ALIASES[modelId] || modelId;
   return AVAILABLE_MODELS[resolvedModelId];
