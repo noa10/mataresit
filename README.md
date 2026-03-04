@@ -89,7 +89,7 @@ Mataresit is a modern, AI-powered web application that automates receipt process
 | **Styling** | Tailwind CSS + Radix UI + Framer Motion |
 | **State Management** | TanStack Query (React Query) |
 | **Backend** | Supabase (PostgreSQL + Edge Functions) |
-| **AI/ML** | Google Gemini 2.0 Flash Lite |
+| **AI/ML** | Google Gemini 2.0 Flash Lite + Groq (Llama 4 Scout) |
 | **Authentication** | Supabase Auth + Google OAuth 2.0 |
 | **Payments** | Stripe (Subscriptions & One-time) |
 | **Testing** | Vitest + Playwright |
@@ -136,6 +136,9 @@ VITE_STRIPE_PUBLIC_KEY=pk_test_your_key
 
 # Optional: Disable real-time features in development
 # VITE_DISABLE_REALTIME=false
+
+# Backend secrets are configured in Supabase Edge Functions (not in .env.local)
+# Example: GROQ_API_KEY
 ```
 
 See [.env.example](./.env.example) for the complete list of configuration options.
