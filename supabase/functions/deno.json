@@ -2,5 +2,8 @@
   "compilerOptions": {
     "useUnknownInCatchVariables": false,
     "noImplicitAny": false
+  },
+  "imports": {
+    "@shared/": "./_shared/"
   }
 }
