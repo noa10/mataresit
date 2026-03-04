@@ -5,6 +5,7 @@ export interface UserApiKeys {
   gemini?: string;
   kilo?: string;
   opencode?: string;
+  groq?: string;
 }
 
 export interface ProcessingSettings {
@@ -72,6 +73,22 @@ const normalizeStoredSettings = (rawSettings: unknown): ProcessingSettings | nul
   };
 };
 
+export const mergeProcessingSettings = (
+  base: ProcessingSettings,
+  newSettings: Partial<ProcessingSettings>
+): ProcessingSettings => ({
+  ...base,
+  ...newSettings,
+  batchUpload: {
+    ...base.batchUpload,
+    ...(newSettings.batchUpload || {})
+  },
+  userApiKeys: {
+    ...base.userApiKeys,
+    ...(newSettings.userApiKeys || {})
+  }
+});
+
 export function getStoredProcessingSettings(): ProcessingSettings | null {
   try {
     if (typeof localStorage === 'undefined') {
@@ -105,7 +122,12 @@ export function useSettings() {
   }, [settings]);
 
   const updateSettings = useCallback((newSettings: Partial<ProcessingSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      // Re-read persisted settings to avoid stale hook instances clobbering newer changes.
+      const persisted = getStoredProcessingSettings();
+      const base = persisted || prev;
+      return mergeProcessingSettings(base, newSettings);
+    });
   }, []);
 
   const resetSettings = useCallback(() => {

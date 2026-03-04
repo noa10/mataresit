@@ -21,7 +21,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-groq-api-key',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
@@ -898,7 +898,10 @@ async function callAIModel(
   input: AIModelInput,
   modelId: string,
   receiptId: string,
-  logger: ProcessingLogger
+  logger: ProcessingLogger,
+  options?: {
+    groqApiKeyOverride?: string;
+  }
 ): Promise<{
   result: any;
   modelUsed: string;
@@ -1016,7 +1019,10 @@ async function callAIModel(
     await validateCompatibility(targetConfig);
 
     await logger.log(`🔑 API KEY VALIDATION: Checking ${targetConfig.apiKeyEnvVar}`, "AI");
-    const apiKey = Deno.env.get(targetConfig.apiKeyEnvVar);
+    const apiKey =
+      targetConfig.provider === 'groq' && options?.groqApiKeyOverride
+        ? options.groqApiKeyOverride
+        : Deno.env.get(targetConfig.apiKeyEnvVar);
     if (!apiKey) {
       await logger.log(`❌ API KEY ERROR: ${targetConfig.apiKeyEnvVar} not found`, "ERROR");
       throw new Error(`${targetConfig.apiKeyEnvVar} not found in environment variables`);
@@ -2788,7 +2794,10 @@ Return your findings in JSON format:
 async function enhanceReceiptData(
   input: AIModelInput,
   modelId: string,
-  receiptId: string
+  receiptId: string,
+  options?: {
+    groqApiKeyOverride?: string;
+  }
 ): Promise<{
   data: any;
   modelUsed: string;
@@ -2816,7 +2825,7 @@ async function enhanceReceiptData(
     // Call the appropriate AI model
     console.log(`🔍 Calling AI model: ${modelToUse}`);
     const aiCallStartTime = Date.now();
-    const aiResult = await callAIModel(input, modelToUse, receiptId, logger);
+    const aiResult = await callAIModel(input, modelToUse, receiptId, logger, options);
     const enhancedData = aiResult.result;
     const actualModelUsed = aiResult.modelUsed;
     const fallbackApplied = aiResult.fallbackApplied;
@@ -2901,6 +2910,7 @@ serve(async (req) => {
 
   try {
     console.log("Received request to enhance receipt data");
+    const groqApiKeyHeader = req.headers.get('x-groq-api-key') || undefined;
 
     // Only accept POST requests
     if (req.method !== 'POST') {
@@ -3028,7 +3038,9 @@ serve(async (req) => {
     }
 
     // Process the receipt data with AI
-    const enhancementResult = await enhanceReceiptData(input, modelId, receiptId);
+    const enhancementResult = await enhanceReceiptData(input, modelId, receiptId, {
+      groqApiKeyOverride: groqApiKeyHeader
+    });
     console.log("Data enhancement complete");
 
     // Return the enhanced data

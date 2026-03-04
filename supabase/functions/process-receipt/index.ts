@@ -22,7 +22,7 @@ const ALWAYS_OPTIMIZE = true;
 // CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-groq-api-key',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
@@ -38,7 +38,7 @@ async function processReceiptImage(
   imageUrl: string,
   receiptId: string,
   modelId: string = '',
-  requestHeaders: { Authorization?: string | null; apikey?: string | null } = { Authorization: null, apikey: null }
+  requestHeaders: { Authorization?: string | null; apikey?: string | null; groqApiKey?: string | null } = { Authorization: null, apikey: null, groqApiKey: null }
 ) {
   const logger = new ProcessingLogger(receiptId);
   const startTime = performance.now(); // Record start time
@@ -58,6 +58,9 @@ async function processReceiptImage(
     }
     if (requestHeaders.apikey) {
       internalFetchHeaders['apikey'] = requestHeaders.apikey;
+    }
+    if (requestHeaders.groqApiKey) {
+      internalFetchHeaders['x-groq-api-key'] = requestHeaders.groqApiKey;
     }
 
     // Process with AI Vision only
@@ -1619,6 +1622,7 @@ serve(async (req: Request) => {
     const authorization = req.headers.get('Authorization') ||
                          `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
     const apikey = req.headers.get('apikey') || Deno.env.get('SUPABASE_ANON_KEY');
+    const groqApiKey = req.headers.get('x-groq-api-key');
 
     // Log header information (without sensitive values)
     console.log("Authorization header present:", !!authorization);
@@ -1677,7 +1681,7 @@ serve(async (req: Request) => {
         imageUrl,
         receiptId,
         modelId,
-        { Authorization: authorization, apikey: apikey }
+        { Authorization: authorization, apikey: apikey, groqApiKey }
       );
 
       console.log("Data extraction complete");

@@ -1257,6 +1257,40 @@ const getGeminiApiKey = (): string | null => {
   return null;
 };
 
+// Helper function to get user's Groq API key from settings
+const getGroqApiKey = (): string | null => {
+  try {
+    const storedSettings = localStorage.getItem('receiptProcessingSettings');
+    if (storedSettings) {
+      const settings = JSON.parse(storedSettings);
+      return settings.userApiKeys?.groq || null;
+    }
+  } catch (error) {
+    console.error('Error reading Groq API key from settings:', error);
+  }
+  return null;
+};
+
+export const buildProcessingRequestHeaders = ({
+  supabaseKey,
+  supabaseAnonKey,
+  groqApiKey
+}: {
+  supabaseKey: string;
+  supabaseAnonKey: string;
+  groqApiKey?: string | null;
+}): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${supabaseKey || supabaseAnonKey}`,
+    'apikey': supabaseAnonKey,
+  };
+  if (groqApiKey) {
+    headers['x-groq-api-key'] = groqApiKey;
+  }
+  return headers;
+};
+
 const parseGeminiResponse = (content: string): any => {
   const cleaned = content.replace(/```json|```/g, '').trim();
   try {
@@ -1772,11 +1806,12 @@ export const processReceiptWithAI = async (
       skipOptimization: true, // React has already optimized the image
       clientOptimized: true, // Indicate client-side optimization was performed
     };
-    const requestHeaders = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseKey || supabaseAnonKey}`,
-      'apikey': supabaseAnonKey,
-    };
+    const groqApiKey = getGroqApiKey();
+    const requestHeaders = buildProcessingRequestHeaders({
+      supabaseKey,
+      supabaseAnonKey,
+      groqApiKey
+    });
 
     // 🔍 ENHANCED DEBUG LOGGING FOR MODEL SELECTION
     console.log('🚀 RECEIPT SERVICE DEBUG - processReceiptWithAI called with:', {

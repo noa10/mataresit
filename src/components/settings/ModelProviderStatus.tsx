@@ -63,6 +63,18 @@ const PROVIDER_INFO = {
     serverSide: false,
     features: ['Multiple Providers', 'Free Models', 'Pay-per-use'],
     requirements: '⚠️ Requires payment method or credits on file (even for free models)'
+  },
+  groq: {
+    name: 'Groq',
+    description: 'Fast OpenAI-compatible inference for multimodal models',
+    icon: '⚙️',
+    color: 'bg-emerald-100 text-emerald-800',
+    setupUrl: 'https://console.groq.com/keys',
+    keyRequired: true,
+    keyOptional: false,
+    serverSide: false,
+    features: ['Vision', 'Low Latency', 'OpenAI Compatible'],
+    requirements: 'Requires a Groq API key from Groq Console'
   }
 };
 
@@ -108,6 +120,40 @@ export function ModelProviderStatus() {
     };
   };
 
+  const testGroqApiKey = async (apiKey: string) => {
+    const modelConfig = AVAILABLE_MODELS['groq/meta-llama/llama-4-scout-17b-16e-instruct']
+      || Object.values(AVAILABLE_MODELS).find((model) => model.provider === 'groq');
+    if (!modelConfig) {
+      return { success: false, message: 'No Groq model available for testing.' };
+    }
+
+    const response = await fetch(modelConfig.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelConfig.id.replace(/^groq\//, ''),
+        messages: [{ role: 'user', content: 'Respond with OK only.' }],
+        max_tokens: 8,
+        temperature: 0
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, message: `Groq API error: ${response.status} - ${errorText}` };
+    }
+
+    const data = await response.json();
+    const hasChoices = Array.isArray(data?.choices) && data.choices.length > 0;
+    return {
+      success: hasChoices,
+      message: hasChoices ? 'Groq key test successful' : 'Groq API responded without choices'
+    };
+  };
+
   // Initialize provider statuses and API keys
   useEffect(() => {
     const providers = Object.keys(PROVIDER_INFO) as ModelProvider[];
@@ -125,6 +171,9 @@ export function ModelProviderStatus() {
     }
     if (settings.userApiKeys?.gemini) {
       initialApiKeys.gemini = settings.userApiKeys.gemini;
+    }
+    if (settings.userApiKeys?.groq) {
+      initialApiKeys.groq = settings.userApiKeys.groq;
     }
     setApiKeys(initialApiKeys);
 
@@ -259,6 +308,33 @@ export function ModelProviderStatus() {
                 available = false;
                 error = 'OpenRouter API key not provided. Please enter your API key and save it.';
                 console.log('No OpenRouter API key found');
+              }
+              break;
+
+            case 'groq':
+              // Test Groq connection with user's API key
+              {
+                const savedApiKey = settings.userApiKeys?.groq;
+                const localApiKey = apiKeys[status.provider];
+                const groqApiKey = localApiKey || savedApiKey;
+
+                if (groqApiKey && groqApiKey.trim()) {
+                  try {
+                    const groqResult = await testGroqApiKey(groqApiKey.trim());
+                    if (groqResult.success) {
+                      available = true;
+                    } else {
+                      available = false;
+                      error = `Groq connection failed: ${groqResult.message}`;
+                    }
+                  } catch (e: any) {
+                    available = false;
+                    error = `Groq test error: ${e.message}`;
+                  }
+                } else {
+                  available = false;
+                  error = 'Groq API key not provided. Please enter your API key and save it.';
+                }
               }
               break;
 
