@@ -53,14 +53,13 @@ describe('provider routing helpers', () => {
       requestedProvider: 'opencode',
       attemptedModelIds: attempted,
       models: AVAILABLE_MODELS,
-      hasApiKey: (envVar: string) => envVar !== 'OPENROUTER_API_KEY'
+      hasApiKey: (envVar: string) => envVar !== 'OPENROUTER_API_KEY' && envVar !== 'GROQ_API_KEY'
     });
 
     expect(candidates).toContain('opencode/kimi-k2.5-free');
     expect(candidates).toContain('opencode/glm-5-free');
     expect(candidates).toContain('opencode/big-pickle');
-    expect(candidates).toContain('gemini-2.5-flash-lite');
-    expect(candidates).not.toContain('openrouter/google/gemini-2.0-flash-exp:free');
+    expect(candidates).not.toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
     expect(candidates).not.toContain('opencode/minimax-m2.5-free');
   });
 
@@ -73,9 +72,22 @@ describe('provider routing helpers', () => {
       hasApiKey: () => true
     });
 
-    expect(candidates).toContain('gemini-2.5-flash-lite');
-    expect(candidates).toContain('openrouter/google/gemini-2.0-flash-exp:free');
+    expect(candidates).toEqual([]);
     expect(candidates).not.toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
+  });
+
+  it('uses Groq as the only cross-provider image fallback when key is available', () => {
+    const candidates = selectImageFallbackCandidates({
+      requestedModelId: 'opencode/minimax-m2.5-free',
+      requestedProvider: 'opencode',
+      attemptedModelIds: new Set<string>(['opencode/minimax-m2.5-free']),
+      models: AVAILABLE_MODELS,
+      hasApiKey: () => true
+    });
+
+    expect(candidates).toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
+    expect(candidates).not.toContain('gemini-2.5-flash-lite');
+    expect(candidates).not.toContain('openrouter/google/gemini-2.0-flash-exp:free');
   });
 
   it('detects OpenCode retry conditions for image failures', () => {
@@ -125,10 +137,10 @@ describe('provider fallback integration behavior', () => {
     expect(shouldRetry).toBe(true);
   });
 
-  it('falls back to Gemini when OpenCode attempts fail and updates modelUsed', async () => {
+  it('falls back to Groq when OpenCode attempts fail and updates modelUsed', async () => {
     const result = await executeWithFallback({
       primaryModelId: 'opencode/minimax-m2.5-free',
-      fallbackModelIds: ['opencode/kimi-k2.5-free', 'gemini-2.5-flash-lite'],
+      fallbackModelIds: ['opencode/kimi-k2.5-free', 'groq/meta-llama/llama-4-scout-17b-16e-instruct'],
       attempt: async (modelId: string) => {
         if (modelId.startsWith('opencode/')) {
           throw new Error(`provider failed for ${modelId}`);
@@ -139,15 +151,15 @@ describe('provider fallback integration behavior', () => {
 
     expect(result.fallbackApplied).toBe(true);
     expect(result.fallbackFrom).toBe('opencode/minimax-m2.5-free');
-    expect(result.modelUsed).toBe('gemini-2.5-flash-lite');
-    expect(result.result).toEqual({ extracted: true, from: 'gemini-2.5-flash-lite' });
+    expect(result.modelUsed).toBe('groq/meta-llama/llama-4-scout-17b-16e-instruct');
+    expect(result.result).toEqual({ extracted: true, from: 'groq/meta-llama/llama-4-scout-17b-16e-instruct' });
   });
 
   it('throws non-success when all provider attempts fail', async () => {
     await expect(
       executeWithFallback({
         primaryModelId: 'opencode/minimax-m2.5-free',
-        fallbackModelIds: ['opencode/kimi-k2.5-free', 'gemini-2.5-flash-lite'],
+        fallbackModelIds: ['opencode/kimi-k2.5-free', 'groq/meta-llama/llama-4-scout-17b-16e-instruct'],
         attempt: async () => {
           throw new Error('all attempts failed');
         }

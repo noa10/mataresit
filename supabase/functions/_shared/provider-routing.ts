@@ -63,8 +63,7 @@ const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
-  'gemini-2.5-flash-lite',
-  'openrouter/google/gemini-2.0-flash-exp:free'
+  'groq/meta-llama/llama-4-scout-17b-16e-instruct'
 ];
 
 export function resolveKiloGatewayChatEndpoint(endpoint: string): string {
