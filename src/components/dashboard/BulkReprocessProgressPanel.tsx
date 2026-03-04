@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, AlertCircle, Loader2, RefreshCw, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, AlertCircle, Loader2, RefreshCw, X, ChevronUp, ChevronDown, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useBulkReprocess } from '@/contexts/BulkReprocessContext';
 import { useState } from 'react';
+import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
 
 export function BulkReprocessProgressPanel() {
     const {
@@ -19,9 +20,11 @@ export function BulkReprocessProgressPanel() {
         failedCount,
         totalCount,
         progress,
+        succeededReceiptIds,
     } = useBulkReprocess();
 
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isReviewOpen, setIsReviewOpen] = useState(false);
 
     if (!isPanelVisible || totalCount === 0) return null;
 
@@ -117,32 +120,54 @@ export function BulkReprocessProgressPanel() {
 
                             {/* Actions */}
                             {isComplete && (
-                                <div className="flex gap-2 pt-1">
-                                    {failedCount > 0 && (
+                                <div className="space-y-2 pt-1">
+                                    {/* Review All Processed Receipts button */}
+                                    {succeededCount > 0 && (
                                         <Button
-                                            variant="outline"
+                                            variant="default"
                                             size="sm"
-                                            className="flex-1 gap-1.5"
-                                            onClick={retryFailed}
+                                            className="w-full gap-1.5"
+                                            onClick={() => setIsReviewOpen(true)}
                                         >
-                                            <RefreshCw className="h-3.5 w-3.5" />
-                                            Retry Failed ({failedCount})
+                                            <ClipboardList className="h-3.5 w-3.5" />
+                                            Review All Processed Receipts
                                         </Button>
                                     )}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex-1"
-                                        onClick={clearAll}
-                                    >
-                                        Clear
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        {failedCount > 0 && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex-1 gap-1.5"
+                                                onClick={retryFailed}
+                                            >
+                                                <RefreshCw className="h-3.5 w-3.5" />
+                                                Retry Failed ({failedCount})
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={clearAll}
+                                        >
+                                            Clear
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </motion.div>
                 )}
             </motion.div>
+
+            {/* Review Modal */}
+            <DailyReceiptBrowserModal
+                date={new Date().toISOString().split('T')[0]}
+                receiptIds={succeededReceiptIds}
+                isOpen={isReviewOpen}
+                onClose={() => setIsReviewOpen(false)}
+            />
         </AnimatePresence>
     );
 }

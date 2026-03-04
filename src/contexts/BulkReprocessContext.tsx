@@ -40,6 +40,8 @@ export interface BulkReprocessContextType {
     failedCount: number;
     totalCount: number;
     progress: number; // 0–100
+    /** Receipt IDs that succeeded (for review modal) */
+    succeededReceiptIds: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +72,9 @@ export function BulkReprocessProvider({ children }: BulkReprocessProviderProps) 
     // Derived counts
     const queuedCount = items.filter(i => i.status === 'queued').length;
     const activeCount = items.filter(i => i.status === 'in-progress').length;
-    const succeededCount = items.filter(i => i.status === 'succeeded').length;
+    const succeededItems = items.filter(i => i.status === 'succeeded');
+    const succeededCount = succeededItems.length;
+    const succeededReceiptIds = succeededItems.map(i => i.receiptId);
     const failedCount = items.filter(i => i.status === 'failed').length;
     const totalCount = items.length;
     const completedCount = succeededCount + failedCount;
@@ -129,14 +133,12 @@ export function BulkReprocessProvider({ children }: BulkReprocessProviderProps) 
             if (fCount === 0 && sCount > 0) {
                 toast.success(`All ${sCount} receipt${sCount !== 1 ? 's' : ''} reprocessed successfully!`, {
                     duration: 8000,
-                    action: { label: 'View', onClick: () => setIsPanelVisible(true) },
                 });
             } else if (fCount > 0) {
                 toast.warning(
                     `Reprocessing complete: ${sCount}/${sCount + fCount} succeeded`,
                     {
                         duration: 10000,
-                        action: { label: 'View Details', onClick: () => setIsPanelVisible(true) },
                     },
                 );
             }
@@ -209,6 +211,7 @@ export function BulkReprocessProvider({ children }: BulkReprocessProviderProps) 
         failedCount,
         totalCount,
         progress,
+        succeededReceiptIds,
     };
 
     return (
