@@ -32,7 +32,7 @@ const corsHeaders = {
 interface ModelConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter' | 'kilo' | 'opencode';
+  provider: 'gemini' | 'openrouter' | 'kilo' | 'opencode' | 'groq';
   endpoint: string;
   apiKeyEnvVar: string;
   temperature: number;
@@ -450,6 +450,36 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       maxImageSize: 4 * 1024 * 1024, // 4MB
       supportedFormats: ['image/jpeg', 'image/png'],
       contextWindow: 200000
+    }
+  },
+
+  // ==========================================
+  // Groq Models (Vision-Capable)
+  // ==========================================
+  'groq/meta-llama/llama-4-scout-17b-16e-instruct': {
+    id: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+    name: 'Llama 4 Scout 17B 16E Instruct',
+    provider: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    apiKeyEnvVar: 'GROQ_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Meta Llama 4 Scout via Groq chat completions with vision support',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.9
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024,
+      supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      contextWindow: 131072
     }
   },
 
@@ -889,7 +919,8 @@ async function callAIModel(
   const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
     'kilo/google/gemma-3-27b-it:free': 'kilo/google/gemma-3-27b-it',
     'kilo/qwen/qwen2-vl-72b-instruct:free': 'kilo/qwen/qwen2.5-vl-72b-instruct',
-    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5'
+    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5',
+    'meta-llama/llama-4-scout-17b-16e-instruct': 'groq/meta-llama/llama-4-scout-17b-16e-instruct'
   };
   const requestedModelId = modelId && LEGACY_MODEL_ID_ALIASES[modelId]
     ? LEGACY_MODEL_ID_ALIASES[modelId]
@@ -965,6 +996,8 @@ async function callAIModel(
         return await callGeminiAPI(input, config, apiKey, logger);
       case 'openrouter':
         return await callOpenRouterAPI(input, config, apiKey, logger);
+      case 'groq':
+        return await callGroqAPI(input, config, apiKey, logger);
       case 'kilo':
         return await callKiloGatewayAPI(input, config, apiKey, logger);
       case 'opencode':
@@ -2056,6 +2089,212 @@ Return your findings in JSON format:
     const errorMessage = error instanceof Error ? error.message : String(error);
     await logger.log(`❌ OPENROUTER PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
     return {};
+  }
+}
+
+/**
+ * Call Groq API for text or vision processing
+ * Groq uses OpenAI-compatible chat completions for multimodal models
+ */
+async function callGroqAPI(
+  input: AIModelInput,
+  modelConfig: ModelConfig,
+  apiKey: string,
+  logger: ProcessingLogger
+): Promise<any> {
+  const providerCallStart = Date.now();
+
+  await logger.log(`🟢 GROQ API CALL INITIATED`, "AI");
+  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
+  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
+  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
+
+  const payloadConstructionStart = Date.now();
+  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
+
+  const modelName = modelConfig.id.replace(/^groq\//, '');
+  await logger.log(`🔧 Groq model name: ${modelName}`, "AI");
+
+  let messages: any[];
+  if (input.type === 'text') {
+    const prompt = `You are an AI assistant specialized in analyzing receipt data.
+
+RECEIPT TEXT:
+${input.fullText}
+
+EXTRACTED DATA:
+${JSON.stringify(input.extractedData, null, 2)}
+
+Based on the receipt text above, please:
+1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
+2. Identify the PAYMENT METHOD including Malaysian-specific methods.
+3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
+4. Recognize Malaysian business terminology and handle Malay language text.
+5. Provide SUGGESTIONS for potential extraction errors.
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name or business name",
+  "date": "Date in YYYY-MM-DD format",
+  "total": total amount as number,
+  "tax": tax amount as number,
+  "currency": "Currency code (e.g., MYR, USD)",
+  "payment_method": "Payment method used",
+  "predicted_category": "Category from the list above",
+  "line_items": [{"description": "Item description", "amount": price}],
+  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
+}`;
+
+    messages = [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ];
+  } else {
+    const base64Image = encodeBase64(input.imageData.data);
+    const mimeType = input.imageData.mimeType;
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
+
+Analyze this receipt image and extract:
+1. MERCHANT - Store or business name
+2. DATE - Date in YYYY-MM-DD format
+3. TOTAL - Total amount as a number
+4. TAX - Tax amount as a number
+5. CURRENCY - Currency code (e.g., MYR, USD)
+6. PAYMENT_METHOD - Payment method used
+7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
+8. LINE_ITEMS - Array of items with description and amount
+9. CONFIDENCE - Object with confidence scores (0-100)
+
+Return your findings in JSON format:
+{
+  "merchant": "Store name",
+  "date": "YYYY-MM-DD",
+  "total": 0.00,
+  "tax": 0.00,
+  "currency": "MYR",
+  "payment_method": "Cash",
+  "predicted_category": "Dining",
+  "line_items": [{"description": "Item", "amount": 0.00}],
+  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
+}`;
+
+    messages = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: dataUrl
+            }
+          }
+        ]
+      }
+    ];
+  }
+
+  const payload = {
+    model: modelName,
+    messages,
+    temperature: modelConfig.temperature,
+    max_completion_tokens: modelConfig.maxTokens,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0
+  };
+
+  const payloadConstructionEnd = Date.now();
+  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
+  await logger.log(`✅ Groq payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
+
+  await logger.log(`🚀 GROQ API REQUEST: Initiating call to ${modelName}`, "AI");
+  const groqCallStart = Date.now();
+  const response = await fetch(modelConfig.endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const groqCallDuration = (Date.now() - groqCallStart) / 1000;
+  await logger.log(`⏱️ Groq API call completed in ${groqCallDuration.toFixed(2)} seconds`, "AI");
+  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    await logger.log(`❌ GROQ API ERROR: ${response.status} ${response.statusText}`, "ERROR");
+    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
+    throw new ProviderRequestError({
+      provider: 'groq',
+      modelId: modelConfig.id,
+      status: response.status,
+      statusText: response.statusText,
+      errorBodySnippet: errorText.substring(0, 500),
+      endpoint: modelConfig.endpoint
+    });
+  }
+
+  const groqResponse = await response.json();
+
+  try {
+    const responseText = groqResponse.choices[0]?.message?.content;
+    if (!responseText) {
+      throw new Error('No content in Groq response');
+    }
+
+    await logger.log("Parsing Groq response", "AI");
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : null;
+
+    if (!jsonStr) {
+      throw new Error('No valid JSON found in Groq response');
+    }
+
+    const enhancedData = JSON.parse(jsonStr);
+
+    const defaultConfidence = {
+      merchant: 0,
+      date: 0,
+      total: 0,
+      tax: 0,
+      currency: 50,
+      payment_method: 0,
+      predicted_category: 0,
+      line_items: 0
+    };
+
+    if (!enhancedData.confidence || typeof enhancedData.confidence !== 'object') {
+      enhancedData.confidence = {};
+    }
+    enhancedData.confidence = { ...defaultConfidence, ...enhancedData.confidence };
+
+    if (!enhancedData.currency) {
+      enhancedData.currency = 'MYR';
+      enhancedData.confidence.currency = 50;
+      await logger.log("Using default currency: MYR", "AI");
+    } else {
+      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
+    }
+
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    await logger.log(`✅ GROQ PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+    return enhancedData;
+  } catch (error) {
+    const providerCallEnd = Date.now();
+    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await logger.log(`❌ GROQ PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
+    throw error;
   }
 }
 
