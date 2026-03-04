@@ -33,6 +33,12 @@ const PROVIDER_INFO = {
     description: 'Curated models from OpenCode',
     icon: '✨',
     color: 'bg-indigo-100 text-indigo-800'
+  },
+  groq: {
+    name: 'Groq',
+    description: 'Fast OpenAI-compatible inference for multimodal models',
+    icon: '⚙️',
+    color: 'bg-emerald-100 text-emerald-800'
   }
 };
 
