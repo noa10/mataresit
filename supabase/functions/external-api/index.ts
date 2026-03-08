@@ -1,7 +1,7 @@
 /**
  * Mataresit External API - Enhanced with Middleware Bypass
  * Secure REST API for external integrations with receipt and claims management
- * Incorporates proven middleware bypass patterns from bypass-test function
+ * Incorporates proven middleware-compatible request handling patterns
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -19,7 +19,7 @@ import { validators, validateUUID } from '../_shared/api-error-handling.ts';
 const API_VERSION = 'v1';
 const API_BASE_PATH = `/api/${API_VERSION}`;
 
-// Inline CORS headers for reliability (adopted from bypass-test)
+// Inline CORS headers for reliability
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -78,7 +78,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // Enhanced path parsing (adopted from bypass-test)
+    // Enhanced path parsing for function-prefixed routes
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(Boolean);
 
@@ -103,7 +103,7 @@ serve(async (req: Request) => {
     endpoint = '/' + pathSegments.join('/');
     console.log('Final endpoint:', endpoint);
 
-    // Enhanced dual-header authentication (adopted from bypass-test)
+    // Enhanced dual-header authentication
     const authHeader = req.headers.get('Authorization');
     const apiKey = req.headers.get('X-API-Key') || req.headers.get('apikey');
 
@@ -159,7 +159,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Validate API key format (basic validation from bypass-test)
+    // Validate API key format
     if (!apiKey.startsWith('mk_test_') && !apiKey.startsWith('mk_live_')) {
       statusCode = 401;
       errorMessage = 'Invalid API key format';
@@ -168,7 +168,7 @@ serve(async (req: Request) => {
 
     // Environment-based context creation
     if (USE_MOCK_CONTEXT || BYPASS_MODE) {
-      // Use mock context for testing (from bypass-test)
+      // Use mock context for testing
       apiContext = {
         userId: 'test-user-id',
         teamId: 'test-team-id',

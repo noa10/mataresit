@@ -10,14 +10,12 @@ import crypto from 'crypto';
 
 // Test configuration - Updated to use production external-api function
 const API_BASE_URL = process.env.API_BASE_URL || 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1';
-const API_BASE_URL_BYPASS = process.env.API_BASE_URL_BYPASS || 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/bypass-test/api/v1';
 const TEST_API_KEY = process.env.TEST_API_KEY;
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 console.log('🧪 Test Configuration:');
 console.log('  Primary API URL:', API_BASE_URL);
-console.log('  Bypass API URL:', API_BASE_URL_BYPASS);
 console.log('  Using Production External API:', API_BASE_URL.includes('external-api'));
 console.log('  Test API Key:', TEST_API_KEY ? TEST_API_KEY.substring(0, 20) + '...' : 'NOT SET');
 console.log('  Supabase Key:', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
