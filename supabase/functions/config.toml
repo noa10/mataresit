@@ -57,20 +57,20 @@ verify_jwt = true
 # API key management requires user authentication
 
 [test-simple]
-verify_jwt = false
-# Simple test function for debugging
+verify_jwt = true
+# Retired debug function; keep JWT verification enabled if deployed
 
 [api-external]
 verify_jwt = false
-# Alternative external API function to bypass middleware issues
+# Retired alias that only returns a 410 deprecation response; use external-api instead
 
 [mataresit-api]
 verify_jwt = false
-# Mataresit API function with different naming
+# Retired alias that only returns a 410 deprecation response; use external-api instead
 
 [public-api-test]
-verify_jwt = false
-# Public API test function to bypass middleware issues
+verify_jwt = true
+# Retired debug function; keep JWT verification enabled if deployed
 
 [generate-embeddings]
 verify_jwt = true
