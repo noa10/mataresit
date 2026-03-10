@@ -71,7 +71,6 @@
     "playwright-mcp:debug-verbose": "DEBUG=pw:api PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace"
   },
   "dependencies": {
-    "@agentdeskai/browser-tools-mcp": "^1.2.1",
     "@hookform/resolvers": "^5.2.1",
     "@playwright/mcp": "^0.0.64",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -157,6 +156,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@agentdeskai/browser-tools-mcp": "^1.2.1",
     "@eslint/js": "^9.33.0",
     "@playwright/test": "^1.54.2",
     "@swc/core": "^1.13.3",
