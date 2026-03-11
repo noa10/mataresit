@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:unit": "vitest run tests/unit --reporter=verbose",
+    "test:unit": "vitest run --config vitest.unit.config.ts --reporter=verbose",
     "test:integration": "vitest run tests/integration --reporter=verbose",
     "test:integration:all": "node tests/integration/stripe-integration.test.js && node tests/integration/gemini-function.test.js && node tests/integration/test-payment-flow.js",
     "test:manual": "echo \"Manual tests available in tests/manual/ directory\"",

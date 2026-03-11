@@ -2730,6 +2730,7 @@ export type Database = {
           push_receipt_shared: boolean | null
           push_team_activity: boolean | null
           push_team_invitations: boolean | null
+          push_gamification_streak_reminders: boolean | null
           push_team_member_removed: boolean | null
           quiet_hours_enabled: boolean | null
           quiet_hours_end: string | null
@@ -2766,6 +2767,7 @@ export type Database = {
           push_receipt_shared?: boolean | null
           push_team_activity?: boolean | null
           push_team_invitations?: boolean | null
+          push_gamification_streak_reminders?: boolean | null
           push_team_member_removed?: boolean | null
           quiet_hours_enabled?: boolean | null
           quiet_hours_end?: string | null
@@ -2802,6 +2804,7 @@ export type Database = {
           push_receipt_shared?: boolean | null
           push_team_activity?: boolean | null
           push_team_invitations?: boolean | null
+          push_gamification_streak_reminders?: boolean | null
           push_team_member_removed?: boolean | null
           quiet_hours_enabled?: boolean | null
           quiet_hours_end?: string | null
@@ -5995,6 +5998,7 @@ export type Database = {
           push_receipt_shared: boolean
           push_team_activity: boolean
           push_team_invitations: boolean
+          push_gamification_streak_reminders: boolean
           push_team_member_removed: boolean
           quiet_hours_enabled: boolean
           quiet_hours_end: string
@@ -6988,6 +6992,7 @@ export type Database = {
               push_receipt_shared: boolean | null
               push_team_activity: boolean | null
               push_team_invitations: boolean | null
+              push_gamification_streak_reminders: boolean | null
               push_team_member_removed: boolean | null
               quiet_hours_enabled: boolean | null
               quiet_hours_end: string | null
@@ -7096,6 +7101,7 @@ export type Database = {
         | "receipt_approved_by_team"
         | "receipt_flagged_for_review"
         | "team_member_removed"
+        | "gamification_streak_reminder"
       subscription_status:
         | "active"
         | "trialing"
@@ -7299,6 +7305,7 @@ export const Constants = {
         "receipt_approved_by_team",
         "receipt_flagged_for_review",
         "team_member_removed",
+        "gamification_streak_reminder",
       ],
       subscription_status: [
         "active",
