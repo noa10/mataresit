@@ -1,4 +1,5 @@
 import { supabaseClient } from './supabase-client.ts';
+import { getPushNotificationPreferenceKey } from './notification-preferences.ts';
 
 export interface NotificationData {
   receiptId: string;
@@ -47,12 +48,7 @@ export class EdgeNotificationHelper {
       // Use the correct table name and get specific preference columns
       const { data, error } = await this.supabase
         .from('notification_preferences')
-        .select(`
-          push_enabled,
-          email_enabled,
-          push_${notificationType},
-          email_${notificationType}
-        `)
+        .select('*')
         .eq('user_id', userId)
         .single();
 
@@ -64,10 +60,12 @@ export class EdgeNotificationHelper {
       }
 
       // Check specific notification type preferences
-      const pushSpecificKey = `push_${notificationType}` as keyof typeof data;
+      const pushSpecificKey = getPushNotificationPreferenceKey(notificationType) as keyof typeof data | null | undefined;
       const emailSpecificKey = `email_${notificationType}` as keyof typeof data;
 
-      const pushEnabled = data.push_enabled !== false && data[pushSpecificKey] !== false;
+      const pushEnabled = pushSpecificKey === null
+        ? false
+        : data.push_enabled !== false && (pushSpecificKey ? data[pushSpecificKey] !== false : true);
       const emailEnabled = data.email_enabled !== false && data[emailSpecificKey] !== false;
 
       // Apply enhanced filtering logic for in-app notifications
@@ -96,39 +94,7 @@ export class EdgeNotificationHelper {
       return false;
     }
 
-    // Notification type to preference key mapping (synchronized with client-side)
-    const notificationTypeToPreferenceKey: Record<string, string | null> = {
-      // Receipt processing notifications
-      'receipt_processing_started': null, // Not configurable - always hidden
-      'receipt_processing_completed': 'push_receipt_processing_completed',
-      'receipt_processing_failed': 'push_receipt_processing_failed',
-      'receipt_ready_for_review': 'push_receipt_ready_for_review', // Restored - but won't be created anyway
-      'receipt_batch_completed': 'push_receipt_batch_completed',
-      'receipt_batch_failed': 'push_receipt_batch_failed',
-
-      // Team collaboration notifications
-      'team_invitation_sent': 'push_team_invitations',
-      'team_invitation_accepted': 'push_team_invitations',
-      'team_member_joined': 'push_team_activity',
-      'team_member_left': 'push_team_activity',
-      'team_member_role_changed': 'push_team_activity',
-      'team_settings_updated': 'push_team_activity',
-
-      // Claims notifications (use team activity preference)
-      'claim_submitted': 'push_team_activity',
-      'claim_approved': 'push_team_activity',
-      'claim_rejected': 'push_team_activity',
-      'claim_review_requested': 'push_team_activity',
-
-      // Receipt collaboration notifications
-      'receipt_shared': 'push_receipt_shared',
-      'receipt_comment_added': 'push_receipt_comments',
-      'receipt_edited_by_team_member': 'push_receipt_comments',
-      'receipt_approved_by_team': 'push_receipt_comments',
-      'receipt_flagged_for_review': 'push_receipt_comments',
-    };
-
-    const preferenceKey = notificationTypeToPreferenceKey[notificationType];
+    const preferenceKey = getPushNotificationPreferenceKey(notificationType);
 
     // If no preference key is mapped, hide the notification (like processing_started)
     if (preferenceKey === null) {

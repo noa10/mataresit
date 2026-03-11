@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import {
+  getPushNotificationPreferenceKey,
   Notification,
   NotificationFilters,
   NotificationStats,
@@ -1720,6 +1721,7 @@ export class NotificationService {
       push_receipt_comments: true,
       push_receipt_shared: true,
       push_team_member_removed: true,
+      push_gamification_streak_reminders: true,
       browser_permission_granted: false,
       quiet_hours_enabled: false,
       timezone: 'Asia/Kuala_Lumpur',
@@ -2476,7 +2478,14 @@ export class NotificationService {
       }
 
       // Check specific notification type preferences
-      const preferenceKey = `${deliveryMethod}_${notificationType}` as keyof NotificationPreferences;
+      const preferenceKey = deliveryMethod === 'push'
+        ? getPushNotificationPreferenceKey(notificationType)
+        : `${deliveryMethod}_${notificationType}` as keyof NotificationPreferences;
+
+      if (preferenceKey === null) {
+        return false;
+      }
+
       const isEnabled = preferences[preferenceKey];
 
       if (typeof isEnabled === 'boolean') {

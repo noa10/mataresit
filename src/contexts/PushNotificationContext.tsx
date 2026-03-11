@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useCallback, ReactNode } f
 import { usePushNotifications, PushNotificationState, PushNotificationActions } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { NotificationType } from '@/types/notifications';
+import { getPushNotificationPreferenceKey, NotificationType } from '@/types/notifications';
 import { PushNotificationService } from '@/services/pushNotificationService';
 
 interface PushNotificationContextType extends PushNotificationState, PushNotificationActions {
@@ -85,7 +85,11 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
       if (!centralizedPreferences.push_enabled) return false;
 
       // Check specific notification type preference
-      const prefKey = `push_${type}` as keyof typeof centralizedPreferences;
+      const prefKey = getPushNotificationPreferenceKey(type);
+      if (prefKey === null) {
+        return false;
+      }
+
       const isEnabled = centralizedPreferences[prefKey];
 
       return typeof isEnabled === 'boolean' ? isEnabled : true;
@@ -241,7 +245,11 @@ export function usePushNotificationSettings() {
   };
 
   const toggleNotificationType = async (type: string, enabled: boolean) => {
-    const prefKey = `push_${type}`;
+    const prefKey = getPushNotificationPreferenceKey(type as NotificationType);
+    if (prefKey === null) {
+      return;
+    }
+
     await updatePreferences({ [prefKey]: enabled });
   };
 

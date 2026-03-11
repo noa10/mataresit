@@ -25,7 +25,9 @@ export type NotificationType =
   | 'receipt_comment_added'
   | 'receipt_edited_by_team_member'
   | 'receipt_approved_by_team'
-  | 'receipt_flagged_for_review';
+  | 'receipt_flagged_for_review'
+  // Gamification notifications
+  | 'gamification_streak_reminder';
 
 export type NotificationPriority = 'low' | 'medium' | 'high';
 
@@ -266,39 +268,7 @@ export function shouldShowNotificationWithPreferences(
     return false;
   }
 
-  // Map notification types to preference keys
-  const notificationTypeToPreferenceKey: Record<NotificationType, keyof NotificationPreferences | null> = {
-    // Receipt processing notifications
-    'receipt_processing_started': null, // Not configurable - always hidden
-    'receipt_processing_completed': 'push_receipt_processing_completed',
-    'receipt_processing_failed': 'push_receipt_processing_failed',
-    'receipt_ready_for_review': 'push_receipt_ready_for_review', // Restored - but won't be created anyway
-    'receipt_batch_completed': 'push_receipt_batch_completed',
-    'receipt_batch_failed': 'push_receipt_processing_failed', // Use processing failed preference
-
-    // Team collaboration notifications
-    'team_invitation_sent': 'push_team_invitations',
-    'team_invitation_accepted': 'push_team_invitations',
-    'team_member_joined': 'push_team_activity',
-    'team_member_left': 'push_team_activity',
-    'team_member_role_changed': 'push_team_activity',
-    'team_settings_updated': 'push_team_activity',
-
-    // Claims notifications (use team activity preference)
-    'claim_submitted': 'push_team_activity',
-    'claim_approved': 'push_team_activity',
-    'claim_rejected': 'push_team_activity',
-    'claim_review_requested': 'push_team_activity',
-
-    // Receipt collaboration notifications
-    'receipt_shared': 'push_receipt_shared',
-    'receipt_comment_added': 'push_receipt_comments',
-    'receipt_edited_by_team_member': 'push_receipt_comments',
-    'receipt_approved_by_team': 'push_receipt_comments',
-    'receipt_flagged_for_review': 'push_receipt_comments',
-  };
-
-  const preferenceKey = notificationTypeToPreferenceKey[notification.type];
+  const preferenceKey = getPushNotificationPreferenceKey(notification.type);
 
   // If no preference key is mapped, hide the notification (like processing_started)
   if (preferenceKey === null) {
@@ -313,6 +283,47 @@ export function shouldShowNotificationWithPreferences(
 
   // Default to showing if we can't determine the preference
   return true;
+}
+
+const PUSH_NOTIFICATION_PREFERENCE_KEYS: Record<NotificationType, keyof NotificationPreferences | null> = {
+  // Receipt processing notifications
+  receipt_processing_started: null,
+  receipt_processing_completed: 'push_receipt_processing_completed',
+  receipt_processing_failed: 'push_receipt_processing_failed',
+  receipt_ready_for_review: 'push_receipt_ready_for_review',
+  receipt_batch_completed: 'push_receipt_batch_completed',
+  receipt_batch_failed: 'push_receipt_processing_failed',
+
+  // Team collaboration notifications
+  team_invitation_sent: 'push_team_invitations',
+  team_invitation_accepted: 'push_team_invitations',
+  team_member_joined: 'push_team_activity',
+  team_member_left: 'push_team_activity',
+  team_member_removed: 'push_team_member_removed',
+  team_member_role_changed: 'push_team_activity',
+  team_settings_updated: 'push_team_activity',
+
+  // Claims notifications (use team activity preference)
+  claim_submitted: 'push_team_activity',
+  claim_approved: 'push_team_activity',
+  claim_rejected: 'push_team_activity',
+  claim_review_requested: 'push_team_activity',
+
+  // Receipt collaboration notifications
+  receipt_shared: 'push_receipt_shared',
+  receipt_comment_added: 'push_receipt_comments',
+  receipt_edited_by_team_member: 'push_receipt_comments',
+  receipt_approved_by_team: 'push_receipt_comments',
+  receipt_flagged_for_review: 'push_receipt_comments',
+
+  // Gamification notifications
+  gamification_streak_reminder: 'push_gamification_streak_reminders',
+};
+
+export function getPushNotificationPreferenceKey(
+  notificationType: NotificationType
+): keyof NotificationPreferences | null {
+  return PUSH_NOTIFICATION_PREFERENCE_KEYS[notificationType];
 }
 
 // Notification Preferences Types
@@ -344,6 +355,7 @@ export interface NotificationPreferences {
   push_receipt_comments: boolean;
   push_receipt_shared: boolean;
   push_team_member_removed: boolean;
+  push_gamification_streak_reminders: boolean;
 
   // Browser notification preferences
   browser_permission_granted: boolean;
@@ -422,6 +434,13 @@ export const NOTIFICATION_CATEGORIES = {
     description: 'System updates and security notifications',
     types: [
       'team_settings_updated'
+    ] as NotificationType[]
+  },
+  GAMIFICATION: {
+    label: 'Gamification',
+    description: 'Reminders that help you keep your receipt scan streak going',
+    types: [
+      'gamification_streak_reminder'
     ] as NotificationType[]
   }
 } as const;

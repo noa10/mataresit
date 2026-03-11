@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getPushNotificationPreferenceKey, isInQuietHours } from '../_shared/notification-preferences.ts';
 
 // VAPID keys for push notifications
 // In production, these should be stored as environment variables
@@ -8,9 +9,11 @@ const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || 'your-vapid-priva
 const VAPID_EMAIL = Deno.env.get('VAPID_EMAIL') || 'mailto:admin@mataresit.com';
 
 // Create Supabase client
-const supabaseClient = (authHeader: string) => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const createRequestClient = (authHeader: string) => {
 
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
@@ -20,6 +23,24 @@ const supabaseClient = (authHeader: string) => {
     },
   });
 };
+
+const adminSupabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+type AuthorizedSupabaseClient = ReturnType<typeof createRequestClient>;
+
+async function authorizeRequest(authHeader: string): Promise<AuthorizedSupabaseClient | null> {
+  if (supabaseServiceRoleKey && authHeader === `Bearer ${supabaseServiceRoleKey}`) {
+    return adminSupabase;
+  }
+
+  const requestSupabase = createRequestClient(authHeader);
+  const { data: { user }, error } = await requestSupabase.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  return requestSupabase;
+}
 
 interface PushNotificationPayload {
   title: string;
@@ -78,10 +99,9 @@ serve(async (req: Request) => {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const supabase = supabaseClient(authHeader);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const supabase = await authorizeRequest(authHeader);
+
+    if (!supabase) {
       return new Response('Invalid token', { status: 401 });
     }
 
@@ -199,7 +219,12 @@ async function sendPushToUser(
       }
 
       // Check specific notification type preference
-      const prefKey = `push_${notificationType}`;
+      const prefKey = getPushNotificationPreferenceKey(notificationType);
+      if (prefKey === null) {
+        console.log(`Push notification type ${notificationType} is not displayable`);
+        return;
+      }
+
       if (userPrefs[prefKey] === false) {
         console.log(`Push notification type ${notificationType} disabled for user ${userId}`);
         return;
@@ -207,7 +232,7 @@ async function sendPushToUser(
 
       // Check quiet hours if required
       if (respectQuietHours && userPrefs.quiet_hours_enabled) {
-        const isQuietTime = await checkQuietHours(userPrefs);
+        const isQuietTime = isInQuietHours(userPrefs);
         if (isQuietTime) {
           console.log(`User ${userId} is in quiet hours, skipping push notification`);
           return;
@@ -273,40 +298,3 @@ async function sendWebPush(subscription: any, payload: PushNotificationPayload):
   }
 }
 
-async function checkQuietHours(preferences: any): Promise<boolean> {
-  if (!preferences.quiet_hours_enabled || !preferences.quiet_hours_start || !preferences.quiet_hours_end) {
-    return false;
-  }
-
-  try {
-    const now = new Date();
-    const timezone = preferences.timezone || 'Asia/Kuala_Lumpur';
-    
-    // Get current time in user's timezone
-    const userTime = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(now);
-
-    const [currentHour, currentMinute] = userTime.split(':').map(Number);
-    const currentTimeMinutes = currentHour * 60 + currentMinute;
-
-    const [startHour, startMinute] = preferences.quiet_hours_start.split(':').map(Number);
-    const startTimeMinutes = startHour * 60 + startMinute;
-
-    const [endHour, endMinute] = preferences.quiet_hours_end.split(':').map(Number);
-    const endTimeMinutes = endHour * 60 + endMinute;
-
-    // Handle overnight quiet hours (e.g., 22:00 to 08:00)
-    if (startTimeMinutes > endTimeMinutes) {
-      return currentTimeMinutes >= startTimeMinutes || currentTimeMinutes <= endTimeMinutes;
-    } else {
-      return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
-    }
-  } catch (error) {
-    console.error('Error checking quiet hours:', error);
-    return false;
-  }
-}

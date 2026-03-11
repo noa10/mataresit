@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { usePushNotificationContext, usePushNotificationStatus } from '@/contexts/PushNotificationContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { NOTIFICATION_CATEGORIES } from '@/types/notifications';
+import { getPushNotificationPreferenceKey, NOTIFICATION_CATEGORIES } from '@/types/notifications';
 import { useSettingsTranslation } from '@/contexts/LanguageContext';
 import { NotificationSetupGuide } from '@/components/notifications/NotificationSetupGuide';
 import { NotificationTestPanel } from '@/components/notifications/NotificationTestPanel';
@@ -242,6 +242,7 @@ export function NotificationPreferences() {
                 {categoryKey === 'TEAM_COLLABORATION' && <Users className="h-5 w-5 text-purple-600" />}
                 {categoryKey === 'CLAIMS_AND_BILLING' && <Settings className="h-5 w-5 text-purple-600" />}
                 {categoryKey === 'SYSTEM' && <Info className="h-5 w-5 text-purple-600" />}
+                {categoryKey === 'GAMIFICATION' && <Bell className="h-5 w-5 text-purple-600" />}
               </div>
               <div>
                 <CardTitle className="text-lg">{category.label}</CardTitle>
@@ -258,8 +259,10 @@ export function NotificationPreferences() {
               </h4>
               <div className="grid gap-3">
                 {category.types.map((notificationType) => {
-                  const emailKey = `email_${notificationType}` as keyof typeof localPreferences;
-                  const pushKey = `push_${notificationType}` as keyof typeof localPreferences;
+                  const emailKey = notificationType === 'gamification_streak_reminder'
+                    ? null
+                    : `email_${notificationType}` as keyof typeof localPreferences;
+                  const pushKey = getPushNotificationPreferenceKey(notificationType);
                   
                   return (
                     <div key={notificationType} className="space-y-2">
@@ -268,29 +271,33 @@ export function NotificationPreferences() {
                           {getNotificationTypeLabel(notificationType)}
                         </Label>
                         <div className="flex gap-2">
-                          <div className="flex items-center gap-1">
-                            <Switch
-                              checked={localPreferences[emailKey] as boolean || false}
-                              onCheckedChange={(checked) => updateLocalPreference(emailKey, checked)}
-                              disabled={!localPreferences.email_enabled}
-                              size="sm"
-                            />
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Switch
-                              checked={localPreferences[pushKey] as boolean || false}
-                              onCheckedChange={(checked) => updateLocalPreference(pushKey, checked)}
-                              disabled={pushStatus.isBlocked || !pushStatus.isAvailable}
-                              size="sm"
-                            />
-                            <Smartphone className={cn(
-                              "h-3 w-3",
-                              !localPreferences.push_enabled || !pushStatus.isEnabled
-                                ? "text-muted-foreground/50"
-                                : "text-muted-foreground"
-                            )} />
-                          </div>
+                          {emailKey && (
+                            <div className="flex items-center gap-1">
+                              <Switch
+                                checked={localPreferences[emailKey] as boolean || false}
+                                onCheckedChange={(checked) => updateLocalPreference(emailKey, checked)}
+                                disabled={!localPreferences.email_enabled}
+                                size="sm"
+                              />
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          {pushKey && (
+                            <div className="flex items-center gap-1">
+                              <Switch
+                                checked={localPreferences[pushKey] as boolean || false}
+                                onCheckedChange={(checked) => updateLocalPreference(pushKey, checked)}
+                                disabled={pushStatus.isBlocked || !pushStatus.isAvailable}
+                                size="sm"
+                              />
+                              <Smartphone className={cn(
+                                "h-3 w-3",
+                                !localPreferences.push_enabled || !pushStatus.isEnabled
+                                  ? "text-muted-foreground/50"
+                                  : "text-muted-foreground"
+                              )} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -430,6 +437,9 @@ function getNotificationTypeLabel(type: string): string {
     
     // System
     'team_settings_updated': 'Settings updated',
+
+    // Gamification
+    'gamification_streak_reminder': 'Streak reminders',
   };
   
   return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

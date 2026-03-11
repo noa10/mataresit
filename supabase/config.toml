@@ -97,3 +97,9 @@ enable_signup = true
 # Set to false to disable email confirmations (users can sign in without confirming email)
 [auth.email]
 enable_confirmations = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.send-gamification-streak-reminders]
+verify_jwt = false
