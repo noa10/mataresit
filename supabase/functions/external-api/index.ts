@@ -10,6 +10,9 @@ import { validateApiKey, createApiContext, hasScope } from '../_shared/api-auth.
 import { checkRateLimit, recordRequest, getRateLimitHeaders } from '../_shared/api-rate-limiting.ts';
 import { handleReceiptsAPI } from '../_shared/api-receipts.ts';
 import { handleClaimsAPI } from '../_shared/api-claims.ts';
+import { handleMeAPI } from '../_shared/api-me.ts';
+import { handleCategoriesAPI } from '../_shared/api-categories.ts';
+import { handleGamificationAPI } from '../_shared/api-gamification.ts';
 import { handleSearchAPI } from '../_shared/api-search.ts';
 import { handleAnalyticsAPI } from '../_shared/api-analytics.ts';
 import { handleTeamsAPI } from '../_shared/api-teams.ts';
@@ -27,6 +30,9 @@ serve(createExternalApiHandler(
     getRateLimitHeaders,
     handleReceiptsAPI,
     handleClaimsAPI,
+    handleMeAPI,
+    handleCategoriesAPI,
+    handleGamificationAPI,
     handleSearchAPI,
     handleAnalyticsAPI,
     handleTeamsAPI,

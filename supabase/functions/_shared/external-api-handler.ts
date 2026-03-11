@@ -21,6 +21,8 @@ interface ExternalApiContext {
   scopes: string[];
   keyId: string;
   supabase: unknown;
+  userSupabase: unknown;
+  authHeader: string;
 }
 
 interface RateLimitResult {
@@ -37,7 +39,10 @@ interface RequestMetadata {
 
 interface ExternalApiHandlerDependencies {
   validateApiKey: (apiKey: string | null) => Promise<ExternalApiValidation>;
-  createApiContext: (validation: ExternalApiValidation) => ExternalApiContext | null;
+  createApiContext: (
+    validation: ExternalApiValidation,
+    authHeader: string | null,
+  ) => Promise<ExternalApiContext | null>;
   hasScope: (context: ExternalApiContext, requiredScope: string) => boolean;
   checkRateLimit: (context: ExternalApiContext, endpoint: string) => Promise<RateLimitResult>;
   recordRequest: (
@@ -54,6 +59,9 @@ interface ExternalApiHandlerDependencies {
   handleSearchAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
   handleAnalyticsAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
   handleTeamsAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
+  handleMeAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
+  handleCategoriesAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
+  handleGamificationAPI: (req: Request, pathSegments: string[], context: ExternalApiContext) => Promise<Response>;
   withPerformanceMonitoring: (
     endpoint: string,
     method: string,
@@ -128,13 +136,16 @@ export function createExternalApiHandler(
       claims: [1],
       teams: [1],
     };
+    const reservedSegments: Record<string, Set<string>> = {
+      receipts: new Set(['batch', 'quick']),
+    };
 
     const positions = uuidPositions[resource];
     if (!positions) return null;
 
     for (const position of positions) {
       const id = pathSegments[position];
-      if (id && id !== 'batch') {
+      if (id && !reservedSegments[resource]?.has(id)) {
         const validationError = deps.validateUUID(id, `${resource.slice(0, -1)}Id`);
         if (validationError) {
           return validationError;
@@ -143,6 +154,10 @@ export function createExternalApiHandler(
     }
 
     return null;
+  }
+
+  function isBearerAuthorizationHeader(authHeader: string): boolean {
+    return /^Bearer\s+\S+$/i.test(authHeader);
   }
 
   async function handlePerformanceCheck(context: ExternalApiContext): Promise<Response> {
@@ -157,6 +172,9 @@ export function createExternalApiHandler(
         endpoints: {
           receipts: 'operational',
           claims: 'operational',
+          me: 'groundwork',
+          categories: 'groundwork',
+          gamification: 'groundwork',
           search: 'operational',
           analytics: 'operational',
           teams: 'operational',
@@ -172,6 +190,9 @@ export function createExternalApiHandler(
       endpoints: {
         receipts: 'operational',
         claims: 'operational',
+        me: 'groundwork',
+        categories: 'groundwork',
+        gamification: 'groundwork',
         search: 'operational',
         analytics: 'operational',
         teams: 'operational',
@@ -270,6 +291,15 @@ export function createExternalApiHandler(
         );
       }
 
+      if (!isBearerAuthorizationHeader(authHeader)) {
+        statusCode = 401;
+        errorMessage = 'Invalid Authorization header format';
+        return createErrorResponse(
+          'Invalid Authorization header format. Expected Authorization: Bearer <token>',
+          401,
+        );
+      }
+
       if (!apiKey.startsWith('mk_test_') && !apiKey.startsWith('mk_live_')) {
         statusCode = 401;
         errorMessage = 'Invalid API key format';
@@ -280,9 +310,22 @@ export function createExternalApiHandler(
         apiContext = {
           userId: 'test-user-id',
           teamId: 'test-team-id',
-          scopes: ['receipts:read', 'receipts:write', 'claims:read', 'claims:write', 'search:read', 'analytics:read', 'teams:read'],
+          scopes: [
+            'receipts:read',
+            'receipts:write',
+            'claims:read',
+            'claims:write',
+            'profile:read',
+            'categories:read',
+            'gamification:read',
+            'search:read',
+            'analytics:read',
+            'teams:read',
+          ],
           keyId: 'test-key-id',
           supabase: null,
+          userSupabase: null,
+          authHeader,
         };
         logger.log('Using mock API context');
       } else {
@@ -293,7 +336,7 @@ export function createExternalApiHandler(
           return createErrorResponse(validation.error || 'Invalid API key', 401);
         }
 
-        apiContext = deps.createApiContext(validation);
+        apiContext = await deps.createApiContext(validation, authHeader);
         if (!apiContext) {
           statusCode = 401;
           errorMessage = 'Failed to create API context';
@@ -353,6 +396,9 @@ export function createExternalApiHandler(
             features: {
               receipts: true,
               claims: true,
+              me: true,
+              categories: true,
+              gamification: true,
               search: true,
               analytics: true,
               teams: true,
@@ -364,6 +410,15 @@ export function createExternalApiHandler(
           break;
         case 'claims':
           response = await deps.handleClaimsAPI(req, handlerPathSegments, apiContext);
+          break;
+        case 'me':
+          response = await deps.handleMeAPI(req, handlerPathSegments, apiContext);
+          break;
+        case 'categories':
+          response = await deps.handleCategoriesAPI(req, handlerPathSegments, apiContext);
+          break;
+        case 'gamification':
+          response = await deps.handleGamificationAPI(req, handlerPathSegments, apiContext);
           break;
         case 'search':
           response = options.bypassMode
@@ -392,7 +447,18 @@ export function createExternalApiHandler(
         default:
           statusCode = 404;
           response = createErrorResponse(`Resource '${resource}' not found`, 404, {
-            available: ['health', 'receipts', 'claims', 'search', 'analytics', 'teams', 'performance'],
+            available: [
+              'health',
+              'receipts',
+              'claims',
+              'me',
+              'categories',
+              'gamification',
+              'search',
+              'analytics',
+              'teams',
+              'performance',
+            ],
             received: resource,
           });
       }

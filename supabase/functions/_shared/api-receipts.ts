@@ -6,6 +6,7 @@
 import type { ApiContext } from './api-auth.ts';
 import { hasScope, hasAnyScope } from './api-auth.ts';
 import { validateUUID } from './api-error-handling.ts';
+import { handleQuickReceiptAPI } from './api-receipts-quick.ts';
 
 export interface ReceiptFilters {
   startDate?: string;
@@ -39,6 +40,10 @@ export async function handleReceiptsAPI(
     const method = req.method;
     const receiptId = pathSegments[1]; // /receipts/{id}
     const action = pathSegments[2]; // /receipts/{id}/{action}
+
+    if (receiptId === 'quick') {
+      return await handleQuickReceiptAPI(req, context);
+    }
 
     switch (method) {
       case 'GET':
@@ -421,7 +426,7 @@ function createSuccessResponse(data: any, status: number = 200): Response {
 /**
  * Creates a new receipt
  */
-async function createReceipt(req: Request, context: ApiContext): Promise<Response> {
+export async function createReceipt(req: Request, context: ApiContext): Promise<Response> {
   // Check permissions
   if (!hasScope(context, 'receipts:write')) {
     return createErrorResponse('Insufficient permissions for receipts:write', 403);

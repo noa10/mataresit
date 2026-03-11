@@ -3,7 +3,7 @@
  * Provides secure API key validation and user context extraction
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 export interface ApiKeyValidation {
   valid: boolean;
@@ -19,7 +19,16 @@ export interface ApiContext {
   teamId?: string;
   scopes: string[];
   keyId: string;
-  supabase: any;
+  supabase: SupabaseClient;
+  userSupabase: SupabaseClient;
+  authHeader: string;
+}
+
+export interface BearerTokenValidation {
+  valid: boolean;
+  userId?: string;
+  authHeader?: string;
+  error?: string;
 }
 
 /**
@@ -102,26 +111,120 @@ export async function validateApiKey(apiKey: string | null): Promise<ApiKeyValid
   }
 }
 
+function getSupabaseUrl(): string {
+  return Deno.env.get('SUPABASE_URL') ?? '';
+}
+
+function getServiceRoleKey(): string {
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || '';
+}
+
+function getAnonKey(): string {
+  return Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+}
+
+function createServiceRoleClient() {
+  return createClient(getSupabaseUrl(), getServiceRoleKey());
+}
+
+export function createUserScopedClient(authHeader: string) {
+  return createClient(getSupabaseUrl(), getAnonKey(), {
+    global: {
+      headers: {
+        Authorization: authHeader,
+      },
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+export function extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader) {
+    return null;
+  }
+
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
+
+  return token ? token : null;
+}
+
+export async function validateBearerToken(authHeader: string | null): Promise<BearerTokenValidation> {
+  const token = extractBearerToken(authHeader);
+
+  if (!authHeader || !token) {
+    return {
+      valid: false,
+      error: 'Invalid Authorization header. Expected Bearer <token>',
+    };
+  }
+
+  try {
+    const supabaseAdmin = createServiceRoleClient();
+    const {
+      data: { user },
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+      return {
+        valid: false,
+        error: 'Invalid authentication token',
+      };
+    }
+
+    return {
+      valid: true,
+      userId: user.id,
+      authHeader,
+    };
+  } catch (error) {
+    console.error('Bearer token validation error:', error);
+    return {
+      valid: false,
+      error: 'Internal validation error',
+    };
+  }
+}
+
 /**
  * Creates an authenticated Supabase client for API operations
  */
-export function createApiContext(validation: ApiKeyValidation): ApiContext | null {
+export async function createApiContext(
+  validation: ApiKeyValidation,
+  authHeader: string | null,
+): Promise<ApiContext | null> {
   if (!validation.valid || !validation.userId) {
     return null;
   }
 
-  // Create Supabase client with service role for API operations
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
+  const bearerValidation = await validateBearerToken(authHeader);
+  if (!bearerValidation.valid || !bearerValidation.userId || !bearerValidation.authHeader) {
+    return null;
+  }
+
+  if (bearerValidation.userId !== validation.userId) {
+    console.error('API key user does not match bearer token user', {
+      apiKeyUserId: validation.userId,
+      bearerUserId: bearerValidation.userId,
+    });
+    return null;
+  }
+
+  const supabase = createServiceRoleClient();
+  const userSupabase = createUserScopedClient(bearerValidation.authHeader);
 
   return {
     userId: validation.userId,
     teamId: validation.teamId,
     scopes: validation.scopes || [],
     keyId: validation.keyId!,
-    supabase
+    supabase,
+    userSupabase,
+    authHeader: bearerValidation.authHeader,
   };
 }
 
@@ -194,6 +297,9 @@ export function isValidScope(scope: string): boolean {
     'claims:read',
     'claims:write',
     'claims:delete',
+    'profile:read',
+    'categories:read',
+    'gamification:read',
     'search:read',
     'analytics:read',
     'teams:read',
@@ -209,9 +315,9 @@ export function isValidScope(scope: string): boolean {
 export function getDefaultScopes(level: 'read' | 'write' | 'admin'): string[] {
   switch (level) {
     case 'read':
-      return ['receipts:read', 'claims:read', 'search:read', 'analytics:read', 'teams:read'];
+      return ['receipts:read', 'claims:read', 'profile:read', 'categories:read', 'gamification:read', 'search:read', 'analytics:read', 'teams:read'];
     case 'write':
-      return ['receipts:read', 'receipts:write', 'claims:read', 'claims:write', 'search:read', 'analytics:read', 'teams:read'];
+      return ['receipts:read', 'receipts:write', 'claims:read', 'claims:write', 'profile:read', 'categories:read', 'gamification:read', 'search:read', 'analytics:read', 'teams:read'];
     case 'admin':
       return ['admin:all'];
     default:
