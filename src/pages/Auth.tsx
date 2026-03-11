@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -7,6 +7,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthTranslation } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabase";
+import { captureReferralCodeFromSearch } from "@/lib/referralTracking";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -110,7 +111,7 @@ export default function Auth() {
 
   // Function to check for recovery mode based on URL hash
   // This is primarily for the initial page load.
-  const checkForRecoveryModeOnMount = () => {
+  const checkForRecoveryModeOnMount = useCallback(() => {
     console.log("Auth.tsx: checkForRecoveryModeOnMount running...");
     const hash = window.location.hash;
 
@@ -132,7 +133,11 @@ export default function Auth() {
     }
     console.log("Auth.tsx: checkForRecoveryModeOnMount - No clear recovery indicators in hash.");
     return false;
-  };
+  }, [isRecoverySession, isResetPasswordOpen, t, toast]);
+
+  useEffect(() => {
+    captureReferralCodeFromSearch(location.search);
+  }, [location.search]);
 
   useEffect(() => {
     // Initial check on mount for recovery hash.
@@ -195,7 +200,7 @@ export default function Auth() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [toast, resetPasswordForm]); // Added resetPasswordForm to deps for reset call
+  }, [checkForRecoveryModeOnMount, isRecoverySession, isResetPasswordOpen, t, toast, resetPasswordForm]); // Added resetPasswordForm to deps for reset call
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
@@ -360,11 +365,15 @@ export default function Auth() {
       // A full page reload ensures all state is fresh.
       window.location.assign('/auth'); // Using assign for a full reload effect.
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? error.message
+        : "An unexpected error occurred while updating password. Please try again.";
+
       console.error("Auth.tsx: Unexpected error in onResetPasswordSubmit:", error);
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred while updating password. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
