@@ -164,6 +164,30 @@
     "subtitle_user": "Jejak dan susun resit anda",
     "subtitle_team_member": "Bekerjasama dengan pasukan anda pada resit"
   },
+  "rewards": {
+    "title": "Kemajuan ganjaran",
+    "description": "Jejaki tahap, rentetan, dan bonus hari ini tanpa meninggalkan papan pemuka.",
+    "xpLabel": "Pengalaman",
+    "levelBadge": "Tahap {{level}}",
+    "dailyGoalComplete": "Bonus harian telah dituntut",
+    "dailyGoalReady": "Bonus harian sedia",
+    "progressLabel": "Kemajuan ke tahap seterusnya",
+    "progressHint": "Teruskan mengimbas dan log masuk untuk membuka lebih banyak ganjaran.",
+    "loginStreak": "Rentetan log masuk",
+    "scanStreak": "Rentetan imbasan",
+    "badgesUnlocked": "Lencana dibuka",
+    "footer": "Halaman papan pendahulu dan misi kini boleh dicapai daripada permukaan ganjaran anda.",
+    "actions": {
+      "leaderboard": "Papan pendahulu",
+      "missions": "Misi"
+    },
+    "install": {
+      "title": "Pasang MataResit",
+      "description": "Anda telah melengkapkan imbasan berjaya pertama. Pasang aplikasi untuk akses lebih pantas ke ganjaran seterusnya.",
+      "installCta": "Pasang aplikasi",
+      "dismissCta": "Bukan sekarang"
+    }
+  },
   "malaysian": {
     "currency": {
       "format": "RM {{amount}}",

@@ -18,6 +18,7 @@
   },
   "tabs": {
     "profile": "Profile",
+    "rewards": "Rewards",
     "billing": "Billing",
     "teams": "Teams",
     "settings": "Settings",
@@ -98,6 +99,113 @@
     "darkModeActivated": "Dark mode activated",
     "lightModeActivated": "Light mode activated",
     "themeChanged": "The application theme has been changed to {{mode}} mode."
+  },
+  "rewards": {
+    "title": "Rewards center",
+    "description": "Manage your progression, badges, privacy settings, scanner themes, and referrals.",
+    "actions": {
+      "leaderboard": "Leaderboard",
+      "missions": "Missions"
+    },
+    "overview": {
+      "totalXp": "Total XP",
+      "level": "Level {{level}}",
+      "progress": "Progress to next level",
+      "loginStreak": "Login streak",
+      "scanStreak": "Scan streak",
+      "dailyGoal": "Daily bonus",
+      "completed": "Completed",
+      "ready": "Ready"
+    },
+    "badges": {
+      "title": "Badge collection",
+      "description": "Equip your proudest unlocks and preview upcoming milestones.",
+      "equipped": "Equipped badges",
+      "noneEquipped": "No badges equipped yet.",
+      "unlocked": "Unlocked",
+      "locked": "Locked",
+      "catalog": {
+        "first_scan": { "name": "First scan", "description": "Complete your first successful scan." },
+        "night_owl": { "name": "Night owl", "description": "Log a qualifying scan during the late-night window." },
+        "early_bird": { "name": "Early bird", "description": "Start your day with an early successful scan." },
+        "seven_day_streak": { "name": "7-day streak", "description": "Maintain a seven-day login or scan streak." },
+        "thirty_day_streak": { "name": "30-day streak", "description": "Stay consistent long enough to hit a full month streak." },
+        "referral_starter": { "name": "Referral starter", "description": "Invite your first friend who completes sign-up." },
+        "referral_champion": { "name": "Referral champion", "description": "Rack up multiple successful referrals." },
+        "power_scanner": { "name": "Power scanner", "description": "Reach a major receipt-scanning milestone." },
+        "receipt_historian": { "name": "Receipt historian", "description": "Build a rich archive of organized receipts." },
+        "community_helper": { "name": "Community helper", "description": "Contribute to referral and engagement milestones." }
+      }
+    },
+    "themes": {
+      "title": "Scanner themes",
+      "description": "Choose from the scanner looks you have unlocked.",
+      "selected": "Selected",
+      "unlocked": "Unlocked",
+      "locked": "Locked",
+      "options": {
+        "default": { "title": "Classic", "description": "The familiar scanner look available from day one." },
+        "ocean": { "title": "Ocean", "description": "A cool blue theme for focused scanning sessions." },
+        "forest": { "title": "Forest", "description": "A calm green theme earned through sustained streaks." },
+        "sunset": { "title": "Sunset", "description": "A warm premium look reserved for higher progression." }
+      }
+    },
+    "privacy": {
+      "title": "Leaderboard privacy",
+      "description": "Control whether your profile can appear in public rankings.",
+      "leaderboardOptIn": "Join the leaderboard",
+      "leaderboardOptInHint": "Opt in before your progression appears in leaderboard previews.",
+      "displayMode": "Display mode",
+      "displayModeHint": "Choose whether to show your public identity or stay anonymous.",
+      "displayModes": {
+        "anonymous": "Anonymous",
+        "public": "Public"
+      }
+    },
+    "referrals": {
+      "title": "Referral summary",
+      "description": "Share your referral code and track successful invites.",
+      "code": "Referral code",
+      "successfulReferrals": "Successful referrals",
+      "pendingReferrals": "Pending rewards",
+      "redeemedReferrals": "Rewards released",
+      "copyLink": "Copy referral link",
+      "copySuccess": "Referral link copied",
+      "copyFailed": "Unable to copy referral link"
+    },
+    "shareCards": {
+      "title": "Shareable achievement cards",
+      "description": "Create milestone cards you can share from your device or download as image files.",
+      "footer": "Track more milestones in MataResit.",
+      "shareSuccess": "Share card ready",
+      "downloadFallback": "Share card downloaded",
+      "shareFailed": "Unable to prepare the share card",
+      "level": {
+        "button": "Share level card",
+        "title": "Level {{level}} reached",
+        "subtitle": "Built with every successful scan and review.",
+        "shareText": "I just reached Level {{level}} on MataResit."
+      },
+      "streak": {
+        "button": "Share streak card",
+        "title": "{{days}}-day scan streak",
+        "subtitle": "Consistency keeps the rewards flowing.",
+        "value": "{{days}} day streak",
+        "shareText": "I’m on a {{days}}-day MataResit scan streak."
+      },
+      "badge": {
+        "button": "Share badge card",
+        "title": "Badge unlocked",
+        "subtitle": "Another milestone added to my rewards shelf.",
+        "shareText": "I just unlocked the {{badge}} badge on MataResit."
+      },
+      "deductible": {
+        "button": "Share deductible total",
+        "title": "Deductible total tracked",
+        "subtitle": "Every tax-ready receipt makes the next filing easier.",
+        "shareText": "I’ve tracked {{total}} in deductible receipts with MataResit."
+      }
+    }
   },
   "signOutSuccess": {
     "title": "Signed out successfully",

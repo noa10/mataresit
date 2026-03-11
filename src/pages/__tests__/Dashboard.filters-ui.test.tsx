@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
+import { BulkReprocessProvider } from "@/contexts/BulkReprocessContext";
 import Dashboard from "@/pages/Dashboard";
 import { Receipt } from "@/types/receipt";
 
@@ -26,6 +27,13 @@ vi.mock("@/contexts/TeamContext", () => ({
 
 vi.mock("@/contexts/StripeContext", () => ({
   useStripe: () => ({ subscriptionData: null }),
+}));
+
+vi.mock("@/contexts/BackgroundUploadContext", () => ({
+  useBackgroundUpload: () => ({
+    openModal: vi.fn(),
+    onUploadCompleteCallback: { current: null },
+  }),
 }));
 
 const translationMap: Record<string, string> = {
@@ -108,8 +116,16 @@ vi.mock("@/components/modals/BatchUploadModal", () => ({
   BatchUploadModal: () => null,
 }));
 
+vi.mock("@/components/upload/BackgroundUploadIndicator", () => ({
+  BackgroundUploadIndicator: () => null,
+}));
+
 vi.mock("@/components/ReceiptCard", () => ({
   default: ({ merchant }: { merchant: string }) => <div>{merchant}</div>,
+}));
+
+vi.mock("@/components/gamification/GamificationProgressCard", () => ({
+  GamificationProgressCard: () => <div data-testid="dashboard-gamification-card" />,
 }));
 
 const mockReceipts: Receipt[] = [
@@ -160,6 +176,18 @@ const mockCategories = [
   },
 ];
 
+interface DashboardReceiptQueryParams {
+  page?: number;
+  limit?: number;
+  searchQuery?: string;
+  status?: string;
+  currency?: string | null;
+  categoryId?: string | null;
+  sortOrder?: "newest" | "oldest" | "highest" | "lowest";
+  fromDate?: string | null;
+  toDate?: string | null;
+}
+
 function LocationSearchObserver() {
   const location = useLocation();
   return <div data-testid="location-search">{location.search}</div>;
@@ -176,17 +204,19 @@ function renderDashboard(initialEntry = "/dashboard?view=table") {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Dashboard />
-        <LocationSearchObserver />
-      </MemoryRouter>
+      <BulkReprocessProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Dashboard />
+          <LocationSearchObserver />
+        </MemoryRouter>
+      </BulkReprocessProvider>
     </QueryClientProvider>,
   );
 }
 
 describe("Dashboard filters UI", () => {
   beforeEach(() => {
-    mocks.fetchReceiptsPage.mockImplementation(async (params: any = {}) => {
+    mocks.fetchReceiptsPage.mockImplementation(async (params: DashboardReceiptQueryParams = {}) => {
       const {
         page = 1,
         limit = 25,

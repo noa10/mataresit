@@ -164,6 +164,30 @@
     "subtitle_user": "Track and organize your receipts",
     "subtitle_team_member": "Collaborate with your team on receipts"
   },
+  "rewards": {
+    "title": "Rewards progress",
+    "description": "Track your level, streaks, and today’s bonus without leaving the dashboard.",
+    "xpLabel": "Experience",
+    "levelBadge": "Level {{level}}",
+    "dailyGoalComplete": "Daily bonus claimed",
+    "dailyGoalReady": "Daily bonus ready",
+    "progressLabel": "Progress to next level",
+    "progressHint": "Keep scanning and checking in to unlock more rewards.",
+    "loginStreak": "Login streak",
+    "scanStreak": "Scan streak",
+    "badgesUnlocked": "Badges unlocked",
+    "footer": "Leaderboard and missions pages are now reachable from your rewards surface.",
+    "actions": {
+      "leaderboard": "Leaderboard",
+      "missions": "Missions"
+    },
+    "install": {
+      "title": "Install MataResit",
+      "description": "You’ve completed your first successful scan. Install the app for a faster way back to your next reward.",
+      "installCta": "Install app",
+      "dismissCta": "Not now"
+    }
+  },
   "malaysian": {
     "currency": {
       "format": "RM {{amount}}",

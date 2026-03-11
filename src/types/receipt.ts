@@ -59,6 +59,7 @@ export interface Receipt {
   paid_by_id?: string | null;
   // Team collaboration support
   team_id?: string | null;
+  is_business_expense?: boolean | null;
   // New fields for real-time status updates
   processing_status?: ProcessingStatus;
   processing_error?: string | null;

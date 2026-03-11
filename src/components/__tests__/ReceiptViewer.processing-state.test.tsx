@@ -1,12 +1,35 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { ReceiptWithDetails } from "@/types/receipt";
+
+type MockDivProps = React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode };
+type TransformWrapperRenderProps = {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetTransform: () => void;
+  setTransform: () => void;
+  instance: {
+    transformState: {
+      scale: number;
+      positionX: number;
+      positionY: number;
+    };
+  };
+};
+type TransformWrapperProps = {
+  children: (props: TransformWrapperRenderProps) => React.ReactNode;
+};
+type TooltipMockProps = React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode };
+type SwitchMockProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+};
 
 const mocks = vi.hoisted(() => ({
   fetchCategoriesForDisplay: vi.fn(),
@@ -23,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastInfo: vi.fn(),
   toastWarning: vi.fn(),
+  toastLoading: vi.fn(),
   saveReceipt: vi.fn(() => "save-op-1"),
   supabase: {
     from: vi.fn(),
@@ -34,12 +58,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: MockDivProps) => <div {...props}>{children}</div>,
   },
 }));
 
 vi.mock("react-zoom-pan-pinch", () => ({
-  TransformWrapper: ({ children }: any) =>
+  TransformWrapper: ({ children }: TransformWrapperProps) =>
     children({
       zoomIn: vi.fn(),
       zoomOut: vi.fn(),
@@ -53,7 +77,27 @@ vi.mock("react-zoom-pan-pinch", () => ({
         },
       },
     }),
-  TransformComponent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  TransformComponent: ({ children }: MockDivProps) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: TooltipMockProps) => <>{children}</>,
+  Tooltip: ({ children }: TooltipMockProps) => <>{children}</>,
+  TooltipTrigger: ({ children }: TooltipMockProps) => <>{children}</>,
+  TooltipContent: ({ children }: TooltipMockProps) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/ui/switch", () => ({
+  Switch: ({ checked, onCheckedChange, id, ...props }: SwitchMockProps) => (
+    <button
+      type="button"
+      role="switch"
+      id={id}
+      aria-checked={checked}
+      onClick={() => onCheckedChange?.(!checked)}
+      {...props}
+    />
+  ),
 }));
 
 vi.mock("@/contexts/LanguageContext", () => ({
@@ -142,9 +186,13 @@ vi.mock("@/components/claims/ClaimFromReceiptButton", () => ({
 }));
 
 vi.mock("@/components/ui/OptimizedImage", () => ({
-  ReceiptViewerImage: React.forwardRef<HTMLImageElement, any>((props, ref) => (
-    <img ref={ref} {...props} />
-  )),
+  ReceiptViewerImage: React.forwardRef<
+    HTMLImageElement,
+    React.ImgHTMLAttributes<HTMLImageElement> & {
+      showSkeleton?: boolean;
+      showErrorState?: boolean;
+    }
+  >(({ showSkeleton: _showSkeleton, showErrorState: _showErrorState, ...props }, ref) => <img ref={ref} {...props} />),
 }));
 
 vi.mock("@/components/receipts/BoundingBoxOverlay", () => ({
@@ -165,6 +213,7 @@ vi.mock("sonner", () => ({
     error: mocks.toastError,
     info: mocks.toastInfo,
     warning: mocks.toastWarning,
+    loading: mocks.toastLoading,
   },
 }));
 
@@ -178,6 +227,7 @@ const baseReceipt: ReceiptWithDetails = {
   created_at: "2026-02-28T00:00:00.000Z",
   updated_at: "2026-02-28T00:00:00.000Z",
   currency: "MYR",
+  is_business_expense: false,
   image_url: "https://example.com/receipt.jpg",
   lineItems: [],
   processing_status: "processing",
@@ -205,7 +255,7 @@ function renderViewer(receipt: ReceiptWithDetails) {
 describe("ReceiptViewer processing state behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    window.localStorage.clear();
     mocks.getStoredProcessingSettings.mockReturnValue(null);
 
     mocks.fetchCategoriesForDisplay.mockResolvedValue([]);
@@ -278,8 +328,10 @@ describe("ReceiptViewer processing state behavior", () => {
 
   it.each(["failed_ai", "failed_ocr"] as const)(
     "treats %s as terminal failure state (no infinite loading)",
-    (status) => {
+    async (status) => {
       renderViewer({ ...baseReceipt, id: `receipt-${status}`, processing_status: status });
+
+      await screen.findByRole("button", { name: /Reprocess with AI Vision/i });
 
       expect(screen.queryByRole("button", { name: /Stop Processing/i })).not.toBeInTheDocument();
       expect(screen.queryByText(/Running AI Analysis/i)).not.toBeInTheDocument();
@@ -350,5 +402,48 @@ describe("ReceiptViewer processing state behavior", () => {
         modelId: "gemini-2.5-flash-lite",
       })
     );
+  });
+
+  it("includes tax-claimable state in background save payloads", async () => {
+    const user = userEvent.setup();
+    renderViewer({ ...baseReceipt, processing_status: "complete" });
+
+    await user.click(screen.getByRole("switch", { name: /Tax Claimable/i }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    });
+    await user.click(screen.getByRole("button", { name: /Save Changes/i }));
+
+    await waitFor(() => {
+      expect(mocks.saveReceipt).toHaveBeenCalledWith(
+        "receipt-1",
+        expect.objectContaining({ is_business_expense: true }),
+        expect.any(Array),
+        expect.any(Object)
+      );
+    });
+  });
+
+  it("persists tax-claimable state when marking a receipt as fixed", async () => {
+    const user = userEvent.setup();
+    renderViewer({
+      ...baseReceipt,
+      processing_status: "failed_ai",
+      status: "reviewed",
+    });
+
+    await user.click(screen.getByRole("switch", { name: /Tax Claimable/i }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    });
+    await user.click(screen.getByRole("button", { name: /Mark as fixed/i }));
+
+    await waitFor(() => {
+      expect(mocks.updateReceiptWithLineItems).toHaveBeenCalledWith(
+        "receipt-1",
+        expect.objectContaining({ is_business_expense: true }),
+        expect.any(Array)
+      );
+    });
   });
 });

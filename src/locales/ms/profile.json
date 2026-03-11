@@ -18,6 +18,7 @@
   },
   "tabs": {
     "profile": "Profil",
+    "rewards": "Ganjaran",
     "billing": "Pengebilan",
     "teams": "Pasukan",
     "settings": "Tetapan",
@@ -98,6 +99,113 @@
     "darkModeActivated": "Mod gelap diaktifkan",
     "lightModeActivated": "Mod terang diaktifkan",
     "themeChanged": "Tema aplikasi telah ditukar kepada mod {{mode}}."
+  },
+  "rewards": {
+    "title": "Pusat ganjaran",
+    "description": "Urus kemajuan, lencana, tetapan privasi, tema pengimbas, dan rujukan anda.",
+    "actions": {
+      "leaderboard": "Papan pendahulu",
+      "missions": "Misi"
+    },
+    "overview": {
+      "totalXp": "Jumlah XP",
+      "level": "Tahap {{level}}",
+      "progress": "Kemajuan ke tahap seterusnya",
+      "loginStreak": "Rentetan log masuk",
+      "scanStreak": "Rentetan imbasan",
+      "dailyGoal": "Bonus harian",
+      "completed": "Selesai",
+      "ready": "Sedia"
+    },
+    "badges": {
+      "title": "Koleksi lencana",
+      "description": "Lengkapkan lencana terbaik anda dan lihat sasaran seterusnya.",
+      "equipped": "Lencana dipakai",
+      "noneEquipped": "Tiada lencana dipakai lagi.",
+      "unlocked": "Dibuka",
+      "locked": "Terkunci",
+      "catalog": {
+        "first_scan": { "name": "Imbasan pertama", "description": "Lengkapkan imbasan berjaya pertama anda." },
+        "night_owl": { "name": "Burung malam", "description": "Buat imbasan layak pada waktu malam." },
+        "early_bird": { "name": "Burung awal", "description": "Mulakan hari anda dengan imbasan berjaya pada awal pagi." },
+        "seven_day_streak": { "name": "Rentetan 7 hari", "description": "Kekalkan rentetan log masuk atau imbasan selama tujuh hari." },
+        "thirty_day_streak": { "name": "Rentetan 30 hari", "description": "Kekal konsisten sehingga mencapai rentetan sebulan penuh." },
+        "referral_starter": { "name": "Permulaan rujukan", "description": "Jemput rakan pertama anda yang berjaya mendaftar." },
+        "referral_champion": { "name": "Juara rujukan", "description": "Kumpul beberapa rujukan yang berjaya." },
+        "power_scanner": { "name": "Pengimbas tegar", "description": "Capai pencapaian besar dalam jumlah imbasan resit." },
+        "receipt_historian": { "name": "Sejarawan resit", "description": "Bina arkib resit yang kaya dan tersusun." },
+        "community_helper": { "name": "Pembantu komuniti", "description": "Sumbang kepada pencapaian rujukan dan penglibatan komuniti." }
+      }
+    },
+    "themes": {
+      "title": "Tema pengimbas",
+      "description": "Pilih rupa pengimbas yang telah anda buka.",
+      "selected": "Dipilih",
+      "unlocked": "Dibuka",
+      "locked": "Terkunci",
+      "options": {
+        "default": { "title": "Klasik", "description": "Rupa pengimbas biasa yang tersedia dari hari pertama." },
+        "ocean": { "title": "Lautan", "description": "Tema biru yang tenang untuk sesi imbasan yang fokus." },
+        "forest": { "title": "Hutan", "description": "Tema hijau yang diperoleh melalui rentetan yang berterusan." },
+        "sunset": { "title": "Senja", "description": "Rupa hangat premium untuk kemajuan yang lebih tinggi." }
+      }
+    },
+    "privacy": {
+      "title": "Privasi papan pendahulu",
+      "description": "Kawal sama ada profil anda boleh muncul dalam ranking awam.",
+      "leaderboardOptIn": "Sertai papan pendahulu",
+      "leaderboardOptInHint": "Pilih masuk sebelum kemajuan anda muncul dalam pratonton papan pendahulu.",
+      "displayMode": "Mod paparan",
+      "displayModeHint": "Pilih sama ada untuk memaparkan identiti awam anda atau kekal tanpa nama.",
+      "displayModes": {
+        "anonymous": "Tanpa nama",
+        "public": "Awam"
+      }
+    },
+    "referrals": {
+      "title": "Ringkasan rujukan",
+      "description": "Kongsi kod rujukan anda dan jejak jemputan yang berjaya.",
+      "code": "Kod rujukan",
+      "successfulReferrals": "Rujukan berjaya",
+      "pendingReferrals": "Ganjaran tertunda",
+      "redeemedReferrals": "Ganjaran dilepaskan",
+      "copyLink": "Salin pautan rujukan",
+      "copySuccess": "Pautan rujukan disalin",
+      "copyFailed": "Tidak dapat menyalin pautan rujukan"
+    },
+    "shareCards": {
+      "title": "Kad pencapaian untuk dikongsi",
+      "description": "Cipta kad pencapaian yang boleh dikongsi terus dari peranti anda atau dimuat turun sebagai fail imej.",
+      "footer": "Jejaki lebih banyak pencapaian di MataResit.",
+      "shareSuccess": "Kad perkongsian sedia",
+      "downloadFallback": "Kad perkongsian dimuat turun",
+      "shareFailed": "Tidak dapat menyediakan kad perkongsian",
+      "level": {
+        "button": "Kongsi kad tahap",
+        "title": "Tahap {{level}} dicapai",
+        "subtitle": "Dibina melalui setiap imbasan dan semakan yang berjaya.",
+        "shareText": "Saya baru mencapai Tahap {{level}} di MataResit."
+      },
+      "streak": {
+        "button": "Kongsi kad rentetan",
+        "title": "Rentetan imbasan {{days}} hari",
+        "subtitle": "Konsistensi memastikan ganjaran terus bergerak.",
+        "value": "Rentetan {{days}} hari",
+        "shareText": "Saya sedang berada dalam rentetan imbasan {{days}} hari di MataResit."
+      },
+      "badge": {
+        "button": "Kongsi kad lencana",
+        "title": "Lencana dibuka",
+        "subtitle": "Satu lagi pencapaian untuk rak ganjaran saya.",
+        "shareText": "Saya baru membuka lencana {{badge}} di MataResit."
+      },
+      "deductible": {
+        "button": "Kongsi jumlah tolakan",
+        "title": "Jumlah tolakan dijejaki",
+        "subtitle": "Setiap resit sedia-cukai memudahkan pemfailan seterusnya.",
+        "shareText": "Saya telah menjejak {{total}} resit boleh tolak dengan MataResit."
+      }
+    }
   },
   "signOutSuccess": {
     "title": "Berjaya log keluar",

@@ -5,6 +5,8 @@
   },
   "mainMenu": {
     "dashboard": "Papan Pemuka",
+    "leaderboard": "Papan pendahulu",
+    "missions": "Misi",
     "search": "Carian",
     "analysis": "Analisis",
     "claims": "Tuntutan",
@@ -65,5 +67,86 @@
     "terms": "Terma Perkhidmatan",
     "support": "Sokongan",
     "contact": "Hubungi Kami"
+  },
+  "gamification": {
+    "comingSoon": "Destinasi ini kini telah dirouting dalam aplikasi dan akan diperluas apabila pengalaman penuh papan pendahulu serta misi dilancarkan.",
+    "leaderboardDescription": "Bandingkan kemajuan ganjaran anda merentas XP mingguan, resit bulanan, dan jumlah boleh ditolak.",
+    "missionsDescription": "Jejaki misi onboarding, mingguan, dan komuniti yang terhubung terus dengan kemajuan ganjaran anda.",
+    "backToDashboard": "Kembali ke papan pemuka",
+    "backToProfile": "Kembali ke ganjaran profil",
+    "missions": {
+      "liveBadge": "Kemajuan misi langsung",
+      "emptyTitle": "Tiada misi aktif sekarang",
+      "emptyDescription": "Misi baharu akan muncul di sini apabila kalendar ganjaran berubah.",
+      "personalProgress": "Kemajuan anda",
+      "communityProgress": "Kemajuan komuniti",
+      "windowLabel": "Tempoh aktif",
+      "windowLifetime": "Misi sepanjang masa",
+      "rewardLabel": "Pratonton ganjaran",
+      "communityContributionTitle": "Sumbangan anda",
+      "communityContributionBody": "Anda telah menyumbang",
+      "units": {
+        "scanStreakDays": "{{count}} hari"
+      },
+      "tabs": {
+        "one_time": "Sekali sahaja",
+        "weekly": "Mingguan",
+        "community": "Komuniti"
+      },
+      "status": {
+        "inProgress": "Sedang berjalan",
+        "complete": "Selesai",
+        "community": "Matlamat komuniti"
+      },
+      "summary": {
+        "active": "Misi aktif",
+        "completed": "Selesai",
+        "rewards": "XP tersedia"
+      }
+    },
+    "leaderboard": {
+      "privacyBadge": "Kedudukan peka privasi",
+      "settingsCta": "Urus privasi ganjaran",
+      "emptyTitle": "Belum ada aktiviti papan pendahulu",
+      "emptyDescription": "Ahli yang memilih untuk menyertai akan muncul di sini selepas mula mengumpul kemajuan untuk metrik ini.",
+      "privacyGateTitle": "Sertai papan pendahulu apabila anda bersedia",
+      "privacyGateDescription": "Hidupkan penyertaan papan pendahulu dalam tetapan ganjaran anda untuk membandingkan XP mingguan, resit bulanan, dan jumlah boleh ditolak.",
+      "privacyGateStatus": "Profil ganjaran anda kini disembunyikan daripada papan pendahulu.",
+      "privacyGateAction": "Buka tetapan ganjaran",
+      "currentUserTitle": "Kedudukan anda",
+      "currentUserRank": "Anda berada di #{{rank}}",
+      "currentUserTopTen": "Anda kini berada dalam 10 teratas.",
+      "currentUserGap": "{{amount}} untuk memasuki 10 teratas",
+      "currentUserUnranked": "Anda belum berada dalam ranking untuk paparan ini.",
+      "scopeGlobal": "Global",
+      "scopeMalaysia": "Malaysia",
+      "topThreeTitle": "Peneraju teratas",
+      "topThreeDescription": "Ahli terpilih yang mendahului bagi paparan ini.",
+      "tableTitle": "Papan pendahulu 100 teratas",
+      "tableDescription": "Hanya ahli yang memilih untuk menyertai dipaparkan di sini. Mod anonim menyembunyikan nama peribadi.",
+      "rankHeader": "Kedudukan",
+      "memberHeader": "Ahli",
+      "metricHeader": "Metrik",
+      "badgeYou": "Anda",
+      "badgeAnonymous": "Anonim",
+      "units": {
+        "weeklyXp": "{{count}} XP",
+        "monthlyReceipts": "{{count}} resit"
+      },
+      "metrics": {
+        "weekly_xp": {
+          "label": "XP mingguan",
+          "description": "XP yang diperoleh dalam 7 hari terakhir."
+        },
+        "monthly_receipts": {
+          "label": "Resit bulanan",
+          "description": "Resit lengkap yang dikira dalam bulan semasa."
+        },
+        "deductible_total": {
+          "label": "Jumlah boleh ditolak",
+          "description": "Jumlah boleh ditolak semasa yang dijejaki dalam profil ganjaran anda."
+        }
+      }
+    }
   }
 }

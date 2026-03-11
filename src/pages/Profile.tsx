@@ -1,9 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  User, Moon, Sun, LogOut, Settings, CreditCard, Users, Shield
+  User, Moon, Sun, LogOut, Settings, CreditCard, Users, Shield, Trophy
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfileTranslation } from "@/contexts/LanguageContext";
@@ -20,16 +20,22 @@ import { ProfileInfoEditor } from "@/components/profile/ProfileInfoEditor";
 import { SubscriptionInfo } from "@/components/profile/SubscriptionInfo";
 import { TeamMemberships } from "@/components/profile/TeamMemberships";
 import { AccountSettings } from "@/components/profile/AccountSettings";
+import { ProfileRewardsPanel } from "@/components/gamification/ProfileRewardsPanel";
 import { getProfile, ProfileData } from "@/services/profileService";
+
+const PROFILE_TABS = new Set(["profile", "rewards", "subscription", "teams", "preferences", "security"]);
 
 export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { t } = useProfileTranslation();
   const { isDarkMode, toggleMode } = useTheme();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const requestedTab = searchParams.get("tab") ?? "profile";
+  const activeTab = PROFILE_TABS.has(requestedTab) ? requestedTab : "profile";
 
   // Fetch profile data on component mount
   useEffect(() => {
@@ -52,7 +58,7 @@ export default function Profile() {
     };
 
     fetchProfileData();
-  }, [user?.id, toast]);
+  }, [t, user?.id, toast]);
 
   // Handle dark mode toggle
   const toggleDarkMode = async () => {
@@ -212,11 +218,29 @@ export default function Profile() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  if (value === "profile") {
+                    next.delete("tab");
+                  } else {
+                    next.set("tab", value);
+                  }
+                  return next;
+                });
+              }}
+              className="space-y-6"
+            >
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="profile" className="gap-1">
                   <User className="h-4 w-4" />
                   <span className="hidden sm:inline">{t('tabs.profile')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="rewards" className="gap-1">
+                  <Trophy className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('tabs.rewards')}</span>
                 </TabsTrigger>
                 <TabsTrigger value="subscription" className="gap-1">
                   <CreditCard className="h-4 w-4" />
@@ -241,6 +265,10 @@ export default function Profile() {
                   profile={profile}
                   onProfileUpdate={handleProfileUpdate}
                 />
+              </TabsContent>
+
+                <TabsContent value="rewards" className="space-y-6">
+                  <ProfileRewardsPanel />
               </TabsContent>
 
               <TabsContent value="subscription" className="space-y-6">

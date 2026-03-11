@@ -17,6 +17,7 @@ import { PersonalizationProvider } from "@/contexts/PersonalizationContext";
 import { BackgroundSearchProvider } from "@/contexts/BackgroundSearchContext";
 import { PushNotificationProvider } from "@/contexts/PushNotificationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { GamificationProvider } from "@/contexts/GamificationContext";
 import { SaveStatusProvider } from "@/contexts/SaveStatusContext";
 import { BackgroundUploadProvider } from "@/contexts/BackgroundUploadContext";
 import { BulkReprocessProvider } from "@/contexts/BulkReprocessContext";
@@ -45,6 +46,8 @@ const AuthDebugPage = lazy(() => import("./pages/AuthDebugPage"));
 
 // Lazy load heavy components for better performance
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
+const MissionsPage = lazy(() => import("./pages/MissionsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const PerformanceTestPage = lazy(() => import("./pages/PerformanceTestPage"));
 const AsyncSaveTestPage = lazy(() => import("./pages/AsyncSaveTestPage"));
@@ -127,14 +130,15 @@ const App = () => (
                         <ChatControlsProvider>
                           <NotificationProvider>
                             <PushNotificationProvider>
-                              <SaveStatusProvider>
-                                <TooltipProvider>
-                                  <Toaster />
-                                  <Sonner />
-                                  <SaveStatusToastManager />
-                                  {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
-                                  <BrowserRouter>
-                                    <Routes>
+                              <GamificationProvider>
+                                <SaveStatusProvider>
+                                  <TooltipProvider>
+                                    <Toaster />
+                                    <Sonner />
+                                    <SaveStatusToastManager />
+                                    {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
+                                    <BrowserRouter>
+                                      <Routes>
                                       {/* Public Routes with Layout */}
                                       <Route element={<PublicLayout />}>
                                         <Route path="/" element={<Index />} />
@@ -230,6 +234,16 @@ const App = () => (
                                           <Route path="/dashboard" element={
                                             <Suspense fallback={<PageLoading />}>
                                               <Dashboard />
+                                            </Suspense>
+                                          } />
+                                          <Route path="/leaderboard" element={
+                                            <Suspense fallback={<PageLoading />}>
+                                              <LeaderboardPage />
+                                            </Suspense>
+                                          } />
+                                          <Route path="/missions" element={
+                                            <Suspense fallback={<PageLoading />}>
+                                              <MissionsPage />
                                             </Suspense>
                                           } />
                                           <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
@@ -383,10 +397,11 @@ const App = () => (
                                           } />
                                         </Route>
                                       </Route>
-                                    </Routes>
-                                  </BrowserRouter>
-                                </TooltipProvider>
-                              </SaveStatusProvider>
+                                      </Routes>
+                                    </BrowserRouter>
+                                  </TooltipProvider>
+                                </SaveStatusProvider>
+                              </GamificationProvider>
                             </PushNotificationProvider>
                           </NotificationProvider>
                         </ChatControlsProvider>

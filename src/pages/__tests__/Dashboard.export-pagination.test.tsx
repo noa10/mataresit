@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BulkReprocessProvider } from "@/contexts/BulkReprocessContext";
 import Dashboard from "@/pages/Dashboard";
 import { Receipt } from "@/types/receipt";
 
@@ -27,6 +28,13 @@ vi.mock("@/contexts/TeamContext", () => ({
 
 vi.mock("@/contexts/StripeContext", () => ({
   useStripe: () => ({ subscriptionData: null }),
+}));
+
+vi.mock("@/contexts/BackgroundUploadContext", () => ({
+  useBackgroundUpload: () => ({
+    openModal: vi.fn(),
+    onUploadCompleteCallback: { current: null },
+  }),
 }));
 
 const translationMap: Record<string, string> = {
@@ -127,8 +135,16 @@ vi.mock("@/components/modals/BatchUploadModal", () => ({
   BatchUploadModal: () => null,
 }));
 
+vi.mock("@/components/upload/BackgroundUploadIndicator", () => ({
+  BackgroundUploadIndicator: () => null,
+}));
+
 vi.mock("@/components/ReceiptCard", () => ({
   default: ({ merchant }: { merchant: string }) => <div>{merchant}</div>,
+}));
+
+vi.mock("@/components/gamification/GamificationProgressCard", () => ({
+  GamificationProgressCard: () => <div data-testid="dashboard-gamification-card" />,
 }));
 
 const mockReceipts: Receipt[] = Array.from({ length: 120 }).map((_, index) => ({
@@ -147,7 +163,12 @@ const mockReceipts: Receipt[] = Array.from({ length: 120 }).map((_, index) => ({
   confidence_scores: { merchant: 0.95 },
 }));
 
-function buildPage(params: any = {}) {
+interface BuildPageParams {
+  page?: number | string;
+  limit?: number | string;
+}
+
+function buildPage(params: BuildPageParams = {}) {
   const page = Number(params.page ?? 1);
   const limit = Number(params.limit ?? 25);
   const offset = (page - 1) * limit;
@@ -176,16 +197,18 @@ function renderDashboard() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/dashboard?view=table&page=1&limit=25"]}>
-        <Dashboard />
-      </MemoryRouter>
+      <BulkReprocessProvider>
+        <MemoryRouter initialEntries={["/dashboard?view=table&page=1&limit=25"]}>
+          <Dashboard />
+        </MemoryRouter>
+      </BulkReprocessProvider>
     </QueryClientProvider>,
   );
 }
 
 describe("Dashboard export with paginated data", () => {
   beforeEach(() => {
-    mocks.fetchReceiptsPage.mockImplementation(async (params: any = {}) => buildPage(params));
+    mocks.fetchReceiptsPage.mockImplementation(async (params: BuildPageParams = {}) => buildPage(params));
     mocks.fetchReceiptCurrencies.mockResolvedValue(["MYR"]);
     mocks.deleteReceipt.mockResolvedValue(true);
     mocks.fetchUserCategories.mockResolvedValue([]);

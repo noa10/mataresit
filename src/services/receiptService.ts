@@ -1092,6 +1092,20 @@ export const updateReceiptWithLineItems = async (
       }
     }
 
+    if (receipt.status === 'reviewed') {
+      const rpcClient = supabase as typeof supabase & {
+        rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ error: { message?: string } | null }>;
+      };
+
+      const { error: reviewRewardError } = await rpcClient.rpc('record_receipt_review', {
+        _receipt_id: receiptId,
+      });
+
+      if (reviewRewardError) {
+        console.error('Failed to record receipt review reward:', reviewRewardError);
+      }
+    }
+
     return receipt;
   } catch (error) {
     console.error('Error updating receipt with line items:', error);

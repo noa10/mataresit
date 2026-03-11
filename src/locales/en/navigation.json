@@ -5,6 +5,8 @@
   },
   "mainMenu": {
     "dashboard": "Dashboard",
+    "leaderboard": "Leaderboard",
+    "missions": "Missions",
     "search": "Search",
     "analysis": "Analysis",
     "claims": "Claims",
@@ -65,5 +67,86 @@
     "terms": "Terms of Service",
     "support": "Support",
     "contact": "Contact Us"
+  },
+  "gamification": {
+    "comingSoon": "This destination is now routed in the app and will be expanded as the full leaderboard and missions experiences ship.",
+    "leaderboardDescription": "Compare your current rewards progress across weekly XP, monthly receipts, and deductible totals.",
+    "missionsDescription": "Track onboarding, weekly, and community missions tied directly to your rewards progress.",
+    "backToDashboard": "Back to dashboard",
+    "backToProfile": "Back to profile rewards",
+    "missions": {
+      "liveBadge": "Live mission progress",
+      "emptyTitle": "No active missions right now",
+      "emptyDescription": "New missions will appear here as the rewards calendar rotates.",
+      "personalProgress": "Your progress",
+      "communityProgress": "Community progress",
+      "windowLabel": "Active window",
+      "windowLifetime": "Lifetime mission",
+      "rewardLabel": "Reward preview",
+      "communityContributionTitle": "Your contribution",
+      "communityContributionBody": "You've contributed",
+      "units": {
+        "scanStreakDays": "{{count}} days"
+      },
+      "tabs": {
+        "one_time": "One-time",
+        "weekly": "Weekly",
+        "community": "Community"
+      },
+      "status": {
+        "inProgress": "In progress",
+        "complete": "Completed",
+        "community": "Community goal"
+      },
+      "summary": {
+        "active": "Active missions",
+        "completed": "Completed",
+        "rewards": "Available XP"
+      }
+    },
+    "leaderboard": {
+      "privacyBadge": "Privacy-aware rankings",
+      "settingsCta": "Manage rewards privacy",
+      "emptyTitle": "No leaderboard activity yet",
+      "emptyDescription": "Opted-in members will appear here after they start earning progress for this metric.",
+      "privacyGateTitle": "Join the leaderboard when you're ready",
+      "privacyGateDescription": "Turn on leaderboard participation from your rewards settings to compare weekly XP, monthly receipts, and deductible totals.",
+      "privacyGateStatus": "Your rewards profile is currently hidden from the leaderboard.",
+      "privacyGateAction": "Open rewards settings",
+      "currentUserTitle": "Your position",
+      "currentUserRank": "You are #{{rank}}",
+      "currentUserTopTen": "You're currently inside the top 10.",
+      "currentUserGap": "{{amount}} to enter the top 10",
+      "currentUserUnranked": "You're not ranked for this view yet.",
+      "scopeGlobal": "Global",
+      "scopeMalaysia": "Malaysia",
+      "topThreeTitle": "Top performers",
+      "topThreeDescription": "The leading opted-in members for this view.",
+      "tableTitle": "Top 100 leaderboard",
+      "tableDescription": "Only opted-in members appear here. Anonymous mode hides personal names.",
+      "rankHeader": "Rank",
+      "memberHeader": "Member",
+      "metricHeader": "Metric",
+      "badgeYou": "You",
+      "badgeAnonymous": "Anonymous",
+      "units": {
+        "weeklyXp": "{{count}} XP",
+        "monthlyReceipts": "{{count}} receipts"
+      },
+      "metrics": {
+        "weekly_xp": {
+          "label": "Weekly XP",
+          "description": "XP earned during the last 7 days."
+        },
+        "monthly_receipts": {
+          "label": "Monthly receipts",
+          "description": "Completed receipts counted in the current month."
+        },
+        "deductible_total": {
+          "label": "Deductible total",
+          "description": "Current deductible amount tracked in your rewards profile."
+        }
+      }
+    }
   }
 }

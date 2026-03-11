@@ -337,7 +337,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     payment_method: receipt.payment_method || "",
     predicted_category: receipt.predicted_category || "",
     custom_category_id: receipt.custom_category_id || null,
-    paid_by_id: receipt.paid_by_id || null
+    paid_by_id: receipt.paid_by_id || null,
+    is_business_expense: Boolean(receipt.is_business_expense)
   });
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [dateDisplayValue, setDateDisplayValue] = useState(toDisplayDate(receipt.date || ""));
@@ -366,7 +367,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         payment_method: receipt.payment_method || "",
         predicted_category: receipt.predicted_category || "",
         custom_category_id: receipt.custom_category_id || null,
-        paid_by_id: receipt.paid_by_id || null
+        paid_by_id: receipt.paid_by_id || null,
+        is_business_expense: Boolean(receipt.is_business_expense)
       });
       setDateDisplayValue(toDisplayDate(receipt.date || ""));
     }
@@ -481,7 +483,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         payment_method: receipt.payment_method || "",
         predicted_category: receipt.predicted_category || "",
         custom_category_id: receipt.custom_category_id || null,
-        paid_by_id: receipt.paid_by_id || null
+        paid_by_id: receipt.paid_by_id || null,
+        is_business_expense: Boolean(receipt.is_business_expense)
       });
     }
 
@@ -519,7 +522,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       payment_method: debouncedInputValues.payment_method,
       predicted_category: debouncedInputValues.predicted_category,
       custom_category_id: debouncedInputValues.custom_category_id,
-      paid_by_id: debouncedInputValues.paid_by_id
+      paid_by_id: debouncedInputValues.paid_by_id,
+      is_business_expense: debouncedInputValues.is_business_expense
     }));
 
     // Update confidence scores for fields that have been edited
@@ -702,6 +706,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       predicted_category: editedReceipt.predicted_category,
       custom_category_id: editedReceipt.custom_category_id,
       paid_by_id: editedReceipt.paid_by_id,
+      is_business_expense: editedReceipt.is_business_expense,
       status: "reviewed" as const,
     };
 
@@ -798,7 +803,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     return formatCurrencySafe(amount, inputValues.currency, 'en-US', 'MYR');
   };
 
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     // Check if this is a manual total override
     if (field === 'total') {
       const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
@@ -902,6 +907,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         currency: editedReceipt.currency,
         payment_method: editedReceipt.payment_method,
         predicted_category: editedReceipt.predicted_category,
+        is_business_expense: editedReceipt.is_business_expense,
         lineItems: editedReceipt.lineItems
       });
     }
@@ -1285,6 +1291,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         payment_method: inputValues.payment_method,
         predicted_category: inputValues.predicted_category,
         custom_category_id: inputValues.custom_category_id,
+        is_business_expense: inputValues.is_business_expense,
         status: 'reviewed' as const,
         processing_status: 'complete' as const,
         processing_error: null
@@ -1923,6 +1930,22 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 }}
                 className="bg-background/50"
               />
+            </div>
+
+            <div className="rounded-lg border bg-background/40 p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="business-expense">Tax Claimable</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Mark this receipt as a business expense for tax tracking.
+                  </p>
+                </div>
+                <Switch
+                  id="business-expense"
+                  checked={inputValues.is_business_expense}
+                  onCheckedChange={(checked) => handleInputChange('is_business_expense', checked)}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
