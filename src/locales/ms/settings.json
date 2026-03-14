@@ -100,6 +100,18 @@
         "name": "Padam Tuntutan",
         "description": "Padam tuntutan"
       },
+      "profile:read": {
+        "name": "Baca Profil",
+        "description": "Akses profil akaun dan butiran langganan"
+      },
+      "categories:read": {
+        "name": "Baca Kategori",
+        "description": "Lihat kategori tersedia dan jumlah kategori"
+      },
+      "gamification:read": {
+        "name": "Baca Gamifikasi",
+        "description": "Akses ganjaran, XP dan data papan pendahulu"
+      },
       "search:read": {
         "name": "Carian",
         "description": "Lakukan carian semantik"

@@ -62,8 +62,8 @@ interface ApiKeyUsageStats {
 // This will be moved inside the component to access translations
 
 const ACCESS_LEVELS = {
-  read: ['receipts:read', 'claims:read', 'search:read', 'analytics:read', 'teams:read'],
-  write: ['receipts:read', 'receipts:write', 'claims:read', 'claims:write', 'search:read', 'analytics:read', 'teams:read'],
+  read: ['receipts:read', 'claims:read', 'profile:read', 'categories:read', 'gamification:read', 'search:read', 'analytics:read', 'teams:read'],
+  write: ['receipts:read', 'receipts:write', 'claims:read', 'claims:write', 'profile:read', 'categories:read', 'gamification:read', 'search:read', 'analytics:read', 'teams:read'],
   admin: ['admin:all']
 };
 
@@ -106,6 +106,9 @@ export default function ApiKeyManagement() {
     { id: 'claims:read', name: getScopeTranslation('claims:read', 'name'), description: getScopeTranslation('claims:read', 'description') },
     { id: 'claims:write', name: getScopeTranslation('claims:write', 'name'), description: getScopeTranslation('claims:write', 'description') },
     { id: 'claims:delete', name: getScopeTranslation('claims:delete', 'name'), description: getScopeTranslation('claims:delete', 'description') },
+    { id: 'profile:read', name: getScopeTranslation('profile:read', 'name'), description: getScopeTranslation('profile:read', 'description') },
+    { id: 'categories:read', name: getScopeTranslation('categories:read', 'name'), description: getScopeTranslation('categories:read', 'description') },
+    { id: 'gamification:read', name: getScopeTranslation('gamification:read', 'name'), description: getScopeTranslation('gamification:read', 'description') },
     { id: 'search:read', name: getScopeTranslation('search:read', 'name'), description: getScopeTranslation('search:read', 'description') },
     { id: 'analytics:read', name: getScopeTranslation('analytics:read', 'name'), description: getScopeTranslation('analytics:read', 'description') },
     { id: 'teams:read', name: getScopeTranslation('teams:read', 'name'), description: getScopeTranslation('teams:read', 'description') },

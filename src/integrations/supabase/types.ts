@@ -7050,6 +7050,9 @@ export type Database = {
         | "claims:read"
         | "claims:write"
         | "claims:delete"
+        | "profile:read"
+        | "categories:read"
+        | "gamification:read"
         | "search:read"
         | "analytics:read"
         | "teams:read"
@@ -7250,6 +7253,9 @@ export const Constants = {
         "claims:read",
         "claims:write",
         "claims:delete",
+        "profile:read",
+        "categories:read",
+        "gamification:read",
         "search:read",
         "analytics:read",
         "teams:read",

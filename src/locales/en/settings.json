@@ -100,6 +100,18 @@
         "name": "Delete Claims",
         "description": "Delete claims"
       },
+      "profile:read": {
+        "name": "Read Profile",
+        "description": "Access account profile and subscription details"
+      },
+      "categories:read": {
+        "name": "Read Categories",
+        "description": "View available categories and category counts"
+      },
+      "gamification:read": {
+        "name": "Read Gamification",
+        "description": "Access rewards, XP, and leaderboard data"
+      },
       "search:read": {
         "name": "Search",
         "description": "Perform semantic searches"
