@@ -1,0 +1,27 @@
+lucid: "1.0"
+name: mataresit-skill
+version: "0.1.0"
+description: "OpenClaw scaffold for Mataresit external API v1 receipt, profile, category, gamification, and team-assist flows"
+author: "Mataresit"
+license: "UNLICENSED"
+
+requires:
+  env:
+    - MATARESIT_API_BASE_URL
+    - MATARESIT_API_KEY
+    - MATARESIT_SUPABASE_ACCESS_TOKEN
+
+skills:
+  - quick-receipt
+  - receipt-lookup
+  - claims
+  - profile
+  - categories
+  - gamification
+  - team-insights
+
+entry:
+  openclaw: index.mjs
+
+platforms:
+  openclaw: true
