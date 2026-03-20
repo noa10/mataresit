@@ -101,3 +101,6 @@ Thumbs.db
 telemetry-id
 
 opencode.json
+
+# Claude Code
+.claude/
