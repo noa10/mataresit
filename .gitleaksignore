@@ -1,0 +1,9 @@
+# Legacy Supabase anon key — disabled, dead JWT
+8e903e3f0d4e49a6c876f38f664c228500c3cb44:src/lib/edge-function-utils.ts:jwt:8
+5bde304c07cd5ef8ada16facf8a07e9d0fa3de9e:src/integrations/supabase/client.ts:jwt:6
+
+# Legacy Supabase service role key — disabled, dead JWT
+5c51a0ea0ebb7d0f35f1ec1f252bd3754ba2acb2:supabase/migrations/20250503181349_remote_schema.sql:jwt:174
+
+# Legacy service role key in deleted env.bak file
+21e75b85f53e76c6f696b28e51a5c8d8775b959a:misc/env.bak:jwt:3

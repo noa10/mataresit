@@ -4990,7 +4990,7 @@ BEGIN
   PERFORM supabase_functions.http_request(
     url := 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/process-batch-item',
     method := 'POST',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzAxMjM4OSwiZXhwIjoyMDU4NTg4Mzg5fQ.o6Xn7TTIYF4U9zAOhGWVf5MoAcl_BGPtQ_BRcR2xV0o"}',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer sb_secret_r5jrHqGhCKQYjDphz6SWQg_-WimbsHX"}',
     body := json_body,
     timeout_milliseconds := 5000
   );
@@ -5002,6 +5002,10 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_new_batch_item"() OWNER TO "postgres";
+
+
+-- Service role key is set via migration (20260320_remove_hardcoded_secrets.sql)
+-- using: ALTER FUNCTION handle_new_batch_item() SET app.settings.service_role_key = 'sb_secret_...';
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
