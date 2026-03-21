@@ -328,22 +328,22 @@ export function ProfileRewardsPanel() {
             <CardDescription>{t("rewards.referrals.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-muted-foreground">{t("rewards.referrals.code")}</p>
-                <p className="mt-2 text-2xl font-semibold tracking-wide">{referralSummary?.referralCode ?? "—"}</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border p-4">
+                <p className="text-lg font-medium">{t("rewards.referrals.code")}</p>
+                <p className="text-lg font-semibold">{referralSummary?.referralCode ?? "—"}</p>
               </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-muted-foreground">{t("rewards.referrals.successfulReferrals")}</p>
-                <p className="mt-2 text-2xl font-semibold">{referralSummary?.successfulReferrals ?? 0}</p>
+              <div className="flex items-center justify-between rounded-xl border p-4">
+                <p className="text-lg font-medium">{t("rewards.referrals.successfulReferrals")}</p>
+                <p className="text-lg font-semibold">{referralSummary?.successfulReferrals ?? 0}</p>
               </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-muted-foreground">{t("rewards.referrals.pendingReferrals")}</p>
-                <p className="mt-2 text-2xl font-semibold">{referralSummary?.pendingReferrals ?? 0}</p>
+              <div className="flex items-center justify-between rounded-xl border p-4">
+                <p className="text-lg font-medium">{t("rewards.referrals.pendingReferrals")}</p>
+                <p className="text-lg font-semibold">{referralSummary?.pendingReferrals ?? 0}</p>
               </div>
-              <div className="rounded-xl border p-4">
-                <p className="text-sm text-muted-foreground">{t("rewards.referrals.redeemedReferrals")}</p>
-                <p className="mt-2 text-2xl font-semibold">{referralSummary?.redeemedReferrals ?? 0}</p>
+              <div className="flex items-center justify-between rounded-xl border p-4">
+                <p className="text-lg font-medium">{t("rewards.referrals.redeemedReferrals")}</p>
+                <p className="text-lg font-semibold">{referralSummary?.redeemedReferrals ?? 0}</p>
               </div>
             </div>
             <Button type="button" variant="outline" className="gap-2" onClick={copyReferralLink}>
