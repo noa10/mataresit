@@ -5,17 +5,33 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
     groups:
+      # Group all non-major updates into a single PR
       minor-patches:
         update-types: ["minor", "patch"]
+      # Group dev dependency major updates separately
+      dev-major:
+        dependency-type: "development"
+        update-types: ["major"]
+    ignore:
+      # React 19 requires dedicated upgrade effort (breaking changes, library compat)
+      - dependency-name: "react"
+        versions: [">=19"]
+      - dependency-name: "react-dom"
+        versions: [">=19"]
+      - dependency-name: "@types/react"
+        versions: [">=19"]
+      - dependency-name: "@types/react-dom"
+        versions: [">=19"]
 
   - package-ecosystem: "npm"
     directory: "/supabase/functions/generate-pdf-report"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
       minor-patches:
         update-types: ["minor", "patch"]
