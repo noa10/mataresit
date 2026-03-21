@@ -465,18 +465,18 @@ jobs:
 
           if [[ "$ENVIRONMENT" == "production" ]]; then
             SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-            SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+            SUPABASE_KEY="${{ secrets.SUPABASE_PUBLISHABLE_KEY }}"
           else
             SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
-            SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
+            SUPABASE_KEY="${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}"
           fi
 
           # Validate credentials with detailed debugging
           echo "🔍 Debugging validation credentials for $ENVIRONMENT environment:"
           echo "SUPABASE_URL: ${SUPABASE_URL:+SET (length: ${#SUPABASE_URL})}"
-          echo "SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:+SET (length: ${#SUPABASE_ANON_KEY})}"
+          echo "SUPABASE_KEY: ${SUPABASE_KEY:+SET (length: ${#SUPABASE_KEY})}"
 
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
             echo "❌ Error: Missing Supabase credentials for $ENVIRONMENT"
             echo ""
             echo "🔧 TROUBLESHOOTING GUIDE:"
@@ -484,8 +484,8 @@ jobs:
             if [ -z "$SUPABASE_URL" ]; then
               echo "   ❌ Missing: SUPABASE_URL (for production) or STAGING_SUPABASE_URL (for staging)"
             fi
-            if [ -z "$SUPABASE_ANON_KEY" ]; then
-              echo "   ❌ Missing: SUPABASE_ANON_KEY (for production) or STAGING_SUPABASE_ANON_KEY (for staging)"
+            if [ -z "$SUPABASE_KEY" ]; then
+              echo "   ❌ Missing: SUPABASE_PUBLISHABLE_KEY (for production) or STAGING_SUPABASE_PUBLISHABLE_KEY (for staging)"
             fi
             echo "2. Ensure secrets are configured for the 'Production' environment"
             echo "3. Check that secret values are not empty"
@@ -497,13 +497,13 @@ jobs:
           # Test health endpoint with detailed error reporting
           echo "🏥 Testing health endpoint..."
           if curl -f -s --max-time 30 \
-            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_KEY" \
             "$SUPABASE_URL/health" > /dev/null; then
             echo "✅ Supabase health check passed"
           else
             echo "❌ Supabase health check failed"
             echo "🔍 Attempting to get more details..."
-            curl -v -H "apikey: $SUPABASE_ANON_KEY" "$SUPABASE_URL/health" || true
+            curl -v -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/health" || true
             exit 1
           fi
 
@@ -511,8 +511,8 @@ jobs:
           echo "🗄️ Testing database connectivity..."
           DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "apikey: $SUPABASE_ANON_KEY" || echo "000")
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "apikey: $SUPABASE_KEY" || echo "000")
 
           echo "Database response code: $DB_RESPONSE"
 
@@ -522,8 +522,8 @@ jobs:
             echo "❌ Database connectivity test failed (HTTP $DB_RESPONSE)"
             echo "🔍 Attempting detailed request..."
             curl -v "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
-              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-              -H "apikey: $SUPABASE_ANON_KEY" || true
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "apikey: $SUPABASE_KEY" || true
             exit 1
           fi
 
@@ -534,10 +534,10 @@ jobs:
 
           if [[ "$ENVIRONMENT" == "production" ]]; then
             SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-            SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+            SUPABASE_KEY="${{ secrets.SUPABASE_PUBLISHABLE_KEY }}"
           else
             SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}"
-            SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}"
+            SUPABASE_KEY="${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}"
           fi
 
           # Test key Edge Functions if they exist
@@ -550,7 +550,7 @@ jobs:
 
             FUNC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
               -X POST "$SUPABASE_URL/functions/v1/$func" \
-              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
               -H "Content-Type: application/json" \
               -d '{"test": true}' 2>/dev/null || echo "000")
 
