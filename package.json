@@ -169,7 +169,7 @@
     "@types/react-dom": "^19.1.7",
     "@types/react-helmet": "^6.1.11",
     "@vitejs/plugin-react-swc": "^4.3.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^4.1.0",
     "@vitest/ui": "^4.1.0",
     "autoprefixer": "^10.4.27",
     "chai": "^6.2.2",
@@ -188,7 +188,7 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.57.1",
     "vite": "^8.0.1",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.0"
   },
   "overrides": {
     "path-to-regexp": ">=7.0.0",

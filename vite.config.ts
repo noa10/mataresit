@@ -21,61 +21,53 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks(id) {
           // Core vendor chunks
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-ui': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-toast'
-          ],
-          'vendor-utils': ['date-fns', 'clsx', 'class-variance-authority'],
-          'vendor-charts': ['recharts', 'd3-scale', 'd3-shape'],
-          'vendor-heavy': ['html2canvas', 'browser-image-compression', 'xlsx'],
+          if (id.includes('node_modules')) {
+            if (id.includes('react') && !id.includes('react-router') && !id.includes('react-day-picker') && !id.includes('react-hook-form') && !id.includes('react-i18next') && !id.includes('react-hot-toast') && !id.includes('react-window')) {
+              return 'vendor-react';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'vendor-ui';
+            }
+            if (id.includes('date-fns') || id.includes('clsx') || id.includes('class-variance-authority')) {
+              return 'vendor-utils';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('html2canvas') || id.includes('browser-image-compression') || id.includes('xlsx')) {
+              return 'vendor-heavy';
+            }
+            if (id.includes('i18next') || id.includes('react-i18next')) {
+              return 'i18n-core';
+            }
+          }
 
           // Translation chunks - split by language for better caching
-          'i18n-core': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
-          'translations-en': [
-            './src/locales/en/common.json',
-            './src/locales/en/navigation.json',
-            './src/locales/en/dashboard.json',
-            './src/locales/en/receipts.json',
-            './src/locales/en/auth.json'
-          ],
-          'translations-ms': [
-            './src/locales/ms/common.json',
-            './src/locales/ms/navigation.json',
-            './src/locales/ms/dashboard.json',
-            './src/locales/ms/receipts.json',
-            './src/locales/ms/auth.json'
-          ],
+          if (id.includes('/locales/en/')) {
+            return 'translations-en';
+          }
+          if (id.includes('/locales/ms/')) {
+            return 'translations-ms';
+          }
 
           // Feature-specific chunks - more granular splitting
-          'feature-admin': [
-            './src/pages/admin/AdminDashboard.tsx',
-            './src/components/admin/BlogAnalytics.tsx',
-            './src/components/admin/EmbeddingRepairTest.tsx',
-            './src/components/admin/CacheMonitor.tsx',
-            './src/components/admin/FeedbackAnalytics.tsx'
-          ],
-          'feature-settings': [
-            './src/pages/SettingsPage.tsx',
-            './src/components/settings/NotificationPreferences.tsx',
-            './src/components/categories/CategoryManager.tsx'
-          ],
-          'feature-profile': ['./src/pages/Profile.tsx'],
-          'feature-analytics': [
-            './src/components/analytics/AnalyticsDashboard.tsx',
-            './src/components/analytics/InteractionTrendsChart.tsx',
-            './src/components/analytics/FeatureUsageChart.tsx'
-          ],
-          'feature-search': [
-            './src/pages/SemanticSearch.tsx',
-            './src/pages/UnifiedSearchPage.tsx'
-          ]
+          if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
+            return 'feature-admin';
+          }
+          if (id.includes('/pages/SettingsPage') || id.includes('/components/settings/') || id.includes('/components/categories/')) {
+            return 'feature-settings';
+          }
+          if (id.includes('/pages/Profile')) {
+            return 'feature-profile';
+          }
+          if (id.includes('/components/analytics/')) {
+            return 'feature-analytics';
+          }
+          if (id.includes('/pages/SemanticSearch') || id.includes('/pages/UnifiedSearchPage')) {
+            return 'feature-search';
+          }
         },
 
         // Optimize chunk naming for better caching
@@ -119,14 +111,8 @@ export default defineConfig({
       }
     },
 
-    // Optimize for better compression
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+    // Optimize for better compression (Vite 8 uses oxc/esbuild, not terser)
+    minify: 'oxc',
 
     // Enable source maps for production debugging
     sourcemap: false,
