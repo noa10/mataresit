@@ -174,7 +174,7 @@
     "autoprefixer": "^10.4.27",
     "chai": "^5.2.0",
     "eslint": "^9.33.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^15.9.0",
     "jsdom": "^23.0.1",
