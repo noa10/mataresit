@@ -158,7 +158,7 @@
   },
   "devDependencies": {
     "@agentdeskai/browser-tools-mcp": "^1.2.1",
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.54.2",
     "@swc/core": "^1.15.21",
     "@tailwindcss/typography": "^0.5.16",
@@ -174,7 +174,7 @@
     "@vitest/ui": "^4.1.0",
     "autoprefixer": "^10.4.27",
     "chai": "^6.2.2",
-    "eslint": "^9.39.4",
+    "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
@@ -186,7 +186,7 @@
     "tailwindcss": "^4.1.11",
     "terser": "^5.46.1",
     "tsx": "^4.20.3",
-    "typescript": "^5.9.2",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.57.1",
     "vite": "^8.0.1",
     "vitest": "^4.1.0"
