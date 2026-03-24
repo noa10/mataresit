@@ -25,7 +25,8 @@ serve(async (req: Request) => {
     const fullPath = url.pathname;
     
     console.log('Full path received:', fullPath);
-    console.log('Headers:', Object.fromEntries(req.headers.entries()));
+    // Log only non-sensitive headers for debugging
+    console.log('Request received, content-type:', req.headers.get('content-type'));
     
     // Extract the API path after the function name
     let endpoint = fullPath;
@@ -40,7 +41,7 @@ serve(async (req: Request) => {
                    req.headers.get('apikey') || 
                    req.headers.get('Authorization')?.replace('Bearer ', '');
     
-    console.log('API Key received:', apiKey ? `${apiKey.substring(0, 20)}...` : 'None');
+    console.log('API Key received:', apiKey ? '[REDACTED]' : 'None');
     
     if (!apiKey) {
       return new Response(JSON.stringify({

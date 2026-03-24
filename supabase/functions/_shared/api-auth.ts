@@ -106,7 +106,7 @@ export async function validateApiKey(apiKey: string | null): Promise<ApiKeyValid
     };
 
   } catch (error) {
-    console.error('API key validation error:', error);
+    console.error('API key validation error:', error instanceof Error ? error.message : 'Unknown error');
     return { valid: false, error: 'Internal validation error' };
   }
 }

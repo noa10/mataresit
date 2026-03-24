@@ -90,7 +90,7 @@ export class ProcessingLogger {
         this.loggingEnabled = false; // Disable DB logging for subsequent calls on this instance
       }
     } catch (e) {
-      console.error('Critical DB logging error:', e);
+      console.error('Critical DB logging error:', e instanceof Error ? e.message : 'Unknown error');
       this.loggingEnabled = false;
     }
   }

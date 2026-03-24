@@ -214,7 +214,7 @@ function validateFilters(filters: any): { errors: string[]; warnings: string[] }
  * This ensures semantically similar queries generate similar embeddings
  */
 export function preprocessQuery(query: string): string {
-  console.log(`Preprocessing query: "${query}"`);
+  console.log('Preprocessing query (length: ' + query.length + ')');
 
   // Remove extra whitespace
   let processed = query.trim().replace(/\s+/g, ' ');
@@ -256,7 +256,7 @@ export function preprocessQuery(query: string): string {
     processed = processed.trim();
   }
 
-  console.log(`Preprocessed query result: "${processed}"`);
+  console.log(`Preprocessed query result (length: ${processed.length})`);
   return processed;
 }
 
@@ -688,8 +688,8 @@ export async function reRankSearchResults(params: ReRankingParams): Promise<ReRa
   }
 
   console.log('🔑 DEBUG: GEMINI_API_KEY present:', !!geminiApiKey);
-  console.log('🔑 DEBUG: API key length:', geminiApiKey.length);
-  console.log('🔑 DEBUG: API key prefix:', geminiApiKey.substring(0, 10) + '...');
+  console.log('🔑 DEBUG: API key length:', geminiApiKey?.length || 0);
+  // API key prefix removed for security - do not log sensitive credentials
 
   if (params.candidates.length === 0) {
     console.warn('Cannot perform re-ranking: no candidates provided');
