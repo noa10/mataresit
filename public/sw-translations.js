@@ -76,7 +76,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Only handle translation-related requests
+  // Only handle translation-related requests from same origin
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+  
   if (!isTranslationRequest(url.pathname)) {
     return;
   }

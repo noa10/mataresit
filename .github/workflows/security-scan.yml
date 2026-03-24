@@ -113,6 +113,7 @@ jobs:
         with:
           languages: javascript, typescript
           queries: security-extended,security-and-quality
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

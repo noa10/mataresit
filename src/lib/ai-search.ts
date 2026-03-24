@@ -13,7 +13,8 @@ import { optimizedEdgeFunctionCaller } from './optimized-edge-function-caller';
  * This ensures semantically similar queries generate similar embeddings
  */
 function normalizeSearchQuery(query: string): string {
-  console.log(`Normalizing query: "${query}"`);
+  // Log only query length for debugging, not the actual query content
+  console.log(`Normalizing query (length: ${query.length})`);
 
   let normalizedQuery = query.toLowerCase().trim();
 
@@ -41,7 +42,7 @@ function normalizeSearchQuery(query: string): string {
     normalizedQuery = query.toLowerCase().trim();
   }
 
-  console.log(`Normalized query result: "${normalizedQuery}"`);
+  console.log(`Normalized query result (length: ${normalizedQuery.length})`);
   return normalizedQuery;
 }
 
@@ -111,17 +112,16 @@ export interface SearchResult {
  */
 export async function semanticSearch(params: SearchParams): Promise<SearchResult> {
   try {
-    console.log('🔍 FALLBACK: Starting ai-search.ts semantic search with params:', params);
+    console.log('🔍 FALLBACK: Starting ai-search.ts semantic search');
     console.log('⚠️  NOTE: Consider using unified-search Edge Function instead for better performance');
 
     // Log monetary query parameters specifically
     if (params.minAmount !== undefined || params.maxAmount !== undefined) {
       console.log('💰 FALLBACK: Monetary search detected in semanticSearch:', {
-        minAmount: params.minAmount,
-        maxAmount: params.maxAmount,
+        hasMinAmount: params.minAmount !== undefined,
+        hasMaxAmount: params.maxAmount !== undefined,
         minAmountType: typeof params.minAmount,
-        maxAmountType: typeof params.maxAmount,
-        query: params.query
+        maxAmountType: typeof params.maxAmount
       });
     }
 
@@ -157,8 +157,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
       console.log('Processing search results from API:', {
         target: searchTarget,
         hasLineItems: !!data.results.lineItems,
-        hasReceipts: !!data.results.receipts,
-        raw: data.results
+        hasReceipts: !!data.results.receipts
       });
 
       const results: SearchResult = {
@@ -304,13 +303,13 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
     }
 
     try {
-      console.log('Performing semantic search using utility function...', params);
+        console.log('Performing semantic search using utility function...');
 
       // Try the unified search approach first (using the working unified-search Edge Function)
       try {
         // Normalize the query for consistent search results
         const normalizedQuery = normalizeSearchQuery(params.query);
-        console.log(`Using normalized query for unified search: "${normalizedQuery}"`);
+        console.log(`Using normalized query for unified search (length: ${normalizedQuery.length})`);
 
         // Convert legacy params to unified params (using frontend naming)
         const unifiedParams: UnifiedSearchParams = {
@@ -343,7 +342,7 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
 
         // Use the unified search function which handles proper parameter mapping
         const data = await unifiedSearch(unifiedParams);
-        console.log('Unified search response:', data);
+        console.log('Unified search completed successfully');
 
         if (!data || !data.success) {
           throw new Error(data?.error || 'Unknown error in unified search');
@@ -442,9 +441,9 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
 
         if (isCorsError) {
           console.log('CORS error detected, skipping Edge Functions and using direct database search');
-          console.log('Calling fallbackBasicSearch with params:', params);
+          console.log('Calling fallbackBasicSearch');
           const fallbackResult = await fallbackBasicSearch(params);
-          console.log('Fallback search completed with result:', fallbackResult);
+          console.log('Fallback search completed');
           return fallbackResult;
         }
 
@@ -455,10 +454,10 @@ export async function semanticSearch(params: SearchParams): Promise<SearchResult
             ...params,
             query: normalizeSearchQuery(params.query)
           };
-          console.log(`Using normalized query for legacy search: "${normalizedParams.query}"`);
+          console.log(`Using normalized query for legacy search (length: ${normalizedParams.query.length})`);
 
           const legacyData = await callEdgeFunction('semantic-search', 'POST', normalizedParams);
-          console.log('Legacy semantic search response:', legacyData);
+          console.log('Legacy semantic search completed');
 
           if (!legacyData || !legacyData.success) {
             throw new Error(legacyData?.error || 'Unknown error in legacy semantic search');
@@ -503,7 +502,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
   const isLineItemSearch = params.searchTarget === 'line_items';
   const isUnifiedSearch = params.searchTarget === 'all';
 
-  console.log(`Fallback search for target: ${params.searchTarget}`);
+  console.log(`Fallback search for target: ${params.searchTarget} (query length: ${query.length})`);
 
   // We'll always search receipts, and optionally line items based on search target
 
@@ -528,7 +527,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     };
   }
 
-  console.log('Starting fallback search with query:', query);
+  console.log('Starting fallback search...');
 
   try {
     // Enhanced query parsing for monetary queries in fallback search
@@ -590,7 +589,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
       skipTextSearch = true;
       console.log(`💰 Skipping text search for monetary query, will use amount filtering only`);
     } else {
-      console.log(`Using normalized query for fallback search: "${normalizedQuery}"`);
+      console.log(`Using normalized query for fallback search (length: ${normalizedQuery.length})`);
     }
 
     // Parse natural language queries for date ranges
@@ -598,7 +597,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     let dateFilter: { start?: string; end?: string } | null = null;
 
     // 🚨 EMERGENCY FIX: Add support for "from June 27" patterns
-    console.log('🔍 DEBUG: Checking for temporal patterns in query:', lowerQuery);
+    console.log('🔍 DEBUG: Checking for temporal patterns in query');
 
     // Check for specific date patterns like "from June 27", "May 15", etc.
     const monthPatterns = [
@@ -701,7 +700,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
     // For time-only queries or "all receipts" queries, just execute the base query with date filters
     if (isTimeOnlyQuery || !query || query.trim() === '') {
-      console.log('Executing query for all receipts with date filters:', { dateFilter, query });
+      console.log('Executing query for all receipts with date filters:', { dateFilter });
 
       // Execute the query with any date filters applied
       console.log('Executing all receipts query with date filters...');
@@ -741,7 +740,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     }
 
     if (normalizedQuery && normalizedQuery.trim() !== '' && !isTimeOnlyQuery && !skipTextSearch) {
-      console.log('Performing text search with normalized query:', normalizedQuery);
+      console.log('Performing text search with normalized query');
 
       try {
         // Try individual filter approach (more reliable but potentially slower)
@@ -826,7 +825,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
     if (skipTextSearch) {
       console.log('💰 Monetary search - applying amount filters only');
     } else {
-      console.log('Fallback to simple merchant search with normalized query:', normalizedQuery);
+      console.log('Fallback to simple merchant search with normalized query');
     }
 
     // Apply date filters if present
@@ -912,7 +911,7 @@ async function fallbackBasicSearch(params: SearchParams): Promise<SearchResult> 
 
     if (isLineItemSearch || isUnifiedSearch) {
       try {
-        console.log('Performing fallback line item search with normalized query:', normalizedQuery);
+        console.log(`Performing fallback line item search (query length: ${normalizedQuery.length})`);
 
         // Search line items by description
         // Use a simpler query to avoid relationship issues

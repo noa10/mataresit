@@ -1,0 +1,19 @@
+name: "CodeQL Configuration for MataResit"
+
+paths-ignore:
+  - 'tests/**'
+  - 'scripts/**'
+  - 'tools/**'
+  - 'dist/**'
+  - 'node_modules/**'
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - '**/__tests__/**'
+  - '**/e2e/**'
+  - '**/integration/**'
+
+query-filters:
+  - exclude:
+      tags:
+        - maintainability
+        - readability

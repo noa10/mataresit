@@ -63,10 +63,8 @@ const normalizeStoredSettings = (rawSettings: unknown): ProcessingSettings | nul
       ...defaultSettings.batchUpload,
       ...batchUpload
     },
-    userApiKeys: {
-      ...defaultSettings.userApiKeys,
-      ...userApiKeys
-    },
+    // API keys are not stored in localStorage for security
+    userApiKeys: defaultSettings.userApiKeys,
     skipUploadOptimization: typeof rawSettings.skipUploadOptimization === 'boolean'
       ? rawSettings.skipUploadOptimization
       : defaultSettings.skipUploadOptimization
@@ -115,7 +113,9 @@ export function useSettings() {
       if (typeof localStorage === 'undefined') {
         return;
       }
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      // Exclude API keys from localStorage for security
+      const { userApiKeys, ...settingsToStore } = settings;
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settingsToStore));
     } catch (error) {
       console.error("Error saving settings to localStorage:", error);
     }
