@@ -53,7 +53,7 @@ serve(async (req) => {
     }
 
     // Get inviter information separately including language preference
-    const { data: inviterProfile, error: inviterError } = await supabaseClient
+    const { data: inviterProfile } = await supabaseClient
       .from('profiles')
       .select('first_name, last_name, email, preferred_language')
       .eq('id', invitation.invited_by)

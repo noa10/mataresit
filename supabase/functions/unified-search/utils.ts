@@ -687,8 +687,6 @@ export async function reRankSearchResults(params: ReRankingParams): Promise<ReRa
     };
   }
 
-  console.log('🔑 DEBUG: GEMINI_API_KEY present:', !!geminiApiKey);
-  console.log('🔑 DEBUG: API key length:', geminiApiKey?.length || 0);
   // API key prefix removed for security - do not log sensitive credentials
 
   if (params.candidates.length === 0) {

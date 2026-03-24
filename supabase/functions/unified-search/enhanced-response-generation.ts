@@ -221,7 +221,7 @@ interface ResponseStrategy {
  * Select response strategy based on context
  */
 function selectResponseStrategy(context: EnhancedResponseContext): ResponseStrategy {
-  const { intent, queryClassification } = context.preprocessResult;
+  const { intent } = context.preprocessResult;
   const hasResults = context.searchResults.length > 0;
   const resultCount = context.searchResults.length;
 

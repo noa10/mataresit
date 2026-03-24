@@ -715,63 +715,6 @@ function formatAIVisionResult(visionData: any) {
   return result;
 }
 
-// DEPRECATED: Legacy function for finding discrepancies between processing methods - no longer used with AI-only processing
-// TODO: Remove this function in future cleanup
-function findDiscrepancies(primaryResult: any, alternativeResult: any) {
-  const discrepancies: any[] = [];
-
-  // Compare key fields
-  const fieldsToCompare = [
-    'merchant',
-    'date',
-    'total',
-    'tax',
-    'currency',
-    'payment_method',
-    'predicted_category'
-  ];
-
-  for (const field of fieldsToCompare) {
-    // Skip if either value is missing
-    if (!primaryResult[field] && !alternativeResult[field]) continue;
-
-    // For numeric fields, compare with tolerance
-    if (field === 'total' || field === 'tax') {
-      const numPrimary = parseFloat(primaryResult[field]) || 0;
-      const numAlternative = parseFloat(alternativeResult[field]) || 0;
-      const diff = Math.abs(numPrimary - numAlternative);
-
-      // If difference is more than 1% of the larger value and more than 0.1
-      const tolerance = Math.max(Math.max(numPrimary, numAlternative) * 0.01, 0.1);
-      if (diff > tolerance) {
-        discrepancies.push({
-          field,
-          primaryValue: numPrimary,
-          alternativeValue: numAlternative
-        });
-      }
-    }
-    // String comparison for other fields
-    else if (primaryResult[field]?.toString() !== alternativeResult[field]?.toString()) {
-      discrepancies.push({
-        field,
-        primaryValue: primaryResult[field],
-        alternativeValue: alternativeResult[field]
-      });
-    }
-  }
-
-  // Compare line items count as a basic check
-  if (primaryResult.line_items?.length !== alternativeResult.line_items?.length) {
-    discrepancies.push({
-      field: 'line_items_count',
-      primaryValue: primaryResult.line_items?.length || 0,
-      alternativeValue: alternativeResult.line_items?.length || 0
-    });
-  }
-
-  return discrepancies;
-}
 
 // Helper function to optimize image for AI processing
 async function optimizeImageForProcessing(imageBytes: Uint8Array, logger: ProcessingLogger): Promise<Uint8Array> {

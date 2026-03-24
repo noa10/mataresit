@@ -3,9 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import {
   mapPriceIdToTier,
-  mapStripeStatusToOurStatus,
-  getDebugInfo,
-  validateStripeEnvironment
+  mapStripeStatusToOurStatus
 } from '../_shared/stripe-config.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
@@ -290,7 +288,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   }
 
   try {
-    const { data, error } = await supabaseClient.rpc('update_subscription_from_stripe', {
+    const { error } = await supabaseClient.rpc('update_subscription_from_stripe', {
       _stripe_customer_id: customerId,
       _stripe_subscription_id: subscription.id,
       _tier: newTier,

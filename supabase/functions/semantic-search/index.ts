@@ -1003,7 +1003,7 @@ serve(async (req) => {
 
           // Test Gemini connection by initializing the client
           const genAI = new GoogleGenerativeAI(geminiApiKey);
-          const model = genAI.getGenerativeModel({ model: 'embedding-001' });
+          genAI.getGenerativeModel({ model: 'embedding-001' });
 
           return new Response(
             JSON.stringify({
@@ -1102,7 +1102,7 @@ serve(async (req) => {
           console.log(`Found ${lineItems.length} line items without embeddings.`);
 
           // Get total counts for stats - but limit to first 100 to avoid performance issues
-          const { data: statsData, error: statsError } = await supabaseClient
+          const { error: statsError } = await supabaseClient
             .from('line_items')
             .select('id, embedding')
             .limit(100);

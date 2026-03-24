@@ -2,12 +2,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.1.3';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { validateAndConvertEmbedding, EMBEDDING_DIMENSIONS } from '../_shared/vector-validation.ts';
-import { supabaseClient } from '../_shared/supabase-client.ts';
 import { corsHeaders, addCorsHeaders, createCorsPreflightResponse } from '../_shared/cors.ts';
 import {
   validateSearchParams,
-  preprocessQuery,
-  shouldUseFallback
+  preprocessQuery
 } from './utils.ts';
 import { executeFallbackSearch } from './fallback.ts';
 import { RAGPipeline, RAGPipelineContext } from './rag-pipeline.ts';

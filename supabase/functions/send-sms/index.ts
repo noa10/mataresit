@@ -257,30 +257,4 @@ async function sendViaAWSSNS(
   }
 }
 
-// Helper function to validate phone number format
-function validatePhoneNumber(phoneNumber: string): boolean {
-  // Remove all non-digit characters except +
-  const cleaned = phoneNumber.replace(/[^\d+]/g, '');
-  
-  // Check if it's a valid international format
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-  return phoneRegex.test(cleaned);
-}
 
-// Helper function to format phone number for international delivery
-function formatPhoneNumber(phoneNumber: string): string {
-  // Remove all non-digit characters except +
-  let cleaned = phoneNumber.replace(/[^\d+]/g, '');
-  
-  // Add + if not present and doesn't start with 00
-  if (!cleaned.startsWith('+') && !cleaned.startsWith('00')) {
-    cleaned = '+' + cleaned;
-  }
-  
-  // Convert 00 prefix to +
-  if (cleaned.startsWith('00')) {
-    cleaned = '+' + cleaned.substring(2);
-  }
-  
-  return cleaned;
-}
