@@ -3,13 +3,15 @@ import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthTranslation } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { captureReferralCodeFromSearch } from "@/lib/referralTracking";
 import { useToast } from "@/hooks/use-toast";
-import Navbar from "@/components/Navbar";
+import { AuthBrandingPanel } from "@/components/auth/AuthBrandingPanel";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
@@ -21,9 +23,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sun, Moon } from "lucide-react";
 
 // Schema factory functions that use translations
 const createLoginSchema = (t: (key: string) => string) => z.object({
@@ -65,8 +68,10 @@ export default function Auth() {
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
   const [isRecoverySession, setIsRecoverySession] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { user, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { t } = useAuthTranslation();
+  const { isDarkMode, toggleMode } = useTheme();
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const location = useLocation();
   const { toast } = useToast();
@@ -205,7 +210,7 @@ export default function Auth() {
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      await signIn(data.email, data.password);
+      await signIn(data.email, data.password, rememberMe);
       // Successful signIn will trigger onAuthStateChange, which handles navigation via redirect logic below
     } catch (error) {
       // Error toast is handled by signIn in AuthContext
@@ -402,20 +407,45 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/30">
-      <Navbar />
-      <main className="container px-4 py-8 max-w-md mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-6 md:p-8"
-        >
+    <div className="min-h-screen flex flex-col">
+      {/* Minimal auth header */}
+      <div className="absolute top-0 left-0 right-0 z-10 p-4 md:p-6 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <img src="/mataresit-icon.png" alt="Mataresit" className="h-7 w-7" />
+          <span className="font-bold text-lg">Mataresit</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <LanguageSelector variant="compact" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleMode}
+            title="Toggle theme"
+          >
+            {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex">
+        {/* Left: Branding panel (hidden on mobile) */}
+        <div className="hidden lg:flex lg:w-1/2 xl:w-[55%]">
+          <AuthBrandingPanel />
+        </div>
+
+        {/* Right: Auth form */}
+        <div className="w-full lg:w-1/2 xl:w-[45%] flex items-center justify-center p-6 md:p-12 pt-20 md:pt-24">
+          <div className="w-full max-w-md">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
           <h1 className="text-2xl font-bold text-center mb-6">{t("welcome")}</h1>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")}>
             <TabsList className="grid grid-cols-2 mb-6">
-              <TabsTrigger value="login">{t("tabs.login")}</TabsTrigger>
-              <TabsTrigger value="signup">{t("tabs.signup")}</TabsTrigger>
+              <TabsTrigger value="login" className="data-[state=active]:shadow-sm">{t("tabs.login")}</TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:shadow-sm">{t("tabs.signup")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
@@ -428,7 +458,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signIn.email")}</FormLabel>
                         <FormControl>
-                          <Input placeholder={t("signIn.emailPlaceholder")} {...field} />
+                          <Input className="h-11" placeholder={t("signIn.emailPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -442,28 +472,30 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signIn.password")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder={t("signIn.passwordPlaceholder")} {...field} />
+                          <Input className="h-11" type="password" placeholder={t("signIn.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("signIn.buttonLoading")}
-                      </>
-                    ) : (
-                      t("signIn.button")
-                    )}
-                  </Button>
-
-                  <div className="flex justify-end items-center mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="rememberMe"
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="rememberMe"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {t("signIn.rememberMe")}
+                      </label>
+                    </div>
                     <Button
                       variant="link"
-                      className="p-0 h-auto text-xs text-muted-foreground"
+                      className="p-0 h-auto text-sm text-muted-foreground"
                       type="button"
                       onClick={() => {
                         setIsForgotPasswordOpen(true);
@@ -474,6 +506,17 @@ export default function Auth() {
                       {t("signIn.forgotPassword")}
                     </Button>
                   </div>
+
+                  <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t("signIn.buttonLoading")}
+                      </>
+                    ) : (
+                      t("signIn.button")
+                    )}
+                  </Button>
                 </form>
               </Form>
 
@@ -534,7 +577,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.email")}</FormLabel>
                         <FormControl>
-                          <Input placeholder={t("signUp.emailPlaceholder")} {...field} />
+                          <Input className="h-11" placeholder={t("signUp.emailPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -548,7 +591,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.password")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
+                          <Input className="h-11" type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -562,14 +605,14 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.confirmPassword")}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
+                          <Input className="h-11" type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -629,8 +672,10 @@ export default function Auth() {
               </div>
             </TabsContent>
           </Tabs>
-        </motion.div>
-      </main>
+            </motion.div>
+          </div>
+        </div>
+      </div>
 
       {/* Forgot Password Dialog */}
       <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
