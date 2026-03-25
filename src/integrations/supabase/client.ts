@@ -10,6 +10,75 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Custom storage adapter that respects "Remember Me" preference
+// When session-only mode is active, auth tokens go to sessionStorage (cleared on browser close)
+// Otherwise, tokens persist in localStorage (default Supabase behavior)
+const SESSION_ONLY_KEY = 'mataresit-session-only';
+
+const createAuthStorage = (): Storage => {
+  const isSessionOnly = (): boolean => {
+    try {
+      return sessionStorage.getItem(SESSION_ONLY_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  return {
+    getItem: (key: string): string | null => {
+      try {
+        // Check sessionStorage first (for session-only tokens), then localStorage
+        return sessionStorage.getItem(key) ?? localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    setItem: (key: string, value: string): void => {
+      try {
+        if (isSessionOnly()) {
+          sessionStorage.setItem(key, value);
+          localStorage.removeItem(key);
+        } else {
+          localStorage.setItem(key, value);
+          sessionStorage.removeItem(key);
+        }
+      } catch {
+        // Storage quota exceeded or unavailable
+      }
+    },
+    removeItem: (key: string): void => {
+      try {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      } catch {
+        // Ignore
+      }
+    },
+    get length(): number {
+      try {
+        return localStorage.length;
+      } catch {
+        return 0;
+      }
+    },
+    key(index: number): string | null {
+      try {
+        return localStorage.key(index);
+      } catch {
+        return null;
+      }
+    },
+    clear(): void {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        // Ignore
+      }
+    },
+  };
+};
+
 // Create Supabase client with optimized real-time configuration
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   realtime: {
@@ -33,6 +102,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     detectSessionInUrl: true,
     // Storage key for auth state
     storageKey: 'mataresit-auth',
+    // Custom storage adapter for "Remember Me" support
+    storage: createAuthStorage(),
   },
   // Global configuration
   global: {

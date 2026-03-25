@@ -14,7 +14,7 @@ type AuthContextType = {
   loading: boolean;
   isAdmin: boolean;
   signUp: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -268,8 +268,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
+      // Set session-only flag before sign-in so the storage adapter routes tokens correctly
+      if (!rememberMe) {
+        sessionStorage.setItem('mataresit-session-only', 'true');
+      } else {
+        sessionStorage.removeItem('mataresit-session-only');
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast({
