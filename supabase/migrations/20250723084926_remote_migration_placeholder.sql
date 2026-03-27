@@ -1,0 +1,2 @@
+-- Placeholder for migration applied directly to remote database.
+-- This file exists to keep local and remote migration history in sync.
