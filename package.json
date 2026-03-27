@@ -68,7 +68,13 @@
     "playwright-mcp:debug": "npx @playwright/mcp --config ./playwright-mcp-debug.config.json",
     "playwright-mcp:debug-trace": "npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace",
     "playwright-mcp:debug-console": "PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json",
-    "playwright-mcp:debug-verbose": "DEBUG=pw:api PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace"
+    "playwright-mcp:debug-verbose": "DEBUG=pw:api PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace",
+    "supabase:push": "supabase db push",
+    "supabase:push:dry": "supabase db push --dry-run",
+    "supabase:diff": "supabase db diff --schema public",
+    "supabase:migrate:list": "supabase migration list",
+    "supabase:migrate:new": "supabase migration new",
+    "supabase:migrate:repair": "supabase migration repair"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
