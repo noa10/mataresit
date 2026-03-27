@@ -194,6 +194,13 @@ jobs:
           for file in supabase/migrations/*.sql; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
+
+              # Skip placeholder migration files (used for sync only)
+              if [[ "$filename" == *_remote_migration_placeholder.sql ]]; then
+                echo "  ⏭️ Skipping placeholder file: $filename"
+                continue
+              fi
+
               echo "  Validating SQL syntax: $filename"
 
               # Check for basic SQL syntax issues
