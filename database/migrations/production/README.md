@@ -293,4 +293,63 @@ supabase db diff --schema public
 
 ---
 
+## 🔄 Standard Migration Workflow
+
+For day-to-day migration work, use the npm scripts defined in `package.json`:
+
+### Prerequisites
+
+1. **Authenticate**: Run `supabase login` (cached credentials used automatically)
+2. **Link project**: Run `supabase link --project-ref mpmkbtsufihzdelrlszs`
+3. **Set DB password**: Add `SUPABASE_DB_PASSWORD` to `.env.local` (get from Supabase Dashboard → Settings → Database)
+
+### Creating a New Migration
+
+```bash
+# Create a new migration file
+npm run supabase:migrate:new -- my_migration_name
+
+# Edit the generated file in supabase/migrations/YYYYMMDDHHMMSS_my_migration_name.sql
+```
+
+### Checking Migration Status
+
+```bash
+# List local vs remote migrations
+npm run supabase:migrate:list
+```
+
+### Applying Migrations
+
+```bash
+# Dry run (preview what would be applied)
+npm run supabase:push:dry
+
+# Apply migrations
+npm run supabase:push
+
+# If there are pre-existing migrations with older timestamps, use:
+supabase db push --include-all
+```
+
+### Generating a Diff
+
+```bash
+# Compare local schema to remote
+npm run supabase:diff
+```
+
+### Troubleshooting
+
+If `supabase db push` fails with `tuple concurrently updated`:
+- Set `SUPABASE_DB_PASSWORD` in `.env.local` — this bypasses the login role creation step
+
+If local and remote migration history drifts:
+- Run `supabase migration list` to identify mismatches
+- For remote-only migrations: create placeholder files in `supabase/migrations/`
+- For local-only migrations: run `supabase db push --include-all`
+- As a last resort: `supabase migration repair --status applied <version>`
+
+---
+
 **Note**: This migration system implements comprehensive safety measures, validation procedures, and rollback capabilities for production database deployments. Always test in staging environment before production deployment.

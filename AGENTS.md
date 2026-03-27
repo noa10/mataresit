@@ -111,6 +111,43 @@ src/
 - Never commit secrets, API keys, or .env files
 - Run lint and test commands before finishing tasks
 
+### Supabase Migrations
+
+#### Standard Workflow
+```bash
+# Check migration status
+npm run supabase:migrate:list
+
+# Create new migration
+npm run supabase:migrate:new -- migration_name
+
+# Preview changes (dry run)
+npm run supabase:push:dry
+
+# Apply migrations
+npm run supabase:push
+
+# For migrations with older timestamps than latest remote
+supabase db push --include-all
+```
+
+#### Prerequisites
+- Set `SUPABASE_DB_PASSWORD` in `.env.local` (get from Supabase Dashboard → Settings → Database)
+- Run `supabase login` (credentials cached)
+- Run `supabase link --project-ref mpmkbtsufihzdelrlszs`
+
+#### Migration History Sync (2026-03-27)
+All 302 migrations are now synced between local and remote:
+- Fixed 4 duplicate timestamps by incrementing by 1 second
+- Created 181 placeholder files for remote-only migrations
+- Marked 88 local-only migrations as applied (they were manually applied to remote)
+- Migration drift resolved - `supabase db push` now works correctly
+
+#### Troubleshooting
+- If `supabase db push` fails with "tuple concurrently updated": ensure `SUPABASE_DB_PASSWORD` is set
+- If local/remote drift occurs: use `supabase migration repair <version> --status applied`
+- For schema comparison: `npm run supabase:diff`
+
 ### Performance Considerations
 - Use React.memo for expensive components
 - Use useMemo/useCallback appropriately
@@ -120,7 +157,7 @@ src/
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mataresit** (10140 symbols, 29245 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mataresit** (10101 symbols, 29268 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
