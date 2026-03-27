@@ -162,6 +162,27 @@ jobs:
 
           echo "✅ All migration files follow correct naming convention"
 
+          # Check for duplicate timestamps
+          echo "🔍 Checking for duplicate migration timestamps..."
+          DUPLICATES_FOUND=0
+
+          # Extract timestamps and find duplicates
+          DUPLICATE_TIMESTAMPS=$(ls supabase/migrations/*.sql 2>/dev/null | xargs -I {} basename {} | cut -d'_' -f1 | sort | uniq -d)
+
+          if [ -n "$DUPLICATE_TIMESTAMPS" ]; then
+            echo "❌ Found duplicate timestamps:"
+            for ts in $DUPLICATE_TIMESTAMPS; do
+              echo "  - Timestamp $ts appears in:"
+              ls supabase/migrations/${ts}_*.sql 2>/dev/null | xargs -I {} echo "    * {}"
+            done
+            echo ""
+            echo "Each migration must have a unique timestamp."
+            echo "Rename one of the conflicting files to use a different timestamp."
+            exit 1
+          fi
+
+          echo "✅ All migration timestamps are unique"
+
           # Validate SQL syntax in migration files
           echo "🔍 Validating SQL syntax in migration files..."
           SYNTAX_ERRORS=0
