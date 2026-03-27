@@ -2,49 +2,49 @@
 DO $$ BEGIN
     CREATE TYPE "public"."claim_priority" AS ENUM ('low', 'medium', 'high', 'urgent');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."claim_status" AS ENUM ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'cancelled');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."email_delivery_status" AS ENUM ('pending', 'sent', 'delivered', 'failed', 'bounced', 'complained');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."invitation_status" AS ENUM ('pending', 'accepted', 'declined', 'expired');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."notification_priority" AS ENUM ('low', 'medium', 'high');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."notification_type" AS ENUM ('team_invitation_sent', 'team_invitation_accepted', 'team_member_joined', 'team_member_left', 'team_member_role_changed', 'claim_submitted', 'claim_approved', 'claim_rejected', 'claim_review_requested', 'team_settings_updated');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."team_member_role" AS ENUM ('owner', 'admin', 'member', 'viewer');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE TYPE "public"."team_status" AS ENUM ('active', 'suspended', 'archived');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
 END $$;
 
 -- Drop policies only if they exist
@@ -72,7 +72,7 @@ EXCEPTION
     WHEN undefined_object THEN null;
 END $$;
 
-create table "public"."claim_audit_trail" (
+create table if not exists "public"."claim_audit_trail" (
     "id" uuid not null default gen_random_uuid(),
     "claim_id" uuid not null,
     "user_id" uuid not null,
@@ -87,7 +87,7 @@ create table "public"."claim_audit_trail" (
 
 alter table "public"."claim_audit_trail" enable row level security;
 
-create table "public"."claims" (
+create table if not exists "public"."claims" (
     "id" uuid not null default gen_random_uuid(),
     "team_id" uuid not null,
     "claimant_id" uuid not null,
@@ -113,7 +113,7 @@ create table "public"."claims" (
 
 alter table "public"."claims" enable row level security;
 
-create table "public"."custom_categories" (
+create table if not exists "public"."custom_categories" (
     "id" uuid not null default gen_random_uuid(),
     "user_id" uuid not null,
     "name" text not null,
@@ -126,7 +126,7 @@ create table "public"."custom_categories" (
 
 alter table "public"."custom_categories" enable row level security;
 
-create table "public"."email_deliveries" (
+create table if not exists "public"."email_deliveries" (
     "id" uuid not null default gen_random_uuid(),
     "recipient_email" character varying(255) not null,
     "subject" character varying(500) not null,
@@ -150,7 +150,7 @@ create table "public"."email_deliveries" (
 
 alter table "public"."email_deliveries" enable row level security;
 
-create table "public"."notifications" (
+create table if not exists "public"."notifications" (
     "id" uuid not null default gen_random_uuid(),
     "recipient_id" uuid not null,
     "team_id" uuid,
@@ -171,7 +171,7 @@ create table "public"."notifications" (
 
 alter table "public"."notifications" enable row level security;
 
-create table "public"."posts" (
+create table if not exists "public"."posts" (
     "id" uuid not null default gen_random_uuid(),
     "slug" text not null,
     "title" text not null,
@@ -189,7 +189,7 @@ create table "public"."posts" (
 
 alter table "public"."posts" enable row level security;
 
-create table "public"."team_invitations" (
+create table if not exists "public"."team_invitations" (
     "id" uuid not null default gen_random_uuid(),
     "team_id" uuid not null,
     "email" character varying(255) not null,
@@ -206,7 +206,7 @@ create table "public"."team_invitations" (
 
 alter table "public"."team_invitations" enable row level security;
 
-create table "public"."team_members" (
+create table if not exists "public"."team_members" (
     "id" uuid not null default gen_random_uuid(),
     "team_id" uuid not null,
     "user_id" uuid not null,
@@ -219,7 +219,7 @@ create table "public"."team_members" (
 
 alter table "public"."team_members" enable row level security;
 
-create table "public"."teams" (
+create table if not exists "public"."teams" (
     "id" uuid not null default gen_random_uuid(),
     "name" character varying(255) not null,
     "description" text,
@@ -234,277 +234,469 @@ create table "public"."teams" (
 
 alter table "public"."teams" enable row level security;
 
-alter table "public"."receipts" add column "custom_category_id" uuid;
+DO $$ BEGIN
+    alter table "public"."receipts" ADD COLUMN "custom_category_id" uuid;
+EXCEPTION
+    WHEN duplicate_column THEN null;
+END $$;
 
-alter table "public"."receipts" add column "embedding_status" text;
+DO $$ BEGIN
+    alter table "public"."receipts" ADD COLUMN "embedding_status" text;
+EXCEPTION
+    WHEN duplicate_column THEN null;
+END $$;
 
-alter table "public"."receipts" add column "has_embeddings" boolean default false;
+DO $$ BEGIN
+    alter table "public"."receipts" ADD COLUMN "has_embeddings" boolean DEFAULT false;
+EXCEPTION
+    WHEN duplicate_column THEN null;
+END $$;
 
-alter table "public"."receipts" add column "team_id" uuid;
+DO $$ BEGIN
+    alter table "public"."receipts" ADD COLUMN "team_id" uuid;
+EXCEPTION
+    WHEN duplicate_column THEN null;
+END $$;
 
-CREATE UNIQUE INDEX claim_audit_trail_pkey ON public.claim_audit_trail USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS claim_audit_trail_pkey ON public.claim_audit_trail USING btree (id);
 
-CREATE UNIQUE INDEX claims_pkey ON public.claims USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS claims_pkey ON public.claims USING btree (id);
 
-CREATE UNIQUE INDEX custom_categories_pkey ON public.custom_categories USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS custom_categories_pkey ON public.custom_categories USING btree (id);
 
-CREATE UNIQUE INDEX email_deliveries_pkey ON public.email_deliveries USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS email_deliveries_pkey ON public.email_deliveries USING btree (id);
 
-CREATE INDEX idx_claim_audit_trail_action ON public.claim_audit_trail USING btree (action);
+CREATE INDEX IF NOT EXISTS idx_claim_audit_trail_action ON public.claim_audit_trail USING btree (action);
 
-CREATE INDEX idx_claim_audit_trail_claim_id ON public.claim_audit_trail USING btree (claim_id);
+CREATE INDEX IF NOT EXISTS idx_claim_audit_trail_claim_id ON public.claim_audit_trail USING btree (claim_id);
 
-CREATE INDEX idx_claim_audit_trail_created_at ON public.claim_audit_trail USING btree (created_at);
+CREATE INDEX IF NOT EXISTS idx_claim_audit_trail_created_at ON public.claim_audit_trail USING btree (created_at);
 
-CREATE INDEX idx_claim_audit_trail_user_id ON public.claim_audit_trail USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_claim_audit_trail_user_id ON public.claim_audit_trail USING btree (user_id);
 
-CREATE INDEX idx_claims_approved_by ON public.claims USING btree (approved_by);
+CREATE INDEX IF NOT EXISTS idx_claims_approved_by ON public.claims USING btree (approved_by);
 
-CREATE INDEX idx_claims_claimant_id ON public.claims USING btree (claimant_id);
+CREATE INDEX IF NOT EXISTS idx_claims_claimant_id ON public.claims USING btree (claimant_id);
 
-CREATE INDEX idx_claims_priority ON public.claims USING btree (priority);
+CREATE INDEX IF NOT EXISTS idx_claims_priority ON public.claims USING btree (priority);
 
-CREATE INDEX idx_claims_reviewed_by ON public.claims USING btree (reviewed_by);
+CREATE INDEX IF NOT EXISTS idx_claims_reviewed_by ON public.claims USING btree (reviewed_by);
 
-CREATE INDEX idx_claims_status ON public.claims USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_claims_status ON public.claims USING btree (status);
 
-CREATE INDEX idx_claims_submitted_at ON public.claims USING btree (submitted_at);
+CREATE INDEX IF NOT EXISTS idx_claims_submitted_at ON public.claims USING btree (submitted_at);
 
-CREATE INDEX idx_claims_team_id ON public.claims USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_claims_team_id ON public.claims USING btree (team_id);
 
-CREATE INDEX idx_custom_categories_user_id ON public.custom_categories USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_custom_categories_user_id ON public.custom_categories USING btree (user_id);
 
-CREATE INDEX idx_email_deliveries_created_at ON public.email_deliveries USING btree (created_at);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_created_at ON public.email_deliveries USING btree (created_at);
 
-CREATE INDEX idx_email_deliveries_next_retry_at ON public.email_deliveries USING btree (next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_next_retry_at ON public.email_deliveries USING btree (next_retry_at);
 
-CREATE INDEX idx_email_deliveries_recipient_email ON public.email_deliveries USING btree (recipient_email);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient_email ON public.email_deliveries USING btree (recipient_email);
 
-CREATE INDEX idx_email_deliveries_related_entity ON public.email_deliveries USING btree (related_entity_type, related_entity_id);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_related_entity ON public.email_deliveries USING btree (related_entity_type, related_entity_id);
 
-CREATE INDEX idx_email_deliveries_status ON public.email_deliveries USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON public.email_deliveries USING btree (status);
 
-CREATE INDEX idx_email_deliveries_team_id ON public.email_deliveries USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_email_deliveries_team_id ON public.email_deliveries USING btree (team_id);
 
-CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications USING btree (created_at);
 
-CREATE INDEX idx_notifications_expires_at ON public.notifications USING btree (expires_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_expires_at ON public.notifications USING btree (expires_at);
 
-CREATE INDEX idx_notifications_read_at ON public.notifications USING btree (read_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON public.notifications USING btree (read_at);
 
-CREATE INDEX idx_notifications_recipient_id ON public.notifications USING btree (recipient_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_id ON public.notifications USING btree (recipient_id);
 
-CREATE INDEX idx_notifications_related_entity ON public.notifications USING btree (related_entity_type, related_entity_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_related_entity ON public.notifications USING btree (related_entity_type, related_entity_id);
 
-CREATE INDEX idx_notifications_team_id ON public.notifications USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_team_id ON public.notifications USING btree (team_id);
 
-CREATE INDEX idx_notifications_type ON public.notifications USING btree (type);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON public.notifications USING btree (type);
 
-CREATE INDEX idx_posts_author_id ON public.posts USING btree (author_id);
+CREATE INDEX IF NOT EXISTS idx_posts_author_id ON public.posts USING btree (author_id);
 
-CREATE INDEX idx_posts_created_at ON public.posts USING btree (created_at);
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON public.posts USING btree (created_at);
 
-CREATE INDEX idx_posts_published_at ON public.posts USING btree (published_at);
+CREATE INDEX IF NOT EXISTS idx_posts_published_at ON public.posts USING btree (published_at);
 
-CREATE INDEX idx_posts_slug ON public.posts USING btree (slug);
+CREATE INDEX IF NOT EXISTS idx_posts_slug ON public.posts USING btree (slug);
 
-CREATE INDEX idx_posts_status ON public.posts USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_posts_status ON public.posts USING btree (status);
 
-CREATE INDEX idx_posts_tags ON public.posts USING gin (tags);
+CREATE INDEX IF NOT EXISTS idx_posts_tags ON public.posts USING gin (tags);
 
-CREATE INDEX idx_receipts_custom_category_id ON public.receipts USING btree (custom_category_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_custom_category_id ON public.receipts USING btree (custom_category_id);
 
-CREATE INDEX idx_receipts_embedding_status ON public.receipts USING btree (processing_status, has_embeddings, embedding_status);
+CREATE INDEX IF NOT EXISTS idx_receipts_embedding_status ON public.receipts USING btree (processing_status, has_embeddings, embedding_status);
 
-CREATE INDEX idx_receipts_team_id ON public.receipts USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_team_id ON public.receipts USING btree (team_id);
 
-CREATE INDEX idx_team_invitations_email ON public.team_invitations USING btree (email);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_email ON public.team_invitations USING btree (email);
 
-CREATE INDEX idx_team_invitations_expires_at ON public.team_invitations USING btree (expires_at);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_expires_at ON public.team_invitations USING btree (expires_at);
 
-CREATE INDEX idx_team_invitations_status ON public.team_invitations USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_status ON public.team_invitations USING btree (status);
 
-CREATE INDEX idx_team_invitations_team_id ON public.team_invitations USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_team_id ON public.team_invitations USING btree (team_id);
 
-CREATE INDEX idx_team_invitations_token ON public.team_invitations USING btree (token);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_token ON public.team_invitations USING btree (token);
 
-CREATE INDEX idx_team_members_role ON public.team_members USING btree (role);
+CREATE INDEX IF NOT EXISTS idx_team_members_role ON public.team_members USING btree (role);
 
-CREATE INDEX idx_team_members_team_id ON public.team_members USING btree (team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON public.team_members USING btree (team_id);
 
-CREATE INDEX idx_team_members_user_id ON public.team_members USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON public.team_members USING btree (user_id);
 
-CREATE INDEX idx_teams_owner_id ON public.teams USING btree (owner_id);
+CREATE INDEX IF NOT EXISTS idx_teams_owner_id ON public.teams USING btree (owner_id);
 
-CREATE INDEX idx_teams_slug ON public.teams USING btree (slug);
+CREATE INDEX IF NOT EXISTS idx_teams_slug ON public.teams USING btree (slug);
 
-CREATE INDEX idx_teams_status ON public.teams USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_teams_status ON public.teams USING btree (status);
 
-CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_pkey ON public.notifications USING btree (id);
 
-CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS posts_pkey ON public.posts USING btree (id);
 
-CREATE UNIQUE INDEX posts_slug_key ON public.posts USING btree (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS posts_slug_key ON public.posts USING btree (slug);
 
-CREATE UNIQUE INDEX team_invitations_pkey ON public.team_invitations USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS team_invitations_pkey ON public.team_invitations USING btree (id);
 
-CREATE UNIQUE INDEX team_invitations_token_key ON public.team_invitations USING btree (token);
+CREATE UNIQUE INDEX IF NOT EXISTS team_invitations_token_key ON public.team_invitations USING btree (token);
 
-CREATE UNIQUE INDEX team_members_pkey ON public.team_members USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS team_members_pkey ON public.team_members USING btree (id);
 
-CREATE UNIQUE INDEX team_members_team_id_user_id_key ON public.team_members USING btree (team_id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS team_members_team_id_user_id_key ON public.team_members USING btree (team_id, user_id);
 
-CREATE UNIQUE INDEX teams_pkey ON public.teams USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS teams_pkey ON public.teams USING btree (id);
 
-CREATE UNIQUE INDEX teams_slug_key ON public.teams USING btree (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS teams_slug_key ON public.teams USING btree (slug);
 
-CREATE UNIQUE INDEX unique_category_name_per_user ON public.custom_categories USING btree (user_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS unique_category_name_per_user ON public.custom_categories USING btree (user_id, name);
 
-alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_pkey" PRIMARY KEY using index "claim_audit_trail_pkey";
+DO $$ BEGIN
+    alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_pkey" PRIMARY KEY USING INDEX "claim_audit_trail_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."claims" add constraint "claims_pkey" PRIMARY KEY using index "claims_pkey";
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_pkey" PRIMARY KEY USING INDEX "claims_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."custom_categories" add constraint "custom_categories_pkey" PRIMARY KEY using index "custom_categories_pkey";
+DO $$ BEGIN
+    alter table "public"."custom_categories" add constraint "custom_categories_pkey" PRIMARY KEY USING INDEX "custom_categories_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."email_deliveries" add constraint "email_deliveries_pkey" PRIMARY KEY using index "email_deliveries_pkey";
+DO $$ BEGIN
+    alter table "public"."email_deliveries" add constraint "email_deliveries_pkey" PRIMARY KEY USING INDEX "email_deliveries_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."notifications" add constraint "notifications_pkey" PRIMARY KEY using index "notifications_pkey";
+DO $$ BEGIN
+    alter table "public"."notifications" add constraint "notifications_pkey" PRIMARY KEY USING INDEX "notifications_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."posts" add constraint "posts_pkey" PRIMARY KEY using index "posts_pkey";
+DO $$ BEGIN
+    alter table "public"."posts" add constraint "posts_pkey" PRIMARY KEY USING INDEX "posts_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."team_invitations" add constraint "team_invitations_pkey" PRIMARY KEY using index "team_invitations_pkey";
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_pkey" PRIMARY KEY USING INDEX "team_invitations_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."team_members" add constraint "team_members_pkey" PRIMARY KEY using index "team_members_pkey";
+DO $$ BEGIN
+    alter table "public"."team_members" add constraint "team_members_pkey" PRIMARY KEY USING INDEX "team_members_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."teams" add constraint "teams_pkey" PRIMARY KEY using index "teams_pkey";
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_pkey" PRIMARY KEY USING INDEX "teams_pkey";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_claim_id_fkey" FOREIGN KEY (claim_id) REFERENCES claims(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_claim_id_fkey" FOREIGN KEY (claim_id) REFERENCES claims(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claim_audit_trail" validate constraint "claim_audit_trail_claim_id_fkey";
 
-alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."claim_audit_trail" add constraint "claim_audit_trail_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claim_audit_trail" validate constraint "claim_audit_trail_user_id_fkey";
 
-alter table "public"."claims" add constraint "claims_amount_positive" CHECK ((amount > (0)::numeric)) not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_amount_positive" CHECK ((amount > (0)::numeric)) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_amount_positive";
 
-alter table "public"."claims" add constraint "claims_approved_by_fkey" FOREIGN KEY (approved_by) REFERENCES auth.users(id) not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_approved_by_fkey" FOREIGN KEY (approved_by) REFERENCES auth.users(id) NOT VALID;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_approved_by_fkey";
 
-alter table "public"."claims" add constraint "claims_claimant_id_fkey" FOREIGN KEY (claimant_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_claimant_id_fkey" FOREIGN KEY (claimant_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_claimant_id_fkey";
 
-alter table "public"."claims" add constraint "claims_reviewed_by_fkey" FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_reviewed_by_fkey" FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) NOT VALID;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_reviewed_by_fkey";
 
-alter table "public"."claims" add constraint "claims_status_workflow" CHECK ((((status = 'draft'::claim_status) AND (submitted_at IS NULL)) OR ((status <> 'draft'::claim_status) AND (submitted_at IS NOT NULL)))) not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_status_workflow" CHECK ((((status = 'draft'::claim_status) AND (submitted_at IS NULL)) OR ((status <> 'draft'::claim_status) AND (submitted_at IS NOT NULL)))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_status_workflow";
 
-alter table "public"."claims" add constraint "claims_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_team_id_fkey";
 
-alter table "public"."claims" add constraint "claims_title_length" CHECK (((char_length((title)::text) >= 3) AND (char_length((title)::text) <= 255))) not valid;
+DO $$ BEGIN
+    alter table "public"."claims" add constraint "claims_title_length" CHECK (((char_length((title)::text) >= 3) AND (char_length((title)::text) <= 255))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."claims" validate constraint "claims_title_length";
 
-alter table "public"."custom_categories" add constraint "custom_categories_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."custom_categories" add constraint "custom_categories_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."custom_categories" validate constraint "custom_categories_user_id_fkey";
 
-alter table "public"."custom_categories" add constraint "unique_category_name_per_user" UNIQUE using index "unique_category_name_per_user";
+DO $$ BEGIN
+    alter table "public"."custom_categories" add constraint "unique_category_name_per_user" UNIQUE USING INDEX "unique_category_name_per_user";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."custom_categories" add constraint "valid_color_format" CHECK ((color ~ '^#[0-9A-Fa-f]{6}$'::text)) not valid;
+DO $$ BEGIN
+    alter table "public"."custom_categories" add constraint "valid_color_format" CHECK ((color ~ '^#[0-9A-Fa-f]{6}$'::text)) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."custom_categories" validate constraint "valid_color_format";
 
-alter table "public"."custom_categories" add constraint "valid_name_length" CHECK (((char_length(name) >= 1) AND (char_length(name) <= 50))) not valid;
+DO $$ BEGIN
+    alter table "public"."custom_categories" add constraint "valid_name_length" CHECK (((char_length(name) >= 1) AND (char_length(name) <= 50))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."custom_categories" validate constraint "valid_name_length";
 
-alter table "public"."email_deliveries" add constraint "email_deliveries_retry_count_valid" CHECK (((retry_count >= 0) AND (retry_count <= max_retries))) not valid;
+DO $$ BEGIN
+    alter table "public"."email_deliveries" add constraint "email_deliveries_retry_count_valid" CHECK (((retry_count >= 0) AND (retry_count <= max_retries))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."email_deliveries" validate constraint "email_deliveries_retry_count_valid";
 
-alter table "public"."email_deliveries" add constraint "email_deliveries_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL not valid;
+DO $$ BEGIN
+    alter table "public"."email_deliveries" add constraint "email_deliveries_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete set null not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."email_deliveries" validate constraint "email_deliveries_team_id_fkey";
 
-alter table "public"."notifications" add constraint "notifications_recipient_id_fkey" FOREIGN KEY (recipient_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."notifications" add constraint "notifications_recipient_id_fkey" FOREIGN KEY (recipient_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."notifications" validate constraint "notifications_recipient_id_fkey";
 
-alter table "public"."notifications" add constraint "notifications_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."notifications" add constraint "notifications_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."notifications" validate constraint "notifications_team_id_fkey";
 
-alter table "public"."notifications" add constraint "notifications_title_length" CHECK (((char_length((title)::text) >= 1) AND (char_length((title)::text) <= 255))) not valid;
+DO $$ BEGIN
+    alter table "public"."notifications" add constraint "notifications_title_length" CHECK (((char_length((title)::text) >= 1) AND (char_length((title)::text) <= 255))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."notifications" validate constraint "notifications_title_length";
 
-alter table "public"."posts" add constraint "posts_slug_key" UNIQUE using index "posts_slug_key";
+DO $$ BEGIN
+    alter table "public"."posts" add constraint "posts_slug_key" UNIQUE USING INDEX "posts_slug_key";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."posts" add constraint "posts_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text]))) not valid;
+DO $$ BEGIN
+    alter table "public"."posts" add constraint "posts_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text]))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."posts" validate constraint "posts_status_check";
 
-alter table "public"."receipts" add constraint "receipts_custom_category_id_fkey" FOREIGN KEY (custom_category_id) REFERENCES custom_categories(id) ON DELETE SET NULL not valid;
+DO $$ BEGIN
+    alter table "public"."receipts" add constraint "receipts_custom_category_id_fkey" FOREIGN KEY (custom_category_id) REFERENCES custom_categories(id) on delete set null not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."receipts" validate constraint "receipts_custom_category_id_fkey";
 
-alter table "public"."receipts" add constraint "receipts_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL not valid;
+DO $$ BEGIN
+    alter table "public"."receipts" add constraint "receipts_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete set null not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."receipts" validate constraint "receipts_team_id_fkey";
 
-alter table "public"."team_invitations" add constraint "team_invitations_email_format" CHECK (((email)::text ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)) not valid;
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_email_format" CHECK (((email)::text ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text)) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_invitations" validate constraint "team_invitations_email_format";
 
-alter table "public"."team_invitations" add constraint "team_invitations_expires_future" CHECK ((expires_at > created_at)) not valid;
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_expires_future" CHECK ((expires_at > created_at)) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_invitations" validate constraint "team_invitations_expires_future";
 
-alter table "public"."team_invitations" add constraint "team_invitations_invited_by_fkey" FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_invited_by_fkey" FOREIGN KEY (invited_by) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_invitations" validate constraint "team_invitations_invited_by_fkey";
 
-alter table "public"."team_invitations" add constraint "team_invitations_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_invitations" validate constraint "team_invitations_team_id_fkey";
 
-alter table "public"."team_invitations" add constraint "team_invitations_token_key" UNIQUE using index "team_invitations_token_key";
+DO $$ BEGIN
+    alter table "public"."team_invitations" add constraint "team_invitations_token_key" UNIQUE USING INDEX "team_invitations_token_key";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."team_members" add constraint "team_members_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."team_members" add constraint "team_members_team_id_fkey" FOREIGN KEY (team_id) REFERENCES teams(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_members" validate constraint "team_members_team_id_fkey";
 
-alter table "public"."team_members" add constraint "team_members_team_id_user_id_key" UNIQUE using index "team_members_team_id_user_id_key";
+DO $$ BEGIN
+    alter table "public"."team_members" add constraint "team_members_team_id_user_id_key" UNIQUE USING INDEX "team_members_team_id_user_id_key";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."team_members" add constraint "team_members_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."team_members" add constraint "team_members_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."team_members" validate constraint "team_members_user_id_fkey";
 
-alter table "public"."teams" add constraint "teams_name_length" CHECK (((char_length((name)::text) >= 2) AND (char_length((name)::text) <= 255))) not valid;
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_name_length" CHECK (((char_length((name)::text) >= 2) AND (char_length((name)::text) <= 255))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."teams" validate constraint "teams_name_length";
 
-alter table "public"."teams" add constraint "teams_owner_id_fkey" FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_owner_id_fkey" FOREIGN KEY (owner_id) REFERENCES auth.users(id) on delete cascade not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."teams" validate constraint "teams_owner_id_fkey";
 
-alter table "public"."teams" add constraint "teams_slug_format" CHECK (((slug)::text ~ '^[a-z0-9-]+$'::text)) not valid;
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_slug_format" CHECK (((slug)::text ~ '^[a-z0-9-]+$'::text)) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."teams" validate constraint "teams_slug_format";
 
-alter table "public"."teams" add constraint "teams_slug_key" UNIQUE using index "teams_slug_key";
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_slug_key" UNIQUE USING INDEX "teams_slug_key";
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
-alter table "public"."teams" add constraint "teams_slug_length" CHECK (((char_length((slug)::text) >= 2) AND (char_length((slug)::text) <= 100))) not valid;
+DO $$ BEGIN
+    alter table "public"."teams" add constraint "teams_slug_length" CHECK (((char_length((slug)::text) >= 2) AND (char_length((slug)::text) <= 100))) not valid;
+EXCEPTION
+    WHEN duplicate_object OR sqlstate '55000' THEN null;
+END $$;
 
 alter table "public"."teams" validate constraint "teams_slug_length";
 
