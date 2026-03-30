@@ -170,75 +170,9 @@ export const getContextualTranslation = (
   return translation || i18n.t(key, options);
 };
 
-// Enhanced interpolation with Malaysian cultural formatting
-const enhancedInterpolation = {
+// Enhanced interpolation settings (custom formatters registered after init)
+const interpolationSettings = {
   escapeValue: false, // React already escapes values
-  formatSeparator: ',',
-  format: (value: any, format: string, lng: string, options?: any) => {
-    const language = lng as SupportedLanguage;
-
-    // Currency formatting
-    if (format === 'currency') {
-      if (language === 'ms') {
-        const amount = typeof value === 'number' ? value : parseFloat(value);
-        return `RM ${amount.toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      }
-      return `$${value}`;
-    }
-
-    // Date formatting
-    if (format === 'date') {
-      const date = new Date(value);
-      if (language === 'ms') {
-        return date.toLocaleDateString('ms-MY', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-      }
-      return date.toLocaleDateString('en-US');
-    }
-
-    // Time formatting
-    if (format === 'time') {
-      const date = new Date(value);
-      if (language === 'ms') {
-        return date.toLocaleTimeString('ms-MY', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-      }
-      return date.toLocaleTimeString('en-US');
-    }
-
-    // Number formatting
-    if (format === 'number') {
-      const num = typeof value === 'number' ? value : parseFloat(value);
-      if (language === 'ms') {
-        return num.toLocaleString('ms-MY');
-      }
-      return num.toLocaleString('en-US');
-    }
-
-    // Percentage formatting
-    if (format === 'percentage') {
-      const num = typeof value === 'number' ? value : parseFloat(value);
-      if (language === 'ms') {
-        return `${num.toLocaleString('ms-MY')}%`;
-      }
-      return `${num}%`;
-    }
-
-    // Text case formatting
-    if (format === 'uppercase') return value.toUpperCase();
-    if (format === 'lowercase') return value.toLowerCase();
-    if (format === 'capitalize') {
-      return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-    }
-
-    return value;
-  }
 };
 
 // Initialize i18next with advanced features
@@ -263,7 +197,7 @@ i18n
     resources,
 
     // Enhanced interpolation settings
-    interpolation: enhancedInterpolation,
+    interpolation: interpolationSettings,
 
     // React settings
     react: {
@@ -316,23 +250,58 @@ i18n
     keySeparator: '.',
     nsSeparator: ':',
 
-    // Fallback settings
-    fallbackOnNull: true,
-    fallbackOnEmpty: true,
-
     // Caching
     updateMissing: false,
-
-    // Custom pluralization rules
-    pluralResolver: {
-      addRule: (lng: string, obj: any) => {
-        if (lng === 'ms') {
-          obj.numbers = [0, 1, 2];
-          obj.plurals = malayPluralizationRule;
-        }
-      }
-    }
   });
+
+// Register custom formatters for Malaysian cultural formatting (i18next v26+ API)
+i18n.services.formatter.add('currency', (value: any, lng: string, options: any) => {
+  const language = lng as SupportedLanguage;
+  if (language === 'ms') {
+    const amount = typeof value === 'number' ? value : parseFloat(value);
+    return `RM ${amount.toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `$${value}`;
+});
+
+i18n.services.formatter.add('date', (value: any, lng: string, options: any) => {
+  const language = lng as SupportedLanguage;
+  const date = new Date(value);
+  if (language === 'ms') {
+    return date.toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  return date.toLocaleDateString('en-US');
+});
+
+i18n.services.formatter.add('time', (value: any, lng: string, options: any) => {
+  const language = lng as SupportedLanguage;
+  const date = new Date(value);
+  if (language === 'ms') {
+    return date.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  return date.toLocaleTimeString('en-US');
+});
+
+i18n.services.formatter.add('number', (value: any, lng: string, options: any) => {
+  const language = lng as SupportedLanguage;
+  const num = typeof value === 'number' ? value : parseFloat(value);
+  if (language === 'ms') return num.toLocaleString('ms-MY');
+  return num.toLocaleString('en-US');
+});
+
+i18n.services.formatter.add('percentage', (value: any, lng: string, options: any) => {
+  const language = lng as SupportedLanguage;
+  const num = typeof value === 'number' ? value : parseFloat(value);
+  if (language === 'ms') return `${num.toLocaleString('ms-MY')}%`;
+  return `${num}%`;
+});
+
+i18n.services.formatter.add('uppercase', (value: any) => String(value).toUpperCase());
+i18n.services.formatter.add('lowercase', (value: any) => String(value).toLowerCase());
+i18n.services.formatter.add('capitalize', (value: any) => {
+  const str = String(value);
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+});
 
 // Helper function to change language
 export const changeLanguage = async (language: SupportedLanguage) => {
@@ -411,13 +380,13 @@ export const translationUtils = {
   ): string => {
     // Try main key first
     if (translationUtils.hasTranslation(key, options?.ns)) {
-      return i18n.t(key, options);
+      return String(i18n.t(key, options));
     }
 
     // Try fallback keys
     for (const fallbackKey of fallbacks) {
       if (translationUtils.hasTranslation(fallbackKey, options?.ns)) {
-        return i18n.t(fallbackKey, options);
+        return String(i18n.t(fallbackKey, options));
       }
     }
 
