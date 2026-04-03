@@ -164,7 +164,7 @@
   },
   "devDependencies": {
     "@agentdeskai/browser-tools-mcp": "^1.2.1",
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.54.2",
     "@swc/core": "^1.15.21",
     "@tailwindcss/typography": "^0.5.16",
