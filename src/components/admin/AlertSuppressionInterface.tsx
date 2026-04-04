@@ -73,12 +73,10 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
   // Hooks
   const {
     suppressionRules,
-    createSuppressionRule,
     updateSuppressionRule,
     deleteSuppressionRule,
     maintenanceWindows,
     maintenanceStatus,
-    createMaintenanceWindow,
     updateMaintenanceWindow,
     deleteMaintenanceWindow,
     suppressionStatistics,
@@ -89,9 +87,9 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
   } = useAlertSuppression({ teamId, autoRefresh: true });
 
   // State
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedRule, setSelectedRule] = useState<any>(null);
-  const [selectedWindow, setSelectedWindow] = useState<any>(null);
+  const [_activeTab, setActiveTab] = useState('overview');
+  const [_selectedRule, setSelectedRule] = useState<any>(null);
+  const [_selectedWindow, setSelectedWindow] = useState<any>(null);
   const [_isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
   const [_isWindowDialogOpen, setIsWindowDialogOpen] = useState(false);
   const [_isEditMode, setIsEditMode] = useState(false);
