@@ -100,9 +100,7 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
 
   const {
     channels,
-    createChannel,
     updateChannel,
-    deleteChannel,
     testChannel,
   } = useNotificationChannels({ teamId, autoRefresh: true });
 
