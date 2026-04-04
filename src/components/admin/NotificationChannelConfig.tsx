@@ -42,52 +42,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useNotificationChannels } from '@/hooks/useNotificationChannels';
-import { 
-  NotificationChannel, 
-  NotificationChannelType,
-  EmailChannelConfig,
-  WebhookChannelConfig,
-  SlackChannelConfig,
-  SMSChannelConfig
-} from '@/types/alerting';
 
 // Channel configuration schemas
-const emailConfigSchema = z.object({
-  recipients: z.array(z.string().email()).min(1, 'At least one recipient required'),
-  subject_template: z.string().optional(),
-  body_template: z.string().optional(),
-});
-
-const webhookConfigSchema = z.object({
-  url: z.string().url('Invalid URL'),
-  method: z.enum(['POST', 'PUT', 'PATCH']),
-  headers: z.record(z.string()).optional(),
-  payload_template: z.string().optional(),
-  authentication: z.object({
-    type: z.enum(['none', 'bearer', 'basic', 'api_key']),
-    token: z.string().optional(),
-    username: z.string().optional(),
-    password: z.string().optional(),
-    api_key_header: z.string().optional(),
-    api_key_value: z.string().optional(),
-  }).optional(),
-});
-
-const slackConfigSchema = z.object({
-  webhook_url: z.string().url('Invalid Slack webhook URL'),
-  channel: z.string().optional(),
-  username: z.string().optional(),
-  icon_emoji: z.string().optional(),
-  message_template: z.string().optional(),
-});
-
-const smsConfigSchema = z.object({
-  phone_numbers: z.array(z.string()).min(1, 'At least one phone number required'),
-  provider: z.enum(['twilio', 'aws_sns']),
-  provider_config: z.record(z.any()),
-  message_template: z.string().optional(),
-});
-
 const channelSchema = z.object({
   name: z.string().min(1, 'Channel name is required').max(255, 'Name too long'),
   description: z.string().optional(),
