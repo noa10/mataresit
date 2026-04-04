@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Eye, Calendar, TrendingUp, Tag, Users } from 'lucide-react';
+import { FileText, Eye, Calendar, TrendingUp, Tag } from 'lucide-react';
 
 export function BlogAnalytics() {
   // Fetch blog statistics

@@ -20,7 +20,6 @@ import {
   Settings,
   Star,
   TrendingUp,
-  Clock,
   Zap,
   Eye,
   EyeOff
@@ -118,7 +117,6 @@ export function AdaptiveFeaturePanel({
   const {
     isFeaturePrimary,
     getFeatureUsageFrequency,
-    getSortedComponents,
     trackComponentInteraction,
     adaptationConfidence
   } = useAdaptiveUI();

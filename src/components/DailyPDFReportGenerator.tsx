@@ -47,8 +47,6 @@ export function DailyPDFReportGenerator() {
   const [receiptDates, setReceiptDates] = useState<Date[]>([]);
   // State to track loading of receipt dates
   const [isLoadingDates, setIsLoadingDates] = useState(false);
-  // State for report mode: only 'category' mode supported
-  const [reportMode] = useState<'category'>('category'); // Only category mode
 
   // Function to fetch dates with receipts for the current month
   const fetchReceiptDatesForMonth = async (month: Date) => {

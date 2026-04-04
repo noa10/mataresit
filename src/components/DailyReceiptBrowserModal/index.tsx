@@ -76,11 +76,6 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
 
   // Listen for query invalidations and refresh data
   useEffect(() => {
-    const handleQueryInvalidation = () => {
-      // Force refetch when queries are invalidated
-      queryClient.invalidateQueries({ queryKey: ['receiptsForDay', date, receiptIds] });
-    };
-
     // Set up a listener for query cache changes
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type === 'updated' && event.query.queryKey[0] === 'receiptsForDay') {

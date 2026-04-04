@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Calendar, Store, DollarSign, Eye, Loader2, AlertTriangle, Tag } from "lucide-react";
+import { Calendar, Store, Eye, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { ReceiptStatus, ProcessingStatus, CustomCategory, Receipt } from "@/types/receipt";
 import { ReceiptCardImage } from "@/components/ui/OptimizedImage";
 import { formatCurrencySafe } from "@/utils/currency";

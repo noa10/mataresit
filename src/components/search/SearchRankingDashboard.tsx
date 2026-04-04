@@ -264,7 +264,7 @@ export const SearchRankingDashboard: React.FC = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">High Quality (>0.8)</span>
+                      <span className="text-sm font-medium">High Quality ({'>'}0.8)</span>
                       <span className="text-sm text-green-600 font-medium">
                         {analytics.rankingDistribution.highQuality}%
                       </span>

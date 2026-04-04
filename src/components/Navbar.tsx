@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStripe } from "@/contexts/StripeContext";
@@ -7,7 +6,7 @@ import { useChatControls } from "@/contexts/ChatControlsContext";
 import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, MoreHorizontal, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
@@ -55,7 +54,6 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
     await toggleMode();
   };
 
-  const initial = user?.email?.charAt(0).toUpperCase() ?? "";
   const avatarUrl = user ? getAvatarUrl(user) : null;
   const userInitials = user ? getUserInitials(user) : "";
 
