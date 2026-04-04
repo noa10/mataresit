@@ -106,7 +106,7 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
 
   // State
   const [activeTab, setActiveTab] = useState('rules');
-  const [selectedRule, setSelectedRule] = useState<AlertRule | null>(null);
+  const [, setSelectedRule] = useState<AlertRule | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
