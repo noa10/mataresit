@@ -117,7 +117,6 @@ export function AdaptiveNavigation({
   const location = useLocation();
   const {
     getNavigationStyle,
-    getSortedComponents,
     isFeaturePrimary,
     getFeatureUsageFrequency,
     trackComponentInteraction

@@ -53,7 +53,7 @@ function BatchUploadZone({
   // State to store the completed receipt IDs for the browser modal
   const [completedReceiptIds, setCompletedReceiptIds] = useState<string[]>([]);
   // State to store the current date for the browser modal
-  const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [currentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   // State to track compression status
   const [isCompressing, setIsCompressing] = useState(false);
   // State to track previous file count for auto-scroll
@@ -100,9 +100,6 @@ function BatchUploadZone({
     handleDragEnter,
     handleDragLeave,
     handleDragOver,
-    handleDrop,
-    handleFileInputChange,
-    openFileDialog,
     addToBatchQueue,
     removeFromBatchQueue,
     clearBatchQueue,

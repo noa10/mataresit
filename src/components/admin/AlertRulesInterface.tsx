@@ -14,8 +14,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -24,7 +22,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -44,17 +41,11 @@ import {
   TestTube,
   Settings,
   Bell,
-  Users,
   Clock,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Filter,
   Search,
-  MoreHorizontal,
-  Copy,
-  Download,
-  Upload
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -63,8 +54,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAlertEngine } from '@/hooks/useAlertEngine';
 import { useNotificationChannels } from '@/hooks/useNotificationChannels';
-import { useAlertEscalation } from '@/hooks/useAlertEscalation';
-import { AlertRule, AlertSeverity, NotificationChannelType } from '@/types/alerting';
+import { AlertRule, AlertSeverity } from '@/types/alerting';
 
 // Form validation schemas
 const alertRuleSchema = z.object({
@@ -114,17 +104,7 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
     updateChannel,
     deleteChannel,
     testChannel,
-    getChannelsByType
   } = useNotificationChannels({ teamId, autoRefresh: true });
-
-  const {
-    severityRules,
-    createSeverityRule,
-    updateSeverityRule,
-    deleteSeverityRule,
-    onCallSchedules,
-    alertAssignments
-  } = useAlertEscalation({ teamId, autoRefresh: true });
 
   // State
   const [activeTab, setActiveTab] = useState('rules');

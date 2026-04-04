@@ -34,13 +34,6 @@ import { SaveStatusIndicator } from "@/components/SaveStatusToastManager";
 import { useTeam } from "@/contexts/TeamContext";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,

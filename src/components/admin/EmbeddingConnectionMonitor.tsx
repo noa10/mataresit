@@ -14,12 +14,9 @@ import {
   Wifi, 
   WifiOff, 
   AlertTriangle, 
-  CheckCircle,
   Clock,
   Zap,
-  RefreshCw,
-  TrendingUp,
-  TrendingDown
+  RefreshCw
 } from 'lucide-react';
 import { embeddingMetricsRealtimeService } from '@/services/embeddingMetricsRealtimeService';
 import { embeddingMetricsErrorHandler } from '@/services/embeddingMetricsErrorHandler';

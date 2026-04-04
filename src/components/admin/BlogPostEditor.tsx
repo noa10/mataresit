@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, Eye, EyeOff, Calendar, Tag, Image, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Eye, EyeOff, Calendar, Tag, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';

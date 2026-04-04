@@ -147,16 +147,6 @@ const detectionOptions = {
   checkWhitelist: true
 };
 
-// Advanced pluralization rules for Malay language
-const malayPluralizationRule = (count: number): number => {
-  // Malay doesn't have complex pluralization like English
-  // Generally uses the same form for singular and plural
-  // But we can distinguish between 0, 1, and many for better UX
-  if (count === 0) return 0; // zero form
-  if (count === 1) return 1; // singular form
-  return 2; // plural form (same as singular in Malay, but allows for different phrasing)
-};
-
 // Context-aware translation function
 export const getContextualTranslation = (
   key: string,

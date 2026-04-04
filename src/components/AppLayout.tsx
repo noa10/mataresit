@@ -9,7 +9,7 @@ import { GlobalBackgroundSearchStatus } from "./search/BackgroundSearchIndicator
 
 // AppLayout content component that uses the sidebar context
 function AppLayoutContent() {
-  const { isSidebarOpen, toggleSidebar, sidebarContent, sidebarContentType, isDesktop } = useAppSidebar();
+  const { isSidebarOpen, toggleSidebar, sidebarContent, isDesktop } = useAppSidebar();
   const { chatControls } = useChatControls();
 
   return (

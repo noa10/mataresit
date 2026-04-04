@@ -15,9 +15,6 @@ import {
   AlertTriangle,
   ExternalLink,
   Users,
-  GitBranch,
-  Puzzle,
-  Palette,
   Headphones,
   CheckCircle,
   X

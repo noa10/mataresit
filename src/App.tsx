@@ -22,7 +22,6 @@ import { SaveStatusProvider } from "@/contexts/SaveStatusContext";
 import { BackgroundUploadProvider } from "@/contexts/BackgroundUploadContext";
 import { BulkReprocessProvider } from "@/contexts/BulkReprocessContext";
 import { SaveStatusToastManager } from "@/components/SaveStatusToastManager";
-import { searchCacheManager } from "@/services/searchCacheManager";
 import { AppLayout } from "@/components/AppLayout";
 import { PublicLayout } from "@/components/PublicLayout";
 // Debug component disabled - uncomment to enable: import { MobileDebugInfo } from "@/components/debug/MobileDebugInfo";

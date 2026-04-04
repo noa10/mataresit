@@ -17,7 +17,6 @@ import {
   TrendingDown, 
   Database,
   Clock,
-  Zap,
   AlertTriangle
 } from 'lucide-react';
 import { useCacheStats } from '@/hooks/useCache';
@@ -77,12 +76,6 @@ export function CacheMonitor({ className = '' }: CacheMonitorProps) {
   const formatDuration = (ms: number): string => {
     if (ms < 1000) return `${ms.toFixed(0)}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
-  };
-
-  const getHitRateColor = (hitRate: number): string => {
-    if (hitRate >= 0.8) return 'text-green-600';
-    if (hitRate >= 0.6) return 'text-yellow-600';
-    return 'text-red-600';
   };
 
   const getHitRateVariant = (hitRate: number): 'default' | 'secondary' | 'destructive' => {

@@ -16,7 +16,6 @@ import {
   AlertCircle, 
   RefreshCw, 
   Database, 
-  Search,
   TrendingUp,
   FileText
 } from 'lucide-react';

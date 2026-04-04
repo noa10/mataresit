@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,7 +11,6 @@ import { Link } from 'react-router-dom';
 import {
   Upload,
   Database,
-  Calendar,
   AlertTriangle,
   Users,
   Layers,

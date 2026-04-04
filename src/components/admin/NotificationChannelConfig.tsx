@@ -280,7 +280,7 @@ export function NotificationChannelConfig({ teamId, className }: NotificationCha
                     />
                   </FormControl>
                   <FormDescription>
-                    Use {{alert.title}}, {{alert.severity}}, etc. for dynamic content
+                    Use {'{{alert.title}}'}, {'{{alert.severity}}'}, etc. for dynamic content
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
