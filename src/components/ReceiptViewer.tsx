@@ -311,11 +311,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const { t } = useReceiptsTranslation();
   const { currentTeam } = useTeam();
 
-  // TEAM COLLABORATION FIX: Include team context in categories query for display
-  const { data: categories = [] } = useQuery({
-    queryKey: ['displayCategories', currentTeam?.id],
-    queryFn: () => fetchCategoriesForDisplay({ currentTeam }),
-  });
+
 
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
@@ -452,13 +448,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   const imageRef = useRef<HTMLImageElement>(null);
   const reprocessAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Define available expense categories
-  const expenseCategories = [
-    "Groceries", "Dining", "Transportation", "Utilities",
-    "Entertainment", "Travel", "Shopping", "Healthcare",
-    "Education", "Other"
-  ];
 
   useEffect(() => {
     setEditedReceipt(receipt);
@@ -1166,16 +1155,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         </Button>
       </div>
     );
-  };
-
-  // Add category change handler
-  const handleCategoryChange = (value: string) => {
-    // Only update the inputValues state, which will be debounced
-    setInputValues(prev => ({
-      ...prev,
-      predicted_category: value
-    }));
-    // The actual editedReceipt update will happen in the useEffect that watches debouncedInputValues
   };
 
   // Add custom category change handler

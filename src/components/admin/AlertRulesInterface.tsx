@@ -4,14 +4,11 @@
  * Task 5: Develop Configurable Alert Rules Interface
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -90,10 +87,8 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
   const {
     alerts,
     alertStatistics,
-    refreshAlerts,
     acknowledgeAlert,
     resolveAlert,
-    suppressAlert,
     isEngineHealthy,
     forceEvaluation
   } = useAlertEngine({ teamId, autoRefresh: true });
@@ -108,8 +103,8 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
   const [activeTab, setActiveTab] = useState('rules');
   const [, setSelectedRule] = useState<AlertRule | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+  const [_isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [_isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
@@ -152,25 +147,6 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
     } catch (error) {
       console.error('Error creating alert rule:', error);
       toast.error('Failed to create alert rule');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTestRule = async (ruleData: AlertRuleFormData) => {
-    try {
-      setIsLoading(true);
-      // This would test the alert rule
-      console.log('Testing alert rule:', ruleData);
-      
-      // Simulate test result
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success('Alert rule test completed successfully');
-      setIsTestDialogOpen(false);
-    } catch (error) {
-      console.error('Error testing alert rule:', error);
-      toast.error('Failed to test alert rule');
     } finally {
       setIsLoading(false);
     }

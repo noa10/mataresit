@@ -9,43 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import {
   Plus,
   Edit,
   Trash2,
   Shield,
   Clock,
-  Settings,
   AlertTriangle,
-  CheckCircle,
   Pause,
   Play,
   Calendar,
   BarChart3,
-  Filter,
   Search,
   Wrench,
   Ban,
@@ -54,10 +30,8 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAlertSuppression } from '@/hooks/useAlertSuppression';
-import { AlertSeverity } from '@/types/alerting';
 
 // Form validation schemas
 const suppressionRuleSchema = z.object({
@@ -118,9 +92,9 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedRule, setSelectedRule] = useState<any>(null);
   const [selectedWindow, setSelectedWindow] = useState<any>(null);
-  const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
-  const [isWindowDialogOpen, setIsWindowDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [_isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
+  const [_isWindowDialogOpen, setIsWindowDialogOpen] = useState(false);
+  const [_isEditMode, setIsEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Forms

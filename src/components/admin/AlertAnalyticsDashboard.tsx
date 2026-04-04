@@ -14,8 +14,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -30,18 +28,14 @@ import {
 } from 'recharts';
 import {
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Users,
   Bell,
   Target,
   Activity,
-  Calendar,
   Download,
-  RefreshCw,
-  Filter
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAlertEngine } from '@/hooks/useAlertEngine';
@@ -103,12 +97,12 @@ const SEVERITY_COLORS = {
 export function AlertAnalyticsDashboard({ teamId, className }: AlertAnalyticsDashboardProps) {
   // Hooks
   const { alertStatistics, isEngineHealthy } = useAlertEngine({ teamId, autoRefresh: true });
-  const { escalationStatistics, getRoutingStatistics } = useAlertEscalation({ teamId });
-  const { channels } = useNotificationChannels({ teamId });
+  const { escalationStatistics } = useAlertEscalation({ teamId });
+  const { channels: _channels } = useNotificationChannels({ teamId });
 
   // State
   const [timeRange, setTimeRange] = useState('7d');
-  const [selectedMetric, setSelectedMetric] = useState('volume');
+  const [_selectedMetric, _setSelectedMetric] = useState('volume');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);

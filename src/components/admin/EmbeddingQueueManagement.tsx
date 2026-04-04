@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { 
   Play, 
-  Pause, 
   Square, 
   RefreshCw, 
   Settings, 
@@ -17,9 +16,7 @@ import {
   CheckCircle,
   XCircle,
   Users,
-  Database,
-  Zap,
-  BarChart3
+  Database
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';

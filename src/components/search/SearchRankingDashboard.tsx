@@ -280,7 +280,7 @@ export const SearchRankingDashboard: React.FC = () => {
                     <Progress value={analytics.rankingDistribution.mediumQuality} className="h-2" />
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Low Quality (<0.5)</span>
+                      <span className="text-sm font-medium">Low Quality ({'<'}0.5)</span>
                       <span className="text-sm text-red-600 font-medium">
                         {analytics.rankingDistribution.lowQuality}%
                       </span>
