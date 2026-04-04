@@ -16,8 +16,7 @@ import {
   AlertCircle, 
   RefreshCw, 
   Database, 
-  TrendingUp,
-  FileText
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 

@@ -14,8 +14,7 @@ import {
   XCircle, 
   AlertCircle, 
   RefreshCw, 
-  Database, 
-  TrendingUp
+  Database 
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';

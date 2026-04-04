@@ -159,25 +159,6 @@ export function AlertRulesInterface({ teamId, className }: AlertRulesInterfacePr
     }
   };
 
-  const handleEditRule = async (data: AlertRuleFormData) => {
-    if (!selectedRule) return;
-    
-    try {
-      setIsLoading(true);
-      // This would update the actual alert rule
-      console.log('Updating alert rule:', selectedRule.id, data);
-      toast.success('Alert rule updated successfully');
-      setIsEditDialogOpen(false);
-      setSelectedRule(null);
-      form.reset();
-    } catch (error) {
-      console.error('Error updating alert rule:', error);
-      toast.error('Failed to update alert rule');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleTestRule = async (ruleData: AlertRuleFormData) => {
     try {
       setIsLoading(true);
