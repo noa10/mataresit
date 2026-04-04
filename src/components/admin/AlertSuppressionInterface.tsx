@@ -124,55 +124,6 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
     }
   });
 
-  // Handle form submissions
-  const handleCreateRule = async (data: SuppressionRuleFormData) => {
-    try {
-      await createSuppressionRule({ ...data, team_id: teamId });
-      setIsRuleDialogOpen(false);
-      ruleForm.reset();
-    } catch (error) {
-      console.error('Error creating suppression rule:', error);
-    }
-  };
-
-  const handleEditRule = async (data: SuppressionRuleFormData) => {
-    if (!selectedRule) return;
-    
-    try {
-      await updateSuppressionRule(selectedRule.id, data);
-      setIsRuleDialogOpen(false);
-      setSelectedRule(null);
-      setIsEditMode(false);
-      ruleForm.reset();
-    } catch (error) {
-      console.error('Error updating suppression rule:', error);
-    }
-  };
-
-  const handleCreateWindow = async (data: MaintenanceWindowFormData) => {
-    try {
-      await createMaintenanceWindow({ ...data, team_id: teamId });
-      setIsWindowDialogOpen(false);
-      windowForm.reset();
-    } catch (error) {
-      console.error('Error creating maintenance window:', error);
-    }
-  };
-
-  const handleEditWindow = async (data: MaintenanceWindowFormData) => {
-    if (!selectedWindow) return;
-    
-    try {
-      await updateMaintenanceWindow(selectedWindow.id, data);
-      setIsWindowDialogOpen(false);
-      setSelectedWindow(null);
-      setIsEditMode(false);
-      windowForm.reset();
-    } catch (error) {
-      console.error('Error updating maintenance window:', error);
-    }
-  };
-
   const openRuleEditDialog = (rule: any) => {
     setSelectedRule(rule);
     setIsEditMode(true);

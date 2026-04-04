@@ -19,7 +19,6 @@ import {
   Lightbulb,
   Download,
   RefreshCw,
-  CheckCircle,
   AlertTriangle,
   Info
 } from 'lucide-react';
@@ -97,8 +96,7 @@ export const SearchRankingDashboard: React.FC = () => {
     error,
     analyzeRankingPerformance,
     generateOptimizationSuggestions,
-    exportAnalytics,
-    clearAnalytics
+    exportAnalytics
   } = useSearchRankingAnalytics();
 
   const [autoRefresh, setAutoRefresh] = useState(true);
