@@ -13,7 +13,6 @@
       "destination": "/index.html"
     }
   ],
-
   "headers": [
     {
       "source": "/docs/(.*\\.md)",
