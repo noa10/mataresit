@@ -8,11 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   CheckCircle, 
   XCircle, 
-  AlertCircle, 
   RefreshCw, 
   Database, 
   TrendingUp
@@ -85,7 +83,7 @@ export function EmbeddingSystemDiagnostics() {
   };
 
   const testUnifiedEmbeddingsTable = async () => {
-    const { data, error, count } = await supabase
+    const { data: _data, error, count } = await supabase
       .from('unified_embeddings')
       .select('*', { count: 'exact', head: true });
     
@@ -94,7 +92,7 @@ export function EmbeddingSystemDiagnostics() {
   };
 
   const testReceiptEmbeddingsTable = async () => {
-    const { data, error, count } = await supabase
+    const { data: _data2, error, count } = await supabase
       .from('receipt_embeddings')
       .select('*', { count: 'exact', head: true });
     

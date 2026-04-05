@@ -24,7 +24,6 @@ import {
   auditEmbeddings,
   migrateEmbeddings,
   fixEmbeddingContent,
-  generateMissingEmbeddings,
   processMissingEmbeddingsBatch
 } from '@/lib/edge-function-utils';
 import { EmbeddingRepairService, type EmbeddingAuditResult, type EmbeddingRepairProgress } from '@/lib/embedding-repair-service';

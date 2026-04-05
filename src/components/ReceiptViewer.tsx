@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, Send, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Tag, Download, Trash2, Upload, Eye, EyeOff, Layers, Settings, Bug, RefreshCw, ChevronDown, CheckCircle, Calculator, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -20,9 +20,8 @@ import {
   normalizeReceiptProcessingStatus,
   recoverStuckReceiptProcessing,
 } from "@/services/receiptService";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchCategoriesForDisplay } from "@/services/categoryService";
 import { CategorySelector } from "@/components/categories/CategorySelector";
 import { PaidBySelector } from "@/components/paidby/PaidBySelector";
 import { Switch } from "@/components/ui/switch";
@@ -311,11 +310,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const { t } = useReceiptsTranslation();
   const { currentTeam } = useTeam();
 
-  // TEAM COLLABORATION FIX: Include team context in categories query for display
-  const { data: categories = [] } = useQuery({
-    queryKey: ['displayCategories', currentTeam?.id],
-    queryFn: () => fetchCategoriesForDisplay({ currentTeam }),
-  });
+
 
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
@@ -452,13 +447,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   const imageRef = useRef<HTMLImageElement>(null);
   const reprocessAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Define available expense categories
-  const expenseCategories = [
-    "Groceries", "Dining", "Transportation", "Utilities",
-    "Entertainment", "Travel", "Shopping", "Healthcare",
-    "Education", "Other"
-  ];
 
   useEffect(() => {
     setEditedReceipt(receipt);
@@ -1166,16 +1154,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         </Button>
       </div>
     );
-  };
-
-  // Add category change handler
-  const handleCategoryChange = (value: string) => {
-    // Only update the inputValues state, which will be debounced
-    setInputValues(prev => ({
-      ...prev,
-      predicted_category: value
-    }));
-    // The actual editedReceipt update will happen in the useEffect that watches debouncedInputValues
   };
 
   // Add custom category change handler

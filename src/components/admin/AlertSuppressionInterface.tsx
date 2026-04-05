@@ -9,43 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import {
   Plus,
   Edit,
   Trash2,
   Shield,
   Clock,
-  Settings,
   AlertTriangle,
-  CheckCircle,
   Pause,
   Play,
   Calendar,
   BarChart3,
-  Filter,
   Search,
   Wrench,
   Ban,
@@ -54,10 +30,8 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAlertSuppression } from '@/hooks/useAlertSuppression';
-import { AlertSeverity } from '@/types/alerting';
 
 // Form validation schemas
 const suppressionRuleSchema = z.object({
@@ -99,12 +73,10 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
   // Hooks
   const {
     suppressionRules,
-    createSuppressionRule,
     updateSuppressionRule,
     deleteSuppressionRule,
     maintenanceWindows,
     maintenanceStatus,
-    createMaintenanceWindow,
     updateMaintenanceWindow,
     deleteMaintenanceWindow,
     suppressionStatistics,
@@ -115,12 +87,12 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
   } = useAlertSuppression({ teamId, autoRefresh: true });
 
   // State
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedRule, setSelectedRule] = useState<any>(null);
-  const [selectedWindow, setSelectedWindow] = useState<any>(null);
-  const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
-  const [isWindowDialogOpen, setIsWindowDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [_activeTab, setActiveTab] = useState('overview');
+  const [_selectedRule, setSelectedRule] = useState<any>(null);
+  const [_selectedWindow, setSelectedWindow] = useState<any>(null);
+  const [_isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
+  const [_isWindowDialogOpen, setIsWindowDialogOpen] = useState(false);
+  const [_isEditMode, setIsEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Forms
@@ -149,55 +121,6 @@ export function AlertSuppressionInterface({ teamId, className }: AlertSuppressio
       recurrence_config: {}
     }
   });
-
-  // Handle form submissions
-  const handleCreateRule = async (data: SuppressionRuleFormData) => {
-    try {
-      await createSuppressionRule({ ...data, team_id: teamId });
-      setIsRuleDialogOpen(false);
-      ruleForm.reset();
-    } catch (error) {
-      console.error('Error creating suppression rule:', error);
-    }
-  };
-
-  const handleEditRule = async (data: SuppressionRuleFormData) => {
-    if (!selectedRule) return;
-    
-    try {
-      await updateSuppressionRule(selectedRule.id, data);
-      setIsRuleDialogOpen(false);
-      setSelectedRule(null);
-      setIsEditMode(false);
-      ruleForm.reset();
-    } catch (error) {
-      console.error('Error updating suppression rule:', error);
-    }
-  };
-
-  const handleCreateWindow = async (data: MaintenanceWindowFormData) => {
-    try {
-      await createMaintenanceWindow({ ...data, team_id: teamId });
-      setIsWindowDialogOpen(false);
-      windowForm.reset();
-    } catch (error) {
-      console.error('Error creating maintenance window:', error);
-    }
-  };
-
-  const handleEditWindow = async (data: MaintenanceWindowFormData) => {
-    if (!selectedWindow) return;
-    
-    try {
-      await updateMaintenanceWindow(selectedWindow.id, data);
-      setIsWindowDialogOpen(false);
-      setSelectedWindow(null);
-      setIsEditMode(false);
-      windowForm.reset();
-    } catch (error) {
-      console.error('Error updating maintenance window:', error);
-    }
-  };
 
   const openRuleEditDialog = (rule: any) => {
     setSelectedRule(rule);
