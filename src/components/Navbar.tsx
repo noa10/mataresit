@@ -6,7 +6,7 @@ import { useChatControls } from "@/contexts/ChatControlsContext";
 import { useNavigationTranslation, useCommonTranslation } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
-import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, Crown, Zap, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
+import { FileText, Sun, Moon, ChevronDown, BrainCircuit, Menu, X, Crown, Zap, BarChart3, Sparkles, Settings, DollarSign, MessageSquare, Plus, User, LogOut, ShieldCheck, Code, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
