@@ -160,7 +160,7 @@
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@agentdeskai/browser-tools-mcp": "^1.2.1",
