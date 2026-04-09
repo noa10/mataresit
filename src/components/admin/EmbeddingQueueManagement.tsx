@@ -6,13 +6,15 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Play, 
-  Square, 
-  RefreshCw, 
-  Settings, 
-  Activity, 
-  Clock, 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Play,
+  Square,
+  RefreshCw,
+  Settings,
+  Activity,
+  Clock,
   AlertTriangle,
   CheckCircle,
   XCircle,
