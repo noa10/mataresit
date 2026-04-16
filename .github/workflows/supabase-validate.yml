@@ -516,33 +516,30 @@ jobs:
             if [ -z "$SUPABASE_KEY" ]; then
               echo "   ⚠️ Missing: SUPABASE_PUBLISHABLE_KEY (for production) or STAGING_SUPABASE_PUBLISHABLE_KEY (for staging)"
             fi
-            SKIP_CONNECTIVITY=1
+            exit 0
           fi
 
-          if [ -n "$SKIP_CONNECTIVITY" ]; then
-            echo "⏭️ Skipping Supabase connectivity test (no credentials available)"
+          echo "🔍 Testing Supabase URL: $SUPABASE_URL"
+
+          # Test health endpoint with detailed error reporting
+          echo "🏥 Testing health endpoint..."
+          if curl -f -s --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/health" > /dev/null; then
+            echo "✅ Supabase health check passed"
           else
-            echo "🔍 Testing Supabase URL: $SUPABASE_URL"
+            echo "❌ Supabase health check failed"
+            echo "🔍 Attempting to get more details..."
+            curl -v -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/health" || true
+            exit 1
+          fi
 
-            # Test health endpoint with detailed error reporting
-            echo "🏥 Testing health endpoint..."
-            if curl -f -s --max-time 30 \
-              -H "apikey: $SUPABASE_KEY" \
-              "$SUPABASE_URL/health" > /dev/null; then
-              echo "✅ Supabase health check passed"
-            else
-              echo "❌ Supabase health check failed"
-              echo "🔍 Attempting to get more details..."
-              curl -v -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/health" || true
-              exit 1
-            fi
-
-            # Test database connectivity with detailed error reporting
-            echo "🗄️ Testing database connectivity..."
-            DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-              "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
-              -H "Authorization: Bearer $SUPABASE_KEY" \
-              -H "apikey: $SUPABASE_KEY" || echo "000")
+          # Test database connectivity with detailed error reporting
+          echo "🗄️ Testing database connectivity..."
+          DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "apikey: $SUPABASE_KEY" || echo "000")
 
           echo "Database response code: $DB_RESPONSE"
 
@@ -555,7 +552,6 @@ jobs:
               -H "Authorization: Bearer $SUPABASE_KEY" \
               -H "apikey: $SUPABASE_KEY" || true
             exit 1
-          fi
           fi
 
       - name: Test Edge Functions
