@@ -1502,7 +1502,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 >
                   {({ zoomIn, zoomOut, resetTransform, setTransform, instance }) => {
                     // Create a compatible transform state object that our overlay can use
-                    const transformState = instance ? {
+                    const transformState = instance?.transformState ? {
                       scale: instance.transformState.scale,
                       positionX: instance.transformState.positionX,
                       positionY: instance.transformState.positionY
