@@ -25,6 +25,7 @@ export function RouteAwareSidebarManager() {
     const shouldUseDefaultNavigation = [
       '/dashboard',
       '/leaderboard',
+      '/missions',
       '/settings',
       '/profile',
       '/analysis',
@@ -56,6 +57,7 @@ export const SIDEBAR_ROUTE_CONFIG = {
   navigation: [
     '/dashboard',
     '/leaderboard',
+    '/missions',
     '/settings',
     '/profile',
     '/analysis',

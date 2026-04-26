@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { TeamSelector } from "@/components/team/TeamSelector";
 import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { useSidebarAccessibility } from "@/hooks/useSidebarAccessibility";
 import {
   BrainCircuit, BarChart3, Settings,
-  DollarSign, ChevronLeft, Users, Crown, FileText, Code, Trophy, Target
+  DollarSign, ChevronLeft, Users, Crown, FileText, Code, Trophy, Target, ChevronDown, ChevronRight
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,10 @@ export function MainNavigationSidebar({
 }: MainNavigationSidebarProps) {
   const { user, isAdmin } = useAuth();
   const { t: tNav } = useNavigationTranslation();
+  const location = useLocation();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  const [leaderboardExpanded, setLeaderboardExpanded] = useState(false);
 
   const isAdminUser = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
 
@@ -104,32 +107,45 @@ export function MainNavigationSidebar({
               </NavLink>
             </li>
             <li>
-              <NavLink
-                to="/leaderboard"
-                className={({ isActive }) =>
-                  cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
-                  isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && "justify-center")}
-                onClick={handleItemClick}
-                title={!isOpen ? tNav('mainMenu.leaderboard') : undefined}
-              >
-                <Trophy className="h-4 w-4 flex-shrink-0" />
-                {isOpen && <span>{tNav('mainMenu.leaderboard')}</span>}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
-                to="/missions"
-                className={({ isActive }) =>
-                  cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
-                  isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
-                  !isOpen && "justify-center")}
-                onClick={handleItemClick}
-                title={!isOpen ? tNav('mainMenu.missions') : undefined}
-              >
-                <Target className="h-4 w-4 flex-shrink-0" />
-                {isOpen && <span>{tNav('mainMenu.missions')}</span>}
-              </NavLink>
+              <div className={cn("flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-secondary/50 transition-colors",
+                (location.pathname === '/leaderboard' || location.pathname === '/missions') ? "bg-secondary/70 text-primary font-semibold" : "text-foreground",
+                !isOpen && "justify-center")}>
+                <NavLink
+                  to="/leaderboard"
+                  className="flex items-center gap-2 flex-1"
+                  onClick={handleItemClick}
+                  title={!isOpen ? tNav('mainMenu.leaderboard') : undefined}
+                >
+                  <Trophy className="h-4 w-4 flex-shrink-0" />
+                  {isOpen && <span>{tNav('mainMenu.leaderboard')}</span>}
+                </NavLink>
+                {isOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setLeaderboardExpanded((prev) => !prev)}
+                    className="p-0.5 rounded hover:bg-secondary/80"
+                    aria-label={leaderboardExpanded ? 'Collapse submenu' : 'Expand submenu'}
+                  >
+                    {leaderboardExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+              </div>
+              {isOpen && leaderboardExpanded && (
+                <ul className="mt-1 ml-4 space-y-1">
+                  <li>
+                    <NavLink
+                      to="/missions"
+                      className={({ isActive }) =>
+                        cn("flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-secondary/50 transition-colors",
+                        isActive ? "bg-secondary/70 text-primary font-semibold" : "text-foreground")}
+                      onClick={handleItemClick}
+                    >
+                      <Target className="h-4 w-4 flex-shrink-0" />
+                      <span>{tNav('mainMenu.missions')}</span>
+                    </NavLink>
+                  </li>
+                </ul>
+              )}
             </li>
             <li>
               <NavLink

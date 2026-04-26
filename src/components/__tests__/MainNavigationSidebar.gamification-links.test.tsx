@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,7 @@ vi.mock("@/contexts/LanguageContext", () => ({
         "sidebar.navigation": "Navigation",
         "mainMenu.dashboard": "Dashboard",
         "mainMenu.leaderboard": "Leaderboard",
-        "mainMenu.missions": "Missions",
+        "mainMenu.missions": "Mission & Rewards",
         "mainMenu.search": "Search",
         "mainMenu.analysis": "Analysis",
         "mainMenu.teams": "Teams",
@@ -49,6 +49,11 @@ describe("MainNavigationSidebar rewards links", () => {
     );
 
     expect(screen.getByRole("link", { name: "Leaderboard" })).toHaveAttribute("href", "/leaderboard");
-    expect(screen.getByRole("link", { name: "Missions" })).toHaveAttribute("href", "/missions");
+
+    // Expand the leaderboard submenu to reveal the missions link
+    const expandButton = screen.getByRole("button", { name: /expand submenu/i });
+    fireEvent.click(expandButton);
+
+    expect(screen.getByRole("link", { name: "Mission & Rewards" })).toHaveAttribute("href", "/missions");
   });
 });
