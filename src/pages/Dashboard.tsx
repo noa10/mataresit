@@ -30,7 +30,6 @@ import { BatchUploadModal } from "@/components/modals/BatchUploadModal";
 import { BackgroundUploadIndicator } from "@/components/upload/BackgroundUploadIndicator";
 import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GamificationProgressCard } from "@/components/gamification/GamificationProgressCard";
 import { deleteReceipt } from "@/services/receiptService";
 import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
@@ -1172,8 +1171,6 @@ export default function Dashboard() {
             </Button>
           </motion.div>
         </div>
-
-                  {user?.id && <GamificationProgressCard />}
 
         {/* Filters and Tabs Section */}
         <motion.div

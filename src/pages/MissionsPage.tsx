@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { useGamification } from "@/contexts/GamificationContext";
+import { GamificationProgressCard } from "@/components/gamification/GamificationProgressCard";
 import { cn } from "@/lib/utils";
 import { gamificationQueryKeys } from "@/services/gamificationService";
 import type { MissionProgress, MissionType } from "@/types/gamification";
@@ -168,6 +169,8 @@ export default function MissionsPage() {
           <Link to="/dashboard"><ChevronLeft className="h-4 w-4" />{t("gamification.backToDashboard")}</Link>
         </Button>
         <div className="space-y-6">
+          <GamificationProgressCard />
+
           <Card>
             <CardHeader className="gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-3">
