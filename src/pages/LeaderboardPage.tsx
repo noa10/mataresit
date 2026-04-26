@@ -82,7 +82,7 @@ export default function LeaderboardPage() {
   const leaderboardQuery = useQuery({
     queryKey: gamificationQueryKeys.leaderboard(selectedMetric, countryCode),
     queryFn: () => getLeaderboard(selectedMetric, { countryCode, limit: LEADERBOARD_LIMIT }),
-    enabled: Boolean(snapshot?.profile.leaderboardOptIn),
+    enabled: !isSnapshotLoading,
   });
 
   const metricMeta = useMemo(() => Object.fromEntries(METRIC_ORDER.map((metric) => [metric, {
