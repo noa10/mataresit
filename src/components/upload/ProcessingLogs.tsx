@@ -231,7 +231,8 @@ export function ProcessingLogs({
                             {log.step_name || 'INFO'}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(log.created_at).toLocaleTimeString([], {
+                            {new Date(log.created_at).toLocaleTimeString('en-MY', {
+                              timeZone: 'Asia/Kuala_Lumpur',
                               hour: '2-digit',
                               minute: '2-digit',
                               second: '2-digit'

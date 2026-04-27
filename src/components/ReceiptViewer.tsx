@@ -1035,10 +1035,15 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     fetchInitialLogs();
   }, [receipt?.id]);
 
-  // Function to format log timestamp
+  // Function to format log timestamp (Malaysia local time)
   const formatLogTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return date.toLocaleTimeString('en-MY', {
+      timeZone: 'Asia/Kuala_Lumpur',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   // Function to get step color
@@ -1797,7 +1802,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                                 {log.step_name}
                               </Badge>
                             )}
-                            <span>{log.status_message}</span>
+                            <span className="break-words">{log.status_message}</span>
                           </div>
                         </div>
                       </div>
