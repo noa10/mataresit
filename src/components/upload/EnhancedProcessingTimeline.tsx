@@ -30,7 +30,7 @@ export function EnhancedProcessingTimeline({
   uploadProgress,
   fileSize = 1024 * 1024, // Default 1MB
   processingMethod = 'ai-vision',
-  modelId = 'gemini-2.5-flash-lite',
+  modelId = 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
   startTime,
   isProgressUpdating = false
 }: EnhancedProcessingTimelineProps) {

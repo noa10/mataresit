@@ -22,8 +22,8 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  selectedModel: 'gemini-2.5-flash-lite',
-  batchModel: 'gemini-2.5-flash-lite', // Default to same model for batch
+  selectedModel: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+  batchModel: 'groq/meta-llama/llama-4-scout-17b-16e-instruct', // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,

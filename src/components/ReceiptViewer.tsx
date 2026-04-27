@@ -752,7 +752,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       return selectedModel;
     }
 
-    return "gemini-2.5-flash-lite";
+    return "groq/meta-llama/llama-4-scout-17b-16e-instruct";
   }, [settings.selectedModel, getStoredProcessingSettings]);
 
   const reprocessMutation = useMutation({

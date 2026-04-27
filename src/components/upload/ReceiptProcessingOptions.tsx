@@ -53,7 +53,7 @@ interface ReceiptProcessingOptionsProps {
 export function ReceiptProcessingOptions({
   onModelChange,
   onBatchModelChange,
-  defaultModel = 'gemini-2.5-flash-lite',
+  defaultModel = 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
   defaultBatchModel,
   showBatchModelSelection = false
 }: ReceiptProcessingOptionsProps) {

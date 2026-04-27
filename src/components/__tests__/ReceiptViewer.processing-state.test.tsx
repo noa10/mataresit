@@ -113,7 +113,7 @@ vi.mock("@/contexts/TeamContext", () => ({
 vi.mock("@/hooks/useSettings", () => ({
   useSettings: () => ({
     settings: {
-      selectedModel: "gemini-2.5-flash-lite",
+      selectedModel: "groq/meta-llama/llama-4-scout-17b-16e-instruct",
     },
   }),
   getStoredProcessingSettings: mocks.getStoredProcessingSettings,
@@ -399,7 +399,7 @@ describe("ReceiptViewer processing state behavior", () => {
     expect(receiptId).toBe("receipt-1");
     expect(options).toEqual(
       expect.objectContaining({
-        modelId: "gemini-2.5-flash-lite",
+        modelId: "groq/meta-llama/llama-4-scout-17b-16e-instruct",
       })
     );
   });

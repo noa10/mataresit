@@ -595,7 +595,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
         // PRIORITY 3: Default fallback
         else {
-          modelToUse = 'gemini-2.5-flash-lite';
+          modelToUse = 'groq/meta-llama/llama-4-scout-17b-16e-instruct';
           prioritySource = 'default';
           console.log('⚠️ Using default model:', modelToUse);
         }
