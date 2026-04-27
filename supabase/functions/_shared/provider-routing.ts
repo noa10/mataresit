@@ -1,4 +1,4 @@
-export type ProviderName = 'gemini' | 'openrouter' | 'kilo' | 'opencode' | 'groq';
+export type ProviderName = 'gemini' | 'openrouter' | 'groq';
 export type ModelInputType = 'text' | 'image';
 
 export interface ProviderRequestErrorOptions {
@@ -48,48 +48,28 @@ export interface FallbackSelectionOptions {
 }
 
 const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
-  gemini: [],
-  openrouter: [],
-  kilo: [
-    'kilo/qwen/qwen2.5-vl-72b-instruct',
-    'kilo/moonshotai/kimi-k2.5'
+  gemini: [
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.5-flash-lite'
   ],
-  opencode: [
-    'opencode/kimi-k2.5-free',
-    'opencode/glm-5-free',
-    'opencode/big-pickle'
+  openrouter: [
+    'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
+    'openrouter/google/gemma-3-12b-it:free',
+    'openrouter/google/gemma-4-26b-a4b-it:free'
   ],
   groq: []
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
-  'groq/meta-llama/llama-4-scout-17b-16e-instruct'
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+  'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
+  'openrouter/google/gemma-3-12b-it:free',
+  'openrouter/google/gemma-4-26b-a4b-it:free'
 ];
-
-export function resolveKiloGatewayChatEndpoint(endpoint: string): string {
-  const normalized = endpoint.replace(/\/+$/, '');
-  if (normalized.endsWith('/chat/completions')) {
-    return normalized;
-  }
-  return `${normalized}/chat/completions`;
-}
-
-export function shouldRetryOpenCodeImageRequest(
-  inputType: ModelInputType,
-  status: number,
-  errorDetails: string
-): boolean {
-  if (inputType !== 'image') return false;
-  if (status === 404) return true;
-  if (status >= 500) return true;
-  return /prompt_tokens/i.test(errorDetails);
-}
-
-export function getOpenCodeRetryEndpoint(endpoint: string): string {
-  // OpenCode currently routes chat completions via /zen/v1/chat/completions.
-  // Do not rewrite to /api/v1 because that path may resolve to HTML app routes.
-  return endpoint;
-}
 
 export function selectImageFallbackCandidates(options: FallbackSelectionOptions): string[] {
   const providerCandidates = SAME_PROVIDER_FALLBACKS[options.requestedProvider] || [];

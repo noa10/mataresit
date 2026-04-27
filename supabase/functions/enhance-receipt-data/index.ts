@@ -6,12 +6,23 @@ import { encodeBase64, decodeBase64 } from "jsr:@std/encoding/base64";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import {
   executeWithFallback,
-  getOpenCodeRetryEndpoint,
   ProviderRequestError,
-  resolveKiloGatewayChatEndpoint,
   selectImageFallbackCandidates,
-  shouldRetryOpenCodeImageRequest
 } from '../_shared/provider-routing.ts'
+import {
+  buildTextPrompt,
+  buildVisionPrompt,
+  TextInput,
+  ImageInput,
+  AIModelInput,
+  PromptDetailLevel,
+} from '../_shared/receipt-prompts.ts'
+import {
+  parseGeminiResponse,
+  parseOpenAICompatibleResponse,
+  parseBoundingBoxFormat,
+  buildDefaultEmptyResponse,
+} from '../_shared/ai-response-parsers.ts'
 
 // Initialize Supabase client for tax processing
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -32,7 +43,7 @@ const corsHeaders = {
 interface ModelConfig {
   id: string;
   name: string;
-  provider: 'gemini' | 'openrouter' | 'kilo' | 'opencode' | 'groq';
+  provider: 'gemini' | 'openrouter' | 'groq';
   endpoint: string;
   apiKeyEnvVar: string;
   temperature: number;
@@ -60,31 +71,33 @@ interface ModelConfig {
  * Registry of available AI models
  */
 const AVAILABLE_MODELS: Record<string, ModelConfig> = {
-  // Google Gemini Models
-  'gemini-2.0-flash-lite': {
-    id: 'gemini-2.0-flash-lite',
-    name: 'Gemini 2.0 Flash Lite',
+  // ==========================================
+  // Google Gemini Models (Primary - Vision-Capable)
+  // ==========================================
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
     provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
     temperature: 0.3,
-    maxTokens: 2048,
+    maxTokens: 8192,
     supportsText: true,
     supportsVision: true,
-    description: 'Latest fast model with improved efficiency',
+    description: 'Fast, low-cost, high-performance Gemini 2.5 model with reasoning capabilities',
     pricing: {
       inputTokens: 0.075,
       outputTokens: 0.30
     },
     performance: {
       speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.95
+      accuracy: 'excellent',
+      reliability: 0.97
     },
     capabilities: {
       maxImageSize: 5 * 1024 * 1024, // 5MB
       supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1000000
+      contextWindow: 1048576
     }
   },
   'gemini-2.0-flash': {
@@ -113,348 +126,35 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       contextWindow: 1048576
     }
   },
-  'gemini-2.5-flash': {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
+  'gemini-2.0-flash-lite': {
+    id: 'gemini-2.0-flash-lite',
+    name: 'Gemini 2.0 Flash Lite',
     provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
     apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.2,
-    maxTokens: 65536,
+    temperature: 0.3,
+    maxTokens: 2048,
     supportsText: true,
     supportsVision: true,
-    description: 'Advanced Gemini 2.5 Flash with thinking capabilities and balanced performance',
+    description: 'Latest fast model with improved efficiency',
     pricing: {
       inputTokens: 0.075,
       outputTokens: 0.30
     },
     performance: {
       speed: 'fast',
-      accuracy: 'excellent',
+      accuracy: 'very-good',
       reliability: 0.95
     },
     capabilities: {
       maxImageSize: 5 * 1024 * 1024, // 5MB
       supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1048576
-    }
-  },
-  'gemini-2.5-flash-lite': {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.3,
-    maxTokens: 8192,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Fast, low-cost, high-performance Gemini 2.5 model with reasoning capabilities',
-    pricing: {
-      inputTokens: 0.075,
-      outputTokens: 0.30
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'excellent',
-      reliability: 0.97
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1048576
-    }
-  },
-  'gemini-2.5-flash-lite-preview-06-17': {
-    id: 'gemini-2.5-flash-lite-preview-06-17',
-    name: 'Gemini 2.5 Flash Lite Preview (Deprecated)',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite-preview-06-17:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.3,
-    maxTokens: 64000,
-    supportsText: true,
-    supportsVision: true,
-    description: '⚠️ DEPRECATED: This model is currently unavailable. Automatically falls back to Gemini 2.5 Flash.',
-    pricing: {
-      inputTokens: 0.075,
-      outputTokens: 0.30
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.50 // Reduced reliability due to availability issues
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
       contextWindow: 1000000
-    }
-  },
-  'gemini-2.5-pro': {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.1,
-    maxTokens: 65536,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Most advanced Gemini model with superior reasoning and thinking capabilities',
-    pricing: {
-      inputTokens: 1.25,
-      outputTokens: 5.00
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'excellent',
-      reliability: 0.98
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1048576
-    }
-  },
-  // OpenRouter Free Models
-  'openrouter/google/gemini-2.0-flash-exp:free': {
-    id: 'openrouter/google/gemini-2.0-flash-exp:free',
-    name: 'Gemini 2.0 Flash Experimental',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Google\'s experimental Gemini 2.0 Flash model with vision (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.88
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 1000000
-    }
-  },
-  'openrouter/meta-llama/llama-4-maverick:free': {
-    id: 'openrouter/meta-llama/llama-4-maverick:free',
-    name: 'Llama 4 Maverick',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Meta\'s latest Llama 4 Maverick model with multimodal capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'excellent',
-      reliability: 0.92
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 128000
-    }
-  },
-  'openrouter/google/gemma-3-27b-it:free': {
-    id: 'openrouter/google/gemma-3-27b-it:free',
-    name: 'Gemma 3 27B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Google\'s Gemma 3 27B Instruct model with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'very-good',
-      reliability: 0.89
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
-    }
-  },
-  'openrouter/qwen/qwen2.5-vl-72b-instruct:free': {
-    id: 'openrouter/qwen/qwen2.5-vl-72b-instruct:free',
-    name: 'Qwen 2.5 VL 72B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Qwen 2.5 Vision-Language 72B model with advanced multimodal capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'excellent',
-      reliability: 0.91
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 32768
-    }
-  },
-  'openrouter/mistralai/mistral-small-3.1-24b-instruct:free': {
-    id: 'openrouter/mistralai/mistral-small-3.1-24b-instruct:free',
-    name: 'Mistral Small 3.1 24B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Mistral Small 3.1 24B model with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.88
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 32768
-    }
-  },
-  'openrouter/mistralai/mistral-small-3.2-24b-instruct:free': {
-    id: 'openrouter/mistralai/mistral-small-3.2-24b-instruct:free',
-    name: 'Mistral Small 3.2 24B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Mistral Small 3.2 24B model with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.88
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 32768
-    }
-  },
-  'openrouter/meta-llama/llama-4-scout:free': {
-    id: 'openrouter/meta-llama/llama-4-scout:free',
-    name: 'Llama 4 Scout',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Meta\'s Llama 4 Scout model with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.87
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
-    }
-  },
-  'openrouter/opengvlab/internvl3-14b:free': {
-    id: 'openrouter/opengvlab/internvl3-14b:free',
-    name: 'InternVL3 14B',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'InternVL3 14B vision-language model with strong multimodal understanding (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'very-good',
-      reliability: 0.85
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
-    }
-  },
-  'openrouter/moonshotai/kimi-vl-a3b-thinking:free': {
-    id: 'openrouter/moonshotai/kimi-vl-a3b-thinking:free',
-    name: 'Kimi VL A3B Thinking',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Moonshot AI\'s vision-language model with reasoning capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'very-good',
-      reliability: 0.86
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 200000
     }
   },
 
   // ==========================================
-  // Groq Models (Vision-Capable)
+  // Groq Models (Fallback 1 - Vision-Capable)
   // ==========================================
   'groq/meta-llama/llama-4-scout-17b-16e-instruct': {
     id: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
@@ -484,205 +184,19 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   },
 
   // ==========================================
-  // Kilo Gateway Models (Vision-Capable)
+  // OpenRouter Free Models (Fallback 2)
   // ==========================================
-  'kilo/google/gemma-3-27b-it': {
-    id: 'kilo/google/gemma-3-27b-it',
-    name: 'Gemma 3 27B Instruct',
-    provider: 'kilo',
-    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
-    apiKeyEnvVar: 'KILO_API_KEY',
+  'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free': {
+    id: 'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
+    name: 'Llama Nemotron Embed VL 1B V2',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 1024,
     supportsText: true,
     supportsVision: true,
-    description: 'Google Gemma 3 27B with vision capabilities (via Kilo)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'very-good',
-      reliability: 0.88
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
-    }
-  },
-  'kilo/qwen/qwen2.5-vl-72b-instruct': {
-    id: 'kilo/qwen/qwen2.5-vl-72b-instruct',
-    name: 'Qwen 2.5 VL 72B Instruct',
-    provider: 'kilo',
-    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
-    apiKeyEnvVar: 'KILO_API_KEY',
-    temperature: 0.2,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Qwen 2.5 Vision-Language 72B model (via Kilo)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'excellent',
-      reliability: 0.90
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 32768
-    }
-  },
-  'kilo/moonshotai/kimi-k2.5': {
-    id: 'kilo/moonshotai/kimi-k2.5',
-    name: 'Kimi K2.5',
-    provider: 'kilo',
-    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
-    apiKeyEnvVar: 'KILO_API_KEY',
-    temperature: 0.2,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Moonshot Kimi K2.5 with vision capabilities (via Kilo)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
-      accuracy: 'very-good',
-      reliability: 0.90
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 128000
-    }
-  },
-
-  // ==========================================
-  // OpenCode Zen Models (Free Vision-Capable)
-  // ==========================================
-  'opencode/gpt-5-nano': {
-    id: 'opencode/gpt-5-nano',
-    name: 'GPT 5 Nano',
-    provider: 'opencode',
-    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
-    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
-    temperature: 0.3,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: false,
-    description: 'OpenAI GPT 5 Nano (chat-completions path used as text-only for stability)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.95
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 100000
-    }
-  },
-  'opencode/kimi-k2.5-free': {
-    id: 'opencode/kimi-k2.5-free',
-    name: 'Kimi K2.5 Free',
-    provider: 'opencode',
-    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
-    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
-    temperature: 0.3,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Moonshot AI Kimi K2.5 with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.92
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 128000
-    }
-  },
-  'opencode/minimax-m2.5-free': {
-    id: 'opencode/minimax-m2.5-free',
-    name: 'MiniMax M2.5 Free',
-    provider: 'opencode',
-    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
-    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
-    temperature: 0.3,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'MiniMax M2.5 with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.90
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 100000
-    }
-  },
-  'opencode/glm-5-free': {
-    id: 'opencode/glm-5-free',
-    name: 'GLM 5 Free',
-    provider: 'opencode',
-    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
-    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
-    temperature: 0.3,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Zhipu AI GLM 5 with vision capabilities (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.88
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024,
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 100000
-    }
-  },
-  'opencode/big-pickle': {
-    id: 'opencode/big-pickle',
-    name: 'Big Pickle',
-    provider: 'opencode',
-    endpoint: 'https://opencode.ai/zen/v1/chat/completions',
-    apiKeyEnvVar: 'OPENCODE_ZEN_API_KEY',
-    temperature: 0.3,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Stealth model by OpenCode - free with vision (beta)',
+    description: 'NVIDIA Llama Nemotron vision-language model (Free)',
     pricing: {
       inputTokens: 0,
       outputTokens: 0
@@ -693,34 +207,67 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       reliability: 0.85
     },
     capabilities: {
-      maxImageSize: 5 * 1024 * 1024,
+      maxImageSize: 4 * 1024 * 1024, // 4MB
       supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 100000
+      contextWindow: 8192
+    }
+  },
+  'openrouter/google/gemma-3-12b-it:free': {
+    id: 'openrouter/google/gemma-3-12b-it:free',
+    name: 'Gemma 3 12B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google Gemma 3 12B vision-language model (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.87
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
+    }
+  },
+  'openrouter/google/gemma-4-26b-a4b-it:free': {
+    id: 'openrouter/google/gemma-4-26b-a4b-it:free',
+    name: 'Gemma 4 26B A4B Instruct',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    temperature: 0.2,
+    maxTokens: 1024,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Google Gemma 4 26B vision-language model (Free)',
+    pricing: {
+      inputTokens: 0,
+      outputTokens: 0
+    },
+    performance: {
+      speed: 'medium',
+      accuracy: 'very-good',
+      reliability: 0.89
+    },
+    capabilities: {
+      maxImageSize: 4 * 1024 * 1024, // 4MB
+      supportedFormats: ['image/jpeg', 'image/png'],
+      contextWindow: 8192
     }
   }
 };
 
 const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash-lite';
 const DEFAULT_VISION_MODEL = 'gemini-2.5-flash-lite';
-
-/**
- * Types for input to AI models
- */
-interface TextInput {
-  type: 'text';
-  extractedData: any; // Legacy field name for compatibility
-  fullText: string;
-}
-
-interface ImageInput {
-  type: 'image';
-  imageData: {
-    data: Uint8Array;
-    mimeType: string;
-  };
-}
-
-type AIModelInput = TextInput | ImageInput;
 
 /**
  * Process Malaysian tax information for a receipt
@@ -920,9 +467,6 @@ async function callAIModel(
   let wasDefaultUsed = false;
   let fallbackReason = '';
   const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
-    'kilo/google/gemma-3-27b-it:free': 'kilo/google/gemma-3-27b-it',
-    'kilo/qwen/qwen2-vl-72b-instruct:free': 'kilo/qwen/qwen2.5-vl-72b-instruct',
-    'kilo/liuhaotian/llava-v1.6-34b:free': 'kilo/moonshotai/kimi-k2.5',
     'meta-llama/llama-4-scout-17b-16e-instruct': 'groq/meta-llama/llama-4-scout-17b-16e-instruct'
   };
   const requestedModelId = modelId && LEGACY_MODEL_ID_ALIASES[modelId]
@@ -1001,10 +545,6 @@ async function callAIModel(
         return await callOpenRouterAPI(input, config, apiKey, logger);
       case 'groq':
         return await callGroqAPI(input, config, apiKey, logger);
-      case 'kilo':
-        return await callKiloGatewayAPI(input, config, apiKey, logger);
-      case 'opencode':
-        return await callOpenCodeZenAPI(input, config, apiKey, logger);
       default:
         throw new Error(`Unsupported model provider: ${config.provider}`);
     }
@@ -1113,80 +653,6 @@ async function callAIModel(
 }
 
 /**
- * Parse bounding box format response from Gemini 2.5 Flash Lite Preview
- * Note: This format provides structure but lacks actual text content
- */
-async function parseBoundingBoxFormat(boundingBoxData: any[], logger: ProcessingLogger): Promise<any> {
-  await logger.log(`📦 Processing ${boundingBoxData.length} bounding box elements`, "AI");
-  await logger.log(`⚠️ LIMITATION: Bounding box format detected - structure available but text content missing`, "ERROR");
-
-  // Group elements by label for analysis
-  const elementsByLabel: { [key: string]: any[] } = {};
-  boundingBoxData.forEach(element => {
-    if (!elementsByLabel[element.label]) {
-      elementsByLabel[element.label] = [];
-    }
-    elementsByLabel[element.label].push(element);
-  });
-
-  const detectedLabels = Object.keys(elementsByLabel);
-  await logger.log(`🏷️ Detected ${detectedLabels.length} unique labels: ${detectedLabels.join(', ')}`, "AI");
-
-  // Create a structured response indicating what was detected
-  const result = {
-    merchant: elementsByLabel.store_name ? 'Store detected (text extraction needed)' : '',
-    date: elementsByLabel.date ? new Date().toISOString().split('T')[0] : '',
-    total: 0, // Cannot extract actual values without text content
-    tax: 0,
-    currency: 'MYR',
-    payment_method: elementsByLabel.payment_method ? 'Payment method detected' : '',
-    predicted_category: 'Other',
-    line_items: [] as any[],
-    confidence: {
-      merchant: elementsByLabel.store_name ? 50 : 0, // Lower confidence due to missing text
-      date: elementsByLabel.date ? 50 : 0,
-      total: 0,
-      tax: 0,
-      currency: 50,
-      payment_method: elementsByLabel.payment_method ? 50 : 0,
-      predicted_category: 30,
-      line_items: 0
-    },
-    // Add metadata about the bounding box detection
-    bounding_box_metadata: {
-      format_detected: 'gemini_2.5_bounding_box',
-      total_elements: boundingBoxData.length,
-      unique_labels: detectedLabels.length,
-      detected_labels: detectedLabels,
-      requires_text_extraction: true
-    }
-  };
-
-  // Create placeholder line items based on detected item descriptions
-  if (elementsByLabel.item_description) {
-    const itemCount = elementsByLabel.item_description.length;
-    for (let i = 0; i < Math.min(itemCount, 3); i++) {
-      result.line_items.push({
-        description: `Item ${i + 1} (structure detected)`,
-        amount: 0 // Cannot extract actual price without text content
-      });
-    }
-    await logger.log(`📦 Created ${result.line_items.length} placeholder line items`, "AI");
-  }
-
-  // Predict category based on structure
-  if (elementsByLabel.item_description && elementsByLabel.item_description.length > 3) {
-    result.predicted_category = 'Groceries';
-    result.confidence.predicted_category = 60;
-  }
-
-  await logger.log(`✅ Bounding box analysis complete - structure detected but text extraction needed`, "AI");
-  await logger.log(`💡 RECOMMENDATION: Use traditional JSON format for better data extraction`, "AI");
-
-  return result;
-}
-
-/**
  * Call Gemini API for text or vision processing
  */
 async function callGeminiAPI(
@@ -1211,111 +677,7 @@ async function callGeminiAPI(
   let payload: any;
 
   if (input.type === 'text') {
-    // Text-based prompt for extracted data with Malaysian business context
-    const prompt = `
-You are an AI assistant specialized in analyzing receipt data with expertise in Malaysian business terminology and Malay language.
-
-RECEIPT TEXT:
-${input.fullText}
-
-EXTRACTED DATA:
-${JSON.stringify(input.extractedData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD including Malaysian-specific methods:
-   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
-   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
-   - Cash: CASH, TUNAI
-   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Recognize Malaysian business terminology:
-   - Common Malaysian business names and chains (e.g., 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer)
-   - Malaysian food establishments (e.g., Mamak, Kopitiam, Restoran, Kedai Kopi)
-   - Malaysian service providers (e.g., Astro, Unifi, Celcom, Digi, Maxis, TNB, Syabas)
-5. Identify MALAYSIAN TAX information:
-   - Look for GST (6% - historical 2015-2018) or SST (Sales & Service Tax - current from 2018)
-   - SST Sales Tax: 5-10% on goods (varies by category)
-   - SST Service Tax: 6% on services
-   - Zero-rated items: Basic food, medical, education
-   - Detect if tax is inclusive or exclusive in the total
-6. Handle Malay language text and mixed English-Malay content
-7. Provide SUGGESTIONS for potential extraction errors - look at fields like merchant name, date format, total amount, etc. that might have been incorrectly extracted.
-
-Return your findings in the following JSON format:
-{
-  "currency": "The currency code (e.g., MYR, USD)",
-  "payment_method": "The payment method used",
-  "predicted_category": "One of the categories from the list above",
-  "merchant": "The merchant name if you find a better match than extracted data",
-  "total": "The total amount if you find a better match than extracted data",
-  "malaysian_tax_info": {
-    "tax_type": "GST, SST_SALES, SST_SERVICE, EXEMPT, or ZERO_RATED",
-    "tax_rate": "Tax rate percentage (e.g., 6.00, 10.00)",
-    "tax_amount": "Calculated or detected tax amount",
-    "is_tax_inclusive": "true if tax is included in total, false if added separately",
-    "business_category": "Detected Malaysian business category"
-  },
-  "structured_data": {
-    "merchant_normalized": "Standardized merchant name for consistent querying",
-    "merchant_category": "Business category (grocery, restaurant, gas_station, pharmacy, etc.)",
-    "business_type": "Type of business (retail, service, restaurant, healthcare, etc.)",
-    "location_city": "City where transaction occurred",
-    "location_state": "State/province where transaction occurred",
-    "receipt_type": "Type of transaction (purchase, refund, exchange, service)",
-    "transaction_time": "Time of day in HH:MM format if available",
-    "item_count": "Number of distinct items purchased",
-    "discount_amount": "Total discount amount applied",
-    "service_charge": "Service charge amount",
-    "tip_amount": "Tip/gratuity amount",
-    "subtotal": "Subtotal before tax and charges",
-    "total_before_tax": "Total amount before tax",
-    "cashier_name": "Name of cashier if visible",
-    "receipt_number": "Receipt number from merchant system",
-    "transaction_id": "Unique transaction identifier",
-    "loyalty_program": "Loyalty program used (if any)",
-    "loyalty_points": "Loyalty points earned or redeemed",
-    "payment_card_last4": "Last 4 digits of payment card if visible",
-    "payment_approval_code": "Payment approval/authorization code",
-    "is_business_expense": "true/false - whether this appears to be a business expense",
-    "expense_type": "Type of expense (meal, travel, office_supplies, fuel, etc.)",
-    "vendor_registration_number": "Vendor business registration number if visible",
-    "invoice_number": "Invoice number for business receipts",
-    "purchase_order_number": "Purchase order number if visible"
-  },
-  "line_items_analysis": {
-    "categories": "Categorize line items by type (food, beverage, service, product, etc.)",
-    "patterns": "Identify patterns in purchases (bulk buying, premium items, etc.)",
-    "anomalies": "Flag unusual items or pricing"
-  },
-  "spending_patterns": {
-    "transaction_type": "regular, bulk_purchase, special_occasion, business_related",
-    "price_tier": "budget, mid_range, premium based on item prices",
-    "shopping_behavior": "planned, impulse, necessity based on items"
-  },
-  "suggestions": {
-    "merchant": "A suggested correction for merchant name if extraction made errors",
-    "date": "A suggested date correction in YYYY-MM-DD format if needed",
-    "total": "A suggested total amount correction if needed",
-    "tax": "A suggested tax amount correction if needed"
-  },
-  "confidence": {
-    "currency": "Confidence score 0-100 for currency",
-    "payment_method": "Confidence score 0-100 for payment method",
-    "predicted_category": "Confidence score 0-100 for category prediction",
-    "malaysian_tax_info": "Confidence score 0-100 for tax detection",
-    "structured_data": "Confidence score 0-100 for structured data extraction",
-    "line_items_analysis": "Confidence score 0-100 for line items analysis",
-    "spending_patterns": "Confidence score 0-100 for spending pattern analysis",
-    "suggestions": {
-      "merchant": "Confidence score 0-100 for merchant suggestion",
-      "date": "Confidence score 0-100 for date suggestion",
-      "total": "Confidence score 0-100 for total suggestion",
-      "tax": "Confidence score 0-100 for tax suggestion"
-    }
-  }
-}`;
-
+    const prompt = buildTextPrompt(input, 'full');
     payload = {
       contents: [{
         parts: [{
@@ -1324,116 +686,11 @@ Return your findings in the following JSON format:
       }]
     };
   } else {
-    // Vision-based prompt for direct image analysis with Malaysian business context
     payload = {
       contents: [{
         parts: [
           {
-            text: `You are an AI assistant specialized in analyzing receipt images with expertise in Malaysian business terminology and Malay language.
-
-IMPORTANT: Please provide TEXT EXTRACTION and DATA ANALYSIS, not bounding box coordinates or structural markup. Return actual extracted text values in JSON format.
-
-Please examine this receipt image and extract the following information:
-1. MERCHANT name (store or business name) - recognize Malaysian business chains and local establishments
-2. DATE of purchase (in YYYY-MM-DD format) - handle DD/MM/YYYY format common in Malaysia
-3. TOTAL amount
-4. TAX amount (if present) - recognize GST/SST terminology
-5. LINE ITEMS (product/service name and price for each item) - handle mixed English-Malay product names
-6. CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous.
-7. PAYMENT METHOD including Malaysian-specific methods:
-   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
-   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
-   - Cash: CASH, TUNAI
-   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
-8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-9. Identify MALAYSIAN TAX information:
-   - Look for GST (6% - historical 2015-2018) or SST (Sales & Service Tax - current from 2018)
-   - SST Sales Tax: 5-10% on goods (varies by category)
-   - SST Service Tax: 6% on services
-   - Zero-rated items: Basic food, medical, education
-   - Detect if tax is inclusive or exclusive in the total
-
-Malaysian Business Recognition:
-- Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer, Jaya Grocer, Cold Storage
-- Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC, Pizza Hut, Subway
-- Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB (Tenaga Nasional), Syabas, IWK
-- Petrol stations: Petronas, Shell, BHP, Caltex
-- Pharmacies: Guardian, Watsons, Caring, Big Pharmacy
-
-Return your findings in the following JSON format:
-{
-  "merchant": "The merchant name",
-  "date": "The date in YYYY-MM-DD format",
-  "total": "The total amount as a number",
-  "tax": "The tax amount as a number",
-  "currency": "The currency code (e.g., MYR, USD)",
-  "payment_method": "The payment method used",
-  "predicted_category": "One of the categories from the list above",
-  "malaysian_tax_info": {
-    "tax_type": "GST, SST_SALES, SST_SERVICE, EXEMPT, or ZERO_RATED",
-    "tax_rate": "Tax rate percentage (e.g., 6.00, 10.00)",
-    "tax_amount": "Calculated or detected tax amount",
-    "is_tax_inclusive": "true if tax is included in total, false if added separately",
-    "business_category": "Detected Malaysian business category"
-  },
-  "line_items": [
-    { "description": "Item 1 description", "amount": "Item 1 price as a number" },
-    { "description": "Item 2 description", "amount": "Item 2 price as a number" }
-  ],
-  "structured_data": {
-    "merchant_normalized": "Standardized merchant name",
-    "merchant_category": "Business category (grocery, restaurant, gas_station, etc.)",
-    "business_type": "Type of business (retail, service, restaurant, etc.)",
-    "location_city": "City where transaction occurred",
-    "location_state": "State/province where transaction occurred",
-    "receipt_type": "purchase, refund, exchange, or service",
-    "transaction_time": "Time in HH:MM format if visible",
-    "item_count": "Number of distinct items purchased",
-    "discount_amount": "Total discount amount",
-    "service_charge": "Service charge amount",
-    "tip_amount": "Tip/gratuity amount",
-    "subtotal": "Subtotal before tax",
-    "total_before_tax": "Total before tax",
-    "cashier_name": "Cashier name if visible",
-    "receipt_number": "Receipt number",
-    "transaction_id": "Transaction ID",
-    "loyalty_program": "Loyalty program used",
-    "loyalty_points": "Points earned/redeemed",
-    "payment_card_last4": "Last 4 digits of card",
-    "payment_approval_code": "Approval code",
-    "is_business_expense": "true/false for business expense",
-    "expense_type": "meal, travel, office_supplies, etc.",
-    "vendor_registration_number": "Business registration number",
-    "invoice_number": "Invoice number",
-    "purchase_order_number": "PO number"
-  },
-  "line_items_analysis": {
-    "categories": "Categorize items by type",
-    "patterns": "Shopping patterns identified",
-    "anomalies": "Unusual items or pricing"
-  },
-  "spending_patterns": {
-    "transaction_type": "regular, bulk_purchase, special_occasion, business_related",
-    "price_tier": "budget, mid_range, premium",
-    "shopping_behavior": "planned, impulse, necessity"
-  },
-  "confidence": {
-    "merchant": "Confidence score 0-100",
-    "date": "Confidence score 0-100",
-    "total": "Confidence score 0-100",
-    "tax": "Confidence score 0-100",
-    "currency": "Confidence score 0-100",
-    "payment_method": "Confidence score 0-100",
-    "predicted_category": "Confidence score 0-100",
-    "malaysian_tax_info": "Confidence score 0-100 for tax detection",
-    "structured_data": "Confidence score 0-100 for structured data",
-    "line_items_analysis": "Confidence score 0-100 for line items analysis",
-    "spending_patterns": "Confidence score 0-100 for spending patterns",
-    "line_items": "Confidence score 0-100"
-  }
-}
-
-CRITICAL INSTRUCTION: Return ONLY the JSON object above with actual extracted text values. Do NOT return bounding box coordinates, structural markup, or any other format. Extract and return the actual text content from the receipt image.`
+            text: buildVisionPrompt('full')
           },
           {
             inlineData: {
@@ -1561,241 +818,35 @@ CRITICAL INSTRUCTION: Return ONLY the JSON object above with actual extracted te
     throw new Error(`Empty response text from ${modelConfig.id}`);
   }
 
-  // Parse the response with enhanced error handling
-  try {
-    // Extract the text content from Gemini response
-    const responseText = geminiResponse.candidates[0].content.parts[0].text;
-    console.log(`🔍 Full Gemini response text:`, responseText);
-    await logger.log("Parsing Gemini response", "AI");
-    await logger.log(`📝 Response length: ${responseText.length} characters`, "AI");
+  // Parse the response using shared parser
+  const responseText = geminiResponse.candidates[0].content.parts[0].text;
+  console.log(`🔍 Full Gemini response text:`, responseText);
 
-    // Enhanced parsing with support for multiple response formats
-    let enhancedData = null;
-    let jsonStr = null;
-    let parseMethod = '';
+  const parseResult = await parseGeminiResponse(responseText, modelConfig.id, logger);
 
-    // Strategy 1: Check for bounding box format (Gemini 2.5 Flash Lite Preview format)
-    // DEBUGGING: Log the actual response structure for gemini-2.5-flash-lite
-    await logger.log(`🔍 DEBUG: Model ID: ${modelConfig.id}`, "AI");
-    await logger.log(`🔍 DEBUG: Response text preview (first 500 chars): ${responseText.substring(0, 500)}`, "AI");
-
-    try {
-      const boundingBoxData = JSON.parse(responseText.trim());
-      await logger.log(`🔍 DEBUG: Parsed response type: ${Array.isArray(boundingBoxData) ? 'Array' : typeof boundingBoxData}`, "AI");
-
-      if (Array.isArray(boundingBoxData)) {
-        await logger.log(`🔍 DEBUG: Array length: ${boundingBoxData.length}`, "AI");
-        if (boundingBoxData.length > 0) {
-          await logger.log(`🔍 DEBUG: First element keys: ${Object.keys(boundingBoxData[0])}`, "AI");
-        }
-      } else {
-        await logger.log(`🔍 DEBUG: Object keys: ${Object.keys(boundingBoxData)}`, "AI");
-      }
-
-      // Only trigger bounding box fallback for the specific preview model
-      if (modelConfig.id === 'gemini-2.5-flash-lite-preview-06-17' &&
-          Array.isArray(boundingBoxData) && boundingBoxData.length > 0 &&
-          boundingBoxData[0].box_2d && boundingBoxData[0].label) {
-        await logger.log("🎯 CRITICAL: Detected bounding box format from Gemini 2.5 Flash Lite Preview", "ERROR");
-        await logger.log("🔄 FALLBACK REQUIRED: This format lacks text content needed for data extraction", "ERROR");
-
-        // This format is not suitable for our needs - trigger fallback
-        const fallbackModelConfig = AVAILABLE_MODELS['gemini-2.5-flash'];
-        if (fallbackModelConfig) {
-          await logger.log(`🚀 AUTOMATIC FALLBACK: Switching to ${fallbackModelConfig.name} due to incompatible response format`, "AI");
-          return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
-        } else {
-          // If no fallback available, parse what we can
-          enhancedData = await parseBoundingBoxFormat(boundingBoxData, logger);
-          parseMethod = 'bounding-box-fallback';
-        }
-      } else if (modelConfig.id === 'gemini-2.5-flash-lite') {
-        // For regular gemini-2.5-flash-lite, treat as normal JSON response
-        await logger.log("✅ DEBUG: gemini-2.5-flash-lite detected - treating as normal JSON response", "AI");
-        enhancedData = boundingBoxData;
-        parseMethod = 'direct-parse-2.5-lite';
-      }
-    } catch (e) {
-      await logger.log(`🔍 DEBUG: JSON parse failed: ${e}`, "AI");
-      // Not bounding box format, continue to other strategies
+  // Handle model fallback signaled by the parser
+  if (parseResult.needsModelFallback && parseResult.fallbackModelId) {
+    const fallbackModelConfig = AVAILABLE_MODELS[parseResult.fallbackModelId];
+    if (fallbackModelConfig) {
+      await logger.log(
+        `🚀 AUTOMATIC FALLBACK: Switching to ${fallbackModelConfig.name} due to ${parseResult.fallbackReason}`,
+        "AI"
+      );
+      return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
     }
-
-    // Strategy 2: Try to find JSON block with code fences
-    if (!enhancedData) {
-      const codeBlockMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (codeBlockMatch) {
-        jsonStr = codeBlockMatch[1].trim();
-        parseMethod = 'code-block';
-        await logger.log("Found JSON in code block", "AI");
-      }
-    }
-
-    // Strategy 3: Try to find JSON object (original method)
-    if (!jsonStr && !enhancedData) {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[0];
-        parseMethod = 'regex-match';
-        await logger.log("Found JSON using regex", "AI");
-      }
-    }
-
-    // Strategy 4: Try to parse the entire response as JSON (traditional format)
-    if (!jsonStr && !enhancedData) {
-      try {
-        enhancedData = JSON.parse(responseText.trim());
-        parseMethod = 'direct-parse';
-        await logger.log("Parsed entire response as JSON", "AI");
-      } catch (e) {
-        // Continue to next strategy
-      }
-    }
-
-    // Strategy 5: Look for JSON-like content with more flexible regex
-    if (!jsonStr && !enhancedData) {
-      const flexibleMatch = responseText.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-      if (flexibleMatch) {
-        jsonStr = flexibleMatch[0];
-        parseMethod = 'flexible-regex';
-        await logger.log("Found JSON using flexible regex", "AI");
-      }
-    }
-
-    // Parse the JSON if we found a string to parse
-    if (jsonStr && !enhancedData) {
-      try {
-        enhancedData = JSON.parse(jsonStr);
-        await logger.log(`✅ JSON parsed successfully using ${parseMethod}`, "AI");
-      } catch (parseError) {
-        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-        await logger.log(`❌ JSON parse error with ${parseMethod}: ${errorMessage}`, "ERROR");
-        await logger.log(`📄 Failed JSON string: ${jsonStr.substring(0, 200)}...`, "ERROR");
-      }
-    }
-
-    // If all parsing strategies failed
-    if (!enhancedData) {
-      console.error('No valid JSON found in Gemini response after all strategies');
-      await logger.log("❌ CRITICAL: No valid JSON found after all parsing strategies", "ERROR");
-      await logger.log(`📄 Raw response preview: ${responseText.substring(0, 500)}...`, "ERROR");
-
-      // Return a structured empty response instead of empty object
-      return {
-        merchant: '',
-        date: '',
-        total: 0,
-        tax: 0,
-        currency: 'MYR',
-        payment_method: '',
-        predicted_category: 'Other',
-        line_items: [],
-        confidence: {
-          merchant: 0,
-          date: 0,
-          total: 0,
-          tax: 0,
-          currency: 50,
-          payment_method: 0,
-          predicted_category: 0,
-          line_items: 0
-        },
-        parsing_error: 'Failed to extract JSON from model response'
-      };
-    }
-
-    // Validate and normalize the parsed data
-    await logger.log("🔍 Validating extracted data", "AI");
-
-    // Ensure all required fields exist with proper defaults
-    const validatedData = {
-      merchant: enhancedData.merchant || '',
-      date: enhancedData.date || '',
-      total: parseFloat(enhancedData.total) || 0,
-      tax: parseFloat(enhancedData.tax) || 0,
-      currency: enhancedData.currency || 'MYR',
-      payment_method: enhancedData.payment_method || '',
-      predicted_category: enhancedData.predicted_category || 'Other',
-      line_items: Array.isArray(enhancedData.line_items) ? enhancedData.line_items : [],
-      confidence: enhancedData.confidence || {}
-    };
-
-    // Ensure confidence object has all required fields
-    if (!validatedData.confidence || typeof validatedData.confidence !== 'object') {
-      validatedData.confidence = {};
-    }
-
-    const defaultConfidence = {
-      merchant: 0,
-      date: 0,
-      total: 0,
-      tax: 0,
-      currency: 50,
-      payment_method: 0,
-      predicted_category: 0,
-      line_items: 0
-    };
-
-    validatedData.confidence = { ...defaultConfidence, ...validatedData.confidence };
-
-    // Set default MYR currency if not found by Gemini
-    if (!enhancedData.currency) {
-      validatedData.currency = 'MYR';
-      validatedData.confidence.currency = 50; // medium confidence for default
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${validatedData.currency}`, "AI");
-    }
-
-    // Validate that we extracted meaningful data
-    const hasData = validatedData.merchant || validatedData.total > 0 || validatedData.date ||
-                   (validatedData.line_items && validatedData.line_items.length > 0);
-
-    if (!hasData) {
-      await logger.log("⚠️ WARNING: No meaningful data extracted from receipt", "ERROR");
-      await logger.log(`📊 Data summary: merchant='${validatedData.merchant}', total=${validatedData.total}, date='${validatedData.date}', items=${validatedData.line_items.length}`, "ERROR");
-
-      // Special handling for problematic models - attempt fallback if no data extracted
-      if (modelConfig.id === 'gemini-2.5-flash-lite-preview-06-17') {
-        await logger.log(`🔄 EMPTY DATA FALLBACK: ${modelConfig.id} returned no data, trying fallback`, "ERROR");
-
-        const fallbackModelConfig = AVAILABLE_MODELS['gemini-2.5-flash'];
-        if (fallbackModelConfig) {
-          await logger.log(`🚀 FALLBACK ATTEMPT: Retrying with ${fallbackModelConfig.name} due to empty data`, "AI");
-          return await callGeminiAPI(input, fallbackModelConfig, apiKey, logger);
-        }
-      }
-    } else {
-      await logger.log("✅ Meaningful data extracted successfully", "AI");
-    }
-
-    // Replace enhancedData with validatedData for the rest of the function
-    enhancedData = validatedData;
-
-    // Log final processing results
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ GEMINI PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
-
-    // Log extracted data summary
-    const dataFields = Object.keys(enhancedData);
-    await logger.log(`📋 Extracted fields: ${dataFields.join(', ')}`, "AI");
-
-    if (enhancedData.confidence) {
-      const avgConfidence = Object.values(enhancedData.confidence)
-        .filter(val => typeof val === 'number')
-        .reduce((sum: number, val: any) => sum + val, 0) /
-        Object.values(enhancedData.confidence).filter(val => typeof val === 'number').length;
-      await logger.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%`, "AI");
-    }
-
-    return enhancedData;
-  } catch (error) {
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ GEMINI PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
-    return {};
   }
+
+  // If parser couldn't extract data and no fallback was triggered
+  if (!parseResult.data) {
+    return buildDefaultEmptyResponse(parseResult.fallbackReason || 'Failed to parse Gemini response');
+  }
+
+  // Log final processing results
+  const providerCallEnd = Date.now();
+  const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+  await logger.log(`✅ GEMINI PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+  return parseResult.data;
 }
 
 /**
@@ -1827,46 +878,7 @@ async function callOpenRouterAPI(
   let messages: any[];
 
   if (input.type === 'text') {
-    // Text-based processing
-    const prompt = `You are an AI assistant specialized in analyzing receipt data.
-
-RECEIPT TEXT:
-${input.fullText}
-
-EXTRACTED DATA:
-${JSON.stringify(input.extractedData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD including Malaysian-specific methods:
-   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
-   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
-   - Cash: CASH, TUNAI
-   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Recognize Malaysian business terminology and handle Malay language text.
-5. Provide SUGGESTIONS for potential extraction errors.
-
-Return your findings in JSON format:
-{
-  "currency": "The currency code (e.g., MYR, USD)",
-  "payment_method": "The payment method used",
-  "predicted_category": "One of the categories from the list above",
-  "merchant": "The merchant name if you find a better match than extracted data",
-  "total": "The total amount if you find a better match than extracted data",
-  "suggestions": {
-    "merchant": "A suggested correction for merchant name if extraction made errors",
-    "date": "A suggested date correction in YYYY-MM-DD format if needed",
-    "total": "A suggested total amount correction if needed",
-    "tax": "A suggested tax amount correction if needed"
-  },
-  "confidence": {
-    "currency": "Confidence score 0-100 for currency",
-    "payment_method": "Confidence score 0-100 for payment method",
-    "predicted_category": "Confidence score 0-100 for category prediction"
-  }
-}`;
-
+    const prompt = buildTextPrompt(input, 'standard');
     messages = [
       { role: "user", content: prompt }
     ];
@@ -1886,52 +898,7 @@ Return your findings in JSON format:
         content: [
           {
             type: "text",
-            text: `You are an AI assistant specialized in analyzing receipt images with expertise in Malaysian business terminology and Malay language.
-
-Please examine this receipt image and extract the following information:
-1. MERCHANT name (store or business name) - recognize Malaysian business chains and local establishments
-2. DATE of purchase (in YYYY-MM-DD format) - handle DD/MM/YYYY format common in Malaysia
-3. TOTAL amount
-4. TAX amount (if present) - recognize GST/SST terminology
-5. LINE ITEMS (product/service name and price for each item) - handle mixed English-Malay product names
-6. CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous.
-7. PAYMENT METHOD including Malaysian-specific methods:
-   - Credit/Debit Cards: VISA, Mastercard, MASTER CARD, Atm Card, MASTER, DEBIT CARD, DEBITCARD
-   - Digital Wallets: GrabPay, Touch 'n Go eWallet, Boost, ShopeePay, BigPay, MAE, FPX
-   - Cash: CASH, TUNAI
-   - Bank Transfer: Online Banking, Internet Banking, Bank Transfer
-8. Predict a CATEGORY for this expense from: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-
-Malaysian Business Recognition:
-- Grocery chains: 99 Speedmart, KK Super Mart, Tesco, AEON, Mydin, Giant, Village Grocer, Jaya Grocer, Cold Storage
-- Food establishments: Mamak, Kopitiam, Restoran, Kedai Kopi, McDonald's, KFC, Pizza Hut, Subway
-- Service providers: Astro, Unifi, Celcom, Digi, Maxis, TNB (Tenaga Nasional), Syabas, IWK
-- Petrol stations: Petronas, Shell, BHP, Caltex
-- Pharmacies: Guardian, Watsons, Caring, Big Pharmacy
-
-Return your findings in JSON format:
-{
-  "merchant": "The merchant name",
-  "date": "The date in YYYY-MM-DD format",
-  "total": "The total amount as a number",
-  "tax": "The tax amount as a number",
-  "currency": "The currency code (e.g., MYR, USD)",
-  "payment_method": "The payment method used",
-  "predicted_category": "One of the categories from the list above",
-  "line_items": [
-    { "description": "Item 1 description", "amount": "Item 1 price as a number" }
-  ],
-  "confidence": {
-    "merchant": "Confidence score 0-100",
-    "date": "Confidence score 0-100",
-    "total": "Confidence score 0-100",
-    "tax": "Confidence score 0-100",
-    "currency": "Confidence score 0-100",
-    "payment_method": "Confidence score 0-100",
-    "predicted_category": "Confidence score 0-100",
-    "line_items": "Confidence score 0-100"
-  }
-}`
+            text: buildVisionPrompt('standard')
           },
           {
             type: "image_url",
@@ -1982,8 +949,8 @@ Return your findings in JSON format:
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://paperless-maverick.vercel.app',
-      'X-Title': 'Paperless Maverick Receipt Processing'
+      'HTTP-Referer': 'https://mataresit.app',
+      'X-Title': 'Mataresit Receipt Processing'
     },
     body: JSON.stringify(payload),
   });
@@ -2038,64 +1005,20 @@ Return your findings in JSON format:
     }
   }
 
-  // Parse the response
-  try {
-    // Extract the text content from OpenRouter response
-    const responseText = openRouterResponse.choices[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('No content in OpenRouter response');
-    }
-
-    await logger.log("Parsing OpenRouter response", "AI");
-
-    // Extract JSON from the response (handle case where other text might be included)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
-
-    if (!jsonStr) {
-      console.error('No valid JSON found in OpenRouter response');
-      await logger.log("No valid JSON found in OpenRouter response", "ERROR");
-      return {};
-    }
-
-    // Parse the JSON data
-    const enhancedData = JSON.parse(jsonStr);
-
-    // Set default MYR currency if not found
-    if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      if (!enhancedData.confidence) enhancedData.confidence = {};
-      enhancedData.confidence.currency = 50; // medium confidence for default
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
-    }
-
-    // Log final processing results
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ OPENROUTER PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
-
-    // Log extracted data summary
-    const dataFields = Object.keys(enhancedData);
-    await logger.log(`📋 Extracted fields: ${dataFields.join(', ')}`, "AI");
-
-    if (enhancedData.confidence) {
-      const avgConfidence = Object.values(enhancedData.confidence)
-        .filter(val => typeof val === 'number')
-        .reduce((sum: number, val: any) => sum + val, 0) /
-        Object.values(enhancedData.confidence).filter(val => typeof val === 'number').length;
-      await logger.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%`, "AI");
-    }
-
-    return enhancedData;
-  } catch (error) {
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ OPENROUTER PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
-    return {};
+  // Parse the response using shared parser
+  const responseText = openRouterResponse.choices[0]?.message?.content;
+  if (!responseText) {
+    throw new Error('No content in OpenRouter response');
   }
+
+  const enhancedData = await parseOpenAICompatibleResponse(responseText, logger, 'OpenRouter');
+
+  // Log final processing results
+  const providerCallEnd = Date.now();
+  const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+  await logger.log(`✅ OPENROUTER PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+  return enhancedData.data;
 }
 
 /**
@@ -2123,34 +1046,7 @@ async function callGroqAPI(
 
   let messages: any[];
   if (input.type === 'text') {
-    const prompt = `You are an AI assistant specialized in analyzing receipt data.
-
-RECEIPT TEXT:
-${input.fullText}
-
-EXTRACTED DATA:
-${JSON.stringify(input.extractedData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD including Malaysian-specific methods.
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Recognize Malaysian business terminology and handle Malay language text.
-5. Provide SUGGESTIONS for potential extraction errors.
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name or business name",
-  "date": "Date in YYYY-MM-DD format",
-  "total": total amount as number,
-  "tax": tax amount as number,
-  "currency": "Currency code (e.g., MYR, USD)",
-  "payment_method": "Payment method used",
-  "predicted_category": "Category from the list above",
-  "line_items": [{"description": "Item description", "amount": price}],
-  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
-}`;
-
+    const prompt = buildTextPrompt(input, 'minimal');
     messages = [
       {
         role: 'user',
@@ -2162,37 +1058,11 @@ Return your findings in JSON format:
     const mimeType = input.imageData.mimeType;
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
-
-Analyze this receipt image and extract:
-1. MERCHANT - Store or business name
-2. DATE - Date in YYYY-MM-DD format
-3. TOTAL - Total amount as a number
-4. TAX - Tax amount as a number
-5. CURRENCY - Currency code (e.g., MYR, USD)
-6. PAYMENT_METHOD - Payment method used
-7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
-8. LINE_ITEMS - Array of items with description and amount
-9. CONFIDENCE - Object with confidence scores (0-100)
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name",
-  "date": "YYYY-MM-DD",
-  "total": 0.00,
-  "tax": 0.00,
-  "currency": "MYR",
-  "payment_method": "Cash",
-  "predicted_category": "Dining",
-  "line_items": [{"description": "Item", "amount": 0.00}],
-  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
-}`;
-
     messages = [
       {
         role: 'user',
         content: [
-          { type: 'text', text: prompt },
+          { type: 'text', text: buildVisionPrompt('minimal') },
           {
             type: 'image_url',
             image_url: {
@@ -2249,547 +1119,23 @@ Return your findings in JSON format:
 
   const groqResponse = await response.json();
 
-  try {
-    const responseText = groqResponse.choices[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('No content in Groq response');
-    }
-
-    await logger.log("Parsing Groq response", "AI");
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
-
-    if (!jsonStr) {
-      throw new Error('No valid JSON found in Groq response');
-    }
-
-    const enhancedData = JSON.parse(jsonStr);
-
-    const defaultConfidence = {
-      merchant: 0,
-      date: 0,
-      total: 0,
-      tax: 0,
-      currency: 50,
-      payment_method: 0,
-      predicted_category: 0,
-      line_items: 0
-    };
-
-    if (!enhancedData.confidence || typeof enhancedData.confidence !== 'object') {
-      enhancedData.confidence = {};
-    }
-    enhancedData.confidence = { ...defaultConfidence, ...enhancedData.confidence };
-
-    if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      enhancedData.confidence.currency = 50;
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
-    }
-
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ GROQ PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
-
-    return enhancedData;
-  } catch (error) {
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ GROQ PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
-    throw error;
+  const responseText = groqResponse.choices[0]?.message?.content;
+  if (!responseText) {
+    throw new Error('No content in Groq response');
   }
+
+  const enhancedData = await parseOpenAICompatibleResponse(responseText, logger, 'Groq');
+
+  const providerCallEnd = Date.now();
+  const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
+  await logger.log(`✅ GROQ PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
+
+  return enhancedData.data;
 }
 
 /**
- * Call Kilo Gateway API for text or vision processing
- * Kilo Gateway uses OpenAI-compatible API format
- */
-async function callKiloGatewayAPI(
-  input: AIModelInput,
-  modelConfig: ModelConfig,
-  apiKey: string,
-  logger: ProcessingLogger
-): Promise<any> {
-  const providerCallStart = Date.now();
-
-  await logger.log(`🟠 KILO GATEWAY API CALL INITIATED`, "AI");
-  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
-  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
-  const resolvedEndpoint = resolveKiloGatewayChatEndpoint(modelConfig.endpoint);
-  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
-  await logger.log(`🌐 Resolved endpoint: ${resolvedEndpoint}`, "AI");
-
-  const payloadConstructionStart = Date.now();
-  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
-
-  // Extract model name from Kilo model ID (e.g., 'kilo/google/gemma-3-27b-it' -> 'google/gemma-3-27b-it')
-  const modelName = modelConfig.id.replace(/^kilo\//, '');
-  await logger.log(`🔧 Kilo model name: ${modelName}`, "AI");
-
-  // Build messages similar to OpenRouter
-  let messages: any[];
-
-  if (input.type === 'text') {
-    const prompt = `You are an AI assistant specialized in analyzing receipt data.
-
-RECEIPT TEXT:
-${input.fullText}
-
-EXTRACTED DATA:
-${JSON.stringify(input.extractedData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD including Malaysian-specific methods.
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Recognize Malaysian business terminology and handle Malay language text.
-5. Provide SUGGESTIONS for potential extraction errors.
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name or business name",
-  "date": "Date in YYYY-MM-DD format",
-  "total": total amount as number,
-  "tax": tax amount as number,
-  "currency": "Currency code (e.g., MYR, USD)",
-  "payment_method": "Payment method used",
-  "predicted_category": "Category from the list above",
-  "line_items": [{"description": "Item description", "amount": price}],
-  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
-}`;
-
-    messages = [
-      {
-        role: 'user',
-        content: prompt
-      }
-    ];
-  } else {
-    // Vision-based processing - convert image to base64
-    const base64Image = encodeBase64(input.imageData.data);
-    const mimeType = input.imageData.mimeType;
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
-
-    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
-
-Analyze this receipt image and extract:
-1. MERCHANT - Store or business name
-2. DATE - Date in YYYY-MM-DD format
-3. TOTAL - Total amount as a number
-4. TAX - Tax amount as a number
-5. CURRENCY - Currency code (e.g., MYR, USD)
-6. PAYMENT_METHOD - Payment method used
-7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
-8. LINE_ITEMS - Array of items with description and amount
-9. CONFIDENCE - Object with confidence scores (0-100)
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name",
-  "date": "YYYY-MM-DD",
-  "total": 0.00,
-  "tax": 0.00,
-  "currency": "MYR",
-  "payment_method": "Cash",
-  "predicted_category": "Dining",
-  "line_items": [{"description": "Item", "amount": 0.00}],
-  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
-}`;
-
-    messages = [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: dataUrl,
-              detail: 'high'
-            }
-          }
-        ]
-      }
-    ];
-  }
-
-  const payload = {
-    model: modelName,
-    messages: messages,
-    temperature: modelConfig.temperature,
-    max_tokens: modelConfig.maxTokens,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0
-  };
-
-  const payloadConstructionEnd = Date.now();
-  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
-  await logger.log(`✅ Kilo Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
-
-  await logger.log(`🚀 KILO GATEWAY API REQUEST: Initiating call to ${modelName}`, "AI");
-  const kiloCallStart = Date.now();
-  const response = await fetch(resolvedEndpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://mataresit.app',
-      'X-Title': 'Mataresit Receipt Processing'
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const kiloCallEnd = Date.now();
-  const kiloCallDuration = kiloCallEnd - kiloCallStart;
-
-  await logger.log(`⏱️ Kilo API call completed in ${(kiloCallDuration / 1000).toFixed(2)} seconds`, "AI");
-  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    await logger.log(`❌ KILO GATEWAY API ERROR: ${response.status} ${response.statusText}`, "ERROR");
-    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
-    throw new ProviderRequestError({
-      provider: 'kilo',
-      modelId: modelConfig.id,
-      status: response.status,
-      statusText: response.statusText,
-      errorBodySnippet: errorText.substring(0, 500),
-      endpoint: resolvedEndpoint
-    });
-  }
-
-  const kiloResponse = await response.json();
-
-  // Parse the response
-  try {
-    const responseText = kiloResponse.choices[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('No content in Kilo Gateway response');
-    }
-
-    await logger.log("Parsing Kilo Gateway response", "AI");
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
-
-    if (!jsonStr) {
-      console.error('No valid JSON found in Kilo Gateway response');
-      await logger.log("No valid JSON found in Kilo Gateway response", "ERROR");
-      throw new Error('No valid JSON found in Kilo Gateway response');
-    }
-
-    const enhancedData = JSON.parse(jsonStr);
-
-    if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      if (!enhancedData.confidence) enhancedData.confidence = {};
-      enhancedData.confidence.currency = 50;
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
-    }
-
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ KILO GATEWAY PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
-
-    return enhancedData;
-  } catch (error) {
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ KILO GATEWAY PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
-    throw error;
-  }
-}
-
-/**
- * Call OpenCode Zen API for text or vision processing
- * OpenCode Zen uses OpenAI-compatible API format for most models
- */
-async function callOpenCodeZenAPI(
-  input: AIModelInput,
-  modelConfig: ModelConfig,
-  apiKey: string,
-  logger: ProcessingLogger
-): Promise<any> {
-  const providerCallStart = Date.now();
-
-  await logger.log(`🟣 OPENCODE ZEN API CALL INITIATED`, "AI");
-  await logger.log(`📋 Model: ${modelConfig.name} (${modelConfig.id})`, "AI");
-  await logger.log(`🎯 Input Type: ${input.type}`, "AI");
-  await logger.log(`🌐 Endpoint: ${modelConfig.endpoint}`, "AI");
-
-  const payloadConstructionStart = Date.now();
-  await logger.log(`🔧 PAYLOAD CONSTRUCTION: Building ${input.type} messages`, "AI");
-
-  // Extract model name from OpenCode model ID (e.g., 'opencode/gpt-5-nano' -> 'gpt-5-nano')
-  const modelName = modelConfig.id.replace(/^opencode\//, '');
-  await logger.log(`🔧 OpenCode Zen model name: ${modelName}`, "AI");
-
-  const buildMessages = (includeImageDetail: boolean): any[] => {
-    if (input.type === 'text') {
-      const prompt = `You are an AI assistant specialized in analyzing receipt data.
-
-RECEIPT TEXT:
-${input.fullText}
-
-EXTRACTED DATA:
-${JSON.stringify(input.extractedData, null, 2)}
-
-Based on the receipt text above, please:
-1. Identify the CURRENCY used (look for symbols like RM, $, MYR, USD, Ringgit). Default to MYR if ambiguous but likely Malaysian.
-2. Identify the PAYMENT METHOD including Malaysian-specific methods.
-3. Predict a CATEGORY for this expense from the following list: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other".
-4. Recognize Malaysian business terminology and handle Malay language text.
-5. Provide SUGGESTIONS for potential extraction errors.
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name or business name",
-  "date": "Date in YYYY-MM-DD format",
-  "total": total amount as number,
-  "tax": tax amount as number,
-  "currency": "Currency code (e.g., MYR, USD)",
-  "payment_method": "Payment method used",
-  "predicted_category": "Category from the list above",
-  "line_items": [{"description": "Item description", "amount": price}],
-  "confidence": {"merchant": 0-100, "date": 0-100, "total": 0-100, "tax": 0-100, "currency": 0-100, "payment_method": 0-100, "predicted_category": 0-100, "line_items": 0-100}
-}`;
-
-      return [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ];
-    }
-
-    // Vision-based processing
-    const base64Image = encodeBase64(input.imageData.data);
-    const mimeType = input.imageData.mimeType;
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
-
-    const prompt = `You are an AI assistant specialized in analyzing receipt data from images.
-
-Analyze this receipt image and extract:
-1. MERCHANT - Store or business name
-2. DATE - Date in YYYY-MM-DD format
-3. TOTAL - Total amount as a number
-4. TAX - Tax amount as a number
-5. CURRENCY - Currency code (e.g., MYR, USD)
-6. PAYMENT_METHOD - Payment method used
-7. PREDICTED_CATEGORY - One of: "Groceries", "Dining", "Transportation", "Utilities", "Entertainment", "Travel", "Shopping", "Healthcare", "Education", "Other"
-8. LINE_ITEMS - Array of items with description and amount
-9. CONFIDENCE - Object with confidence scores (0-100)
-
-Return your findings in JSON format:
-{
-  "merchant": "Store name",
-  "date": "YYYY-MM-DD",
-  "total": 0.00,
-  "tax": 0.00,
-  "currency": "MYR",
-  "payment_method": "Cash",
-  "predicted_category": "Dining",
-  "line_items": [{"description": "Item", "amount": 0.00}],
-  "confidence": {"merchant": 90, "date": 90, "total": 85, "tax": 70, "currency": 95, "payment_method": 80, "predicted_category": 85, "line_items": 75}
-}`;
-
-    const imageUrl: Record<string, any> = {
-      url: dataUrl
-    };
-    if (includeImageDetail) {
-      imageUrl.detail = 'high';
-    }
-
-    return [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: imageUrl
-          }
-        ]
-      }
-    ];
-  };
-
-  const buildPayload = (messages: any[], simplified: boolean): Record<string, any> => {
-    if (simplified) {
-      return {
-        model: modelName,
-        messages,
-        temperature: modelConfig.temperature,
-        max_tokens: modelConfig.maxTokens
-      };
-    }
-
-    return {
-      model: modelName,
-      messages,
-      temperature: modelConfig.temperature,
-      max_tokens: modelConfig.maxTokens,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0
-    };
-  };
-
-  const primaryMessages = buildMessages(true);
-  const primaryPayload = buildPayload(primaryMessages, false);
-
-  const payloadConstructionEnd = Date.now();
-  const payloadConstructionDuration = (payloadConstructionEnd - payloadConstructionStart) / 1000;
-  await logger.log(`✅ OpenCode Zen Payload constructed in ${payloadConstructionDuration.toFixed(3)} seconds`, "AI");
-
-  await logger.log(`🚀 OPENCODE ZEN API REQUEST: Initiating call to ${modelName}`, "AI");
-  await logger.log(`🌐 OpenCode request endpoint: ${modelConfig.endpoint}`, "AI");
-
-  const opencodeCallStart = Date.now();
-  let response = await fetch(modelConfig.endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(primaryPayload),
-  });
-
-  const opencodeCallEnd = Date.now();
-  const opencodeCallDuration = opencodeCallEnd - opencodeCallStart;
-
-  await logger.log(`⏱️ OpenCode Zen API call completed in ${(opencodeCallDuration / 1000).toFixed(2)} seconds`, "AI");
-  await logger.log(`📡 Response status: ${response.status} ${response.statusText}`, "AI");
-
-  let endpointUsed = modelConfig.endpoint;
-  let retryCount = 0;
-  let opencodeResponse: any;
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    await logger.log(`❌ OPENCODE ZEN API ERROR: ${response.status} ${response.statusText}`, "ERROR");
-    await logger.log(`📄 Error details: ${errorText.substring(0, 500)}`, "ERROR");
-    const shouldRetry = shouldRetryOpenCodeImageRequest(input.type, response.status, errorText);
-
-    if (shouldRetry) {
-      retryCount = 1;
-      const retryEndpoint = getOpenCodeRetryEndpoint(modelConfig.endpoint);
-      const retryMessages = buildMessages(false);
-      const retryPayload = buildPayload(retryMessages, true);
-      // Some OpenCode routes resolve model by full ID on 404 paths.
-      if (response.status === 404) {
-        retryPayload.model = modelConfig.id;
-      }
-
-      await logger.log(
-        `🔄 OPENCODE RETRY: retrying with simplified payload at ${retryEndpoint}`,
-        "AI"
-      );
-      await logger.log(`🔧 OPENCODE RETRY MODEL: ${retryPayload.model}`, "AI");
-
-      const retryStart = Date.now();
-      const retryResponse = await fetch(retryEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(retryPayload),
-      });
-      const retryDuration = (Date.now() - retryStart) / 1000;
-
-      await logger.log(`⏱️ OpenCode retry call completed in ${retryDuration.toFixed(2)} seconds`, "AI");
-      await logger.log(`📡 Retry response status: ${retryResponse.status} ${retryResponse.statusText}`, "AI");
-
-      if (!retryResponse.ok) {
-        const retryErrorText = await retryResponse.text();
-        await logger.log(`❌ OPENCODE RETRY ERROR: ${retryResponse.status} ${retryResponse.statusText}`, "ERROR");
-        await logger.log(`📄 Retry error details: ${retryErrorText.substring(0, 500)}`, "ERROR");
-        throw new ProviderRequestError({
-          provider: 'opencode',
-          modelId: modelConfig.id,
-          status: retryResponse.status,
-          statusText: retryResponse.statusText,
-          errorBodySnippet: retryErrorText.substring(0, 500),
-          endpoint: retryEndpoint
-        });
-      }
-
-      endpointUsed = retryEndpoint;
-      response = retryResponse;
-      opencodeResponse = await retryResponse.json();
-      await logger.log(`✅ OpenCode retry succeeded (retry count: ${retryCount})`, "AI");
-    } else {
-      throw new ProviderRequestError({
-        provider: 'opencode',
-        modelId: modelConfig.id,
-        status: response.status,
-        statusText: response.statusText,
-        errorBodySnippet: errorText.substring(0, 500),
-        endpoint: modelConfig.endpoint
-      });
-    }
-  } else {
-    opencodeResponse = await response.json();
-  }
-
-  await logger.log(`🔁 OpenCode retry count: ${retryCount}`, "AI");
-  await logger.log(`🌐 OpenCode final endpoint used: ${endpointUsed}`, "AI");
-
-  // Parse the response
-  try {
-    const responseText = opencodeResponse.choices[0]?.message?.content;
-    if (!responseText) {
-      throw new Error('No content in OpenCode Zen response');
-    }
-
-    await logger.log("Parsing OpenCode Zen response", "AI");
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : null;
-
-    if (!jsonStr) {
-      console.error('No valid JSON found in OpenCode Zen response');
-      await logger.log("No valid JSON found in OpenCode Zen response", "ERROR");
-      throw new Error('No valid JSON found in OpenCode Zen response');
-    }
-
-    const enhancedData = JSON.parse(jsonStr);
-
-    if (!enhancedData.currency) {
-      enhancedData.currency = 'MYR';
-      if (!enhancedData.confidence) enhancedData.confidence = {};
-      enhancedData.confidence.currency = 50;
-      await logger.log("Using default currency: MYR", "AI");
-    } else {
-      await logger.log(`Detected currency: ${enhancedData.currency}`, "AI");
-    }
-
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    await logger.log(`✅ OPENCODE ZEN PROCESSING COMPLETE in ${totalProviderDuration.toFixed(2)} seconds`, "AI");
-
-    return enhancedData;
-  } catch (error) {
-    const providerCallEnd = Date.now();
-    const totalProviderDuration = (providerCallEnd - providerCallStart) / 1000;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`❌ OPENCODE ZEN PARSING ERROR after ${totalProviderDuration.toFixed(2)}s: ${errorMessage}`, "ERROR");
-    throw error;
-  }
-}
-
-/**
- * Primary function to enhance receipt data using selected AI model
+ * Main entry point for receipt data enhancement.
+ * Coordinates AI model selection, execution, and post-processing.
  */
 async function enhanceReceiptData(
   input: AIModelInput,
@@ -2897,11 +1243,10 @@ async function enhanceReceiptData(
   } catch (error) {
     console.error("Error in enhanceReceiptData:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await logger.log(`Error in AI enhancement: ${errorMessage}`, "ERROR");
+    await logger.log(`Error in enhanceReceiptData: ${errorMessage}`, "ERROR");
     throw error;
   }
 }
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
