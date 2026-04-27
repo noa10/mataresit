@@ -1919,9 +1919,17 @@ export const processReceiptWithAI = async (
     await updateReceiptProcessingStatus(receiptId, 'complete');
 
     // Update the receipt with the processed data
+    const isValidISODate = (value: any): boolean => {
+      if (!value || typeof value !== 'string') return false;
+      const trimmed = value.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return false;
+      const d = new Date(trimmed);
+      return !isNaN(d.getTime());
+    };
+
     const updateData: any = {
       merchant: result.merchant || '',
-      date: result.date || new Date().toISOString().split('T')[0], // Use today's date as fallback
+      date: isValidISODate(result.date) ? result.date : new Date().toISOString().split('T')[0],
       total: result.total || 0,
       tax: result.tax || 0,
       currency: result.currency || 'MYR',
