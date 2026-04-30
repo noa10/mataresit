@@ -14,7 +14,7 @@
  *   GROQ_API_KEY=xxx OPENROUTER_API_KEY=xxx deno test --allow-env --allow-net supabase/functions/enhance-receipt-data/test-providers.ts
  */
 
-import { assertEquals, assertExists, assertNotEquals } from 'jsr:@std/assert';
+import { assertEquals, assertExists } from 'jsr:@std/assert';
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import {
   executeWithFallback,
@@ -72,21 +72,6 @@ function createTextInput(): TextInput {
     type: 'text',
     extractedData: SAMPLE_EXTRACTED_DATA,
     fullText: SAMPLE_RECEIPT_TEXT,
-  };
-}
-
-function createImageInput(): ImageInput {
-  // Create a minimal 1x1 JPEG for testing
-  const minimalJpeg = new Uint8Array([
-    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
-    0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9
-  ]);
-  return {
-    type: 'image',
-    imageData: {
-      data: minimalJpeg,
-      mimeType: 'image/jpeg',
-    },
   };
 }
 

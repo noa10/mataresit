@@ -12,15 +12,11 @@ import {
 import {
   buildTextPrompt,
   buildVisionPrompt,
-  TextInput,
-  ImageInput,
   AIModelInput,
-  PromptDetailLevel,
 } from '../_shared/receipt-prompts.ts'
 import {
   parseGeminiResponse,
   parseOpenAICompatibleResponse,
-  parseBoundingBoxFormat,
   buildDefaultEmptyResponse,
 } from '../_shared/ai-response-parsers.ts'
 
