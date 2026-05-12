@@ -114,7 +114,7 @@
     "@tanstack/react-query": "^5.99.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "axios": "^1.15.1",
+    "axios": "^1.15.2",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -207,7 +207,9 @@
       "ajv": "^6.12.4"
     },
     "ajv": "^8.18.0",
-    "hono": "^4.12.14",
+    "hono": "^4.12.18",
+    "fast-uri": ">=3.1.2",
+    "ip-address": ">=10.1.1",
     "flatted": ">=3.4.2",
     "serialize-javascript": ">=7.0.5"
   }
