@@ -128,7 +128,76 @@ export class TeamService {
       // Don't throw here - the invitation was created successfully
     }
 
+    // Create an in-app notification for the invitee if they already have an account.
+    // This lets them accept directly from the notification bell at /invite/{token}.
+    try {
+      await this.createInviteeInAppNotification(invitationId, request);
+    } catch (notifyError) {
+      console.error('Failed to create in-app invitation notification:', notifyError);
+      // Non-fatal — invite still works via email or shared link
+    }
+
     return invitationId;
+  }
+
+  private async createInviteeInAppNotification(
+    invitationId: string,
+    request: InviteTeamMemberRequest,
+  ): Promise<void> {
+    const { data: invitation, error: invitationError } = await supabase
+      .from('team_invitations')
+      .select('id, token, email, team_id, role, expires_at, teams!team_id(name)')
+      .eq('id', invitationId)
+      .single();
+
+    if (invitationError || !invitation) {
+      console.warn('Skipping invitee notification — invitation not retrievable:', invitationError);
+      return;
+    }
+
+    const { data: invitee, error: inviteeError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('email', invitation.email)
+      .maybeSingle();
+
+    if (inviteeError) {
+      console.warn('Skipping invitee notification — profile lookup failed:', inviteeError);
+      return;
+    }
+
+    if (!invitee?.id) {
+      // Invitee has no Mataresit account yet — they'll get the email instead
+      return;
+    }
+
+    const teamName = (invitation.teams as { name?: string } | null)?.name || 'a team';
+    const inviteeFirstName = invitee.first_name?.trim();
+
+    const { error: notificationError } = await supabase.from('notifications').insert({
+      recipient_id: invitee.id,
+      team_id: invitation.team_id,
+      type: 'team_invitation_sent',
+      priority: 'high',
+      title: `You're invited to join ${teamName}`,
+      message: inviteeFirstName
+        ? `${inviteeFirstName}, you've been invited to join ${teamName} as ${invitation.role}. Click to accept.`
+        : `You've been invited to join ${teamName} as ${invitation.role}. Click to accept.`,
+      action_url: `/invite/${invitation.token}`,
+      related_entity_type: 'team_invitation',
+      related_entity_id: invitation.id,
+      expires_at: invitation.expires_at,
+      metadata: {
+        invitation_id: invitation.id,
+        team_id: invitation.team_id,
+        role: invitation.role,
+        token: invitation.token,
+      },
+    });
+
+    if (notificationError) {
+      console.warn('Failed to insert invitee notification:', notificationError);
+    }
   }
 
   async acceptInvitation(token: string): Promise<boolean> {
