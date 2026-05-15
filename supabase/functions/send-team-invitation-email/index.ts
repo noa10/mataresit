@@ -110,6 +110,10 @@ serve(async (req) => {
     }
 
     let providerMessageId: string | undefined;
+    const timeoutMsRaw = Number(Deno.env.get('RESEND_REQUEST_TIMEOUT_MS') ?? '8000');
+    const resendTimeoutMs = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0 ? timeoutMsRaw : 8000;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), resendTimeoutMs);
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -124,6 +128,7 @@ serve(async (req) => {
           html,
           text,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -150,22 +155,39 @@ serve(async (req) => {
         provider_message_id: providerMessageId,
       });
     } catch (sendError) {
-      console.error('Error sending invitation email via Resend:', sendError);
+      const isTimeout =
+        (sendError as { name?: string }).name === 'AbortError' ||
+        controller.signal.aborted;
+      const errorMessage = isTimeout
+        ? `Resend request timed out after ${resendTimeoutMs}ms`
+        : (sendError as Error).message;
+      console.error('Error sending invitation email via Resend:', {
+        timeout: isTimeout,
+        message: errorMessage,
+      });
       if (deliveryId) {
         await supabaseClient.rpc('update_email_delivery_status', {
           _delivery_id: deliveryId,
           _status: 'failed',
           _provider_message_id: null,
-          _error_message: (sendError as Error).message,
+          _error_message: errorMessage,
         });
       }
       return new Response(
         JSON.stringify({
-          error: 'Failed to send invitation email',
-          details: (sendError as Error).message,
+          error: isTimeout
+            ? 'Invitation email send timed out'
+            : 'Failed to send invitation email',
+          details: errorMessage,
+          timeout: isTimeout,
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        {
+          status: isTimeout ? 504 : 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
       );
+    } finally {
+      clearTimeout(timeoutHandle);
     }
 
     return new Response(
