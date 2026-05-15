@@ -793,6 +793,15 @@ export class NotificationService {
 
     this.pendingSubscriptions.add(channelName);
 
+    // 🔧 FIX: Flush any pending deferred channel removals before creating a new
+    // channel with the same name. Without this, supabase.channel(channelName) can
+    // return the previously-subscribed channel (still alive because removal was
+    // queued for the next tick), and `.on('postgres_changes', …)` on a SUBSCRIBED
+    // channel throws: "cannot add `postgres_changes` callbacks ... after subscribe()".
+    if (this.deferredCleanupQueue.has(channelName)) {
+      this.processDeferredCleanup();
+    }
+
     // OPTIMIZATION: Build selective event filter instead of using '*'
     const events = options?.events || ['INSERT', 'UPDATE', 'DELETE'];
     const eventFilter = events.length === 3 ? '*' : events.join(',');
@@ -1088,6 +1097,9 @@ export class NotificationService {
   private processDeferredCleanup(): void {
     const channelsToCleanup = Array.from(this.deferredCleanupQueue);
     this.deferredCleanupQueue.clear();
+    if (this.cleanupBatchTimer) {
+      clearTimeout(this.cleanupBatchTimer);
+    }
     this.cleanupBatchTimer = null;
 
     for (const channelName of channelsToCleanup) {
