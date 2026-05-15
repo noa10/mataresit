@@ -120,7 +120,7 @@ export function CollaborationMetricsChart({
               {memberAnalytics.filter(m => m.collaboration_score > 70).length}
             </div>
             <p className="text-xs text-muted-foreground">
-              Score > 70
+              Score &gt; 70
             </p>
           </CardContent>
         </Card>
