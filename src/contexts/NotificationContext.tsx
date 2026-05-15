@@ -702,8 +702,12 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     broadcastToOtherTabs('mark_all_read');
 
     try {
-      // Perform backend operation
-      const count = await notificationService.markAllNotificationsAsRead(currentTeam?.id);
+      // Perform backend operation.
+      // NOTE: getUserNotifications returns notifications across all teams (not scoped),
+      // so the "mark all" RPC must also be unscoped. Passing currentTeam.id would only
+      // mark the current team's notifications, leaving others unread in the DB — they
+      // repopulate the unread count on the next refetch (focus, reconnect, team switch).
+      const count = await notificationService.markAllNotificationsAsRead();
 
       const duration = performance.now() - startTime;
       console.log(`✅ Mark all as read operation completed in ${duration.toFixed(2)}ms`);
