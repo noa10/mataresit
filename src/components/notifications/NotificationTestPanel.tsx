@@ -188,7 +188,6 @@ export function NotificationTestPanel() {
         .from('team_members')
         .select('user_id, role')
         .eq('team_id', currentTeam.id)
-        .eq('status', 'active')
         .neq('user_id', user.id);
 
       if (membersError) {

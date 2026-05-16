@@ -355,8 +355,7 @@ export class TeamCollaborationNotificationService {
       const { data, error } = await supabase
         .from('team_members')
         .select('user_id, role')
-        .eq('team_id', teamId)
-        .eq('status', 'active');
+        .eq('team_id', teamId);
 
       if (error) {
         console.error('Error fetching team members:', error);
