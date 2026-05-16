@@ -57,7 +57,7 @@ export function UnregisteredUserFlow({
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [currentStep, setCurrentStep] = useState<'preview' | 'signup' | 'processing'>('preview');
+  const [currentStep, setCurrentStep] = useState<'preview' | 'signup' | 'processing' | 'email-sent'>('preview');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -131,6 +131,7 @@ export function UnregisteredUserFlow({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/invite/${token}`,
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
@@ -163,14 +164,8 @@ export function UnregisteredUserFlow({
           sessionId,
         }));
 
-        // Redirect to a confirmation waiting page
-        navigate('/auth/confirm-email', { 
-          state: { 
-            email: formData.email,
-            invitationToken: token,
-            teamName: invitation.team_name,
-          }
-        });
+        // Show in-page confirmation; emailRedirectTo will route them back to /invite/{token}
+        setCurrentStep('email-sent');
         return;
       }
 
@@ -266,6 +261,27 @@ export function UnregisteredUserFlow({
                 Please wait while we set up your account and add you to the team...
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Render email-sent step (signup pending email confirmation)
+  if (currentStep === 'email-sent') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+            <Mail className="h-10 w-10 text-primary" />
+            <h3 className="text-lg font-semibold">Check Your Email</h3>
+            <p className="text-muted-foreground">
+              We sent a confirmation link to <strong>{formData.email}</strong>. Click it to verify your account
+              and you'll be returned here to join {invitation.team_name}.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              You can close this tab — the link in the email will bring you back.
+            </p>
           </CardContent>
         </Card>
       </div>
