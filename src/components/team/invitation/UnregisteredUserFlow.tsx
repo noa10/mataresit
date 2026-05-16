@@ -197,7 +197,7 @@ export function UnregisteredUserFlow({
     try {
       // The invitation will be automatically processed by the auth callback
       // or we can process it here directly
-      onSuccess(invitation.team_id, invitation.team_name, `/teams/${invitation.team_id}`);
+      onSuccess(invitation.team_id, invitation.team_name, '/teams');
     } catch (error: any) {
       console.error('Error processing invitation:', error);
       onError('Account created successfully, but failed to join team. Please try accepting the invitation again.', 'INVITATION_PROCESSING_FAILED');
