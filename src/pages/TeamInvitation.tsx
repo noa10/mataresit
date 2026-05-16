@@ -60,14 +60,13 @@ export default function TeamInvitationPage() {
 
       // Generate browser fingerprint and get client info
       const browserFingerprint = invitationFlowService.generateBrowserFingerprint();
-      const ipAddress = await invitationFlowService.getClientIPAddress();
       const userAgent = navigator.userAgent;
 
       // Detect user state and validate invitation
       const result = await invitationFlowService.detectUserState(
         token,
         browserFingerprint,
-        ipAddress,
+        null,
         userAgent
       );
 
