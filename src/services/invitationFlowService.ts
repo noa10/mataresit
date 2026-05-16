@@ -350,17 +350,14 @@ export class InvitationFlowService {
   }
 
   /**
-   * Get client IP address (best effort)
+   * Client-side IP lookup is disabled — we previously called api.ipify.org but
+   * it blocks invitation validation for tens of seconds when the request is
+   * blocked by an adblocker, network policy, or simply slow. The server-side
+   * RPC reads the IP from request headers in `acceptance_ip_address` for
+   * audit logging, so the browser doesn't need to provide one.
    */
   async getClientIPAddress(): Promise<string | null> {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      console.warn('Could not determine client IP address:', error);
-      return null;
-    }
+    return null;
   }
 
   /**
