@@ -57,7 +57,7 @@ export function RegisteredUserFlow({
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [currentStep, setCurrentStep] = useState<'preview' | 'login' | 'processing'>('preview');
+  const [currentStep, setCurrentStep] = useState<'preview' | 'login' | 'processing' | 'magic-link-sent'>('preview');
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -188,14 +188,8 @@ export function RegisteredUserFlow({
         sessionId,
       }));
 
-      // Navigate to a confirmation waiting page
-      navigate('/auth/magic-link-sent', { 
-        state: { 
-          email: formData.email,
-          invitationToken: token,
-          teamName: invitation.team_name,
-        }
-      });
+      // Show in-page confirmation; emailRedirectTo will route them back to /invite/{token}
+      setCurrentStep('magic-link-sent');
 
     } catch (error: any) {
       console.error('Magic link error:', error);
@@ -280,6 +274,27 @@ export function RegisteredUserFlow({
                 Please wait while we sign you in and add you to the team...
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Render magic-link-sent step
+  if (currentStep === 'magic-link-sent') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+            <Send className="h-10 w-10 text-primary" />
+            <h3 className="text-lg font-semibold">Check Your Email</h3>
+            <p className="text-muted-foreground">
+              We sent a magic link to <strong>{formData.email}</strong>. Click it to sign in and you'll be returned
+              here to join {invitation.team_name}.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              You can close this tab — the link in the email will bring you back.
+            </p>
           </CardContent>
         </Card>
       </div>
