@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Sun, Moon } from "lucide-react";
+import { Loader2, Sun, Moon, Eye, EyeOff } from "lucide-react";
 
 // Schema factory functions that use translations
 const createLoginSchema = (t: (key: string) => string) => z.object({
@@ -69,6 +69,11 @@ export default function Auth() {
   const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
   const [isRecoverySession, setIsRecoverySession] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
   const { user, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { t } = useAuthTranslation();
   const { isDarkMode, toggleMode } = useTheme();
@@ -458,7 +463,13 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signIn.email")}</FormLabel>
                         <FormControl>
-                          <Input className="h-11" placeholder={t("signIn.emailPlaceholder")} {...field} />
+                          <Input
+                            className="h-11"
+                            type="email"
+                            autoComplete="email"
+                            placeholder={t("signIn.emailPlaceholder")}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -472,7 +483,30 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signIn.password")}</FormLabel>
                         <FormControl>
-                          <Input className="h-11" type="password" placeholder={t("signIn.passwordPlaceholder")} {...field} />
+                          <div className="relative">
+                            <Input
+                              className="h-11 pr-10"
+                              type={showLoginPassword ? "text" : "password"}
+                              autoComplete="current-password"
+                              placeholder={t("signIn.passwordPlaceholder")}
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              tabIndex={-1}
+                              aria-label={showLoginPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
+                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                              onClick={() => setShowLoginPassword((prev) => !prev)}
+                            >
+                              {showLoginPassword ? (
+                                <EyeOff className="h-4 w-4" aria-hidden="true" />
+                              ) : (
+                                <Eye className="h-4 w-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -577,7 +611,13 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.email")}</FormLabel>
                         <FormControl>
-                          <Input className="h-11" placeholder={t("signUp.emailPlaceholder")} {...field} />
+                          <Input
+                            className="h-11"
+                            type="email"
+                            autoComplete="email"
+                            placeholder={t("signUp.emailPlaceholder")}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -591,7 +631,30 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.password")}</FormLabel>
                         <FormControl>
-                          <Input className="h-11" type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
+                          <div className="relative">
+                            <Input
+                              className="h-11 pr-10"
+                              type={showSignupPassword ? "text" : "password"}
+                              autoComplete="new-password"
+                              placeholder={t("signUp.passwordPlaceholder")}
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              tabIndex={-1}
+                              aria-label={showSignupPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
+                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                              onClick={() => setShowSignupPassword((prev) => !prev)}
+                            >
+                              {showSignupPassword ? (
+                                <EyeOff className="h-4 w-4" aria-hidden="true" />
+                              ) : (
+                                <Eye className="h-4 w-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -605,7 +668,30 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t("signUp.confirmPassword")}</FormLabel>
                         <FormControl>
-                          <Input className="h-11" type="password" placeholder={t("signUp.passwordPlaceholder")} {...field} />
+                          <div className="relative">
+                            <Input
+                              className="h-11 pr-10"
+                              type={showSignupConfirmPassword ? "text" : "password"}
+                              autoComplete="new-password"
+                              placeholder={t("signUp.passwordPlaceholder")}
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              tabIndex={-1}
+                              aria-label={showSignupConfirmPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
+                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                              onClick={() => setShowSignupConfirmPassword((prev) => !prev)}
+                            >
+                              {showSignupConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" aria-hidden="true" />
+                              ) : (
+                                <Eye className="h-4 w-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -699,7 +785,12 @@ export default function Auth() {
                     <FormItem>
                       <FormLabel>{t("forgotPassword.email")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t("forgotPassword.emailPlaceholder")} {...field} />
+                        <Input
+                          type="email"
+                          autoComplete="email"
+                          placeholder={t("forgotPassword.emailPlaceholder")}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -768,7 +859,31 @@ export default function Auth() {
                   <FormItem>
                     <FormLabel>{t("resetPassword.password")}</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder={t("resetPassword.passwordPlaceholder")} {...field} autoFocus />
+                      <div className="relative">
+                        <Input
+                          className="pr-10"
+                          type={showResetPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          placeholder={t("resetPassword.passwordPlaceholder")}
+                          {...field}
+                          autoFocus
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          tabIndex={-1}
+                          aria-label={showResetPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
+                          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                          onClick={() => setShowResetPassword((prev) => !prev)}
+                        >
+                          {showResetPassword ? (
+                            <EyeOff className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -782,7 +897,30 @@ export default function Auth() {
                   <FormItem>
                     <FormLabel>{t("resetPassword.confirmPassword")}</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder={t("resetPassword.passwordPlaceholder")} {...field} />
+                      <div className="relative">
+                        <Input
+                          className="pr-10"
+                          type={showResetConfirmPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          placeholder={t("resetPassword.passwordPlaceholder")}
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          tabIndex={-1}
+                          aria-label={showResetConfirmPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
+                          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                          onClick={() => setShowResetConfirmPassword((prev) => !prev)}
+                        >
+                          {showResetConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
