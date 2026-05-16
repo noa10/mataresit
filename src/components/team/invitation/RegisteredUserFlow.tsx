@@ -163,6 +163,7 @@ export function RegisteredUserFlow({
       const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
         options: {
+          emailRedirectTo: `${window.location.origin}/invite/${token}`,
           data: {
             invitation_token: token,
           },

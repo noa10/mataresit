@@ -131,6 +131,7 @@ export function UnregisteredUserFlow({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/invite/${token}`,
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
