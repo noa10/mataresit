@@ -582,6 +582,7 @@ DECLARE
   cutoff_date TIMESTAMP WITH TIME ZONE;
   archive_table_name TEXT;
   archived_count INTEGER := 0;
+  rows_this_team INTEGER;
   teams_processed INTEGER := 0;
   team_record RECORD;
 BEGIN
@@ -599,13 +600,16 @@ BEGIN
     EXECUTE format('INSERT INTO public.%I SELECT * FROM public.team_audit_logs WHERE team_id = $1 AND created_at < $2', archive_table_name)
       USING team_record.team_id, cutoff_date;
     DELETE FROM public.team_audit_logs WHERE team_id = team_record.team_id AND created_at < cutoff_date;
-    GET DIAGNOSTICS archived_count = archived_count + ROW_COUNT;
+    -- GET DIAGNOSTICS only accepts the bare system item, not an expression.
+    -- Capture this loop's row count separately and accumulate.
+    GET DIAGNOSTICS rows_this_team = ROW_COUNT;
+    archived_count := archived_count + rows_this_team;
     teams_processed := teams_processed + 1;
 
     PERFORM public.log_team_audit_event_enhanced(
       team_record.team_id, 'team_settings_updated'::team_audit_action,
-      'Audit logs archived: ' || archived_count || ' records moved to ' || archive_table_name,
-      NULL, '{}', jsonb_build_object('archived_records', archived_count),
+      'Audit logs archived: ' || rows_this_team || ' records moved to ' || archive_table_name,
+      NULL, '{}', jsonb_build_object('archived_records', rows_this_team),
       jsonb_build_object('archive_table', archive_table_name, 'cutoff_date', cutoff_date,
                          'retention_days', p_retention_days, 'operation_type', 'audit_archival')
     );
