@@ -104,7 +104,6 @@ opencode.json
 
 # Claude Code
 .claude/
-.gitnexus
 
 # Kilo
 .kilo/
