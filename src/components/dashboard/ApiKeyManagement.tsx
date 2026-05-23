@@ -173,8 +173,18 @@ export default function ApiKeyManagement() {
         return;
       }
 
+      if (formData.name.trim().length < 3) {
+        toast.error('Name must be at least 3 characters');
+        return;
+      }
+
       if (formData.scopes.length === 0) {
         toast.error(t('apiKeys.notifications.scopeRequired'));
+        return;
+      }
+
+      if (formData.expiresAt && new Date(formData.expiresAt) <= new Date()) {
+        toast.error('Expiration date must be in the future');
         return;
       }
 
@@ -190,7 +200,12 @@ export default function ApiKeyManagement() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message);
+        console.error('Edge function error response:', response);
+        const serverMessage =
+          response.data?.message ||
+          response.error.message ||
+          'Failed to create API key';
+        throw new Error(serverMessage);
       }
 
       const newKey = response.data?.data;
@@ -199,15 +214,25 @@ export default function ApiKeyManagement() {
       setShowCreateDialog(false);
       resetForm();
       toast.success(t('apiKeys.notifications.createSuccess'));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating API key:', error);
-      toast.error(t('apiKeys.notifications.createFailed'));
+      toast.error(error?.message || t('apiKeys.notifications.createFailed'));
     }
   };
 
   const updateApiKey = async (keyId: string, updates: Partial<ApiKey>) => {
     try {
       console.log('Updating API key:', { keyId, updates });
+
+      if (updates.name !== undefined && updates.name.trim().length < 3) {
+        toast.error('Name must be at least 3 characters');
+        return;
+      }
+
+      if (updates.expiresAt !== undefined && updates.expiresAt && new Date(updates.expiresAt) <= new Date()) {
+        toast.error('Expiration date must be in the future');
+        return;
+      }
 
       const response = await supabase.functions.invoke('manage-api-keys', {
         method: 'PUT',
@@ -218,8 +243,12 @@ export default function ApiKeyManagement() {
       });
 
       if (response.error) {
-        console.error('API key update error:', response.error);
-        throw new Error(response.error.message);
+        console.error('API key update error:', response);
+        const serverMessage =
+          response.data?.message ||
+          response.error.message ||
+          'Failed to update API key';
+        throw new Error(serverMessage);
       }
 
       console.log('API key update response:', response.data);
@@ -228,9 +257,9 @@ export default function ApiKeyManagement() {
         key.id === keyId ? { ...key, ...updates } : key
       ));
       toast.success(t('apiKeys.notifications.updateSuccess'));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating API key:', error);
-      toast.error(t('apiKeys.notifications.updateFailed'));
+      toast.error(error?.message || t('apiKeys.notifications.updateFailed'));
     }
   };
 
@@ -246,14 +275,19 @@ export default function ApiKeyManagement() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message);
+        console.error('API key delete error:', response);
+        const serverMessage =
+          response.data?.message ||
+          response.error.message ||
+          'Failed to delete API key';
+        throw new Error(serverMessage);
       }
 
       setApiKeys(prev => prev.filter(key => key.id !== keyId));
       toast.success(t('apiKeys.notifications.deleteSuccess'));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting API key:', error);
-      toast.error(t('apiKeys.notifications.deleteFailed'));
+      toast.error(error?.message || t('apiKeys.notifications.deleteFailed'));
     }
   };
 
