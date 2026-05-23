@@ -201,7 +201,15 @@ export default function ApiKeyManagement() {
 
       if (response.error) {
         console.error('Edge function error response:', response);
+        console.error('Error details:', {
+          message: response.error.message,
+          name: (response.error as any).name,
+          status: (response.error as any).status,
+          context: (response.error as any).context,
+          data: response.data,
+        });
         const serverMessage =
+          (response.error as any)?.context?.message ||
           response.data?.message ||
           response.error.message ||
           'Failed to create API key';

@@ -150,7 +150,10 @@ async function createApiKey(supabase: any, userId: string, req: Request) {
 
     if (error) {
       console.error('Database error creating API key:', error);
-      return createErrorResponse('Failed to create API key', 500);
+      return createErrorResponse(
+        `Database error: ${error.message || error.details || 'Failed to create API key'}`,
+        500
+      );
     }
 
     return createSuccessResponse({
@@ -160,9 +163,12 @@ async function createApiKey(supabase: any, userId: string, req: Request) {
       message: 'API key created successfully. Store this key securely - it will not be shown again.'
     }, 201);
 
-  } catch (error) {
-    console.error('Error creating API key:', error);
-    return createErrorResponse('Invalid request body', 400);
+  } catch (error: any) {
+    console.error('Unhandled error creating API key:', error);
+    return createErrorResponse(
+      `Server error: ${error?.message || error?.toString() || 'Unknown error'}`,
+      500
+    );
   }
 }
 
