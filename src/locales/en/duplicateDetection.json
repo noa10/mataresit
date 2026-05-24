@@ -20,5 +20,10 @@
   "duplicateLabel": "Duplicate",
   "groupLabel": "Group {{n}}",
   "scanFreshnessWarning": "Results from {{time}}. Re-scan recommended before deleting.",
-  "deleting": "Deleting..."
+  "deleting": "Deleting...",
+  "scanError": "Failed to scan for duplicates. Please try again.",
+  "confirmDeleteSelectedTitle": "Confirm Deletion",
+  "confirmDeleteAllTitle": "Confirm Bulk Deletion",
+  "cancel": "Cancel",
+  "confirmDelete": "Confirm Delete"
 }

@@ -20,5 +20,10 @@
   "duplicateLabel": "Pendua",
   "groupLabel": "Kumpulan {{n}}",
   "scanFreshnessWarning": "Hasil dari {{time}}. Imbas semula disyorkan sebelum memadam.",
-  "deleting": "Memadam..."
+  "deleting": "Memadam...",
+  "scanError": "Gagal mengimbas pendua. Sila cuba lagi.",
+  "confirmDeleteSelectedTitle": "Sahkan Pemadaman",
+  "confirmDeleteAllTitle": "Sahkan Pemadaman Pukal",
+  "cancel": "Batal",
+  "confirmDelete": "Sahkan Pemadaman"
 }
