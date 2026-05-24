@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Trash2 } from "lucide-react";
 
@@ -46,27 +46,11 @@ export function DuplicateDetectionPanel() {
   const [pendingDeleteType, setPendingDeleteType] = useState<"selected" | "all" | null>(null);
 
   // Scan freshness tracking
-  const [scanTime, setScanTime] = useState<number | null>(null);
-  const isStale = scanTime !== null && Date.now() - scanTime > SCAN_FRESHNESS_MS;
+  const isStale = data ? (Date.now() - new Date(data.scannedAt).getTime() > SCAN_FRESHNESS_MS) : false;
 
-  // Update scan timestamp when data arrives
-  useEffect(() => {
-    if (data) {
-      setScanTime(Date.now());
-    }
-  }, [data]);
-
-  // Reset checked state when data changes (new scan)
-  useEffect(() => {
-    if (data) {
-      // Checked state is managed by the hook, no reset needed here
-      // since it's a fresh scan with new groups
-    }
-  }, [data]);
 
   const handleScan = () => {
     reset();
-    setScanTime(null);
     scan(config);
   };
 
@@ -96,14 +80,15 @@ export function DuplicateDetectionPanel() {
       setShowConfirm(false);
       setPendingDeleteType(null);
       reset();
-      setScanTime(null);
     } catch (err) {
       // Error is handled by the mutation hook
       console.error("Failed to delete duplicates:", err);
     }
   };
 
-  const formatScanTime = (timestamp: number): string => {
+  const formatScanTime = (): string => {
+    if (!data?.scannedAt) return '';
+    const timestamp = new Date(data.scannedAt).getTime();
     const minutesAgo = Math.floor((Date.now() - timestamp) / 60000);
     if (minutesAgo < 1) return t("scanFreshnessWarning", { time: "just now" });
     if (minutesAgo < 60) return t("scanFreshnessWarning", { time: `${minutesAgo}m ago` });
@@ -173,7 +158,8 @@ export function DuplicateDetectionPanel() {
             <Alert className="border-amber-500/50 bg-amber-500/10">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <AlertDescription className="text-amber-600 dark:text-amber-400">
-                {formatScanTime(scanTime!)}
+                {formatScanTime()}
+
               </AlertDescription>
             </Alert>
           )}
