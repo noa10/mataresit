@@ -10,7 +10,8 @@ import {
   Upload, Search, SlidersHorizontal,
   PlusCircle, XCircle, Calendar as CalendarIcon, X,
   LayoutGrid, LayoutList, Table as TableIcon,
-  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag, RefreshCw
+  Files, CheckSquare, Trash2, Loader2, Check, Crown, Zap, Tag, RefreshCw,
+  ChevronDown, ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
@@ -43,6 +44,8 @@ import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet"
 import { ReceiptsPagination } from "@/components/dashboard/ReceiptsPagination";
 import { BulkReprocessProgressPanel } from "@/components/dashboard/BulkReprocessProgressPanel";
 import { useBulkReprocess } from "@/contexts/BulkReprocessContext";
+import { DuplicateDetectionPanel } from "@/components/dashboard/DuplicateDetectionPanel";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 import {
   Table,
@@ -294,6 +297,7 @@ export default function Dashboard() {
 
   const { openModal: openUploadModal, onUploadCompleteCallback } = useBackgroundUpload();
   const [isFiltersSheetOpen, setIsFiltersSheetOpen] = useState(false);
+  const [isDedupOpen, setIsDedupOpen] = useState(false);
 
   // Register the dashboard's refetch callback with the background upload context
   // so that when background uploads complete, the receipt list auto-refreshes.
@@ -1479,6 +1483,19 @@ export default function Dashboard() {
           activeFilterCount={activeFilterCount}
           tDash={tDash}
         />
+
+        {/* Duplicate Detection Collapsible */}
+        <Collapsible open={isDedupOpen} onOpenChange={setIsDedupOpen} className="mb-6">
+          <CollapsibleTrigger asChild>
+            <button className="flex w-full items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors">
+              <ChevronRight className={`h-4 w-4 transition-transform ${isDedupOpen ? 'rotate-90' : ''}`} />
+              Duplicate Detection
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <DuplicateDetectionPanel />
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Main Content Area */}
         {renderReceiptContent()}
