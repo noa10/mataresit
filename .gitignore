@@ -107,4 +107,5 @@ opencode.json
 
 # Kilo
 .kilo/
-.omc/
+.omc/*
+.omo/*
