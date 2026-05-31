@@ -53,7 +53,6 @@ export function CollaborationMetricsChart({
 }: CollaborationMetricsChartProps) {
   
   // Generate collaboration data
-  const collaborationOverviewData = generateCollaborationOverview(teamAnalytics);
   const communicationTrendsData = generateCommunicationTrends(memberAnalytics);
   const collaborationEffectivenessData = generateCollaborationEffectiveness(memberAnalytics);
   const networkAnalysisData = generateNetworkAnalysis(memberAnalytics);
