@@ -21,7 +21,6 @@ import type { ScanConfig, DuplicateGroup } from "@/types/duplicateDetection";
 export function useDuplicateScan() {
   const { currentTeam: team } = useTeam();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: (config: ScanConfig) =>
