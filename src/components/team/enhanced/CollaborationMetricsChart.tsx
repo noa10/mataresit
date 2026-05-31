@@ -28,11 +28,8 @@ import {
 import { 
   MessageSquare, 
   Users, 
-  Share2,
-  Clock,
   TrendingUp,
   Network,
-  Activity,
   Target,
   Zap
 } from 'lucide-react';
