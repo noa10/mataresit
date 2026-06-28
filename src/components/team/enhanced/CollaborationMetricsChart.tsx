@@ -412,15 +412,6 @@ export function CollaborationMetricsChart({
 }
 
 // Helper functions to generate collaboration data
-function generateCollaborationOverview(teamAnalytics: TeamAdvancedAnalytics) {
-  return {
-    avgCollaborationScore: teamAnalytics.collaboration_summary.avg_collaboration_score,
-    activeConversations: teamAnalytics.collaboration_summary.team_conversations,
-    collaborationEffectiveness: teamAnalytics.collaboration_summary.collaboration_effectiveness,
-    highCollaborators: Math.round(teamAnalytics.team_info.total_members * 0.3)
-  };
-}
-
 function generateCommunicationTrends(memberAnalytics: any[]) {
   const trends = [];
   const periods = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
