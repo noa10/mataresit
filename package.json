@@ -152,7 +152,7 @@
     "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "^3.9.0",
     "remark-gfm": "^4.0.1",
-    "sharp": "^0.35.2",
+    "sharp": "^0.35.4",
     "sonner": "^2.0.7",
     "stripe": "^22.3.0",
     "tailwind-merge": "^3.6.0",
