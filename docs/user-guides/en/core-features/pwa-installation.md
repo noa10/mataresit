@@ -259,7 +259,7 @@ Monitor and manage PWA storage usage.
 - **Symptoms:** No install prompt or menu option visible
 - **Cause:** Browser doesn't support PWA or requirements not met
 - **Solution:** Use supported browser and ensure HTTPS connection
-- **Prevention:** Always access via https://mataresit.com
+- **Prevention:** Always access via https://mataresit.vercel.app
 
 **Issue 2: Installation Fails**
 - **Symptoms:** Installation starts but doesn't complete

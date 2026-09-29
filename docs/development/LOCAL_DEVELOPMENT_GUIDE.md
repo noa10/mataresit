@@ -1,172 +1,116 @@
-# 🚀 Local Development Guide - Paperless Maverick
+# Local Development Guide
 
-## 🔍 Understanding the Setup
+This guide describes a safe local workflow for developing Mataresit. It does not use production credentials, production data, or a shared Supabase project.
 
-### **Current Configuration**
-- **Production Mode**: Currently active (real data, existing users)
-- **Local Mode**: Available (empty database, for testing)
+## Principles
 
-### **Why Authentication Failed**
-✅ **This is expected behavior!** Here's why:
-- Local Supabase = Separate database from production
-- No existing users in local environment
-- Different JWT keys (demo vs production)
-- Completely isolated for development safety
+- Keep development data isolated from production.
+- Never commit `.env.local`, API keys, service-role keys, Stripe secrets, or real receipts.
+- Do not use `supabase db push` as part of normal local setup.
+- Do not use a production-linked project for migrations, Edge Function deployment, or test data.
+- Treat the `env:*` npm scripts as maintainer utilities and inspect them before using them.
 
-## 🎯 Three Development Approaches
+## Prerequisites
 
-### **Approach 1: Quick Toggle (Recommended)**
-Switch between local and production easily:
+- Node.js 20 (see [`.nvmrc`](../../.nvmrc))
+- npm
+- Supabase CLI
+- Docker Desktop or another supported local container runtime for the Supabase stack
+- A Gemini API key for AI receipt processing
+
+## Install the frontend
 
 ```bash
-# Check current environment
-node scripts/switch-env.js status
+git clone https://github.com/noa10/mataresit.git
+cd mataresit
 
-# Switch to production (real data, existing users)
-node scripts/switch-env.js production
+nvm use
+npm ci
+cp .env.example .env.local
+```
 
-# Switch to local (empty database, testing)
-node scripts/switch-env.js local
+## Start an isolated Supabase stack
 
-# Restart dev server after switching
+Start the local Supabase services:
+
+```bash
+supabase start
+```
+
+Inspect the local connection values:
+
+```bash
+supabase status
+```
+
+Apply the migrations to the local database:
+
+```bash
+supabase db reset
+```
+
+`supabase db reset` is destructive for the local database. It must never be run against a shared or production project.
+
+## Configure the frontend
+
+Copy the local API URL and anonymous key printed by `supabase status` into `.env.local`:
+
+```dotenv
+VITE_SUPABASE_URL=http://127.0.0.1:54331
+VITE_SUPABASE_ANON_KEY=<local-anon-key-from-supabase-status>
+# Leave VITE_SITE_URL unset locally so auth redirects stay on localhost.
+```
+
+Do not use a service-role key in a `VITE_` variable. Keep provider and Stripe secrets on the server side.
+
+Start the frontend after the local values are configured:
+
+```bash
 npm run dev
 ```
 
-### **Approach 2: Manual Environment Switching**
-Edit `.env.local` directly:
+The Vite server normally runs at `http://localhost:5173`.
+
+## Edge Functions and AI secrets
+
+Receipt processing, search embeddings, reports, billing, and notifications use Supabase Edge Functions. Configure the required functions and server-side secrets in the local Supabase environment or in a separate development Supabase project. When testing local email or notification links, set `SITE_URL` and `FRONTEND_URL` to `http://localhost:5173` in the local function environment.
+
+Never put `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, Stripe secret keys, or webhook secrets in `VITE_` variables.
+
+The primary receipt-processing flow is described in [`supabase/functions/process-receipt/README.md`](../../supabase/functions/process-receipt/README.md).
+
+## Hosted development alternative
+
+If local Supabase is not available, create a separate development project and configure only that project's public URL and browser-safe key in `.env.local`. Do not reuse a production project, service-role key, or production data.
+
+## Validation commands
 
 ```bash
-# For PRODUCTION (real data):
-VITE_SUPABASE_URL=https://mpmkbtsufihzdelrlszs.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# For LOCAL (testing):
-# VITE_SUPABASE_URL=http://127.0.0.1:54331
-# VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+npm run lint
+npm run test:unit
+npm run test
+npm run build
 ```
 
-### **Approach 3: Data Migration (Advanced)**
-Copy production data to local for testing:
+Integration, queue, alerting, and end-to-end tests may require additional test services and environment configuration. See [`package.json`](../../package.json) for the available scripts.
 
-```bash
-# Export from production
-supabase db dump --db-url "postgresql://postgres:[PASSWORD]@db.mpmkbtsufihzdelrlszs.supabase.co:5432/postgres" > backup.sql
+## Troubleshooting
 
-# Import to local
-supabase db reset
-psql "postgresql://postgres:postgres@127.0.0.1:54332/postgres" < backup.sql
-```
+### The frontend cannot reach Supabase
 
-## 🛠️ Recommended Workflow
+1. Run `supabase status`.
+2. Confirm the URL and anonymous key in `.env.local`.
+3. Restart Vite after changing environment variables.
+4. Confirm the local Supabase services are running.
 
-### **For Regular Development**
-1. **Use Production Mode** (current setting)
-   - Access your real data and users
-   - Test with actual receipts and content
-   - Safe for UI/UX changes
+### Authentication does not work locally
 
-### **For Testing New Features**
-1. **Switch to Local Mode**
-   ```bash
-   node scripts/switch-env.js local
-   npm run dev
-   ```
-2. **Create test users** in local environment
-3. **Test dangerous operations** safely
-4. **Switch back to production** when done
+Create a test user in the local Supabase instance. Local users and production users are separate.
 
-### **For Database Changes**
-1. **Always test locally first**
-2. **Run migrations on local**
-3. **Verify everything works**
-4. **Then apply to production**
+### AI processing fails
 
-## 🔐 Authentication in Local Mode
+Confirm that the required Edge Function is running and that its server-side provider secret is configured. Do not send real receipts to a development environment while diagnosing configuration.
 
-When using local mode, you'll need to:
+### The wrong environment is selected
 
-1. **Create new test accounts**:
-   - Go to http://localhost:8080/auth
-   - Sign up with test email (e.g., test@example.com)
-   - No email verification required in local mode
-
-2. **Access local Supabase Studio**:
-   - URL: http://127.0.0.1:54334
-   - View/edit users in Authentication tab
-   - Manually set user roles if needed
-
-## 📊 Environment Status
-
-### **Production Environment**
-- ✅ Real user data
-- ✅ Existing receipts and content
-- ✅ Production API keys
-- ⚠️ Changes affect real users
-
-### **Local Environment**
-- ✅ Safe for testing
-- ✅ Fast development cycle
-- ✅ No risk to production data
-- ❌ Empty database (no existing users/data)
-
-## 🚨 Important Notes
-
-1. **Edge Functions**: Currently point to production Supabase for API keys
-2. **File Storage**: Local uses separate storage bucket
-3. **Database Schema**: Automatically synced via migrations
-4. **Environment Variables**: Some (like Gemini API) are shared
-
-## 🔧 Troubleshooting
-
-### **Can't Login in Local Mode**
-- ✅ Expected! Create new test account
-- Check you're in local mode: `node scripts/switch-env.js status`
-
-### **No Data in Local Mode**
-- ✅ Expected! Local starts empty
-- Import data or create test content
-
-### **Edge Functions Not Working**
-- Check Supabase local status: `supabase status`
-- Verify functions are deployed: `supabase functions list`
-
-### **Environment Not Switching**
-- Restart dev server after switching
-- Clear browser cache/localStorage
-- Check .env.local file was updated
-
-## 🎯 Quick Commands
-
-### **Using npm scripts (Recommended):**
-```bash
-# Check current environment
-npm run env:status
-
-# Switch to production and start dev server
-npm run dev:production
-
-# Switch to local and start dev server
-npm run dev:local
-
-# Just switch environment (without starting dev server)
-npm run env:production
-npm run env:local
-```
-
-### **Using node scripts directly:**
-```bash
-# Check current environment
-node scripts/switch-env.js status
-
-# Switch to production (real data)
-node scripts/switch-env.js production
-
-# Switch to local (testing)
-node scripts/switch-env.js local
-
-# Check Supabase status
-supabase status
-
-# View local database
-open http://127.0.0.1:54334
-```
+Stop the dev server and inspect `.env.local` manually. The `env:*` scripts may target maintainer-managed environments; do not use a production target for local development.

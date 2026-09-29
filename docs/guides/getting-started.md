@@ -6,7 +6,7 @@ Welcome to the Mataresit API! This guide will help you get up and running with o
 
 ### 1. Get Your API Key
 
-1. Sign up at [mataresit.com](https://mataresit.com)
+1. Sign up at [mataresit.vercel.app](https://mataresit.vercel.app)
 2. Navigate to **Dashboard → API Keys**
 3. Click **"Create API Key"**
 4. Choose appropriate scopes for your use case
@@ -16,7 +16,7 @@ Welcome to the Mataresit API! This guide will help you get up and running with o
 
 ```bash
 curl -X GET \
-  'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1/health' \
+  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/external-api/api/v1/health' \
   -H 'X-API-Key: mk_live_your_api_key_here'
 ```
 
@@ -40,7 +40,7 @@ curl -X GET \
 
 ```bash
 curl -X POST \
-  'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1/receipts' \
+  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/external-api/api/v1/receipts' \
   -H 'X-API-Key: mk_live_your_api_key_here' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -216,7 +216,7 @@ Most list endpoints support filtering and sorting:
 
 ```bash
 curl -X GET \
-  'https://api.mataresit.com/v1/receipts?start_date=2025-01-01&end_date=2025-01-31&min_amount=10&sort_by=total&sort_order=desc&limit=25' \
+  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/external-api/api/v1/receipts?start_date=2025-01-01&end_date=2025-01-31&min_amount=10&sort_by=total&sort_order=desc&limit=25' \
   -H 'X-API-Key: mk_live_your_api_key_here'
 ```
 
@@ -313,8 +313,8 @@ try {
 
 ## Support
 
-- **Documentation**: [docs.mataresit.com](https://docs.mataresit.com)
-- **API Status**: [status.mataresit.com](https://status.mataresit.com)
+- **Documentation**: [docs](https://mataresit.vercel.app/docs)
+- **API Status**: [status](https://mataresit.vercel.app/status)
 - **Support Email**: [api-support@mataresit.com](mailto:api-support@mataresit.com)
 - **Community**: [Discord](https://discord.gg/mataresit)
 

@@ -49,7 +49,7 @@ function formatCurrency(amount, currency = 'MYR') {
 
 ## Links
 
-[Visit Mataresit](https://mataresit.co) for more information.
+[Visit Mataresit](https://mataresit.vercel.app) for more information.
 
 ## Summary
 

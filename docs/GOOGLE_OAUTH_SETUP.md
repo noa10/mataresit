@@ -47,7 +47,8 @@ The application logs detailed auth information to the browser console:
   - `http://localhost:5173/auth`
   - `http://localhost:3000/auth`
   - `http://localhost:8080/auth`
-  - `https://mataresit.co/auth`
+  - `https://mataresit.vercel.app/auth`
+  - `https://mataresit.vercel.app/**`
 
 ### 2. Google Cloud Console
 - [ ] OAuth 2.0 Client ID created
@@ -56,8 +57,9 @@ The application logs detailed auth information to the browser console:
 
 ### 3. Environment Variables
 ```bash
-# .env.local
-VITE_SUPABASE_URL=https://mpmkbtsufihzdelrlszs.supabase.co
+# .env.local (leave VITE_SITE_URL unset for local-only development)
+VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
 
@@ -65,7 +67,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ### Issue: "Redirect URL not allowed"
 **Cause:** The redirect URL is not in Supabase's allowed list
-**Solution:** Add your localhost URL to Supabase Auth settings
+**Solution:** Add the local URL for development or `https://mataresit.vercel.app/**` for the hosted frontend to Supabase Auth settings
 
 ### Issue: "CORS error"
 **Cause:** Cross-origin request blocked
@@ -108,14 +110,19 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 ## Production Deployment
 
 ### Redirect URLs for Production
-Ensure these URLs are configured in Supabase:
-- `https://mataresit.co/auth`
-- `https://paperless-maverick.vercel.app/auth`
+Ensure the hosted Supabase Auth settings include:
+- `https://mataresit.vercel.app`
+- `https://mataresit.vercel.app/**`
+
+Keep the Google OAuth authorized redirect URI pointed at the Supabase callback
+(`https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`), not at the Vercel
+frontend URL.
 
 ### Environment Variables
 Production should use:
 ```bash
-VITE_SUPABASE_URL=https://mpmkbtsufihzdelrlszs.supabase.co
+VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=production_anon_key
 ```
 

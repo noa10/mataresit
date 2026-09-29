@@ -8,9 +8,11 @@ This document outlines the production deployment configuration for the Mataresit
 
 ```bash
 # Supabase Configuration
-SUPABASE_URL=https://mpmkbtsufihzdelrlszs.supabase.co
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+SITE_URL=https://mataresit.vercel.app
+FRONTEND_URL=https://mataresit.vercel.app
 
 # API Configuration
 API_VERSION=v1
@@ -19,7 +21,7 @@ API_RATE_LIMIT_MAX_REQUESTS=1000  # Default for Pro tier
 
 # Security Configuration
 API_KEY_ENCRYPTION_KEY=your_32_byte_encryption_key_here
-CORS_ALLOWED_ORIGINS=https://mataresit.com,https://app.mataresit.com
+CORS_ALLOWED_ORIGINS=https://mataresit.vercel.app
 CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
 CORS_ALLOWED_HEADERS=X-API-Key,Content-Type,Authorization
 
@@ -372,7 +374,7 @@ pg_dump -h db.mpmkbtsufihzdelrlszs.supabase.co \
 - Provide emergency access through dashboard
 
 ### 4. Communication Plan
-- Update status page: status.mataresit.com
+- Update status page: https://mataresit.vercel.app/status
 - Notify users via email and dashboard notifications
 - Provide regular updates during recovery
 ```

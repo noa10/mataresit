@@ -56,7 +56,7 @@ OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1"
 PORT: "3000"                          # Application port
 NODE_ENV: "production"                # Environment mode
 LOG_LEVEL: "info"                     # Logging level (debug/info/warn/error)
-CORS_ORIGIN: "https://app.mataresit.com" # CORS allowed origins
+CORS_ORIGIN: "https://mataresit.vercel.app" # CORS allowed origins
 
 # Feature flags
 ENABLE_AI_VISION: "true"              # Enable AI vision processing

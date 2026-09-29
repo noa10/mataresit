@@ -1,49 +1,33 @@
 # Process Receipt Edge Function
 
-This Edge Function processes receipt images using OCR and AI enhancement.
+The `process-receipt` Edge Function processes an uploaded receipt image through Mataresit's AI vision pipeline.
 
-## Logging
+## Processing flow
 
-This function uses the unified ProcessingLogger from `supabase/functions/_shared/db-logger.ts` which provides:
+1. Validate the request and receipt identifier.
+2. Fetch and optimize the uploaded image.
+3. Send the image to `enhance-receipt-data` for structured extraction.
+4. Generate a thumbnail for list and preview views.
+5. Save the extracted receipt data and processing status.
+6. Queue or trigger embedding generation for search.
+7. Allow database triggers and notification helpers to publish status updates.
 
-- Resilient error handling that never crashes the parent function
-- Automatic fallback to console logging if database logging fails
-- Service role key authentication to avoid RLS issues
-- Consistent logging format across all edge functions
+The primary extraction path is AI vision-based. Traditional OCR-first processing is not the default path for this function.
+
+## Provider configuration
+
+AI provider credentials are read from server-side environment variables. Gemini is the primary configured path; other providers may be available through the provider-routing layer. Never place provider secrets in frontend `VITE_` variables or commit them to the repository.
+
+## Local safety
+
+Use an isolated local Supabase project for development. Do not run local reset, migration, or Edge Function deployment commands against a shared or production project.
 
 ## Deployment
 
-Deploy the function using:
+Deploy the function from the repository root with the Supabase CLI after the required project configuration and secrets are in place:
 
 ```bash
-# From the project root directory
 supabase functions deploy process-receipt
 ```
 
-## Architecture
-
-The function follows a modular pipeline approach:
-
-1. Gracefully handles RLS policy violations
-2. Continues to log to the console even when database logging fails
-3. Automatically disables database logging after the first RLS error
-4. Never fails the main function due to logging errors
-
-This ensures that receipt processing continues to work even when the database logging fails.
-
-## Alternative Solution
-
-If you prefer to fix the RLS policy instead, you can add a policy to the `processing_logs` table that allows the service role to insert rows:
-
-```sql
--- Run this in the SQL editor in the Supabase dashboard
-ALTER TABLE public.processing_logs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Service role can insert logs"
-  ON public.processing_logs
-  FOR INSERT
-  TO service_role
-  USING (true);
-```
-
-This would allow the Edge Function to log to the database while still protecting the table from unauthorized access.
+The deployment must also include any functions and shared configuration required by the receipt-processing pipeline.

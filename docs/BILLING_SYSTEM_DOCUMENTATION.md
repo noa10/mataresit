@@ -360,11 +360,17 @@ SERVICE_ROLE_KEY=your_service_role_key
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_webhook_secret
 
-# Frontend Configuration
-FRONTEND_URL=your_frontend_url
+# Frontend Configuration (Vercel)
+VITE_SITE_URL=https://mataresit.vercel.app
+
+# Supabase Edge Function URL secrets
+FRONTEND_URL=https://mataresit.vercel.app
+SITE_URL=https://mataresit.vercel.app
 
 # Email Configuration
 EMAIL_SERVICE_API_KEY=your_email_service_key
+FROM_EMAIL=Mataresit <noreply@your-verified-domain>
+BILLING_ALERT_EMAILS=finance@your-verified-domain
 ```
 
 ### Deployment Steps

@@ -60,29 +60,20 @@ info:
 
     ## Support
 
-    - **Documentation**: [https://docs.mataresit.com](https://docs.mataresit.com)
-    - **Support**: [support@mataresit.com](mailto:support@mataresit.com)
-    - **Status Page**: [https://status.mataresit.com](https://status.mataresit.com)
+    - **Documentation**: [Mataresit repository](https://github.com/noa10/mataresit)
+    - **Support**: [Open an issue](https://github.com/noa10/mataresit/issues)
+    - **Security**: Follow the security guidance in the repository README
 
   version: 1.0.0
   contact:
-    name: Mataresit API Support
-    url: https://docs.mataresit.com
-    email: support@mataresit.com
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
-  termsOfService: https://mataresit.com/terms
-
-externalDocs:
-  description: Find more info here
-  url: https://docs.mataresit.com
+    name: Mataresit maintainers
+    url: https://github.com/noa10/mataresit/issues
 
 servers:
-  - url: https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/external-api/api/v1
-    description: Production server
-  - url: http://127.0.0.1:54321/functions/v1/external-api/api/v1
-    description: Development server
+  - url: https://YOUR_PROJECT_REF.supabase.co/functions/v1/external-api/api/v1
+    description: Production server (replace with your Supabase project URL)
+  - url: http://127.0.0.1:54331/functions/v1/external-api/api/v1
+    description: Local Supabase server
 
 security:
   - ApiKeyAuth: []

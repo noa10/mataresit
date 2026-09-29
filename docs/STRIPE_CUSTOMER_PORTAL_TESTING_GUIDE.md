@@ -23,11 +23,15 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
 # Site Configuration
-VITE_SITE_URL=https://mataresit.com
+# Vercel Production environment:
+VITE_SITE_URL=https://mataresit.vercel.app
+# Supabase Edge Function secrets:
+FRONTEND_URL=https://mataresit.vercel.app
+SITE_URL=https://mataresit.vercel.app
 ```
 
 ### 2. Configuration Steps
-1. **Access Supabase Dashboard**: https://supabase.com/dashboard/project/mpmkbtsufihzdelrlszs
+1. **Access Supabase Dashboard**: https://supabase.com/dashboard/project/YOUR_PROJECT_REF
 2. **Navigate to**: Project Settings → Edge Functions → Environment Variables
 3. **Add each environment variable** listed above
 4. **Save configuration** and wait for propagation
@@ -41,7 +45,7 @@ VITE_SITE_URL=https://mataresit.com
 **Objective**: Verify that users can access the Stripe Customer Portal from the billing preferences UI.
 
 **Test Steps**:
-1. **Navigate to Application**: http://localhost:5002 (development) or https://mataresit.com (production)
+1. **Navigate to Application**: http://localhost:5173 (development) or https://mataresit.vercel.app (production)
 2. **Login**: Use valid user credentials
 3. **Access Settings**: Click on user menu → Settings
 4. **Navigate to Billing**: Click on "Billing" tab (3rd tab with CreditCard icon)
@@ -119,7 +123,7 @@ VITE_SITE_URL=https://mataresit.com
 
 ```bash
 # Test create_portal_session action
-curl -X POST "https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/manage-subscription" \
+curl -X POST "https://YOUR_PROJECT_REF.supabase.co/functions/v1/manage-subscription" \
   -H "Authorization: Bearer <USER_JWT_TOKEN>" \
   -H "Content-Type: application/json" \
   -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwMTIzODksImV4cCI6MjA1ODU4ODM4OX0.25ZyBSIl0TQxXFZsaT1R55118Tn8b6Ri8N556gOQyPY" \

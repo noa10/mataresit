@@ -8,7 +8,7 @@
 ## 🚀 Quick Steps
 
 ### 1. Create Your Account
-Visit [mataresit.com](https://mataresit.com) and sign up with your email.
+Visit [mataresit.vercel.app](https://mataresit.vercel.app) and sign up with your email.
 
 ![Quick Signup](../../assets/screenshots/onboarding/quick-01_signup_desktop_en.png)
 

@@ -1,123 +1,42 @@
-# Mataresit Documentation
+# Mataresit documentation
 
-This directory contains comprehensive documentation for the Mataresit (formerly Paperless Maverick) project, including user guides, technical documentation, and system administration resources.
+This directory contains user guides, technical references, implementation notes, and operational material for Mataresit.
 
-## 🧭 Navigation
-- **[Complete Documentation Navigation](NAVIGATION.md)** - Find any documentation quickly
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Comprehensive documentation catalog
+The [root README](../README.md) is the canonical product and setup overview. Use the source code and current configuration as the source of truth when an older document conflicts with it.
 
-## Structure
+The current temporary hosted frontend is [https://mataresit.vercel.app](https://mataresit.vercel.app); update this reference when the final canonical domain is selected.
 
-### 📚 **User Guides**
-Comprehensive user guides and tutorials for using the application.
-- **[User Guides Collection](user-guides/README.md)** - Complete user documentation index
-- **[English User Guides](user-guides/en/README.md)** - English documentation
-- **[Getting Started](user-guides/en/onboarding/quick-start-5min.md)** - 5-minute quick start
-- **[Core Features](user-guides/en/core-features/quick-start-core-features.md)** - Essential functionality
-- **[Team Collaboration](user-guides/en/team-collaboration/quick-start-team-collaboration.md)** - Team setup
-- **[AI Intelligence](user-guides/en/ai-intelligence/quick-start-ai-intelligence.md)** - AI features
-- `paperless-maverick-documentation.md` - Technical system documentation
+## Start here
 
-### 🔧 **Development**
-Development-related documentation and setup guides.
-- `LOCAL_DEVELOPMENT_GUIDE.md` - Local development setup
-- `PROJECT_STRUCTURE_REORGANIZATION.md` - Project structure changes
+- [Root README](../README.md) — product overview, architecture, setup, deployment model, and contribution guidance
+- [GitHub automation overview](../.github/workflows/README.md) — active CI, security, monitoring, and Supabase validation workflows
+- [User guides](./user-guides/README.md) — historical and task-oriented product documentation
+- [Architecture notes](./architecture/) — design and implementation references
+- [API specification](./api/openapi.yaml) — draft external API contract; verify the deployment URL and versioning before using it
+- [Supabase Edge Functions](../supabase/functions/) — server-side processing, search, billing, and notification functions
+- [Tests](../tests/) — unit, integration, end-to-end, alerting, and queue suites
 
-### 🏗️ **Architecture**
-System architecture and high-level design documents.
-- `master-implementation-plan.md` - Overall system architecture
-- `master-receipt-implementation-plan.md` - Receipt processing architecture
+## Documentation areas
 
-### 🔌 **API**
-API documentation and integration guides.
-- `stripe-integration.md` - Stripe payment integration documentation
+| Area | Location | Notes |
+| --- | --- | --- |
+| User onboarding | `user-guides/en/onboarding/` | Product walkthroughs; some content predates the current UI |
+| Core features | `user-guides/en/core-features/` | Receipt capture, search, reporting, and platform notes |
+| Team workflows | `user-guides/en/team-collaboration/` | Teams, roles, claims, and collaboration |
+| AI and localization | `user-guides/en/ai-intelligence/` | Search, Malaysian business context, and notifications |
+| Development | `development/` | Local setup and project conventions; review environment-safety notes before use |
+| Architecture | `architecture/` | Receipt-processing and system design references |
+| API | `api/` | External API specification and integration notes |
+| Deployment and operations | `deployment/`, `monitoring/`, `troubleshooting/` | Maintainer and operational material |
 
-### 🚀 **Features**
-Feature-specific documentation and implementation details.
-- `batch-upload-plan.md` - Batch upload functionality
-- `batch-upload-readme.md` - Batch upload user guide
-- `batch_processing_plan.md` - Batch processing implementation
-- `export-functionality.md` - Export features documentation
-- `DailyPDFReportGenerator.md` - PDF report generation
-- `generate-embeddings.md` - Embedding generation system
-- `search-improvements.md` - Search functionality improvements
-- `semantic-search-refactor.md` - Semantic search implementation
+## Documentation status
 
-### 🤖 **AI**
-AI and machine learning related documentation.
-- `AI_ENHANCEMENT_PLAN.md` - AI feature enhancement plans
-- `AI_INTERGRATION_PLAN.md` - AI integration strategy
-- `AI-Providers-Settings-Redesign.md` - AI provider configuration
-- `IMPLEMENTATION_SUMMARY_AI.md` - AI implementation summary
+The documentation tree contains material written for multiple versions of Mataresit, including references to the former Paperless Maverick name and older deployment approaches. Those references are retained for historical context until they are reviewed and updated.
 
-### 🎨 **UI/UX**
-User interface and user experience documentation.
-- `UI_ENHANCEMENTS_PLAN.md` - UI enhancement plans
-- `UI_UX_Fix_PLAN.md` - UI/UX fixes and improvements
-- `ui-ux-improvements.md` - General UI/UX improvements
+When adding or changing documentation:
 
-### 📋 **Implementation Plans**
-Detailed implementation plans for various features.
-- `CONFIDENCE_SCORES_IMPLEMENTATION.md` - Confidence scoring system
-- `CONFIDENCE_SCORE_FIX_PLAN.md` - Confidence score fixes
-- `CONFIDENCE_SCORE_IMPROVEMENT_PLAN.md` - Confidence score improvements
-- `ENHANCED_TYPES_PLAN.md` - Type system enhancements
-- `SCORING_ALGORITHM_IMPROVEMENTS.md` - Algorithm improvements
-- `adding-tabs-analysis.md` - Tab functionality analysis
-- `confidence-score-visibility.md` - Score visibility improvements
-- `pricing-update-2025.md` - Pricing structure updates
-- `real-time-feedback.md` - Real-time feedback implementation
-- `real-time-status-updates.md` - Status update system
-- `refactoring-analysis-page-plan.md` - Analysis page refactoring
-- `report-generation-options.md` - Report generation features
-- `simplify-receipt-viewing-plan.md` - Receipt viewer improvements
-
-### 🚀 **Deployment**
-Deployment guides and production setup.
-- `DEPLOYMENT_COMPLETE.md` - Deployment completion guide
-
-### 🔧 **Troubleshooting**
-Troubleshooting guides and debugging information.
-- `SUBSCRIPTION_FIXES_SUMMARY.md` - Subscription system fixes
-- `WEBHOOK_DEBUGGING_GUIDE.md` - Webhook debugging guide
-- `debug-save-issue-plan.md` - Save functionality debugging
-- `dialog-scrolling-issue-fix.md` - Dialog scrolling fixes
-- `OpenRouter-Integration-Fix.md` - OpenRouter integration fixes
-
-## Quick Navigation
-
-### For New Users
-1. Start with **[5-Minute Quick Start](user-guides/en/onboarding/quick-start-5min.md)**
-2. Follow **[New User Guide](user-guides/en/onboarding/new-user-guide.md)**
-3. Explore **[Core Features](user-guides/en/core-features/quick-start-core-features.md)**
-
-### For Team Administrators
-1. Begin with **[Team Setup Guide](user-guides/en/team-collaboration/team-setup.md)**
-2. Configure **[Role & Permissions](user-guides/en/team-collaboration/role-permissions.md)**
-3. Implement **[Claims Management](user-guides/en/team-collaboration/claims-management.md)**
-
-### For New Developers
-1. Start with `guides/paperless-maverick-documentation.md`
-2. Follow `development/LOCAL_DEVELOPMENT_GUIDE.md`
-3. Review `architecture/master-implementation-plan.md`
-
-### For Feature Development
-1. Check `features/` for existing feature documentation
-2. Review `implementation-plans/` for planned features
-3. Consult `api/` for integration requirements
-
-### For UI/UX Work
-1. Review `ui-ux/` directory for design guidelines
-2. Check `implementation-plans/` for UI-related plans
-
-### For Troubleshooting
-1. Check `troubleshooting/` directory for known issues
-2. Review deployment guides in `deployment/`
-
-## Contributing to Documentation
-
-1. Place new documentation in the appropriate subdirectory
-2. Use descriptive filenames with `.md` extension
-3. Include a brief description in this README
-4. Cross-reference related documents
-5. Keep documentation up-to-date with code changes
+- Use `Mataresit` consistently for the current product.
+- Link to existing files and verify the target exists.
+- Do not publish credentials, production data, or private infrastructure details.
+- Mark experimental or plan-dependent features clearly.
+- Update both English and Bahasa Malaysia translations when changing user-facing product copy.

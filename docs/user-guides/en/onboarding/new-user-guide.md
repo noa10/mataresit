@@ -33,7 +33,7 @@ Welcome to Mataresit, the intelligent receipt management platform that transform
 ### Phase 1: Account Creation & Setup (5 minutes)
 
 #### Step 1: Create Your Account
-Visit [mataresit.com](https://mataresit.com) and click "Get Started" to begin.
+Visit [mataresit.vercel.app](https://mataresit.vercel.app) and click "Get Started" to begin.
 
 ![Account Creation](../../assets/screenshots/onboarding/01_account-creation_desktop_en.png)
 

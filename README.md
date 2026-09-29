@@ -1,272 +1,344 @@
-# Mataresit
-
-<p align="center">
-  <img src="./public/mataresit-icon.png" alt="Mataresit Logo" width="120">
-</p>
-
-<p align="center">
-  <strong>AI-Powered Receipt Processing & Expense Management</strong>
-</p>
-
-<p align="center">
-  <a href="#features">Features</a> •
-  <a href="#getting-started">Getting Started</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#deployment">Deployment</a>
-</p>
+<div align="center">
+  <img src="./public/mataresit-icon.png" alt="Mataresit logo" width="96" />
+  <h1>Mataresit</h1>
+  <p><strong>AI-assisted receipt processing and expense management</strong></p>
+  <p>Turn receipt images into structured, searchable expense records.</p>
+</div>
 
 ---
 
-## What is Mataresit?
+Mataresit is a web-based receipt and expense workspace for individuals, small businesses, and teams. Upload a receipt, let AI vision extract structured fields, review confidence-scored results, and then search, analyze, export, or submit expenses through one system.
 
-Mataresit is a modern, AI-powered web application that automates receipt processing and expense management. Using advanced AI Vision technology (Google Gemini), it extracts data from receipt images instantly, eliminating manual data entry and helping businesses and individuals track expenses effortlessly.
+The application includes English and Bahasa Malaysia localization, Malaysian currency and business metadata, team workflows, and integrations for receipt management. It is built as a React/Vite frontend on top of Supabase.
 
-### Key Benefits
+> **Project status:** active development. This repository contains both the user-facing application and the backend infrastructure used to operate it. Some advanced features are plan-dependent or still being stabilized.
+>
+> **Temporary production URL:** [https://mataresit.vercel.app](https://mataresit.vercel.app). Replace this with the final canonical domain when it is ready.
 
-- ⏱️ **Save 5+ hours per week** - No more manual receipt entry
-- 🎯 **99% accuracy** - AI-powered data extraction with confidence scoring
-- 🔍 **Smart search** - Find any receipt instantly with semantic search
-- 💰 **Maximize tax deductions** - Never miss a deductible expense
-- 👥 **Team collaboration** - Share and manage expenses with your team
-- 🔒 **Bank-grade security** - Your data is encrypted and secure
+[Capabilities](#capabilities) · [Architecture](#architecture) · [Getting started](#getting-started) · [Deployment](#deployment-model) · [Contributing](#contributing)
 
-## Features
+## What problem does Mataresit solve?
 
-### AI-Powered Receipt Processing
+Receipts are often photographed, stored in chat threads, or entered manually into spreadsheets. Mataresit turns that paper trail into organized data:
 
-- 🤖 **Intelligent Data Extraction** - Google Gemini 2.0 Flash Lite analyzes receipt images and extracts merchant, date, total, items, and more
-- 📸 **Batch Upload** - Process multiple receipts simultaneously
-- 🎯 **Confidence Scoring** - Visual indicators highlight fields that need verification
-- ✏️ **Smart Verification** - Side-by-side image and data editor with AI suggestions
+```text
+Receipt image
+    ↓
+AI vision extraction
+    ↓
+Review and correct confidence-scored fields
+    ↓
+Search, categorize, analyze, and export
+    ↓
+Create claims or collaborate with a team
+```
 
-### Advanced Analytics & Reporting
+The goal is not to remove human review. It is to make the review faster by bringing the receipt image, extracted data, and follow-up workflows together.
 
-- 📊 **Expense Dashboard** - Visual insights into spending patterns
-- 📈 **Trend Analysis** - Track spending over time with interactive charts
-- 📑 **Automated Reports** - Generate daily, weekly, or monthly PDF reports
-- 📤 **Export Options** - Export to PDF, Excel (CSV), or JSON
+## Product preview
 
-### Smart Search & Organization
+<img src="./public/receipt-scanner.png" alt="Illustrative receipt capture workflow" width="420" />
 
-- 🔍 **Semantic Search** - Search by description, merchant, or content meaning
-- 🏷️ **Auto-Categorization** - AI suggests expense categories automatically
-- 📁 **Custom Categories** - Create and manage your own category system
-- 🏢 **Merchant Normalization** - Standardizes merchant names automatically
+*Illustrative receipt capture preview. The application supports multiple currencies and Malaysian-aware formatting.*
 
-### Team Collaboration
+## Capabilities
 
-- 👥 **Team Management** - Create teams and invite members
-- 🔐 **Role-Based Access** - Admin, manager, and member permissions
-- 📝 **Claims Workflow** - Submit and approve expense claims
-- 📧 **Email Notifications** - Real-time alerts for team activities
+### Receipt capture and AI
 
-### Multi-Language & Accessibility
+- Upload receipt images from the dashboard.
+- Process the primary path with configurable AI vision providers.
+- Extract merchant, date, totals, tax, payment method, line items, and other structured fields.
+- Receive confidence indicators for fields that may need attention.
+- Review, edit, categorize, and save extracted data.
+- Generate thumbnails for faster receipt browsing.
+- Batch-upload supported by the client and backend upload workflow.
 
-- 🌍 **Bilingual Support** - English and Malay (Bahasa Malaysia) interfaces
-- 📱 **Mobile Responsive** - Works seamlessly on desktop, tablet, and mobile
-- 🌓 **Dark/Light Mode** - Comfortable viewing in any environment
-- ♿ **Accessibility** - WCAG-compliant design
+The upload interface accepts JPEG, PNG, and PDF files, while the primary processing path is optimized for images. Validate PDF processing in the target environment before relying on it.
 
-### Security & Compliance
+### Search and organization
 
-- 🔒 **Supabase Auth** - Secure authentication with Google OAuth support
-- 🛡️ **Row Level Security** - Data isolation at the database level
-- 🔐 **Encrypted Storage** - All data encrypted at rest and in transit
-- ✅ **GDPR Ready** - Privacy-compliant data handling
+- Natural-language and hybrid search across receipt data.
+- Search by merchant, category, date, amount, and receipt content.
+- Automatic and manual categorization.
+- Dashboard statistics and spending analysis.
+- Receipt and report export workflows.
 
-### Admin & Monitoring
+### Team workflows
 
-- 🎛️ **Admin Dashboard** - User management and system analytics
-- 📡 **Real-time Monitoring** - System health and performance metrics
-- 🚨 **Alert System** - Configurable notifications for critical events
-- 📈 **Usage Analytics** - Track API quotas and system usage
+- Team and workspace management.
+- Member invitations and role-based access.
+- Receipt sharing and team visibility.
+- Expense claims with submission and approval states.
+- Notifications for processing, team, and claim activity.
 
-## Tech Stack
+The current team roles include `owner`, `admin`, `member`, and `viewer`.
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | React 18 + TypeScript + Vite |
-| **Styling** | Tailwind CSS + Radix UI + Framer Motion |
-| **State Management** | TanStack Query (React Query) |
-| **Backend** | Supabase (PostgreSQL + Edge Functions) |
-| **AI/ML** | Google Gemini 2.0 Flash Lite + Groq (Llama 4 Scout) |
-| **Authentication** | Supabase Auth + Google OAuth 2.0 |
-| **Payments** | Stripe (Subscriptions & One-time) |
-| **Testing** | Vitest + Playwright |
-| **Deployment** | Vercel + GitHub Actions CI/CD |
+### Platform features
 
-## Getting Started
+- English and Bahasa Malaysia (`en` and `ms`) localization.
+- Malaysian currency formatting and business/tax metadata.
+- Responsive web interface with light and dark themes.
+- Subscription tiers backed by Stripe.
+- External API surface for approved integrations, subject to authentication, scopes, quotas, and plan availability.
+
+Features such as the external API, gamification, PWA/offline behavior, and some advanced integrations should be treated as advanced or experimental until their deployment status is confirmed.
+
+## Architecture
+
+Mataresit uses a serverless frontend/backend split:
+
+```mermaid
+flowchart LR
+    A["React + Vite web app"] --> B["Supabase Auth"]
+    A --> C[("Supabase Postgres")]
+    A --> D[("Supabase Storage")]
+    A --> E["Supabase Realtime"]
+    A --> F["Supabase Edge Functions"]
+    F --> G["AI provider routing"]
+    F --> H["Embeddings and search"]
+    F --> I["Stripe billing"]
+    F --> J["Email and push notifications"]
+```
+
+### Main responsibilities
+
+- **Frontend:** React routes, receipt dashboard, review editor, search, analytics, teams, claims, settings, and billing UI.
+- **Database:** profiles, receipts, line items, categories, teams, claims, subscriptions, notifications, API keys, and supporting audit data.
+- **Storage:** original receipt files, avatars, and generated thumbnails.
+- **Realtime:** processing status and notification updates.
+- **Edge Functions:** receipt processing, AI enhancement, embeddings, search, reports, notifications, billing, and the external API.
+- **AI providers:** Gemini is the primary configured path; Groq and OpenRouter paths exist in the provider-routing layer. Model availability and selection can change.
+
+> **Data handling:** Receipt images and extracted data are sent to the configured AI provider for processing. Review the provider's terms and your own data-handling requirements before processing sensitive or production receipts.
+
+## Technology
+
+| Area | Technology |
+| --- | --- |
+| Frontend | React 18, TypeScript, Vite 8 |
+| UI | Tailwind CSS 4, Radix UI, Framer Motion |
+| Routing | React Router 7 |
+| Server state | TanStack Query 5 |
+| Backend | Supabase Postgres, Auth, Storage, Realtime |
+| Server runtime | Deno Supabase Edge Functions |
+| AI | Gemini-first provider routing with optional Groq/OpenRouter paths |
+| Billing | Stripe subscriptions and checkout |
+| Internationalization | i18next with English and Bahasa Malaysia resources |
+| Testing | Vitest 4, Playwright, MSW |
+| Frontend hosting | Vercel |
+| CI/security | GitHub Actions, CodeQL, npm audit, TruffleHog, and GitLeaks |
+
+## Getting started
 
 ### Prerequisites
 
-- **Node.js** 18+ and npm
-- **Supabase** account (free tier works)
-- **Google Cloud** account (for Gemini API - free tier available)
-- **Stripe** account (for payments - test mode for development)
+- Node.js 20 (see [`.nvmrc`](./.nvmrc))
+- npm
+- A Supabase project for a hosted development environment, or the Supabase CLI for local development
+- A Gemini API key for AI receipt processing
+- Stripe test credentials only if you are working on billing
 
-### Quick Start
+The repository does not require Docker or Kubernetes for its Vercel deployment. A local Supabase stack normally uses Docker through the Supabase CLI.
+
+### Clone and install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/mataresit.git
+git clone https://github.com/noa10/mataresit.git
 cd mataresit
 
-# Install dependencies
-npm install
-
-# Set up environment variables
+nvm use
+npm ci
 cp .env.example .env.local
-# Edit .env.local with your configuration
+```
 
-# Start development server
+Edit your local `.env.local` file using [`.env.example`](./.env.example) with the public URL and anonymous key for a development Supabase project. Do not put service-role keys or other server secrets in a `VITE_` variable.
+
+> **Environment safety:** Do not start the app with unresolved Supabase variables. Some legacy integration paths contain deployment-specific fallbacks, so always select an explicit local or development project before running the frontend.
+
+### Run the frontend
+
+```bash
 npm run dev
 ```
 
-### Environment Variables
+The Vite development server is available at the URL printed by the command, normally `http://localhost:5173`.
 
-Create a `.env.local` file with the following:
+### Use a local Supabase stack
 
-```bash
-# Supabase Configuration
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Stripe Configuration
-VITE_STRIPE_PUBLIC_KEY=pk_test_your_key
-
-# Optional: Disable real-time features in development
-# VITE_DISABLE_REALTIME=false
-
-# Backend secrets are configured in Supabase Edge Functions (not in .env.local)
-# Example: GROQ_API_KEY
-```
-
-See [.env.example](./.env.example) for the complete list of configuration options.
-
-### Available Scripts
+For an isolated local backend:
 
 ```bash
-# Development
-npm run dev              # Start development server with hot reload
-npm run build            # Build for production
-npm run preview          # Preview production build locally
-
-# Code Quality
-npm run lint             # Run ESLint
-
-# Testing
-npm run test             # Run all tests
-npm run test:unit        # Run unit tests only
-npm run test:integration # Run integration tests
+supabase start
+supabase status
+supabase db reset
 ```
 
-## Project Structure
+Copy the local URL and anonymous key printed by `supabase status` into `.env.local`, then start the frontend:
 
+```bash
+npm run dev
 ```
+
+`supabase db reset` affects the local database only. Do not use `supabase db push` against a shared or production project as part of normal local setup.
+
+AI processing also requires the relevant Edge Functions and server-side provider secrets. Keep those secrets in the local Supabase environment or the appropriate Supabase project settings; never commit them to `.env.local` or the repository.
+
+## Configuration
+
+The configuration is split between Vite variables and server-side Edge Function secrets.
+
+### Frontend variables
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_SITE_URL` | Public application URL used for production links; leave unset locally |
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Browser-safe Supabase anonymous/publishable key |
+| `VITE_STRIPE_PUBLIC_KEY` | Stripe publishable key |
+| `VITE_STRIPE_*_PRICE_ID` | Stripe Price IDs used by checkout |
+| `VITE_ENABLE_REALTIME` | Optional realtime feature flag |
+| `VITE_REALTIME_HEARTBEAT_INTERVAL` | Optional realtime heartbeat setting |
+
+### Server-side secrets
+
+The following values are used by Edge Functions or server integrations and must not be exposed to the browser:
+
+- `GEMINI_API_KEY`
+- `GROQ_API_KEY` or `OPENROUTER_API_KEY` when those providers are enabled
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `SITE_URL` and `FRONTEND_URL` for links generated by Edge Functions
+- `FROM_EMAIL` for Resend sending
+
+The exact list and examples are maintained in [`.env.example`](./.env.example).
+
+## Common commands
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Create a production build |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run the Vitest suite |
+| `npm run test:unit` | Run the unit-focused Vitest configuration |
+| `npm run test:integration` | Run integration tests; external test services may be required |
+| `npm run test:alerting:unit` | Run alerting unit tests |
+| `npm run test:queue:unit` | Run queue unit tests |
+
+## Repository layout
+
+```text
 mataresit/
 ├── src/
-│   ├── components/     # Reusable UI components
-│   ├── contexts/       # React contexts (auth, language, etc.)
-│   ├── hooks/          # Custom React hooks
-│   ├── lib/            # Utility functions and configurations
-│   ├── pages/          # Route pages
-│   ├── services/       # API and business logic services
-│   └── types/          # TypeScript type definitions
-├── docs/               # Comprehensive documentation
-├── scripts/            # Build and utility scripts
-├── tests/              # Test suites
-├── supabase/           # Supabase configuration and migrations
-└── public/             # Static assets
+│   ├── components/       # UI, feature, and shared components
+│   ├── contexts/         # Auth, team, theme, language, billing, and app state
+│   ├── hooks/            # Data-fetching and interaction hooks
+│   ├── lib/              # Shared utilities, i18n, search, export, and configuration
+│   ├── pages/            # Public, authenticated, team, and admin routes
+│   ├── services/         # Business logic and Supabase-facing services
+│   └── locales/          # English and Bahasa Malaysia translations
+├── supabase/
+│   ├── functions/        # Deno Edge Functions
+│   ├── migrations/       # Database migration history
+│   └── config.toml       # Supabase configuration
+├── docs/                 # User and technical documentation
+├── scripts/              # Maintenance, monitoring, and deployment utilities
+├── tests/                # Unit, integration, E2E, alerting, and queue tests
+├── public/               # Static assets and generated documentation assets
+└── .github/              # Workflows, security configuration, and maintainer notes
 ```
+
+## External API
+
+The repository includes a versioned `external-api` Supabase Edge Function and a draft [OpenAPI specification](./docs/api/openapi.yaml). The API surface is designed for receipt, claim, search, analytics, category, team, and profile operations.
+
+API requests are authenticated and scoped, and access is subject to subscription limits and quotas. Treat the API as an advanced integration surface rather than a stable SDK until the deployment URL, versioning policy, and production availability are confirmed.
+
+## Deployment model
+
+### Frontend
+
+The frontend is configured for Vercel:
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- SPA rewrites are defined in [`vercel.json`](./vercel.json)
+- Vercel's Git integration is responsible for frontend deployments
+
+### Backend
+
+Supabase provides the managed PostgreSQL database, Auth, Storage, Realtime, and Edge Functions. For the current temporary Vercel host, set the Vercel Production environment variable `VITE_SITE_URL=https://mataresit.vercel.app`, configure the hosted Supabase Auth **Site URL** as `https://mataresit.vercel.app`, and allow `https://mataresit.vercel.app/**` for redirects. Set the Supabase Edge Function secrets `SITE_URL` and `FRONTEND_URL` to the same origin, and configure a verified `FROM_EMAIL` for Resend.
+
+When the final domain is selected, update the Vercel `VITE_SITE_URL`, hosted Supabase Auth Site URL/redirect allow-list, `SITE_URL`/`FRONTEND_URL` Edge Function secrets, GitHub `APP_DOMAIN`, and the canonical/sitemap references together.
+
+A production deployment must also configure:
+
+- Supabase Auth redirect URLs and providers
+- Supabase Edge Function secrets: `SITE_URL`, `FRONTEND_URL`, and a verified `FROM_EMAIL`
+- Storage buckets and access policies
+- Database migrations
+- Edge Function secrets
+- Stripe products, webhook signing secrets, and webhook delivery
+- AI provider credentials
+
+### Continuous integration
+
+The current GitHub workflows perform code quality checks, tests, builds, Supabase validation, security scanning, and scheduled monitoring. The Supabase validation workflow is validation-oriented; it does not replace the required production deployment steps.
+
+See [`.github/README.md`](./.github/README.md) for the current automation overview.
 
 ## Documentation
 
-We maintain extensive documentation for developers, administrators, and end users:
+- [Documentation index](./docs/README.md)
+- [Local development guide](./docs/development/LOCAL_DEVELOPMENT_GUIDE.md)
+- [Edge Function processing notes](./supabase/functions/process-receipt/README.md)
 
-### For Users
-- [5-Minute Quick Start](./docs/user-guides/en/onboarding/quick-start-5min.md)
-- [New User Guide](./docs/user-guides/en/onboarding/new-user-guide.md)
-- [Core Features Guide](./docs/user-guides/en/core-features/)
-- [Team Collaboration](./docs/user-guides/en/team-collaboration/)
-
-### For Developers
-- [Local Development Guide](./docs/development/LOCAL_DEVELOPMENT_GUIDE.md)
-- [Project Guidelines](./docs/development/MATARESIT_PROJECT_GUIDELINES.md)
-- [Architecture Overview](./docs/architecture/)
-- [API Reference](./docs/api/)
-
-### For Administrators
-- [Deployment Guide](./.github/docs/DEPLOYMENT.md)
-- [Monitoring Setup](./docs/MONITORING_SETUP_GUIDE.md)
-- [Troubleshooting Guide](./docs/troubleshooting/)
-- [Security Implementation](./docs/SECURITY_IMPLEMENTATION.md)
-
-### Complete Documentation Index
-📚 [View Full Documentation Index](./docs/DOCUMENTATION_INDEX.md)
-
-## Deployment
-
-Mataresit is optimized for **Vercel** deployment with automatic CI/CD:
-
-- 🚀 **Production**: Auto-deploy on pushes to `main` branch
-- 🔍 **Preview**: Automatic preview deployments for pull requests
-- 🔧 **CI/CD**: GitHub Actions run tests, linting, and security scans
-
-### Deployment Checklist
-
-1. Set up Supabase project with required tables and RLS policies
-2. Configure environment variables in Vercel
-3. Set up Stripe webhooks
-4. Configure Google OAuth credentials
-5. Deploy and verify
-
-See [Deployment Documentation](./.github/docs/DEPLOYMENT.md) for detailed instructions.
-
-## Pricing
-
-Mataresit offers flexible pricing for individuals and teams:
-
-| Plan | Price | Features |
-|------|-------|----------|
-| **Free** | $0/month | 50 receipts/month, basic features |
-| **Pro** | $9/month | Unlimited receipts, team features, analytics |
-| **Max** | $29/month | Everything in Pro + priority support, API access |
-
-See [Pricing Page](./src/pages/PricingPage.tsx) or visit our [live demo](https://mataresit.com/pricing) for full details.
+Some documents under `docs/` predate the current Vercel + Supabase workflow and should be reviewed before use. The root README and the source code should be treated as the current source of truth when documentation conflicts.
 
 ## Contributing
 
-We welcome contributions from the community!
+Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request.
 
-1. **Fork** the repository
-2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feature/amazing-feature`
-5. **Open** a Pull Request
+At a minimum:
 
-Please read our [Contributing Guidelines](./CONTRIBUTING.md) for details on our code of conduct and development process.
+1. Create a focused branch.
+2. Do not commit credentials, production data, or real receipt images.
+3. Run `npm run lint`, the relevant tests, and `npm run build`.
+4. Call out any required migrations, Edge Function changes, or environment variables.
+5. Keep user-facing documentation and translations in sync with behavior changes.
 
-## Support
+## Security
 
-- 📖 [Documentation](./docs)
-- 🐛 [Issue Tracker](../../issues)
-- 💬 [Discussions](../../discussions)
-- 📧 Email: support@mataresit.com
+Do not open a public issue for a suspected vulnerability or expose production credentials. Do not include real receipts, access tokens, service-role keys, API keys, or private infrastructure details in issues, pull requests, screenshots, or test fixtures.
 
-## License
+Because a private security contact has not yet been published in this repository, confirm a private reporting channel with the maintainer before disclosing a vulnerability.
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+## Support and feedback
 
-## Acknowledgments
+- [Open an issue](https://github.com/noa10/mataresit/issues) for reproducible bugs and feature requests.
+- Use pull requests for proposed code or documentation changes.
+- Do not use public issues for security reports or sensitive receipt data.
 
-- [Google Gemini](https://deepmind.google/technologies/gemini/) for AI Vision capabilities
-- [Supabase](https://supabase.com/) for backend infrastructure
-- [Vercel](https://vercel.com/) for hosting and deployment
-- [Stripe](https://stripe.com/) for payment processing
-- [Radix UI](https://www.radix-ui.com/) for accessible components
+## License status
+
+This repository does not currently include a `LICENSE` file. Until the project owner adds one, do not assume that the code is released under MIT or another open-source license. Confirm reuse and redistribution terms with the maintainers.
+
+## Acknowledgements
+
+Mataresit builds on the work of the open-source communities behind:
+
+- [Supabase](https://supabase.com/)
+- [Vercel](https://vercel.com/)
+- [Stripe](https://stripe.com/)
+- [Google Gemini](https://ai.google.dev/)
+- [Radix UI](https://www.radix-ui.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Vitest](https://vitest.dev/)
+- [Playwright](https://playwright.dev/)
 
 ---
 
-<p align="center">
-  Made with ❤️ for efficient expense management
-</p>
+<div align="center">
+  <strong>More business, less paperwork.</strong>
+</div>

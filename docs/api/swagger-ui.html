@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mataresit API Documentation</title>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css" />
-    <link rel="icon" type="image/png" href="https://mataresit.com/favicon.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="https://mataresit.vercel.app/favicon.png" sizes="32x32" />
     <style>
         html {
             box-sizing: border-box;
@@ -301,7 +301,7 @@
                 <h3>🚀 Quick Start</h3>
                 <p>Ready to get started? Try creating your first receipt:</p>
                 <div class="code-example">curl -X POST \
-  'https://api.mataresit.com/v1/receipts' \
+  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/external-api/api/v1/receipts' \
   -H 'X-API-Key: mk_live_your_key' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -316,10 +316,10 @@
         <div class="quick-start">
             <h3>🔧 Getting Started</h3>
             <ol>
-                <li><strong>Get an API Key:</strong> Sign up at <a href="https://mataresit.com" target="_blank">mataresit.com</a> and generate an API key</li>
+                <li><strong>Get an API Key:</strong> Sign up at <a href="https://mataresit.vercel.app" target="_blank">mataresit.vercel.app</a> and generate an API key</li>
                 <li><strong>Authenticate:</strong> Include your API key in the <code>X-API-Key</code> header</li>
                 <li><strong>Start Building:</strong> Use the interactive documentation below to explore endpoints</li>
-                <li><strong>Need Help?</strong> Check our <a href="https://docs.mataresit.com" target="_blank">developer guides</a> or contact support</li>
+                <li><strong>Need Help?</strong> Check our <a href="https://mataresit.vercel.app/docs" target="_blank">developer guides</a> or contact support</li>
             </ol>
         </div>
     </div>
@@ -383,7 +383,7 @@
                     helpText.innerHTML = `
                         <p style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px; border-left: 4px solid #0ea5e9;">
                             <strong>💡 Tip:</strong> Get your API key from the 
-                            <a href="https://mataresit.com/dashboard/api-keys" target="_blank">Mataresit Dashboard</a>
+                            <a href="https://mataresit.vercel.app/dashboard/api-keys" target="_blank">Mataresit Dashboard</a>
                         </p>
                     `;
                     authSection.appendChild(helpText);

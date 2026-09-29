@@ -357,7 +357,7 @@ Adaptive interface that works perfectly on any screen size.
 - **Symptoms:** No install prompt or option visible
 - **Cause:** Browser doesn't support PWA or site not served over HTTPS
 - **Solution:** Use Chrome/Edge/Firefox and ensure HTTPS connection
-- **Prevention:** Always access via https://mataresit.com
+- **Prevention:** Always access via https://mataresit.vercel.app
 
 **Issue 2: Push Notifications Not Working**
 - **Symptoms:** No notifications received despite enabling

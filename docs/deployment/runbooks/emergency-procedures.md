@@ -24,7 +24,7 @@ This document outlines critical emergency procedures for the Paperless Maverick 
 ```bash
 # 1. Verify outage scope
 curl -f https://api.mataresit.com/health || echo "API DOWN"
-curl -f https://app.mataresit.com || echo "APP DOWN"
+curl -f https://mataresit.vercel.app || echo "APP DOWN"
 
 # 2. Check infrastructure status
 kubectl get nodes
