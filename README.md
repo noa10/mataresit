@@ -286,7 +286,7 @@ A production deployment must also configure:
 
 The current GitHub workflows perform code quality checks, tests, builds, Supabase validation, security scanning, and scheduled monitoring. The Supabase validation workflow is validation-oriented; it does not replace the required production deployment steps.
 
-See [`.github/README.md`](./.github/README.md) for the current automation overview.
+See [`.github/AUTOMATION.md`](./.github/AUTOMATION.md) for the current automation overview.
 
 ## Documentation
 
