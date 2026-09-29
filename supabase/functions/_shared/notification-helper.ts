@@ -1,5 +1,6 @@
 import { supabaseClient } from './supabase-client.ts';
 import { getPushNotificationPreferenceKey } from './notification-preferences.ts';
+import { getFrontendUrl } from './site-url.ts';
 
 export interface NotificationData {
   receiptId: string;
@@ -434,7 +435,7 @@ export class EdgeNotificationHelper {
             total: receiptData.total || 0,
             currency: receiptData.currency || 'MYR',
             status: 'completed',
-            receipt_url: `${Deno.env.get('FRONTEND_URL') || 'https://paperless-maverick.vercel.app'}/receipt/${receiptId}`
+            receipt_url: `${getFrontendUrl()}/receipt/${receiptId}`
           },
           'receipt',
           receiptId,
@@ -521,7 +522,7 @@ export class EdgeNotificationHelper {
             currency: receiptData.currency || 'MYR',
             status: 'failed',
             error_message: errorMessage || 'Unknown error occurred',
-            receipt_url: `${Deno.env.get('FRONTEND_URL') || 'https://paperless-maverick.vercel.app'}/receipt/${receiptId}`
+            receipt_url: `${getFrontendUrl()}/receipt/${receiptId}`
           },
           'receipt',
           receiptId,
@@ -605,7 +606,7 @@ export class EdgeNotificationHelper {
             total_receipts: batchData.totalReceipts,
             successful_receipts: successCount,
             failed_receipts: failCount,
-            dashboard_url: `${Deno.env.get('FRONTEND_URL') || 'https://paperless-maverick.vercel.app'}/dashboard`
+            dashboard_url: `${getFrontendUrl()}/dashboard`
           },
           'batch_upload',
           batchData.batchId || 'unknown',

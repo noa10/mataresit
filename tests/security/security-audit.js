@@ -380,7 +380,7 @@ describe('Security Audit - Mataresit External API', function() {
     it('should handle CORS preflight requests', async function() {
       const response = await axios.options(`${API_BASE_URL}/health`, {
         headers: {
-          'Origin': 'https://mataresit.com',
+          'Origin': 'https://mataresit.vercel.app',
           'Access-Control-Request-Method': 'GET',
           'Access-Control-Request-Headers': 'X-API-Key'
         },

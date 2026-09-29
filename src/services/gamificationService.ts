@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import { supabase } from "@/integrations/supabase/client";
+import { getSiteUrl } from "@/lib/site-url";
 import {
   GAMIFICATION_XP_PER_LEVEL,
   SCANNER_THEME_IDS,
@@ -72,7 +73,7 @@ const hasMissingArtifactError = (error: { code?: string; message?: string } | nu
 const todayStamp = (timeZone: string) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const buildReferralLink = (referralCode: string | null) => {
   if (!referralCode) return null;
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://mataresit.com";
+  const origin = getSiteUrl();
   return `${origin}/auth?ref=${encodeURIComponent(referralCode)}`;
 };
 

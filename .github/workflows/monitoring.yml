@@ -34,7 +34,7 @@ permissions:
   pull-requests: read
 
 env:
-  DOMAIN: ${{ github.event.inputs.environment == 'staging' && 'staging.mataresit.com' || 'mataresit.com' }}
+  DOMAIN: ${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
   CACHE_VERSION: 'v1'
 
@@ -124,7 +124,7 @@ jobs:
           fi
 
           # Test specific application routes
-          ROUTES_TO_TEST=("/" "/pricing" "/login")
+          ROUTES_TO_TEST=("/" "/pricing" "/auth")
 
           for route in "${ROUTES_TO_TEST[@]}"; do
             RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ env.DOMAIN }}$route" || echo "000")
@@ -417,6 +417,7 @@ jobs:
         env:
           TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
 
       - name: Monitor system resources
         continue-on-error: true
@@ -475,6 +476,8 @@ jobs:
           echo "✅ Dependencies installed successfully"
 
       - name: Check Supabase security configuration (if configured)
+        env:
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
         run: |
           echo "Checking Supabase security configuration..."
 
@@ -502,7 +505,7 @@ jobs:
           echo "Checking security headers..."
 
           # Test security headers on main domain
-          DOMAIN="${{ github.event.inputs.environment == 'staging' && 'staging.mataresit.com' || 'mataresit.com' }}"
+          DOMAIN="${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}"
 
           if curl -s -I "https://$DOMAIN" | grep -i "x-frame-options\|x-content-type-options\|x-xss-protection\|strict-transport-security"; then
             echo "✅ Security headers found"
@@ -594,6 +597,7 @@ jobs:
         env:
           TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
 
       - name: Check notification channels
         run: |
@@ -789,8 +793,6 @@ jobs:
 
               ### Links:
               - [Monitoring Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
-              - [Production Dashboard](https://grafana.mataresit.com)
-              - [System Logs](https://logs.mataresit.com)
               `,
               labels: ['critical', 'monitoring', 'incident', context.payload.inputs?.environment || 'production']
             });

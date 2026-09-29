@@ -11,6 +11,11 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+const BILLING_ALERT_EMAILS = (Deno.env.get('BILLING_ALERT_EMAILS') || '')
+  .split(',')
+  .map((email) => email.trim())
+  .filter((email) => email.length > 0);
+
 interface AlertRule {
   id: string;
   name: string;
@@ -434,7 +439,7 @@ async function sendAlertNotifications(alert: any) {
     case 'critical':
       notifications.push({
         channel: 'email',
-        recipients: ['admin@mataresit.com'], // Replace with actual admin emails
+        recipients: BILLING_ALERT_EMAILS,
         template: 'critical_alert',
         metadata: alert
       });
@@ -450,7 +455,7 @@ async function sendAlertNotifications(alert: any) {
     case 'high':
       notifications.push({
         channel: 'email',
-        recipients: ['admin@mataresit.com'],
+        recipients: BILLING_ALERT_EMAILS,
         template: 'high_alert',
         metadata: alert
       });
@@ -459,7 +464,7 @@ async function sendAlertNotifications(alert: any) {
     case 'medium':
       notifications.push({
         channel: 'email',
-        recipients: ['admin@mataresit.com'],
+        recipients: BILLING_ALERT_EMAILS,
         template: 'medium_alert',
         metadata: alert
       });
@@ -486,6 +491,11 @@ async function sendAlertNotifications(alert: any) {
 async function sendNotification(notification: AlertNotification) {
   switch (notification.channel) {
     case 'email':
+      if (notification.recipients.length === 0) {
+        console.warn('BILLING_ALERT_EMAILS is not configured; skipping billing alert email');
+        return;
+      }
+
       await supabaseClient.functions.invoke('send-email', {
         body: {
           to: notification.recipients[0], // Simplified for now

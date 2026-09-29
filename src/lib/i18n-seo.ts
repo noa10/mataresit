@@ -99,6 +99,7 @@ export class SEOMetaManager {
     
     // Add alternate language links
     this.updateAlternateLanguageLinks();
+    this.updateCanonicalUrl();
   }
 
   /**
@@ -160,8 +161,21 @@ export class SEOMetaManager {
     defaultLink.rel = 'alternate';
     defaultLink.hreflang = 'x-default';
     defaultLink.href = this.buildLanguageURL(URL_STRUCTURE_CONFIG.defaultLanguage, currentPath);
-    
+
     document.head.appendChild(defaultLink);
+  }
+
+  private updateCanonicalUrl(): void {
+    const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
+    let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+      canonicalLink.rel = 'canonical';
+      document.head.appendChild(canonicalLink);
+    }
+
+    canonicalLink.href = canonicalUrl;
   }
 
   /**

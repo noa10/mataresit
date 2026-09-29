@@ -150,7 +150,7 @@ serve(async (req) => {
 
     // Enhanced implementation with Resend and delivery tracking
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'Mataresit <noreply@mataresit.com>';
+    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || '';
 
     console.log('Environment check:', {
       hasResendKey: !!RESEND_API_KEY,
@@ -183,6 +183,10 @@ serve(async (req) => {
 
     if (RESEND_API_KEY) {
       try {
+        if (!FROM_EMAIL) {
+          throw new Error('FROM_EMAIL is not configured');
+        }
+
         console.log('Sending email via Resend API...');
 
         const response = await fetch('https://api.resend.com/emails', {

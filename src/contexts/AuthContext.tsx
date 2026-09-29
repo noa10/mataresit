@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { AppRole, UserWithRole, AuthState } from "@/types/auth";
 import { invitationFlowService } from "@/services/invitationFlowService";
+import { getAuthRedirectUrl } from "@/lib/site-url";
 
 const ADMIN_EMAIL = "k.anwarbakar@gmail.com";
 
@@ -321,24 +322,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * This ensures that auth redirects work correctly in both development and production
    */
   const getRedirectUrl = (path: string = '/auth'): string => {
-    // Make sure path starts with a slash
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-
-    // Check if we're in a production environment (mataresit.co or vercel.app)
-    const isProduction = window.location.hostname.includes('mataresit.co') || window.location.hostname.includes('vercel.app');
-
-    // For production deployments, use the production URL to ensure consistency
-    if (isProduction) {
-      const productionUrl = 'https://mataresit.co';
-      const redirectUrl = `${productionUrl}${normalizedPath}`;
-      console.log(`Using production redirect URL: ${redirectUrl}`);
-      return redirectUrl;
-    }
-
-    // For local development, use the current origin
-    const baseUrl = window.location.origin;
-    const redirectUrl = `${baseUrl}${normalizedPath}`;
-    console.log(`Using local redirect URL: ${redirectUrl}`);
+    const redirectUrl = getAuthRedirectUrl(path);
+    console.log(`Using auth redirect URL: ${redirectUrl}`);
     return redirectUrl;
   };
 

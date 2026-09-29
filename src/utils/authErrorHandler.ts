@@ -2,6 +2,8 @@
  * Enhanced error handling for authentication flows
  */
 
+import { getBrowserOrigin, getSiteUrl } from "@/lib/site-url";
+
 export interface AuthError {
   code: string;
   message: string;
@@ -105,8 +107,10 @@ export class AuthErrorHandler {
 export class RedirectUrlValidator {
   private static allowedHosts = [
     'localhost',
-    'mataresit.co',
-    'paperless-maverick.vercel.app'
+    '127.0.0.1',
+    '[::1]',
+    '::1',
+    'mataresit.vercel.app'
   ];
 
   private static allowedPorts = [3000, 5173, 8080];
@@ -120,20 +124,19 @@ export class RedirectUrlValidator {
         return { valid: false, reason: 'Invalid protocol. Must be http or https.' };
       }
 
-      // Check hostname
-      const isAllowedHost = this.allowedHosts.some(host => 
-        urlObj.hostname === host || urlObj.hostname.endsWith(`.${host}`)
-      );
+      // Check hostname. Keep the production host exact; broad subdomain
+      // matching would allow an unrelated Vercel preview to pass validation.
+      const isAllowedHost = this.allowedHosts.some((host) => urlObj.hostname === host);
 
       if (!isAllowedHost) {
         return { valid: false, reason: `Hostname ${urlObj.hostname} is not allowed.` };
       }
 
-      // Check port for localhost
-      if (urlObj.hostname === 'localhost') {
+      // Check ports for local development hosts.
+      if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1' || urlObj.hostname === '[::1]' || urlObj.hostname === '::1') {
         const port = parseInt(urlObj.port) || (urlObj.protocol === 'https:' ? 443 : 80);
         if (!this.allowedPorts.includes(port)) {
-          return { valid: false, reason: `Port ${port} is not allowed for localhost.` };
+          return { valid: false, reason: `Port ${port} is not allowed for local development.` };
         }
       }
 
@@ -149,20 +152,13 @@ export class RedirectUrlValidator {
   }
 
   static getRecommendedRedirectUrl(): string {
-    const currentOrigin = window.location.origin;
-    const urlObj = new URL(currentOrigin);
-    
-    // If current origin is valid, use it
+    const currentOrigin = getBrowserOrigin();
     const validation = this.validateRedirectUrl(`${currentOrigin}/auth`);
+
     if (validation.valid) {
       return `${currentOrigin}/auth`;
     }
 
-    // Fallback to a known good URL
-    if (urlObj.hostname === 'localhost') {
-      return 'http://localhost:5173/auth';
-    }
-
-    return 'https://mataresit.co/auth';
+    return `${getSiteUrl()}/auth`;
   }
 }

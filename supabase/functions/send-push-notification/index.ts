@@ -6,7 +6,7 @@ import { getPushNotificationPreferenceKey, isInQuietHours } from '../_shared/not
 // In production, these should be stored as environment variables
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || 'BEl62iUYgUivxIkv69yViEuiBIa40HcCWLEaQK07x8hiKAantUM4hM5CxbxrwhHuFAU2dX4tnMJiHG9AJL0x8cs';
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || 'your-vapid-private-key-here';
-const VAPID_EMAIL = Deno.env.get('VAPID_EMAIL') || 'mailto:admin@mataresit.com';
+const VAPID_EMAIL = Deno.env.get('VAPID_EMAIL') || '';
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";

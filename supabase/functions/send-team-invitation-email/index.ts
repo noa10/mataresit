@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { generateTeamInvitationEmail } from '../send-email/templates.ts';
+import { getSiteUrl } from '../_shared/site-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,7 +52,7 @@ serve(async (req) => {
       ? `${inviterProfile.first_name} ${inviterProfile.last_name || ''}`.trim()
       : inviterProfile?.email || 'Someone';
 
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://mataresit.co';
+    const siteUrl = getSiteUrl();
     const acceptUrl = `${siteUrl}/invite/${invitation.token}`;
 
     const emailData = {
@@ -90,10 +91,27 @@ serve(async (req) => {
     }
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'Mataresit <noreply@mataresit.co>';
+    const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || '';
 
     if (!RESEND_API_KEY) {
       const errorMessage = 'RESEND_API_KEY is not configured';
+      console.error(errorMessage);
+      if (deliveryId) {
+        await supabaseClient.rpc('update_email_delivery_status', {
+          _delivery_id: deliveryId,
+          _status: 'failed',
+          _provider_message_id: null,
+          _error_message: errorMessage,
+        });
+      }
+      return new Response(
+        JSON.stringify({ error: errorMessage }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!FROM_EMAIL) {
+      const errorMessage = 'FROM_EMAIL is not configured';
       console.error(errorMessage);
       if (deliveryId) {
         await supabaseClient.rpc('update_email_delivery_status', {

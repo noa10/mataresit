@@ -1,5 +1,7 @@
 // Email Templates for Team Collaboration Features
 
+import { getFrontendUrl } from '../_shared/site-url.ts';
+
 export interface TeamInvitationEmailData {
   inviteeEmail: string;
   teamName: string;
@@ -67,6 +69,7 @@ export interface TeamMemberRemovedEmailData {
   removalReason?: string;
   removalTimestamp: string;
   transferredToUserName?: string;
+  appUrl?: string;
   language?: 'en' | 'ms';
 }
 
@@ -770,6 +773,7 @@ export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData)
   }
 
   const subject = `You have been removed from team "${data.teamName}"`;
+  const appUrl = data.appUrl || getFrontendUrl();
 
   const html = `
 <!DOCTYPE html>
@@ -830,7 +834,7 @@ export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData)
 
       <p>Thank you for your time with the team. If you need to access your personal receipt data, you can still log into your Mataresit account.</p>
 
-      <a href="https://app.mataresit.com/login" class="cta-button">Access Your Account</a>
+      <a href="${appUrl}/auth" class="cta-button">Access Your Account</a>
 
       <p>Best regards,<br>The Mataresit Team</p>
     </div>
@@ -871,7 +875,7 @@ You can also reach out to our support team if you need assistance.
 
 Thank you for your time with the team. If you need to access your personal receipt data, you can still log into your Mataresit account.
 
-Access Your Account: https://app.mataresit.com/login
+Access Your Account: ${appUrl}/auth
 
 Best regards,
 The Mataresit Team
@@ -1709,6 +1713,7 @@ Ini adalah pemberitahuan pengebilan automatik. Sila jangan balas e-mel ini.
  */
 function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): { subject: string; html: string; text: string } {
   const subject = `Anda telah dikeluarkan dari pasukan "${data.teamName}"`;
+  const appUrl = data.appUrl || getFrontendUrl();
 
   const html = `
 <!DOCTYPE html>
@@ -1769,7 +1774,7 @@ function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): 
 
       <p>Terima kasih atas masa anda bersama pasukan. Jika anda perlu mengakses data resit peribadi anda, anda masih boleh log masuk ke akaun Mataresit anda.</p>
 
-      <a href="https://app.mataresit.com/login" class="cta-button">Akses Akaun Anda</a>
+      <a href="${appUrl}/auth" class="cta-button">Akses Akaun Anda</a>
 
       <p>Salam hormat,<br>Pasukan Mataresit</p>
     </div>
@@ -1810,7 +1815,7 @@ Anda juga boleh menghubungi pasukan sokongan kami jika anda memerlukan bantuan.
 
 Terima kasih atas masa anda bersama pasukan. Jika anda perlu mengakses data resit peribadi anda, anda masih boleh log masuk ke akaun Mataresit anda.
 
-Akses Akaun Anda: https://app.mataresit.com/login
+Akses Akaun Anda: ${appUrl}/auth
 
 Salam hormat,
 Pasukan Mataresit

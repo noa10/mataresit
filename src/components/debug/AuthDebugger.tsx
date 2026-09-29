@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getAuthRedirectUrl } from '@/lib/site-url';
 import { AlertCircle, CheckCircle, Info, RefreshCw } from 'lucide-react';
 
 interface AuthDebugInfo {
@@ -30,22 +31,11 @@ export function AuthDebugger() {
     'http://localhost:8080/auth',
     'http://localhost:5173/auth',
     'http://localhost:3000/auth',
-    'https://mataresit.co/auth',
-    'https://paperless-maverick.vercel.app/auth'
+    'https://mataresit.vercel.app/auth',
   ];
 
   const getRedirectUrl = (path: string = '/auth'): string => {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const isProduction = window.location.hostname.includes('mataresit.co') || 
-                        window.location.hostname.includes('vercel.app');
-    
-    if (isProduction) {
-      const productionUrl = 'https://mataresit.co';
-      return `${productionUrl}${normalizedPath}`;
-    }
-    
-    const baseUrl = window.location.origin;
-    return `${baseUrl}${normalizedPath}`;
+    return getAuthRedirectUrl(path);
   };
 
   const collectDebugInfo = (): AuthDebugInfo => {

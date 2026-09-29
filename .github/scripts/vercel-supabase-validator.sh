@@ -106,24 +106,14 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Set domain based on environment if not provided
+# Set the application domain. APP_DOMAIN can be configured for a future
+# canonical domain without changing this script.
 if [[ -z "$DOMAIN" ]]; then
-    case "$ENVIRONMENT" in
-        "production")
-            DOMAIN="mataresit.com"
-            ;;
-        "staging")
-            DOMAIN="staging.mataresit.com"
-            ;;
-        "development")
-            DOMAIN="dev.mataresit.com"
-            ;;
-        *)
-            error "Unknown environment: $ENVIRONMENT"
-            exit 1
-            ;;
-    esac
+    DOMAIN="${APP_DOMAIN:-mataresit.vercel.app}"
 fi
+DOMAIN="${DOMAIN#https://}"
+DOMAIN="${DOMAIN#http://}"
+DOMAIN="${DOMAIN%/}"
 
 # Validation results storage
 declare -A VALIDATION_RESULTS

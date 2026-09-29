@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getSiteUrl } from '@/lib/site-url';
 import { NotificationType } from '@/types/notifications';
 
 export interface EmailNotificationData {
@@ -334,9 +335,7 @@ export class EmailNotificationService {
   }
 
   private static getBaseUrl(): string {
-    return process.env.NODE_ENV === 'production' 
-      ? 'https://mataresit.com' 
-      : 'http://localhost:5173';
+    return getSiteUrl();
   }
 
   private static getNotificationTypeForReceiptStatus(status: string): NotificationType {

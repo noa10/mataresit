@@ -5,6 +5,7 @@ import {
   mapPriceIdToTier,
   mapStripeStatusToOurStatus
 } from '../_shared/stripe-config.ts';
+import { getFrontendUrl, getSiteUrl } from '../_shared/site-url.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -468,7 +469,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
           paymentMethodLast4: profile.payment_method_last_four,
           paymentMethodBrand: profile.payment_method_brand,
           invoiceUrl: invoice.hosted_invoice_url,
-          manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+          manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`,
           language: 'en' // TODO: Get from user preferences
         }
       }
@@ -546,8 +547,8 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
             maxRetryAttempts: prefs.max_payment_retry_attempts,
             nextRetryDate: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString() : null,
             gracePeriodDays: prefs.grace_period_days,
-            updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-methods`,
-            manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
+            updatePaymentMethodUrl: `${getFrontendUrl()}/settings/billing?tab=payment-methods`,
+            manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`,
             language: prefs.preferred_language
           }
         }
@@ -671,8 +672,8 @@ async function handleUpcomingInvoice(invoice: Stripe.Invoice) {
           daysUntilRenewal: daysBefore,
           paymentMethodLast4: profile.payment_method_last_four,
           paymentMethodBrand: profile.payment_method_brand,
-          manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
-          updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-method`
+          manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`,
+          updatePaymentMethodUrl: `${getFrontendUrl()}/settings/billing?tab=payment-method`
         },
         p_language: prefs.preferred_language
       });
@@ -794,8 +795,8 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
         recipientEmail: profile.email,
         subscriptionTier: profile.subscription_tier,
         trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-        manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
-        pricingUrl: `${Deno.env.get('FRONTEND_URL')}/pricing`,
+        manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`,
+        pricingUrl: `${getFrontendUrl()}/pricing`,
         language: prefs.preferred_language
       }
     }
@@ -1125,7 +1126,7 @@ async function sendPaymentConfirmationEmail(userId: string, paymentDetails: {
           <p>Your subscription is now active! You can start enjoying all the features of your ${planNames[paymentDetails.tier as keyof typeof planNames]}.</p>
 
           <div style="text-align: center;">
-            <a href="${Deno.env.get('SITE_URL') || 'https://mataresit.co'}/dashboard" class="button">
+            <a href="${getSiteUrl()}/dashboard" class="button">
               Go to Dashboard
             </a>
           </div>

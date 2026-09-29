@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import Stripe from "https://esm.sh/stripe@14.21.0";
+import { getFrontendUrl } from "../_shared/site-url.ts";
 
 // Initialize Supabase client
 const supabaseClient = createClient(
@@ -752,8 +753,8 @@ async function scheduleReminderEmail(renewal: any, daysUntilRenewal: number) {
       daysUntilRenewal: daysUntilRenewal,
       paymentMethodLast4: renewal.payment_method_last_four,
       paymentMethodBrand: renewal.payment_method_brand,
-      manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`,
-      updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-method`
+      manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`,
+      updatePaymentMethodUrl: `${getFrontendUrl()}/settings/billing?tab=payment-method`
     },
     p_language: billingPrefs.preferred_language
   });
@@ -786,8 +787,8 @@ async function schedulePaymentFailedEmail(profile: any, attemptNumber: number, m
       retryAttempt: attemptNumber,
       maxRetryAttempts: maxAttempts,
       gracePeriodEndDate: profile.grace_period_end_date,
-      updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-method`,
-      manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`
+      updatePaymentMethodUrl: `${getFrontendUrl()}/settings/billing?tab=payment-method`,
+      manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`
     },
     p_language: billingPrefs.preferred_language
   });
@@ -816,8 +817,8 @@ async function scheduleGracePeriodEmail(profile: any, gracePeriodEnd: Date) {
       recipientEmail: profile.email,
       subscriptionTier: profile.subscription_tier,
       gracePeriodEndDate: gracePeriodEnd.toISOString(),
-      updatePaymentMethodUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing?tab=payment-method`,
-      manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`
+      updatePaymentMethodUrl: `${getFrontendUrl()}/settings/billing?tab=payment-method`,
+      manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`
     },
     p_language: billingPrefs.preferred_language
   });
@@ -842,8 +843,8 @@ async function scheduleSubscriptionExpiryEmail(profile: any) {
       subscriptionTier: profile.subscription_tier,
       expiryDate: profile.subscription_end_date || new Date().toISOString(),
       isInGracePeriod: false,
-      renewSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/pricing`,
-      manageSubscriptionUrl: `${Deno.env.get('FRONTEND_URL')}/settings/billing`
+      renewSubscriptionUrl: `${getFrontendUrl()}/pricing`,
+      manageSubscriptionUrl: `${getFrontendUrl()}/settings/billing`
     },
     p_language: billingPrefs.preferred_language
   });

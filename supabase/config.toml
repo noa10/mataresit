@@ -55,35 +55,30 @@ enabled = true
 port = 54337
 
 [auth]
-# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "https://mataresit.co"
+# This file configures the local Supabase stack. The hosted project's Auth URL
+# settings are managed separately in the Supabase Dashboard.
+site_url = "http://localhost:5173"
 
 # A list of URLs that auth providers are permitted to redirect to post authentication.
+# Keep local origins here and add the current production origin explicitly.
 additional_redirect_urls = [
   "http://localhost:8080",
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "http://localhost:3000",
-  "https://mataresit.co",
-  "https://mataresit.co/auth",
-  "https://mataresit.co/auth/",
-  "https://mataresit.co/auth/callback",
-  "https://mataresit.co/auth/reset-password",
-  "https://mataresit.co/auth?type=recovery",
-  "https://paperless-maverick.vercel.app",
-  "https://paperless-maverick.vercel.app/auth",
-  "https://paperless-maverick.vercel.app/auth/",
-  "https://paperless-maverick.vercel.app/auth/callback",
-  "https://paperless-maverick.vercel.app/auth/reset-password",
-  "https://paperless-maverick.vercel.app/auth?type=recovery",
+  "https://mataresit.vercel.app",
+  "https://mataresit.vercel.app/**",
   "http://localhost:8080/auth",
   "http://localhost:5173/auth",
+  "http://127.0.0.1:5173/auth",
   "http://localhost:3000/auth",
   "http://localhost:8080/auth/callback",
   "http://localhost:5173/auth/callback",
+  "http://127.0.0.1:5173/auth/callback",
   "http://localhost:3000/auth/callback",
   "http://localhost:8080/auth/reset-password",
   "http://localhost:5173/auth/reset-password",
+  "http://127.0.0.1:5173/auth/reset-password",
   "http://localhost:3000/auth/reset-password"
 ]
 

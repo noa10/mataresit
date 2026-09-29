@@ -95,7 +95,7 @@ Steps:
   .github/scripts/vercel-supabase-validator.sh --environment production --check-type all
   
   # Health checks only
-  .github/scripts/vercel-supabase-validator.sh --check-type health --domain mataresit.com
+  .github/scripts/vercel-supabase-validator.sh --check-type health --domain mataresit.vercel.app
   
   # JSON output for automation
   .github/scripts/vercel-supabase-validator.sh --json --check-type post
