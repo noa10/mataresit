@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Check, Clock, Zap, Turtle, Activity } from "lucide-react";
 import { PROCESSING_STAGES } from "./ProcessingStages";
+import { DEFAULT_MODELS } from "@/config/modelProviders";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -30,7 +31,7 @@ export function EnhancedProcessingTimeline({
   uploadProgress,
   fileSize = 1024 * 1024, // Default 1MB
   processingMethod = 'ai-vision',
-  modelId = 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+  modelId = DEFAULT_MODELS.vision,
   startTime,
   isProgressUpdating = false
 }: EnhancedProcessingTimelineProps) {

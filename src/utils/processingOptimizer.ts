@@ -32,7 +32,58 @@ export interface FileAnalysis {
 }
 
 // Import model configurations from the centralized config
-import { getModelConfig } from '@/config/modelProviders';
+import { getModelConfig, resolveModelId, AVAILABLE_MODELS, DEFAULT_MODELS } from '@/config/modelProviders';
+import { selectModelForImageSize } from '../../supabase/functions/_shared/provider-routing';
+
+/**
+ * Resolve a candidate model to one that can actually accept this file size.
+ *
+ * Models declare `capabilities.maxImageSize`, but nothing ever enforced it —
+ * it was only logged. With Groq (4MB) now primary, an oversized receipt is
+ * sent to Groq, rejected by the provider, and only rescued by the server-side
+ * fallback chain: one guaranteed failed round-trip per large file, plus the
+ * added latency and error-log noise.
+ *
+ * This helper is the single guard point for that. It must be applied where the
+ * model is actually selected — i.e. after `preferredModel` short-circuits the
+ * size-based branches in getProcessingRecommendation, which run only when no
+ * user preference is supplied.
+ *
+ * Applies to the upload path only. Reprocess paths (ReceiptViewer,
+ * processBatchReceipts, the queue worker) have no client-side size knowledge,
+ * so the same rule is enforced server-side by the SIZE PRE-ROUTE block in
+ * supabase/functions/enhance-receipt-data/index.ts. The selection rule below
+ * MUST stay in sync with that block — pick the highest-capacity vision model
+ * that fits, and leave the model unchanged if none does.
+ *
+ * Returns the original model when it fits, otherwise the highest-capacity
+ * vision model that does, or the original model if nothing fits (in which case
+ * the server fallback chain remains the backstop).
+ */
+export function resolveModelForFileSize(
+  modelId: string,
+  fileSizeInBytes: number
+): { modelId: string; adjusted: boolean } {
+  const result = selectModelForImageSize({
+    // selectModelForImageSize() does a direct registry lookup, so resolve legacy
+    // IDs first. This preserves the behavior of the pre-extraction code, which
+    // went through getModelConfig() (resolves aliases) — without it a retired ID
+    // would miss its cap and pass through unadjusted.
+    modelId: resolveModelId(modelId),
+    fileSizeInBytes,
+    models: AVAILABLE_MODELS
+  });
+
+  if (result.adjusted) {
+    const capInMB = (getModelConfig(modelId)?.capabilities.maxImageSize ?? 0) / (1024 * 1024);
+    const sizeInMB = fileSizeInBytes / (1024 * 1024);
+    console.warn(
+      `[model-sizing] ${modelId} cap is ${capInMB.toFixed(1)}MB but file is ${sizeInMB.toFixed(1)}MB — routing to ${result.modelId}`
+    );
+  }
+
+  return result;
+}
 
 /**
  * Analyze file characteristics to determine processing complexity
@@ -96,7 +147,7 @@ export function getProcessingRecommendation(
 ): ProcessingRecommendation {
   const reasoning: string[] = [];
   const recommendedMethod: 'ai-vision' = 'ai-vision'; // Always AI Vision
-  let recommendedModel = 'gemini-2.5-flash-lite'; // Default
+  let recommendedModel = DEFAULT_MODELS.vision;
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
 
@@ -117,6 +168,10 @@ export function getProcessingRecommendation(
       reasoning.push('Large file size detected - using higher-capacity AI Vision model');
       riskLevel = 'medium';
     } else if (fileAnalysis.complexity === 'high' && fileAnalysis.size > 4 * 1024 * 1024) {
+      // Also covers the Groq 4MB cap: analyzeFile classifies anything >3MB as
+      // 'high' complexity, so every file that exceeds Groq's maxImageSize lands
+      // in this branch and is routed to a 5MB-cap Gemini model. A dedicated
+      // `size > 4MB` branch below would be unreachable.
       recommendedModel = 'gemini-3.1-flash-lite';
       reasoning.push('High complexity large receipt - newer Gemini model provides better accuracy');
       riskLevel = 'medium';
@@ -125,9 +180,11 @@ export function getProcessingRecommendation(
       reasoning.push('Very complex receipt detected - using newer Gemini model');
       riskLevel = 'high';
     } else {
-      // Default to gemini-2.5-flash-lite for better reliability and rate limit avoidance
-      recommendedModel = 'gemini-2.5-flash-lite';
-      reasoning.push('Using reliable fast AI Vision model for optimal processing');
+      // Default to Groq (qwen3.8-27b): free, ~7x faster than Gemini and
+      // equivalent extraction quality. Bounded above by its 4MB image cap —
+      // the size branches above route larger files to Gemini.
+      recommendedModel = DEFAULT_MODELS.vision;
+      reasoning.push('Using fast free Groq vision model for optimal processing');
       confidence = 'high';
     }
   }
@@ -138,7 +195,7 @@ export function getProcessingRecommendation(
   // PRIORITY 3: Apply speed/accuracy preferences only if no specific model was chosen
   if (!userPreferences?.preferredModel) {
     if (userPreferences?.prioritizeSpeed) {
-      recommendedModel = 'gemini-2.5-flash-lite';
+      recommendedModel = DEFAULT_MODELS.fast;
       reasoning.push('Speed prioritized - using fastest model');
     }
 
@@ -194,16 +251,16 @@ function createFallbackStrategy(
 
   // Choose fallback model based on file characteristics
   // Use different models for reliable fallback processing
-  let fallbackModel = 'gemini-3.1-flash-lite';
-  if (fileAnalysis.size > 3 * 1024 * 1024) {
-    fallbackModel = 'groq/qwen/qwen3.8-27b'; // Fast provider for large files
-  } else if (fileAnalysis.complexity === 'high') {
+  let fallbackModel = 'gemini-2.5-flash-lite';
+  if (fileAnalysis.complexity === 'high') {
     fallbackModel = 'gemini-3.1-flash-lite'; // Newer model for complex files
   }
 
   // Ensure fallback model is different from primary model
   if (fallbackModel === primaryModel) {
-    fallbackModel = primaryModel === 'gemini-2.5-flash-lite' ? 'gemini-3.1-flash-lite' : 'gemini-2.5-flash-lite';
+    fallbackModel = primaryModel === 'groq/qwen/qwen3.8-27b'
+      ? 'gemini-2.5-flash-lite'
+      : 'groq/qwen/qwen3.8-27b';
   }
 
   // Define triggers for fallback
@@ -271,7 +328,11 @@ export function getBatchProcessingOptimization(
     sum + (rec.riskLevel === 'high' ? 3 : rec.riskLevel === 'medium' ? 2 : 1), 0
   );
 
-  // Check if most files will use the fast Gemini 2.5 Flash Lite model
+  // Count files that will use a genuinely fast model. Groq is the default and
+  // is free-tier rate-limited, so this intentionally does NOT raise
+  // concurrency for Groq batches — the extra throughput would just trade one
+  // error for a burst of 429s. Only a batch that is predominantly Gemini gets
+  // the bump.
   const fastModelCount = recommendations.filter(rec =>
     rec.recommendedModel === 'gemini-2.5-flash-lite'
   ).length;

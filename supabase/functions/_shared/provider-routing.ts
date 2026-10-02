@@ -48,8 +48,10 @@ export interface FallbackSelectionOptions {
 }
 
 // Candidate order matters: each entry is tried in turn until one succeeds.
-// The primary Gemini model is repeated here so it is still reachable when the
-// request starts on another provider (Groq/OpenRouter).
+// Groq (qwen3.8-27b) is the primary; it is repeated here so it is still
+// reachable when the request starts on another provider (Gemini/OpenRouter).
+// The Gemini models follow as the accuracy/reliability fallback tier, and
+// OpenRouter last as the cross-provider safety net.
 // All IDs below were verified live against their provider.
 const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
   gemini: [
@@ -60,11 +62,65 @@ const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
+  'groq/qwen/qwen3.8-27b',
   'gemini-2.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'groq/qwen/qwen3.8-27b',
   'openrouter/google/gemma-4-26b-a4b-it'
 ];
+
+export interface SizeCapSelectableModel {
+  id: string;
+  supportsVision: boolean;
+  capabilities: {
+    maxImageSize: number;
+  };
+}
+
+export interface SizeCapSelectionOptions {
+  modelId: string;
+  fileSizeInBytes: number;
+  models: Record<string, SizeCapSelectableModel>;
+}
+
+/**
+ * Pick the highest-capacity vision model that can accept `fileSizeInBytes`.
+ *
+ * Models declare `capabilities.maxImageSize`, but nothing enforced it until
+ * this helper existed — it was only logged. An image over the chosen model's
+ * cap is rejected by the provider and rescued only by the fallback chain, so
+ * every oversized file cost one guaranteed failed round-trip.
+ *
+ * This is the single implementation of the rule. Both call sites use it:
+ *   - client: resolveModelForFileSize() in src/utils/processingOptimizer.ts
+ *     (upload path, where the File is in hand)
+ *   - server: SIZE PRE-ROUTE in supabase/functions/enhance-receipt-data/index.ts
+ *     (reprocess paths, where the stored size is only known server-side)
+ *
+ * Returns the original model when it fits or when nothing in the registry can
+ * accept the file — in that case the caller proceeds and lets the fallback
+ * chain surface the failure, rather than failing at a less informative point.
+ */
+export function selectModelForImageSize(options: SizeCapSelectionOptions): {
+  modelId: string;
+  adjusted: boolean;
+} {
+  const { modelId, fileSizeInBytes, models } = options;
+  const cap = models[modelId]?.capabilities.maxImageSize;
+
+  if (!cap || fileSizeInBytes <= cap) {
+    return { modelId, adjusted: false };
+  }
+
+  const replacement = Object.values(models)
+    .filter((m) => m.supportsVision && m.capabilities.maxImageSize >= fileSizeInBytes)
+    .sort((a, b) => b.capabilities.maxImageSize - a.capabilities.maxImageSize)[0];
+
+  if (!replacement) {
+    return { modelId, adjusted: false };
+  }
+
+  return { modelId: replacement.id, adjusted: true };
+}
 
 export function selectImageFallbackCandidates(options: FallbackSelectionOptions): string[] {
   const providerCandidates = SAME_PROVIDER_FALLBACKS[options.requestedProvider] || [];

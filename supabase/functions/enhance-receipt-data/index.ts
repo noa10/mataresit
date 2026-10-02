@@ -8,6 +8,7 @@ import {
   executeWithFallback,
   ProviderRequestError,
   selectImageFallbackCandidates,
+  selectModelForImageSize,
 } from '../_shared/provider-routing.ts'
 import {
   buildTextPrompt,
@@ -193,8 +194,12 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   }
 };
 
-const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash-lite';
-const DEFAULT_VISION_MODEL = 'gemini-2.5-flash-lite';
+// Groq (qwen3.8-27b) is the primary: free and ~7x faster than Gemini on the
+// same receipt image at equivalent extraction quality. Gemini 2.5 Flash Lite
+// stays reachable as a cross-provider fallback via selectImageFallbackCandidates.
+// Keep in sync with DEFAULT_MODELS in src/config/modelProviders.ts.
+const DEFAULT_TEXT_MODEL = 'groq/qwen/qwen3.8-27b';
+const DEFAULT_VISION_MODEL = 'groq/qwen/qwen3.8-27b';
 
 /**
  * Process Malaysian tax information for a receipt
@@ -438,6 +443,54 @@ async function callAIModel(
     fallbackReason = 'No model specified';
 
     await logger.log(`🔄 DEFAULT: Using default ${input.type} model: ${modelConfig.name}`, "AI");
+  }
+
+  // SIZE PRE-ROUTE — applies to every resolution branch above, including the
+  // "model not found" and "no model specified" fallbacks, both of which land on
+  // the 4MB-cap Groq default.
+  //
+  // Every model declares `capabilities.maxImageSize`, but until now nothing
+  // enforced it — it was only logged. Reprocess paths (ReceiptViewer,
+  // processBatchReceipts, the queue worker) pass a model straight through with
+  // no client-side size knowledge, since the stored size is not available in
+  // ProcessingOptions. Callers can also omit `modelId` entirely (both batch
+  // helpers take `options?`), which routes here via the no-model branch.
+  // Without this check an oversized image is sent to the provider, rejected,
+  // and rescued only by the fallback chain: one guaranteed failed round-trip.
+  //
+  // input.imageData.data is normalized to a Uint8Array during request parsing
+  // (the isBase64 decode at index.ts:1274), so .length is genuine binary bytes
+  // and needs no base64 correction.
+  //
+  // Uses selectModelForImageSize() from _shared/provider-routing.ts — the same
+  // implementation the client calls via resolveModelForFileSize(), so the rule
+  // cannot drift between the two points.
+  if (input.type === 'image') {
+    const imageBytes = input.imageData?.data?.length ?? 0;
+    const cap = modelConfig.capabilities.maxImageSize;
+    const sizeRoute = selectModelForImageSize({
+      modelId: modelConfig.id,
+      fileSizeInBytes: imageBytes,
+      models: AVAILABLE_MODELS
+    });
+
+    if (sizeRoute.adjusted) {
+      await logger.log(
+        `📏 SIZE PRE-ROUTE: ${modelConfig.name} cap is ${(cap / (1024 * 1024)).toFixed(1)}MB but image is ${(imageBytes / (1024 * 1024)).toFixed(1)}MB — using ${AVAILABLE_MODELS[sizeRoute.modelId].name}`,
+        "AI"
+      );
+      wasDefaultUsed = true;
+      fallbackReason = `${fallbackReason ? fallbackReason + '; ' : ''}image exceeds ${modelConfig.name} size cap (${(cap / (1024 * 1024)).toFixed(1)}MB)`;
+      modelConfig = AVAILABLE_MODELS[sizeRoute.modelId];
+    } else if (cap && imageBytes > cap) {
+      // adjusted === false while still over cap means nothing in the registry
+      // can accept this image; proceed and let the fallback chain surface the
+      // failure rather than failing earlier at a less informative point.
+      await logger.log(
+        `📏 SIZE PRE-ROUTE: no model accepts ${(imageBytes / (1024 * 1024)).toFixed(1)}MB — proceeding with ${modelConfig.name}`,
+        "AI"
+      );
+    }
   }
 
   // Log model selection timing

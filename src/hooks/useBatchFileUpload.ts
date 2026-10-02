@@ -14,7 +14,7 @@ import { useTeam } from "@/contexts/TeamContext";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
-import { getBatchProcessingOptimization, ProcessingRecommendation } from "@/utils/processingOptimizer";
+import { getBatchProcessingOptimization, ProcessingRecommendation, resolveModelForFileSize } from "@/utils/processingOptimizer";
 
 import { ReceiptNotificationService } from "@/services/receiptNotificationService";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
@@ -1244,9 +1244,23 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         processingAbortControllersRef.current[upload.id] = controller;
         let result: any;
 
+        // Same size guard as the single-upload path: batch recommendations come
+        // from `preferredModel`, so the size-based branches in
+        // getProcessingRecommendation never run and an oversized file would
+        // otherwise be sent to a model that cannot accept it.
+        const batchModelGuard = resolveModelForFileSize(
+          recommendation?.recommendedModel || settings.selectedModel,
+          upload.file.size
+        );
+        if (batchModelGuard.adjusted) {
+          console.warn(
+            `[model-sizing] batch file ${upload.file.name} (${(upload.file.size / (1024 * 1024)).toFixed(1)}MB) exceeds model cap — using ${batchModelGuard.modelId}`
+          );
+        }
+
         // Process with AI Vision
         result = await processReceiptWithAI(newReceiptId, {
-          modelId: recommendation?.recommendedModel || settings.selectedModel,
+          modelId: batchModelGuard.modelId,
           uploadContext: 'batch',
           signal: controller.signal
         });

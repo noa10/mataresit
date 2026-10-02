@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { resolveModelId } from '@/config/modelProviders';
+import { resolveModelId, DEFAULT_MODELS } from '@/config/modelProviders';
 
 export interface UserApiKeys {
   openrouter?: string;
@@ -23,10 +23,11 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  // Gemini 2.5 Flash Lite is the primary verified vision model. Groq
-  // (qwen3.8-27b) is the fast fallback — see src/config/modelProviders.ts.
-  selectedModel: 'gemini-2.5-flash-lite',
-  batchModel: 'gemini-2.5-flash-lite', // Default to same model for batch
+  // Groq (qwen3.8-27b) is the primary model: free and ~7x faster than Gemini
+  // 2.5 Flash Lite at equivalent extraction quality. Gemini remains selectable
+  // as a fallback / "accurate" pick — see src/config/modelProviders.ts.
+  selectedModel: DEFAULT_MODELS.vision,
+  batchModel: DEFAULT_MODELS.vision, // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,

@@ -32,7 +32,7 @@ import { ErrorState } from "./upload/ErrorState";
 import { FileAnalyzer } from "./upload/FileAnalyzer";
 import { useFileUpload } from "@/hooks/useFileUpload";
 
-import { ProcessingRecommendation, analyzeFile, getProcessingRecommendation } from "@/utils/processingOptimizer";
+import { ProcessingRecommendation, analyzeFile, getProcessingRecommendation, resolveModelForFileSize } from "@/utils/processingOptimizer";
 import { CategorySelector } from "./categories/CategorySelector";
 import { Label } from "@/components/ui/label";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
@@ -599,6 +599,24 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           modelToUse = DEFAULT_MODELS.vision;
           prioritySource = 'default';
           console.log('⚠️ Using default model:', modelToUse);
+        }
+
+        // SIZE GUARD: none of the branches above consider image size once
+        // `settings.selectedModel` is set — it always is, so it short-circuits
+        // the size-based branches in getProcessingRecommendation. Enforce each
+        // model's declared maxImageSize here, otherwise a receipt over the
+        // primary's cap is sent straight to the provider, rejected, and only
+        // rescued by the server fallback chain (a wasted round-trip plus
+        // latency and error-log noise).
+        {
+          const sizeGuard = resolveModelForFileSize(modelToUse, file.size);
+          if (sizeGuard.adjusted) {
+            console.warn(
+              `📏 ${modelToUse} cannot accept ${(file.size / (1024 * 1024)).toFixed(1)}MB — switching to ${sizeGuard.modelId}`
+            );
+            addLocalLog('START', `File too large for ${modelToUse}; using ${sizeGuard.modelId} instead`);
+            modelToUse = sizeGuard.modelId;
+          }
         }
 
         console.log('🎯 FINAL MODEL SELECTION:', {
