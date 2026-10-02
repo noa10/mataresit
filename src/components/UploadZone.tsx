@@ -18,6 +18,7 @@ import {
 import { ProcessingLog, ProcessingStatus, Receipt } from "@/types/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
+import { DEFAULT_MODELS } from "@/config/modelProviders";
 import { optimizeImageForUpload } from "@/utils/imageUtils";
 import { SubscriptionEnforcementService, handleActionResult } from "@/services/subscriptionEnforcementService";
 import { CacheInvalidationService } from "@/services/cacheInvalidationService";
@@ -595,7 +596,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
         }
         // PRIORITY 3: Default fallback
         else {
-          modelToUse = 'groq/meta-llama/llama-4-scout-17b-16e-instruct';
+          modelToUse = DEFAULT_MODELS.vision;
           prioritySource = 'default';
           console.log('⚠️ Using default model:', modelToUse);
         }

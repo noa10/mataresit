@@ -50,19 +50,10 @@ const SIZE_MULTIPLIERS = {
 
 // Model-specific multipliers
 const MODEL_MULTIPLIERS: Record<string, number> = {
-  'gemini-2.0-flash-lite': 0.7,
-  'gemini-2.0-flash': 0.75,
-  'gemini-2.5-flash': 0.8,
-  'gemini-2.5-flash-lite': 0.65, // Fastest and most efficient model
-  'gemini-2.5-flash-lite-preview-06-17': 0.75,
-  'gemini-2.5-pro': 1.0,
-  'openrouter/google/gemini-2.0-flash-exp:free': 0.9,
-  'openrouter/google/gemma-3-27b-it:free': 1.0,
-  'openrouter/qwen/qwen2.5-vl-72b-instruct:free': 1.1,
-  'openrouter/mistralai/mistral-small-3.1-24b-instruct:free': 0.95,
-  'openrouter/meta-llama/llama-4-scout:free': 1.05,
-  'openrouter/opengvlab/internvl3-14b:free': 1.15,
-  'openrouter/moonshotai/kimi-vl-a3b-thinking:free': 1.2,
+  'gemini-2.5-flash-lite': 0.65, // Primary: fast and reliable
+  'gemini-3.1-flash-lite': 0.7,
+  'groq/qwen/qwen3.8-27b': 0.6, // Fastest vision model
+  'openrouter/google/gemma-4-26b-a4b-it': 0.95,
 };
 
 /**

@@ -37,90 +37,8 @@ export interface ModelConfig {
  */
 export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   // ==========================================
-  // Groq Models (Primary - Vision-Capable)
+  // Google Gemini Models (Primary - Vision-Capable)
   // ==========================================
-  'groq/meta-llama/llama-4-scout-17b-16e-instruct': {
-    id: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
-    name: 'Llama 4 Scout 17B 16E Instruct',
-    provider: 'groq',
-    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    apiKeyEnvVar: 'GROQ_API_KEY',
-    temperature: 0.2,
-    maxTokens: 4096,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Meta Llama 4 Scout via Groq chat completions with vision support',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.9
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],
-      contextWindow: 131072
-    }
-  },
-
-  // ==========================================
-  // Google Gemini Models (Fallback 1)
-  // ==========================================
-  'gemini-2.0-flash-lite': {
-    id: 'gemini-2.0-flash-lite',
-    name: 'Gemini 2.0 Flash Lite',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.3,
-    maxTokens: 2048,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Latest fast model with improved efficiency',
-    pricing: {
-      inputTokens: 0.075,
-      outputTokens: 0.30
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.95
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1000000
-    }
-  },
-  'gemini-2.0-flash': {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    provider: 'gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
-    apiKeyEnvVar: 'GEMINI_API_KEY',
-    temperature: 0.3,
-    maxTokens: 8192,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Latest Gemini 2.0 Flash model with enhanced speed and capabilities',
-    pricing: {
-      inputTokens: 0.075,
-      outputTokens: 0.30
-    },
-    performance: {
-      speed: 'fast',
-      accuracy: 'very-good',
-      reliability: 0.96
-    },
-    capabilities: {
-      maxImageSize: 5 * 1024 * 1024, // 5MB
-      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
-      contextWindow: 1048576
-    }
-  },
   'gemini-2.5-flash-lite': {
     id: 'gemini-2.5-flash-lite',
     name: 'Gemini 2.5 Flash Lite',
@@ -147,73 +65,79 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
       contextWindow: 1048576
     }
   },
-
-  // ==========================================
-  // OpenRouter Free Models (Fallback 2)
-  // ==========================================
-  'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free': {
-    id: 'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
-    name: 'Llama Nemotron Embed VL 1B V2',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
+  'gemini-3.1-flash-lite': {
+    id: 'gemini-3.1-flash-lite',
+    name: 'Gemini 3.1 Flash Lite',
+    provider: 'gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
+    apiKeyEnvVar: 'GEMINI_API_KEY',
+    temperature: 0.3,
+    maxTokens: 8192,
     supportsText: true,
     supportsVision: true,
-    description: 'NVIDIA Llama Nemotron vision-language model (Free)',
+    description: 'Newer Gemini 3.1 Flash Lite generation, verified vision-capable',
+    pricing: {
+      inputTokens: 0.075,
+      outputTokens: 0.30
+    },
+    performance: {
+      speed: 'fast',
+      accuracy: 'very-good',
+      reliability: 0.94
+    },
+    capabilities: {
+      maxImageSize: 5 * 1024 * 1024, // 5MB
+      supportedFormats: ['image/jpeg', 'image/png', 'application/pdf'],
+      contextWindow: 1048576
+    }
+  },
+
+  // ==========================================
+  // Groq Models (Vision-Capable, OpenAI-compatible)
+  // ==========================================
+  'groq/qwen/qwen3.8-27b': {
+    id: 'groq/qwen/qwen3.8-27b',
+    name: 'Qwen 3.8 27B (Groq)',
+    provider: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    apiKeyEnvVar: 'GROQ_API_KEY',
+    temperature: 0.2,
+    maxTokens: 4096,
+    supportsText: true,
+    supportsVision: true,
+    description: 'Qwen 3.8 27B via Groq chat completions with verified vision support',
     pricing: {
       inputTokens: 0,
       outputTokens: 0
     },
     performance: {
       speed: 'fast',
-      accuracy: 'good',
-      reliability: 0.85
-    },
-    capabilities: {
-      maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
-    }
-  },
-  'openrouter/google/gemma-3-12b-it:free': {
-    id: 'openrouter/google/gemma-3-12b-it:free',
-    name: 'Gemma 3 12B Instruct',
-    provider: 'openrouter',
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    temperature: 0.2,
-    maxTokens: 1024,
-    supportsText: true,
-    supportsVision: true,
-    description: 'Google Gemma 3 12B vision-language model (Free)',
-    pricing: {
-      inputTokens: 0,
-      outputTokens: 0
-    },
-    performance: {
-      speed: 'medium',
       accuracy: 'very-good',
-      reliability: 0.87
+      reliability: 0.9
     },
     capabilities: {
       maxImageSize: 4 * 1024 * 1024, // 4MB
-      supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
+      supportedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      contextWindow: 131072
     }
   },
-  'openrouter/google/gemma-4-26b-a4b-it:free': {
-    id: 'openrouter/google/gemma-4-26b-a4b-it:free',
+
+  // ==========================================
+  // OpenRouter Models (Last-resort fallback)
+  // Note: ":free" variants sit on a shared upstream pool and return HTTP 429
+  // under load, so the paid tier is used here for predictable availability.
+  // ==========================================
+  'openrouter/google/gemma-4-26b-a4b-it': {
+    id: 'openrouter/google/gemma-4-26b-a4b-it',
     name: 'Gemma 4 26B A4B Instruct',
     provider: 'openrouter',
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
     apiKeyEnvVar: 'OPENROUTER_API_KEY',
     temperature: 0.2,
-    maxTokens: 1024,
+    maxTokens: 8192,
     supportsText: true,
     supportsVision: true,
-    description: 'Google Gemma 4 26B vision-language model (Free)',
+    description: 'Google Gemma 4 26B vision-language model (OpenRouter, verified)',
     pricing: {
       inputTokens: 0,
       outputTokens: 0
@@ -221,12 +145,12 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
     performance: {
       speed: 'medium',
       accuracy: 'very-good',
-      reliability: 0.89
+      reliability: 0.85
     },
     capabilities: {
       maxImageSize: 4 * 1024 * 1024, // 4MB
       supportedFormats: ['image/jpeg', 'image/png'],
-      contextWindow: 8192
+      contextWindow: 262144
     }
   }
 };
@@ -235,10 +159,35 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
 export const DEFAULT_MODELS = {
   text: 'gemini-2.5-flash-lite',
   vision: 'gemini-2.5-flash-lite',
-  fast: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+  fast: 'groq/qwen/qwen3.8-27b',
   accurate: 'gemini-2.5-flash-lite',
-  economical: 'groq/meta-llama/llama-4-scout-17b-16e-instruct'
+  economical: 'groq/qwen/qwen3.8-27b'
 };
+
+/**
+ * Retired model IDs mapped to their live replacements.
+ *
+ * Keep in sync with LEGACY_MODEL_ID_ALIASES in
+ * supabase/functions/enhance-receipt-data/index.ts so that a model
+ * persisted by an older client still resolves after an upgrade.
+ */
+export const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
+  'meta-llama/llama-4-scout-17b-16e-instruct': 'groq/qwen/qwen3.8-27b',
+  'groq/meta-llama/llama-4-scout-17b-16e-instruct': 'groq/qwen/qwen3.8-27b',
+  'gemini-2.0-flash': 'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite': 'gemini-2.5-flash-lite',
+  'gemini-2.5-flash-lite-preview-06-17': 'gemini-2.5-flash-lite',
+  'openrouter/google/gemma-3-12b-it:free': 'openrouter/google/gemma-4-26b-a4b-it',
+  'openrouter/google/gemma-4-26b-a4b-it:free': 'openrouter/google/gemma-4-26b-a4b-it',
+  'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free': 'openrouter/google/gemma-4-26b-a4b-it'
+};
+
+/**
+ * Resolve any model ID (current or legacy) to a live registry entry.
+ */
+export function resolveModelId(modelId: string): string {
+  return LEGACY_MODEL_ID_ALIASES[modelId] || modelId;
+}
 
 /**
  * Get models by provider
@@ -278,23 +227,20 @@ export function getRecommendedModels(criteria: {
  * Get model configuration by ID
  */
 export function getModelConfig(modelId: string): ModelConfig | undefined {
-  const LEGACY_MODEL_ID_ALIASES: Record<string, string> = {
-    'meta-llama/llama-4-scout-17b-16e-instruct': 'groq/meta-llama/llama-4-scout-17b-16e-instruct'
-  };
-  const resolvedModelId = LEGACY_MODEL_ID_ALIASES[modelId] || modelId;
-  return AVAILABLE_MODELS[resolvedModelId];
+  return AVAILABLE_MODELS[resolveModelId(modelId)];
 }
 
 /**
  * Check if a model is available (has required API key)
  */
+/**
+ * Check if a model ID resolves to a registry entry.
+ *
+ * This only validates registry membership, not key availability —
+ * provider keys live server-side and cannot be read from the browser.
+ */
 export function isModelAvailable(modelId: string): boolean {
-  const model = AVAILABLE_MODELS[modelId];
-  if (!model) return false;
-
-  // In a real implementation, you'd check if the API key is configured
-  // For now, we'll assume all models are available
-  return true;
+  return Boolean(AVAILABLE_MODELS[resolveModelId(modelId)]);
 }
 
 /**

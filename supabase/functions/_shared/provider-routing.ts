@@ -47,28 +47,23 @@ export interface FallbackSelectionOptions {
   hasApiKey: (apiKeyEnvVar: string) => boolean;
 }
 
+// Candidate order matters: each entry is tried in turn until one succeeds.
+// The primary Gemini model is repeated here so it is still reachable when the
+// request starts on another provider (Groq/OpenRouter).
+// All IDs below were verified live against their provider.
 const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
   gemini: [
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-2.5-flash-lite'
+    'gemini-3.1-flash-lite'
   ],
-  openrouter: [
-    'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
-    'openrouter/google/gemma-3-12b-it:free',
-    'openrouter/google/gemma-4-26b-a4b-it:free'
-  ],
+  openrouter: [],
   groq: []
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
-  'gemini-2.0-flash-lite',
-  'gemini-2.0-flash',
   'gemini-2.5-flash-lite',
-  'groq/meta-llama/llama-4-scout-17b-16e-instruct',
-  'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free',
-  'openrouter/google/gemma-3-12b-it:free',
-  'openrouter/google/gemma-4-26b-a4b-it:free'
+  'gemini-3.1-flash-lite',
+  'groq/qwen/qwen3.8-27b',
+  'openrouter/google/gemma-4-26b-a4b-it'
 ];
 
 export function selectImageFallbackCandidates(options: FallbackSelectionOptions): string[] {
