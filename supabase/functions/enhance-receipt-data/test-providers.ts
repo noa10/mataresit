@@ -252,20 +252,20 @@ Deno.test('parseOpenAICompatibleResponse - preserves valid date', async () => {
 
 Deno.test('selectImageFallbackCandidates - returns candidates excluding requested model', () => {
   const mockModels = {
-    'groq/meta-llama/llama-4-scout-17b-16e-instruct': {
-      id: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+    'groq/qwen/qwen3.8-27b': {
+      id: 'groq/qwen/qwen3.8-27b',
       provider: 'groq' as const,
       apiKeyEnvVar: 'GROQ_API_KEY',
       supportsVision: true,
     },
-    'gemini-2.0-flash-lite': {
-      id: 'gemini-2.0-flash-lite',
+    'gemini-2.5-flash-lite': {
+      id: 'gemini-2.5-flash-lite',
       provider: 'gemini' as const,
       apiKeyEnvVar: 'GEMINI_API_KEY',
       supportsVision: true,
     },
-    'openrouter/google/gemma-3-12b-it:free': {
-      id: 'openrouter/google/gemma-3-12b-it:free',
+    'openrouter/google/gemma-4-26b-a4b-it': {
+      id: 'openrouter/google/gemma-4-26b-a4b-it',
       provider: 'openrouter' as const,
       apiKeyEnvVar: 'OPENROUTER_API_KEY',
       supportsVision: true,
@@ -273,16 +273,16 @@ Deno.test('selectImageFallbackCandidates - returns candidates excluding requeste
   };
 
   const candidates = selectImageFallbackCandidates({
-    requestedModelId: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+    requestedModelId: 'groq/qwen/qwen3.8-27b',
     requestedProvider: 'groq',
     attemptedModelIds: new Set(),
     models: mockModels,
     hasApiKey: (envVar: string) => envVar === 'GEMINI_API_KEY' || envVar === 'OPENROUTER_API_KEY',
   });
 
-  assertEquals(candidates.includes('groq/meta-llama/llama-4-scout-17b-16e-instruct'), false);
-  assertEquals(candidates.includes('gemini-2.0-flash-lite'), true);
-  assertEquals(candidates.includes('openrouter/google/gemma-3-12b-it:free'), true);
+  assertEquals(candidates.includes('groq/qwen/qwen3.8-27b'), false);
+  assertEquals(candidates.includes('gemini-2.5-flash-lite'), true);
+  assertEquals(candidates.includes('openrouter/google/gemma-4-26b-a4b-it'), true);
 });
 
 Deno.test('executeWithFallback - succeeds on primary without fallback', async () => {
@@ -344,7 +344,7 @@ async function callGroqAPI(
   input: TextInput | ImageInput,
   logger: ProcessingLogger
 ): Promise<any> {
-  const modelName = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  const modelName = 'qwen/qwen3.8-27b';
 
   let messages: any[];
   if (input.type === 'text') {
@@ -549,7 +549,7 @@ Deno.test('end-to-end: parseGeminiResponse handles normal JSON', async () => {
   const logger = new MockLogger() as unknown as ProcessingLogger;
   const responseText = `{"merchant":"AEON Big","date":"2026-04-10","total":45.60,"tax":2.74,"currency":"MYR","payment_method":"Credit Card","predicted_category":"Groceries","line_items":[{"description":"Rice 5KG","amount":18.50},{"description":"Cooking Oil","amount":8.90}],"confidence":{"merchant":90,"date":85,"total":92,"tax":80,"currency":95,"payment_method":88,"predicted_category":90,"line_items":75}}`;
 
-  const result = await parseGeminiResponse(responseText, 'gemini-2.0-flash-lite', logger);
+  const result = await parseGeminiResponse(responseText, 'gemini-2.5-flash-lite', logger);
 
   assertExists(result.data);
   assertEquals(result.data.merchant, 'AEON Big');
@@ -560,7 +560,7 @@ Deno.test('end-to-end: parseGeminiResponse normalizes invalid date to empty stri
   const logger = new MockLogger() as unknown as ProcessingLogger;
   const responseText = `{"merchant":"AEON Big","date":"2016.00","total":45.60,"currency":"MYR"}`;
 
-  const result = await parseGeminiResponse(responseText, 'gemini-2.0-flash-lite', logger);
+  const result = await parseGeminiResponse(responseText, 'gemini-2.5-flash-lite', logger);
 
   assertExists(result.data);
   assertEquals(result.data.date, '');

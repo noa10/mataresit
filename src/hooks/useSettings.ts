@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { resolveModelId } from '@/config/modelProviders';
 
 export interface UserApiKeys {
   openrouter?: string;
@@ -22,8 +23,10 @@ export interface ProcessingSettings {
 }
 
 const defaultSettings: ProcessingSettings = {
-  selectedModel: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
-  batchModel: 'groq/meta-llama/llama-4-scout-17b-16e-instruct', // Default to same model for batch
+  // Gemini 2.5 Flash Lite is the primary verified vision model. Groq
+  // (qwen3.8-27b) is the fast fallback — see src/config/modelProviders.ts.
+  selectedModel: 'gemini-2.5-flash-lite',
+  batchModel: 'gemini-2.5-flash-lite', // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,
@@ -55,9 +58,11 @@ const normalizeStoredSettings = (rawSettings: unknown): ProcessingSettings | nul
 
   return {
     ...defaultSettings,
-    selectedModel: selectedModel.trim(),
+    // Resolve retired model IDs so users persisted on a since-removed
+    // model are transparently moved to its live replacement.
+    selectedModel: resolveModelId(selectedModel.trim()),
     batchModel: typeof batchModel === 'string' && batchModel.trim()
-      ? batchModel.trim()
+      ? resolveModelId(batchModel.trim())
       : defaultSettings.batchModel,
     batchUpload: {
       ...defaultSettings.batchUpload,

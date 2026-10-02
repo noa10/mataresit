@@ -1,148 +1,134 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   executeWithFallback,
-  getOpenCodeRetryEndpoint,
   ProviderRequestError,
-  resolveKiloGatewayChatEndpoint,
-  selectImageFallbackCandidates,
-  shouldRetryOpenCodeImageRequest
+  selectImageFallbackCandidates
 } from '../../supabase/functions/_shared/provider-routing';
-import { AVAILABLE_MODELS } from '../config/modelProviders';
+import { AVAILABLE_MODELS, resolveModelId, getModelConfig } from '../config/modelProviders';
+
+const hasAllKeys = () => true;
 
 describe('provider routing helpers', () => {
-  it('resolves Kilo endpoint to /chat/completions exactly once', () => {
-    expect(resolveKiloGatewayChatEndpoint('https://api.kilo.ai/api/gateway'))
-      .toBe('https://api.kilo.ai/api/gateway/chat/completions');
-    expect(resolveKiloGatewayChatEndpoint('https://api.kilo.ai/api/gateway/chat/completions'))
-      .toBe('https://api.kilo.ai/api/gateway/chat/completions');
-    expect(resolveKiloGatewayChatEndpoint('https://api.kilo.ai/api/gateway/chat/completions/'))
-      .toBe('https://api.kilo.ai/api/gateway/chat/completions');
-  });
-
-  it('keeps all Kilo model endpoints on /chat/completions in model registry', () => {
-    const kiloModels = Object.values(AVAILABLE_MODELS).filter((model) => model.provider === 'kilo');
-    expect(kiloModels.length).toBeGreaterThan(0);
-    for (const model of kiloModels) {
-      expect(model.endpoint.endsWith('/chat/completions')).toBe(true);
-    }
-  });
-
   it('captures structured details in ProviderRequestError', () => {
     const error = new ProviderRequestError({
-      provider: 'opencode',
-      modelId: 'opencode/minimax-m2.5-free',
+      provider: 'openrouter',
+      modelId: 'openrouter/google/gemma-4-26b-a4b-it',
       status: 500,
       statusText: 'Internal Server Error',
-      errorBodySnippet: '{"message":"Cannot read properties of undefined (reading prompt_tokens)"}',
-      endpoint: 'https://opencode.ai/zen/v1/chat/completions'
+      errorBodySnippet: '{"message":"upstream failure"}',
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions'
     });
 
     expect(error.name).toBe('ProviderRequestError');
-    expect(error.provider).toBe('opencode');
-    expect(error.modelId).toBe('opencode/minimax-m2.5-free');
+    expect(error.provider).toBe('openrouter');
+    expect(error.modelId).toBe('openrouter/google/gemma-4-26b-a4b-it');
     expect(error.status).toBe(500);
     expect(error.statusText).toBe('Internal Server Error');
-    expect(error.errorBodySnippet).toContain('prompt_tokens');
+    expect(error.errorBodySnippet).toContain('upstream failure');
     expect(error.endpoint).toContain('/chat/completions');
   });
 
-  it('selects fallback models while skipping attempted and missing-api-key models', () => {
-    const attempted = new Set<string>(['opencode/minimax-m2.5-free']);
-    const candidates = selectImageFallbackCandidates({
-      requestedModelId: 'opencode/minimax-m2.5-free',
-      requestedProvider: 'opencode',
-      attemptedModelIds: attempted,
-      models: AVAILABLE_MODELS,
-      hasApiKey: (envVar: string) => envVar !== 'OPENROUTER_API_KEY' && envVar !== 'GROQ_API_KEY'
-    });
+  it('every registered model points at its provider host and supports vision', () => {
+    for (const model of Object.values(AVAILABLE_MODELS)) {
+      expect(model.supportsVision).toBe(true);
+      expect(model.maxTokens).toBeGreaterThanOrEqual(4096);
 
-    expect(candidates).toContain('opencode/kimi-k2.5-free');
-    expect(candidates).toContain('opencode/glm-5-free');
-    expect(candidates).toContain('opencode/big-pickle');
-    expect(candidates).not.toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
-    expect(candidates).not.toContain('opencode/minimax-m2.5-free');
+      switch (model.provider) {
+        case 'gemini':
+          expect(model.endpoint).toContain('generativelanguage.googleapis.com');
+          expect(model.apiKeyEnvVar).toBe('GEMINI_API_KEY');
+          break;
+        case 'groq':
+          expect(model.endpoint).toBe('https://api.groq.com/openai/v1/chat/completions');
+          expect(model.apiKeyEnvVar).toBe('GROQ_API_KEY');
+          break;
+        case 'openrouter':
+          expect(model.endpoint).toBe('https://openrouter.ai/api/v1/chat/completions');
+          expect(model.apiKeyEnvVar).toBe('OPENROUTER_API_KEY');
+          break;
+      }
+    }
   });
 
-  it('supports groq provider in fallback selection without same-provider fallbacks', () => {
+  it('keeps retired model IDs resolvable to a live registry entry', () => {
+    const retiredIds = [
+      'meta-llama/llama-4-scout-17b-16e-instruct',
+      'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-2.5-flash-lite-preview-06-17',
+      'openrouter/google/gemma-3-12b-it:free',
+      'openrouter/google/gemma-4-26b-a4b-it:free',
+      'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free'
+    ];
+
+    for (const retiredId of retiredIds) {
+      expect(resolveModelId(retiredId)).not.toBe(retiredId);
+      expect(getModelConfig(retiredId)).toBeDefined();
+    }
+  });
+
+  it('never selects the requested model or an already-attempted model as fallback', () => {
+    const requested = 'gemini-2.5-flash-lite';
     const candidates = selectImageFallbackCandidates({
-      requestedModelId: 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+      requestedModelId: requested,
+      requestedProvider: 'gemini',
+      attemptedModelIds: new Set<string>([requested]),
+      models: AVAILABLE_MODELS,
+      hasApiKey: hasAllKeys
+    });
+
+    expect(candidates).not.toContain(requested);
+    for (const candidate of candidates) {
+      expect(AVAILABLE_MODELS[candidate]).toBeDefined();
+      expect(AVAILABLE_MODELS[candidate].supportsVision).toBe(true);
+    }
+  });
+
+  it('excludes fallbacks whose API key is missing', () => {
+    const candidates = selectImageFallbackCandidates({
+      requestedModelId: 'gemini-2.5-flash-lite',
+      requestedProvider: 'gemini',
+      attemptedModelIds: new Set<string>(['gemini-2.5-flash-lite']),
+      models: AVAILABLE_MODELS,
+      hasApiKey: (envVar: string) => envVar === 'GEMINI_API_KEY'
+    });
+
+    expect(candidates).not.toContain('groq/qwen/qwen3.8-27b');
+    expect(candidates).not.toContain('openrouter/google/gemma-4-26b-a4b-it');
+  });
+
+  it('falls back to another provider when the primary groq model fails', () => {
+    const candidates = selectImageFallbackCandidates({
+      requestedModelId: 'groq/qwen/qwen3.8-27b',
       requestedProvider: 'groq',
-      attemptedModelIds: new Set<string>(['groq/meta-llama/llama-4-scout-17b-16e-instruct']),
+      attemptedModelIds: new Set<string>(['groq/qwen/qwen3.8-27b']),
       models: AVAILABLE_MODELS,
-      hasApiKey: () => true
+      hasApiKey: hasAllKeys
     });
 
-    expect(candidates).toEqual([]);
-    expect(candidates).not.toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
-  });
-
-  it('uses Groq as the only cross-provider image fallback when key is available', () => {
-    const candidates = selectImageFallbackCandidates({
-      requestedModelId: 'opencode/minimax-m2.5-free',
-      requestedProvider: 'opencode',
-      attemptedModelIds: new Set<string>(['opencode/minimax-m2.5-free']),
-      models: AVAILABLE_MODELS,
-      hasApiKey: () => true
-    });
-
-    expect(candidates).toContain('groq/meta-llama/llama-4-scout-17b-16e-instruct');
-    expect(candidates).not.toContain('gemini-2.5-flash-lite');
-    expect(candidates).not.toContain('openrouter/google/gemini-2.0-flash-exp:free');
-  });
-
-  it('detects OpenCode retry conditions for image failures', () => {
-    expect(shouldRetryOpenCodeImageRequest('image', 500, 'Internal Server Error')).toBe(true);
-    expect(shouldRetryOpenCodeImageRequest('image', 404, '{"message":"not found"}')).toBe(true);
-    expect(
-      shouldRetryOpenCodeImageRequest(
-        'image',
-        400,
-        '{"message":"Cannot read properties of undefined (reading prompt_tokens)"}'
-      )
-    ).toBe(true);
-    expect(shouldRetryOpenCodeImageRequest('image', 400, '{"message":"bad request"}')).toBe(false);
-    expect(
-      shouldRetryOpenCodeImageRequest(
-        'text',
-        500,
-        '{"message":"Cannot read properties of undefined (reading prompt_tokens)"}'
-      )
-    ).toBe(false);
-  });
-
-  it('keeps OpenCode retry endpoint on /zen/v1 chat completions', () => {
-    expect(getOpenCodeRetryEndpoint('https://opencode.ai/zen/v1/chat/completions'))
-      .toBe('https://opencode.ai/zen/v1/chat/completions');
+    expect(candidates).toContain('gemini-2.5-flash-lite');
+    expect(candidates).not.toContain('groq/qwen/qwen3.8-27b');
   });
 });
-
 describe('provider fallback integration behavior', () => {
-  it('uses corrected Kilo endpoint so POST would target chat/completions', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }));
-    const resolvedEndpoint = resolveKiloGatewayChatEndpoint('https://api.kilo.ai/api/gateway');
-
-    await fetchMock(resolvedEndpoint, { method: 'POST' });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.kilo.ai/api/gateway/chat/completions');
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' });
-  });
-
-  it('allows OpenCode retry path for 500 prompt_tokens-class failures', () => {
-    const shouldRetry = shouldRetryOpenCodeImageRequest(
-      'image',
-      500,
-      '{"type":"error","error":{"message":"Cannot read properties of undefined (reading prompt_tokens)"}}'
-    );
-    expect(shouldRetry).toBe(true);
-  });
-
-  it('falls back to Groq when OpenCode attempts fail and updates modelUsed', async () => {
+  it('reports the primary model when it succeeds', async () => {
     const result = await executeWithFallback({
-      primaryModelId: 'opencode/minimax-m2.5-free',
-      fallbackModelIds: ['opencode/kimi-k2.5-free', 'groq/meta-llama/llama-4-scout-17b-16e-instruct'],
+      primaryModelId: 'gemini-2.5-flash-lite',
+      fallbackModelIds: ['groq/qwen/qwen3.8-27b'],
+      attempt: async () => ({ merchant: 'Test Store' })
+    });
+
+    expect(result.fallbackApplied).toBe(false);
+    expect(result.modelUsed).toBe('gemini-2.5-flash-lite');
+  });
+
+  it('falls back to groq when gemini attempts fail and updates modelUsed', async () => {
+    const result = await executeWithFallback({
+      primaryModelId: 'gemini-2.5-flash-lite',
+      fallbackModelIds: ['gemini-3.1-flash-lite', 'groq/qwen/qwen3.8-27b'],
       attempt: async (modelId: string) => {
-        if (modelId.startsWith('opencode/')) {
+        if (modelId.startsWith('gemini-')) {
           throw new Error(`provider failed for ${modelId}`);
         }
         return { extracted: true, from: modelId };
@@ -150,20 +136,56 @@ describe('provider fallback integration behavior', () => {
     });
 
     expect(result.fallbackApplied).toBe(true);
-    expect(result.fallbackFrom).toBe('opencode/minimax-m2.5-free');
-    expect(result.modelUsed).toBe('groq/meta-llama/llama-4-scout-17b-16e-instruct');
-    expect(result.result).toEqual({ extracted: true, from: 'groq/meta-llama/llama-4-scout-17b-16e-instruct' });
+    expect(result.fallbackFrom).toBe('gemini-2.5-flash-lite');
+    expect(result.modelUsed).toBe('groq/qwen/qwen3.8-27b');
+    expect(result.result).toEqual({ extracted: true, from: 'groq/qwen/qwen3.8-27b' });
   });
 
-  it('throws non-success when all provider attempts fail', async () => {
+  it('reaches the openrouter last resort when gemini and groq both fail', async () => {
+    const result = await executeWithFallback({
+      primaryModelId: 'gemini-2.5-flash-lite',
+      fallbackModelIds: ['groq/qwen/qwen3.8-27b', 'openrouter/google/gemma-4-26b-a4b-it'],
+      attempt: async (modelId: string) => {
+        if (!modelId.startsWith('openrouter/')) {
+          throw new Error(`provider failed for ${modelId}`);
+        }
+        return { extracted: true, from: modelId };
+      }
+    });
+
+    expect(result.modelUsed).toBe('openrouter/google/gemma-4-26b-a4b-it');
+    expect(result.attemptedModels).toEqual([
+      'gemini-2.5-flash-lite',
+      'groq/qwen/qwen3.8-27b',
+      'openrouter/google/gemma-4-26b-a4b-it'
+    ]);
+  });
+
+  it('throws when all provider attempts fail', async () => {
     await expect(
       executeWithFallback({
-        primaryModelId: 'opencode/minimax-m2.5-free',
-        fallbackModelIds: ['opencode/kimi-k2.5-free', 'groq/meta-llama/llama-4-scout-17b-16e-instruct'],
+        primaryModelId: 'gemini-2.5-flash-lite',
+        fallbackModelIds: ['groq/qwen/qwen3.8-27b'],
         attempt: async () => {
           throw new Error('all attempts failed');
         }
       })
     ).rejects.toThrow('all attempts failed');
+  });
+
+  it('does not retry an already-attempted model', async () => {
+    const seen: string[] = [];
+    await expect(
+      executeWithFallback({
+        primaryModelId: 'gemini-2.5-flash-lite',
+        fallbackModelIds: ['gemini-2.5-flash-lite', 'groq/qwen/qwen3.8-27b'],
+        attempt: async (modelId: string) => {
+          seen.push(modelId);
+          throw new Error('boom');
+        }
+      })
+    ).rejects.toThrow('boom');
+
+    expect(seen).toEqual(['gemini-2.5-flash-lite', 'groq/qwen/qwen3.8-27b']);
   });
 });

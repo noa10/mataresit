@@ -121,7 +121,7 @@ export function ModelProviderStatus() {
   };
 
   const testGroqApiKey = async (apiKey: string) => {
-    const modelConfig = AVAILABLE_MODELS['groq/meta-llama/llama-4-scout-17b-16e-instruct']
+    const modelConfig = AVAILABLE_MODELS['groq/qwen/qwen3.8-27b']
       || Object.values(AVAILABLE_MODELS).find((model) => model.provider === 'groq');
     if (!modelConfig) {
       return { success: false, message: 'No Groq model available for testing.' };
@@ -243,8 +243,8 @@ export function ModelProviderStatus() {
               if (openRouterApiKey && openRouterApiKey.trim()) {
                 const openRouterService = new OpenRouterService(openRouterApiKey.trim());
                 try {
-                  // Test with a free vision-capable model
-                  const testModelId = 'openrouter/google/gemini-2.0-flash-exp:free';
+                  // Test with a registered vision-capable model
+                  const testModelId = 'openrouter/google/gemma-4-26b-a4b-it';
                   console.log('Testing OpenRouter with model:', testModelId);
 
                   // Use detailed connection test for better error messages
