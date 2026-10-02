@@ -421,6 +421,44 @@ async function callAIModel(
     // Requested model exists
     modelConfig = AVAILABLE_MODELS[requestedModelId];
     await logger.log(`✅ Requested model found: ${modelConfig.name}`, "AI");
+
+    // SIZE PRE-ROUTE: every model declares `capabilities.maxImageSize`, but
+    // until now nothing enforced it — it was only logged. Reprocess paths
+    // (ReceiptViewer, processBatchReceipts, the queue worker) pass a model
+    // straight through with no client-side size knowledge, because the stored
+    // size is not available in ProcessingOptions. Without this check an
+    // oversized stored receipt is sent to the provider, rejected, and rescued
+    // only by the fallback chain: one guaranteed failed round-trip per file.
+    //
+    // input.imageData.data is normalized to a Uint8Array during request
+    // parsing (see isBase64 decode above), so .length is genuine binary bytes
+    // and needs no base64 correction.
+    if (input.type === 'image') {
+      const cap = modelConfig.capabilities.maxImageSize;
+      const imageBytes = input.imageData?.data?.length ?? 0;
+      if (cap && imageBytes > cap) {
+        const replacement = Object.values(AVAILABLE_MODELS)
+          .filter((m) => m.supportsVision && m.capabilities.maxImageSize >= imageBytes)
+          .sort((a, b) => b.capabilities.maxImageSize - a.capabilities.maxImageSize)[0];
+
+        if (replacement) {
+          await logger.log(
+            `📏 SIZE PRE-ROUTE: ${modelConfig.name} cap is ${(cap / (1024 * 1024)).toFixed(1)}MB but image is ${(imageBytes / (1024 * 1024)).toFixed(1)}MB — using ${replacement.name}`,
+            "AI"
+          );
+          wasDefaultUsed = true;
+          fallbackReason = `Image exceeds ${modelConfig.name} size cap (${(cap / (1024 * 1024)).toFixed(1)}MB)`;
+          modelConfig = replacement;
+        } else {
+          // Nothing in the registry can accept this image; proceed and let the
+          // fallback chain surface the failure rather than failing earlier here.
+          await logger.log(
+            `📏 SIZE PRE-ROUTE: no model accepts ${(imageBytes / (1024 * 1024)).toFixed(1)}MB — proceeding with ${modelConfig.name}`,
+            "AI"
+          );
+        }
+      }
+    }
   } else if (requestedModelId) {
     // Requested model doesn't exist - log detailed error and use fallback
     const availableModels = Object.keys(AVAILABLE_MODELS);

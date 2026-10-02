@@ -45,6 +45,7 @@ import DocumentStructureViewer from "@/components/receipts/DocumentStructureView
 import VisualizationSettings from "@/components/receipts/VisualizationSettings";
 import { SimilarReceipts } from "@/components/search/SimilarReceipts";
 import { getStoredProcessingSettings, useSettings } from "@/hooks/useSettings";
+import { DEFAULT_MODELS } from "@/config/modelProviders";
 import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButton";
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { upsertCategoryRule } from "@/services/categoryRuleService";
@@ -752,7 +753,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       return selectedModel;
     }
 
-    return "groq/meta-llama/llama-4-scout-17b-16e-instruct";
+    return DEFAULT_MODELS.vision;
   }, [settings.selectedModel, getStoredProcessingSettings]);
 
   const reprocessMutation = useMutation({
