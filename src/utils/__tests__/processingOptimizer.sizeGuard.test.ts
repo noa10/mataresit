@@ -4,7 +4,7 @@ import {
   getProcessingRecommendation,
   analyzeFile,
 } from '../processingOptimizer';
-import { getModelConfig, DEFAULT_MODELS } from '@/config/modelProviders';
+import { getModelConfig, resolveModelId, DEFAULT_MODELS } from '@/config/modelProviders';
 
 const MB = 1024 * 1024;
 const GROQ = 'groq/qwen/qwen3.8-27b';
@@ -44,6 +44,26 @@ describe('resolveModelForFileSize', () => {
   it('passes through models that are not in the registry', () => {
     const result = resolveModelForFileSize('some/retired-model', 5 * MB);
     expect(result).toEqual({ modelId: 'some/retired-model', adjusted: false });
+  });
+
+  it('resolves a legacy model id before applying the cap (round-4 nit)', () => {
+    // resolveModelForFileSize must resolve retired IDs before the size check.
+    // selectModelForImageSize() does a direct registry lookup, so without this
+    // a legacy ID would miss its cap and pass through unadjusted — a behavior
+    // regression versus the pre-extraction code, which went through
+    // getModelConfig() (resolves aliases).
+    // 'gemini-2.0-flash-lite' -> 'gemini-2.5-flash-lite' (5MB cap).
+    const legacy = 'gemini-2.0-flash-lite';
+    expect(resolveModelId(legacy)).not.toBe(legacy);
+
+    const cap = getModelConfig(resolveModelId(legacy))!.capabilities.maxImageSize;
+    const result = resolveModelForFileSize(legacy, 4.5 * MB);
+
+    // With alias resolution the 4.5MB file fits the resolved model's 5MB cap,
+    // so no reroute should occur and the resolved ID is returned.
+    expect(4.5 * MB).toBeLessThanOrEqual(cap);
+    expect(result.adjusted).toBe(false);
+    expect(result.modelId).toBe(resolveModelId(legacy));
   });
 
   it('regression: a 4-5MB receipt with default settings is not sent to Groq', () => {

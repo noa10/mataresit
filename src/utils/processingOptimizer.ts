@@ -32,7 +32,7 @@ export interface FileAnalysis {
 }
 
 // Import model configurations from the centralized config
-import { getModelConfig, AVAILABLE_MODELS, DEFAULT_MODELS } from '@/config/modelProviders';
+import { getModelConfig, resolveModelId, AVAILABLE_MODELS, DEFAULT_MODELS } from '@/config/modelProviders';
 import { selectModelForImageSize } from '../../supabase/functions/_shared/provider-routing';
 
 /**
@@ -65,7 +65,11 @@ export function resolveModelForFileSize(
   fileSizeInBytes: number
 ): { modelId: string; adjusted: boolean } {
   const result = selectModelForImageSize({
-    modelId,
+    // selectModelForImageSize() does a direct registry lookup, so resolve legacy
+    // IDs first. This preserves the behavior of the pre-extraction code, which
+    // went through getModelConfig() (resolves aliases) — without it a retired ID
+    // would miss its cap and pass through unadjusted.
+    modelId: resolveModelId(modelId),
     fileSizeInBytes,
     models: AVAILABLE_MODELS
   });
