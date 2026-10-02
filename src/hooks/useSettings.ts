@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { resolveModelId } from '@/config/modelProviders';
+import { resolveModelId, DEFAULT_MODELS } from '@/config/modelProviders';
 
 export interface UserApiKeys {
   openrouter?: string;
@@ -26,8 +26,8 @@ const defaultSettings: ProcessingSettings = {
   // Groq (qwen3.8-27b) is the primary model: free and ~7x faster than Gemini
   // 2.5 Flash Lite at equivalent extraction quality. Gemini remains selectable
   // as a fallback / "accurate" pick — see src/config/modelProviders.ts.
-  selectedModel: 'groq/qwen/qwen3.8-27b',
-  batchModel: 'groq/qwen/qwen3.8-27b', // Default to same model for batch
+  selectedModel: DEFAULT_MODELS.vision,
+  batchModel: DEFAULT_MODELS.vision, // Default to same model for batch
   batchUpload: {
     maxConcurrent: 2,
     autoStart: false,

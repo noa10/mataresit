@@ -2,6 +2,12 @@
  * Time estimation utilities for receipt processing
  */
 
+// The model actually used for vision processing. Hard-pinning an ID here
+// previously used 'gemini-2.0-flash-lite', a model retired in #187 — it never
+// matched MODEL_MULTIPLIERS and silently fell through to the 1.0 default.
+// Centralized so the next model promotion is a one-line change.
+const DEFAULT_PRIMARY_MODEL = 'groq/qwen/qwen3.8-27b';
+
 export interface ProcessingTimeEstimate {
   estimatedTimeMs: number;
   estimatedTimeRemaining: number;
@@ -73,7 +79,7 @@ function getFileSizeCategory(sizeInBytes: number): keyof typeof SIZE_MULTIPLIERS
 export function calculateInitialEstimate(
   fileSize: number,
   processingMethod: 'ocr-ai' | 'ai-vision',
-  modelId: string = 'gemini-2.0-flash-lite'
+  modelId: string = DEFAULT_PRIMARY_MODEL
 ): ProcessingTimeEstimate {
   const sizeCategory = getFileSizeCategory(fileSize);
   const sizeMultiplier = SIZE_MULTIPLIERS[sizeCategory];
