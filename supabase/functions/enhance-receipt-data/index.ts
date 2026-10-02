@@ -193,8 +193,12 @@ const AVAILABLE_MODELS: Record<string, ModelConfig> = {
   }
 };
 
-const DEFAULT_TEXT_MODEL = 'gemini-2.5-flash-lite';
-const DEFAULT_VISION_MODEL = 'gemini-2.5-flash-lite';
+// Groq (qwen3.8-27b) is the primary: free and ~7x faster than Gemini on the
+// same receipt image at equivalent extraction quality. Gemini 2.5 Flash Lite
+// stays reachable as a cross-provider fallback via selectImageFallbackCandidates.
+// Keep in sync with DEFAULT_MODELS in src/config/modelProviders.ts.
+const DEFAULT_TEXT_MODEL = 'groq/qwen/qwen3.8-27b';
+const DEFAULT_VISION_MODEL = 'groq/qwen/qwen3.8-27b';
 
 /**
  * Process Malaysian tax information for a receipt

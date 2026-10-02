@@ -30,7 +30,7 @@ export function EnhancedProcessingTimeline({
   uploadProgress,
   fileSize = 1024 * 1024, // Default 1MB
   processingMethod = 'ai-vision',
-  modelId = 'groq/meta-llama/llama-4-scout-17b-16e-instruct',
+  modelId = 'groq/qwen/qwen3.8-27b', // Primary model — keep in sync with DEFAULT_MODELS.vision
   startTime,
   isProgressUpdating = false
 }: EnhancedProcessingTimelineProps) {

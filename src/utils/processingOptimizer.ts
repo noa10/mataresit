@@ -120,14 +120,21 @@ export function getProcessingRecommendation(
       recommendedModel = 'gemini-3.1-flash-lite';
       reasoning.push('High complexity large receipt - newer Gemini model provides better accuracy');
       riskLevel = 'medium';
+    } else if (fileAnalysis.size > 4 * 1024 * 1024) {
+      // Groq's maxImageSize is 4MB; anything larger must go to Gemini (5MB cap).
+      recommendedModel = 'gemini-2.5-flash-lite';
+      reasoning.push('File exceeds Groq 4MB image limit - using Gemini vision model');
+      riskLevel = 'medium';
     } else if (fileAnalysis.estimatedProcessingDifficulty > 8) {
       recommendedModel = 'gemini-3.1-flash-lite';
       reasoning.push('Very complex receipt detected - using newer Gemini model');
       riskLevel = 'high';
     } else {
-      // Default to gemini-2.5-flash-lite for better reliability and rate limit avoidance
-      recommendedModel = 'gemini-2.5-flash-lite';
-      reasoning.push('Using reliable fast AI Vision model for optimal processing');
+      // Default to Groq (qwen3.8-27b): free, ~7x faster than Gemini and
+      // equivalent extraction quality. Bounded above by its 4MB image cap —
+      // the size branches above route larger files to Gemini.
+      recommendedModel = 'groq/qwen/qwen3.8-27b';
+      reasoning.push('Using fast free Groq vision model for optimal processing');
       confidence = 'high';
     }
   }
@@ -138,7 +145,7 @@ export function getProcessingRecommendation(
   // PRIORITY 3: Apply speed/accuracy preferences only if no specific model was chosen
   if (!userPreferences?.preferredModel) {
     if (userPreferences?.prioritizeSpeed) {
-      recommendedModel = 'gemini-2.5-flash-lite';
+      recommendedModel = 'groq/qwen/qwen3.8-27b';
       reasoning.push('Speed prioritized - using fastest model');
     }
 
@@ -194,16 +201,16 @@ function createFallbackStrategy(
 
   // Choose fallback model based on file characteristics
   // Use different models for reliable fallback processing
-  let fallbackModel = 'gemini-3.1-flash-lite';
-  if (fileAnalysis.size > 3 * 1024 * 1024) {
-    fallbackModel = 'groq/qwen/qwen3.8-27b'; // Fast provider for large files
-  } else if (fileAnalysis.complexity === 'high') {
+  let fallbackModel = 'gemini-2.5-flash-lite';
+  if (fileAnalysis.complexity === 'high') {
     fallbackModel = 'gemini-3.1-flash-lite'; // Newer model for complex files
   }
 
   // Ensure fallback model is different from primary model
   if (fallbackModel === primaryModel) {
-    fallbackModel = primaryModel === 'gemini-2.5-flash-lite' ? 'gemini-3.1-flash-lite' : 'gemini-2.5-flash-lite';
+    fallbackModel = primaryModel === 'groq/qwen/qwen3.8-27b'
+      ? 'gemini-2.5-flash-lite'
+      : 'groq/qwen/qwen3.8-27b';
   }
 
   // Define triggers for fallback

@@ -107,5 +107,12 @@ opencode.json
 
 # Kilo
 .kilo/
-.omc/*
-.omo/*
+
+# Agent runtime state (tool sessions, checkpoints, replay logs).
+# Use the directory form, not ".omc/*" — the latter is anchored to the repo
+# root and silently misses nested dirs such as supabase/functions/.omc/.
+.omc/
+.omo/
+
+# Local agent/merge planning notes
+MERGE_PLAN.md

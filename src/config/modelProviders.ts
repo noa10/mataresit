@@ -156,9 +156,15 @@ export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
 };
 
 // Default models for different scenarios
+//
+// Groq (qwen3.8-27b) is the primary for both text and vision: it is free,
+// ~7x faster than Gemini 2.5 Flash Lite on the same receipt image, and
+// returns equivalent extraction quality. Gemini 2.5 Flash Lite is retained as
+// a cross-provider fallback (see supabase/functions/_shared/provider-routing.ts)
+// and as the "accurate" pick, since it is the more reliable model (0.97).
 export const DEFAULT_MODELS = {
-  text: 'gemini-2.5-flash-lite',
-  vision: 'gemini-2.5-flash-lite',
+  text: 'groq/qwen/qwen3.8-27b',
+  vision: 'groq/qwen/qwen3.8-27b',
   fast: 'groq/qwen/qwen3.8-27b',
   accurate: 'gemini-2.5-flash-lite',
   economical: 'groq/qwen/qwen3.8-27b'

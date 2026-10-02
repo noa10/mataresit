@@ -48,8 +48,10 @@ export interface FallbackSelectionOptions {
 }
 
 // Candidate order matters: each entry is tried in turn until one succeeds.
-// The primary Gemini model is repeated here so it is still reachable when the
-// request starts on another provider (Groq/OpenRouter).
+// Groq (qwen3.8-27b) is the primary; it is repeated here so it is still
+// reachable when the request starts on another provider (Gemini/OpenRouter).
+// The Gemini models follow as the accuracy/reliability fallback tier, and
+// OpenRouter last as the cross-provider safety net.
 // All IDs below were verified live against their provider.
 const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
   gemini: [
@@ -60,9 +62,9 @@ const SAME_PROVIDER_FALLBACKS: Record<ProviderName, string[]> = {
 };
 
 const CROSS_PROVIDER_IMAGE_FALLBACKS = [
+  'groq/qwen/qwen3.8-27b',
   'gemini-2.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'groq/qwen/qwen3.8-27b',
   'openrouter/google/gemma-4-26b-a4b-it'
 ];
 
