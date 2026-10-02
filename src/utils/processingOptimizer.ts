@@ -32,7 +32,8 @@ export interface FileAnalysis {
 }
 
 // Import model configurations from the centralized config
-import { getModelConfig, getModelsByCapability, DEFAULT_MODELS } from '@/config/modelProviders';
+import { getModelConfig, AVAILABLE_MODELS, DEFAULT_MODELS } from '@/config/modelProviders';
+import { selectModelForImageSize } from '../../supabase/functions/_shared/provider-routing';
 
 /**
  * Resolve a candidate model to one that can actually accept this file size.
@@ -48,6 +49,13 @@ import { getModelConfig, getModelsByCapability, DEFAULT_MODELS } from '@/config/
  * size-based branches in getProcessingRecommendation, which run only when no
  * user preference is supplied.
  *
+ * Applies to the upload path only. Reprocess paths (ReceiptViewer,
+ * processBatchReceipts, the queue worker) have no client-side size knowledge,
+ * so the same rule is enforced server-side by the SIZE PRE-ROUTE block in
+ * supabase/functions/enhance-receipt-data/index.ts. The selection rule below
+ * MUST stay in sync with that block — pick the highest-capacity vision model
+ * that fits, and leave the model unchanged if none does.
+ *
  * Returns the original model when it fits, otherwise the highest-capacity
  * vision model that does, or the original model if nothing fits (in which case
  * the server fallback chain remains the backstop).
@@ -56,31 +64,21 @@ export function resolveModelForFileSize(
   modelId: string,
   fileSizeInBytes: number
 ): { modelId: string; adjusted: boolean } {
-  const config = getModelConfig(modelId);
-  const cap = config?.capabilities.maxImageSize;
+  const result = selectModelForImageSize({
+    modelId,
+    fileSizeInBytes,
+    models: AVAILABLE_MODELS
+  });
 
-  if (!cap || fileSizeInBytes <= cap) {
-    return { modelId, adjusted: false };
+  if (result.adjusted) {
+    const capInMB = (getModelConfig(modelId)?.capabilities.maxImageSize ?? 0) / (1024 * 1024);
+    const sizeInMB = fileSizeInBytes / (1024 * 1024);
+    console.warn(
+      `[model-sizing] ${modelId} cap is ${capInMB.toFixed(1)}MB but file is ${sizeInMB.toFixed(1)}MB — routing to ${result.modelId}`
+    );
   }
 
-  const sizeInMB = fileSizeInBytes / (1024 * 1024);
-  const capInMB = cap / (1024 * 1024);
-
-  // Pick the vision model with the largest cap that fits this file.
-  const replacement = getModelsByCapability('vision')
-    .filter((m) => m.capabilities.maxImageSize >= fileSizeInBytes)
-    .sort((a, b) => b.capabilities.maxImageSize - a.capabilities.maxImageSize)[0];
-
-  if (!replacement) {
-    // Nothing in the registry can take this file; let the request proceed and
-    // rely on the server-side fallback chain.
-    return { modelId, adjusted: false };
-  }
-
-  console.warn(
-    `[model-sizing] ${modelId} cap is ${capInMB.toFixed(1)}MB but file is ${sizeInMB.toFixed(1)}MB — routing to ${replacement.id}`
-  );
-  return { modelId: replacement.id, adjusted: true };
+  return result;
 }
 
 /**

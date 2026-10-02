@@ -2,11 +2,63 @@ import { describe, expect, it } from 'vitest';
 import {
   executeWithFallback,
   ProviderRequestError,
-  selectImageFallbackCandidates
+  selectImageFallbackCandidates,
+  selectModelForImageSize
 } from '../../supabase/functions/_shared/provider-routing';
 import { AVAILABLE_MODELS, resolveModelId, getModelConfig } from '../config/modelProviders';
 
 const hasAllKeys = () => true;
+const MB = 1024 * 1024;
+
+describe('selectModelForImageSize (shared size-cap rule)', () => {
+  const run = (modelId: string, size: number) =>
+    selectModelForImageSize({ modelId, fileSizeInBytes: size, models: AVAILABLE_MODELS });
+
+  it('keeps the model when the file fits its cap', () => {
+    expect(run('groq/qwen/qwen3.8-27b', 2 * MB)).toEqual({
+      modelId: 'groq/qwen/qwen3.8-27b',
+      adjusted: false
+    });
+  });
+
+  it('treats the cap as inclusive', () => {
+    const cap = getModelConfig('groq/qwen/qwen3.8-27b')!.capabilities.maxImageSize;
+    expect(run('groq/qwen/qwen3.8-27b', cap).adjusted).toBe(false);
+  });
+
+  it('reroutes an oversized image to a model whose cap it fits', () => {
+    const result = run('groq/qwen/qwen3.8-27b', 4.5 * MB);
+    expect(result.adjusted).toBe(true);
+    expect(getModelConfig(result.modelId)!.capabilities.maxImageSize)
+      .toBeGreaterThanOrEqual(4.5 * MB);
+  });
+
+  it('leaves the model alone when nothing in the registry can accept it', () => {
+    // Max registered cap is 5MB; the caller then proceeds and lets the
+    // fallback chain surface the failure.
+    expect(run('groq/qwen/qwen3.8-27b', 6 * MB)).toEqual({
+      modelId: 'groq/qwen/qwen3.8-27b',
+      adjusted: false
+    });
+  });
+
+  it('passes through unknown model ids', () => {
+    expect(run('not/registered', 9 * MB)).toEqual({
+      modelId: 'not/registered',
+      adjusted: false
+    });
+  });
+
+  // Regression for review round 3: the server pre-route must cover the
+  // "no model specified" and "model not found" branches too. Both land on the
+  // 4MB-cap Groq default, so the rule has to be applied after resolution, not
+  // only inside the "requested model exists" branch.
+  it('applies to the Groq default that the no-model branch resolves to', () => {
+    const result = run('groq/qwen/qwen3.8-27b', 4.5 * MB);
+    expect(result.adjusted).toBe(true);
+    expect(result.modelId).not.toBe('groq/qwen/qwen3.8-27b');
+  });
+});
 
 describe('provider routing helpers', () => {
   it('captures structured details in ProviderRequestError', () => {
