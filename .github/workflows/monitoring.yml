@@ -406,7 +406,10 @@ jobs:
 
           echo "Connecting to $REALTIME_URL"
 
-          if timeout 8 node -e "
+          # REALTIME_URL must be exported: node reads it via process.env, and a
+          # shell variable that was never exported is invisible to the child
+          # process — it silently connects to "undefined/realtime/v1/websocket".
+          if REALTIME_URL="$REALTIME_URL" timeout 8 node -e "
             const WebSocket = require('ws');
             const ws = new WebSocket(process.env.REALTIME_URL + '?apikey=' + process.env.SUPABASE_ANON_KEY + '&vsn=1.0.0');
             ws.on('open', () => { console.log('✅ Realtime: Connection successful'); process.exit(0); });
