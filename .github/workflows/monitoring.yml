@@ -33,13 +33,15 @@ permissions:
   issues: write
   pull-requests: read
 
+# NOTE: `environment:` is only valid per-job, not at workflow level. Each job
+# below declares it individually.
+#
 # The Supabase secrets on this repository live in the Production *environment*
 # scope (Settings → Environments → production → Secrets), not at repository
 # level. Every job below reads secrets.*, and a workflow that reads secrets
 # without declaring an environment gets empty strings for all of them — which is
 # why these checks ran green for months while never contacting the database.
-# Declaring the environment at workflow level makes secrets.* resolve.
-environment: production
+# Declaring the environment per job makes secrets.* resolve.
 
 env:
   DOMAIN: ${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
@@ -53,6 +55,9 @@ jobs:
   health-monitoring:
     name: System Health Check
     runs-on: ubuntu-latest
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'health' || github.event_name == 'schedule'
     outputs:
       health-status: ${{ steps.health.outputs.status }}
@@ -273,6 +278,9 @@ jobs:
   supabase-monitoring:
     name: Supabase Services Check
     runs-on: ubuntu-latest
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'supabase' || github.event_name == 'schedule'
     outputs:
       supabase-status: ${{ steps.supabase.outputs.status }}
@@ -443,6 +451,9 @@ jobs:
   performance-monitoring:
     name: Performance Monitoring
     runs-on: ubuntu-latest
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'performance' || github.event_name == 'schedule'
 
     steps:
@@ -532,6 +543,9 @@ jobs:
   security-monitoring:
     name: Security Monitoring
     runs-on: ubuntu-latest
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'security' || github.event_name == 'schedule'
 
     steps:
@@ -628,6 +642,9 @@ jobs:
   alert-monitoring:
     name: Alert System Check
     runs-on: ubuntu-latest
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
     if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'alerts' || github.event_name == 'schedule'
 
     steps:
