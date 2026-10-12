@@ -346,7 +346,15 @@ jobs:
       - name: Check if scanning is needed
         id: scan-check
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # A scheduled run has no base/head pair — HEAD is the tip of the
+          # default branch and "main" resolves to the same commit. TruffleHog
+          # errors out with "BASE and HEAD commits are the same", which failed
+          # the job on every nightly run. On a schedule there is nothing to
+          # diff, so scan the most recent commit instead.
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "scan-mode=recent-commit" >> $GITHUB_OUTPUT
+            echo "Scheduled run — scanning the most recent commit only"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
             # For direct pushes to main, scan the last commit only
             echo "scan-mode=single-commit" >> $GITHUB_OUTPUT
             echo "Scanning single commit for direct push to main"
@@ -366,12 +374,22 @@ jobs:
           extra_args: --debug --only-verified
         continue-on-error: true
 
+      - name: Run TruffleHog (most recent commit)
+        if: steps.scan-check.outputs.scan-mode == 'recent-commit'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: HEAD~1
+          head: HEAD
+          extra_args: --debug --only-verified
+        continue-on-error: true
+
       - name: Run TruffleHog (diff)
         if: steps.scan-check.outputs.scan-mode == 'diff'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || 'main' }}
           head: HEAD
           extra_args: --debug --only-verified
         continue-on-error: true

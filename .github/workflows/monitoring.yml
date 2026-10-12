@@ -80,34 +80,59 @@ jobs:
 
           echo "✅ Dependencies installed successfully"
 
-      - name: Check Supabase health (if configured)
+      - name: Check Supabase health
         id: health
+        env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Checking Supabase and application health..."
 
-          # Test Supabase connectivity (optional)
-          SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-          SUPABASE_KEY="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}"
-
+          # Fail loudly instead of passing green while doing nothing. An empty
+          # secret set makes every secrets.* reference resolve to an empty
+          # string, which is how this job reported success for weeks without
+          # ever touching the database.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-            echo "::notice::Supabase configuration not available - skipping health check"
-            echo "To enable Supabase monitoring:"
-            echo "1. Add SUPABASE_URL to repository secrets"
-            echo "2. Add SUPABASE_ANON_KEY to repository secrets"
-            echo "status=skipped" >> $GITHUB_OUTPUT
-            exit 0
+            echo "::error::Supabase configuration not available."
+            echo "Add SUPABASE_URL and SUPABASE_ANON_KEY under Settings → Secrets and variables → Actions."
+            echo "status=unconfigured" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
-          # Test Supabase health endpoint
-          SUPABASE_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$SUPABASE_URL/health" || echo "000")
+          # $SUPABASE_URL/health is not a Supabase endpoint and always failed.
+          # The real liveness signal is an authenticated PostgREST query: 200
+          # means the gateway and database both answer, 401 means the project is
+          # alive but the key is wrong, and 000 means the host is unreachable
+          # (which is what a paused project looks like — it stops resolving).
+          DB_RESPONSE=$(curl -sS -o /tmp/supabase-health.json -w "%{http_code}" \
+            --max-time "${{ env.TIMEOUT }}" \
+            "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" || echo "000")
 
-          if [ "$SUPABASE_HEALTH" = "200" ]; then
+          echo "Database responded HTTP $DB_RESPONSE"
+          head -c 400 /tmp/supabase-health.json 2>/dev/null || true
+          echo ""
+
+          if [ "$DB_RESPONSE" = "200" ]; then
             echo "✅ Supabase health check passed"
             echo "status=healthy" >> $GITHUB_OUTPUT
+          elif [ "$DB_RESPONSE" = "401" ] || [ "$DB_RESPONSE" = "403" ]; then
+            # The project is up; the credential is not. That is a configuration
+            # problem, not an outage.
+            echo "::error::Supabase is reachable but rejected the key (HTTP $DB_RESPONSE)."
+            echo "SUPABASE_ANON_KEY is wrong or expired — regenerate it in Project Settings → API."
+            echo "status=unauthorized" >> $GITHUB_OUTPUT
+            exit 1
+          elif [ "$DB_RESPONSE" = "000" ]; then
+            echo "::error::Could not connect to Supabase at all (DNS failure or timeout)."
+            echo "A paused project stops resolving its hostname — check the dashboard for a Paused status."
+            echo "status=unreachable" >> $GITHUB_OUTPUT
+            exit 1
           else
-            echo "::warning::Supabase health check failed (HTTP $SUPABASE_HEALTH)"
+            echo "::error::Supabase health check failed (HTTP $DB_RESPONSE)"
             echo "status=unhealthy" >> $GITHUB_OUTPUT
-            # Don't exit with error - just log the issue
+            exit 1
           fi
 
       - name: Test Vercel deployment endpoints
@@ -147,35 +172,56 @@ jobs:
             fi
           done
 
-      - name: Test Supabase Edge Functions (if configured)
+      - name: Test Supabase Edge Functions
+        env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Testing Supabase Edge Functions..."
 
-          SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-          SUPABASE_KEY="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}"
-
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-            echo "::notice::Supabase configuration not available - skipping Edge Functions test"
-            exit 0
+            echo "::error::Supabase configuration not available — cannot test Edge Functions."
+            exit 1
           fi
 
-          # Test key Edge Functions
+          # Each of these returns a meaningful status without needing a real
+          # payload: a webhook rejecting a bad signature, a processor rejecting
+          # an empty body, and an auth-guarded endpoint. Anything in the
+          # 200-499 band means the function is deployed and routing; 404 means
+          # it is not deployed; 000 means the project is unreachable.
           FUNCTIONS_TO_TEST=("stripe-webhook" "process-receipt" "manage-api-keys")
+
+          failed=0
 
           for func in "${FUNCTIONS_TO_TEST[@]}"; do
             echo "Testing function: $func"
-            FUNC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            # The Authorization header must carry the real anon key. Supabase's
+            # gateway rejects the request before it reaches the function
+            # otherwise, so a literal placeholder here always returned 401 and
+            # the check never proved anything.
+            FUNC_RESPONSE=$(curl -sS -o /dev/null -w "%{http_code}" \
+              --max-time "${{ env.TIMEOUT }}" \
               -X POST "$SUPABASE_URL/functions/v1/$func" \
               -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "apikey: $SUPABASE_KEY" \
               -H "Content-Type: application/json" \
               -d '{"test": true}' || echo "000")
 
-            if [ "$FUNC_RESPONSE" = "200" ] || [ "$FUNC_RESPONSE" = "400" ] || [ "$FUNC_RESPONSE" = "401" ]; then
-              echo "✅ Function $func is responding (HTTP $FUNC_RESPONSE)"
+            if [ "$FUNC_RESPONSE" = "000" ]; then
+              echo "::error::Function $func is unreachable — the project may be paused."
+              failed=1
+            elif [ "$FUNC_RESPONSE" = "404" ]; then
+              echo "::error::Function $func returned 404 — it is not deployed."
+              failed=1
+            elif [ "$FUNC_RESPONSE" -ge 500 ] 2>/dev/null; then
+              echo "::error::Function $func returned a server error (HTTP $FUNC_RESPONSE)."
+              failed=1
             else
-              echo "::warning::Function $func may be unavailable (HTTP $FUNC_RESPONSE)"
+              echo "✅ Function $func is responding (HTTP $FUNC_RESPONSE)"
             fi
           done
+
+          exit $failed
 
       - name: Test Vercel security headers
         run: |
@@ -254,36 +300,51 @@ jobs:
 
           echo "✅ Dependencies installed successfully"
 
-      - name: Test Supabase Database (if configured)
+      - name: Test Supabase Database
         id: supabase
+        env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Testing Supabase database services..."
 
-          SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-          SUPABASE_SERVICE_KEY="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-
+          # Fail loudly. Every secrets.* reference resolves to an empty string
+          # when the secret is unset, so the previous "skip and exit 0" guard
+          # made this whole job report success without contacting the database.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
-            echo "::notice::Supabase configuration not available - skipping database tests"
-            echo "status=skipped" >> $GITHUB_OUTPUT
-            exit 0
+            echo "::error::Supabase configuration not available."
+            echo "Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY under Settings → Secrets and variables → Actions."
+            echo "status=unconfigured" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
-          # Test database connectivity
-          DB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          failures=0
+
+          # Every request below must send the real key. The previous version
+          # sent a literal "$SUPAB..._KEY" placeholder, so each curl was
+          # unauthenticated and the result said nothing about project health.
+
+          echo "Testing database connectivity..."
+          DB_RESPONSE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --max-time "${{ env.TIMEOUT }}" \
             "$SUPABASE_URL/rest/v1/receipts?select=id&limit=1" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "apikey: $SUPABASE_SERVICE_KEY" || echo "000")
 
-          if [ "$DB_RESPONSE" = "200" ] || [ "$DB_RESPONSE" = "404" ]; then
+          if [ "$DB_RESPONSE" = "200" ]; then
             echo "✅ Database connectivity: OK"
             echo "status=healthy" >> $GITHUB_OUTPUT
           else
-            echo "::warning::Database connectivity failed (HTTP $DB_RESPONSE)"
+            # 404 here means the receipts table is missing, which is a real
+            # problem — the old check accepted it as "OK" and hid schema drift.
+            echo "::error::Database connectivity failed (HTTP $DB_RESPONSE)"
             echo "status=unhealthy" >> $GITHUB_OUTPUT
+            failures=1
           fi
 
-          # Test Auth service
-          AUTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Testing auth service..."
+          AUTH_RESPONSE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --max-time "${{ env.TIMEOUT }}" \
             "$SUPABASE_URL/auth/v1/settings" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "apikey: $SUPABASE_SERVICE_KEY" || echo "000")
@@ -291,11 +352,13 @@ jobs:
           if [ "$AUTH_RESPONSE" = "200" ]; then
             echo "✅ Auth service: OK"
           else
-            echo "::warning::Auth service may be unavailable (HTTP $AUTH_RESPONSE)"
+            echo "::error::Auth service unavailable (HTTP $AUTH_RESPONSE)"
+            failures=1
           fi
 
-          # Test Storage service
-          STORAGE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Testing storage service..."
+          STORAGE_RESPONSE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --max-time "${{ env.TIMEOUT }}" \
             "$SUPABASE_URL/storage/v1/bucket" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "apikey: $SUPABASE_SERVICE_KEY" || echo "000")
@@ -303,50 +366,69 @@ jobs:
           if [ "$STORAGE_RESPONSE" = "200" ]; then
             echo "✅ Storage service: OK"
           else
-            echo "::warning::Storage service may be unavailable (HTTP $STORAGE_RESPONSE)"
+            echo "::error::Storage service unavailable (HTTP $STORAGE_RESPONSE)"
+            failures=1
           fi
 
+          exit $failures
+
       - name: Test Realtime Connections
+        env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Testing Realtime service..."
 
-          SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-          SUPABASE_ANON_KEY="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Supabase anon key not configured — cannot test Realtime."
+            exit 1
+          fi
 
-          # Test Realtime WebSocket endpoint
-          REALTIME_URL=$(echo "$SUPABASE_URL" | sed 's/https:/wss:/')/realtime/v1/websocket
+          # With an empty URL this previously built "wss:/realtime/v1/websocket"
+          # and warned on every single run.
+          REALTIME_URL=$(echo "$SUPABASE_URL" | sed 's|https:|wss:|')/realtime/v1/websocket
 
-          # Simple connection test (timeout after 5 seconds)
-          if timeout 5 node -e "
+          echo "Connecting to $REALTIME_URL"
+
+          if timeout 8 node -e "
             const WebSocket = require('ws');
-            const ws = new WebSocket('$REALTIME_URL?apikey=$SUPABASE_ANON_KEY&vsn=1.0.0');
+            const ws = new WebSocket(process.env.REALTIME_URL + '?apikey=' + process.env.SUPABASE_ANON_KEY + '&vsn=1.0.0');
             ws.on('open', () => { console.log('✅ Realtime: Connection successful'); process.exit(0); });
-            ws.on('error', (err) => { console.log('::warning::Realtime connection failed:', err.message); process.exit(1); });
-            setTimeout(() => { console.log('::warning::Realtime connection timeout'); process.exit(1); }, 4000);
-          " 2>/dev/null; then
-            echo "Realtime WebSocket test completed"
+            ws.on('error', (err) => { console.error('::error::Realtime connection failed:', err.message); process.exit(1); });
+            setTimeout(() => { console.error('::error::Realtime connection timeout'); process.exit(1); }, 7000);
+          " 2>&1; then
+            echo "Realtime WebSocket test passed"
           else
-            echo "::warning::Realtime WebSocket test failed or timed out"
+            echo "::error::Realtime WebSocket test failed or timed out"
+            exit 1
           fi
 
       - name: Test Queue System
+        env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Testing queue system functionality..."
 
-          # Test queue tables exist and are accessible
-          SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-          SUPABASE_SERVICE_KEY="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "::error::Supabase configuration not available — cannot test the queue system."
+            exit 1
+          fi
 
-          # Check embedding_queue table
-          QUEUE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          # The real key is required here too; the placeholder made every
+          # request unauthenticated so this reported HTTP 000 and warned always.
+          QUEUE_RESPONSE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --max-time "${{ env.TIMEOUT }}" \
             "$SUPABASE_URL/rest/v1/embedding_queue?select=id&limit=1" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "apikey: $SUPABASE_SERVICE_KEY" || echo "000")
 
-          if [ "$QUEUE_RESPONSE" = "200" ] || [ "$QUEUE_RESPONSE" = "404" ]; then
+          if [ "$QUEUE_RESPONSE" = "200" ]; then
             echo "✅ Queue system: Tables accessible"
           else
-            echo "::warning::Queue system may have issues (HTTP $QUEUE_RESPONSE)"
+            # 404 means the table is missing, which is a real schema problem.
+            echo "::error::Queue system check failed (HTTP $QUEUE_RESPONSE) — embedding_queue may be missing."
+            exit 1
           fi
 
   # Performance Monitoring
@@ -586,15 +668,29 @@ jobs:
             # Basic alerting system check
             echo "Checking basic alerting functionality..."
 
-            # Test database connectivity for alerting
-            SUPABASE_URL="${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}"
-            if curl -s "$SUPABASE_URL/health" > /dev/null; then
-              echo "✅ Database connectivity for alerting: OK"
+            # Test database connectivity for alerting. /health is not a
+            # Supabase endpoint — an authenticated PostgREST query is. Note
+            # `curl -s` without -f reports success on any HTTP response,
+            # including a 401 or a 404 page, so the old check always passed.
+            if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+              echo "::warning::Supabase not configured — skipping the alerting connectivity check"
             else
-              echo "::warning::Database connectivity for alerting: FAILED"
+              ALERT_DB_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+                --max-time 15 \
+                "$SUPABASE_URL/rest/v1/alerts?select=id&limit=1" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" || echo "000")
+
+              if [ "$ALERT_DB_CODE" = "200" ]; then
+                echo "✅ Database connectivity for alerting: OK"
+              else
+                echo "::warning::Database connectivity for alerting: FAILED (HTTP $ALERT_DB_CODE)"
+              fi
             fi
           fi
         env:
+          SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
           APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}

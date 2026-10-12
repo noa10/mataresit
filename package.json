@@ -211,6 +211,7 @@
     "fast-uri": ">=4.2.1",
     "ip-address": ">=10.1.1",
     "flatted": ">=3.4.2",
-    "serialize-javascript": ">=7.0.5"
+    "serialize-javascript": ">=7.0.5",
+    "source-map-js": ">=1.2.2"
   }
 }

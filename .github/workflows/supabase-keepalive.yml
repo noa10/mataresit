@@ -1,0 +1,302 @@
+name: Supabase Keepalive
+
+# Supabase pauses Free plan projects after roughly 7 days without sufficient
+# user database activity. A paused project stops resolving its hostname
+# entirely, so every API call fails with a DNS error until someone resumes it
+# from the dashboard.
+#
+# This workflow writes one real row into public.keepalive_pings every day,
+# which meets the documented activity threshold ("a few user requests to the
+# database each day over the previous week").
+#
+# It deliberately does NOT ping through the receipt-upload/AI pipeline: that
+# path costs paid AI credits and writes junk rows. A single INSERT is what the
+# platform actually measures. The end-to-end product path is covered separately
+# by supabase-smoke-test.yml on a weekly schedule.
+#
+# Required repository secrets:
+#   SUPABASE_URL                 e.g. https://<project-ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY    service role key (bypasses RLS to write the ledger)
+#
+# Also note: GitHub auto-disables `schedule:` workflows in a public repo after
+# 60 days with no repository activity. The keep-repo-active job below resets
+# that clock so the keepalive itself cannot die quietly.
+
+on:
+  schedule:
+    # 07:15 UTC daily. Staggered off the hour so it does not queue behind
+    # other scheduled jobs.
+    - cron: '15 7 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to keep alive'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # Never let two keepalive runs overlap; a stale run holding the lock would
+  # block the next day's ping.
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  keepalive:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Verify keepalive secrets are configured
+        id: config
+        run: |
+          # Fail loudly rather than passing green while doing nothing. An empty
+          # secret set makes every secrets.* reference resolve to an empty
+          # string, which is how monitoring workflows end up silently no-opping.
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set."
+            echo "Add them under Settings → Secrets and variables → Actions, then re-run."
+            exit 1
+          fi
+          echo "Supabase keepalive is configured."
+
+      - name: Confirm the project hostname resolves
+        id: dns
+        run: |
+          # A paused project stops serving its hostname, so it resolves as
+          # NXDOMAIN. Checking DNS first gives a precise diagnosis ("paused")
+          # instead of a generic curl failure. supabase.co is checked alongside
+          # it so a broken runner resolver cannot masquerade as a pause.
+          REF_HOST=$(echo "$SUPABASE_URL" | sed -E 's|^https?://||; s|/.*$||')
+
+          if getent hosts "$REF_HOST" >/dev/null 2>&1; then
+            project_status=ok
+          else
+            project_status=nxdomain
+          fi
+
+          if getent hosts supabase.co >/dev/null 2>&1; then
+            platform_status=ok
+          else
+            platform_status=nxdomain
+          fi
+
+          echo "project hostname ($REF_HOST): $project_status"
+          echo "platform hostname (supabase.co): $platform_status"
+
+          if [ "$project_status" = "nxdomain" ] && [ "$platform_status" = "ok" ]; then
+            echo "::error::Project hostname does not resolve while supabase.co does — the project is paused or deleted."
+            echo "Resume it from the Supabase dashboard (paused project → Resume project)."
+            echo "There is a limited (~1 year) restore window after a pause."
+            exit 1
+          fi
+
+          if [ "$platform_status" != "ok" ]; then
+            echo "::error::supabase.co does not resolve either — this is a runner/network DNS problem, not a paused project."
+            exit 1
+          fi
+
+      - name: Write keepalive ping
+        id: ping
+        run: |
+          # PostgREST insert against the ledger table. An authenticated write is
+          # real database activity, which is what the inactivity window measures.
+          http_code=$(curl -sS -o /tmp/ping-response.json -w '%{http_code}' \
+            --max-time 30 \
+            -X POST "$SUPABASE_URL/rest/v1/keepalive_pings" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d '{
+              "source": "supabase-keepalive",
+              "status": "ok",
+              "detail": {
+                "run_id": "'"$GITHUB_RUN_ID"'",
+                "run_url": "'"$RUN_URL"'",
+                "ref": "'"$GITHUB_REF_NAME"'",
+                "workflow": "supabase-keepalive"
+              }
+            }' || echo "000")
+
+          echo "HTTP $http_code"
+          if [ "$http_code" != "201" ]; then
+            echo "::error::Keepalive insert failed (HTTP $http_code)."
+            echo "Response body:"
+            cat /tmp/ping-response.json 2>/dev/null || echo "(empty)"
+            echo ""
+            echo "If the ledger migration has not been applied yet, run: npm run supabase:push"
+            exit 1
+          fi
+
+          echo "Keepalive row written."
+
+      - name: Read the ping back to prove the round trip
+        run: |
+          # A write the API accepted but the database never stored would still
+          # look like activity on the wire. Reading it back confirms the row
+          # actually landed.
+          newest=$(curl -sS --max-time 30 \
+            "$SUPABASE_URL/rest/v1/keepalive_pings?select=id,created_at&order=created_at.desc&limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+
+          echo "Newest keepalive row: $newest"
+
+          # Parsed with node rather than sed: PostgREST may return
+          # "created_at": "..." with a space after the colon, which a naive sed
+          # pattern silently fails to match.
+          row_count=$(echo "$newest" | node -e "
+            let raw = '';
+            process.stdin.on('data', (c) => { raw += c; });
+            process.stdin.on('end', () => {
+              try {
+                const rows = JSON.parse(raw);
+                process.stdout.write(String(Array.isArray(rows) ? rows.length : 0));
+              } catch {
+                process.stdout.write('0');
+              }
+            });
+          ")
+
+          if [ "$row_count" = "0" ] || [ -z "$row_count" ]; then
+            echo "::error::Keepalive ledger is empty after the insert — the project may be paused."
+            exit 1
+          fi
+
+          created_at=$(echo "$newest" | node -e "
+            let raw = '';
+            process.stdin.on('data', (c) => { raw += c; });
+            process.stdin.on('end', () => {
+              try {
+                const rows = JSON.parse(raw);
+                process.stdout.write(String(rows[0]?.created_at ?? 'unknown'));
+              } catch {
+                process.stdout.write('unknown');
+              }
+            });
+          ")
+
+          echo "::notice::Keepalive confirmed. Last ping at $created_at."
+
+      - name: Open an issue if the ping failed
+        # Only reached on an earlier failure. A silent red workflow is invisible
+        # when nobody is watching the Actions tab.
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Supabase keepalive failed — project may be paused';
+            const body = `## 🚨 Supabase keepalive failed
+
+            The daily keepalive ping did not reach the database. The most likely
+            cause is that the **Supabase project has been paused for inactivity**
+            (Free plan projects pause after ~7 days without user database activity).
+
+            ### What to do
+
+            1. Open the [Supabase dashboard](https://supabase.com/dashboard) and check the project status.
+            2. If it shows **Paused**, click **Resume project**. There is a limited (~1 year) restore window.
+            3. Confirm the ledger migration is applied: \`npm run supabase:push\`
+            4. Re-run this workflow to confirm it goes green.
+
+            ### Run details
+
+            - **Run:** ${process.env.RUN_URL}
+            - **Triggered by:** \`${context.eventName}\`
+            - **Ref:** \`${context.refName}\`
+
+            This issue is closed automatically once the keepalive succeeds again.`;
+
+            // Reuse an existing open issue instead of opening one per failure.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'keepalive',
+              per_page: 1,
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: `Keepalive still failing — see [this run](${process.env.RUN_URL}).`,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['keepalive', 'infrastructure'],
+            });
+
+      - name: Close the incident issue once healthy
+        # Self-healing: an alert that stays open after the problem is fixed
+        # trains you to ignore it.
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'keepalive',
+              per_page: 10,
+            });
+
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `✅ Keepalive is healthy again — see [this run](${process.env.RUN_URL}).`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }
+
+  # ---------------------------------------------------------------------------
+  # GitHub auto-disables scheduled workflows in a public repository after 60
+  # days with no repository activity. Without this job the keepalive above
+  # would silently stop running — which is exactly how the project got paused
+  # in the first place.
+  # ---------------------------------------------------------------------------
+  keep-repo-active:
+    name: Keep Scheduled Workflows Enabled
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Reset the 60-day inactivity clock
+        uses: gautamkrishrar/keepalive-workflow@v2
+        with:
+          # Re-enable via the GitHub API rather than making dummy commits, so
+          # the git history stays clean.
+          time_elapsed: '45'
