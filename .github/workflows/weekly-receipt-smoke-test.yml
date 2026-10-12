@@ -7,10 +7,16 @@ name: Weekly Receipt API Smoke Test
 # Weekly rather than daily because it writes a row and invokes the API layer;
 # there is no reason to pay that cost seven times a week.
 #
-# Required repository secrets:
+# Required secrets — these live in the Production *environment* scope on this
+# repository (Settings → Environments → production → Secrets), NOT at
+# repository level. The job below declares `environment: production` because a
+# workflow reading secrets.* without an environment gets empty strings:
 #   SUPABASE_URL      e.g. https://<project-ref>.supabase.co
 #   SUPABASE_ANON_KEY anon key, sent as the Bearer token for middleware bypass
 #   TEST_API_KEY      an active mk_test_ API key with receipts:write + receipts:delete
+#
+# If TEST_API_KEY is absent the job warns and passes: the daily keepalive still
+# runs, only the end-to-end receipt check is skipped.
 
 on:
   schedule:
@@ -35,6 +41,9 @@ jobs:
     name: Create and Delete a Test Receipt
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
 
     steps:
       - name: Checkout code

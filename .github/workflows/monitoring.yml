@@ -33,6 +33,14 @@ permissions:
   issues: write
   pull-requests: read
 
+# The Supabase secrets on this repository live in the Production *environment*
+# scope (Settings → Environments → production → Secrets), not at repository
+# level. Every job below reads secrets.*, and a workflow that reads secrets
+# without declaring an environment gets empty strings for all of them — which is
+# why these checks ran green for months while never contacting the database.
+# Declaring the environment at workflow level makes secrets.* resolve.
+environment: production
+
 env:
   DOMAIN: ${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
@@ -94,7 +102,7 @@ jobs:
           # ever touching the database.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
             echo "::error::Supabase configuration not available."
-            echo "Add SUPABASE_URL and SUPABASE_ANON_KEY under Settings → Secrets and variables → Actions."
+            echo "Add SUPABASE_URL and SUPABASE_ANON_KEY under Settings → Environments → production → Secrets."
             echo "status=unconfigured" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -313,7 +321,7 @@ jobs:
           # made this whole job report success without contacting the database.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
             echo "::error::Supabase configuration not available."
-            echo "Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY under Settings → Secrets and variables → Actions."
+            echo "Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY under Settings → Environments → production → Secrets."
             echo "status=unconfigured" >> $GITHUB_OUTPUT
             exit 1
           fi

@@ -15,7 +15,9 @@ Mataresit uses GitHub Actions for validation, security checks, and scheduled mon
 
 ## Required secrets and variables
 
-These workflows read the secrets below. **A missing secret makes every `secrets.*` reference resolve to an empty string**, so the workflows deliberately fail rather than skip when one is absent — a green run that silently did nothing is worse than a red one.
+These workflows read the secrets below. **The secrets live in the `Production` *environment* scope** (Settings → Environments → production → Secrets), **not at repository level**.
+
+That distinction is the whole bug this PR fixes. A workflow that reads `secrets.*` without declaring `environment: production` gets an **empty string for every secret**, so each health check hit its *"not configured - skipping"* guard and exited 0. The repository-level secret list was empty the entire time while 15 secrets sat in the Production environment, unused.
 
 | Secret | Used by | Purpose |
 | --- | --- | --- |
@@ -26,6 +28,8 @@ These workflows read the secrets below. **A missing secret makes every `secrets.
 | `STAGING_*` equivalents | all of the above | Optional staging environment |
 
 Also set the repository variable `APP_DOMAIN` to the current frontend host.
+
+Every job that reads a secret declares `environment: production`. When adding a new workflow that needs Supabase credentials, do the same — and prefer failing loudly over skipping, because a green run that silently did nothing is worse than a red one.
 
 ## Supabase keepalive
 

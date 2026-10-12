@@ -14,7 +14,10 @@ name: Supabase Keepalive
 # platform actually measures. The end-to-end product path is covered separately
 # by supabase-smoke-test.yml on a weekly schedule.
 #
-# Required repository secrets:
+# Required secrets — these live in the Production *environment* scope on this
+# repository (Settings → Environments → production → Secrets), NOT at
+# repository level. The jobs below declare `environment: production` because a
+# workflow reading secrets.* without an environment gets empty strings:
 #   SUPABASE_URL                 e.g. https://<project-ref>.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY    service role key (bypasses RLS to write the ledger)
 #
@@ -58,6 +61,13 @@ jobs:
     name: Ping Supabase Database
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The Supabase secrets on this repository live in the Production
+    # *environment* scope, not at repository level. A workflow that reads
+    # secrets.* without declaring an environment gets empty strings for every
+    # one of them — which is exactly why the original monitoring workflow ran
+    # green for months without ever contacting the database. This declaration
+    # is what makes secrets.SUPABASE_URL resolve at all.
+    environment: production
 
     steps:
       - name: Verify keepalive secrets are configured
@@ -68,7 +78,7 @@ jobs:
           # string, which is how monitoring workflows end up silently no-opping.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
             echo "::error::SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set."
-            echo "Add them under Settings → Secrets and variables → Actions, then re-run."
+            echo "Check they exist under Settings → Environments → production → Secrets."
             exit 1
           fi
           echo "Supabase keepalive is configured."
