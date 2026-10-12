@@ -294,6 +294,11 @@ jobs:
   # days with no repository activity. Without this job the keepalive above
   # would silently stop running — which is exactly how the project got paused
   # in the first place.
+  #
+  # Implemented inline against the REST API rather than with a third-party
+  # action: gautamkrishnar/keepalive-workflow is currently blocked by GitHub
+  # for a terms-of-service violation ("Repository access blocked", reason: tos),
+  # so pinning it would break this job outright.
   # ---------------------------------------------------------------------------
   keep-repo-active:
     name: Keep Scheduled Workflows Enabled
@@ -301,12 +306,40 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Re-enable any auto-disabled scheduled workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking for scheduled workflows GitHub auto-disabled for inactivity..."
 
-      - name: Reset the 60-day inactivity clock
-        uses: gautamkrishrar/keepalive-workflow@v2
-        with:
-          # Re-enable via the GitHub API rather than making dummy commits, so
-          # the git history stays clean.
-          time_elapsed: '45'
+          # List every workflow with its state, then re-enable any that are
+          # disabled. GitHub disables a scheduled workflow in a public repo once
+          # 60 days pass with no repository activity; re-enabling resets the
+          # clock so the daily keepalive cannot quietly stop.
+          reenabled=0
+
+          gh api "repos/${{ github.repository }}/actions/workflows?per_page=100" \
+            --jq '.workflows[] | "\(.id)\t\(.state)\t\(.name)"' |
+          while IFS=$'\t' read -r id state name; do
+            if [ "$state" = "disabled_manually" ]; then
+              # Someone turned it off on purpose — leave it alone.
+              echo "⏭️  $name is disabled manually, leaving as-is"
+              continue
+            fi
+
+            if [ "$state" = "disabled_inactivity" ]; then
+              echo "♻️  $name was auto-disabled for inactivity — re-enabling"
+              if gh api --method PUT \
+                "repos/${{ github.repository }}/actions/workflows/$id/enable" \
+                --silent; then
+                echo "✅ $name re-enabled"
+              else
+                echo "::error::Could not re-enable $name (id $id)"
+              fi
+            else
+              echo "✅ $name is active"
+            fi
+          done
+
+          echo ""
+          echo "Done. Scheduled workflows stay enabled while this job keeps running."
