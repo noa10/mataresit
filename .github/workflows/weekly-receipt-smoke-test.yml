@@ -1,0 +1,138 @@
+name: Weekly Receipt API Smoke Test
+
+# The daily keepalive only proves the database answers. This workflow proves the
+# product path still works end to end: an authenticated API key can create a
+# receipt and delete it again.
+#
+# Weekly rather than daily because it writes a row and invokes the API layer;
+# there is no reason to pay that cost seven times a week.
+#
+# Required secrets — these live in the Production *environment* scope on this
+# repository (Settings → Environments → production → Secrets), NOT at
+# repository level. The job below declares `environment: production` because a
+# workflow reading secrets.* without an environment gets empty strings:
+#   SUPABASE_URL      e.g. https://<project-ref>.supabase.co
+#   SUPABASE_ANON_KEY anon key, sent as the Bearer token for middleware bypass
+#   TEST_API_KEY      an active mk_test_ API key with receipts:write + receipts:delete
+#
+# If TEST_API_KEY is absent the job warns and passes: the daily keepalive still
+# runs, only the end-to-end receipt check is skipped.
+
+on:
+  schedule:
+    # 08:15 UTC every Sunday.
+    - cron: '15 8 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: supabase-smoke-test
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  receipt-api-smoke-test:
+    name: Create and Delete a Test Receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Secrets live in the Production environment scope; without this the
+    # secrets.* references resolve to empty strings.
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run receipt API smoke test
+        id: smoke
+        env:
+          API_BASE_URL: ${{ env.SUPABASE_URL }}/functions/v1/external-api/api/v1
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
+        run: |
+          if [ -z "$TEST_API_KEY" ]; then
+            echo "::warning::TEST_API_KEY is not configured — skipping the weekly smoke test."
+            echo "The daily keepalive still runs; this only skips the end-to-end receipt check."
+            exit 0
+          fi
+
+          node tests/api/receipt-smoke-test.mjs
+
+      - name: Report smoke test failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'smoke-test',
+              per_page: 1,
+            });
+
+            const body = `## 🧪 Weekly receipt API smoke test failed
+
+            The end-to-end receipt create/delete check against the external API
+            did not pass. See [this run](${process.env.RUN_URL}) for the response bodies.
+
+            The daily keepalive may still be green — that only proves the
+            database answers, not that the API layer works.`;
+
+            if (open.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open.data[0].number,
+                body: `Smoke test still failing — see [this run](${process.env.RUN_URL}).`,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🧪 Weekly receipt API smoke test failed',
+              body,
+              labels: ['smoke-test', 'infrastructure'],
+            });
+
+      - name: Close the smoke test issue once healthy
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'smoke-test',
+              per_page: 10,
+            });
+
+            for (const issue of open.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `✅ Receipt API smoke test is healthy again — see [this run](${process.env.RUN_URL}).`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+            }
