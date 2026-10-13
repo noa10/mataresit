@@ -15,3 +15,9 @@
 -- What actually ran on 2026-05-15/16 is already reflected in the live schema;
 -- the committed "repair drift" migrations (20260515130000 through
 -- 20260517120000) document the same repairs and are the auditable record.
+
+-- Intentional no-op: this version is already recorded as applied remotely, so the
+-- statement below never runs. It exists only to satisfy repository migration
+-- validation, which requires every file to contain a SQL statement.
+SELECT 1
+WHERE FALSE;
