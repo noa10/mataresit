@@ -266,10 +266,10 @@ async function getReceipt(context: ApiContext, receiptId: string): Promise<Respo
         line_items (*),
         processing_logs (
           id,
-          log_level,
-          message,
-          timestamp,
-          metadata
+          created_at,
+          step_name,
+          status_message,
+          batch_item_id
         )
       `)
       .eq('id', receiptId)

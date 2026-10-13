@@ -5,6 +5,12 @@
 -- In production, these should be set up through Supabase's cron job interface
 -- or external scheduling system like GitHub Actions, AWS EventBridge, etc.
 
+-- Production carried a different, out-of-band variant of this function
+-- (returning TEXT instead of the VOID defined below), which makes a bare
+-- CREATE OR REPLACE fail with 42P13 "cannot change return type". Drop the
+-- zero-argument overload first so the committed definition can land.
+DROP FUNCTION IF EXISTS setup_billing_cron_jobs();
+
 -- Function to setup billing cron jobs
 CREATE OR REPLACE FUNCTION setup_billing_cron_jobs()
 RETURNS VOID AS $$

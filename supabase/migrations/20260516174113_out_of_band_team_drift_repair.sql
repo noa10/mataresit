@@ -1,0 +1,23 @@
+-- Migration: 20260516174113_OUT_OF_BAND_TEAM_DRIFT_REPAIR
+--
+-- History placeholder. This version is recorded as applied in the remote
+-- supabase_migrations.schema_migrations history table (applied out-of-band on
+-- 2026-05-15/16 during the team-management drift repair effort), but the SQL
+-- was never committed to this repository.
+--
+-- The file exists so `supabase db push`'s local/remote consistency check
+-- passes: the CLI refuses to push while remote history contains versions with
+-- no local counterpart (error: DbPushMissingLocalError). Because this version
+-- is already marked applied remotely, the file will never execute. Do NOT add
+-- statements here — that would create a new, unapplied migration that renames
+-- nothing and applies nothing.
+--
+-- What actually ran on 2026-05-15/16 is already reflected in the live schema;
+-- the committed "repair drift" migrations (20260515130000 through
+-- 20260517120000) document the same repairs and are the auditable record.
+
+-- Intentional no-op: this version is already recorded as applied remotely, so the
+-- statement below never runs. It exists only to satisfy repository migration
+-- validation, which requires every file to contain a SQL statement.
+SELECT 1
+WHERE FALSE;
