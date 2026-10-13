@@ -11,9 +11,15 @@ name: Weekly Receipt API Smoke Test
 # repository (Settings → Environments → production → Secrets), NOT at
 # repository level. The job below declares `environment: production` because a
 # workflow reading secrets.* without an environment gets empty strings:
-#   SUPABASE_URL      e.g. https://<project-ref>.supabase.co
-#   SUPABASE_ANON_KEY anon key, sent as the Bearer token for middleware bypass
-#   TEST_API_KEY      an active mk_test_ API key with receipts:write + receipts:delete
+#   SUPABASE_URL       e.g. https://<project-ref>.supabase.co
+#   SUPABASE_ANON_KEY  anon key (apikey header + password grant)
+#   TEST_API_KEY       an active mk_test_ API key with receipts:write + receipts:delete
+#   TEST_CI_EMAIL      email of the CI account that owns TEST_API_KEY (migration 20261013120000)
+#   TEST_CI_PASSWORD   password of that CI account
+#
+# The external API requires Authorization: Bearer <user JWT> whose user owns the
+# X-API-Key (api-auth.ts createApiContext — there is no anon-key bypass), so the
+# script mints a token with the password grant before calling the API.
 #
 # If TEST_API_KEY is absent the job warns and passes: the daily keepalive still
 # runs, only the end-to-end receipt check is skipped.
@@ -60,6 +66,8 @@ jobs:
           API_BASE_URL: ${{ env.SUPABASE_URL }}/functions/v1/external-api/api/v1
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TEST_API_KEY: ${{ secrets.TEST_API_KEY }}
+          TEST_CI_EMAIL: ci-smoke@mataresit.com
+          TEST_CI_PASSWORD: ${{ secrets.TEST_CI_PASSWORD }}
         run: |
           if [ -z "$TEST_API_KEY" ]; then
             echo "::warning::TEST_API_KEY is not configured — skipping the weekly smoke test."
