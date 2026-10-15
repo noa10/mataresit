@@ -65,7 +65,7 @@ jobs:
         id: cache-keys
         if: steps.scan-decision.outputs.should-run == 'true'
         run: |
-          echo "node-key=${{ env.CACHE_VERSION }}-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}" >> $GITHUB_OUTPUT
+          echo "node-key=${{ env.CACHE_VERSION }}-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('**/package-lock.json', 'package.json') }}" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js
         if: steps.scan-decision.outputs.should-run == 'true'
