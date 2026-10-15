@@ -777,7 +777,10 @@ jobs:
     steps:
       - name: Generate monitoring summary
         run: |
-          cat > monitoring-report.md << 'EOF'
+          # NOTE: heredoc delimiter is intentionally unquoted so $(date ...)
+          # expands in the shell. Quoting it ('EOF') disables expansion and
+          # leaves a literal $(date -u ...) in the report.
+          cat > monitoring-report.md << EOF
           # Production Monitoring Report
 
           **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
