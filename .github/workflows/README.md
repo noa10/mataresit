@@ -54,13 +54,15 @@ Both workflows depend on `keep-repo-active`, which resets GitHub's 60-day schedu
 
 ## CI behavior
 
-`ci.yml` uses Node.js 20 and reports:
+`ci.yml` uses Node.js 22 and reports:
 
 - ESLint results
 - TypeScript results
 - Unit and integration test results
 - Production build results
 - A deployment-readiness summary
+
+Before installing, `Setup Dependencies` runs a lockfile-sync check. If `package-lock.json` does not match `package.json`, the job fails immediately and writes the remedy to the step summary, instead of repeating npm's error through the install retry loop. Lockfiles must be generated with the npm that Node 22 ships (npm 10) — see the lockfile note in `AGENTS.md`.
 
 Some checks are intentionally non-blocking in the current workflow configuration. Review the workflow before treating a green check as proof that every quality gate passed.
 
