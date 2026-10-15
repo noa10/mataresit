@@ -25,6 +25,11 @@ updates:
         versions: [">=19"]
       - dependency-name: "@types/react-dom"
         versions: [">=19"]
+      # TypeScript 7: no released typescript-eslint supports it yet
+      # (typescript-eslint caps typescript at ">=4.8.4 <6.1.0"), which blocks
+      # npm ci with ERESOLVE. Revisit once typescript-eslint ships TS7 support.
+      - dependency-name: "typescript"
+        versions: [">=7"]
 
   - package-ecosystem: "npm"
     directory: "/supabase/functions/generate-pdf-report"
