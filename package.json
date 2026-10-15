@@ -192,7 +192,7 @@
     "tailwindcss": "^4.1.11",
     "terser": "^5.51.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"

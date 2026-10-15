@@ -21,7 +21,7 @@ on:
       - '.github/workflows/**'
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   CACHE_VERSION: 'v1'
 
 jobs:
