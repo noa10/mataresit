@@ -57,6 +57,39 @@ jobs:
           restore-keys: |
             ${{ env.CACHE_VERSION }}-${{ runner.os }}-node-${{ env.NODE_VERSION }}-
 
+      - name: Verify lockfile is in sync
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          # `npm ci` refuses an out-of-sync lockfile, and the retry wrapper below would
+          # repeat that same wall of npm output three times. Fail once, naming the fix.
+          if npm ci --dry-run > /tmp/lock-check.log 2>&1; then
+            echo "package-lock.json is in sync." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "### ❌ package-lock.json is out of sync"
+            echo ""
+            echo "\`npm ci\` rejected the lockfile, so no dependency install, test or build can run."
+            echo ""
+            echo "Usual cause: the lockfile was written by a different npm major. CI installs with"
+            echo "the npm bundled with Node ${{ env.NODE_VERSION }} (npm 10). Dependabot also omits"
+            echo "nested transitive entries such as \`vitest -> msw@2.15.0\`."
+            echo ""
+            echo "**Fix:** run \`npx npm@10 install\` on this branch, confirm \`npx npm@10 ci --dry-run\` is clean, then commit \`package-lock.json\`."
+            echo ""
+            echo "<details><summary>npm output</summary>"
+            echo ""
+            echo '```'
+            tail -40 /tmp/lock-check.log
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::error::package-lock.json is out of sync — regenerate with 'npx npm@10 install'"
+          exit 1
+
       - name: Install dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
         uses: nick-invision/retry@v2

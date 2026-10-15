@@ -131,6 +131,7 @@ npm run deploy:validate:malaysian   # Pre-deployment Malaysian features check
 
 - **Supabase migration history is synced** — 302 migrations. `supabase db push` works. If drift occurs: `supabase migration repair <version> --status applied`.
 - **React 19 pinned, ignored by Dependabot** — Requires dedicated migration effort. Do not upgrade React casually.
+- **Lockfiles must be generated with npm 10** — CI and Vercel both install via `npm ci` on Node 22, i.e. npm 10. A lockfile written by a newer local npm, or by Dependabot (which omits the nested `vitest → msw@2.15.0` subtree), fails with `npm error Missing: <pkg> from lock file` and skips every downstream job. Remedy: on the branch run `npx npm@10 install`, confirm `npx npm@10 ci --dry-run` is clean, commit the lockfile.
 - **Vercel SPA rewrites** — All routes `/*` → `/index.html`. Special handling for `/docs/*`.
 - **Edge Functions use Deno, not Node** — Do not use Node.js APIs in `supabase/functions/`. Use Deno standard library.
 - **CI `continue-on-error: true`** — ESLint, TypeScript, security audit steps do not fail fast. Failures are aggregated in a final `deployment-gate` job.
