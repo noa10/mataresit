@@ -58,6 +58,12 @@ CREATE OR REPLACE FUNCTION public.process_post_auth_invitation(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+-- Pin the search path. Every table and function this body references is already
+-- schema-qualified, so nothing changes today; pinning it stops a future edit
+-- from silently resolving an unqualified name through the caller's search_path,
+-- which is the standard escalation route for a SECURITY DEFINER function.
+-- pg_catalog is still searched implicitly, so NOW() and friends keep working.
+SET search_path = ''
 AS $$
 DECLARE
   v_actor UUID;

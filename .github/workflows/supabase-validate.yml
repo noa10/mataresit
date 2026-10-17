@@ -285,6 +285,71 @@ jobs:
           echo "✅ Migration file validation completed successfully"
           echo "ℹ️ Note: Files validated for syntax and structure only - manual deployment required"
 
+  # Authorization regression test for team invitation acceptance.
+  #
+  # The migration validation above checks file naming and structure only -- it
+  # never executes any SQL -- so this is the job that actually applies the
+  # migration and asserts the security property. Without it the regression test
+  # would depend on someone remembering to run it by hand.
+  invitation-auth-regression:
+    name: Invitation Acceptance Auth Regression
+    runs-on: ubuntu-latest
+    needs: validate
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: invitation_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ensure psql is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
+      # Supabase always provides these roles; a bare Postgres does not, and the
+      # migration grants EXECUTE to them.
+      - name: Create the Supabase roles
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d invitation_test -v ON_ERROR_STOP=1 -c "
+            CREATE ROLE anon NOLOGIN;
+            CREATE ROLE authenticated NOLOGIN;
+            CREATE ROLE service_role NOLOGIN;"
+
+      # Expected on stderr: warnings for the other invitation RPCs, which this
+      # migration revokes but does not define and which do not exist on a bare
+      # database. Warnings do not fail the run.
+      - name: Apply the invitation acceptance migration
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d invitation_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261016090000_bind_invitation_acceptance_to_session_user.sql
+
+      - name: Assert acceptance is bound to the caller's session
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d invitation_test -v ON_ERROR_STOP=1 \
+            -f supabase/tests/invitation_acceptance_auth.sql
+
   # Edge Functions Validation
   validate-edge-functions:
     name: Validate Edge Functions
@@ -621,7 +686,7 @@ jobs:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, validate-edge-functions, validate-deployment]
+    needs: [validate, validate-migrations, invitation-auth-regression, validate-edge-functions, validate-deployment]
     if: always()
 
     steps:
@@ -631,16 +696,18 @@ jobs:
           echo "🚀 Supabase deployment successful!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
       - name: Log deployment failure
-        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
+        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.invitation-auth-regression.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
         run: |
           echo "❌ Supabase deployment failed!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Validation: ${{ needs.validate.result }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Check workflow logs for details."
 
@@ -651,6 +718,7 @@ jobs:
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Validation: ${{ needs.validate.result }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
+          echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
