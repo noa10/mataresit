@@ -1,15 +1,32 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Crown, ExternalLink, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Crown, ExternalLink } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Panel } from "@/components/ledger/Panel";
 import { StatusChip } from "@/components/ledger/StatusChip";
 import ApiKeyManagement from "@/components/dashboard/ApiKeyManagement";
 import { CategoryManager } from "@/components/categories/CategoryManager";
 import { PayerManager } from "@/components/payers/PayerManager";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { BillingPreferences } from "@/components/settings/BillingPreferences";
+import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
+import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
+import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
+import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
 import { useDashboardTranslation, useLanguage, useSettingsTranslation } from "@/contexts/LanguageContext";
+import { useSettings } from "@/hooks/useSettings";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -18,33 +35,48 @@ import type { SupportedLanguage } from "@/lib/i18n";
 import type { ThemeMode } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 
-type SettingsSection = "preferences" | "plan" | "api" | "categories" | "payers" | "notifications";
+type SettingsSection =
+  | "preferences"
+  | "processing"
+  | "plan"
+  | "api"
+  | "categories"
+  | "payers"
+  | "notifications"
+  | "providers"
+  | "usage";
 
 const SECTION_ORDER: SettingsSection[] = [
   "preferences",
+  "processing",
   "plan",
   "api",
   "categories",
   "payers",
   "notifications",
+  "providers",
+  "usage",
 ];
 
 const SECTION_LABEL_KEY: Record<SettingsSection, string> = {
   preferences: "workspace.settings.nav.preferences",
+  processing: "workspace.settings.nav.processing",
   plan: "workspace.settings.nav.plan",
   api: "workspace.settings.nav.api",
   categories: "workspace.settings.nav.categories",
   payers: "workspace.settings.nav.payers",
   notifications: "workspace.settings.nav.notifications",
+  providers: "workspace.settings.nav.providers",
+  usage: "workspace.settings.nav.usage",
 };
 
 const mapTabToSection = (tab: string | null): SettingsSection => {
   switch (tab) {
     case "preferences":
     case "theme":
-    case "processing":
-    case "providers":
       return "preferences";
+    case "processing":
+      return "processing";
     case "api":
     case "api-keys":
       return "api";
@@ -54,9 +86,12 @@ const mapTabToSection = (tab: string | null): SettingsSection => {
       return "payers";
     case "notifications":
       return "notifications";
+    case "providers":
+      return "providers";
+    case "usage":
+      return "usage";
     case "plan":
     case "billing":
-    case "usage":
     default:
       return "plan";
   }
@@ -108,9 +143,11 @@ export default function SettingsPage() {
   const { t: ts } = useSettingsTranslation();
   const { language, changeLanguage } = useLanguage();
   const { theme, setMode } = useTheme();
+  const { settings, updateSettings, resetSettings } = useSettings();
   const { subscriptionData, createPortalSession } = useStripe();
   const { limits, usage, isLoading: usageLoading, getCurrentTier, isFeatureAvailable } = useSubscription();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const section = mapTabToSection(searchParams.get("tab"));
   const sectionsRef = useRef<HTMLElement | null>(null);
 
@@ -220,6 +257,7 @@ export default function SettingsPage() {
 
         <div className="min-w-0">
           {section === "plan" && (
+            <>
             <Panel
               title={t("workspace.settings.planTitle")}
               action={
@@ -315,6 +353,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             </Panel>
+            <div className="mt-5">
+              <BillingPreferences />
+            </div>
+            </>
           )}
 
           {section === "preferences" && (
@@ -375,18 +417,6 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-ledger-line pt-4">
-                <p className="max-w-[46ch] text-sm text-ledger-muted">
-                  {t("workspace.settings.advancedHint")}
-                </p>
-                <Button variant="accent-outline" size="app" asChild>
-                  <Link to="/settings/advanced">
-                    <SlidersHorizontal className="mr-2 h-4 w-4" />
-                    {t("workspace.settings.advanced")}
-                  </Link>
-                </Button>
-              </div>
             </Panel>
           )}
 
@@ -440,6 +470,112 @@ export default function SettingsPage() {
           {section === "payers" && <PayerManager />}
 
           {section === "notifications" && <NotificationPreferences />}
+
+          {section === "processing" && (
+            <Panel
+              title={ts("processing.title", { defaultValue: "Processing" })}
+              description={ts("processing.description", {
+                defaultValue: "Choose the AI model and batch behaviour used to process receipts.",
+              })}
+            >
+              <div className="space-y-6">
+                <ReceiptProcessingOptions
+                  defaultModel={settings.selectedModel}
+                  showBatchModelSelection={false}
+                  onModelChange={(model) => updateSettings({ selectedModel: model, batchModel: model })}
+                />
+
+                <div className="space-y-4 border-t border-dashed border-ledger-line pt-5">
+                  <h3 className="text-sm font-semibold text-ledger-ink">
+                    {ts("processing.batchProcessingConfig", { defaultValue: "Batch processing" })}
+                  </h3>
+                  <BatchUploadSettings
+                    maxConcurrent={settings?.batchUpload?.maxConcurrent || 2}
+                    autoStart={settings?.batchUpload?.autoStart || false}
+                    timeoutSeconds={settings?.batchUpload?.timeoutSeconds || 120}
+                    maxRetries={settings?.batchUpload?.maxRetries || 2}
+                    preserveImageQuality={settings?.skipUploadOptimization || true}
+                    onMaxConcurrentChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          maxConcurrent: value
+                        }
+                      })
+                    }
+                    onAutoStartChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          autoStart: value
+                        }
+                      })
+                    }
+                    onTimeoutChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          timeoutSeconds: value
+                        }
+                      })
+                    }
+                    onMaxRetriesChange={(value) =>
+                      updateSettings({
+                        batchUpload: {
+                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
+                          maxRetries: value
+                        }
+                      })
+                    }
+                    onPreserveImageQualityChange={(value) =>
+                      updateSettings({ skipUploadOptimization: value })
+                    }
+                  />
+                </div>
+
+                <div className="flex justify-end border-t border-dashed border-ledger-line pt-4">
+                  <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline">{ts("actions.reset", { defaultValue: "Reset to defaults" })}</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{ts("messages.resetConfirm", { defaultValue: "Reset processing settings?" })}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {ts("messages.resetDescription", {
+                            defaultValue: "This will restore the default processing and batch upload settings.",
+                          })}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{ts("actions.cancel", { defaultValue: "Cancel" })}</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => {
+                            resetSettings();
+                            toast.info(ts("messages.resetToast", { defaultValue: "Processing settings reset." }));
+                            setIsResetAlertOpen(false);
+                          }}
+                        >
+                          {ts("messages.continue", { defaultValue: "Continue" })}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </Panel>
+          )}
+
+          {section === "providers" && <ModelProviderStatus />}
+
+          {section === "usage" && (
+            <Panel
+              title={ts("usage.title", { defaultValue: "Usage" })}
+              description={ts("usage.description", { defaultValue: "Your plan limits and current consumption." })}
+            >
+              <SubscriptionLimitsDisplay showUpgradePrompts={true} />
+            </Panel>
+          )}
         </div>
       </div>
     </div>

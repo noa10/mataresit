@@ -50,7 +50,6 @@ const ReceiptsPage = lazy(() => import("./pages/ReceiptsPage"));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
 const MissionsPage = lazy(() => import("./pages/MissionsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
-const SettingsAdvancedPage = lazy(() => import("./pages/SettingsAdvancedPage"));
 const PerformanceTestPage = lazy(() => import("./pages/PerformanceTestPage"));
 const AsyncSaveTestPage = lazy(() => import("./pages/AsyncSaveTestPage"));
 const AdminLayoutPage = lazy(() => import("./pages/admin/AdminLayout"));
@@ -268,11 +267,7 @@ const App = () => (
                                               <SettingsPage />
                                             </Suspense>
                                           } />
-                                          <Route path="/settings/advanced" element={
-                                            <Suspense fallback={<PageLoading />}>
-                                              <SettingsAdvancedPage />
-                                            </Suspense>
-                                          } />
+                                          <Route path="/settings/advanced" element={<Navigate to="/settings" replace />} />
                                           <Route path="/account/billing" element={<Navigate to="/settings?tab=billing" replace />} />
                                           <Route path="/performance-test" element={
                                             <Suspense fallback={<PageLoading />}>

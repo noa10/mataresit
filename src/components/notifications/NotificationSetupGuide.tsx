@@ -100,16 +100,16 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
 
   if (!pushStatus.isAvailable) {
     return (
-      <Card className="border-orange-200 bg-orange-50">
+      <Card className="border-ledger-amber/30 bg-ledger-amber-soft/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <div className="p-2 bg-ledger-amber-soft rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-ledger-amber" />
               </div>
               <div>
-                <CardTitle className="text-orange-900">Notifications Not Available</CardTitle>
-                <CardDescription className="text-orange-700">
+                <CardTitle className="text-ledger-ink">Notifications Not Available</CardTitle>
+                <CardDescription className="text-ledger-ink-2">
                   Your browser doesn't support push notifications
                 </CardDescription>
               </div>
@@ -135,16 +135,16 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
 
   if (isSetupComplete) {
     return (
-      <Card className="border-green-200 bg-green-50">
+      <Card className="border-ledger-accent/30 bg-ledger-accent-soft/40">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
+                <CheckCircle className="h-5 w-5 text-ledger-accent" />
               </div>
               <div>
-                <CardTitle className="text-green-900">Setup Complete!</CardTitle>
-                <CardDescription className="text-green-700">
+                <CardTitle className="text-ledger-ink">Setup Complete!</CardTitle>
+                <CardDescription className="text-ledger-ink-2">
                   Your notifications are configured and ready to go
                 </CardDescription>
               </div>
@@ -159,10 +159,10 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-green-100 text-green-800">
+              <Badge variant="default" className="bg-ledger-accent-soft text-ledger-accent">
                 {completedSteps}/{steps.length} steps completed
               </Badge>
-              <span className="text-sm text-green-700">
+              <span className="text-sm text-ledger-ink-2">
                 You'll now receive notifications for receipt processing and team activities
               </span>
             </div>
@@ -176,16 +176,16 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
   }
 
   return (
-    <Card className="border-blue-200 bg-blue-50">
+    <Card className="border-ledger-accent/30 bg-ledger-accent-soft/50">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Bell className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-ledger-accent-soft rounded-lg">
+              <Bell className="h-5 w-5 text-ledger-accent" />
             </div>
             <div>
-              <CardTitle className="text-blue-900">Set Up Notifications</CardTitle>
-              <CardDescription className="text-blue-700">
+              <CardTitle className="text-ledger-ink">Set Up Notifications</CardTitle>
+              <CardDescription className="text-ledger-ink-2">
                 Get notified about receipt processing and team activities
               </CardDescription>
             </div>
@@ -203,9 +203,9 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
           <Badge variant="outline">
             Step {currentStep} of {steps.length}
           </Badge>
-          <div className="flex-1 bg-blue-100 rounded-full h-2">
+          <div className="flex-1 bg-ledger-surface-2 rounded-full h-2">
             <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="bg-ledger-accent h-2 rounded-full transition-all duration-300"
               style={{ width: `${(currentStep / steps.length) * 100}%` }}
             />
           </div>
@@ -215,12 +215,12 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
         {currentStepData && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
                 {currentStepData.icon}
               </div>
               <div>
-                <h4 className="font-medium text-blue-900">{currentStepData.title}</h4>
-                <p className="text-sm text-blue-700">{currentStepData.description}</p>
+                <h4 className="font-medium text-ledger-ink">{currentStepData.title}</h4>
+                <p className="text-sm text-ledger-ink-2">{currentStepData.description}</p>
               </div>
             </div>
 

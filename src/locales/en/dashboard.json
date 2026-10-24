@@ -489,7 +489,10 @@
         "api": "API keys",
         "categories": "Categories",
         "payers": "Payers",
-        "notifications": "Notifications"
+        "notifications": "Notifications",
+        "processing": "Processing",
+        "providers": "AI providers",
+        "usage": "Usage stats"
       },
       "advanced": "Advanced settings",
       "planTitle": "Plan & usage",

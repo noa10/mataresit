@@ -489,7 +489,10 @@
         "api": "Kunci API",
         "categories": "Kategori",
         "payers": "Pembayar",
-        "notifications": "Pemberitahuan"
+        "notifications": "Pemberitahuan",
+        "processing": "Pemprosesan",
+        "providers": "Pembekal AI",
+        "usage": "Statistik penggunaan"
       },
       "advanced": "Tetapan lanjutan",
       "planTitle": "Pelan & penggunaan",
