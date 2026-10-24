@@ -147,7 +147,8 @@ export function getProcessingRecommendation(
 ): ProcessingRecommendation {
   const reasoning: string[] = [];
   const recommendedMethod: 'ai-vision' = 'ai-vision'; // Always AI Vision
-  let recommendedModel = DEFAULT_MODELS.vision;
+  // Assigned on every branch below; no default needed (CodeQL js/useless-assignment-to-local).
+  let recommendedModel: string;
   let confidence: 'high' | 'medium' | 'low' = 'medium';
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
 

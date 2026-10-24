@@ -2,11 +2,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { getPushNotificationPreferenceKey, isInQuietHours } from '../_shared/notification-preferences.ts';
 
-// VAPID keys for push notifications
-// In production, these should be stored as environment variables
-const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || 'BEl62iUYgUivxIkv69yViEuiBIa40HcCWLEaQK07x8hiKAantUM4hM5CxbxrwhHuFAU2dX4tnMJiHG9AJL0x8cs';
-const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || 'your-vapid-private-key-here';
-const VAPID_EMAIL = Deno.env.get('VAPID_EMAIL') || '';
+// NOTE: VAPID keys are not read here yet. `sendWebPush` below is still a stub, so
+// these constants were dead code (CodeQL js/unused-local-variable). The browser
+// application server key lives in src/services/pushNotificationService.ts. When
+// web push is implemented, reintroduce the VAPID env reads alongside it.
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
