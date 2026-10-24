@@ -1,0 +1,629 @@
+{
+  "meta": {
+    "docs": {
+      "title": "Documentation — Mataresit",
+      "description": "Mataresit documentation: upload receipts, read confidence scores, batch process, search in natural language and troubleshoot — the complete guide."
+    },
+    "api": {
+      "title": "API reference — Mataresit",
+      "description": "Mataresit REST API: 13 production endpoints for receipts, search, teams, claims and spending analytics. Keyed, JSON, rate-limited."
+    },
+    "help": {
+      "title": "Help centre — Mataresit",
+      "description": "Mataresit help centre: getting started, account and billing, AI processing — answers from the support team, usually within a day."
+    },
+    "status": {
+      "title": "System status — Mataresit",
+      "description": "Live status of Mataresit services and third-party integrations: database, auth, storage, edge functions and AI processing."
+    },
+    "blog": {
+      "title": "Blog — Mataresit",
+      "description": "The Mataresit blog: product notes, Malaysian tax tips, AI deep dives and release news from the receipt-processing trenches."
+    },
+    "blogPost": {
+      "title": "Blog — Mataresit",
+      "description": "Notes from the Mataresit ledger."
+    }
+  },
+  "shared": {
+    "openGuide": "Open guide",
+    "readMore": "Read more",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "docs": {
+    "hero": {
+      "eyebrow": "Documentation",
+      "titleLead": "Read the manual,",
+      "titleAccent": "then forget it.",
+      "lede": "Everything Mataresit does, in the order you'll need it — from the first upload to the audit trail. Written for people with receipts to file, not time to burn.",
+      "note": "Updated October 2026 · 5 sections · ~8 min read"
+    },
+    "search": {
+      "label": "Search the documentation",
+      "placeholder": "Search the manual…",
+      "clear": "Clear search",
+      "results": "Search results",
+      "count_one": "{{count}} guide",
+      "count_other": "{{count}} guides",
+      "searching": "Searching…",
+      "empty": "No guides matched that phrase. Try a different search, or ask the help centre.",
+      "error": "The guide library could not be loaded. The manual below still works."
+    },
+    "toc": {
+      "title": "On this page",
+      "overview": "Overview",
+      "gettingStarted": "Getting started",
+      "coreFeatures": "Core features",
+      "troubleshooting": "Troubleshooting",
+      "glossary": "Glossary"
+    },
+    "overview": {
+      "title": "Overview",
+      "whatIsTitle": "What is Mataresit?",
+      "whatIsLede": "Mataresit takes the manual data entry out of receipt and expense management. Upload a photo or PDF, and AI reads the merchant, date, totals and line items, categorises the spend and hands you a clean ledger — accurate enough to file, editable enough to trust.",
+      "keyFeaturesTitle": "Key features",
+      "features": [
+        {
+          "title": "Automated data extraction",
+          "description": "Upload JPEG, PNG or PDF; the system pulls merchant, date, total and line items on its own."
+        },
+        {
+          "title": "AI-powered enhancement",
+          "description": "Merchant names are normalised, payment methods standardised and categories predicted — with suggested fixes for OCR slips."
+        },
+        {
+          "title": "Confidence scoring",
+          "description": "Every extracted field carries a confidence score, so you see at a glance what's safe and what needs a second look."
+        },
+        {
+          "title": "Real-time processing",
+          "description": "A status timeline follows each receipt from upload to completion — no guessing what the queue is doing."
+        },
+        {
+          "title": "Semantic search",
+          "description": "Ask in plain language: \"coffee from last week\" or \"what did I buy at Watsons?\" finds the line item."
+        },
+        {
+          "title": "Batch processing",
+          "description": "Drop a stack of receipts at once; they process in parallel with full control over the queue."
+        },
+        {
+          "title": "Analysis & reporting",
+          "description": "Spending dashboards plus PDF reports summarised by category or payer, ready for the accountant."
+        },
+        {
+          "title": "Flexible AI models",
+          "description": "Choose between AI Vision and OCR+AI pipelines to balance speed, cost and accuracy per upload."
+        }
+      ],
+      "quickStartTitle": "Quick start guides",
+      "quickStartLede": "The four guides most new workspaces open first."
+    },
+    "gettingStarted": {
+      "title": "Getting started",
+      "firstUploadTitle": "Your first upload",
+      "steps": [
+        {
+          "title": "Navigate to the dashboard",
+          "description": "After signing in, you land on your main workspace — the receipts inbox."
+        },
+        {
+          "title": "Open the upload modal",
+          "description": "Click \"Upload\". Two tabs appear: Single upload and Batch upload."
+        },
+        {
+          "title": "Select a file",
+          "description": "Drag and drop a JPG, PNG or PDF, or click to browse your device."
+        },
+        {
+          "title": "Processing begins",
+          "description": "Upload and extraction start automatically. Follow progress on the processing timeline."
+        },
+        {
+          "title": "Review and save",
+          "description": "When processing finishes you're taken to the receipt viewer to check, correct and save."
+        }
+      ],
+      "dashboardTitle": "Understanding the dashboard",
+      "dashboardItems": [
+        "Receipt cards — each card shows merchant, date, total and a thumbnail of the image.",
+        "Status indicators — Unreviewed (amber) needs your approval; Reviewed (blue) is confirmed.",
+        "Filtering & sorting — controls at the top search, filter and sort the whole library.",
+        "View modes — switch between grid, list and table views for dense months."
+      ]
+    },
+    "coreFeatures": {
+      "title": "Core features",
+      "batchTitle": "Uploading receipts — single & batch",
+      "batchBody": "Batch upload processes many receipts in parallel, with controls to start, pause and retry failed items — built for the shoebox months. Free plans queue 5 files at a time, Pro 50, Max 100.",
+      "confidenceTitle": "AI suggestions & confidence scores",
+      "confidenceBody": "When the AI suspects an OCR error it offers a one-click correction. Every key field also shows a confidence bar:",
+      "high": "High",
+      "highRange": "80–100%",
+      "medium": "Medium",
+      "mediumRange": "60–79%",
+      "low": "Low",
+      "lowRange": "< 60%",
+      "confidenceNote": "Editing a field manually sets its confidence to 100%.",
+      "visionTitle": "AI Vision processing",
+      "visionBody": "AI Vision hands the raw image straight to the model — no intermediate text extraction. It copes better with complex layouts, handwriting and multiple languages, which covers most Malaysian receipt formats from mamak stalls to hardware suppliers.",
+      "searchTitle": "AI search",
+      "searchBody": "Ask for what you remember, in the words you'd use out loud:",
+      "queries": [
+        "\"coffee expenses from last month\"",
+        "\"grocery items over RM 20\"",
+        "\"fuel receipts in Selangor\""
+      ],
+      "featuredTitle": "Featured guides",
+      "featuredLede": "Longer walkthroughs for the workflows teams ask about most."
+    },
+    "troubleshooting": {
+      "title": "Troubleshooting",
+      "items": [
+        {
+          "question": "Why is my receipt stuck or failed?",
+          "answer": "The processing status on the card or viewer shows the current stage. A failed_ai stage usually means a low-quality image. Reprocess the receipt, or enter the data manually — both are one click from the receipt viewer."
+        },
+        {
+          "question": "Why are my search results not what I expected?",
+          "answer": "Semantic search relies on embeddings. Receipts uploaded before the feature was enabled may not have them yet — admins can generate embeddings for the back catalogue from Admin → Settings."
+        },
+        {
+          "question": "How do I change my subscription?",
+          "answer": "Manage the subscription, view invoices and update payment methods from the Stripe billing portal. Open it via any plan card on the pricing page, or the payment-success screen after a transaction."
+        }
+      ]
+    },
+    "glossary": {
+      "title": "Glossary",
+      "items": [
+        {
+          "term": "ai-vision",
+          "definition": "A processing method where the AI model reads the image directly to extract and understand its contents."
+        },
+        {
+          "term": "embedding",
+          "definition": "A numerical representation of text that captures semantic meaning — the engine behind AI search."
+        },
+        {
+          "term": "semantic-search",
+          "definition": "Search that interprets intent and context rather than matching exact keywords."
+        },
+        {
+          "term": "confidence-score",
+          "definition": "A per-field probability that the extracted value is correct, rendered as a colour-coded bar."
+        }
+      ]
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "readingTime": "{{count}} min",
+    "cta": {
+      "eyebrow": "Enough reading",
+      "title": "The manual is shorter than the month-end pile.",
+      "lede": "Open the workspace, drop one receipt in, and watch the ledger build itself.",
+      "primary": "Open the workspace",
+      "secondary": "Ask the help centre"
+    }
+  },
+  "api": {
+    "hero": {
+      "eyebrow": "API reference",
+      "titleLead": "Thirteen endpoints,",
+      "titleAccent": "one clean ledger.",
+      "lede": "Pull receipts, teams, claims and spending analytics straight into your stack with a keyed REST API. JSON in, JSON out, no glue code required.",
+      "note": "REST · JSON · v1 · 13 endpoints · 22/22 integration tests passing"
+    },
+    "quickStart": {
+      "title": "Quick start",
+      "lede": "Two headers and you're in business. Point your client at the base URL and validate with the health check.",
+      "baseUrlLabel": "Base URL",
+      "baseUrlMeta": "all requests",
+      "testLabel": "Quick test",
+      "testMeta": "curl",
+      "testComment": "# → { \"status\": \"ok\", \"service\": \"external-api\" }"
+    },
+    "auth": {
+      "title": "Authentication",
+      "lede": "Every request carries both a session token and an API key — the token proves who you are, the key decides scopes and rate limits.",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer <access-token> — required, identifies the caller"
+        },
+        {
+          "name": "X-API-Key",
+          "value": "<api-key> — required, scope validation and rate limiting"
+        }
+      ],
+      "scopesLabel": "Available scopes",
+      "scopes": [
+        "receipts:read",
+        "receipts:write",
+        "teams:read",
+        "claims:read",
+        "claims:write"
+      ],
+      "note": "Generate keys from Settings → API keys in the workspace, choosing only the scopes you need. Admin scopes exist but are validated separately."
+    },
+    "endpoints": {
+      "title": "Endpoints",
+      "lede": "All endpoints below are live in production. Select a row for parameters and a copyable request.",
+      "groups": {
+        "health": "Health",
+        "receipts": "Receipts",
+        "search": "Search",
+        "teams": "Teams",
+        "claims": "Claims",
+        "analytics": "Analytics"
+      },
+      "items": {
+        "health": {
+          "desc": "Check API status and validate authentication",
+          "params": "No parameters."
+        },
+        "receiptsList": {
+          "desc": "List receipts with filtering and pagination",
+          "params": "limit · offset · start_date · end_date"
+        },
+        "receiptCreate": {
+          "desc": "Create a new receipt",
+          "params": "merchant · date · currency · total · category · payment_method"
+        },
+        "receiptsBatch": {
+          "desc": "Create multiple receipts in a single request",
+          "params": "receipts[] · up to 5 on Free, 50 on Pro, 100 on Max"
+        },
+        "searchSuggestions": {
+          "desc": "Search suggestions for a query",
+          "params": "q · limit"
+        },
+        "searchSources": {
+          "desc": "Available search sources",
+          "params": "No parameters."
+        },
+        "teamsList": {
+          "desc": "List your teams",
+          "params": "No parameters."
+        },
+        "teamDetails": {
+          "desc": "Team details",
+          "params": "id (path)"
+        },
+        "teamStats": {
+          "desc": "Team statistics",
+          "params": "id (path)"
+        },
+        "claimsList": {
+          "desc": "List claims with filtering",
+          "params": "status · limit · offset"
+        },
+        "claimsCreate": {
+          "desc": "Create a new claim",
+          "params": "title · amount · currency · receipt_ids[]"
+        },
+        "analyticsSpending": {
+          "desc": "Spending analytics",
+          "params": "start_date · end_date · group_by"
+        },
+        "analyticsTrends": {
+          "desc": "Spending trends over time",
+          "params": "period · months"
+        }
+      },
+      "note": "Analytics endpoints are restricted to Pro and Max subscription tiers.",
+      "dialog": {
+        "title": "Endpoint details",
+        "parameters": "Parameters",
+        "sample": "Sample request",
+        "auth": "Send both Authorization and X-API-Key headers with every request.",
+        "close": "Close"
+      }
+    },
+    "example": {
+      "title": "Example — create a receipt",
+      "lede": "A POST to /receipts with the merchant, total and currency. The response echoes the created record with its id and processing status.",
+      "requestCaption": "Request",
+      "requestMeta": "POST /receipts",
+      "responseCaption": "Response",
+      "responseMeta": "201 Created"
+    },
+    "meta": {
+      "errorsTitle": "Error codes",
+      "errors": [
+        {
+          "code": "400",
+          "text": "Malformed request body or query"
+        },
+        {
+          "code": "401",
+          "text": "Missing or invalid token / API key"
+        },
+        {
+          "code": "403",
+          "text": "Scope or subscription tier insufficient"
+        },
+        {
+          "code": "404",
+          "text": "Resource not found"
+        },
+        {
+          "code": "429",
+          "text": "Rate limit exceeded — back off and retry"
+        }
+      ],
+      "limitsTitle": "Rate limits & specs",
+      "limitsBody": "Limits scale with your plan and are enforced per API key. Every response includes headers with the remaining quota. A full OpenAPI 3.1 document is published alongside the API — generate TypeScript or Python clients with one command.",
+      "openapiCommand": "openapi-generator-cli generate -i openapi.json -g typescript-axios",
+      "openapiLink": "Download the OpenAPI document"
+    },
+    "plans": {
+      "title": "Plans & limits",
+      "lede": "What each tier can call, and how often. Burst allowances are 5, 20 and 100 requests respectively.",
+      "plan": "Plan",
+      "access": "API access",
+      "rate": "Rate limit",
+      "batch": "Batch",
+      "rows": [
+        {
+          "plan": "Free",
+          "access": "Health, receipts (25/month), search, teams read-only",
+          "rate": "100/hour · 1,000/day",
+          "batch": "—"
+        },
+        {
+          "plan": "Pro",
+          "access": "Everything in Free, claims, analytics, team management",
+          "rate": "1,000/hour · 10,000/day",
+          "batch": "50 receipts"
+        },
+        {
+          "plan": "Max",
+          "access": "Everything in Pro, priority processing, webhooks",
+          "rate": "5,000/hour · 50,000/day",
+          "batch": "100 receipts"
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Build on the ledger",
+      "title": "Your stack, reading receipts natively.",
+      "lede": "Generate an API key in the workspace and have the first receipt in your terminal before the coffee cools.",
+      "primary": "Get an API key",
+      "secondary": "Read the docs"
+    }
+  },
+  "help": {
+    "hero": {
+      "eyebrow": "Help centre",
+      "titleLead": "Stuck?",
+      "titleAccent": "Unstuck.",
+      "lede": "The ten questions we hear most, answered plainly. If yours isn't here, a human picks it up — usually within a day."
+    },
+    "search": {
+      "label": "Search help articles",
+      "placeholder": "Search for help…",
+      "results_one": "{{count}} result",
+      "results_other": "{{count}} results",
+      "clear": "Clear filters"
+    },
+    "categories": {
+      "label": "Browse by category",
+      "gettingStarted": {
+        "title": "Getting started",
+        "description": "Uploads, exports and the daily flow."
+      },
+      "accountBilling": {
+        "title": "Account & billing",
+        "description": "Subscriptions, invoices and security."
+      },
+      "aiProcessing": {
+        "title": "AI & processing",
+        "description": "Models, accuracy and search quality."
+      },
+      "count_one": "{{count}} article",
+      "count_other": "{{count}} articles"
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "lede": "Click a question to unfold the answer.",
+      "empty": "Nothing matched. Try a different phrase, or clear the filters.",
+      "emptyAction": "Ask us directly"
+    },
+    "faqs": [
+      {
+        "category": "gettingStarted",
+        "question": "How do I upload a receipt?",
+        "answer": "Head to the workspace and use the Upload button. Drag and drop files or pick them from your device — JPEG, PNG and PDF are all supported."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "What's the difference between OCR+AI and AI Vision?",
+        "answer": "AI Vision analyses the receipt image directly for higher accuracy, especially with complex layouts. OCR+AI extracts text first, then structures it with AI. We recommend AI Vision for the best results."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "How can I improve search results?",
+        "answer": "Use natural language — \"coffee from last week\" or \"groceries from Watsons over RM 50\". If older receipts predate semantic search, an admin can generate their embeddings from Admin → Settings."
+      },
+      {
+        "category": "accountBilling",
+        "question": "How do I manage my subscription?",
+        "answer": "Open the pricing page and click \"Manage subscription\" — it takes you to the secure Stripe billing portal where you can change plans, view invoices and update payment methods."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "What file formats are supported?",
+        "answer": "JPEG, PNG and PDF. For the cleanest extraction, keep images sharp and well-lit with every line of text visible."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "How accurate is the AI extraction?",
+        "answer": "Accuracy is high on clear, well-lit receipts. Every field carries a confidence score so you can spot the ones worth a second look, and you can correct anything before saving."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "Can I export my receipt data?",
+        "answer": "Yes — CSV, JSON and PDF reports. Exports live on the analysis page, where you can shape the report by category or payer first."
+      },
+      {
+        "category": "accountBilling",
+        "question": "Is my data secure?",
+        "answer": "Yes. Storage is encrypted, endpoints are secured, and access is strictly scoped. Your data is never shared with third parties."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "What AI models do you support?",
+        "answer": "Google Gemini is the default and primary engine on every plan, so processing quality doesn't depend on your subscription tier."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "How do I set up batch processing?",
+        "answer": "Batch processing is available on Pro and Max. Select multiple receipts in the workspace and run them through the batch option — the queue handles the rest."
+      }
+    ],
+    "contact": {
+      "title": "Can't find what you're looking for?",
+      "lede": "Our support team is here to help.",
+      "email": "Email support",
+      "chat": "Live chat",
+      "docs": "Read the documentation",
+      "note": "Replies usually within one business day · Malaysia time (GMT+8)"
+    }
+  },
+  "status": {
+    "hero": {
+      "eyebrow": "System status",
+      "titleLead": "The pipes,",
+      "titleAccent": "watched.",
+      "lede": "Live status of every service Mataresit leans on — our own and the third parties. When something blips, it shows here before it shows in your inbox."
+    },
+    "banner": {
+      "operational": "All systems operational",
+      "degraded": "Some systems are degraded",
+      "outage": "Major outage detected",
+      "checking": "Checking system status…",
+      "lastChecked": "Last checked {{time}} · checks run every 5 minutes",
+      "justNow": "just now",
+      "minutesAgo": "{{count}} min ago",
+      "refresh": "Refresh",
+      "refreshing": "Checking services…"
+    },
+    "serviceStatus": {
+      "operational": "Operational",
+      "degraded": "Degraded",
+      "outage": "Outage",
+      "loading": "Checking"
+    },
+    "serviceMessages": {
+      "database": "Connection successful.",
+      "auth": "Service is responsive.",
+      "storage": "Bucket is accessible.",
+      "edge": "All functions are responsive.",
+      "ai": "Connection successful."
+    },
+    "uptime": {
+      "title": "Uptime — last 90 days",
+      "overall": "99.98% overall",
+      "daysAgo": "90 days ago",
+      "sixty": "60",
+      "thirty": "30",
+      "today": "today",
+      "aria": "90-day uptime bar: all days operational except one degraded day in early October"
+    },
+    "incidents": {
+      "title": "Incident history",
+      "resolved": "Resolved",
+      "date": "02 Oct 2026",
+      "incidentTitle": "Elevated processing latency",
+      "incidentBody": "Edge function cold starts slowed receipt processing for roughly 41 minutes (14:02–14:43 MYT). Queued receipts completed automatically; no data was lost.",
+      "none": "No other incidents reported in the last 90 days."
+    },
+    "footnote": {
+      "lead": "Experiencing something that isn't showing here? Visit the",
+      "link": "help centre",
+      "tail": "or contact support — we take it from there."
+    }
+  },
+  "blog": {
+    "hero": {
+      "eyebrow": "The Mataresit blog",
+      "titleLead": "Notes from",
+      "titleAccent": "the ledger.",
+      "lede": "Product notes, Malaysian tax tips and the occasional deep dive from the receipt-processing trenches. New posts roughly twice a month.",
+      "rssFollow": "Follow along:",
+      "rssLink": "RSS feed"
+    },
+    "filter": {
+      "label": "Filter by topic",
+      "all": "All",
+      "searchLabel": "Search the blog",
+      "searchPlaceholder": "Search posts…",
+      "empty": "No posts under this topic yet — try another chip.",
+      "noSearch": "No posts matched your search. Try a different phrase or clear the filters.",
+      "emptyAction": "Clear filters"
+    },
+    "featured": {
+      "latest": "Latest post",
+      "read": "Read the post"
+    },
+    "post": {
+      "by": "By {{author}}",
+      "minRead": "{{count}} min read"
+    },
+    "states": {
+      "loading": "Loading the ledger…",
+      "errorTitle": "The blog could not be loaded",
+      "errorBody": "We're having trouble reaching the posts right now. Try again in a moment.",
+      "emptyTitle": "No posts yet",
+      "emptyBody": "Check back soon for notes from the receipt-processing trenches."
+    },
+    "receipt": {
+      "merchant": "NASI KANDAR PELITA",
+      "address": "Jalan Ampang, Kuala Lumpur · 24.10.2026",
+      "items": [
+        {
+          "name": "Nasi lemak ayam",
+          "amount": "14.50",
+          "tax": "SST 6%",
+          "taxZero": false
+        },
+        {
+          "name": "Teh tarik × 2",
+          "amount": "7.00",
+          "tax": "SST 0%",
+          "taxZero": true
+        },
+        {
+          "name": "Roti canai",
+          "amount": "4.50",
+          "tax": "SST 6%",
+          "taxZero": false
+        }
+      ],
+      "totalLabel": "TOTAL · MYR",
+      "total": "27.56",
+      "foot": "— SST CODES CAPTURED —"
+    },
+    "cta": {
+      "eyebrow": "Less reading, more filing",
+      "title": "The blog writes itself from the ledger.",
+      "lede": "Every feature post here started as a pile of receipts someone didn't want to type in. Open the workspace and skip the story.",
+      "primary": "Open the workspace",
+      "secondary": "See pricing"
+    }
+  },
+  "blogPost": {
+    "back": "The blog",
+    "loading": "Loading post…",
+    "notFoundTitle": "Post not found",
+    "notFoundBody": "The blog post you're looking for doesn't exist or has been removed.",
+    "notFoundCta": "Back to the blog",
+    "filedUnder": "Filed under",
+    "endNote": "That's the end of this entry. The ledger keeps the rest."
+  }
+}

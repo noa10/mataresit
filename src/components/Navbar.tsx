@@ -281,7 +281,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
 
                   {/* Get Started CTA */}
                   <div className="px-2 py-1">
-                    <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+                    <Button asChild variant="accent" className="w-full font-medium">
                       <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
                     </Button>
                   </div>
@@ -292,7 +292,7 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
 
           {/* Primary CTA Button (Discord-style) - Desktop */}
           {!user ? (
-            <Button asChild className="hidden lg:flex bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-4 py-2 rounded-full">
+            <Button asChild variant="accent" className="hidden lg:flex font-medium px-4 py-2 rounded-full">
               <Link to="/auth">{tCommon('buttons.getStarted')}</Link>
             </Button>
           ) : (

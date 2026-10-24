@@ -238,5 +238,394 @@
     "subtitle": "Start your free trial today and see how Mataresit can transform your business.",
     "button": "Start Free Trial",
     "contact": "Contact Sales"
+  },
+  "page": {
+    "meta": {
+      "title": "Features — Mataresit",
+      "description": "Line-item extraction, smart search, Malaysian SST intelligence, batch upload, team review, claims and analytics — the capabilities behind a clean receipt ledger."
+    },
+    "hero": {
+      "eyebrow": "Features",
+      "titleLead": "Every line on the receipt,",
+      "titleAccent": "read once",
+      "titleTail": "and filed right.",
+      "lede": "Mataresit takes the photo, the email or the folder of scans and returns line items, SST, merchant and category — with a confidence score on every field and a review trail behind it.",
+      "workspace": "Open the workspace",
+      "pricing": "See pricing",
+      "note": "Malaysian receipts · SST · multi-currency"
+    },
+    "extractionCard": {
+      "label": "Receipt 04 · extraction",
+      "status": "Read",
+      "fields": {
+        "merchant": {
+          "label": "Merchant",
+          "value": "Nasi Kandar Pelita"
+        },
+        "date": {
+          "label": "Date",
+          "value": "18 / 10 / 2026"
+        },
+        "lineItems": {
+          "label": "Line items",
+          "value": "3 items"
+        },
+        "subtotal": {
+          "label": "Subtotal",
+          "value": "RM 26.00"
+        },
+        "sst": {
+          "label": "SST 6%",
+          "value": "RM 1.56"
+        },
+        "total": {
+          "label": "Total",
+          "value": "RM 27.56"
+        },
+        "payment": {
+          "label": "Payment",
+          "value": "Visa ·· 4821"
+        },
+        "category": {
+          "label": "Category",
+          "value": "Meals"
+        },
+        "confidence": {
+          "label": "Confidence",
+          "value": "96% · high"
+        }
+      },
+      "foot": "Every field stays editable before it enters the ledger."
+    },
+    "index": {
+      "label": "On this page",
+      "extraction": "Extraction",
+      "search": "Search",
+      "malaysia": "Malaysia",
+      "batch": "Batch",
+      "team": "Team",
+      "reporting": "Reporting",
+      "platform": "Platform"
+    },
+    "blocks": {
+      "extraction": {
+        "num": "01 — Capture",
+        "title": "Line items, not just a total.",
+        "lede": "Most tools read the merchant and the grand total. Mataresit reads what the money was actually spent on: every line, the tax line and the payment, then scores its own confidence so the uncertain fields stand out.",
+        "checks": [
+          "Merchant, date, line items, tax and payment extracted",
+          "Confidence scoring on every field, not just the header",
+          "Anything below the line goes to review instead of the ledger"
+        ],
+        "receipt": {
+          "label": "Receipt 04 · scanned",
+          "status": "Read",
+          "merchant": "Nasi Kandar Pelita",
+          "meta": "Jalan Ampang · 18/10/2026",
+          "items": [
+            {
+              "name": "Nasi lemak ayam",
+              "amount": "14.50"
+            },
+            {
+              "name": "Teh tarik × 2",
+              "amount": "7.00"
+            },
+            {
+              "name": "Roti canai",
+              "amount": "4.50"
+            }
+          ],
+          "totalLabel": "Total",
+          "total": "RM 27.56",
+          "fields": {
+            "merchant": {
+              "label": "Merchant",
+              "value": "Nasi Kandar Pelita"
+            },
+            "date": {
+              "label": "Date",
+              "value": "18 / 10 / 2026"
+            },
+            "total": {
+              "label": "Total",
+              "value": "RM 27.56"
+            },
+            "category": {
+              "label": "Category",
+              "value": "Meals"
+            }
+          },
+          "footLeft": "3 line items · SST 6%",
+          "footRight": "Confidence 96%"
+        }
+      },
+      "search": {
+        "num": "02 — Find",
+        "title": "One field that knows where things are.",
+        "lede": "Search a merchant, an item, a category, a payment method or an amount. Mataresit looks across the receipt and its line items, so “nasi lemak” finds the receipt even when the merchant name never mentions it.",
+        "checks": [
+          "Search merchants, items, categories, payments and amounts",
+          "Filter by status, month and category without losing the query",
+          "Results keep the line item that matched, not just the merchant"
+        ],
+        "mock": {
+          "label": "Search",
+          "shortcut": "⌘ K",
+          "query": "meals",
+          "chips": [
+            "All",
+            "Meals",
+            "October",
+            "Approved"
+          ],
+          "results": [
+            {
+              "title": "Nasi Kandar Pelita",
+              "meta": "Nasi lemak ayam · 18 Oct",
+              "amount": "RM 27.56"
+            },
+            {
+              "title": "Restoran Devi’s",
+              "meta": "Roti canai & teh tarik · 12 Oct",
+              "amount": "RM 41.80"
+            },
+            {
+              "title": "Tealive",
+              "meta": "Brown sugar milk tea · 4 Oct",
+              "amount": "RM 18.90"
+            },
+            {
+              "title": "Kopitiam Kita",
+              "meta": "Nasi kerabu · 27 Oct",
+              "amount": "RM 23.40"
+            }
+          ],
+          "footLeft": "4 receipts",
+          "footRight": "RM 111.66 total"
+        }
+      },
+      "malaysia": {
+        "num": "03 — Local intelligence",
+        "title": "Built around how Malaysian receipts are printed.",
+        "lede": "Kopitiam names, SST lines, day-first dates, ringgit and the occasional foreign-currency card slip. The extraction model is tuned for the receipts your team actually comes back with.",
+        "checks": [
+          "SST captured as its own line, not folded into the total",
+          "Local merchant names, addresses and day-first dates recognised",
+          "Multi-currency detection when the card slip and receipt disagree"
+        ],
+        "mock": {
+          "label": "SST breakdown",
+          "date": "18 Oct 2026",
+          "rows": [
+            {
+              "label": "Subtotal",
+              "value": "RM 26.00",
+              "total": false
+            },
+            {
+              "label": "SST 6%",
+              "value": "RM 1.56",
+              "total": false
+            },
+            {
+              "label": "Total",
+              "value": "RM 27.56",
+              "total": true
+            }
+          ],
+          "tags": [
+            "SST captured separately",
+            "DD / MM / YYYY",
+            "MYR + foreign cards"
+          ],
+          "footLeft": "Read from a Kuala Lumpur kopitiam receipt",
+          "footRight": "6% SST"
+        }
+      },
+      "batch": {
+        "num": "04 — Volume",
+        "title": "A month of receipts, not a month of typing.",
+        "lede": "Drop a batch of files and let the queue work through them. Each file carries its own status, and anything the model is unsure about lands in review instead of the ledger.",
+        "checks": [
+          "Batch uploads of 5, 50 or 100 files depending on plan",
+          "Per-file progress, so a slow scan never blocks the rest",
+          "Uncertain receipts routed to review, not quietly approved"
+        ],
+        "mock": {
+          "label": "Upload queue",
+          "count": "18 files",
+          "rows": [
+            {
+              "file": "pelita-oct-18.jpg",
+              "state": "Read · 3 line items",
+              "tag": "Done",
+              "progress": 100,
+              "tone": "done"
+            },
+            {
+              "file": "village-grocer-oct-16.pdf",
+              "state": "Reading line items…",
+              "tag": "62%",
+              "progress": 62,
+              "tone": "reading"
+            },
+            {
+              "file": "tealive-oct-14.jpg",
+              "state": "Queued",
+              "tag": "Waiting",
+              "progress": 0,
+              "tone": "wait"
+            }
+          ],
+          "footLeft": "16 read · 2 in review",
+          "footRight": "Batch 04"
+        }
+      },
+      "team": {
+        "num": "05 — Team",
+        "title": "One receipt, one visible trail.",
+        "lede": "Invite the team, share a receipt, and let role-based permissions decide who can approve. Claims move through the same workspace, so the approved receipt and its claim never drift apart.",
+        "checks": [
+          "Team invitations and shared receipt access",
+          "Role-based permissions on Max",
+          "Claims management beside the receipt that started it"
+        ],
+        "mock": {
+          "label": "Approval trail",
+          "status": "Approved",
+          "receipt": {
+            "merchant": "Nasi Kandar Pelita",
+            "meta": "18 Oct 2026 · Meals",
+            "amount": "RM 27.56"
+          },
+          "trail": [
+            {
+              "title": "Aina submitted",
+              "meta": "09:42 · receipt upload"
+            },
+            {
+              "title": "Marcus approved",
+              "meta": "10:03 · manager"
+            },
+            {
+              "title": "Claim MY-2841 created",
+              "meta": "10:05 · October claims"
+            }
+          ]
+        }
+      },
+      "reporting": {
+        "num": "06 — Reporting",
+        "title": "Numbers that survive the month-end.",
+        "lede": "Spend by category, merchant analysis, monthly and quarterly trends — and on Max, year-over-year comparisons and tax deduction identification. Export the ledger as CSV whenever finance asks.",
+        "checks": [
+          "Merchant analysis and category totals",
+          "Monthly and quarterly trends",
+          "CSV export on every plan"
+        ],
+        "mock": {
+          "label": "October spend",
+          "total": "RM 855.50",
+          "chartLabel": "October spend by category: Meals RM 412.30, Travel RM 289.00, Office RM 154.20.",
+          "categories": [
+            {
+              "name": "Meals",
+              "amount": "412.30",
+              "value": "RM 412.30"
+            },
+            {
+              "name": "Travel",
+              "amount": "289.00",
+              "value": "RM 289.00"
+            },
+            {
+              "name": "Office",
+              "amount": "154.20",
+              "value": "RM 154.20"
+            }
+          ],
+          "footLeft": "Monthly trend · October 2026",
+          "footRight": "CSV ready"
+        }
+      }
+    },
+    "platform": {
+      "eyebrow": "Platform",
+      "title": "Also in the box.",
+      "lede": "The smaller pieces that keep a receipt workspace usable on a Tuesday afternoon, not just in a launch post.",
+      "items": [
+        {
+          "icon": "categories",
+          "title": "Custom categories",
+          "description": "Build the chart of accounts your finance team already uses, then let receipts fall into it."
+        },
+        {
+          "icon": "storage",
+          "title": "Secure storage",
+          "description": "Receipts and line items live with your workspace, not in a shared drive or somebody’s inbox."
+        },
+        {
+          "icon": "notifications",
+          "title": "Real-time notifications",
+          "description": "Know when a receipt lands, a batch finishes, or a field needs a second look."
+        },
+        {
+          "icon": "mobile",
+          "title": "Mobile & PWA",
+          "description": "Install Mataresit to the home screen and capture from the queue, not from a laptop bag."
+        },
+        {
+          "icon": "api",
+          "title": "API access",
+          "description": "Push receipts in and pull structured data out, on Max, without exporting a spreadsheet first."
+        },
+        {
+          "icon": "subscription",
+          "title": "Subscription management",
+          "description": "Change plan or billing period from the workspace, without an email thread."
+        },
+        {
+          "icon": "help",
+          "title": "Help centre",
+          "description": "Guides for setup, search, claims and exports — written for the person doing the filing."
+        },
+        {
+          "icon": "export",
+          "title": "Export options",
+          "description": "Take the ledger with you as CSV, including the line items and the tax you captured."
+        }
+      ]
+    },
+    "plans": {
+      "eyebrow": "Plans",
+      "title": "Same read. Three sizes.",
+      "lede": "Every plan includes line-item extraction, confidence scoring, multi-currency detection and CSV export. The difference is volume, team tools and how deep the reporting goes.",
+      "cta": "Compare plans",
+      "facts": [
+        {
+          "name": "Free",
+          "price": "RM 0",
+          "note": "50 receipts / month"
+        },
+        {
+          "name": "Pro",
+          "price": "RM 10 / mo",
+          "note": "500 receipts / month"
+        },
+        {
+          "name": "Max",
+          "price": "RM 20 / mo",
+          "note": "Unlimited receipts"
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Bring the shoebox",
+      "title": "The month closes itself.",
+      "lede": "Drop the month’s receipts, review what’s uncertain, and close the books with a trail behind every number.",
+      "workspace": "Open the workspace",
+      "pricing": "See pricing"
+    }
   }
 }

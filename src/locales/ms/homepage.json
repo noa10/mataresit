@@ -1,114 +1,181 @@
 {
   "meta": {
-    "title": "Lebih Perniagaan, Kurang Kertas Kerja - Mataresit"
+    "title": "Mataresit — Resit, dibaca dan sedia",
+    "description": "Mataresit menukar resit yang difoto, dihantar melalui e-mel dan dimuat naik secara pukal kepada item baris yang bersih dan dikategorikan untuk diluluskan oleh pasukan anda dalam beberapa minit."
   },
-  "hero": {
-    "title": "Lebih Perniagaan, <span class=\"text-primary\">Kurang Kertas Kerja</span>",
-    "subtitle": "Tukar resit anda kepada data teratur dengan serta-merta. Jimat masa berjam-jam setiap minggu dan jangan terlepas potongan cukai lagi.",
-    "benefits": {
-      "saveTime": "Jimat 5+ Jam/Minggu",
-      "accuracy": "99% Ketepatan",
-      "security": "Keselamatan Tahap Bank"
-    },
-    "cta": {
-      "getStarted": "Mula Percuma",
-      "viewPricing": "Lihat Harga",
-      "goToDashboard": "Pergi ke Papan Pemuka",
-      "trySmartSearch": "Cuba Carian Pintar"
-    },
-    "imageOverlay": {
-      "title": "Transformasi Perniagaan Anda",
-      "subtitle": "Jimat masa, tingkatkan ketepatan",
-      "startNow": "Mula Sekarang"
-    }
-  },
-  "howItWorks": {
-    "title": "Bagaimana Ia Berfungsi",
-    "subtitle": "Dari resit kepada data teratur dalam tiga langkah mudah. Tiada latihan diperlukan.",
-    "steps": {
-      "upload": {
-        "title": "Muat Naik",
-        "description": "Ambil foto atau muat naik fail. Seret dan lepas beberapa resit untuk pemprosesan kelompok."
+  "skipToContent": "Langkau ke kandungan",
+  "nav": {
+    "main": "Utama",
+    "pages": "Halaman",
+    "home": "Laman utama",
+    "features": "Ciri-ciri",
+    "pricing": "Harga",
+    "signIn": "Log masuk",
+    "openWorkspace": "Buka ruang kerja",
+    "language": "Bahasa",
+    "toggleTheme": "Tukar tema",
+    "resources": {
+      "label": "Sumber",
+      "items": {
+        "documentation": {
+          "title": "Dokumentasi",
+          "description": "Panduan, langkah persediaan dan resipi aliran kerja."
+        },
+        "apiReference": {
+          "title": "Rujukan API",
+          "description": "Endpoint dan webhook untuk menarik resit ke dalam sistem anda."
+        },
+        "help": {
+          "title": "Pusat bantuan",
+          "description": "Jawapan daripada pasukan sokongan, biasanya dalam sehari."
+        },
+        "status": {
+          "title": "Status sistem",
+          "description": "Sejarah masa operasi dan pemantauan insiden langsung."
+        },
+        "blog": {
+          "title": "Blog",
+          "description": "Nota produk, tip cukai Malaysia dan berita keluaran."
+        }
       },
-      "aiProcessing": {
-        "title": "Pemprosesan AI",
-        "description": "AI kami mengekstrak semua data dengan skor keyakinan. Semak dan luluskan dalam beberapa saat."
-      },
-      "exportAnalyze": {
-        "title": "Eksport & Analisis",
-        "description": "Eksport ke Excel, QuickBooks, atau perisian perakaunan kegemaran anda. Jana laporan dengan serta-merta."
+      "card": {
+        "eyebrow": "Dari lejar",
+        "titleLead": "Kod SST, dibaca",
+        "titleAccent": "terus daripada resit.",
+        "description": "Setiap item baris kini membawa kod cukainya ke dalam eksport yang sudah digunakan oleh akauntan anda.",
+        "link": "Baca log perubahan"
       }
     }
   },
-  "stats": {
-    "title": "Sertai ribuan perniagaan yang menjimatkan masa dan wang",
+  "hero": {
+    "eyebrow": "Pemprosesan resit AI untuk pasukan kecil",
+    "titleLead": "Setiap resit, difailkan",
+    "titleAccent": "sebelum",
+    "titleTail": "anda sempat memikirkannya.",
+    "lede": "Foto, e-mel atau lepaskan sebulan imbasan sekaligus. Mataresit membaca item baris, cukai dan peniaga, kemudian menyerahkan hanya medan yang tidak pasti kepada pasukan anda.",
+    "ctaWorkspace": "Buka ruang kerja",
+    "ctaHow": "Lihat cara ia berfungsi",
+    "benefits": {
+      "accuracy": "Ketepatan item baris",
+      "bulk": "Muat naik pukal",
+      "trail": "Jejak kelulusan pasukan"
+    }
+  },
+  "scan": {
+    "fieldsLabel": "Medan diekstrak",
+    "label": "Imbasan 04 · Oktober",
+    "extracting": "Mengekstrak",
+    "merchant": "Nasi Kandar Pelita",
+    "address": "Jalan Ampang, Kuala Lumpur",
+    "date": "18 Oktober 2026 · 09:42",
     "items": {
-      "businesses": "Perniagaan Mempercayai Kami",
-      "accuracy": "Kadar Ketepatan",
-      "timeSaved": "Dijimatkan Setiap Minggu"
+      "nasiLemak": "Nasi lemak ayam",
+      "tehTarik": "Teh tarik × 2",
+      "rotiCanai": "Roti canai"
+    },
+    "subtotal": "Jumlah kecil",
+    "tax": "SST 6%",
+    "total": "Jumlah",
+    "payment": "VISA •• 4821 · APPROVED",
+    "fields": {
+      "merchant": "Peniaga",
+      "total": "Jumlah",
+      "category": "Kategori"
+    },
+    "merchantValue": "Nasi Kandar Pelita",
+    "totalValue": "RM 27.56 · 3 item baris",
+    "categoryValue": "Makanan · 96% padanan"
+  },
+  "how": {
+    "eyebrow": "Cara ia berfungsi",
+    "title": "Tiga langkah, tanpa hamparan.",
+    "lede": "Kerja yang dahulu anda lakukan selepas waktu kerja — menaip jumlah, meneka kategori, mencari resit yang hilang — selesai sebelum kopi anda sejuk.",
+    "steps": {
+      "capture": {
+        "title": "Tangkap",
+        "description": "Teruskan e-mel, ambil foto salinan kertas, atau muat naik sebulan imbasan sekali gus."
+      },
+      "extract": {
+        "title": "Ekstrak",
+        "description": "Peniaga, tarikh, item baris dan cukai jualan dibaca dan dipadankan dengan kategori anda."
+      },
+      "review": {
+        "title": "Semak",
+        "description": "Hanya medan yang tidak pasti memerlukan manusia. Luluskan sekali dan jumlah bulan itu berubah."
+      }
     }
   },
   "features": {
-    "title": "Semua yang anda perlukan untuk <span class=\"text-primary\">mengubah perniagaan anda</span>",
-    "subtitle": "Berhenti membuang masa pada kemasukan data manual. Platform pintar kami mengendalikan segala-galanya dari tangkapan resit hingga pelaporan kewangan.",
-    "list": {
-      "saveTime": {
-        "title": "Jimat Jam Setiap Minggu",
-        "description": "Hapuskan kemasukan data manual selama-lamanya. AI kami memproses resit dalam beberapa saat, bukan jam, memberi anda masa untuk fokus mengembangkan perniagaan anda."
-      },
+    "eyebrow": "Keupayaan",
+    "title": "Dibina di sekeliling resit, bukan borang.",
+    "lede": "Semua di bawah adalah sebahagian daripada ruang kerja yang sama: baca resit, betulkan medan, luluskan, dan lihat buku mengikut.",
+    "items": {
       "accuracy": {
-        "title": "99% Ketepatan Dijamin",
-        "description": "AI canggih dengan pemarkahan keyakinan memastikan data kewangan anda sentiasa tepat. Tangkap ralat sebelum ia menjadi masalah."
+        "title": "Ketepatan peringkat medan",
+        "description": "Setiap nilai yang diekstrak membawa skor keyakinan, jadi jumlah yang diragui dihantar ke semakan dan bukan diteka secara senyap."
+      },
+      "typing": {
+        "title": "Jimat taip",
+        "description": "Muat naik kelompok dan biarkan baris gilir melakukan kerja. Tiada jumlah perlu disalin, tiada tarikh perlu diformat semula."
       },
       "search": {
-        "title": "Cari Mana-mana Resit Dengan Serta-merta",
-        "description": "Carian pintar yang memahami bahasa semula jadi. Cari resit dengan bertanya 'perbelanjaan kopi bulan lepas' atau 'resit makan malam klien'."
+        "title": "Carian pintar",
+        "description": "Cari mana-mana resit mengikut peniaga, kategori, kaedah pembayaran atau jumlah dalam satu medan."
       },
-      "taxDeductions": {
-        "title": "Maksimumkan Potongan Cukai",
-        "description": "Jangan terlepas perbelanjaan boleh ditolak lagi. Kategorikan dan atur resit secara automatik untuk musim cukai dan pelaporan kewangan."
+      "tax": {
+        "title": "Cukai jualan ditangkap",
+        "description": "Cukai direkodkan bagi setiap resit dan digulung ke jumlah berjalan, jadi potongan itu tidak pernah hidup dalam nota kaki."
       },
-      "teamCollaboration": {
-        "title": "Kerjasama Pasukan Dipermudahkan",
-        "description": "Kongsi resit dan laporan dengan pasukan atau akauntan anda. Kerjasama masa nyata dengan kebenaran berdasarkan peranan dan jejak audit."
+      "team": {
+        "title": "Kerjasama pasukan",
+        "description": "Peti masuk kongsi dengan jejak kelulusan yang jelas — siapa menyemak, bila, dan apa yang berubah."
       },
       "security": {
-        "title": "Keselamatan Tahap Bank",
-        "description": "Data kewangan anda dilindungi dengan keselamatan gred perusahaan. Mematuhi SOC 2 dengan penyulitan hujung ke hujung."
+        "title": "Keselamatan ruang kerja",
+        "description": "Resit kekal dalam skop ruang kerja anda, dengan akses berdasarkan peranan untuk mereka yang memfail dan meluluskan."
       }
     }
   },
-  "cta": {
-    "title": "Bersedia untuk mengubah perniagaan anda?",
-    "subtitle": "Sertai ribuan perniagaan yang sudah menjimatkan jam setiap minggu. Mulakan percubaan percuma anda hari ini.",
-    "startFreeTrial": "Mula Percubaan Percuma",
-    "viewPricing": "Lihat Harga",
-    "goToDashboard": "Pergi ke Papan Pemuka"
+  "inside": {
+    "eyebrow": "Di dalam ruang kerja",
+    "title": "Ruang kerja yang dibaca seperti lejar.",
+    "lede": "Ruang kerja ini hidup, bukan tangkapan skrin. Muat naik resit, lihat medan mendarat, betulkan kategori, dan lihat jumlah bulan itu bertindak balas.",
+    "cta": "Buka ruang kerja langsung",
+    "items": {
+      "overview": {
+        "title": "Gambaran keseluruhan",
+        "description": "Perbelanjaan, cukai ditangkap dan beban semakan, semuanya diperoleh daripada resit yang sama yang anda lihat di bawah."
+      },
+      "inbox": {
+        "title": "Peti masuk resit",
+        "description": "Cari, tapis dan buka mana-mana resit hingga ke item baris dan kaedah pembayarannya."
+      },
+      "review": {
+        "title": "Baris gilir semakan",
+        "description": "Medan berkeyakinan rendah menunggu di sini dengan skor padanan, bukan tertimbus dalam tab hamparan."
+      },
+      "approval": {
+        "title": "Kelulusan satu klik",
+        "description": "Luluskan resit dan status, jumlah serta carta kategori dikemas kini di tempatnya."
+      }
+    }
   },
   "footer": {
-    "description": "Tukar resit anda kepada data teratur. Jimat masa, tingkatkan ketepatan, dan jangan terlepas potongan.",
-    "sections": {
-      "product": {
-        "title": "Produk",
-        "features": "Ciri-ciri",
-        "dashboard": "Papan Pemuka",
-        "apiReference": "Rujukan API",
-        "pricing": "Harga"
-      },
-      "resources": {
-        "title": "Sumber",
-        "documentation": "Dokumentasi",
-        "helpCenter": "Pusat Bantuan",
-        "systemStatus": "Status Sistem",
-        "blog": "Blog"
-      },
-      "legal": {
-        "title": "Undang-undang",
-        "privacyPolicy": "Dasar Privasi",
-        "termsOfService": "Terma Perkhidmatan",
-        "contactUs": "Hubungi Kami"
-      }
+    "blurb": "Resit masuk, buku bersih. Dibina untuk pasukan yang lebih suka menutup bulan daripada mengejar kertas kerja.",
+    "product": {
+      "title": "Produk",
+      "features": "Ciri-ciri",
+      "pricing": "Harga",
+      "howItWorks": "Cara ia berfungsi",
+      "workspaceOverview": "Gambaran ruang kerja"
     },
-    "copyright": "© {{year}} Mataresit. Semua hak terpelihara."
+    "workspace": {
+      "title": "Ruang kerja",
+      "inbox": "Peti masuk resit",
+      "review": "Baris gilir semakan",
+      "upload": "Muat naik resit"
+    },
+    "copyright": "© {{year}} Mataresit",
+    "tagline": "Pemprosesan resit, tanpa kertas kerja"
   }
 }

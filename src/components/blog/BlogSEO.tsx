@@ -1,13 +1,12 @@
 import { Helmet } from 'react-helmet-async';
 import { useEffect } from 'react';
 import { BlogSEOProps } from '@/types/blog';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useAdvancedTranslation } from '@/hooks/useAdvancedTranslation';
+import { useLanguage, useResourcesTranslation } from '@/contexts/LanguageContext';
 import { seoUtils, LANGUAGE_SEO_CONFIGS } from '@/lib/i18n-seo';
 
-export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
+export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOProps) {
   const { language } = useLanguage();
-  const { t } = useAdvancedTranslation('homepage');
+  const { t: tResources } = useResourcesTranslation();
   const languageConfig = LANGUAGE_SEO_CONFIGS[language];
   // Initialize SEO for current language
   useEffect(() => {
@@ -15,10 +14,9 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
   }, [language]);
 
   // Default SEO values for the blog (localized)
-  const defaultTitle = t('blog.title', { defaultValue: 'The Mataresit Blog' });
-  const defaultDescription = t('blog.description', {
-    defaultValue: 'Insights, updates, and expert tips on AI-powered expense management, productivity, and digital transformation for modern businesses.'
-  });
+  const defaultTitle = title || String(tResources('meta.blog.title'));
+  const defaultDescription =
+    description || String(tResources('meta.blog.description'));
   const defaultImage = '/og-blog.jpg';
   const siteUrl = window.location.origin;
 
@@ -36,8 +34,8 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
 
     if (!post) {
       return {
-        title: t('blog.notFound.title', { defaultValue: 'Blog Post Not Found | Mataresit' }),
-        description: t('blog.notFound.description', { defaultValue: 'The requested blog post could not be found.' }),
+        title: title || 'Blog post not found — Mataresit',
+        description: description || defaultDescription,
         url: `${siteUrl}/blog`,
         image: defaultImage,
         type: 'article',
@@ -45,8 +43,8 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
     }
 
     // Individual post SEO with language-specific URL structure
-    const title = `${post.title} | ${t('blog.title', { defaultValue: 'Mataresit Blog' })}`;
-    const description = post.excerpt || defaultDescription;
+    const postTitle = title || `${post.title} — Mataresit`;
+    const postDescription = post.excerpt || defaultDescription;
 
     // Build language-aware URL
     const basePath = language === 'en' ? '/blog' : `/${language}/blog`;
@@ -54,8 +52,8 @@ export function BlogSEO({ post, isIndex = false }: BlogSEOProps) {
     const image = post.image_url || defaultImage;
 
     return {
-      title,
-      description,
+      title: postTitle,
+      description: postDescription,
       url,
       image,
       type: 'article',

@@ -50,6 +50,8 @@ export interface PostPreview {
 export interface BlogSEOProps {
   post?: Post;
   isIndex?: boolean;
+  title?: string;
+  description?: string;
 }
 
 // For blog card component

@@ -1,255 +1,417 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getPostPreviews } from '@/services/blogService';
-import { BlogCard } from '@/components/blog/BlogCard';
-import { BlogSEO } from '@/components/blog/BlogSEO';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, BookOpen, Rss, Search, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { BookOpen, Loader2, Rss } from "lucide-react";
+import {
+  useLanguage,
+  useHomepageTranslation,
+  useResourcesTranslation,
+} from "@/contexts/LanguageContext";
+import { BlogSEO } from "@/components/blog/BlogSEO";
+import { MarketingCtaBand } from "@/components/marketing/MarketingCtaBand";
+import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { MarketingPageHero } from "@/components/marketing/MarketingPageHero";
+import { MarketingSearch } from "@/components/marketing/MarketingSearch";
+import { getPostPreviews } from "@/services/blogService";
+import type { PostPreview } from "@/types/blog";
+
+const shell = "mx-auto w-full max-w-[1240px] px-5 min-[881px]:px-6";
+
+interface ReceiptItem {
+  name: string;
+  amount: string;
+  tax: string;
+  taxZero: boolean;
+}
+
+function ReceiptVisual({
+  labels,
+  items,
+}: {
+  labels: {
+    merchant: string;
+    address: string;
+    totalLabel: string;
+    total: string;
+    foot: string;
+  };
+  items: ReceiptItem[];
+}) {
+  return (
+    <figure
+      aria-hidden="true"
+      className="relative w-full max-w-[340px] justify-self-center rounded-[10px] border border-ledger-line-strong bg-ledger-paper px-[22px] pb-4 pt-[22px] shadow-[0_1px_2px_rgba(18,23,21,0.05),0_24px_48px_-28px_rgba(18,23,21,0.35)]"
+    >
+      <span className="absolute -top-[7px] left-6 right-6 h-3 rounded-t-md border border-b-0 border-ledger-line-strong bg-ledger-surface" />
+      <div className="mb-3 border-b border-dashed border-ledger-line-strong pb-3 text-center">
+        <p className="font-data text-xs font-medium tracking-[0.04em] text-ledger-ink">
+          {labels.merchant}
+        </p>
+        <p className="mt-[3px] font-data text-[0.625rem] text-ledger-muted">
+          {labels.address}
+        </p>
+      </div>
+      {items.map((item) => (
+        <div
+          key={item.name}
+          className="grid grid-cols-[1fr_auto_auto] items-baseline gap-3 py-[7px] font-data text-[0.6875rem]"
+        >
+          <span className="text-ledger-ink-2">{item.name}</span>
+          <span className="text-ledger-ink">{item.amount}</span>
+          <span
+            className={
+              item.taxZero
+                ? "rounded-[4px] bg-ledger-surface-2 px-1.5 py-0.5 text-[0.5625rem] text-ledger-muted"
+                : "rounded-[4px] bg-ledger-accent-soft px-1.5 py-0.5 text-[0.5625rem] text-ledger-accent"
+            }
+          >
+            {item.tax}
+          </span>
+        </div>
+      ))}
+      <div className="mt-2.5 flex justify-between border-t border-dashed border-ledger-line-strong pt-2.5 font-data text-[0.8125rem] font-medium text-ledger-ink">
+        <span>{labels.totalLabel}</span>
+        <span>{labels.total}</span>
+      </div>
+      <p className="mt-3 text-center font-data text-[0.5625rem] tracking-[0.1em] text-ledger-muted">
+        {labels.foot}
+      </p>
+    </figure>
+  );
+}
+
+function authorName(post: PostPreview) {
+  const name = `${post.author?.first_name ?? ""} ${post.author?.last_name ?? ""}`.trim();
+  return name;
+}
+
+function displayTag(tag: string) {
+  return tag.toLowerCase() === "ai"
+    ? "AI"
+    : tag.charAt(0).toUpperCase() + tag.slice(1);
+}
+
+function readingMinutes(post: PostPreview) {
+  const words = `${post.title} ${post.excerpt ?? ""}`.trim().split(/\s+/).length;
+  return Math.max(1, Math.ceil(words / 200));
+}
+
+function usePostDate() {
+  const { language } = useLanguage();
+  return (value?: string, withYear = true) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat(language === "ms" ? "ms-MY" : "en-MY", {
+      day: "2-digit",
+      month: "short",
+      ...(withYear ? { year: "numeric" } : {}),
+    }).format(date);
+  };
+}
 
 export default function BlogIndexPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string>('all');
+  const { t } = useResourcesTranslation();
+  const { t: tHome } = useHomepageTranslation();
+  const formatDate = usePostDate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTag, setSelectedTag] = useState("all");
 
   const {
     data: posts,
     isLoading,
-    error
+    error,
   } = useQuery({
-    queryKey: ['blogPosts'],
+    queryKey: ["blogPosts"],
     queryFn: getPostPreviews,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
   });
 
-  // Filter posts based on search term and selected tag
-  const filteredPosts = posts?.filter(post => {
-    const matchesSearch = !searchTerm ||
-      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.excerpt?.toLowerCase().includes(searchTerm.toLowerCase());
+  const copy = (key: string) => String(t(key));
+  const receiptLabels = {
+    merchant: copy("blog.receipt.merchant"),
+    address: copy("blog.receipt.address"),
+    totalLabel: copy("blog.receipt.totalLabel"),
+    total: copy("blog.receipt.total"),
+    foot: copy("blog.receipt.foot"),
+  };
+  const receiptItems = t("blog.receipt.items", {
+    returnObjects: true,
+  }) as unknown as ReceiptItem[];
 
-    const matchesTag = selectedTag === 'all' ||
-      post.tags?.includes(selectedTag);
+  const allTags = useMemo(
+    () =>
+      Array.from(new Set(posts?.flatMap((post) => post.tags ?? []) ?? [])).sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    [posts],
+  );
 
-    return matchesSearch && matchesTag;
-  }) || [];
+  const filteredPosts = useMemo(() => {
+    const needle = searchTerm.trim().toLowerCase();
+    return (posts ?? []).filter((post) => {
+      const matchesSearch =
+        !needle ||
+        `${post.title} ${post.excerpt ?? ""} ${(post.tags ?? []).join(" ")}`
+          .toLowerCase()
+          .includes(needle);
+      const matchesTag =
+        selectedTag === "all" || (post.tags ?? []).includes(selectedTag);
+      return matchesSearch && matchesTag;
+    });
+  }, [posts, searchTerm, selectedTag]);
 
-  // Get all unique tags from posts
-  const allTags = Array.from(
-    new Set(posts?.flatMap(post => post.tags || []) || [])
-  ).sort();
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading blog posts...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Unable to load blog posts</h2>
-            <p className="text-muted-foreground">
-              We're having trouble loading the blog posts. Please try again later.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  const filtersActive = searchTerm.trim().length > 0 || selectedTag !== "all";
   const featuredPost = filteredPosts[0];
   const otherPosts = filteredPosts.slice(1);
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedTag("all");
+  };
+
+  const postMeta = (post: PostPreview, withYear = true) => {
+    const date = formatDate(post.published_at, withYear);
+    const author = authorName(post);
+    const minutes = readingMinutes(post);
+    return [author, date, copy("blog.post.minRead").replace("{{count}}", String(minutes))]
+      .filter(Boolean)
+      .join(" · ");
+  };
+
   return (
-    <>
-      <BlogSEO isIndex />
-      <div className="container mx-auto px-4 py-12">
-      {/* Header Section */}
-      <div className="text-center mb-12">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Rss className="h-8 w-8 text-primary" />
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            The Mataresit Blog
-          </h1>
-        </div>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Insights, updates, and expert tips on AI-powered expense management,
-          productivity, and digital transformation for modern businesses.
-        </p>
+    <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
+      <BlogSEO
+        isIndex
+        title={copy("meta.blog.title")}
+        description={copy("meta.blog.description")}
+      />
 
-        {/* RSS Feed Link */}
-        <div className="mt-6">
-          <Button variant="outline" size="sm" asChild>
-            <a href="/api/blog-rss" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-              <Rss className="h-4 w-4" />
-              RSS Feed
+      <a
+        href="#main"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper focus:top-3"
+      >
+        {String(tHome("skipToContent"))}
+      </a>
+
+      <MarketingHeader />
+
+      <main id="main">
+        <MarketingPageHero
+          eyebrow={copy("blog.hero.eyebrow")}
+          titleLead={copy("blog.hero.titleLead")}
+          titleAccent={copy("blog.hero.titleAccent")}
+          lede={copy("blog.hero.lede")}
+        >
+          <p className="mt-2 flex flex-wrap items-center gap-2.5 font-data text-[0.6875rem] text-ledger-muted">
+            <Rss aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.6} />
+            {copy("blog.hero.rssFollow")}
+            <a
+              href="/api/blog-rss"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-ledger-accent underline underline-offset-[3px]"
+            >
+              {copy("blog.hero.rssLink")}
             </a>
-          </Button>
-        </div>
-      </div>
+          </p>
+        </MarketingPageHero>
 
-      {/* Search and Filter Section */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search blog posts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={selectedTag} onValueChange={setSelectedTag}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by tag" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tags</SelectItem>
-              {allTags.map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <section className="border-b border-ledger-line">
+          <div className={`${shell} grid gap-11 pb-[88px] pt-10 min-[881px]:gap-14 min-[881px]:pt-[52px]`}>
+            {isLoading ? (
+              <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 text-ledger-muted">
+                <Loader2 aria-hidden="true" className="h-7 w-7 animate-spin" />
+                <p className="text-[0.9375rem]">{copy("blog.states.loading")}</p>
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-ledger-line bg-ledger-surface px-6 py-16 text-center">
+                <BookOpen
+                  aria-hidden="true"
+                  className="mx-auto mb-4 h-10 w-10 text-ledger-muted"
+                  strokeWidth={1.4}
+                />
+                <h2 className="font-display text-2xl font-normal text-ledger-ink">
+                  {copy("blog.states.errorTitle")}
+                </h2>
+                <p className="mx-auto mt-2 max-w-[46ch] text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                  {copy("blog.states.errorBody")}
+                </p>
+              </div>
+            ) : !posts || posts.length === 0 ? (
+              <div className="rounded-2xl border border-ledger-line bg-ledger-surface px-6 py-16 text-center">
+                <BookOpen
+                  aria-hidden="true"
+                  className="mx-auto mb-4 h-10 w-10 text-ledger-muted"
+                  strokeWidth={1.4}
+                />
+                <h2 className="font-display text-2xl font-normal text-ledger-ink">
+                  {copy("blog.states.emptyTitle")}
+                </h2>
+                <p className="mx-auto mt-2 max-w-[46ch] text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                  {copy("blog.states.emptyBody")}
+                </p>
+              </div>
+            ) : (
+              <>
+                {featuredPost ? (
+                  <article className="grid items-center gap-10 rounded-2xl border border-ledger-line bg-ledger-surface p-6 shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)] min-[881px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[881px]:p-8">
+                    <ReceiptVisual labels={receiptLabels} items={receiptItems} />
+                    <div>
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {(featuredPost.tags ?? []).slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-ledger-accent-soft px-2.5 py-[5px] font-data text-[0.625rem] uppercase tracking-[0.08em] text-ledger-accent"
+                          >
+                            {displayTag(tag)}
+                          </span>
+                        ))}
+                        <span className="rounded-full border border-ledger-line px-2.5 py-[5px] font-data text-[0.625rem] uppercase tracking-[0.08em] text-ledger-muted">
+                          {copy("blog.featured.latest")}
+                        </span>
+                      </div>
+                      <h2 className="font-display text-[clamp(1.7rem,3vw,2.4rem)] font-normal leading-[1.08] tracking-[-0.02em] text-ledger-ink">
+                        <Link
+                          to={`/blog/${featuredPost.slug}`}
+                          className="no-underline transition-colors hover:text-ledger-accent"
+                        >
+                          {featuredPost.title}
+                        </Link>
+                      </h2>
+                      {featuredPost.excerpt ? (
+                        <p className="mt-3.5 max-w-[56ch] text-[1.0625rem] leading-[1.65] text-ledger-muted">
+                          {featuredPost.excerpt}
+                        </p>
+                      ) : null}
+                      <p className="mt-[18px] font-data text-[0.6875rem] tracking-[0.03em] text-ledger-muted">
+                        {postMeta(featuredPost)}
+                      </p>
+                      <div className="mt-[22px]">
+                        <Link
+                          to={`/blog/${featuredPost.slug}`}
+                          className="inline-flex min-h-[46px] items-center justify-center rounded-lg bg-ledger-accent px-5 text-[0.9375rem] font-semibold text-white transition-colors hover:bg-ledger-accent-hover dark:text-ledger-panel"
+                        >
+                          {copy("blog.featured.read")}
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ) : null}
 
-        {/* Results count */}
-        {(searchTerm || selectedTag !== 'all') && (
-          <div className="text-center mt-4 text-sm text-muted-foreground">
-            {filteredPosts.length === 0
-              ? 'No posts found matching your criteria'
-              : `Found ${filteredPosts.length} post${filteredPosts.length === 1 ? '' : 's'}`
-            }
-          </div>
-        )}
-      </div>
-
-      {/* Featured Post Section */}
-      {featuredPost && (
-        <>
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <Badge variant="default" className="px-3 py-1">
-                Featured
-              </Badge>
-              <h2 className="text-2xl font-semibold">Latest Post</h2>
-            </div>
-            
-            <div className="grid lg:grid-cols-2 gap-8 items-center">
-              {featuredPost.image_url && (
-                <div className="order-2 lg:order-1">
-                  <img 
-                    src={featuredPost.image_url} 
-                    alt={featuredPost.title}
-                    className="rounded-lg shadow-lg w-full h-64 lg:h-80 object-cover"
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="mb-4 font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted">
+                      {copy("blog.filter.label")}
+                    </p>
+                    <div
+                      role="group"
+                      aria-label={copy("blog.filter.label")}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {["all", ...allTags].map((tag) => {
+                        const pressed = selectedTag === tag;
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            aria-pressed={pressed}
+                            onClick={() => setSelectedTag(tag)}
+                            className={
+                              pressed
+                                ? "rounded-full border border-ledger-ink bg-ledger-ink px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] text-ledger-paper transition-colors"
+                                : "rounded-full border border-ledger-line-strong bg-transparent px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] text-ledger-ink-2 transition-colors hover:border-ledger-ink hover:bg-ledger-surface"
+                            }
+                          >
+                            {tag === "all" ? copy("blog.filter.all") : displayTag(tag)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <MarketingSearch
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder={copy("blog.filter.searchPlaceholder")}
+                    label={copy("blog.filter.searchLabel")}
+                    className="w-full min-[641px]:w-[280px]"
+                    inputClassName="min-h-10 rounded-full py-2 text-sm"
                   />
                 </div>
-              )}
-              
-              <div className={`order-1 ${featuredPost.image_url ? 'lg:order-2' : 'lg:col-span-2'}`}>
-                <div className="space-y-4">
-                  {featuredPost.tags && featuredPost.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {featuredPost.tags.slice(0, 3).map((tag) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <h3 className="text-3xl font-bold leading-tight">
-                    {featuredPost.title}
-                  </h3>
-                  
-                  {featuredPost.excerpt && (
-                    <p className="text-lg text-muted-foreground leading-relaxed">
-                      {featuredPost.excerpt}
+
+                {filtersActive && filteredPosts.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-ledger-line px-6 py-12 text-center">
+                    <p className="text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                      {searchTerm.trim()
+                        ? copy("blog.filter.noSearch")
+                        : copy("blog.filter.empty")}
                     </p>
-                  )}
-                  
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    {featuredPost.author && (
-                      <span>
-                        By {featuredPost.author.first_name} {featuredPost.author.last_name}
-                      </span>
-                    )}
-                    {featuredPost.published_at && (
-                      <span>
-                        {new Date(featuredPost.published_at).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="mt-2 text-sm font-semibold text-ledger-accent hover:underline"
+                    >
+                      {copy("blog.filter.emptyAction")}
+                    </button>
                   </div>
-                  
-                  <a 
-                    href={`/blog/${featuredPost.slug}`}
-                    className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    Read More
-                  </a>
-                </div>
-              </div>
-            </div>
+                ) : null}
+
+                {otherPosts.length > 0 ? (
+                  <div className="grid gap-3 min-[641px]:grid-cols-2 min-[1025px]:grid-cols-3">
+                    {otherPosts.map((post) => (
+                      <Link
+                        key={post.id}
+                        to={`/blog/${post.slug}`}
+                        className="grid content-start rounded-2xl border border-ledger-line bg-ledger-surface px-[22px] pb-[18px] pt-[22px] no-underline transition-all hover:-translate-y-0.5 hover:border-ledger-line-strong hover:shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+                      >
+                        <div>
+                          {post.tags && post.tags.length > 0 ? (
+                            <span className="mb-3.5 inline-block w-fit rounded-full bg-ledger-accent-soft px-2.5 py-1 font-data text-[0.5625rem] uppercase tracking-[0.1em] text-ledger-accent">
+                              {displayTag(post.tags[0])}
+                            </span>
+                          ) : null}
+                          <h3 className="font-display text-[1.35rem] font-normal leading-[1.15] tracking-[-0.012em] text-ledger-ink">
+                            {post.title}
+                          </h3>
+                          {post.excerpt ? (
+                            <p className="mt-2.5 text-sm leading-[1.6] text-ledger-muted">
+                              {post.excerpt}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 flex justify-between gap-3 border-t border-dashed border-ledger-line pt-3.5 font-data text-[0.625rem] text-ledger-muted">
+                          <span className="truncate">
+                            {authorName(post) ? `${authorName(post)} · ` : ""}
+                            {formatDate(post.published_at, false)}
+                          </span>
+                          <span className="shrink-0 font-medium text-ledger-accent">
+                            {copy("blog.post.minRead").replace(
+                              "{{count}}",
+                              String(readingMinutes(post)),
+                            )}{" "}
+                            →
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
+        </section>
 
-          <Separator className="my-12" />
-        </>
-      )}
+        <MarketingCtaBand
+          eyebrow={copy("blog.cta.eyebrow")}
+          title={copy("blog.cta.title")}
+          lede={copy("blog.cta.lede")}
+          primary={{ label: copy("blog.cta.primary"), to: "/auth" }}
+          secondary={{ label: copy("blog.cta.secondary"), to: "/pricing" }}
+        />
+      </main>
 
-      {/* Other Posts Section */}
-      {otherPosts.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-semibold mb-8">
-            {featuredPost ? 'More Posts' : 'Latest Posts'}
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {otherPosts.map((post) => (
-              <BlogCard key={post.slug} post={post} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!posts || posts.length === 0 ? (
-        <div className="text-center py-12">
-          <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">No blog posts yet</h2>
-          <p className="text-muted-foreground">
-            Check back soon for insights and updates from the Mataresit team.
-          </p>
-        </div>
-      ) : filteredPosts.length === 0 && (searchTerm || selectedTag !== 'all') ? (
-        <div className="text-center py-12">
-          <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">No posts found</h2>
-          <p className="text-muted-foreground">
-            Try adjusting your search terms or filters to find what you're looking for.
-          </p>
-        </div>
-      ) : null}
-      </div>
-    </>
+      <MarketingFooter />
+    </div>
   );
 }
