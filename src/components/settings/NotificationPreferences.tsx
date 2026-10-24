@@ -121,8 +121,8 @@ export function NotificationPreferences() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Smartphone className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-ledger-accent-soft rounded-lg">
+              <Smartphone className="h-5 w-5 text-ledger-accent" />
             </div>
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -237,12 +237,12 @@ export function NotificationPreferences() {
         <Card key={categoryKey}>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                {categoryKey === 'RECEIPT_PROCESSING' && <Receipt className="h-5 w-5 text-purple-600" />}
-                {categoryKey === 'TEAM_COLLABORATION' && <Users className="h-5 w-5 text-purple-600" />}
-                {categoryKey === 'CLAIMS_AND_BILLING' && <Settings className="h-5 w-5 text-purple-600" />}
-                {categoryKey === 'SYSTEM' && <Info className="h-5 w-5 text-purple-600" />}
-                {categoryKey === 'GAMIFICATION' && <Bell className="h-5 w-5 text-purple-600" />}
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
+                {categoryKey === 'RECEIPT_PROCESSING' && <Receipt className="h-5 w-5 text-ledger-accent" />}
+                {categoryKey === 'TEAM_COLLABORATION' && <Users className="h-5 w-5 text-ledger-accent" />}
+                {categoryKey === 'CLAIMS_AND_BILLING' && <Settings className="h-5 w-5 text-ledger-accent" />}
+                {categoryKey === 'SYSTEM' && <Info className="h-5 w-5 text-ledger-accent" />}
+                {categoryKey === 'GAMIFICATION' && <Bell className="h-5 w-5 text-ledger-accent" />}
               </div>
               <div>
                 <CardTitle className="text-lg">{category.label}</CardTitle>
@@ -313,8 +313,8 @@ export function NotificationPreferences() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Moon className="h-5 w-5 text-indigo-600" />
+            <div className="p-2 bg-ledger-accent-soft rounded-lg">
+              <Moon className="h-5 w-5 text-ledger-accent" />
             </div>
             <div>
               <CardTitle>Quiet Hours</CardTitle>

@@ -265,7 +265,7 @@ export function BillingPreferences() {
       case 'critical': return 'text-red-600 bg-red-50 border-red-200';
       case 'high': return 'text-orange-600 bg-orange-50 border-orange-200';
       case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'low': return 'text-ledger-accent bg-ledger-accent-soft border-ledger-accent/30';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
@@ -303,9 +303,9 @@ export function BillingPreferences() {
 
       {/* Simulated Subscription Alert */}
       {isSimulatedSubscription && (
-        <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800 dark:text-blue-200">
+        <Alert className="mb-6 border-ledger-accent/30 bg-ledger-accent-soft">
+          <Info className="h-4 w-4 text-ledger-accent" />
+          <AlertDescription className="text-ledger-ink-2">
             <div className="space-y-2">
               <p className="font-medium">Demo Mode - Simulated Subscription</p>
               <p className="text-sm">
@@ -382,9 +382,9 @@ export function BillingPreferences() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {subscriptionData?.tier === 'max' ? (
-                    <Crown className="h-5 w-5 text-purple-600" />
+                    <Crown className="h-5 w-5 text-ledger-amber" />
                   ) : subscriptionData?.tier === 'pro' ? (
-                    <Zap className="h-5 w-5 text-blue-600" />
+                    <Zap className="h-5 w-5 text-ledger-accent" />
                   ) : (
                     <Shield className="h-5 w-5 text-gray-600" />
                   )}

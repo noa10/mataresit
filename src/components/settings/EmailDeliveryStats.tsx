@@ -78,7 +78,7 @@ export function EmailDeliveryStats({ className }: EmailDeliveryStatsProps) {
       case 'delivered':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'sent':
-        return <Mail className="h-4 w-4 text-blue-600" />;
+        return <Mail className="h-4 w-4 text-ledger-accent" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-600" />;
       case 'scheduled':
@@ -93,7 +93,7 @@ export function EmailDeliveryStats({ className }: EmailDeliveryStatsProps) {
       case 'delivered':
         return 'text-green-600 bg-green-50 border-green-200';
       case 'sent':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
+        return 'text-ledger-accent bg-ledger-accent-soft border-ledger-accent/30';
       case 'failed':
         return 'text-red-600 bg-red-50 border-red-200';
       case 'scheduled':

@@ -146,37 +146,38 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
 };
 
 export const NOTIFICATION_TYPE_COLORS: Record<NotificationType, string> = {
-  // Team collaboration notifications
-  team_invitation_sent: 'text-blue-400 bg-blue-900/20',
-  team_invitation_accepted: 'text-green-400 bg-green-900/20',
-  team_member_joined: 'text-green-400 bg-green-900/20',
-  team_member_left: 'text-gray-400 bg-gray-800/20',
-  team_member_removed: 'text-red-400 bg-red-900/20',
-  team_member_role_changed: 'text-blue-400 bg-blue-900/20',
-  claim_submitted: 'text-blue-400 bg-blue-900/20',
-  claim_approved: 'text-green-400 bg-green-900/20',
-  claim_rejected: 'text-red-400 bg-red-900/20',
-  claim_review_requested: 'text-yellow-400 bg-yellow-900/20',
-  team_settings_updated: 'text-gray-400 bg-gray-800/20',
+  // Team collaboration notifications — ledger palette: emerald for
+  // info/success, amber for attention, danger for failures.
+  team_invitation_sent: 'text-ledger-accent bg-ledger-accent-soft/50',
+  team_invitation_accepted: 'text-ledger-accent bg-ledger-accent-soft/50',
+  team_member_joined: 'text-ledger-accent bg-ledger-accent-soft/50',
+  team_member_left: 'text-ledger-muted bg-ledger-surface-2',
+  team_member_removed: 'text-ledger-danger bg-ledger-danger-soft/50',
+  team_member_role_changed: 'text-ledger-accent bg-ledger-accent-soft/50',
+  claim_submitted: 'text-ledger-accent bg-ledger-accent-soft/50',
+  claim_approved: 'text-ledger-accent bg-ledger-accent-soft/50',
+  claim_rejected: 'text-ledger-danger bg-ledger-danger-soft/50',
+  claim_review_requested: 'text-ledger-amber bg-ledger-amber-soft/50',
+  team_settings_updated: 'text-ledger-muted bg-ledger-surface-2',
   // Receipt processing notifications
-  receipt_processing_started: 'text-blue-400 bg-blue-900/20',
-  receipt_processing_completed: 'text-green-400 bg-green-900/20',
-  receipt_processing_failed: 'text-red-400 bg-red-900/20',
-  receipt_ready_for_review: 'text-yellow-400 bg-yellow-900/20',
-  receipt_batch_completed: 'text-green-400 bg-green-900/20',
-  receipt_batch_failed: 'text-red-400 bg-red-900/20',
+  receipt_processing_started: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_processing_completed: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_processing_failed: 'text-ledger-danger bg-ledger-danger-soft/50',
+  receipt_ready_for_review: 'text-ledger-amber bg-ledger-amber-soft/50',
+  receipt_batch_completed: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_batch_failed: 'text-ledger-danger bg-ledger-danger-soft/50',
   // Team receipt collaboration notifications
-  receipt_shared: 'text-blue-400 bg-blue-900/20',
-  receipt_comment_added: 'text-purple-400 bg-purple-900/20',
-  receipt_edited_by_team_member: 'text-orange-400 bg-orange-900/20',
-  receipt_approved_by_team: 'text-green-400 bg-green-900/20',
-  receipt_flagged_for_review: 'text-red-400 bg-red-900/20',
+  receipt_shared: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_comment_added: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_edited_by_team_member: 'text-ledger-amber bg-ledger-amber-soft/50',
+  receipt_approved_by_team: 'text-ledger-accent bg-ledger-accent-soft/50',
+  receipt_flagged_for_review: 'text-ledger-danger bg-ledger-danger-soft/50',
 };
 
 export const NOTIFICATION_PRIORITY_COLORS: Record<NotificationPriority, string> = {
-  low: 'text-gray-400',
-  medium: 'text-blue-400',
-  high: 'text-red-400',
+  low: 'text-ledger-muted',
+  medium: 'text-ledger-accent',
+  high: 'text-ledger-danger',
 };
 
 export function getNotificationTypeDisplayName(type: NotificationType): string {

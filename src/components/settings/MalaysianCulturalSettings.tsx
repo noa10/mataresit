@@ -225,11 +225,11 @@ const MalaysianCulturalSettings: React.FC = () => {
 
         {/* Malaysian States Information */}
         {localPreferences.cultural_context === 'MY' && (
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">
+          <div className="bg-ledger-accent-soft/50 p-4 rounded-lg">
+            <h4 className="font-medium text-ledger-ink mb-2">
               {t('settings.cultural.malaysianStates')}
             </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-blue-700">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-ledger-ink-2">
               {Object.entries(MALAYSIAN_STATES).map(([code, name]) => (
                 <div key={code} className="flex items-center gap-1">
                   <Badge variant="outline" className="text-xs">{code}</Badge>

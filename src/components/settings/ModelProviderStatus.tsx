@@ -44,7 +44,7 @@ const PROVIDER_INFO = {
     name: 'Google Gemini',
     description: 'Google\'s advanced AI models with excellent vision capabilities',
     icon: '🔍',
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-ledger-accent-soft text-ledger-accent',
     setupUrl: 'https://aistudio.google.com/app/apikey',
     keyRequired: false,
     keyOptional: true,
@@ -56,7 +56,7 @@ const PROVIDER_INFO = {
     name: 'OpenRouter',
     description: 'Access to multiple AI providers through a unified API',
     icon: '🌐',
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-ledger-amber-soft text-ledger-amber',
     setupUrl: 'https://openrouter.ai/keys',
     keyRequired: true,
     keyOptional: false,
@@ -427,7 +427,7 @@ export function ModelProviderStatus() {
 
   const getStatusIcon = (status: ProviderStatus) => {
     if (status.testing) {
-      return <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />;
+      return <RefreshCw className="h-4 w-4 animate-spin text-ledger-accent" />;
     }
     if (status.available) {
       return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -441,7 +441,7 @@ export function ModelProviderStatus() {
   const getStatusBadge = (status: ProviderStatus) => {
     if (status.testing) {
       return (
-        <Badge variant="outline" className="text-blue-600 bg-blue-50 dark:text-blue-300 dark:bg-blue-950/40">
+        <Badge variant="outline" className="text-ledger-accent bg-ledger-accent-soft">
           {tString("providers.status.testing")}
         </Badge>
       );
@@ -513,7 +513,7 @@ export function ModelProviderStatus() {
           return (
             <Card key={status.provider} className={`relative transition-all duration-200 ${status.available ? 'border-green-200 bg-green-50/30 dark:border-green-900/60 dark:bg-green-950/30' :
               configured ? 'border-yellow-200 bg-yellow-50/30 dark:border-amber-900/60 dark:bg-amber-950/25' :
-                'border-gray-200 dark:border-slate-800/80 dark:bg-slate-950/40'
+                'border-ledger-line bg-ledger-surface-2'
               }`}>
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -577,7 +577,7 @@ export function ModelProviderStatus() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-1">
-                            <Brain className="h-3 w-3 text-purple-500" />
+                            <Brain className="h-3 w-3 text-ledger-accent" />
                             <span className="text-xs">{stats.accurateModels}</span>
                           </div>
                         </TooltipTrigger>
@@ -605,9 +605,9 @@ export function ModelProviderStatus() {
 
                 {/* API Key Configuration */}
                 {showApiKeySection && (
-                  <div className="space-y-3 p-3 bg-slate-50/70 dark:bg-slate-900/80 rounded-lg border border-slate-200/60 dark:border-slate-800/80">
+                  <div className="space-y-3 p-3 bg-ledger-surface-2 rounded-lg border border-ledger-line">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor={`${status.provider}-key`} className="text-sm font-medium flex items-center gap-2 text-gray-900 dark:text-slate-100">
+                      <Label htmlFor={`${status.provider}-key`} className="text-sm font-medium flex items-center gap-2 text-ledger-ink">
                         <Key className="h-3 w-3" />
                         {info.keyOptional ? 'API Key (Optional)' : 'API Key'}
                       </Label>
@@ -625,13 +625,13 @@ export function ModelProviderStatus() {
                         value={apiKeys[status.provider] || ''}
                         onChange={(e) => handleApiKeyChange(status.provider, e.target.value)}
                         placeholder={info.keyOptional ? 'Enter your API key (optional)...' : 'Enter your API key...'}
-                        className="pr-10 text-sm bg-white/80 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
+                        className="pr-10 text-sm bg-ledger-surface border-ledger-line-strong text-ledger-ink"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-ledger-muted hover:text-ledger-ink"
                         onClick={() => toggleApiKeyVisibility(status.provider)}
                       >
                         {showApiKeys[status.provider] ? (
@@ -668,7 +668,7 @@ export function ModelProviderStatus() {
                         variant="ghost"
                         size="sm"
                         onClick={() => window.open(info.setupUrl, '_blank')}
-                        className="flex items-center gap-1 text-xs ml-auto text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+                        className="flex items-center gap-1 text-xs ml-auto text-ledger-muted hover:text-ledger-ink"
                       >
                         Get Key
                         <ExternalLink className="h-3 w-3" />
@@ -715,7 +715,7 @@ export function ModelProviderStatus() {
                     )}
                   </div>
                   {!info.keyRequired && !configured && (
-                    <span className="text-blue-600 dark:text-blue-300">Server-managed</span>
+                    <span className="text-ledger-accent">Server-managed</span>
                   )}
                 </div>
               </CardContent>
@@ -725,42 +725,42 @@ export function ModelProviderStatus() {
       </div>
 
       {/* Enhanced Information Card */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-950/80 dark:to-slate-900/80 border-blue-200 dark:border-slate-800/80">
+      <Card className="bg-ledger-surface-2 border-ledger-line">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <div className="p-2 bg-blue-100 dark:bg-slate-900/80 rounded-lg">
-              <Info className="h-5 w-5 text-blue-600 dark:text-slate-200" />
+            <div className="p-2 bg-ledger-accent-soft rounded-lg">
+              <Info className="h-5 w-5 text-ledger-accent" />
             </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-blue-900 dark:text-slate-100 mb-2">AI Provider Configuration Guide</h4>
-              <div className="text-sm text-blue-800 dark:text-slate-200 space-y-2">
+              <h4 className="font-semibold text-ledger-ink mb-2">AI Provider Configuration Guide</h4>
+              <div className="text-sm text-ledger-ink-2 space-y-2">
                 <p>
-                  <strong className="text-blue-900 dark:text-slate-100">Google Gemini:</strong> Uses server-side keys by default.
+                  <strong className="text-ledger-ink">Google Gemini:</strong> Uses server-side keys by default.
                   Add your own key here to switch to client-side processing.
                 </p>
                 <p>
-                  <strong className="text-blue-900 dark:text-slate-100">OpenRouter:</strong> Requires your API key for client-side access.
+                  <strong className="text-ledger-ink">OpenRouter:</strong> Requires your API key for client-side access.
                   Provides access to multiple AI providers through a single unified API.
                 </p>
                 <p>
-                  <strong className="text-blue-900 dark:text-slate-100">Status Indicators:</strong> Green border = connected and working,
+                  <strong className="text-ledger-ink">Status Indicators:</strong> Green border = connected and working,
                   Yellow border = configured but not tested, Gray border = needs configuration.
                 </p>
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <Badge variant="outline" className="text-xs border-blue-200 dark:border-slate-700 text-blue-700 dark:text-slate-300">
+                <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <Zap className="h-3 w-3 mr-1" />
                   Fast
                 </Badge>
-                <Badge variant="outline" className="text-xs border-blue-200 dark:border-slate-700 text-blue-700 dark:text-slate-300">
+                <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <Brain className="h-3 w-3 mr-1" />
                   Accurate
                 </Badge>
-                <Badge variant="outline" className="text-xs border-blue-200 dark:border-slate-700 text-blue-700 dark:text-slate-300">
+                <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <DollarSign className="h-3 w-3 mr-1" />
                   Economical
                 </Badge>
-                <span className="text-xs text-blue-600 dark:text-slate-400 ml-2">Model capability indicators</span>
+                <span className="text-xs text-ledger-muted ml-2">Model capability indicators</span>
               </div>
             </div>
           </div>
