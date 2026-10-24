@@ -161,7 +161,7 @@ export default function UnifiedSearchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-ledger-paper">
       <Helmet>
         <title>Unified Search - Mataresit</title>
       </Helmet>
@@ -172,7 +172,7 @@ export default function UnifiedSearchPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Unified Search</h1>
-              <p className="text-muted-foreground mt-2">
+              <p className="text-ledger-muted mt-2">
                 Search across all your data sources in one place
               </p>
             </div>
@@ -269,7 +269,7 @@ export default function UnifiedSearchPage() {
             {searchMetadata && (
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between text-sm text-ledger-muted">
                     <div className="flex items-center gap-4">
                       <span>Search completed in {searchMetadata.searchDuration}ms</span>
                       <Separator orientation="vertical" className="h-4" />

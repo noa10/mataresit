@@ -10,7 +10,7 @@ export interface DailyExpenseData {
 }
 
 // Fetch daily expense data with optional date filtering, aggregating IDs
-export const fetchDailyExpenses = async (startDateISO?: string | null, endDateISO?: string | null): Promise<DailyExpenseData[]> => {
+export const fetchDailyExpenses = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<DailyExpenseData[]> => {
   let query = supabase
     .from('receipts')
     // Select id, date, and total
@@ -24,6 +24,9 @@ export const fetchDailyExpenses = async (startDateISO?: string | null, endDateIS
       // Use 'lte' for less than or equal to the end date
       // Adjust if end date should be exclusive
       query = query.lte('date', endDateISO);
+  }
+  if (teamId) {
+    query = query.eq('team_id', teamId);
   }
 
 
@@ -71,7 +74,7 @@ export interface CategoryExpenseData {
 
 // Fetch expenses grouped by category with optional date filtering
 // This function now prioritizes custom categories over predicted categories
-export const fetchExpensesByCategory = async (startDateISO?: string | null, endDateISO?: string | null): Promise<CategoryExpenseData[]> => {
+export const fetchExpensesByCategory = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<CategoryExpenseData[]> => {
     // Query receipts with custom category information
     let query = supabase
       .from('receipts')
@@ -89,6 +92,9 @@ export const fetchExpensesByCategory = async (startDateISO?: string | null, endD
     // Add end date filtering
     if (endDateISO) {
         query = query.lte('date', endDateISO);
+    }
+    if (teamId) {
+      query = query.eq('team_id', teamId);
     }
 
     const { data, error } = await query;
@@ -132,23 +138,27 @@ export interface ReceiptSummary {
   id: string;
   date: string;
   total: number | null;
+  tax?: number | null;
   merchant: string | null;
   payment_method: string | null;
   paid_by_id: string | null;
 }
 
 // Fetch detailed receipt summaries for a date range
-export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, endDateISO?: string | null): Promise<ReceiptSummary[]> => {
+export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<ReceiptSummary[]> => {
   let query = supabase
     .from('receipts')
     // Select necessary fields
-    .select('id, date, total, merchant, payment_method, paid_by_id');
+    .select('id, date, total, tax, merchant, payment_method, paid_by_id');
 
   if (startDateISO) {
     query = query.gte('date', startDateISO);
   }
   if (endDateISO) {
     query = query.lte('date', endDateISO);
+  }
+  if (teamId) {
+    query = query.eq('team_id', teamId);
   }
 
   // Order by date for easier processing in the select function

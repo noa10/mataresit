@@ -334,13 +334,23 @@ export default function Dashboard() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!searchParams.get("page") || !searchParams.get("limit")) {
-      updateSearchParams({
-        page: String(page),
-        limit: String(limit),
-      });
+    const hasMissingPageParams =
+      !searchParams.get("page") || !searchParams.get("limit");
+    const shouldOpenUpload = searchParams.get("upload") === "1";
+
+    if (!hasMissingPageParams && !shouldOpenUpload) return;
+
+    if (shouldOpenUpload) {
+      openUploadModal();
     }
-  }, [searchParams, page, limit]);
+
+    updateSearchParams({
+      ...(hasMissingPageParams
+        ? { page: String(page), limit: String(limit) }
+        : {}),
+      ...(shouldOpenUpload ? { upload: null } : {}),
+    });
+  }, [searchParams, page, limit, openUploadModal]);
 
   const setPageAndSync = (nextPage: number) => {
     const normalizedPage = Math.max(1, Math.floor(nextPage));
@@ -1102,16 +1112,18 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="dashboard-container min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <main className="container px-4 py-8 w-full max-w-none lg:max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="dashboard-container min-h-full bg-ledger-paper">
+      <main className="mx-auto w-full max-w-[1400px] px-4 py-8 lg:px-8">
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
           >
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{tDash('title')}</h1>
+              <h1 className="font-display text-[clamp(2rem,4vw,2.6rem)] leading-tight text-ledger-ink">
+                {tDash('workspace.receipts.title')}
+              </h1>
               {subscriptionData?.tier && subscriptionData.tier !== 'free' && (
                 <Badge className={`${subscriptionData.tier === 'pro'
                   ? 'bg-blue-500 text-white'
@@ -1131,8 +1143,8 @@ export default function Dashboard() {
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground mt-1">
-              Manage and track all your receipts in one place
+            <p className="mt-1 text-[0.95rem] text-ledger-muted">
+              {tDash('workspace.receipts.lede')}
             </p>
           </motion.div>
 
@@ -1167,11 +1179,13 @@ export default function Dashboard() {
             </ToggleGroup>
 
             <Button
+              variant="accent"
+              size="app"
               className="gap-2"
               onClick={() => openUploadModal()}
             >
               <Upload size={16} />
-              Upload
+              {tDash('workspace.receipts.upload')}
             </Button>
           </motion.div>
         </div>

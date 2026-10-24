@@ -52,6 +52,12 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
+  /* Typography — Instrument Sans for UI, Instrument Serif for display,
+     IBM Plex Mono for receipt data / micro-labels. */
+  --font-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
   /* Animations */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -116,47 +122,133 @@
   }
 }
 
+/* ---------- Ledger design tokens (receipt workspace redesign) ----------
+   Raw values live in :root/.dark so they can flip with the theme class.
+   @theme inline exposes them as Tailwind utilities (bg-ledger-surface, …). */
+@theme inline {
+  --color-ledger-paper: var(--ledger-paper);
+  --color-ledger-surface: var(--ledger-surface);
+  --color-ledger-surface-2: var(--ledger-surface-2);
+  --color-ledger-ink: var(--ledger-ink);
+  --color-ledger-ink-2: var(--ledger-ink-2);
+  --color-ledger-muted: var(--ledger-muted);
+  --color-ledger-line: var(--ledger-line);
+  --color-ledger-line-strong: var(--ledger-line-strong);
+  --color-ledger-accent: var(--ledger-accent);
+  --color-ledger-accent-hover: var(--ledger-accent-hover);
+  --color-ledger-accent-soft: var(--ledger-accent-soft);
+  --color-ledger-amber: var(--ledger-amber);
+  --color-ledger-amber-soft: var(--ledger-amber-soft);
+  --color-ledger-danger: var(--ledger-danger);
+  --color-ledger-danger-soft: var(--ledger-danger-soft);
+  --color-ledger-panel: var(--ledger-panel);
+  --color-ledger-panel-2: var(--ledger-panel-2);
+  --color-ledger-on-panel: var(--ledger-on-panel);
+  --color-ledger-on-panel-muted: var(--ledger-on-panel-muted);
+  --color-ledger-chart-1: var(--ledger-chart-1);
+  --color-ledger-chart-2: var(--ledger-chart-2);
+  --color-ledger-chart-3: var(--ledger-chart-3);
+  --color-ledger-chart-4: var(--ledger-chart-4);
+  --color-ledger-chart-5: var(--ledger-chart-5);
+}
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --ledger-paper: #F1F2EE;
+    --ledger-surface: #FFFFFF;
+    --ledger-surface-2: #F6F7F3;
+    --ledger-ink: #121715;
+    --ledger-ink-2: #2B342F;
+    --ledger-muted: #59625B;
+    --ledger-line: #DCE0D8;
+    --ledger-line-strong: #C2C8BE;
+    --ledger-accent: #0B6B4D;
+    --ledger-accent-hover: #085741;
+    --ledger-accent-soft: #DFEFE6;
+    --ledger-amber: #7A4200;
+    --ledger-amber-soft: #F8ECD8;
+    --ledger-danger: #9B2C2C;
+    --ledger-danger-soft: #F7E4E2;
+    --ledger-panel: #101614;
+    --ledger-panel-2: #18211D;
+    --ledger-on-panel: #F1F2EE;
+    --ledger-on-panel-muted: #AEB9B2;
+    --ledger-chart-1: #0B6B4D;
+    --ledger-chart-2: #3C8468;
+    --ledger-chart-3: #6BA189;
+    --ledger-chart-4: #9CBFAC;
+    --ledger-chart-5: #CBDCCF;
+  }
+
+  .dark {
+    --ledger-paper: #0C1110;
+    --ledger-surface: #141B18;
+    --ledger-surface-2: #18211D;
+    --ledger-ink: #F1F2EE;
+    --ledger-ink-2: #D7DED9;
+    --ledger-muted: #A7B2AB;
+    --ledger-line: #26302B;
+    --ledger-line-strong: #3A4640;
+    --ledger-accent: #3FBF8E;
+    --ledger-accent-hover: #55D2A2;
+    --ledger-accent-soft: #16352A;
+    --ledger-amber: #E1A85C;
+    --ledger-amber-soft: #33260F;
+    --ledger-danger: #E08B86;
+    --ledger-danger-soft: #3A1E1C;
+    --ledger-panel: #080C0A;
+    --ledger-panel-2: #111713;
+    --ledger-on-panel: #F1F2EE;
+    --ledger-on-panel-muted: #8C9A93;
+    --ledger-chart-1: #3FBF8E;
+    --ledger-chart-2: #67CFA6;
+    --ledger-chart-3: #8FDDBE;
+    --ledger-chart-4: #B5E9D5;
+    --ledger-chart-5: #D6F3E8;
+  }
+
+  :root {
+    /* Old shadcn tokens retuned to the ledger palette so legacy components
+       and ui primitives render on-theme with the redesign. */
+    --background: 75 13% 94%;
+    --foreground: 156 12% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 156 12% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 156 12% 8%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 161 81% 23%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 75 20% 96%;
+    --secondary-foreground: 156 12% 8%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 75 20% 96%;
+    --muted-foreground: 133 5% 37%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 75 20% 96%;
+    --accent-foreground: 156 12% 8%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 56% 39%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 90 11% 86%;
+    --input: 96 8% 76%;
+    --ring: 161 81% 23%;
 
     --radius: 0.5rem;
 
     /* Sidebar variables */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 75 20% 96%;
+    --sidebar-foreground: 133 5% 37%;
+    --sidebar-primary: 161 81% 23%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 146 33% 91%;
+    --sidebar-accent-foreground: 156 12% 8%;
+    --sidebar-border: 90 11% 86%;
+    --sidebar-ring: 161 81% 23%;
 
     /* Layout vars and helpers */
     --nav-width: var(--sidebar-width, 0px);
@@ -167,43 +259,43 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 168 17% 6%;
+    --foreground: 75 13% 94%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 154 15% 9%;
+    --card-foreground: 75 13% 94%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 154 15% 9%;
+    --popover-foreground: 75 13% 94%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 157 50% 50%;
+    --primary-foreground: 168 17% 5%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 153 16% 11%;
+    --secondary-foreground: 75 13% 94%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 153 16% 11%;
+    --muted-foreground: 142 7% 68%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 153 16% 11%;
+    --accent-foreground: 75 13% 94%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 3 59% 70%;
+    --destructive-foreground: 168 17% 5%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 150 12% 17%;
+    --input: 150 9% 25%;
+    --ring: 157 50% 50%;
 
     /* Sidebar variables for dark mode */
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 94.1%;
-    --sidebar-primary-foreground: 240 5.9% 10%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 154 15% 9%;
+    --sidebar-foreground: 142 7% 68%;
+    --sidebar-primary: 157 50% 50%;
+    --sidebar-primary-foreground: 168 17% 5%;
+    --sidebar-accent: 159 41% 15%;
+    --sidebar-accent-foreground: 75 13% 94%;
+    --sidebar-border: 150 12% 17%;
+    --sidebar-ring: 157 50% 50%;
 
     /* Date picker icon (dark mode) */
     --date-picker-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e2e8f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
@@ -227,11 +319,66 @@
   }
 }
 
+/* ---------- Marketing homepage motion ---------- */
+@keyframes ledger-scan {
+  0%, 8% { transform: translateY(-56px); opacity: 0; }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  92%, 100% { transform: translateY(320px); opacity: 0; }
+}
+
+@keyframes ledger-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.82); }
+}
+
+.ledger-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 54px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(11,107,77,0) 0%, rgba(11,107,77,.10) 60%, rgba(11,107,77,.34) 100%);
+  border-bottom: 1px solid rgba(11,107,77,.75);
+  animation: ledger-scan 5s ease-in-out infinite;
+}
+
+.ledger-pulse-dot {
+  animation: ledger-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ledger-caret {
+  50% { opacity: 0; }
+}
+
+.ledger-caret {
+  animation: ledger-caret 1.4s steps(2) infinite;
+}
+
+@keyframes marketing-resources-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.marketing-resources-panel {
+  animation: marketing-resources-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-scanline { display: none; }
+  .ledger-pulse-dot { animation: none; }
+  .ledger-caret { animation: none; }
+  .marketing-resources-panel { animation: none; }
+}
+
 @layer base {
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     border-color: hsl(var(--border));
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     /* Ensure proper scrolling on mobile devices */
     overflow-x: hidden;
     overflow-y: auto;

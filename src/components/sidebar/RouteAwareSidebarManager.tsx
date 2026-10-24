@@ -24,6 +24,8 @@ export function RouteAwareSidebarManager() {
     // Clear any custom sidebar content when navigating to routes that should use default navigation
     const shouldUseDefaultNavigation = [
       '/dashboard',
+      '/receipts',
+      '/review',
       '/leaderboard',
       '/missions',
       '/settings',
@@ -56,6 +58,8 @@ export const SIDEBAR_ROUTE_CONFIG = {
   // Routes that should show default navigation
   navigation: [
     '/dashboard',
+    '/receipts',
+    '/review',
     '/leaderboard',
     '/missions',
     '/settings',

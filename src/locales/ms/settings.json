@@ -355,7 +355,8 @@
     "cancelSubscription": "Cancel Subscription",
     "paymentMethod": "Payment Method",
     "billingHistory": "Billing History",
-    "invoices": "Invoices"
+    "invoices": "Invoices",
+    "simulatedNotice": "Anda melihat maklumat bil simulasi. Naik taraf ke pelan berbayar untuk mengakses portal bil Stripe sepenuhnya."
   },
   "team": {
     "title": "Team Management",

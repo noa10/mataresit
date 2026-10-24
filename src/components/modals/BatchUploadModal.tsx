@@ -46,11 +46,18 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
           ? "w-full h-full max-w-none max-h-none p-4"
           : "sm:max-w-[900px] w-[95vw] max-w-[95vw] h-[85vh] max-h-[95vh] min-h-[600px] p-6"
         }
-        flex flex-col overflow-hidden
+        flex flex-col overflow-hidden border-ledger-line bg-ledger-paper
       `}>
-        <DialogHeader className={`flex-shrink-0 ${isMobile ? "pb-2" : "pb-4"}`}>
-          <DialogTitle className={isMobile ? "text-lg" : "text-xl"}>Upload Receipts</DialogTitle>
-          <DialogDescription className="text-sm">
+        <DialogHeader className={`flex-shrink-0 border-b border-ledger-line ${isMobile ? "pb-2" : "pb-4"}`}>
+          <p className="font-data text-[0.58rem] uppercase tracking-[0.18em] text-ledger-muted">
+            Add to the ledger
+          </p>
+          <DialogTitle
+            className={`font-display text-ledger-ink ${isMobile ? "text-xl" : "text-[1.7rem] leading-tight"}`}
+          >
+            Upload Receipts
+          </DialogTitle>
+          <DialogDescription className="text-sm text-ledger-muted">
             Upload and process your receipts. You can upload a single receipt or process multiple receipts at once.
           </DialogDescription>
         </DialogHeader>
@@ -59,19 +66,21 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
           defaultValue="single"
           value={activeTab}
           onValueChange={setActiveTab}
-          className="flex-grow flex flex-col min-h-0 overflow-hidden"
+          className="flex-grow flex flex-col min-h-0 overflow-hidden pt-4"
         >
-          <TabsList className={`${isMobile ? "mb-2" : "mb-4"} self-center flex-shrink-0 ${isMobile ? "w-full" : "w-auto"}`}>
+          <TabsList
+            className={`${isMobile ? "mb-2" : "mb-4"} self-center flex-shrink-0 border border-ledger-line bg-ledger-surface-2 ${isMobile ? "w-full" : "w-auto"}`}
+          >
             <TabsTrigger
               value="single"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm`}
+              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm data-[state=active]:bg-ledger-surface data-[state=active]:text-ledger-ink`}
             >
               <Upload size={isMobile ? 14 : 16} />
               {isMobile ? "Single" : "Single Upload"}
             </TabsTrigger>
             <TabsTrigger
               value="batch"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm`}
+              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm data-[state=active]:bg-ledger-surface data-[state=active]:text-ledger-ink`}
             >
               <Files size={isMobile ? 14 : 16} />
               {isMobile ? "Batch" : "Batch Upload"}

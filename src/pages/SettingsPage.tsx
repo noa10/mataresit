@@ -1,369 +1,447 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ReceiptProcessingOptions } from "@/components/upload/ReceiptProcessingOptions";
-import { BatchUploadSettings } from "@/components/upload/BatchUploadSettings";
-
-import { ModelProviderStatus } from "@/components/settings/ModelProviderStatus";
-import ApiKeyManagement from "@/components/dashboard/ApiKeyManagement";
-import { useSettings } from "@/hooks/useSettings";
-import { useSubscription } from "@/hooks/useSubscription";
-import { useSettingsTranslation } from "@/contexts/LanguageContext";
+import { useEffect, useMemo, useRef } from "react";
+import { Crown, ExternalLink, SlidersHorizontal } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
-import SubscriptionLimitsDisplay from "@/components/SubscriptionLimitsDisplay";
+import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ledger/Panel";
+import { StatusChip } from "@/components/ledger/StatusChip";
+import ApiKeyManagement from "@/components/dashboard/ApiKeyManagement";
 import { CategoryManager } from "@/components/categories/CategoryManager";
 import { PayerManager } from "@/components/payers/PayerManager";
-import { CompactSubscriptionLimitError } from "@/components/SubscriptionLimitError";
-import { Link, useSearchParams } from "react-router-dom";
-import { Crown, Key, Zap, ArrowRight, Bell, Palette, CreditCard } from "lucide-react";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
-import { ThemePreferences } from "@/components/settings/ThemePreferences";
-import { BillingPreferences } from "@/components/settings/BillingPreferences";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useDashboardTranslation, useLanguage, useSettingsTranslation } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useStripe } from "@/contexts/StripeContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import { SUBSCRIPTION_TIERS } from "@/config/stripe";
+import type { SupportedLanguage } from "@/lib/i18n";
+import type { ThemeMode } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 
-const UsageStatsPanel = () => {
-  const { t } = useSettingsTranslation();
+type SettingsSection = "preferences" | "plan" | "api" | "categories" | "payers" | "notifications";
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('usage.title')}</CardTitle>
-        <CardDescription>{t('usage.description')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <SubscriptionLimitsDisplay showUpgradePrompts={true} />
-      </CardContent>
-    </Card>
-  );
+const SECTION_ORDER: SettingsSection[] = [
+  "preferences",
+  "plan",
+  "api",
+  "categories",
+  "payers",
+  "notifications",
+];
+
+const SECTION_LABEL_KEY: Record<SettingsSection, string> = {
+  preferences: "workspace.settings.nav.preferences",
+  plan: "workspace.settings.nav.plan",
+  api: "workspace.settings.nav.api",
+  categories: "workspace.settings.nav.categories",
+  payers: "workspace.settings.nav.payers",
+  notifications: "workspace.settings.nav.notifications",
 };
 
-// API Access Upgrade Prompt Component
-const ApiAccessUpgradePrompt = () => {
-  const { t } = useSettingsTranslation();
-  const { getCurrentTier } = useSubscription();
-  const currentTier = getCurrentTier();
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <Key className="h-5 w-5 text-purple-600" />
-          </div>
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {t('apiKeys.title')}
-              <Crown className="h-4 w-4 text-purple-500" />
-            </CardTitle>
-            <CardDescription>
-              {t('apiKeys.description')}
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 relative overflow-hidden">
-          {/* Decorative background pattern */}
-          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-100 rounded-full -translate-y-10 translate-x-10 opacity-50"></div>
-          <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-100 rounded-full translate-y-8 -translate-x-8 opacity-50"></div>
-          <div className="flex items-start gap-3">
-            <Crown className="h-5 w-5 text-purple-600 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="font-medium text-purple-900 mb-2">
-                {t('apiKeys.upgrade.title', { defaultValue: 'Max Plan Required' })}
-              </h4>
-              <p className="text-sm text-purple-700 mb-3">
-                {t('apiKeys.upgrade.description', {
-                  defaultValue: 'API key management is available exclusively for Max plan subscribers. Create and manage API keys to integrate with external applications and services.'
-                })}
-              </p>
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-purple-700">
-                  <ArrowRight className="h-3 w-3" />
-                  <span>{t('apiKeys.upgrade.features.unlimitedKeys', { defaultValue: 'Create unlimited API keys' })}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-purple-700">
-                  <ArrowRight className="h-3 w-3" />
-                  <span>{t('apiKeys.upgrade.features.fullAccess', { defaultValue: 'Full API access to all endpoints' })}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-purple-700">
-                  <ArrowRight className="h-3 w-3" />
-                  <span>{t('apiKeys.upgrade.features.analytics', { defaultValue: 'Advanced usage analytics' })}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-purple-700">
-                  <ArrowRight className="h-3 w-3" />
-                  <span>{t('apiKeys.upgrade.features.support', { defaultValue: 'Priority support for integrations' })}</span>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button asChild className="flex-1">
-                  <Link to="/pricing">
-                    <Crown className="h-4 w-4 mr-2" />
-                    {t('apiKeys.upgrade.actions.upgrade', { defaultValue: 'Upgrade to Max Plan' })}
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild className="flex-1">
-                  <Link to="/api-reference">
-                    {t('apiKeys.upgrade.actions.viewDocs', { defaultValue: 'View API Documentation' })}
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Current Plan Info */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">
-                {t('apiKeys.upgrade.currentPlan', {
-                  defaultValue: 'Current Plan: {{tier}}',
-                  tier: currentTier.charAt(0).toUpperCase() + currentTier.slice(1)
-                })}
-              </span>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/pricing" className="text-purple-600 hover:text-purple-700">
-                {t('apiKeys.upgrade.actions.compare', { defaultValue: 'Compare Plans' })}
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+const mapTabToSection = (tab: string | null): SettingsSection => {
+  switch (tab) {
+    case "preferences":
+    case "theme":
+    case "processing":
+    case "providers":
+      return "preferences";
+    case "api":
+    case "api-keys":
+      return "api";
+    case "categories":
+      return "categories";
+    case "payers":
+      return "payers";
+    case "notifications":
+      return "notifications";
+    case "plan":
+    case "billing":
+    case "usage":
+    default:
+      return "plan";
+  }
 };
+
+const formatMonthYear = (value: string | null | undefined, language: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat(language === "ms" ? "ms-MY" : "en-MY", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return null;
+  }
+};
+
+const formatStorage = (megabytes: number) => {
+  if (!Number.isFinite(megabytes) || megabytes <= 0) return "0 MB";
+  if (megabytes >= 1024) return `${(megabytes / 1024).toFixed(1)} GB`;
+  return `${Math.round(megabytes)} MB`;
+};
+
+const percentOf = (used: number, limit: number) => {
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)));
+};
+
+const ProgressBar = ({ value }: { value: number }) => (
+  <span className="mt-2.5 block h-[7px] overflow-hidden rounded-full bg-ledger-surface-2">
+    <i
+      className="block h-full rounded-full bg-ledger-accent"
+      style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+    />
+  </span>
+);
+
+const setRowClass =
+  "flex flex-wrap items-center justify-between gap-x-[18px] gap-y-3 border-b border-dashed border-ledger-line py-3 last:border-b-0";
+
+const selectClass =
+  "h-10 rounded-[8px] border border-ledger-line-strong bg-ledger-surface px-3 text-sm text-ledger-ink outline-none focus-visible:border-ledger-accent focus-visible:ring-2 focus-visible:ring-ledger-accent-soft";
 
 export default function SettingsPage() {
-  const { settings, updateSettings, resetSettings } = useSettings();
-  const { isFeatureAvailable } = useSubscription();
-  const { t } = useSettingsTranslation();
-  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('processing');
+  const { t } = useDashboardTranslation();
+  const { t: ts } = useSettingsTranslation();
+  const { language, changeLanguage } = useLanguage();
+  const { theme, setMode } = useTheme();
+  const { subscriptionData, createPortalSession } = useStripe();
+  const { limits, usage, isLoading: usageLoading, getCurrentTier, isFeatureAvailable } = useSubscription();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section = mapTabToSection(searchParams.get("tab"));
+  const sectionsRef = useRef<HTMLElement | null>(null);
 
-  // Check if user has access to API features
-  const hasApiAccess = isFeatureAvailable('api_access');
-
-  // Handle URL parameters
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    const simulatedParam = searchParams.get('simulated');
+    const active = sectionsRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    active?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [section]);
 
-    if (tabParam) {
-      setActiveTab(tabParam);
+  useEffect(() => {
+    if (searchParams.get("simulated") === "true") {
+      toast.info(ts("billing.simulatedNotice", { defaultValue: "You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal." }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    if (simulatedParam === 'true') {
-      toast.info('You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal.');
+  const handleSectionChange = (key: SettingsSection) => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("tab", key);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const tier = getCurrentTier() as keyof typeof SUBSCRIPTION_TIERS;
+  const tierConfig = SUBSCRIPTION_TIERS[tier] ?? SUBSCRIPTION_TIERS.free;
+  const tierLabel = tierConfig.name;
+  const isFree = tier === "free";
+  const hasApiAccess = isFeatureAvailable("api_access");
+
+  const status = subscriptionData?.status ?? "active";
+  const statusLabel = status === "active" ? t("workspace.settings.active") : status;
+
+  const renewalDate = useMemo(
+    () => formatMonthYear(subscriptionData?.subscriptionEndDate, language),
+    [subscriptionData?.subscriptionEndDate, language]
+  );
+
+  const receiptsUsed = usage?.receiptsUsedThisMonth ?? subscriptionData?.receiptsUsedThisMonth ?? 0;
+  const receiptsLimit = limits?.monthlyReceipts ?? tierConfig.monthlyReceipts;
+  const storageUsed = usage?.storageUsedMB ?? 0;
+  const storageLimit = limits?.storageLimitMB ?? tierConfig.storageLimitMB;
+  const batchLimit = limits?.batchUploadLimit ?? tierConfig.batchUploadLimit;
+  const unlimited = (value: number) => !Number.isFinite(value) || value < 0;
+
+  const handleBillingPortal = async () => {
+    if (isFree) return;
+    try {
+      await createPortalSession();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to open the billing portal");
     }
-  }, [searchParams]);
+  };
 
-  const handleResetConfirm = () => {
-    resetSettings();
-    toast.info(t('messages.resetToast'));
-    setIsResetAlertOpen(false);
+  const handleLanguageChange = (value: string) => {
+    void changeLanguage(value as SupportedLanguage);
+  };
+
+  const handleThemeChange = (value: string) => {
+    void setMode(value as ThemeMode);
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-grow container mx-auto p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
-            <p className="text-muted-foreground mt-2">
-              {t('description')}
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-[1180px] px-5 pb-14 pt-8 md:px-7">
+      <header className="flex flex-wrap items-end justify-between gap-[18px]">
+        <div className="min-w-0">
+          <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+            {t("workspace.settings.eyebrow")}
+          </p>
+          <h1 className="mt-1.5 font-display text-[clamp(2rem,3.2vw,2.75rem)] leading-[1.05] tracking-[-0.02em] text-ledger-ink">
+            {t("workspace.settings.title")}
+          </h1>
+          <p className="mt-2 max-w-[58ch] text-[0.9375rem] leading-relaxed text-ledger-muted">
+            {t("workspace.settings.lede")}
+          </p>
+        </div>
+      </header>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full mb-8 max-w-5xl grid-cols-9">
-              <TabsTrigger value="processing">{t('tabs.processing')}</TabsTrigger>
-              <TabsTrigger value="categories">{t('tabs.categories')}</TabsTrigger>
-              <TabsTrigger value="payers">Payers</TabsTrigger>
-              <TabsTrigger value="billing">
-                <CreditCard className="h-4 w-4 mr-1" />
-                {t('tabs.billing')}
-              </TabsTrigger>
-              <TabsTrigger value="notifications">
-                <Bell className="h-4 w-4 mr-1" />
-                {t('tabs.notifications')}
-              </TabsTrigger>
-              <TabsTrigger value="theme">
-                <Palette className="h-4 w-4 mr-1" />
-                {t('tabs.theme')}
-              </TabsTrigger>
-              <TabsTrigger value="providers">{t('tabs.providers')}</TabsTrigger>
-              <TabsTrigger
-                value="api-keys"
-                className={`relative ${!hasApiAccess ? 'text-purple-600 data-[state=active]:text-purple-700' : ''}`}
-              >
-                {t('tabs.apiKeys')}
-                {!hasApiAccess && (
-                  <Crown className="h-3 w-3 ml-1 text-purple-500" />
+      <div className="mt-6 grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+        <nav
+          ref={sectionsRef}
+          aria-label={t("workspace.settings.sections")}
+          className="flex gap-1 overflow-x-auto border-b border-ledger-line pb-2 lg:sticky lg:top-[88px] lg:flex-col lg:gap-0.5 lg:self-start lg:overflow-visible lg:border-b-0 lg:pb-0"
+        >
+          {SECTION_ORDER.map((key) => {
+            const active = key === section;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-current={active ? "page" : undefined}
+                onClick={() => handleSectionChange(key)}
+                className={cn(
+                  "shrink-0 rounded-[7px] px-3 py-2 text-left text-sm font-medium transition-colors",
+                  active
+                    ? "bg-ledger-accent-soft text-ledger-accent"
+                    : "text-ledger-ink-2 hover:bg-ledger-surface-2 hover:text-ledger-ink"
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="usage">{t('tabs.usage')}</TabsTrigger>
-            </TabsList>
+              >
+                {t(SECTION_LABEL_KEY[key])}
+              </button>
+            );
+          })}
+        </nav>
 
-          <TabsContent value="processing">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('processing.title')}</CardTitle>
-                <CardDescription>
-                  {t('processing.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="prose prose-sm max-w-none text-muted-foreground">
-                  <p>
-                    {t('processing.aiVisionDescription')}
-                  </p>
-                  <p>
-                    {t('processing.aiModelConfigDescription')}
-                  </p>
+        <div className="min-w-0">
+          {section === "plan" && (
+            <Panel
+              title={t("workspace.settings.planTitle")}
+              action={
+                isFree ? (
+                  <Button variant="accent-outline" size="app" asChild>
+                    <Link to="/pricing">{t("workspace.settings.upgrade")}</Link>
+                  </Button>
+                ) : (
+                  <Button variant="accent-outline" size="app" onClick={handleBillingPortal}>
+                    {t("workspace.settings.billingPortal")}
+                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                  </Button>
+                )
+              }
+            >
+              <div className="grid gap-0.5">
+                <div className={setRowClass}>
+                  <span className="min-w-0">
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {isFree
+                        ? t("workspace.settings.freePlan")
+                        : t("workspace.settings.planName", { tier: tierLabel })}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-ledger-muted">
+                      {isFree
+                        ? t("workspace.settings.freeForever")
+                        : renewalDate
+                          ? t("workspace.settings.renews", { date: renewalDate })
+                          : t("workspace.settings.renews", { date: "—" })}
+                    </span>
+                  </span>
+                  <StatusChip tone={status === "active" ? "reviewed" : "unreviewed"} label={statusLabel} />
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">{t('processing.aiModelConfig')}</h3>
-                  <ReceiptProcessingOptions
-                    defaultModel={settings.selectedModel}
-                    showBatchModelSelection={false}
-                    onModelChange={(model) => updateSettings({ selectedModel: model, batchModel: model })}
-                  />
+                <div className={setRowClass}>
+                  <span className="min-w-[200px] flex-1">
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.receiptsThisMonth")}
+                    </span>
+                    {usageLoading ? (
+                      <span className="mt-2.5 block h-[7px] animate-pulse rounded-full bg-ledger-surface-2" />
+                    ) : !unlimited(receiptsLimit) ? (
+                      <ProgressBar value={percentOf(receiptsUsed, receiptsLimit)} />
+                    ) : null}
+                  </span>
+                  <span className="font-data text-[0.75rem] text-ledger-muted">
+                    {usageLoading
+                      ? "—"
+                      : unlimited(receiptsLimit)
+                        ? t("workspace.settings.unlimited")
+                        : t("workspace.settings.usageMeta", {
+                            used: receiptsUsed,
+                            limit: receiptsLimit,
+                          })}
+                  </span>
                 </div>
 
-                <Separator className="my-6" />
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">{t('processing.batchProcessingConfig')}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t('processing.batchProcessingDescription')}
-                  </p>
-
-                  <BatchUploadSettings
-                    maxConcurrent={settings?.batchUpload?.maxConcurrent || 2}
-                    autoStart={settings?.batchUpload?.autoStart || false}
-                    timeoutSeconds={settings?.batchUpload?.timeoutSeconds || 120}
-                    maxRetries={settings?.batchUpload?.maxRetries || 2}
-                    preserveImageQuality={settings?.skipUploadOptimization || true}
-                    onMaxConcurrentChange={(value) =>
-                      updateSettings({
-                        batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
-                          maxConcurrent: value
-                        }
-                      })
-                    }
-                    onAutoStartChange={(value) =>
-                      updateSettings({
-                        batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
-                          autoStart: value
-                        }
-                      })
-                    }
-                    onTimeoutChange={(value) =>
-                      updateSettings({
-                        batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
-                          timeoutSeconds: value
-                        }
-                      })
-                    }
-                    onMaxRetriesChange={(value) =>
-                      updateSettings({
-                        batchUpload: {
-                          ...(settings?.batchUpload || { maxConcurrent: 2, autoStart: false, timeoutSeconds: 120, maxRetries: 2 }),
-                          maxRetries: value
-                        }
-                      })
-                    }
-                    onPreserveImageQualityChange={(value) =>
-                      updateSettings({ skipUploadOptimization: value })
-                    }
-                  />
+                <div className={setRowClass}>
+                  <span className="min-w-[200px] flex-1">
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.batchQueue")}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-ledger-muted">
+                      {t("workspace.settings.batchLimit", { limit: batchLimit })}
+                    </span>
+                  </span>
+                  <span className="font-data text-[0.75rem] text-ledger-muted">
+                    {t("workspace.settings.batchValue", { limit: batchLimit })}
+                  </span>
                 </div>
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline">{t('actions.reset')}</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('messages.resetConfirm')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('messages.resetDescription')}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('actions.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleResetConfirm}>{t('messages.continue')}</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+
+                <div className={setRowClass}>
+                  <span className="min-w-[200px] flex-1">
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.storage")}
+                    </span>
+                    {usageLoading ? (
+                      <span className="mt-2.5 block h-[7px] animate-pulse rounded-full bg-ledger-surface-2" />
+                    ) : !unlimited(storageLimit) ? (
+                      <ProgressBar value={percentOf(storageUsed, storageLimit)} />
+                    ) : null}
+                  </span>
+                  <span className="font-data text-[0.75rem] text-ledger-muted">
+                    {usageLoading
+                      ? "—"
+                      : unlimited(storageLimit)
+                        ? t("workspace.settings.unlimited")
+                        : t("workspace.settings.storageMeta", {
+                            used: formatStorage(storageUsed),
+                            limit: formatStorage(storageLimit),
+                          })}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </Panel>
+          )}
 
-          <TabsContent value="categories">
-            <CategoryManager />
-          </TabsContent>
+          {section === "preferences" && (
+            <Panel title={t("workspace.settings.preferencesTitle")}>
+              <div className="grid gap-0.5">
+                <div className={setRowClass}>
+                  <span>
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.currency")}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-ledger-muted">
+                      {t("workspace.settings.currencyLede")}
+                    </span>
+                  </span>
+                  <span className="font-data text-[0.75rem] text-ledger-ink-2">
+                    {t("workspace.settings.currencyValue")}
+                  </span>
+                </div>
 
-          <TabsContent value="payers">
-            <PayerManager />
-          </TabsContent>
+                <div className={setRowClass}>
+                  <span>
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.language")}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-ledger-muted">
+                      {t("workspace.settings.languageLede")}
+                    </span>
+                  </span>
+                  <select
+                    aria-label={t("workspace.settings.language")}
+                    className={selectClass}
+                    value={language}
+                    onChange={(event) => handleLanguageChange(event.target.value)}
+                  >
+                    <option value="en">English</option>
+                    <option value="ms">Bahasa Melayu</option>
+                  </select>
+                </div>
 
-          <TabsContent value="billing">
-            <BillingPreferences />
-          </TabsContent>
+                <div className={setRowClass}>
+                  <span>
+                    <span className="block text-[0.9375rem] font-medium text-ledger-ink">
+                      {t("workspace.settings.theme")}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-ledger-muted">
+                      {t("workspace.settings.themeLede")}
+                    </span>
+                  </span>
+                  <select
+                    aria-label={t("workspace.settings.theme")}
+                    className={selectClass}
+                    value={theme.mode}
+                    onChange={(event) => handleThemeChange(event.target.value)}
+                  >
+                    <option value="light">{t("workspace.settings.light")}</option>
+                    <option value="dark">{t("workspace.settings.dark")}</option>
+                    <option value="auto">{t("workspace.settings.auto")}</option>
+                  </select>
+                </div>
+              </div>
 
-          <TabsContent value="notifications">
-            <NotificationPreferences />
-          </TabsContent>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-ledger-line pt-4">
+                <p className="max-w-[46ch] text-sm text-ledger-muted">
+                  {t("workspace.settings.advancedHint")}
+                </p>
+                <Button variant="accent-outline" size="app" asChild>
+                  <Link to="/settings/advanced">
+                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    {t("workspace.settings.advanced")}
+                  </Link>
+                </Button>
+              </div>
+            </Panel>
+          )}
 
-          <TabsContent value="theme">
-            <ThemePreferences />
-          </TabsContent>
-
-          <TabsContent value="providers" className="space-y-6">
-            <ModelProviderStatus />
-          </TabsContent>
-
-          <TabsContent value="api-keys">
-            {hasApiAccess ? (
+          {section === "api" &&
+            (hasApiAccess ? (
               <ApiKeyManagement />
             ) : (
-              <ApiAccessUpgradePrompt />
-            )}
-          </TabsContent>
+              <Panel title={t("workspace.settings.apiTitle")} description={t("workspace.settings.apiLede")}>
+                <div className="flex flex-wrap items-start gap-4 rounded-[8px] border border-dashed border-ledger-line bg-ledger-surface-2/60 p-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ledger-accent-soft text-ledger-accent">
+                    <Crown className="h-[18px] w-[18px]" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-[220px] flex-1">
+                    <h3 className="text-sm font-semibold text-ledger-ink">
+                      {ts("apiKeys.upgrade.title", { defaultValue: "Max Plan Required" })}
+                    </h3>
+                    <p className="mt-1 max-w-[58ch] text-sm leading-relaxed text-ledger-muted">
+                      {ts("apiKeys.upgrade.description", {
+                        defaultValue:
+                          "API key management is available exclusively for Max plan subscribers. Create and manage API keys to integrate with external applications and services.",
+                      })}
+                    </p>
+                    <p className="mt-3 font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-muted">
+                      {ts("apiKeys.upgrade.currentPlan", {
+                        defaultValue: "Current Plan: {{tier}}",
+                        tier: tierLabel,
+                      })}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button variant="accent" size="app" asChild>
+                        <Link to="/pricing">
+                          <Crown className="mr-2 h-4 w-4" />
+                          {ts("apiKeys.upgrade.actions.upgrade", { defaultValue: "Upgrade to Max Plan" })}
+                        </Link>
+                      </Button>
+                      <Button variant="accent-outline" size="app" asChild>
+                        <Link to="/api-reference">
+                          {ts("apiKeys.upgrade.actions.viewDocs", {
+                            defaultValue: "View API Documentation",
+                          })}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            ))}
 
-          <TabsContent value="usage">
-            <UsageStatsPanel />
-          </TabsContent>
-          </Tabs>
+          {section === "categories" && <CategoryManager />}
+
+          {section === "payers" && <PayerManager />}
+
+          {section === "notifications" && <NotificationPreferences />}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

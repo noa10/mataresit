@@ -182,8 +182,8 @@ export function ConfidenceIndicator({
   if (loading) {
     return (
       <div className="flex items-center gap-1">
-        <span className="inline-block w-4 h-1 rounded bg-gray-300 animate-pulse"></span>
-        <span className="text-xs text-gray-400">{t('viewer.processing')}</span>
+        <span className="inline-block w-4 h-1 rounded bg-ledger-line-strong animate-pulse"></span>
+        <span className="text-xs text-ledger-muted">{t('viewer.processing')}</span>
       </div>
     );
   }
@@ -191,9 +191,9 @@ export function ConfidenceIndicator({
   const normalizedScore = normalizeConfidence(score);
 
   // More granular color scale with 4 levels
-  const color = normalizedScore >= 80 ? 'bg-green-500' :
-    normalizedScore >= 60 ? 'bg-yellow-500' :
-      normalizedScore >= 40 ? 'bg-orange-500' : 'bg-red-500';
+  const color = normalizedScore >= 80 ? 'bg-ledger-accent' :
+    normalizedScore >= 60 ? 'bg-ledger-chart-2' :
+      normalizedScore >= 40 ? 'bg-ledger-amber' : 'bg-ledger-danger';
 
   const labelKey = normalizedScore >= 80
     ? "viewer.highConfidence"
@@ -1051,23 +1051,23 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const getStepColor = (step: string | null) => {
     switch (step) {
       case 'START':
-        return 'bg-blue-500';
+        return 'bg-ledger-accent';
       case 'FETCH':
-        return 'bg-indigo-500';
+        return 'bg-ledger-chart-2';
       case 'OCR':
-        return 'bg-purple-500';
+        return 'bg-ledger-chart-3';
       case 'EXTRACT':
-        return 'bg-violet-500';
+        return 'bg-ledger-chart-4';
       case 'GEMINI':
-        return 'bg-fuchsia-500';
+        return 'bg-ledger-chart-5';
       case 'SAVE':
-        return 'bg-pink-500';
+        return 'bg-ledger-amber';
       case 'COMPLETE':
-        return 'bg-green-500';
+        return 'bg-ledger-accent';
       case 'ERROR':
-        return 'bg-red-500';
+        return 'bg-ledger-danger';
       default:
-        return 'bg-gray-500';
+        return 'bg-ledger-muted';
     }
   };
 
@@ -1140,9 +1140,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       <div className="mt-1 flex items-center gap-2">
         <Badge
           variant="outline"
-          className={`flex items-center gap-1 ${confidence >= 80 ? 'border-green-500 text-green-700' :
-            confidence >= 60 ? 'border-yellow-500 text-yellow-700' :
-              'border-red-500 text-red-700'
+          className={`flex items-center gap-1 ${confidence >= 80 ? 'border-ledger-accent text-ledger-accent' :
+            confidence >= 60 ? 'border-ledger-amber text-ledger-amber' :
+              'border-ledger-danger text-ledger-danger'
             }`}
         >
           <Sparkles size={12} />
@@ -1156,7 +1156,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
           onClick={() => handleAcceptSuggestion(field, suggestion)}
           title={`Accept suggestion (${confidence}% confidence)`}
         >
-          <Check size={14} className="text-green-600" />
+          <Check size={14} className="text-ledger-accent" />
         </Button>
       </div>
     );
@@ -1326,40 +1326,40 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
     let statusText = 'Processing...';
     let icon = <Loader2 className="h-4 w-4 animate-spin mr-2" />;
-    let colorClass = 'bg-blue-500';
+    let colorClass = 'bg-ledger-accent';
 
     switch (currentStatus) {
       case 'uploading':
         statusText = 'Uploading...';
-        colorClass = 'bg-blue-500';
+        colorClass = 'bg-ledger-accent';
         break;
       case 'uploaded':
         statusText = 'Preparing for AI Processing...';
-        colorClass = 'bg-indigo-500';
+        colorClass = 'bg-ledger-panel';
         break;
       case 'processing':
         statusText = 'AI Processing...';
-        colorClass = 'bg-purple-500';
+        colorClass = 'bg-ledger-panel-2';
         break;
       case 'failed':
         statusText = 'Processing Failed';
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
-        colorClass = 'bg-red-500';
+        colorClass = 'bg-ledger-danger';
         break;
       case 'failed_ai':
         statusText = 'AI Processing Failed';
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
-        colorClass = 'bg-red-500';
+        colorClass = 'bg-ledger-danger';
         break;
       case 'failed_ocr':
         statusText = 'OCR Processing Failed';
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
-        colorClass = 'bg-red-500';
+        colorClass = 'bg-ledger-danger';
         break;
       case 'cancelled':
         statusText = 'Processing Cancelled';
         icon = <AlertTriangle className="h-4 w-4 mr-2" />;
-        colorClass = 'bg-amber-500';
+        colorClass = 'bg-ledger-amber';
         break;
     }
 
@@ -1404,7 +1404,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
         {/* Show error details if available */}
         {hasErrorDetails && (
-          <div className={`text-sm px-3 py-2 rounded-md ${isResourceLimitError ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
+          <div className={`text-sm px-3 py-2 rounded-md ${isResourceLimitError ? 'bg-ledger-amber-soft text-ledger-amber' : 'bg-ledger-danger-soft text-ledger-danger'}`}>
             {isResourceLimitError ? (
               <>
                 <p className="font-medium">Resource Limit Exceeded</p>
@@ -1639,7 +1639,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                             <Button
                               variant="secondary"
                               size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-red-500/10 hover:text-red-500"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-ledger-danger/10 hover:text-ledger-danger"
                               onClick={() => {
                                 if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
                                   deleteMutation.mutate();
@@ -1712,7 +1712,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
                 {imageError ? (
                   <>
-                    <AlertTriangle size={64} className="mb-4 text-amber-500" />
+                    <AlertTriangle size={64} className="mb-4 text-ledger-amber" />
                     <p className="text-center mb-2">Failed to load receipt image</p>
                     <p className="text-xs text-center text-muted-foreground mb-4">
                       The image URL may be invalid or the image may no longer exist.
@@ -1952,7 +1952,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   />
                   <CalendarIcon
                     size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200 pointer-events-none"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-ledger-muted pointer-events-none"
                   />
                   <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                     <PopoverTrigger asChild>
@@ -1963,7 +1963,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                         aria-label="Open calendar date picker"
                         className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 border border-input bg-background/70 hover:bg-accent"
                       >
-                        <CalendarIcon size={16} className="text-muted-foreground dark:text-blue-200" />
+                        <CalendarIcon size={16} className="text-ledger-muted" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto overflow-hidden p-0" align="end">
@@ -2013,7 +2013,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     {isManualTotal && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Pencil size={14} className="text-amber-600 cursor-help" />
+                          <Pencil size={14} className="text-ledger-amber cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Manual override</p>
@@ -2023,7 +2023,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     {!isManualTotal && lineItemsTotal > 0 && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Calculator size={14} className="text-green-600 cursor-help" />
+                          <Calculator size={14} className="text-ledger-accent cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Auto calculated price from line items</p>
@@ -2040,14 +2040,14 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     step="0.01"
                     value={inputValues.total || 0}
                     onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
-                    className={`bg-background/50 pl-9 ${isManualTotal ? 'border-amber-300 focus:border-amber-500' : ''}`}
+                    className={`bg-background/50 pl-9 ${isManualTotal ? 'border-ledger-amber focus:border-ledger-amber' : ''}`}
                     onMouseEnter={() => handleFieldHover('total')}
                     onMouseLeave={() => handleFieldHover(null)}
                   />
-                  <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                  <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ledger-muted" />
                 </div>
                 {isManualTotal && lineItemsTotal > 0 && (
-                  <div className="flex items-center justify-between text-xs text-amber-600">
+                  <div className="flex items-center justify-between text-xs text-ledger-amber">
                     <span>Total manually overridden. Line items sum: {formatCurrency(lineItemsTotal)}</span>
                     <Button
                       variant="outline"
@@ -2099,7 +2099,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     onMouseEnter={() => handleFieldHover('payment_method')}
                     onMouseLeave={() => handleFieldHover(null)}
                   />
-                  <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground dark:text-blue-200" />
+                  <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ledger-muted" />
                 </div>
                 {renderSuggestion('payment_method', 'payment method')}
               </div>
@@ -2234,7 +2234,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   </>
                 ) : saveStatus === 'saved' ? (
                   <>
-                    <CheckCircle size={16} className="mr-2 text-green-500" />
+                    <CheckCircle size={16} className="mr-2 text-ledger-accent" />
                     Saved
                   </>
                 ) : saveStatus === 'failed' ? (

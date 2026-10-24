@@ -1,1320 +1,524 @@
-import React, { useState, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { format, addDays, startOfDay } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-
-
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  eachDayOfInterval,
+  eachMonthOfInterval,
+  endOfDay,
+  format,
+  startOfDay,
+  startOfMonth,
+  startOfQuarter,
+  startOfYear,
+  subDays,
+} from "date-fns";
+import { BarChart3, Download, Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-
+import { EmptyState } from "@/components/ledger/EmptyState";
+import { KpiCard } from "@/components/ledger/KpiCard";
+import { Panel } from "@/components/ledger/Panel";
+import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
+import { useDashboardTranslation, useLanguage } from "@/contexts/LanguageContext";
+import { useTeam } from "@/contexts/TeamContext";
+import { fetchUserPayers } from "@/services/paidByService";
+import {
+  fetchDailyExpenses,
+  fetchExpensesByCategory,
+  fetchReceiptDetailsForRange,
+} from "@/services/supabase/analysis";
+import type { ReceiptSummary } from "@/services/supabase/analysis";
+import type { PaidBy } from "@/types/receipt";
 import { cn } from "@/lib/utils";
-// Import Shadcn UI Tabs
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrencySafe } from "@/utils/currency";
 
-// Import Lucide icons
-import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2, Loader2 } from "lucide-react";
+type RangeKey = "month" | "last30" | "quarter" | "year";
 
-// Import services and types
-import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
-import { fetchUserPayers } from '@/services/paidByService';
-import { PaidBy } from '@/types/receipt';
-import { useTeam } from '@/contexts/TeamContext';
-import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar, RadialBarChart, RadialBar } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+const RANGE_ORDER: RangeKey[] = ["month", "last30", "quarter", "year"];
+const CURRENCY = "MYR";
+const LOCALE_BY_LANGUAGE = {
+  en: "en-MY",
+  ms: "ms-MY",
+} as const;
 
-// Import ReceiptViewer and related types/functions
-import ReceiptViewer from '@/components/ReceiptViewer';
-import { fetchReceiptById } from '@/services/receiptService';
-import { ReceiptWithDetails } from '@/types/receipt';
+const getLocale = (language: string) => LOCALE_BY_LANGUAGE[language as keyof typeof LOCALE_BY_LANGUAGE] ?? "en-MY";
 
-import { supabase } from '@/integrations/supabase/client'; // Corrected supabase client import path
-
-// Import the new DailyReceiptBrowserModal
-import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
-
-// Import currency utility
-import { formatCurrencySafe } from '@/utils/currency';
-
-// Import download utility
-import { downloadDailyExpenseReport } from '@/lib/export/dailyExpenseReportDownload';
-
-// Currency formatting function
-const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
-  return formatCurrencySafe(amount, currencyCode, 'en-US', 'MYR');
-};
-
-// Date formatting function for charts (short format)
-const formatChartDate = (dateString: string) => {
+const monthName = (date: Date, language: string) => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch (e) {
-    return dateString;
+    return new Intl.DateTimeFormat(getLocale(language), { month: "long", year: "numeric" }).format(date);
+  } catch {
+    return format(date, "MMMM yyyy");
   }
 };
 
-// Date formatting function for table (full format)
-const formatFullDate = (dateString: string) => {
+const shortMonth = (date: Date, language: string) => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch (e) {
-    return dateString;
+    return new Intl.DateTimeFormat(getLocale(language), { month: "short" }).format(date);
+  } catch {
+    return format(date, "MMM");
   }
 };
 
-// Define color constants for charts and UI elements
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#DD8888', '#82CA9D'];
+const dayLabel = (date: Date, language: string) => {
+  try {
+    return new Intl.DateTimeFormat(getLocale(language), { day: "numeric", month: "short" }).format(date);
+  } catch {
+    return format(date, "d MMM");
+  }
+};
 
-// Define the enhanced data structure for the table
-type EnhancedDailyExpenseData = {
-  date: string;
+interface TrendPoint {
+  key: string;
+  label: string;
+  caption: string;
   total: number;
-  receiptIds: string[];
-  topMerchant: string;
-  paymentMethod: string;
-};
-
-// ExpenseStats Component
-interface ExpenseStatsProps {
-  totalExpenses: number;
-  totalReceipts: number;
-  averagePerReceipt: number;
-  dateRange: DateRange | undefined;
-  onDateRangeClick: (range: DateRange | undefined) => void;
 }
 
-const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
-  // Format date range for display
-  const formattedDateRange = dateRange?.from && dateRange?.to
-    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-    : 'All time';
-
-  const stats = [
-    {
-      title: "Total Expenses",
-      value: formatCurrency(totalExpenses),
-      period: formattedDateRange,
-      icon: CreditCard,
-      trend: "",  // We'll leave trends empty since we don't have trend data yet
-      trendUp: true
-    },
-    {
-      title: "Total Receipts",
-      value: totalReceipts.toString(),
-      period: formattedDateRange,
-      icon: Receipt,
-      trend: "",
-      trendUp: true
-    },
-    {
-      title: "Average Per Receipt",
-      value: formatCurrency(averagePerReceipt),
-      period: formattedDateRange,
-      icon: Receipt,
-      trend: "",
-      trendUp: true
-    }
-  ];
-
+function AnalysisSkeleton() {
   return (
-    <Card className="border border-border/40 shadow-sm h-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base sm:text-lg">Financial Summary</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6 pt-2">
-        <div className="grid gap-4 sm:gap-6">
-          {stats.map((stat, index) => (
-            <div key={index} className="flex items-start justify-between">
-              <div className="space-y-1 flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground break-words">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.period}</p>
-                {stat.trend && (
-                  <p className={`text-sm flex items-center gap-1 ${stat.trendUp ? 'text-green-600' : 'text-red-600'}`}>
-                    <TrendingUp className={`w-4 h-4 ${stat.trendUp ? '' : 'rotate-180'}`} />
-                    {stat.trend}
-                  </p>
-                )}
-              </div>
-              <div className="p-2 sm:p-3 bg-primary/10 rounded-lg flex-shrink-0 ml-3">
-                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// CategoryPieChart Component
-interface CategoryPieChartProps {
-  categoryData: CategoryExpenseData[];
-  isLoading?: boolean;
-  dateCaption?: string;
-}
-
-const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading, dateCaption }) => {
-  if (isLoading) {
-    return (
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div>
-            <CardTitle>Expenses by Category</CardTitle>
-            {dateCaption && (
-              <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
-                {dateCaption}
-              </CardDescription>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[300px]">
-          <p className="text-muted-foreground">Loading...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const chartData = categoryData.map((category, index) => ({
-    name: category.category || 'Uncategorized',
-    value: category.total_spent,
-    color: COLORS[index % COLORS.length],
-  }));
-
-  return (
-    <Card className="border border-border/40 shadow-sm h-full">
-      <CardHeader className="pb-3">
-        <div>
-          <CardTitle className="text-base sm:text-lg">Expenses by Category</CardTitle>
-          {dateCaption && (
-            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
-              {dateCaption}
-            </CardDescription>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[250px] sm:h-[300px]">
-          {chartData.length > 0 ? (
-            <ChartContainer config={{}} className="h-full w-full" style={{ aspectRatio: 'auto' }}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <ChartTooltip
-                  content={<ChartTooltipContent className="bg-background text-foreground" />}
-                  formatter={(value: any, name: any, item: any) => [
-                    formatCurrency(value as number),
-                    item?.payload?.name ?? name
-                  ]}
-                  labelFormatter={(label: any) => label}
-                />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ChartContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No category data available</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// CategoryRadialChart Component (Shadcn UI pattern)
-interface CategoryRadialChartProps {
-  categoryData: CategoryExpenseData[];
-  isLoading?: boolean;
-  dateCaption?: string;
-}
-
-const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData, isLoading, dateCaption }) => {
-  // Use same date caption as Financial Summary for consistency
-  const formatDateRangeForCaption = dateCaption || ''
-  if (isLoading) {
-    return (
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Category Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[300px]">
-          <p className="text-muted-foreground">Loading...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Transform category data for stacked radial: top 3 concentric rings
-  const sorted = [...categoryData].sort((a, b) => b.total_spent - a.total_spent)
-  const top3 = sorted.slice(0, 3)
-  const total = categoryData.reduce((s, c) => s + c.total_spent, 0)
-
-  const ringData = top3.map((c, idx) => ({
-    name: c.category || 'Uncategorized',
-    value: total > 0 ? Math.round((c.total_spent / total) * 100) : 0,
-    color: COLORS[idx % COLORS.length]
-  }))
-
-  // Individual arrays for each ring (one datum per RadialBar)
-  const ring1 = ringData[0] ? [{ ...ringData[0], index: 0 }] : []
-  const ring2 = ringData[1] ? [{ ...ringData[1], index: 1 }] : []
-  const ring3 = ringData[2] ? [{ ...ringData[2], index: 2 }] : []
-
-  const radialChartConfig = {
-    ring1: { label: ringData[0]?.name, color: ringData[0]?.color },
-    ring2: { label: ringData[1]?.name, color: ringData[1]?.color },
-    ring3: { label: ringData[2]?.name, color: ringData[2]?.color },
-  } as const;
-
-  return (
-    <Card className="border border-border/40 shadow-sm h-full">
-      <CardHeader className="pb-3">
-        <div>
-          <CardTitle className="text-base sm:text-lg">Category Analysis</CardTitle>
-          <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
-            {formatDateRangeForCaption}
-          </CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[250px] sm:h-[300px]">
-          {categoryData.length > 0 ? (
-            <ChartContainer className="h-full w-full" style={{ aspectRatio: 'auto' }} config={radialChartConfig}>
-              <RadialBarChart data={ringData} cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" startAngle={90} endAngle={-270}>
-                {/* Center label */}
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm">
-                  Top 3
-                </text>
-                {/* Ring 1: Top category */}
-                <RadialBar data={ring1} dataKey="value" nameKey="name" cornerRadius={10}
-                  innerRadius="65%" outerRadius="90%"
-                  fill={ringData[0]?.color || 'hsl(var(--primary))'} />
-                {/* Ring 2: Second top category */}
-                <RadialBar data={ring2} dataKey="value" nameKey="name" cornerRadius={10}
-                  innerRadius="45%" outerRadius="65%"
-                  fill={ringData[1]?.color || 'hsl(var(--muted-foreground))'} />
-                {/* Ring 3: Third top category */}
-                <RadialBar data={ring3} dataKey="value" nameKey="name" cornerRadius={10}
-                  innerRadius="25%" outerRadius="45%"
-                  fill={ringData[2]?.color || 'hsl(var(--accent))'} />
-                <ChartTooltip
-                  content={<ChartTooltipContent className="bg-background text-foreground" />}
-                  formatter={(value: any, _name: any, item: any) => [
-                    `${value}%`, item?.payload?.name ?? 'Category'
-                  ]}
-                  labelFormatter={() => ''}
-                />
-              </RadialBarChart>
-            </ChartContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No category data available</p>
-            </div>
-          )}
-        </div>
-
-        {/* Legend */}
-        {ringData.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2 text-xs">
-            {ringData.map((r, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-[2px]" style={{ backgroundColor: r.color }} />
-                <span className="text-foreground truncate">{r.name}</span>
-                <span className="ml-auto font-mono tabular-nums text-muted-foreground">{r.value}%</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-      </CardContent>
-    </Card>
-  );
-};
-
-// ExpenseChart Component
-interface ExpenseChartProps {
-  dailyData: EnhancedDailyExpenseData[];
-  isLoading?: boolean;
-  dateRange: DateRange | undefined;
-  onDateRangeChange: (range: DateRange | undefined) => void;
-}
-
-const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange, onDateRangeChange }) => {
-  // Add state for chart type toggle
-  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
-
-  // Format date range for display (must be before any early returns to maintain hooks order)
-  const formattedDateRange = dateRange?.from && dateRange?.to
-    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-    : 'Filter Date Range';
-
-  // Handle date selection
-  const handleDateSelect = React.useCallback((range: DateRange | undefined) => {
-    if (onDateRangeChange) {
-      onDateRangeChange(range);
-    }
-  }, [onDateRangeChange]);
-
-  if (isLoading) {
-    return (
-      <Card className="border border-border/40 shadow-sm">
-        <CardHeader>
-          <CardTitle>Daily Expense Trend</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[350px]">
-          <p className="text-muted-foreground">Loading...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Process and enhance chart data
-  const sortedData = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  const chartData = sortedData.map(day => ({
-    date: formatChartDate(day.date),
-    fullDate: day.date,
-    amount: day.total,
-    receipts: day.receiptIds.length
-  }));
-
-  // Calculate statistics for annotations
-  const totalExpenses = chartData.reduce((sum, day) => sum + day.amount, 0);
-  const avgExpenses = totalExpenses / (chartData.length || 1);
-  const maxExpenses = Math.max(...chartData.map(d => d.amount), 0);
-  const peakDay = chartData.find(d => d.amount === maxExpenses);
-
-  // Custom tooltip to display more information
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="p-3 bg-popover border border-border rounded-md shadow-md">
-          <p className="font-medium text-sm mb-1 text-popover-foreground">{format(new Date(data.fullDate), 'MMM d, yyyy')}</p>
-          <p className="text-sm text-popover-foreground mb-1">
-            <span className="font-medium">Expenses:</span> {formatCurrency(data.amount)}
-          </p>
-          <p className="text-xs text-popover-foreground/80">
-            {data.receipts} {data.receipts === 1 ? 'receipt' : 'receipts'}
-          </p>
-          {data.amount > avgExpenses && (
-            <p className="text-xs text-destructive mt-1">
-              {((data.amount / avgExpenses - 1) * 100).toFixed(0)}% above average
-            </p>
-          )}
-          {data.amount < avgExpenses && (
-            <p className="text-xs text-green-500 mt-1">
-              {((1 - data.amount / avgExpenses) * 100).toFixed(0)}% below average
-            </p>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Toggle chart type handler
-  const toggleChartType = () => {
-    setChartType(prev => prev === 'line' ? 'bar' : 'line');
-  };
-
-
-
-  return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-base sm:text-lg">Daily Expense Trend</CardTitle>
-          {chartData.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1 break-words">
-              Average daily expenses: {formatCurrency(avgExpenses)}
-              {dateRange?.from && dateRange?.to && (
-                <span className="hidden sm:inline">
-                  {` (${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')})`}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-        {/* Date Range Picker and Chart Type Toggle */}
-        <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <CalendarIcon className="w-4 h-4" />
-                <span className="text-xs hidden xs:inline">{formattedDateRange}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-3">
-                <Calendar
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={(range) => {
-                    console.log('Calendar onSelect called with:', range);
-                    console.log('Current dateRange:', dateRange);
-                    handleDateSelect(range);
-                  }}
-                  numberOfMonths={2}
-                  showOutsideDays={true}
-                />
-                {dateRange?.from && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-3 w-full"
-                    onClick={() => handleDateSelect(undefined)}
-                  >
-                    Clear Selection
-                  </Button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleChartType}
-            className="flex items-center gap-1"
-          >
-            {chartType === 'line' ? (
-              <>
-                <BarChart2 className="h-4 w-4" />
-                <span className="text-xs hidden xs:inline">Bar View</span>
-              </>
-            ) : (
-              <>
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-xs hidden xs:inline">Line View</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px] sm:h-[350px]">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              {chartType === 'line' ? (
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  className="[&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground [&_.recharts-reference-line-label]:fill-foreground dark:[&_.recharts-dot]:stroke-opacity-100 dark:[&_.recharts-dot]:fill-primary/90 dark:[&_.recharts-dot]:stroke-gray-900 dark:[&_.recharts-activedot]:stroke-gray-900 dark:[&_.recharts-activedot]:fill-primary dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-reference-line]:stroke-gray-500"
-                >
-                  <defs>
-                    <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={true}
-                    horizontal={true}
-                    stroke="var(--border)"
-                    opacity={0.4}
-                    className="dark:opacity-60"
-                  />
-
-                  <XAxis
-                    dataKey="date"
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--border)' }}
-                    padding={{ left: 10, right: 10 }}
-                    tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
-                    className="dark:stroke-gray-500"
-                  />
-
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--border)' }}
-                    tickFormatter={(value) => `MYR ${value}`}
-                    tick={{ fill: 'var(--foreground)', className: 'dark:fill-gray-300' }}
-                    className="dark:stroke-gray-500"
-                  />
-
-                  <Tooltip content={<CustomTooltip />} />
-
-                  {/* Area under the line chart */}
-                  <Area
-                    type="monotone"
-                    dataKey="amount"
-                    stroke="var(--primary)"
-                    strokeWidth={0}
-                    fillOpacity={1}
-                    fill="url(#colorAmount)"
-                    className="dark:opacity-30"
-                  />
-
-                  {/* Average expenses reference line */}
-                  <ReferenceLine
-                    y={avgExpenses}
-                    stroke="var(--muted-foreground)"
-                    strokeDasharray="3 3"
-                    className="dark:stroke-gray-400"
-                    label={{
-                      value: 'Average',
-                      position: 'insideTopRight',
-                      fill: 'var(--muted-foreground)',
-                      fontSize: 11,
-                      className: 'recharts-reference-line-label dark:fill-gray-300'
-                    }}
-                  />
-
-                  {/* Vertical lines from points to axis */}
-                  {chartData.map((entry, index) => (
-                    <ReferenceLine
-                      key={`ref-line-${index}`}
-                      x={entry.date}
-                      stroke="var(--primary)"
-                      strokeOpacity={0.4}
-                      strokeDasharray="3 3"
-                      segment={[{ y: 0 }, { y: entry.amount }]}
-                      className="dark:opacity-60"
-                    />
-                  ))}
-
-                  {/* Main line */}
-                  <Line
-                    type="monotone"
-                    dataKey="amount"
-                    stroke="var(--primary)"
-                    strokeWidth={2.5}
-                    className="stroke-primary stroke-opacity-100 dark:stroke-primary dark:stroke-opacity-100 dark:brightness-125"
-                    dot={{
-                      stroke: 'var(--primary)',
-                      strokeWidth: 3,
-                      fill: 'var(--card)',
-                      r: 5,
-                      className: 'stroke-primary fill-card stroke-opacity-100 dark:stroke-primary dark:fill-gray-900 dark:stroke-opacity-100 dark:brightness-125'
-                    }}
-                    activeDot={{
-                      stroke: 'var(--card)',
-                      strokeWidth: 3,
-                      fill: 'var(--primary)',
-                      r: 7,
-                      className: 'stroke-card fill-primary stroke-opacity-100 dark:stroke-gray-900 dark:fill-primary dark:brightness-125'
-                    }}
-                  />
-                </LineChart>
-              ) : (
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  className="
-                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground
-                    [&_.recharts-legend-item-text]:fill-foreground
-                    [&_.recharts-rectangle]:stroke-opacity-30
-                    dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600
-                    dark:[&_.recharts-reference-line]:stroke-gray-500
-                    dark:[&_.recharts-rectangle]:brightness-125
-                    [&_.recharts-cartesian-axis-line]:stroke-border [&_.recharts-cartesian-axis-line]:stroke-opacity-80 dark:[&_.recharts-cartesian-axis-line]:stroke-gray-600 dark:[&_.recharts-cartesian-axis-line]:stroke-opacity-100
-                    [&_.recharts-reference-line-label]:fill-muted-foreground dark:[&_.recharts-reference-line-label]:fill-gray-300
-                    [&_.recharts-cartesian-axis-tick-value]:fill-foreground dark:[&_.recharts-cartesian-axis-tick-value]:fill-gray-300
-                  "
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={true}
-                    horizontal={true}
-                    stroke="var(--border)"
-                    opacity={0.4}
-                    className="dark:opacity-60"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--border)' }}
-                    tick={{
-                      fill: 'var(--foreground)',
-                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300'
-                    }}
-                    className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
-                  />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--border)' }}
-                    tickFormatter={(value) => `MYR ${value}`}
-                    tick={{
-                      fill: 'var(--foreground)',
-                      className: 'fill-foreground fill-opacity-100 dark:fill-gray-300'
-                    }}
-                    className="stroke-border stroke-opacity-80 dark:stroke-gray-600 dark:stroke-opacity-100"
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine
-                    y={avgExpenses}
-                    stroke="var(--muted-foreground)"
-                    strokeDasharray="3 3"
-                    className="stroke-muted-foreground stroke-opacity-100 stroke-dasharray-3 dark:stroke-gray-400"
-                    label={{
-                      value: 'Average',
-                      position: 'insideTopRight',
-                      fill: 'var(--muted-foreground)',
-                      fontSize: 11,
-                      className: 'recharts-reference-line-label fill-muted-foreground fill-opacity-100 dark:fill-gray-300'
-                    }}
-                  />
-                  <Bar
-                    dataKey="amount"
-                    radius={[4, 4, 0, 0]}
-                    barSize={20}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.amount > avgExpenses ? 'var(--destructive)' : 'var(--primary)'}
-                        className={cn(
-                          'fill-opacity-95',
-                          'stroke-gray-200 stroke-width-1',
-                          'dark:fill-opacity-100',
-                          'dark:brightness-125',
-                          entry.amount > avgExpenses ? 'dark:fill-red-300' : 'dark:fill-blue-300',
-                          'dark:stroke-gray-800 dark:stroke-width-1'
-                        )}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              )}
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No expense data available</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-// ExpenseTable Component
-interface ExpenseTableProps {
-  sortedData: EnhancedDailyExpenseData[];
-  onViewReceipts: (date: string, receiptIds: string[]) => void;
-  isLoading?: boolean;
-}
-
-const ExpenseTable: React.FC<ExpenseTableProps> = ({
-  sortedData,
-  onViewReceipts,
-  isLoading
-}) => {
-  // State to track which download button is currently loading
-  const [downloadingDate, setDownloadingDate] = useState<string | null>(null);
-
-  // Handle download report for a specific date
-  const handleDownloadReport = async (dateString: string) => {
-    try {
-      setDownloadingDate(dateString);
-
-      // Validate and convert date string to Date object
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        throw new Error('Invalid date format');
-      }
-
-      // Call the download utility function
-      const result = await downloadDailyExpenseReport(date, {
-        includeImages: true,
-        onLoadingChange: (isLoading) => {
-          // The utility function handles its own toast notifications
-          // We keep our button loading state until the operation completes
-        }
-      });
-
-      // Log the result for debugging
-      if (result.success) {
-        console.log(`Successfully downloaded report for ${dateString}`);
-      } else {
-        console.error(`Failed to download report for ${dateString}:`, result.error);
-      }
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      // The utility function already shows error toasts, so we don't need to show another one
-    } finally {
-      setDownloadingDate(null);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Daily Expense Details</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[200px]">
-          <p className="text-muted-foreground">Loading...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="border border-border/40 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-base sm:text-lg">Daily Expense Details</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6">
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="relative">
-            <TableHeader>
-              <TableRow className="border-b border-border/50">
-                <TableHead className="min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Date</TableHead>
-                <TableHead className="min-w-[120px] font-semibold text-foreground/90 py-3 px-4">Receipts</TableHead>
-                <TableHead className="min-w-[120px] hidden sm:table-cell font-semibold text-foreground/90 py-3 px-4">Top Merchant</TableHead>
-                <TableHead className="min-w-[100px] hidden md:table-cell font-semibold text-foreground/90 py-3 px-4">Payment Method</TableHead>
-                <TableHead className="text-right min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Total Expenses</TableHead>
-                <TableHead className="text-center min-w-[80px] w-[80px] hidden xs:table-cell font-semibold text-foreground/90 py-3 px-4">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedData.length > 0 ? sortedData.map(({ date, total, receiptIds = [], topMerchant, paymentMethod }, index) => (
-                <TableRow
-                  key={date}
-                  className={`
-                    ${index % 2 === 0 ? 'bg-muted/20 dark:bg-muted/50' : ''}
-                    hover:bg-muted/30 dark:hover:bg-muted/60 transition-colors duration-150
-                    border-b border-border/30 last:border-b-0
-                  `}
-                >
-                  <TableCell data-label="Date" className="font-medium py-3 px-4">
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">{formatFullDate(date)}</span>
-                        {/* Show download button on very small screens (xs) */}
-                        {receiptIds.length > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadReport(date)}
-                            disabled={downloadingDate === date}
-                            className="h-6 w-6 p-0 xs:hidden hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50 ml-2"
-                            title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
-                          >
-                            {downloadingDate === date ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Download className="w-3 h-3" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                      {/* Show merchant and payment method on mobile when hidden columns */}
-                      <div className="sm:hidden text-xs text-muted-foreground mt-1">
-                        <div>{topMerchant}</div>
-                        <div className="md:hidden">{paymentMethod}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell data-label="Receipts" className="py-3 px-4">
-                    {receiptIds.length > 0 ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onViewReceipts(date, receiptIds)}
-                        className="h-auto py-1 px-2 text-xs flex items-center gap-1"
-                        title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
-                      >
-                        <Receipt className="w-3 h-3" />
-                        <span className="hidden xs:inline">{receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}</span>
-                        <span className="xs:hidden">{receiptIds.length}</span>
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No Receipts</span>
-                    )}
-                  </TableCell>
-                  <TableCell data-label="Top Merchant" className="hidden sm:table-cell py-3 px-4">{topMerchant}</TableCell>
-                  <TableCell data-label="Payment Method" className="hidden md:table-cell py-3 px-4">{paymentMethod}</TableCell>
-                  <TableCell data-label="Total Expenses" className="text-right font-medium py-3 px-4">{formatCurrency(total)}</TableCell>
-                  <TableCell data-label="Actions" className="text-center hidden xs:table-cell py-3 px-4">
-                    {receiptIds.length > 0 ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownloadReport(date)}
-                        disabled={downloadingDate === date}
-                        className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50"
-                        title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
-                      >
-                        {downloadingDate === date ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                      </Button>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
-                    No expense data available for this period
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface PayerExpenseData {
-  payer_name: string;
-  total_spent: number;
-  receipt_count: number;
-}
-
-interface PayerPieChartProps {
-  payerData: PayerExpenseData[];
-  isLoading: boolean;
-  dateCaption: string;
-}
-
-const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dateCaption }) => {
-  if (isLoading) {
-    return (
-      <Card className="border border-border/40 shadow-sm h-full">
-        <CardHeader className="pb-3">
-          <div>
-            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
-            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!payerData || payerData.length === 0) {
-    return (
-      <Card className="border border-border/40 shadow-sm h-full">
-        <CardHeader className="pb-3">
-          <div>
-            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
-            <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px]">
-          <p className="text-muted-foreground text-sm">No payer data available</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const totalSpent = payerData.reduce((sum, p) => sum + p.total_spent, 0);
-
-  // Build chart data with explicit color assignment for consistent legend
-  const chartData = payerData.map((p, index) => ({
-    ...p,
-    fill: COLORS[index % COLORS.length],
-  }));
-
-  return (
-    <Card className="border border-border/40 shadow-sm h-full">
-      <CardHeader className="pb-3">
-        <div>
-          <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
-          <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[220px]">
-          <ChartContainer config={{}} className="h-full w-full" style={{ aspectRatio: 'auto' }}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={40}
-                outerRadius={75}
-                paddingAngle={2}
-                dataKey="total_spent"
-                nameKey="payer_name"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Pie>
-              <ChartTooltip
-                content={<ChartTooltipContent className="bg-background text-foreground" />}
-                formatter={(value: any, name: any, item: any) => [
-                  formatCurrency(value as number),
-                  item?.payload?.payer_name ?? name
-                ]}
-                labelFormatter={(label: any) => label}
-              />
-            </PieChart>
-          </ChartContainer>
-        </div>
-        {/* Custom legend below the chart to prevent cut-off */}
-        {chartData.length > 0 && (
-          <div className="mt-2 flex flex-col gap-1.5 text-xs">
-            {chartData.map((entry, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-[2px] flex-shrink-0" style={{ backgroundColor: entry.fill }} />
-                <span className="text-foreground truncate">{entry.payer_name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-const AnalysisPage = () => {
-  const queryClient = useQueryClient();
-  const { currentTeam } = useTeam();
-
-  // State for date range picker
-  const [date, setDate] = React.useState<DateRange | undefined>(() => {
-    const today = new Date();
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(today.getMonth() - 1);
-    return {
-      from: oneMonthAgo,
-      to: today,
-    };
-  });
-
-  // Handle date change
-  const handleDateChange = React.useCallback((newDate: DateRange | undefined) => {
-    setDate(newDate);
-  }, []);
-
-  // State for managing the active tab
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
-
-  // NEW STATE: For the DailyReceiptBrowserModal
-  const [dailyReceiptBrowserData, setDailyReceiptBrowserData] = useState<{ date: string; receiptIds: string[] } | null>(null);
-
-  // Prepare ISO strings for API calls
-  const startDateISO = date?.from ? date.from.toISOString() : null;
-  const endDateISO = date?.to ? startOfDay(addDays(date.to, 1)).toISOString() : null;
-
-  // Fetch daily expense data - using new function and select transformation
-  const { data: enhancedDailyExpenseData, isLoading: isLoadingDaily, error: dailyError } = useQuery<
-    ReceiptSummary[], // Fetch raw summaries
-    Error,
-    EnhancedDailyExpenseData[] // Select transforms to this
-  >({
-    queryKey: ['dailyExpenseDetails', startDateISO, endDateISO], // Updated queryKey
-    queryFn: () => fetchReceiptDetailsForRange(startDateISO, endDateISO), // Use the new fetch function
-    select: (receipts) => { // Apply the transformation logic
-      const grouped = receipts.reduce((acc, receipt) => {
-        // Ensure date is handled correctly (extract date part)
-        const date = (receipt.date || '').split('T')[0];
-        if (!date) return acc; // Skip if date is invalid
-        if (!acc[date]) acc[date] = [];
-        acc[date].push(receipt);
-        return acc;
-      }, {} as Record<string, ReceiptSummary[]>);
-
-      const dailyData: EnhancedDailyExpenseData[] = Object.entries(grouped).map(([date, dayReceipts]) => {
-        const total = dayReceipts.reduce((sum, r) => sum + (r.total || 0), 0);
-        const receiptIds = dayReceipts.map(r => r.id);
-
-        // Find receipt with highest total (handle empty dayReceipts)
-        const topReceipt = dayReceipts.length > 0
-          ? dayReceipts.reduce((max, r) => ((r.total || 0) > (max?.total || 0) ? r : max), dayReceipts[0])
-          : null; // Handle cases with no receipts for a day
-
-        const topMerchant = topReceipt?.merchant || 'Unknown';
-        // Use payment_method from top receipt, default to N/A
-        const paymentMethod = topReceipt?.payment_method || 'N/A';
-
-        return { date, total, receiptIds, topMerchant, paymentMethod };
-      });
-
-      // Ensure data is sorted by date descending by default for the table view later
-      // Although fetched ascending, the select output might not preserve order strictly
-      return dailyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    },
-    enabled: !!date, // Only fetch if date range is set
-  });
-
-  // Fetch category breakdown data (updated to use new function)
-  const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategoryExpenseData[], Error>({
-    queryKey: ['expensesByCategory', startDateISO, endDateISO],
-    queryFn: () => fetchExpensesByCategory(startDateISO, endDateISO),
-    enabled: !!date,
-  });
-
-  const totalCategoryExpenses = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
-
-  // Fetch all user payers (uses RPC with proper permissions)
-  const { data: allPayers = [], isSuccess: payersLoaded } = useQuery<PaidBy[]>({
-    queryKey: ['user-payers', currentTeam?.id],
-    queryFn: () => fetchUserPayers({ currentTeam }),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
-
-  const payerExpenseData = React.useMemo(() => {
-    if (!enhancedDailyExpenseData) return [];
-
-    // Wait for payers to load before computing
-    if (!payersLoaded) {
-      console.log('[PayerData] Waiting for payers to load...', { payersLoaded });
-      return [];
-    }
-
-    const rawReceipts = queryClient.getQueryData<any[]>(['dailyExpenseDetails', startDateISO, endDateISO]);
-    if (!rawReceipts) return [];
-
-    const payerMap = new Map<string, { total: number; count: number }>();
-    for (const r of rawReceipts) {
-      const key = r.paid_by_id ?? '__none__';
-      const curr = payerMap.get(key) ?? { total: 0, count: 0 };
-      curr.total += Number(r.total) || 0;
-      curr.count += 1;
-      payerMap.set(key, curr);
-    }
-
-    const payerNameMap: Record<string, string> = {};
-    for (const p of allPayers) payerNameMap[p.id] = p.name;
-
-    console.log('[PayerData] Building expense data', {
-      payerMap: Array.from(payerMap.keys()),
-      payerNameMap,
-      allPayers
-    });
-
-    const result: PayerExpenseData[] = [];
-    payerMap.forEach((val, key) => {
-      const payerName = key === '__none__' ? 'No Payer' : (payerNameMap[key] ?? 'Unknown Payer');
-      console.log(`[PayerData] Mapping ${key} -> ${payerName}`);
-      result.push({
-        payer_name: payerName,
-        total_spent: val.total,
-        receipt_count: val.count,
-      });
-    });
-
-    return result.sort((a, b) => b.total_spent - a.total_spent);
-  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, startDateISO, endDateISO]);
-
-  // Data for the line chart (needs adjustment if data source changes)
-  const aggregatedChartData = React.useMemo(() => {
-    // Create data suitable for the chart (date, total) from enhanced data
-    // Ensure it's sorted chronologically for the line chart
-    return [...(enhancedDailyExpenseData || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [enhancedDailyExpenseData]);
-
-  // Calculate total expenses from transformed data
-  const totalExpenses = React.useMemo(() => {
-    return enhancedDailyExpenseData?.reduce((sum, item) => sum + item.total, 0) || 0;
-  }, [enhancedDailyExpenseData]);
-
-  // Calculate average per receipt from transformed data
-  const averagePerReceipt = React.useMemo(() => {
-    const totalReceipts = enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0;
-    if (totalReceipts === 0) return 0;
-    return totalExpenses / totalReceipts;
-  }, [enhancedDailyExpenseData, totalExpenses]);
-
-  // Format selected date range for display
-  const formattedDateRange = React.useMemo(() => {
-    if (date?.from) {
-      if (date.to) {
-        return `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`;
-      }
-      return format(date.from, "LLL dd, y");
-    }
-    return "Select Date Range";
-  }, [date]);
-
-  // Sort the daily expense data for the table (default descending by date)
-  const sortedDailyExpenseDataForTable = React.useMemo(() => {
-    // Data is already sorted descending in the select transformation,
-    // but we can re-sort here if needed for future sorting features.
-    return [...(enhancedDailyExpenseData || [])];
-  }, [enhancedDailyExpenseData]);
-
-  // UPDATED: Handler for viewing receipts - now opens the DailyReceiptBrowserModal
-  const handleViewReceipts = (date: string, receiptIds: string[]) => {
-    // Set the data needed for the browser modal
-    setDailyReceiptBrowserData({ date, receiptIds });
-  };
-
-  // Handler to close the receipt browser modal
-  const handleCloseDailyReceiptBrowser = () => {
-    setDailyReceiptBrowserData(null);
-  };
-
-  // Handler for when a receipt is deleted from the modal
-  const handleReceiptDeleted = (deletedId: string) => {
-    // Invalidate the daily expense queries to refresh the data
-    queryClient.invalidateQueries({ queryKey: ['dailyExpenseDetails'] });
-    queryClient.invalidateQueries({ queryKey: ['expensesByCategory'] });
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      {/* Responsive layout that adapts to sidebar width */}
-      <main
-        className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8"
-        style={{
-          width: 'calc(100vw - var(--sidebar-width, 0px))',
-          maxWidth: 'calc(1400px + var(--sidebar-width, 0px))',
-          marginLeft: 'auto',
-          marginRight: 'auto'
-        }}
-      >
-        {/* Dashboard Header */}
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Track and analyze your expense patterns</p>
-        </div>
-
-        {/* Display errors if any */}
-        {(dailyError || categoriesError) && (
-          <Alert variant="destructive" className="mb-6 sm:mb-8">
-            <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription className="text-sm">
-              {dailyError?.message || categoriesError?.message || "An unknown error occurred."}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-auto">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm py-2 sm:py-3">
-              <span className="hidden xs:inline">Expense Overview</span>
-              <span className="xs:hidden">Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="details" className="text-xs sm:text-sm py-2 sm:py-3">
-              <span className="hidden xs:inline">Daily Expense Details</span>
-              <span className="xs:hidden">Details</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            {/* Responsive Grid Layout */}
-            <div className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
-              {/* First Row: Expense Chart */}
-              <div className="grid grid-cols-1 gap-4 sm:gap-6">
-                <ExpenseChart
-                  dailyData={aggregatedChartData}
-                  isLoading={isLoadingDaily}
-                  dateRange={date}
-                  onDateRangeChange={handleDateChange}
-                />
-              </div>
-
-              {/* Second Row: Category Charts and Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                {/* Category Pie Chart */}
-                <div className="min-w-0">
-                  <CategoryPieChart
-                    categoryData={categoryData || []}
-                    isLoading={isLoadingCategories}
-                    dateCaption={formattedDateRange}
-                  />
-                </div>
-
-                {/* Category Radial Chart (Shadcn pattern) */}
-                <div className="min-w-0">
-                  <CategoryRadialChart
-                    categoryData={categoryData || []}
-                    isLoading={isLoadingCategories}
-                    dateCaption={formattedDateRange}
-                  />
-                </div>
-
-                {/* Spending by Payer */}
-                <div className="min-w-0">
-                  <PayerPieChart
-                    payerData={payerExpenseData}
-                    isLoading={isLoadingDaily && !payersLoaded}
-                    dateCaption={formattedDateRange}
-                  />
-                </div>
-
-                {/* Financial Summary */}
-                <div className="min-w-0">
-                  <ExpenseStats
-                    totalExpenses={totalExpenses}
-                    totalReceipts={enhancedDailyExpenseData?.reduce((count, day) => count + (day.receiptIds?.length || 0), 0) || 0}
-                    averagePerReceipt={averagePerReceipt}
-                    dateRange={date}
-                    onDateRangeClick={handleDateChange}
-                  />
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="details">
-            {/* Daily Expense Details Table */}
-            <div className="mt-4 sm:mt-6">
-              <ExpenseTable
-                sortedData={sortedDailyExpenseDataForTable}
-                onViewReceipts={handleViewReceipts}
-                isLoading={isLoadingDaily}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Daily Receipt Browser Modal */}
-        {dailyReceiptBrowserData && (
-          <DailyReceiptBrowserModal
-            isOpen={!!dailyReceiptBrowserData}
-            onClose={handleCloseDailyReceiptBrowser}
-            date={dailyReceiptBrowserData.date}
-            receiptIds={dailyReceiptBrowserData.receiptIds}
-            onReceiptDeleted={handleReceiptDeleted}
+    <div className="space-y-4" aria-hidden="true">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((index) => (
+          <div
+            key={index}
+            className="h-[118px] animate-pulse rounded-[10px] border border-ledger-line bg-ledger-surface-2"
           />
-        )}
-      </main>
+        ))}
+      </div>
+      <div className="h-[240px] animate-pulse rounded-[10px] border border-ledger-line bg-ledger-surface-2" />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="h-[250px] animate-pulse rounded-[10px] border border-ledger-line bg-ledger-surface-2" />
+        <div className="h-[250px] animate-pulse rounded-[10px] border border-ledger-line bg-ledger-surface-2" />
+      </div>
     </div>
   );
-};
-export default AnalysisPage;
+}
+
+export default function AnalysisPage() {
+  const { t } = useDashboardTranslation();
+  const { language } = useLanguage();
+  const { currentTeam } = useTeam();
+  const { openModal } = useBackgroundUpload();
+  const [range, setRange] = useState<RangeKey>("month");
+
+  const rangeConfig = useMemo(() => {
+    const today = new Date();
+    const end = endOfDay(today);
+    switch (range) {
+      case "last30":
+        return { start: startOfDay(subDays(today, 29)), end, label: t("workspace.analysis.rangeLast30") };
+      case "quarter":
+        return {
+          start: startOfQuarter(today),
+          end,
+          label: `${format(today, "QQQ")} ${format(today, "yyyy")}`,
+        };
+      case "year":
+        return { start: startOfYear(today), end, label: format(today, "yyyy") };
+      case "month":
+      default:
+        return { start: startOfMonth(today), end, label: monthName(today, language) };
+    }
+  }, [range, t, language]);
+
+  const startISO = format(rangeConfig.start, "yyyy-MM-dd");
+  const endISO = format(rangeConfig.end, "yyyy-MM-dd");
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["workspace", "analysis", currentTeam?.id ?? null, startISO, endISO],
+    queryFn: async () => {
+      const [daily, categories, receipts, payers] = await Promise.all([
+        fetchDailyExpenses(startISO, endISO, currentTeam?.id ?? null),
+        fetchExpensesByCategory(startISO, endISO, currentTeam?.id ?? null),
+        fetchReceiptDetailsForRange(startISO, endISO, currentTeam?.id ?? null),
+        fetchUserPayers({ currentTeam: currentTeam ?? null }),
+      ]);
+      return { daily, categories, receipts, payers };
+    },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const receipts: ReceiptSummary[] = useMemo(() => data?.receipts ?? [], [data]);
+  const categories = useMemo(() => data?.categories ?? [], [data]);
+  const payers: PaidBy[] = useMemo(() => data?.payers ?? [], [data]);
+  const daily = useMemo(() => data?.daily ?? [], [data]);
+
+  const totals = useMemo(() => {
+    const totalSpend = receipts.reduce((sum, receipt) => sum + (Number(receipt.total) || 0), 0);
+    const totalTax = receipts.reduce((sum, receipt) => sum + (Number(receipt.tax) || 0), 0);
+    const receiptCount = receipts.length;
+    return {
+      totalSpend,
+      totalTax,
+      receiptCount,
+      average: receiptCount > 0 ? totalSpend / receiptCount : 0,
+    };
+  }, [receipts]);
+
+  const categoryRows = useMemo(() => {
+    return [...categories]
+      .map((entry) => ({
+        key: entry.category ?? "__unassigned__",
+        label: entry.category?.trim() || t("workspace.analysis.unassigned"),
+        total: Number(entry.total_spent) || 0,
+      }))
+      .filter((entry) => entry.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [categories, t]);
+
+  const topCategory = categoryRows[0];
+  const topCategoryShare =
+    topCategory && totals.totalSpend > 0
+      ? Math.round((topCategory.total / totals.totalSpend) * 100)
+      : 0;
+
+  const payerRows = useMemo(() => {
+    const byPayer = new Map<string, number>();
+    for (const receipt of receipts) {
+      const key = receipt.paid_by_id || "__unassigned__";
+      byPayer.set(key, (byPayer.get(key) ?? 0) + (Number(receipt.total) || 0));
+    }
+    const names = new Map(payers.map((payer) => [payer.id, payer.name]));
+    return [...byPayer.entries()]
+      .map(([key, total]) => ({
+        key,
+        label:
+          key === "__unassigned__"
+            ? t("workspace.analysis.unassigned")
+            : names.get(key) || t("workspace.analysis.unassigned"),
+        total,
+      }))
+      .filter((entry) => entry.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [receipts, payers, t]);
+
+  const isMonthlyTrend = range === "quarter" || range === "year";
+
+  const trend = useMemo<TrendPoint[]>(() => {
+    const totalsByDay = new Map<string, number>();
+    for (const entry of daily) {
+      totalsByDay.set(entry.date, (totalsByDay.get(entry.date) ?? 0) + (Number(entry.total) || 0));
+    }
+
+    if (isMonthlyTrend) {
+      const months = eachMonthOfInterval({ start: rangeConfig.start, end: rangeConfig.end });
+      return months.map((month) => {
+        const key = format(month, "yyyy-MM");
+        let total = 0;
+        for (const [date, value] of totalsByDay.entries()) {
+          if (date.startsWith(key)) total += value;
+        }
+        return {
+          key,
+          label: shortMonth(month, language),
+          caption: shortMonth(month, language),
+          total,
+        };
+      });
+    }
+
+    const days = eachDayOfInterval({ start: rangeConfig.start, end: rangeConfig.end });
+    const every = days.length > 16 ? 5 : days.length > 10 ? 2 : 1;
+    return days.map((day, index) => {
+      const key = format(day, "yyyy-MM-dd");
+      const label =
+        range === "month"
+          ? index % every === 0 || index === days.length - 1
+            ? format(day, "d")
+            : ""
+          : index % every === 0 || index === days.length - 1
+            ? dayLabel(day, language)
+            : "";
+      return {
+        key,
+        label,
+        caption: dayLabel(day, language),
+        total: totalsByDay.get(key) ?? 0,
+      };
+    });
+  }, [daily, isMonthlyTrend, range, rangeConfig, language]);
+
+  const trendMax = Math.max(...trend.map((point) => point.total), 0);
+  const trendPeakKey = trend.find((point) => point.total === trendMax && trendMax > 0)?.key;
+  const rangeCaption = `${dayLabel(rangeConfig.start, language)} – ${dayLabel(rangeConfig.end, language)}, ${format(rangeConfig.end, "yyyy")}`;
+
+  const handleExport = () => {
+    if (receipts.length === 0) return;
+    const names = new Map(payers.map((payer) => [payer.id, payer.name]));
+    const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const rows = [
+      ["Date", "Merchant", "Total", "Tax", "Payer"],
+      ...receipts.map((receipt) => [
+        receipt.date,
+        receipt.merchant ?? "",
+        (Number(receipt.total) || 0).toFixed(2),
+        (Number(receipt.tax) || 0).toFixed(2),
+        receipt.paid_by_id ? names.get(receipt.paid_by_id) ?? "" : "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(escape).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mataresit-analysis-${startISO}-to-${endISO}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const kpiValueClass = "text-[1.625rem]";
+
+  return (
+    <div className="mx-auto w-full max-w-[1180px] px-5 pb-14 pt-8 md:px-7">
+      <header className="flex flex-wrap items-end justify-between gap-[18px]">
+        <div className="min-w-0">
+          <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+            {t("workspace.analysis.eyebrow", { range: rangeConfig.label })}
+          </p>
+          <h1 className="mt-1.5 font-display text-[clamp(2rem,3.2vw,2.75rem)] leading-[1.05] tracking-[-0.02em] text-ledger-ink">
+            {t("workspace.analysis.title")}
+          </h1>
+          <p className="mt-2 max-w-[58ch] text-[0.9375rem] leading-relaxed text-ledger-muted">
+            {t("workspace.analysis.lede")}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="accent-outline" size="app" asChild>
+            <Link to="/analysis/advanced">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              {t("workspace.analysis.advanced")}
+            </Link>
+          </Button>
+          <Button
+            variant="accent"
+            size="app"
+            onClick={handleExport}
+            disabled={receipts.length === 0}
+            title={receipts.length === 0 ? t("workspace.analysis.exportEmpty") : undefined}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {t("workspace.analysis.exportCsv")}
+          </Button>
+        </div>
+      </header>
+
+      <div
+        className="mt-6 flex flex-wrap gap-2"
+        role="group"
+        aria-label={t("workspace.analysis.dateRange")}
+      >
+        {RANGE_ORDER.map((key) => {
+          const active = key === range;
+          const labels: Record<RangeKey, string> = {
+            month: t("workspace.analysis.rangeThisMonth"),
+            last30: t("workspace.analysis.rangeLast30"),
+            quarter: t("workspace.analysis.rangeQuarter"),
+            year: t("workspace.analysis.rangeYear"),
+          };
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setRange(key)}
+              className={cn(
+                "rounded-full border px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] transition-colors",
+                active
+                  ? "border-ledger-ink bg-ledger-ink text-ledger-paper"
+                  : "border-ledger-line-strong text-ledger-ink-2 hover:border-ledger-accent hover:text-ledger-accent"
+              )}
+            >
+              {labels[key]}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5">
+        {isLoading ? (
+          <AnalysisSkeleton />
+        ) : isError ? (
+          <Panel title={t("workspace.analysis.title")}>
+            <div className="flex flex-col items-start gap-3 py-6">
+              <p className="text-sm text-ledger-muted">{t("workspace.analysis.noSpendLede")}</p>
+              <Button variant="accent-outline" size="app" onClick={() => refetch()}>
+                {t("workspace.analysis.retry")}
+              </Button>
+            </div>
+          </Panel>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <KpiCard
+                label={t("workspace.analysis.totalSpend")}
+                value={formatCurrencySafe(totals.totalSpend, CURRENCY)}
+                meta={rangeConfig.label}
+                valueClassName={kpiValueClass}
+              />
+              <KpiCard
+                label={t("workspace.analysis.avgReceipt")}
+                value={formatCurrencySafe(totals.average, CURRENCY)}
+                meta={t("workspace.analysis.acrossReceipts", { count: totals.receiptCount })}
+                valueClassName={kpiValueClass}
+              />
+              <KpiCard
+                label={t("workspace.analysis.salesTax")}
+                value={formatCurrencySafe(totals.totalTax, CURRENCY)}
+                meta={t("workspace.analysis.recordedPerLine")}
+                valueClassName={kpiValueClass}
+              />
+              <KpiCard
+                label={t("workspace.analysis.topCategory")}
+                value={topCategory?.label ?? "—"}
+                meta={
+                  topCategory
+                    ? t("workspace.analysis.shareOfSpend", { percent: topCategoryShare })
+                    : t("workspace.analysis.noSpend")
+                }
+                valueClassName="mt-2 truncate text-[1.35rem]"
+              />
+            </div>
+
+            {totals.receiptCount === 0 ? (
+              <div className="mt-4">
+                <EmptyState
+                  icon={<BarChart3 className="h-7 w-7" />}
+                  title={t("workspace.analysis.noSpend")}
+                  description={t("workspace.analysis.noSpendLede")}
+                  action={
+                    <Button variant="accent" size="app" onClick={openModal}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      {t("workspace.overview.upload")}
+                    </Button>
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <Panel
+                  className="mt-4"
+                  title={
+                    isMonthlyTrend
+                      ? t("workspace.analysis.monthlyTrend")
+                      : t("workspace.analysis.dailyTrend")
+                  }
+                  action={<span className="font-data text-[0.625rem] text-ledger-muted">{rangeCaption}</span>}
+                >
+                  <div
+                    className="flex h-[150px] items-end gap-1"
+                    role="img"
+                    aria-label={`${isMonthlyTrend ? t("workspace.analysis.monthlyTrend") : t("workspace.analysis.dailyTrend")} — ${rangeCaption}`}
+                  >
+                    {trend.map((point) => {
+                      const height = trendMax > 0 ? Math.max((point.total / trendMax) * 100, 1.5) : 1.5;
+                      const peak = point.key === trendPeakKey;
+                      return (
+                        <div
+                          key={point.key}
+                          className="grid h-full min-w-0 flex-1 grid-rows-[1fr_auto] gap-2"
+                          title={`${point.caption} · ${formatCurrencySafe(point.total, CURRENCY)}`}
+                        >
+                          <div className="flex items-end">
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "block w-full rounded-t-[4px]",
+                                peak ? "bg-ledger-accent" : "bg-ledger-chart-3"
+                              )}
+                              style={{ height: `${height}%`, minHeight: 3 }}
+                            />
+                          </div>
+                          <span className="truncate text-center font-data text-[0.5625rem] text-ledger-muted">
+                            {point.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Panel>
+
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <Panel
+                    title={t("workspace.analysis.categories")}
+                    action={<span className="font-data text-[0.625rem] text-ledger-muted">{rangeConfig.label}</span>}
+                  >
+                    {categoryRows.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-ledger-muted">
+                        {t("workspace.analysis.noSpend")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2.5">
+                        {categoryRows.slice(0, 6).map((row) => {
+                          const max = categoryRows[0]?.total || 1;
+                          return (
+                            <div
+                              key={row.key}
+                              className="grid grid-cols-[128px_1fr_84px] items-center gap-3.5 max-sm:grid-cols-[92px_1fr_74px] max-sm:gap-2.5"
+                            >
+                              <span className="truncate text-sm text-ledger-ink-2">{row.label}</span>
+                              <span className="h-2 overflow-hidden rounded-[4px] bg-ledger-surface-2">
+                                <i
+                                  className="block h-full rounded-[4px] bg-ledger-accent"
+                                  style={{ width: `${Math.max((row.total / max) * 100, 2)}%` }}
+                                />
+                              </span>
+                              <span className="text-right font-data text-[0.6875rem] text-ledger-ink">
+                                {formatCurrencySafe(row.total, CURRENCY)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Panel>
+
+                  <Panel
+                    title={t("workspace.analysis.payers")}
+                    action={
+                      <span className="font-data text-[0.625rem] text-ledger-muted">
+                        {t("workspace.analysis.payerMeta")}
+                      </span>
+                    }
+                  >
+                    {payerRows.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-ledger-muted">
+                        {t("workspace.analysis.noSpend")}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2.5">
+                        {payerRows.map((row) => {
+                          const max = payerRows[0]?.total || 1;
+                          return (
+                            <div
+                              key={row.key}
+                              className="grid grid-cols-[128px_1fr_84px] items-center gap-3.5 max-sm:grid-cols-[92px_1fr_74px] max-sm:gap-2.5"
+                            >
+                              <span className="truncate text-sm text-ledger-ink-2">{row.label}</span>
+                              <span className="h-2 overflow-hidden rounded-[4px] bg-ledger-surface-2">
+                                <i
+                                  className="block h-full rounded-[4px] bg-ledger-accent"
+                                  style={{ width: `${Math.max((row.total / max) * 100, 2)}%` }}
+                                />
+                              </span>
+                              <span className="text-right font-data text-[0.6875rem] text-ledger-ink">
+                                {formatCurrencySafe(row.total, CURRENCY)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Panel>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

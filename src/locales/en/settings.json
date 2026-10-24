@@ -355,7 +355,8 @@
     "cancelSubscription": "Cancel Subscription",
     "paymentMethod": "Payment Method",
     "billingHistory": "Billing History",
-    "invoices": "Invoices"
+    "invoices": "Invoices",
+    "simulatedNotice": "You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal."
   },
   "team": {
     "title": "Team Management",

@@ -1,67 +1,55 @@
 import { Outlet } from "react-router-dom";
-import Navbar from "./Navbar";
-import { MainNavigationSidebar } from "./MainNavigationSidebar";
-import { MainNavigationToggle } from "./MainNavigationToggle";
-import { useChatControls } from "@/contexts/ChatControlsContext";
-import { AppSidebarProvider, useAppSidebar } from "@/contexts/AppSidebarContext";
-import { RouteAwareSidebarManager } from "./sidebar/RouteAwareSidebarManager";
+import { useQueryClient } from "@tanstack/react-query";
+import { AppHeader } from "./workspace/AppHeader";
+import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar";
+import { WorkspaceTabs } from "./workspace/WorkspaceTabs";
 import { GlobalBackgroundSearchStatus } from "./search/BackgroundSearchIndicator";
+import { BatchUploadModal } from "./modals/BatchUploadModal";
+import { BackgroundUploadIndicator } from "./upload/BackgroundUploadIndicator";
+import { BulkReprocessProgressPanel } from "./dashboard/BulkReprocessProgressPanel";
 
-// AppLayout content component that uses the sidebar context
-function AppLayoutContent() {
-  const { isSidebarOpen, toggleSidebar, sidebarContent, isDesktop } = useAppSidebar();
-  const { chatControls } = useChatControls();
-
+/**
+ * Authenticated workspace shell: fixed ledger sidebar, slim header and a
+ * single scrolling content column. Pages own their width and padding so the
+ * receipt viewer and other full-bleed routes can opt out of the 1180px shell.
+ */
+export function AppLayout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Route-aware sidebar manager for automatic content switching */}
-      <RouteAwareSidebarManager />
+    <div className="min-h-screen bg-ledger-paper min-[980px]:grid min-[980px]:grid-cols-[252px_minmax(0,1fr)]">
+      <WorkspaceSidebar />
 
-      {/* Dynamic Sidebar - only render on desktop screens (>= lg breakpoint) */}
-      {isDesktop && (
-        <div className="flex-shrink-0">
-          {sidebarContent ? (
-            // Render custom sidebar content from context (e.g., ConversationSidebar)
-            sidebarContent
-          ) : (
-            // Render default main navigation sidebar
-            <MainNavigationSidebar
-              isOpen={isSidebarOpen}
-              onToggle={toggleSidebar}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Navbar
-          navControls={{
-            navSidebarToggle: (
-              <MainNavigationToggle
-                isOpen={isSidebarOpen}
-                onToggle={toggleSidebar}
-              />
-            )
-          }}
-          chatControls={chatControls}
-        />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex min-h-screen min-w-0 flex-col">
+        <AppHeader />
+        <WorkspaceTabs />
+        <main className="flex-1 overflow-x-hidden bg-ledger-paper">
           <Outlet />
         </main>
       </div>
 
-      {/* Global background search status indicator */}
       <GlobalBackgroundSearchStatus />
+      <WorkspaceUploadModal />
+      <BackgroundUploadIndicator />
+      <BulkReprocessProgressPanel />
     </div>
   );
 }
 
-// Main AppLayout component with provider wrapper
-export function AppLayout() {
+/**
+ * The upload modal lives here (not per page) because BackgroundUploadContext
+ * owns its open state — every page's "Upload" button just calls openModal().
+ * The old Dashboard mounted this itself; the workspace shell mounts it once
+ * for all pages.
+ */
+function WorkspaceUploadModal() {
+  const queryClient = useQueryClient();
+
   return (
-    <AppSidebarProvider>
-      <AppLayoutContent />
-    </AppSidebarProvider>
+    <BatchUploadModal
+      onUploadComplete={() => {
+        void queryClient.invalidateQueries({ queryKey: ["receipts"] });
+        void queryClient.invalidateQueries({ queryKey: ["receipt-counts"] });
+        void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      }}
+    />
   );
 }

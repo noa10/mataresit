@@ -125,16 +125,73 @@
       "unlocked": "Unlocked",
       "locked": "Locked",
       "catalog": {
-        "first_scan": { "name": "First scan", "description": "Complete your first successful scan." },
-        "night_owl": { "name": "Night owl", "description": "Log a qualifying scan during the late-night window." },
-        "early_bird": { "name": "Early bird", "description": "Start your day with an early successful scan." },
-        "seven_day_streak": { "name": "7-day streak", "description": "Maintain a seven-day login or scan streak." },
-        "thirty_day_streak": { "name": "30-day streak", "description": "Stay consistent long enough to hit a full month streak." },
-        "referral_starter": { "name": "Referral starter", "description": "Invite your first friend who completes sign-up." },
-        "referral_champion": { "name": "Referral champion", "description": "Rack up multiple successful referrals." },
-        "power_scanner": { "name": "Power scanner", "description": "Reach a major receipt-scanning milestone." },
-        "receipt_historian": { "name": "Receipt historian", "description": "Build a rich archive of organized receipts." },
-        "community_helper": { "name": "Community helper", "description": "Contribute to referral and engagement milestones." }
+        "first_scan": {
+          "name": "First scan",
+          "description": "Complete your first successful scan."
+        },
+        "night_owl": {
+          "name": "Night owl",
+          "description": "Log a qualifying scan during the late-night window."
+        },
+        "early_bird": {
+          "name": "Early bird",
+          "description": "Start your day with an early successful scan."
+        },
+        "seven_day_streak": {
+          "name": "7-day streak",
+          "description": "Maintain a seven-day login or scan streak."
+        },
+        "thirty_day_streak": {
+          "name": "30-day streak",
+          "description": "Stay consistent long enough to hit a full month streak."
+        },
+        "referral_starter": {
+          "name": "Referral starter",
+          "description": "Invite your first friend who completes sign-up."
+        },
+        "referral_champion": {
+          "name": "Referral champion",
+          "description": "Rack up multiple successful referrals."
+        },
+        "power_scanner": {
+          "name": "Power scanner",
+          "description": "Reach a major receipt-scanning milestone."
+        },
+        "receipt_historian": {
+          "name": "Receipt historian",
+          "description": "Build a rich archive of organized receipts."
+        },
+        "community_helper": {
+          "name": "Community helper",
+          "description": "Contribute to referral and engagement milestones."
+        },
+        "scanner_pro_100": {
+          "name": "Scanner Pro"
+        },
+        "receipt_marathon_30": {
+          "name": "Receipt Marathon"
+        },
+        "level_5": {
+          "name": "Level 5"
+        },
+        "level_10": {
+          "name": "Level 10"
+        },
+        "tax_saver_10": {
+          "name": "Tax Saver"
+        },
+        "tax_warrior_7": {
+          "name": "Tax Warrior"
+        },
+        "malaysia_tax_hero_5000": {
+          "name": "Malaysia Tax Hero"
+        },
+        "mission_master": {
+          "name": "Mission Master"
+        },
+        "recruiter": {
+          "name": "Recruiter"
+        }
       }
     },
     "themes": {
@@ -144,10 +201,22 @@
       "unlocked": "Unlocked",
       "locked": "Locked",
       "options": {
-        "default": { "title": "Classic", "description": "The familiar scanner look available from day one." },
-        "ocean": { "title": "Ocean", "description": "A cool blue theme for focused scanning sessions." },
-        "forest": { "title": "Forest", "description": "A calm green theme earned through sustained streaks." },
-        "sunset": { "title": "Sunset", "description": "A warm premium look reserved for higher progression." }
+        "default": {
+          "title": "Classic",
+          "description": "The familiar scanner look available from day one."
+        },
+        "ocean": {
+          "title": "Ocean",
+          "description": "A cool blue theme for focused scanning sessions."
+        },
+        "forest": {
+          "title": "Forest",
+          "description": "A calm green theme earned through sustained streaks."
+        },
+        "sunset": {
+          "title": "Sunset",
+          "description": "A warm premium look reserved for higher progression."
+        }
       }
     },
     "privacy": {

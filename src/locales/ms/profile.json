@@ -125,16 +125,73 @@
       "unlocked": "Dibuka",
       "locked": "Terkunci",
       "catalog": {
-        "first_scan": { "name": "Imbasan pertama", "description": "Lengkapkan imbasan berjaya pertama anda." },
-        "night_owl": { "name": "Burung malam", "description": "Buat imbasan layak pada waktu malam." },
-        "early_bird": { "name": "Burung awal", "description": "Mulakan hari anda dengan imbasan berjaya pada awal pagi." },
-        "seven_day_streak": { "name": "Rentetan 7 hari", "description": "Kekalkan rentetan log masuk atau imbasan selama tujuh hari." },
-        "thirty_day_streak": { "name": "Rentetan 30 hari", "description": "Kekal konsisten sehingga mencapai rentetan sebulan penuh." },
-        "referral_starter": { "name": "Permulaan rujukan", "description": "Jemput rakan pertama anda yang berjaya mendaftar." },
-        "referral_champion": { "name": "Juara rujukan", "description": "Kumpul beberapa rujukan yang berjaya." },
-        "power_scanner": { "name": "Pengimbas tegar", "description": "Capai pencapaian besar dalam jumlah imbasan resit." },
-        "receipt_historian": { "name": "Sejarawan resit", "description": "Bina arkib resit yang kaya dan tersusun." },
-        "community_helper": { "name": "Pembantu komuniti", "description": "Sumbang kepada pencapaian rujukan dan penglibatan komuniti." }
+        "first_scan": {
+          "name": "Imbasan pertama",
+          "description": "Lengkapkan imbasan berjaya pertama anda."
+        },
+        "night_owl": {
+          "name": "Burung malam",
+          "description": "Buat imbasan layak pada waktu malam."
+        },
+        "early_bird": {
+          "name": "Burung awal",
+          "description": "Mulakan hari anda dengan imbasan berjaya pada awal pagi."
+        },
+        "seven_day_streak": {
+          "name": "Rentetan 7 hari",
+          "description": "Kekalkan rentetan log masuk atau imbasan selama tujuh hari."
+        },
+        "thirty_day_streak": {
+          "name": "Rentetan 30 hari",
+          "description": "Kekal konsisten sehingga mencapai rentetan sebulan penuh."
+        },
+        "referral_starter": {
+          "name": "Permulaan rujukan",
+          "description": "Jemput rakan pertama anda yang berjaya mendaftar."
+        },
+        "referral_champion": {
+          "name": "Juara rujukan",
+          "description": "Kumpul beberapa rujukan yang berjaya."
+        },
+        "power_scanner": {
+          "name": "Pengimbas tegar",
+          "description": "Capai pencapaian besar dalam jumlah imbasan resit."
+        },
+        "receipt_historian": {
+          "name": "Sejarawan resit",
+          "description": "Bina arkib resit yang kaya dan tersusun."
+        },
+        "community_helper": {
+          "name": "Pembantu komuniti",
+          "description": "Sumbang kepada pencapaian rujukan dan penglibatan komuniti."
+        },
+        "scanner_pro_100": {
+          "name": "Pro Pengimbas"
+        },
+        "receipt_marathon_30": {
+          "name": "Maraton Resit"
+        },
+        "level_5": {
+          "name": "Tahap 5"
+        },
+        "level_10": {
+          "name": "Tahap 10"
+        },
+        "tax_saver_10": {
+          "name": "Penjimat Cukai"
+        },
+        "tax_warrior_7": {
+          "name": "Pejuang Cukai"
+        },
+        "malaysia_tax_hero_5000": {
+          "name": "Wira Cukai Malaysia"
+        },
+        "mission_master": {
+          "name": "Master Misi"
+        },
+        "recruiter": {
+          "name": "Perekrut"
+        }
       }
     },
     "themes": {
@@ -144,10 +201,22 @@
       "unlocked": "Dibuka",
       "locked": "Terkunci",
       "options": {
-        "default": { "title": "Klasik", "description": "Rupa pengimbas biasa yang tersedia dari hari pertama." },
-        "ocean": { "title": "Lautan", "description": "Tema biru yang tenang untuk sesi imbasan yang fokus." },
-        "forest": { "title": "Hutan", "description": "Tema hijau yang diperoleh melalui rentetan yang berterusan." },
-        "sunset": { "title": "Senja", "description": "Rupa hangat premium untuk kemajuan yang lebih tinggi." }
+        "default": {
+          "title": "Klasik",
+          "description": "Rupa pengimbas biasa yang tersedia dari hari pertama."
+        },
+        "ocean": {
+          "title": "Lautan",
+          "description": "Tema biru yang tenang untuk sesi imbasan yang fokus."
+        },
+        "forest": {
+          "title": "Hutan",
+          "description": "Tema hijau yang diperoleh melalui rentetan yang berterusan."
+        },
+        "sunset": {
+          "title": "Senja",
+          "description": "Rupa hangat premium untuk kemajuan yang lebih tinggi."
+        }
       }
     },
     "privacy": {

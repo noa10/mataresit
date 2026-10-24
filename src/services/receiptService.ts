@@ -2101,7 +2101,11 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
 };
 
 // Update receipt status
-export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Promise<boolean> => {
+export const updateReceiptStatus = async (
+  id: string,
+  status: ReceiptStatus,
+  options: { silent?: boolean } = {}
+): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from("receipts")
@@ -2112,11 +2116,15 @@ export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Pr
       throw error;
     }
 
-    toast.success(`Receipt marked as ${status}`);
+    if (!options.silent) {
+      toast.success(`Receipt marked as ${status}`);
+    }
     return true;
   } catch (error) {
     console.error("Error updating receipt status:", error);
-    toast.error("Failed to update receipt status");
+    if (!options.silent) {
+      toast.error("Failed to update receipt status");
+    }
     return false;
   }
 };
