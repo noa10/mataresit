@@ -1008,7 +1008,7 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
   );
 };
 
-const AnalysisPage = () => {
+const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
   const queryClient = useQueryClient();
   const { currentTeam } = useTeam();
 
@@ -1195,22 +1195,32 @@ const AnalysisPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+    <div className={embedded ? undefined : "min-h-screen bg-gradient-to-b from-background to-secondary/20"}>
       {/* Responsive layout that adapts to sidebar width */}
       <main
-        className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8"
-        style={{
-          width: 'calc(100vw - var(--sidebar-width, 0px))',
-          maxWidth: 'calc(1400px + var(--sidebar-width, 0px))',
-          marginLeft: 'auto',
-          marginRight: 'auto'
-        }}
+        className={
+          embedded
+            ? "space-y-6"
+            : "px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8 space-y-6 sm:space-y-8"
+        }
+        style={
+          embedded
+            ? undefined
+            : {
+                width: 'calc(100vw - var(--sidebar-width, 0px))',
+                maxWidth: 'calc(1400px + var(--sidebar-width, 0px))',
+                marginLeft: 'auto',
+                marginRight: 'auto'
+              }
+        }
       >
-        {/* Dashboard Header */}
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Track and analyze your expense patterns</p>
-        </div>
+        {/* Dashboard Header — skipped when embedded in the analysis page */}
+        {!embedded && (
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Track and analyze your expense patterns</p>
+          </div>
+        )}
 
         {/* Display errors if any */}
         {(dailyError || categoriesError) && (

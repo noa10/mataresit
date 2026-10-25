@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ledger/EmptyState";
 import { Panel } from "@/components/ledger/Panel";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { AccountSettings } from "@/components/profile/AccountSettings";
 import { ProfileRewardsPanel } from "@/components/gamification/ProfileRewardsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGamification } from "@/contexts/GamificationContext";
@@ -452,14 +453,6 @@ export default function Profile() {
       <Panel
         className="mt-3"
         title={td("workspace.profile.account")}
-        action={
-          <Link
-            to="/profile/advanced"
-            className="font-data text-[0.625rem] text-ledger-accent hover:underline"
-          >
-            {td("workspace.profile.advanced")}
-          </Link>
-        }
         flush
       >
         <div className="divide-y divide-ledger-line border-t border-ledger-line">
@@ -511,21 +504,6 @@ export default function Profile() {
             <ChevronRight className="h-4 w-4 text-ledger-muted" aria-hidden="true" />
           </Link>
 
-          <Link to="/profile/advanced" className={linkRowClass}>
-            <span className={iconTileClass} aria-hidden="true">
-              <Shield className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-ledger-ink">
-                {td("workspace.profile.security")}
-              </span>
-              <span className="mt-0.5 block text-xs text-ledger-muted">
-                {td("workspace.profile.advanced")}
-              </span>
-            </span>
-            <ChevronRight className="h-4 w-4 text-ledger-muted" aria-hidden="true" />
-          </Link>
-
           <button type="button" onClick={handleSignOut} className={cn(linkRowClass, "w-full")}>
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-ledger-danger-soft text-ledger-danger"
@@ -540,6 +518,14 @@ export default function Profile() {
           </button>
         </div>
       </Panel>
+
+      {/* Account & security — the former /profile/advanced security tab,
+          embedded so profile has a single page. */}
+      {user && (
+        <div className="mt-3">
+          <AccountSettings userId={user.id} />
+        </div>
+      )}
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-[480px]">

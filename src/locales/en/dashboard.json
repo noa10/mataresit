@@ -360,7 +360,8 @@
       "dateRange": "Date range",
       "exportCsv": "Export CSV",
       "exportEmpty": "Add a receipt to export this range.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "deepDive": "Deep dive"
     },
     "claims": {
       "eyebrow": "Claims — {{count}} total",

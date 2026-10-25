@@ -360,7 +360,8 @@
       "dateRange": "Julat tarikh",
       "exportCsv": "Eksport CSV",
       "exportEmpty": "Tambah resit untuk mengeksport julat ini.",
-      "retry": "Cuba lagi"
+      "retry": "Cuba lagi",
+      "deepDive": "Analisis mendalam"
     },
     "claims": {
       "eyebrow": "Tuntutan — {{count}} jumlah",

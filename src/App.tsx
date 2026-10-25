@@ -64,9 +64,7 @@ const BlogManagement = lazy(() => import("./pages/admin/BlogManagement"));
 // Lazy load other pages for better performance
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
-const ProfileAdvancedPage = lazy(() => import("./pages/ProfileAdvancedPage"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
-const AnalysisAdvancedPage = lazy(() => import("./pages/AnalysisAdvancedPage"));
 const AISearchPage = lazy(() => import("./pages/AISearchPage"));
 const UnifiedSearchPage = lazy(() => import("./pages/UnifiedSearchPage"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
@@ -289,21 +287,13 @@ const App = () => (
                                               <Profile />
                                             </Suspense>
                                           } />
-                                          <Route path="/profile/advanced" element={
-                                            <Suspense fallback={<PageLoading />}>
-                                              <ProfileAdvancedPage />
-                                            </Suspense>
-                                          } />
+                                          <Route path="/profile/advanced" element={<Navigate to="/profile" replace />} />
                                           <Route path="/analysis" element={
                                             <Suspense fallback={<PageLoading />}>
                                               <AnalysisPage />
                                             </Suspense>
                                           } />
-                                          <Route path="/analysis/advanced" element={
-                                            <Suspense fallback={<PageLoading />}>
-                                              <AnalysisAdvancedPage />
-                                            </Suspense>
-                                          } />
+                                          <Route path="/analysis/advanced" element={<Navigate to="/analysis" replace />} />
                                           <Route path="/search" element={
                                             <Suspense fallback={<PageLoading />}>
                                               <AISearchPage />

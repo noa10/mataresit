@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
@@ -100,12 +100,6 @@ export function ReceiptDetailSheet({ receiptId, onOpenChange }: ReceiptDetailShe
   const category = receipt?.custom_category?.name || receipt?.predicted_category || null;
   const isReviewed = receipt?.status === "reviewed";
   const isPending = statusMutation.isPending;
-  const [imageFailed, setImageFailed] = useState(false);
-  const showOriginalImage = Boolean(receipt?.image_url) && !imageFailed;
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [receiptId]);
 
   return (
     <Sheet open={Boolean(receiptId)} onOpenChange={onOpenChange}>
@@ -163,33 +157,18 @@ export function ReceiptDetailSheet({ receiptId, onOpenChange }: ReceiptDetailShe
         ) : (
           <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
             <div className="mx-auto w-full max-w-[340px] lg:mx-0">
-              {showOriginalImage ? (
-                <figure className="overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-surface">
-                  <figcaption className="border-b border-ledger-line px-3 py-2 font-data text-[0.6rem] uppercase tracking-[0.12em] text-ledger-muted">
-                    {t("workspace.detail.viewOriginal")}
-                  </figcaption>
-                  <img
-                    src={receipt.image_url}
-                    alt={t("workspace.detail.viewOriginal")}
-                    loading="lazy"
-                    onError={() => setImageFailed(true)}
-                    className="max-h-[520px] w-full bg-white object-contain"
-                  />
-                </figure>
-              ) : (
-                <ReceiptPaper
-                  merchant={receipt.merchant || t("workspace.detail.unknown")}
-                  date={receipt.date}
-                  items={(receipt.lineItems ?? []).map((item) => ({
-                    name: item.description,
-                    price: item.amount,
-                  }))}
-                  tax={receipt.tax ?? null}
-                  total={receipt.total}
-                  currency={receipt.currency}
-                  payment={receipt.payment_method || null}
-                />
-              )}
+              <ReceiptPaper
+                merchant={receipt.merchant || t("workspace.detail.unknown")}
+                date={receipt.date}
+                items={(receipt.lineItems ?? []).map((item) => ({
+                  name: item.description,
+                  price: item.amount,
+                }))}
+                tax={receipt.tax ?? null}
+                total={receipt.total}
+                currency={receipt.currency}
+                payment={receipt.payment_method || null}
+              />
             </div>
 
             <div className="space-y-4">

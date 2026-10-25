@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import AnalysisAdvancedView from "./AnalysisAdvancedPage";
 import {
   eachDayOfInterval,
   eachMonthOfInterval,
@@ -12,7 +13,6 @@ import {
   subDays,
 } from "date-fns";
 import { BarChart3, Download, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ledger/EmptyState";
 import { KpiCard } from "@/components/ledger/KpiCard";
@@ -287,12 +287,6 @@ export default function AnalysisPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button variant="accent-outline" size="app" asChild>
-            <Link to="/analysis/advanced">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              {t("workspace.analysis.advanced")}
-            </Link>
-          </Button>
           <Button
             variant="accent"
             size="app"
@@ -519,6 +513,17 @@ export default function AnalysisPage() {
           </>
         )}
       </div>
+
+      {/* Deep dive: the former /analysis/advanced view — daily trends, category
+          charts and the per-day expense table with receipt drill-down. */}
+      <section className="mt-10">
+        <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+          {t("workspace.analysis.deepDive", { defaultValue: "Deep dive" })}
+        </p>
+        <div className="mt-3">
+          <AnalysisAdvancedView embedded />
+        </div>
+      </section>
     </div>
   );
 }
