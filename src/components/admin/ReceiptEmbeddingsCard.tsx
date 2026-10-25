@@ -160,10 +160,10 @@ export function ReceiptEmbeddingsCard() {
             </div>
           </div>
 
-          <div className="w-full bg-ledger-surface-2 rounded-full h-2">
+          <div className="w-full overflow-hidden rounded-full bg-ledger-surface-2 h-2">
             <div
               className="bg-ledger-accent h-2 rounded-full"
-              style={{ width: `${embeddingStats && embeddingStats.total > 0 ? (embeddingStats.withEmbeddings / embeddingStats.total) * 100 : 0}%` }}
+              style={{ width: `${embeddingStats && embeddingStats.total > 0 ? Math.min(100, (embeddingStats.withEmbeddings / embeddingStats.total) * 100) : 0}%` }}
             ></div>
           </div>
 
@@ -181,7 +181,7 @@ export function ReceiptEmbeddingsCard() {
                 </span>
                 <span>{processedReceipts} of {totalReceipts}</span>
               </div>
-              <div className="w-full bg-ledger-surface-2 rounded-full h-2">
+              <div className="w-full overflow-hidden rounded-full bg-ledger-surface-2 h-2">
                 <div
                   className="bg-ledger-accent h-2 rounded-full"
                   style={{ width: `${embeddingProgress}%` }}
