@@ -331,6 +331,24 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     panelTop: number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
+  const imageBoxRef = useRef<HTMLDivElement>(null);
+  // Live size of the fixed image box, for swapping the image axes when
+  // rotated so the full receipt stays inside the pane.
+  const [boxSize, setBoxSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const box = imageBoxRef.current;
+    if (!box) return;
+    const read = () => {
+      const rect = box.getBoundingClientRect();
+      setBoxSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
+    };
+    read();
+    if (typeof ResizeObserver === 'undefined') return; // jsdom
+    const observer = new ResizeObserver(read);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
 
   const MAG_ZOOM = 3;
 
@@ -365,9 +383,17 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       if (relX < 0 || relY < 0 || relX > dispW || relY > dispH) return clear();
 
       const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+      // Amazon-sized panel: as large as the viewport allows beside the box,
+      // never covering the receipt.
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const roomRight = vw - rect.right - 24;
+      const roomLeft = rect.left - 24;
+      const preferRight = roomRight >= roomLeft;
+      const room = Math.max(preferRight ? roomRight : roomLeft, 240);
+      const panelW = Math.min(560, vh - 40, room);
       // Amazon correspondence: the panel shows exactly the lens area, so the
       // lens side is panel / zoom.
-      const panelW = Math.min(hostRect.width * 0.64, 540);
       const lensW = Math.max(60, Math.min(panelW / MAG_ZOOM, dispW, dispH));
       const contentLeft = offX - hostRect.left;
       const contentTop = offY - hostRect.top;
@@ -375,13 +401,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const boxTop = clamp(contentTop + relY - lensW / 2, contentTop, contentTop + dispH - lensW);
 
       // The zoomed panel floats OUTSIDE the image box (Amazon-style), over
-      // the adjacent column; flip to the left when the right edge is near.
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      let panelLeft = rect.right + 12;
-      if (panelLeft + panelW > vw - 8) {
-        panelLeft = Math.max(8, rect.left - panelW - 12);
-      }
+      // the adjacent column; flip to whichever side has more room.
+      const panelLeft = preferRight
+        ? Math.min(rect.right + 12, vw - panelW - 8)
+        : Math.max(rect.left - panelW - 12, 8);
       const panelTop = clamp(event.clientY - panelW / 2, 8, vh - panelW - 8);
 
       setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, lensW, panelLeft, panelTop });
@@ -1725,13 +1748,26 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
                 {/* Fixed-size image box: the same dimensions for every
                     receipt, whatever its natural size or aspect ratio. */}
-                <div className="relative h-full aspect-[3/4] max-w-full">
+                <div ref={imageBoxRef} className="relative h-full aspect-[3/4] max-w-full">
+                  {(() => {
+                    // When rotated a quarter-turn, swap the image element's
+                    // axes so the whole receipt stays inside the fixed box.
+                    const quarter = Math.abs(rotation) % 180 === 90 && boxSize.w > 0;
+                    return (
                   <ReceiptViewerImage
                     ref={imageRef}
                     src={receipt.image_url}
                     alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                    className="receipt-image h-full w-full object-contain"
-                    style={{ transform: `rotate(${rotation}deg)` }}
+                    className={quarter
+                      ? "receipt-image absolute left-1/2 top-1/2 object-contain"
+                      : "receipt-image h-full w-full object-contain"}
+                    style={quarter
+                      ? {
+                          width: boxSize.h,
+                          height: boxSize.w,
+                          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                        }
+                      : { transform: `rotate(${rotation}deg)` }}
                     onError={(e) => {
                       console.error('Image failed to load:', receipt.image_url);
                       console.error('Image error event:', e);
@@ -1748,6 +1784,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     showSkeleton={true}
                     showErrorState={false}
                   />
+                    );
+                  })()}
                   {showBoundingBoxes && (
                     <BoundingBoxOverlay
                       fieldGeometry={receipt.field_geometry || {}}
