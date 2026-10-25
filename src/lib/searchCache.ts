@@ -43,6 +43,7 @@ interface SearchCacheKey {
   similarityThreshold: number;
   limit: number;
   offset: number;
+  useEnhancedPrompting: boolean;
   temporalTimestamp?: number; // Added for temporal queries to ensure fresh results
 }
 
@@ -95,7 +96,8 @@ class SearchCache {
       language: params.filters?.language,
       similarityThreshold: params.similarityThreshold || 0.2,
       limit: params.limit || 20,
-      offset: params.offset || 0
+      offset: params.offset || 0,
+      useEnhancedPrompting: params.useEnhancedPrompting || false
     };
 
     // For temporal queries, add a timestamp to make cache key unique

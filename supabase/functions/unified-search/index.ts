@@ -532,6 +532,8 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
 
   try {
     const { query, useEnhancedPrompting = false, conversationHistory, userProfile, ...otherParams } = body;
+    const requestedLanguage = body?.responseLanguage || body?.filters?.language;
+    const responseLanguage: 'en' | 'ms' = requestedLanguage === 'ms' ? 'ms' : 'en';
 
     // 🔧 FIX: Check if this is a forced enhanced search (e.g., line item query)
     const isLineItemQuery = body.query && isLineItemQueryDetection(body.query);
@@ -754,6 +756,7 @@ async function handleEnhancedSearch(req: Request, body: any): Promise<Response> 
           searchResults: pipelineResult.results,
           userProfile,
           conversationHistory,
+          responseLanguage,
           metadata: pipelineResult.searchMetadata,
           smartSuggestions: pipelineResult.smartSuggestions
         };

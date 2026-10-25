@@ -240,26 +240,28 @@ class OptimizedSearchExecutor {
     };
 
     try {
-      // Check cache first
-      const cacheStartTime = performance.now();
-      const cachedResult = await searchCache.get(params, userId);
-      metrics.cacheTime = performance.now() - cacheStartTime;
+      // Check cache first (conversational requests opt out to avoid stale AI answers)
+      if (!params.bypassCache) {
+        const cacheStartTime = performance.now();
+        const cachedResult = await searchCache.get(params, userId);
+        metrics.cacheTime = performance.now() - cacheStartTime;
 
-      if (cachedResult) {
-        metrics.cacheHit = true;
-        metrics.totalTime = performance.now() - startTime;
-        metrics.searchStrategy = 'cache';
-        this.recordMetrics(metrics as SearchExecutionMetrics);
-        
-        console.log(`🎯 Cache hit for search: "${params.query}" (${metrics.totalTime.toFixed(2)}ms)`);
-        return cachedResult;
+        if (cachedResult) {
+          metrics.cacheHit = true;
+          metrics.totalTime = performance.now() - startTime;
+          metrics.searchStrategy = 'cache';
+          this.recordMetrics(metrics as SearchExecutionMetrics);
+
+          console.log(`🎯 Cache hit for search: "${params.query}" (${metrics.totalTime.toFixed(2)}ms)`);
+          return cachedResult;
+        }
       }
 
       // Execute parallel search strategies
       const result = await this.executeParallelSearch(params, userId, metrics);
-      
+
       // 🚀 PERFORMANCE: Cache successful results asynchronously to avoid blocking
-      if (result.success && result.results.length > 0) {
+      if (!params.bypassCache && result.success && result.results.length > 0) {
         // Don't await - cache in background
         searchCache.set(params, userId, result).catch(error => {
           console.warn('Background cache set failed:', error);
@@ -433,12 +435,13 @@ class OptimizedSearchExecutor {
    * Optimize search parameters for better performance
    */
   private optimizeSearchParams(params: UnifiedSearchParams): UnifiedSearchParams {
-    // 🚀 PERFORMANCE: Optimize query string
-    const optimizedQuery = params.query
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .substring(0, 200); // Limit query length
+    // 🚀 PERFORMANCE: Optimize query string. Conversational requests keep
+    // their original casing so the LLM prompt reads naturally.
+    const normalizedQuery = params.query.trim().replace(/\s+/g, ' ');
+    const optimizedQuery = (params.useEnhancedPrompting
+      ? normalizedQuery
+      : normalizedQuery.toLowerCase()
+    ).substring(0, 200); // Limit query length
 
     // 🚀 PERFORMANCE: Optimize limits for faster response
     const optimizedLimit = Math.min(params.limit || 20, 50); // Cap at 50 for performance
