@@ -178,8 +178,7 @@ describe("ProfileRewardsPanel", () => {
     renderPanel();
 
     // Unique extras remain.
-    expect(await screen.findByText("Scanner themes")).toBeInTheDocument();
-    expect(screen.getByText("Leaderboard privacy")).toBeInTheDocument();
+    expect(await screen.findByText("Leaderboard privacy")).toBeInTheDocument();
     expect(screen.getByText("INVITE42")).toBeInTheDocument();
     expect(screen.getByText("Pending rewards")).toBeInTheDocument();
     expect(screen.getByText("Shareable achievement cards")).toBeInTheDocument();
@@ -190,6 +189,9 @@ describe("ProfileRewardsPanel", () => {
     expect(screen.queryByText("Badge collection")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Leaderboard" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Missions" })).not.toBeInTheDocument();
+
+    // Scanner themes are removed: no consumer renders the selected theme.
+    expect(screen.queryByText("Scanner themes")).not.toBeInTheDocument();
   });
 
   it("updates privacy preferences", async () => {

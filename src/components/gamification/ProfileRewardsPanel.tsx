@@ -3,23 +3,14 @@ import { Copy, Share2 } from "lucide-react";
 import { useGamification } from "@/contexts/GamificationContext";
 import { useProfileTranslation } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { shareAchievementCard, type ShareCardPayload } from "@/lib/shareCards";
 import { buildReferralLink } from "@/services/gamificationService";
-import { SCANNER_THEME_IDS, type GamificationPreferencesUpdate, type ScannerThemeId } from "@/types/gamification";
-import { cn } from "@/lib/utils";
+import type { GamificationPreferencesUpdate } from "@/types/gamification";
 import { formatCurrencySafe } from "@/utils/currency";
-
-const themeAccents: Record<ScannerThemeId, string> = {
-  default: "from-slate-400 to-slate-600",
-  ocean: "from-cyan-400 to-blue-600",
-  forest: "from-emerald-400 to-green-700",
-  sunset: "from-amber-400 to-rose-500",
-};
 
 const formatBadgeFallback = (code: string | null) =>
   code
@@ -124,48 +115,10 @@ export function ProfileRewardsPanel() {
     <div className="space-y-6" data-testid="profile-rewards-panel">
       {/* XP overview and badge gallery intentionally omitted — the profile
           page already renders the XP stat cards and the badge collection.
-          This panel carries only the rewards extras: scanner themes,
-          leaderboard privacy, referrals and share cards. */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("rewards.themes.title")}</CardTitle>
-          <CardDescription>{t("rewards.themes.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {SCANNER_THEME_IDS.map((themeId) => {
-            const isUnlocked = profile?.unlockedScannerThemes.includes(themeId) ?? themeId === "default";
-            const isSelected = profile?.selectedScannerTheme === themeId;
-
-            return (
-              <button
-                key={themeId}
-                type="button"
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-colors",
-                  isSelected ? "border-primary ring-2 ring-primary/20" : "border-border/70",
-                  !isUnlocked && "cursor-not-allowed opacity-60",
-                )}
-                disabled={!isUnlocked}
-                onClick={() => updateSnapshot({ selectedScannerTheme: themeId })}
-              >
-                <div className={cn("mb-3 h-10 rounded-lg bg-gradient-to-r", themeAccents[themeId])} />
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{t(`rewards.themes.options.${themeId}.title`)}</p>
-                  <Badge variant={isSelected ? "default" : "outline"}>
-                    {isSelected
-                      ? t("rewards.themes.selected")
-                      : isUnlocked
-                        ? t("rewards.themes.unlocked")
-                        : t("rewards.themes.locked")}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{t(`rewards.themes.options.${themeId}.description`)}</p>
-              </button>
-            );
-          })}
-        </CardContent>
-      </Card>
-
+          Scanner themes are omitted too: nothing in the app consumes the
+          selected theme, so the picker promised an effect it never had.
+          This panel carries the rewards extras that are real: leaderboard
+          privacy, referrals and share cards. */}
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
