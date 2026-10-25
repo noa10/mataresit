@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Calendar as CalendarIcon, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ export default function ReceiptsPage() {
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dupOpen, setDupOpen] = useState(false);
+  const duplicateRef = useRef<HTMLElement>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
@@ -412,6 +413,24 @@ export default function ReceiptsPage() {
             )}
           </Button>
 
+          <Button
+            variant="accent-outline"
+            size="sm"
+            className="h-9 rounded-[7px] border-ledger-line-strong font-medium text-ledger-ink"
+            onClick={() => {
+              setDupOpen(true);
+              requestAnimationFrame(() => {
+                duplicateRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+            }}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            {t("workspace.receipts.duplicateDetection")}
+            {dupOpen && (
+              <span aria-hidden="true" className="ml-2 h-1.5 w-1.5 rounded-full bg-ledger-accent" />
+            )}
+          </Button>
+
           <ExportDropdown
             receipts={(data?.receipts ?? []) as Receipt[]}
             filters={{
@@ -591,8 +610,12 @@ export default function ReceiptsPage() {
       </section>
 
       {/* Duplicate detection — self-contained panel behind a collapsible
-          header, matching the old dashboard's capabilities. */}
-      <section className="mt-4 overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-surface">
+          header, matching the old dashboard's capabilities. The toolbar's
+          Duplicate detection button expands and scrolls here. */}
+      <section
+        ref={duplicateRef}
+        className="mt-4 scroll-mt-24 overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-surface"
+      >
         <button
           type="button"
           aria-expanded={dupOpen}
