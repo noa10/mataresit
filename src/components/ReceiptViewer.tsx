@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -326,6 +327,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     boxTop: number;
     panelW: number;
     lensW: number;
+    panelLeft: number;
+    panelTop: number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
 
@@ -371,7 +374,17 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const boxLeft = clamp(contentLeft + relX - lensW / 2, contentLeft, contentLeft + dispW - lensW);
       const boxTop = clamp(contentTop + relY - lensW / 2, contentTop, contentTop + dispH - lensW);
 
-      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, lensW });
+      // The zoomed panel floats OUTSIDE the image box (Amazon-style), over
+      // the adjacent column; flip to the left when the right edge is near.
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let panelLeft = rect.right + 12;
+      if (panelLeft + panelW > vw - 8) {
+        panelLeft = Math.max(8, rect.left - panelW - 12);
+      }
+      const panelTop = clamp(event.clientY - panelW / 2, 8, vh - panelW - 8);
+
+      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, lensW, panelLeft, panelTop });
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -1567,7 +1580,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             <h3 className="font-medium">Receipt Image</h3>
             {renderProcessingStatus()}
           </div>
-          <div className="flex-1 min-h-0 overflow-auto rounded-lg relative bg-secondary/30">
+          <div className="flex-1 min-h-0 overflow-hidden rounded-lg relative bg-secondary/30">
             {isActiveReceiptProcessingStatus(processingStatus) && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
                 <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
@@ -1772,18 +1785,24 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                         height: lens.lensW,
                       }}
                     />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute right-2 top-1/2 z-20 hidden -translate-y-1/2 overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
-                      style={{
-                        width: lens.panelW,
-                        height: lens.panelW,
-                        backgroundImage: `url(${receipt.image_url})`,
-                        backgroundRepeat: "no-repeat",
-                        backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
-                        backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
-                      }}
-                    />
+                    {createPortal(
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none z-[70] hidden overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
+                        style={{
+                          position: "fixed",
+                          left: lens.panelLeft,
+                          top: lens.panelTop,
+                          width: lens.panelW,
+                          height: lens.panelW,
+                          backgroundImage: `url(${receipt.image_url})`,
+                          backgroundRepeat: "no-repeat",
+                          backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
+                          backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
+                        }}
+                      />,
+                      document.body
+                    )}
                   </>
                 )}
               </div>
