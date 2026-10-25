@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Plus, Minus, Receipt, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -315,6 +315,63 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
+  const [isImageFullscreen, setIsImageFullscreen] = useState(false);
+  const [zoomPercent, setZoomPercent] = useState(100);
+  // Latest zoom API from the TransformWrapper render prop; the dblclick
+  // listener below reads it from a ref because React synthetic dblclick
+  // events don't reach this pane reliably.
+  const zoomApiRef = useRef<{
+    zoomToPoint: (scale: number, x: number, y: number, time?: number) => void;
+    resetTransform: (time?: number) => void;
+    getScale: () => number;
+  } | null>(null);
+  const zoomHostRef = useRef<HTMLDivElement>(null);
+
+  // Native double-click: toggle between fit and 2.2x at the pointer.
+  useEffect(() => {
+    const host = zoomHostRef.current;
+    const wrapper = host?.querySelector<HTMLElement>(".react-transform-wrapper");
+    if (!host || !wrapper) return;
+
+    // Read the scale from the live DOM — the render-prop instance snapshot
+    // can lag behind the current transform.
+    const currentScale = () => {
+      const content = host.querySelector<HTMLElement>(".react-transform-component");
+      const match = content?.style.transform.match(/scale\(([\d.]+)\)/);
+      return match ? parseFloat(match[1]) : 1;
+    };
+
+    const onDblClick = (event: MouseEvent) => {
+      const api = zoomApiRef.current;
+      if (!api) return;
+      if (currentScale() > 1.05) {
+        api.resetTransform(250);
+        setZoomPercent(100);
+      } else {
+        api.zoomToPoint(2.2, event.clientX, event.clientY, 250);
+        setZoomPercent(220);
+      }
+    };
+
+    wrapper.addEventListener("dblclick", onDblClick);
+    return () => wrapper.removeEventListener("dblclick", onDblClick);
+  }, [isImageFullscreen]);
+
+  // Sync the zoom readout when zooming ends (wheel, pinch, buttons).
+  const syncZoomPercent = (ref: { transformState?: { scale?: number } } | undefined) => {
+    const scale = ref?.transformState?.scale;
+    if (typeof scale === "number") setZoomPercent(Math.round(scale * 100));
+  };
+
+  // Exit the receipt image fullscreen with Escape
+  useEffect(() => {
+    if (!isImageFullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsImageFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isImageFullscreen]);
   const [editedReceipt, setEditedReceipt] = useState(receipt);
   // Add a separate state for input values that will be debounced
   const [inputValues, setInputValues] = useState({
@@ -1495,18 +1552,29 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               </div>
             )}
             {receipt.image_url && !imageError ? (
-              <div className="w-full h-full">
+              <div
+                ref={zoomHostRef}
+                className={
+                  isImageFullscreen
+                    ? "fixed inset-0 z-[60] bg-black/95 p-4 md:p-8"
+                    : "w-full h-full"
+                }
+              >
                 <TransformWrapper
                   initialScale={1}
-                  minScale={0.1}
+                  minScale={0.5}
                   maxScale={8}
                   centerOnInit={true}
+                  centerZoomedOut={true}
                   limitToBounds={false}
                   smooth={true}
-                  wheel={{ smoothStep: 0.04 }}
+                  wheel={{ step: 0.08 }}
                   pinch={{ step: 5 }}
+                  doubleClick={{ disabled: true }}
+                  autoAlignment={{ disabled: false }}
+                  onZoomStop={(ref) => syncZoomPercent(ref)}
                 >
-                  {({ zoomIn, zoomOut, resetTransform, setTransform, instance }) => {
+                  {({ zoomIn, zoomOut, resetTransform, setTransform, zoomToPoint, instance }) => {
                     // Create a compatible transform state object that our overlay can use
                     const transformState = instance?.transformState ? {
                       scale: instance.transformState.scale,
@@ -1514,10 +1582,34 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                       positionY: instance.transformState.positionY
                     } : undefined;
 
+                    // Keep the latest zoom API available to the native dblclick listener.
+                    zoomApiRef.current = {
+                      zoomToPoint: (scale, x, y, time) => {
+                        void zoomToPoint(scale, x, y, time);
+                      },
+                      resetTransform: (time) => {
+                        void resetTransform(time);
+                      },
+                      getScale: () => instance?.transformState?.scale ?? 1,
+                    };
+
                     return (
                       <>
                         <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
                           <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-8 min-w-[3.25rem] bg-background/80 px-2 font-data text-xs tabular-nums backdrop-blur-sm"
+                              onClick={() => {
+                                resetTransform();
+                                setZoomPercent(100);
+                              }}
+                              disabled={zoomPercent === 100}
+                              title="Reset zoom (fit)"
+                            >
+                              {zoomPercent}%
+                            </Button>
                             <Button
                               variant="secondary"
                               size="icon"
@@ -1535,6 +1627,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                               title="Zoom Out"
                             >
                               <ZoomOut size={16} />
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                              onClick={() => setIsImageFullscreen((open) => !open)}
+                              title={isImageFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+                            >
+                              {isImageFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                             </Button>
                           </div>
 
@@ -1656,6 +1760,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                             </Button>
                           </div>
                         </div>
+                        {isImageFullscreen && (
+                          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
+                            Scroll to zoom &middot; double-click to toggle &middot; Esc to exit
+                          </div>
+                        )}
                         <TransformComponent
                           wrapperClass="w-full h-full"
                           contentClass="w-full h-full"
