@@ -325,7 +325,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     boxLeft: number;
     boxTop: number;
     panelW: number;
+    panelH: number;
     lensW: number;
+    lensH: number;
     panelLeft: number;
     panelTop: number;
   } | null>(null);
@@ -368,23 +370,26 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const roomLeft = rect.left - 24;
       const preferRight = roomRight >= roomLeft;
       const room = Math.max(preferRight ? roomRight : roomLeft, 240);
-      const panelW = Math.min(560, vh - 40, room);
-      // Amazon correspondence: the panel shows exactly the lens area, so the
-      // lens side is panel / zoom.
-      const lensW = Math.max(60, Math.min(panelW / MAG_ZOOM, dispW, dispH));
+      // Receipts are tall, so the panel is too: width from the room beside
+      // the box, height from the viewport. The lens matches the panel shape
+      // (panel / zoom), showing exactly what the panel displays.
+      const panelW = Math.min(620, room, vw * 0.46);
+      const panelH = Math.max(panelW, Math.min(vh - 24, 820));
+      const lensW = Math.max(50, Math.min(panelW / MAG_ZOOM, dispW));
+      const lensH = Math.max(50, Math.min(panelH / MAG_ZOOM, dispH));
       const contentLeft = offX - hostRect.left;
       const contentTop = offY - hostRect.top;
       const boxLeft = clamp(contentLeft + relX - lensW / 2, contentLeft, contentLeft + dispW - lensW);
-      const boxTop = clamp(contentTop + relY - lensW / 2, contentTop, contentTop + dispH - lensW);
+      const boxTop = clamp(contentTop + relY - lensH / 2, contentTop, contentTop + dispH - lensH);
 
       // The zoomed panel floats OUTSIDE the image box (Amazon-style), over
       // the adjacent column; flip to whichever side has more room.
       const panelLeft = preferRight
         ? Math.min(rect.right + 12, vw - panelW - 8)
         : Math.max(rect.left - panelW - 12, 8);
-      const panelTop = clamp(event.clientY - panelW / 2, 8, vh - panelW - 8);
+      const panelTop = clamp(event.clientY - panelH / 2, 8, vh - panelH - 8);
 
-      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, lensW, panelLeft, panelTop });
+      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, panelH, lensW, lensH, panelLeft, panelTop });
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -1748,7 +1753,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                         left: lens.boxLeft,
                         top: lens.boxTop,
                         width: lens.lensW,
-                        height: lens.lensW,
+                        height: lens.lensH,
                       }}
                     />
                     {createPortal(
@@ -1760,11 +1765,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                           left: lens.panelLeft,
                           top: lens.panelTop,
                           width: lens.panelW,
-                          height: lens.panelW,
+                          height: lens.panelH,
                           backgroundImage: `url(${receipt.image_url})`,
                           backgroundRepeat: "no-repeat",
                           backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
-                          backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
+                          backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelH / 2)}px`,
                         }}
                       />,
                       document.body
