@@ -174,17 +174,22 @@ describe("ProfileRewardsPanel", () => {
     });
   });
 
-  it("renders rewards sections and placeholder route links", async () => {
+  it("renders the rewards extras without the duplicated overview and badges", async () => {
     renderPanel();
 
-    expect(await screen.findByText("Rewards center")).toBeInTheDocument();
-    expect(await screen.findByText("Level 4")).toBeInTheDocument();
-    expect(screen.getByText("Badge collection")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Leaderboard" })).toHaveAttribute("href", "/leaderboard");
-    expect(screen.getByRole("link", { name: "Missions" })).toHaveAttribute("href", "/missions");
+    // Unique extras remain.
+    expect(await screen.findByText("Scanner themes")).toBeInTheDocument();
+    expect(screen.getByText("Leaderboard privacy")).toBeInTheDocument();
     expect(screen.getByText("INVITE42")).toBeInTheDocument();
     expect(screen.getByText("Pending rewards")).toBeInTheDocument();
     expect(screen.getByText("Shareable achievement cards")).toBeInTheDocument();
+
+    // The XP overview, badge gallery and leaderboard/missions links live on
+    // the profile page itself now — the panel must not duplicate them.
+    expect(screen.queryByText("Rewards center")).not.toBeInTheDocument();
+    expect(screen.queryByText("Badge collection")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Leaderboard" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Missions" })).not.toBeInTheDocument();
   });
 
   it("updates privacy preferences", async () => {

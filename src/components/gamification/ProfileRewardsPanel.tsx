@@ -1,5 +1,4 @@
-import { Award, Copy, Medal, Share2, Shield, Sparkles, Target, Trophy, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Copy, Share2 } from "lucide-react";
 
 import { useGamification } from "@/contexts/GamificationContext";
 import { useProfileTranslation } from "@/contexts/LanguageContext";
@@ -7,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { shareAchievementCard, type ShareCardPayload } from "@/lib/shareCards";
@@ -15,19 +13,6 @@ import { buildReferralLink } from "@/services/gamificationService";
 import { SCANNER_THEME_IDS, type GamificationPreferencesUpdate, type ScannerThemeId } from "@/types/gamification";
 import { cn } from "@/lib/utils";
 import { formatCurrencySafe } from "@/utils/currency";
-
-const badgeIcons = {
-  first_scan: Sparkles,
-  tax_saver_10: Award,
-  tax_warrior_7: Shield,
-  receipt_marathon_30: Target,
-  scanner_pro_100: Medal,
-  malaysia_tax_hero_5000: Trophy,
-  level_5: Sparkles,
-  level_10: Trophy,
-  mission_master: Target,
-  recruiter: Users,
-} as const;
 
 const themeAccents: Record<ScannerThemeId, string> = {
   default: "from-slate-400 to-slate-600",
@@ -135,115 +120,12 @@ export function ProfileRewardsPanel() {
     }
   };
 
-  const equippedBadges = snapshot?.badges.filter((badge) => badge.equipped) ?? [];
-  const earnedBadges = snapshot?.badges ?? [];
-
   return (
     <div className="space-y-6" data-testid="profile-rewards-panel">
-      <Card>
-        <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              {t("rewards.title")}
-            </CardTitle>
-            <CardDescription>{t("rewards.description")}</CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary" size="sm">
-              <Link to="/leaderboard">{t("rewards.actions.leaderboard")}</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/missions">{t("rewards.actions.missions")}</Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border p-4">
-            <p className="text-sm text-muted-foreground">{t("rewards.overview.totalXp")}</p>
-            <p className="mt-2 text-3xl font-semibold">{profile?.totalXp?.toLocaleString() ?? "—"}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{t("rewards.overview.level", { level: profile?.currentLevel ?? 1 })}</p>
-          </div>
-          <div className="rounded-xl border p-4 md:col-span-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{t("rewards.overview.progress")}</span>
-              <span>
-                {profile?.xpIntoLevel ?? 0}/{profile?.xpForNextLevel ?? 500}
-              </span>
-            </div>
-            <Progress value={isLoading ? 10 : profile?.progressPercent ?? 0} className="mt-3 h-2.5" />
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div>
-                <p className="text-xl font-semibold">{profile?.loginStreakDays ?? 0}</p>
-                <p className="text-sm text-muted-foreground">{t("rewards.overview.loginStreak")}</p>
-              </div>
-              <div>
-                <p className="text-xl font-semibold">{profile?.scanStreakDays ?? 0}</p>
-                <p className="text-sm text-muted-foreground">{t("rewards.overview.scanStreak")}</p>
-              </div>
-              <div>
-                <p className="text-xl font-semibold">
-                  {profile?.dailyGoalCompletedToday ? t("rewards.overview.completed") : t("rewards.overview.ready")}
-                </p>
-                <p className="text-sm text-muted-foreground">{t("rewards.overview.dailyGoal")}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("rewards.badges.title")}</CardTitle>
-          <CardDescription>{t("rewards.badges.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <p className="mb-3 text-sm font-medium">{t("rewards.badges.equipped")}</p>
-            {equippedBadges.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {equippedBadges.map((badge) => {
-                  const Icon = badgeIcons[badge.code as keyof typeof badgeIcons] ?? Award;
-                  return (
-                    <div key={badge.id} className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                      <Icon className="mb-3 h-5 w-5 text-primary" />
-                      <p className="font-medium">{badge.definition?.name ?? formatBadgeFallback(badge.code)}</p>
-                      <p className="text-sm text-muted-foreground">{badge.definition?.description ?? formatBadgeFallback(badge.code)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{t("rewards.badges.noneEquipped")}</p>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {earnedBadges.map((badge) => {
-              const Icon = badgeIcons[badge.code as keyof typeof badgeIcons] ?? Award;
-              return (
-                <div
-                  key={badge.id}
-                  className={cn(
-                    "rounded-xl border p-4 transition-colors",
-                    "border-primary/20 bg-primary/5",
-                  )}
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <Badge variant="default">{t("rewards.badges.unlocked")}</Badge>
-                  </div>
-                  <p className="font-medium">{badge.definition?.name ?? formatBadgeFallback(badge.code)}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{badge.definition?.description ?? formatBadgeFallback(badge.code)}</p>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* XP overview and badge gallery intentionally omitted — the profile
+          page already renders the XP stat cards and the badge collection.
+          This panel carries only the rewards extras: scanner themes,
+          leaderboard privacy, referrals and share cards. */}
       <Card>
         <CardHeader>
           <CardTitle>{t("rewards.themes.title")}</CardTitle>

@@ -13,7 +13,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -86,7 +86,6 @@ const iconTileClass =
 export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { t } = useProfileTranslation();
   const { t: td, language } = useDashboardTranslation();
@@ -97,12 +96,6 @@ export default function Profile() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "" });
-
-  // Rewards & privacy expands in place under the Account panel — the URL
-  // param only seeds the initial state so old links keep working.
-  const [showRewardsPanel, setShowRewardsPanel] = useState(
-    searchParams.get("tab") === "rewards"
-  );
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -286,15 +279,6 @@ export default function Profile() {
             {td("workspace.profile.lede")}
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button variant="accent-outline" size="app" asChild>
-            <Link to="/leaderboard">{td("workspace.profile.leaderboard")}</Link>
-          </Button>
-          <Button variant="accent-outline" size="app" asChild>
-            <Link to="/missions">{td("workspace.profile.missions")}</Link>
-          </Button>
-        </div>
       </header>
 
       <Panel className="mt-7">
@@ -438,6 +422,17 @@ export default function Profile() {
           )}
         </Panel>
 
+      {/* Rewards & privacy — scanner themes, leaderboard privacy, referrals
+          and share cards; always visible, no toggle. */}
+      <section className="mt-3">
+        <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+          {td("workspace.profile.rewardsPrivacy")}
+        </p>
+        <div className="mt-3">
+          <ProfileRewardsPanel />
+        </div>
+      </section>
+
       <Panel
         className="mt-3"
         title={td("workspace.profile.account")}
@@ -474,32 +469,6 @@ export default function Profile() {
             <ChevronRight className="h-4 w-4 text-ledger-muted" aria-hidden="true" />
           </Link>
 
-          <button
-            type="button"
-            onClick={() => setShowRewardsPanel((open) => !open)}
-            aria-expanded={showRewardsPanel}
-            className={cn(linkRowClass, "w-full")}
-          >
-            <span className={iconTileClass} aria-hidden="true">
-              <Trophy className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-ledger-ink">
-                {td("workspace.profile.rewardsPrivacy")}
-              </span>
-              <span className="mt-0.5 block text-xs text-ledger-muted">
-                {td("workspace.profile.rewardsPrivacyLede")}
-              </span>
-            </span>
-            <ChevronRight
-              className={cn(
-                "h-4 w-4 text-ledger-muted transition-transform",
-                showRewardsPanel && "rotate-90"
-              )}
-              aria-hidden="true"
-            />
-          </button>
-
           <button type="button" onClick={handleSignOut} className={cn(linkRowClass, "w-full")}>
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-ledger-danger-soft text-ledger-danger"
@@ -514,14 +483,6 @@ export default function Profile() {
           </button>
         </div>
       </Panel>
-
-      {/* Rewards & privacy — expands in place, directly under the row that
-          toggles it, instead of swapping content at the top of the page. */}
-      {showRewardsPanel && (
-        <div id="rewards" className="mt-3">
-          <ProfileRewardsPanel />
-        </div>
-      )}
 
       {/* Account & security — the former /profile/advanced security tab,
           embedded so profile has a single page. */}
