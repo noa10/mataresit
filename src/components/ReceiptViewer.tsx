@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, RotateCcw, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -314,7 +314,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
 
   // State for image manipulation
-  const [rotation, setRotation] = useState(0);
   const [isImageFullscreen, setIsImageFullscreen] = useState(false);
   // Amazon-style hover magnifier: lens coordinates are relative to the
   // displayed (object-contain fitted) image; active whenever unrotated.
@@ -331,29 +330,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     panelTop: number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
-  const imageBoxRef = useRef<HTMLDivElement>(null);
-  // Live size of the fixed image box, for swapping the image axes when
-  // rotated so the full receipt stays inside the pane.
-  const [boxSize, setBoxSize] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const box = imageBoxRef.current;
-    if (!box) return;
-    const read = () => {
-      const rect = box.getBoundingClientRect();
-      setBoxSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
-    };
-    read();
-    if (typeof ResizeObserver === 'undefined') return; // jsdom
-    const observer = new ResizeObserver(read);
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, []);
-
   const MAG_ZOOM = 3;
-
-  // The magnifier only makes sense on the unrotated image.
-  const magnifierEnabled = rotation === 0;
 
   // Hover magnifier — native listeners on the image pane.
   useEffect(() => {
@@ -411,22 +388,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     };
 
     const onMouseMove = (event: MouseEvent) => {
-      if (rotation !== 0) return clear();
       computeLens(event);
     };
 
+    host.style.cursor = "crosshair";
     host.addEventListener("mousemove", onMouseMove);
     host.addEventListener("mouseleave", clear);
     return () => {
+      host.style.cursor = "";
       host.removeEventListener("mousemove", onMouseMove);
       host.removeEventListener("mouseleave", clear);
     };
-  }, [isImageFullscreen, rotation]);
-
-  useEffect(() => {
-    const host = zoomHostRef.current;
-    if (host) host.style.cursor = magnifierEnabled ? "crosshair" : "";
-  }, [magnifierEnabled, isImageFullscreen]);
+  }, [isImageFullscreen]);
 
   // Exit the receipt image fullscreen with Escape
   useEffect(() => {
@@ -1625,40 +1598,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     : "relative flex h-full w-full items-center justify-center"
                 }
               >
-                {/* Controls: rotation, fullscreen, overlays, file actions.
-                    The old pan/zoom controls are gone — hover magnifies. */}
+                {/* Controls: fullscreen, overlays, file actions. The old
+                    pan/zoom and rotation controls are gone — hover magnifies. */}
                 <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
-                  <div className="flex gap-1">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                      onClick={() => setRotation((rotation - 90) % 360)}
-                      title="Rotate Left"
-                    >
-                      <RotateCcw size={16} />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                      onClick={() => setRotation((rotation + 90) % 360)}
-                      title="Rotate Right"
-                    >
-                      <RotateCw size={16} />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                      onClick={() => setRotation(0)}
-                      disabled={rotation === 0}
-                      title="Reset rotation"
-                    >
-                      <RefreshCw size={16} />
-                    </Button>
-                  </div>
-
                   <div className="flex gap-1">
                     <Button
                       variant="secondary"
@@ -1748,26 +1690,14 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
                 {/* Fixed-size image box: the same dimensions for every
                     receipt, whatever its natural size or aspect ratio. */}
-                <div ref={imageBoxRef} className="relative h-full aspect-[3/4] max-w-full">
-                  {(() => {
-                    // When rotated a quarter-turn, swap the image element's
-                    // axes so the whole receipt stays inside the fixed box.
-                    const quarter = Math.abs(rotation) % 180 === 90 && boxSize.w > 0;
-                    return (
+                <div className="relative h-full aspect-[3/4] max-w-full">
                   <ReceiptViewerImage
                     ref={imageRef}
                     src={receipt.image_url}
                     alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                    className={quarter
-                      ? "receipt-image absolute left-1/2 top-1/2 object-contain"
-                      : "receipt-image h-full w-full object-contain"}
-                    style={quarter
-                      ? {
-                          width: boxSize.h,
-                          height: boxSize.w,
-                          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-                        }
-                      : { transform: `rotate(${rotation}deg)` }}
+                    containerClassName="h-full w-full"
+                    className="receipt-image h-full w-full object-contain"
+                    style={{ objectFit: "contain" }}
                     onError={(e) => {
                       console.error('Image failed to load:', receipt.image_url);
                       console.error('Image error event:', e);
@@ -1784,8 +1714,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     showSkeleton={true}
                     showErrorState={false}
                   />
-                    );
-                  })()}
                   {showBoundingBoxes && (
                     <BoundingBoxOverlay
                       fieldGeometry={receipt.field_geometry || {}}
@@ -1811,7 +1739,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 )}
                 {/* Amazon-style hover magnifier: lens on the image, large
                     zoomed panel docked to the right of the pane. */}
-                {lens && magnifierEnabled && (
+                {lens && (
                   <>
                     <div
                       aria-hidden="true"
