@@ -114,9 +114,9 @@ export function ClaimSubmissionDialog({
 
         <div className="space-y-6">
           {/* Claim Summary */}
-          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-ledger-surface-2 p-4 rounded-lg space-y-4 border border-ledger-line">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">{claim.title}</h3>
+              <h3 className="font-semibold text-lg text-ledger-ink">{claim.title}</h3>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
                   {getClaimStatusDisplayName(claim.status)}
