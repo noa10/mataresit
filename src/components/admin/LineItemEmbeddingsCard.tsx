@@ -148,7 +148,7 @@ export function LineItemEmbeddingsCard() {
             </Alert>
           )}
 
-          <div className="flex flex-col xs:flex-row gap-2 xs:justify-between text-sm">
+          <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2 xs:justify-between text-sm">
             <div className="whitespace-nowrap">
               <span className="font-medium">Total Line Items:</span> {embeddingStats?.total || 0}
             </div>
@@ -160,9 +160,9 @@ export function LineItemEmbeddingsCard() {
             </div>
           </div>
 
-          <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
+          <div className="w-full bg-ledger-surface-2 rounded-full h-2">
             <div
-              className="bg-blue-600 h-2 rounded-full"
+              className="bg-ledger-accent h-2 rounded-full"
               style={{ width: `${embeddingStats && embeddingStats.total > 0 ? (embeddingStats.withEmbeddings / embeddingStats.total) * 100 : 0}%` }}
             ></div>
           </div>
@@ -181,9 +181,9 @@ export function LineItemEmbeddingsCard() {
                 </span>
                 <span>{processedLineItems} of {totalLineItems}</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
+              <div className="w-full bg-ledger-surface-2 rounded-full h-2">
                 <div
-                  className="bg-blue-600 h-2 rounded-full"
+                  className="bg-ledger-accent h-2 rounded-full"
                   style={{ width: `${embeddingProgress}%` }}
                 ></div>
               </div>

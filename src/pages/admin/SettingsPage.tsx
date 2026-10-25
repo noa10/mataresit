@@ -25,12 +25,12 @@ export default function AdminSettingsPage() {
         {/* Embeddings Cards - Responsive Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Receipt Embeddings Card */}
-          <div className="w-full">
+          <div className="w-full min-w-0">
             <ReceiptEmbeddingsCard />
           </div>
 
           {/* Line Item Embeddings Card */}
-          <div className="w-full">
+          <div className="w-full min-w-0">
             <LineItemEmbeddingsCard />
           </div>
         </div>
