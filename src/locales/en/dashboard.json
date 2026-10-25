@@ -277,7 +277,7 @@
       "title": "Receipts",
       "lede": "Search, filter and open any receipt. Changes to a category update the totals immediately.",
       "search": "Search",
-      "filters": "More filters",
+      "filters": "Filters",
       "all": "All",
       "sort": "Sort",
       "emptyTitle": "No receipts yet",
@@ -306,7 +306,18 @@
       "clearFilters": "Clear filters",
       "previous": "Previous",
       "next": "Next",
-      "pageOf": "Page {{page}} of {{total}}"
+      "pageOf": "Page {{page}} of {{total}}",
+      "select": "Select",
+      "cancel": "Cancel",
+      "clearRange": "Clear date range",
+      "selectedCount": "{{count}} selected",
+      "bulkApprove": "Approve selected",
+      "bulkDelete": "Delete selected",
+      "bulkDeleteConfirm": "Delete the selected receipts? This cannot be undone.",
+      "bulkApprovedToast": "{{count}} receipts approved",
+      "bulkDeletedToast": "{{count}} receipts deleted",
+      "bulkFailedToast": "{{count}} failed",
+      "duplicateDetection": "Duplicate detection"
     },
     "detail": {
       "title": "Receipt detail",

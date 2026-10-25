@@ -277,7 +277,7 @@
       "title": "Resit",
       "lede": "Cari, tapis dan buka mana-mana resit. Perubahan kategori mengemas kini jumlah serta-merta.",
       "search": "Cari",
-      "filters": "Penapis lain",
+      "filters": "Penapis",
       "all": "Semua",
       "sort": "Susun",
       "emptyTitle": "Belum ada resit",
@@ -306,7 +306,18 @@
       "clearFilters": "Kosongkan penapis",
       "previous": "Sebelum",
       "next": "Seterusnya",
-      "pageOf": "Halaman {{page}} daripada {{total}}"
+      "pageOf": "Halaman {{page}} daripada {{total}}",
+      "select": "Pilih",
+      "cancel": "Batal",
+      "clearRange": "Kosongkan julat tarikh",
+      "selectedCount": "{{count}} dipilih",
+      "bulkApprove": "Luluskan pilihan",
+      "bulkDelete": "Padam pilihan",
+      "bulkDeleteConfirm": "Padam resit yang dipilih? Tindakan ini tidak boleh dibatalkan.",
+      "bulkApprovedToast": "{{count}} resit diluluskan",
+      "bulkDeletedToast": "{{count}} resit dipadam",
+      "bulkFailedToast": "{{count}} gagal",
+      "duplicateDetection": "Pengesanan pendua"
     },
     "detail": {
       "title": "Butiran resit",

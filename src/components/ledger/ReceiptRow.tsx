@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { useDashboardTranslation } from "@/contexts/LanguageContext";
 import { MonogramTile } from "@/components/ledger/MonogramTile";
 import { StatusChip } from "@/components/ledger/StatusChip";
@@ -11,6 +11,10 @@ interface ReceiptRowProps {
   receipt: WorkspaceReceiptSummary;
   onOpen?: (id: string) => void;
   className?: string;
+  /** Selection mode: a checkbox leads the row and clicks toggle instead of open. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, selected: boolean) => void;
 }
 
 const formatRowDate = (value: string): string => {
@@ -20,7 +24,14 @@ const formatRowDate = (value: string): string => {
 };
 
 /** Single receipt line used by the overview and the receipts inbox. */
-export function ReceiptRow({ receipt, onOpen, className }: ReceiptRowProps) {
+export function ReceiptRow({
+  receipt,
+  onOpen,
+  className,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+}: ReceiptRowProps) {
   const { t } = useDashboardTranslation();
   const dateLabel = formatRowDate(receipt.date);
   const isReviewed = receipt.status === "reviewed";
@@ -29,14 +40,40 @@ export function ReceiptRow({ receipt, onOpen, className }: ReceiptRowProps) {
     : t("workspace.status.review")) as string;
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen?.(receipt.id)}
+    <div
+      role={selectable ? undefined : "button"}
+      tabIndex={selectable ? undefined : 0}
+      onClick={() => (selectable ? onToggleSelect?.(receipt.id, !selected) : onOpen?.(receipt.id))}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          if (selectable) onToggleSelect?.(receipt.id, !selected);
+          else onOpen?.(receipt.id);
+        }
+      }}
       className={cn(
-        "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t border-ledger-line px-[18px] py-[11px] text-left transition-colors first:border-t-0 hover:bg-ledger-surface-2 focus-visible:bg-ledger-surface-2 focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_84px_108px_104px_20px] md:gap-y-0",
+        "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t border-ledger-line px-[18px] py-[11px] text-left transition-colors first:border-t-0 hover:bg-ledger-surface-2 focus-visible:bg-ledger-surface-2 focus-visible:outline-none md:gap-y-0",
+        selectable
+          ? "md:grid-cols-[18px_minmax(0,1fr)_84px_108px_104px_20px]"
+          : "md:grid-cols-[minmax(0,1fr)_84px_108px_104px_20px]",
+        selectable && "cursor-pointer",
+        selected && "bg-ledger-accent-soft/60",
         className
       )}
     >
+      {selectable && (
+        <span
+          className={cn(
+            "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+            selected
+              ? "border-ledger-accent bg-ledger-accent text-white"
+              : "border-ledger-line-strong bg-ledger-surface"
+          )}
+          aria-hidden="true"
+        >
+          {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+        </span>
+      )}
       <span className="flex min-w-0 items-center gap-[11px]">
         <MonogramTile name={receipt.merchant} />
         <span className="min-w-0">
@@ -78,6 +115,6 @@ export function ReceiptRow({ receipt, onOpen, className }: ReceiptRowProps) {
           {dateLabel}
         </span>
       </span>
-    </button>
+    </div>
   );
 }
