@@ -506,6 +506,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [showDocumentStructure, setShowDocumentStructure] = useState(false);
   const [showVisualizationSettings, setShowVisualizationSettings] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  // Long receipts (taller than ~3:4) render too small inside the fixed box,
+  // so they get a full-width column at readable size instead; the pane
+  // scrolls only in that case.
+  const isLongReceipt =
+    imageDimensions.width > 0 && imageDimensions.width / imageDimensions.height < 0.7;
   // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
   const [processLogs, setProcessLogs] = useState<ProcessingLog[]>([]);
   const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>(
@@ -1581,7 +1586,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             <h3 className="font-medium">Receipt Image</h3>
             {renderProcessingStatus()}
           </div>
-          <div className="flex-1 min-h-0 overflow-hidden rounded-lg relative bg-secondary/30">
+          <div className={`flex-1 min-h-0 rounded-lg relative bg-secondary/30 ${isLongReceipt ? "overflow-y-auto" : "overflow-hidden"}`}>
             {isActiveReceiptProcessingStatus(processingStatus) && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
                 <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
@@ -1695,7 +1700,13 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
                 {/* Fixed-size image box: the same dimensions for every
                     receipt, whatever its natural size or aspect ratio. */}
-                <div className="relative h-full aspect-[3/4] max-w-full">
+                <div
+                  className={
+                    isLongReceipt
+                      ? "relative w-full"
+                      : "relative h-full aspect-[3/4] max-w-full"
+                  }
+                >
                   <ReceiptViewerImage
                     ref={imageRef}
                     src={receipt.image_url}
