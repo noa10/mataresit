@@ -738,7 +738,7 @@ function BatchUploadZone({
                       ? "Some files are not supported. Please upload only JPEG, PNG, or PDF files."
                       : isDragging
                         ? "Release to add files to the queue"
-                        : "Drag & drop multiple receipt files here, or click to browse (up to 5MB each)"}
+                        : "Drag & drop your receipt files here, or click to browse (up to 5MB each)"}
                 </p>
               </div>
             </motion.div>

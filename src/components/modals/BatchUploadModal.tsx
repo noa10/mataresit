@@ -6,10 +6,7 @@ import {
   MobileDialogDescription as DialogDescription
 } from "@/components/ui/mobile-dialog";
 import BatchUploadZone from "@/components/BatchUploadZone";
-import UploadZone from "@/components/UploadZone";
-import { useCallback, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Files } from "lucide-react";
+import { useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
 
@@ -18,7 +15,6 @@ interface BatchUploadModalProps {
 }
 
 export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
-  const [activeTab, setActiveTab] = useState<string>("single");
   const isMobile = useIsMobile();
 
   // Consume upload state & modal control from the background context.
@@ -58,58 +54,16 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
             Upload Receipts
           </DialogTitle>
           <DialogDescription className="text-sm text-ledger-muted">
-            Upload and process your receipts. You can upload a single receipt or process multiple receipts at once.
+            Add one receipt or many — drop them here and the batch queue handles the rest.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs
-          defaultValue="single"
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-grow flex flex-col min-h-0 overflow-hidden pt-4"
-        >
-          <TabsList
-            className={`${isMobile ? "mb-2" : "mb-4"} self-center flex-shrink-0 border border-ledger-line bg-ledger-surface-2 ${isMobile ? "w-full" : "w-auto"}`}
-          >
-            <TabsTrigger
-              value="single"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm data-[state=active]:bg-ledger-surface data-[state=active]:text-ledger-ink`}
-            >
-              <Upload size={isMobile ? 14 : 16} />
-              {isMobile ? "Single" : "Single Upload"}
-            </TabsTrigger>
-            <TabsTrigger
-              value="batch"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm data-[state=active]:bg-ledger-surface data-[state=active]:text-ledger-ink`}
-            >
-              <Files size={isMobile ? 14 : 16} />
-              {isMobile ? "Batch" : "Batch Upload"}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value="single"
-            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-y-auto overflow-x-hidden"
-          >
-            <div className="flex-grow min-h-0 h-full overflow-x-hidden overflow-y-auto">
-              <UploadZone
-                onUploadComplete={handleUploadComplete}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent
-            value="batch"
-            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden"
-          >
-            <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
-              <BatchUploadZone
-                onUploadComplete={handleUploadComplete}
-                backgroundUpload={backgroundUpload}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+        <div className={`flex-grow flex flex-col min-h-0 pt-4 ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
+          <BatchUploadZone
+            onUploadComplete={handleUploadComplete}
+            backgroundUpload={backgroundUpload}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
