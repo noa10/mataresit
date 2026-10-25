@@ -98,7 +98,11 @@ export default function Profile() {
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "" });
 
-  const showRewards = searchParams.get("tab") === "rewards";
+  // Rewards & privacy expands in place under the Account panel — the URL
+  // param only seeds the initial state so old links keep working.
+  const [showRewardsPanel, setShowRewardsPanel] = useState(
+    searchParams.get("tab") === "rewards"
+  );
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -284,20 +288,12 @@ export default function Profile() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {showRewards ? (
-            <Button variant="accent-outline" size="app" asChild>
-              <Link to="/profile">{td("workspace.profile.backToProfile")}</Link>
-            </Button>
-          ) : (
-            <>
-              <Button variant="accent-outline" size="app" asChild>
-                <Link to="/leaderboard">{td("workspace.profile.leaderboard")}</Link>
-              </Button>
-              <Button variant="accent-outline" size="app" asChild>
-                <Link to="/missions">{td("workspace.profile.missions")}</Link>
-              </Button>
-            </>
-          )}
+          <Button variant="accent-outline" size="app" asChild>
+            <Link to="/leaderboard">{td("workspace.profile.leaderboard")}</Link>
+          </Button>
+          <Button variant="accent-outline" size="app" asChild>
+            <Link to="/missions">{td("workspace.profile.missions")}</Link>
+          </Button>
         </div>
       </header>
 
@@ -331,12 +327,6 @@ export default function Profile() {
           </Button>
         </div>
       </Panel>
-
-      {showRewards && (
-        <div id="rewards" className="mt-3">
-          <ProfileRewardsPanel />
-        </div>
-      )}
 
       <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="rounded-[10px] border border-ledger-line bg-ledger-surface px-4 py-3.5">
@@ -391,10 +381,9 @@ export default function Profile() {
         </div>
       </div>
 
-      {!showRewards && (
-        <Panel
-          className="mt-3"
-          title={td("workspace.profile.badges")}
+      <Panel
+        className="mt-3"
+        title={td("workspace.profile.badges")}
           action={
             <span className="font-data text-[0.625rem] text-ledger-muted">
               {td("workspace.profile.badgesMeta", { count: badgeList.length })}
@@ -448,7 +437,6 @@ export default function Profile() {
             </div>
           )}
         </Panel>
-      )}
 
       <Panel
         className="mt-3"
@@ -486,9 +474,11 @@ export default function Profile() {
             <ChevronRight className="h-4 w-4 text-ledger-muted" aria-hidden="true" />
           </Link>
 
-          <Link
-            to={showRewards ? "/profile" : "/profile?tab=rewards"}
-            className={linkRowClass}
+          <button
+            type="button"
+            onClick={() => setShowRewardsPanel((open) => !open)}
+            aria-expanded={showRewardsPanel}
+            className={cn(linkRowClass, "w-full")}
           >
             <span className={iconTileClass} aria-hidden="true">
               <Trophy className="h-4 w-4" />
@@ -501,8 +491,14 @@ export default function Profile() {
                 {td("workspace.profile.rewardsPrivacyLede")}
               </span>
             </span>
-            <ChevronRight className="h-4 w-4 text-ledger-muted" aria-hidden="true" />
-          </Link>
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 text-ledger-muted transition-transform",
+                showRewardsPanel && "rotate-90"
+              )}
+              aria-hidden="true"
+            />
+          </button>
 
           <button type="button" onClick={handleSignOut} className={cn(linkRowClass, "w-full")}>
             <span
@@ -518,6 +514,14 @@ export default function Profile() {
           </button>
         </div>
       </Panel>
+
+      {/* Rewards & privacy — expands in place, directly under the row that
+          toggles it, instead of swapping content at the top of the page. */}
+      {showRewardsPanel && (
+        <div id="rewards" className="mt-3">
+          <ProfileRewardsPanel />
+        </div>
+      )}
 
       {/* Account & security — the former /profile/advanced security tab,
           embedded so profile has a single page. */}
