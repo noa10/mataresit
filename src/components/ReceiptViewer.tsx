@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, RotateCcw, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -31,7 +31,6 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { useSaveStatus, useReceiptSaveStatus } from "@/contexts/SaveStatusContext";
 import { SaveStatusIndicator } from "@/components/SaveStatusToastManager";
 import { useTeam } from "@/contexts/TeamContext";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   Collapsible,
   CollapsibleContent,
@@ -316,9 +315,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // State for image manipulation
   const [rotation, setRotation] = useState(0);
   const [isImageFullscreen, setIsImageFullscreen] = useState(false);
-  const [zoomPercent, setZoomPercent] = useState(100);
   // Amazon-style hover magnifier: lens coordinates are relative to the
-  // displayed (object-contain fitted) image; only active at fit + no rotation.
+  // displayed (object-contain fitted) image; active whenever unrotated.
   const [lens, setLens] = useState<{
     x: number;
     y: number;
@@ -327,120 +325,72 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     boxLeft: number;
     boxTop: number;
     panelW: number;
-  } | null>(null);
-  const magnifierEnabledRef = useRef(false);
-  // Latest zoom API from the TransformWrapper render prop; the dblclick
-  // listener below reads it from a ref because React synthetic dblclick
-  // events don't reach this pane reliably.
-  const zoomApiRef = useRef<{
-    zoomToPoint: (scale: number, x: number, y: number, time?: number) => void;
-    resetTransform: (time?: number) => void;
-    getScale: () => number;
+    lensW: number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
 
-  const MAG_ZOOM = 2.4;
-  const MAG_LENS = 150;
+  const MAG_ZOOM = 3;
 
-  // Hover magnifier — native listeners on the transform wrapper so the pan/
-  // zoom gestures keep working underneath.
+  // The magnifier only makes sense on the unrotated image.
+  const magnifierEnabled = rotation === 0;
+
+  // Hover magnifier — native listeners on the image pane.
   useEffect(() => {
     const host = zoomHostRef.current;
-    const wrapper = host?.querySelector<HTMLElement>(".react-transform-wrapper");
-    if (!host || !wrapper) return;
+    if (!host) return;
+
+    const clear = () => setLens(null);
 
     const computeLens = (event: MouseEvent) => {
       // Query per event — OptimizedImage can swap the img element when the
       // real image loads, which orphans any reference captured at mount.
       const img = host.querySelector<HTMLImageElement>(".receipt-image");
-      if (!img || !img.naturalWidth) return;
+      if (!img || !img.naturalWidth) return clear();
       const rect = img.getBoundingClientRect();
       const hostRect = host.getBoundingClientRect();
-      const natW = img.naturalWidth || rect.width;
-      const natH = img.naturalHeight || rect.height;
+      const natW = img.naturalWidth;
+      const natH = img.naturalHeight;
       const drawScale = Math.min(rect.width / natW, rect.height / natH);
       const dispW = natW * drawScale;
       const dispH = natH * drawScale;
       const offX = rect.left + (rect.width - dispW) / 2;
       const offY = rect.top + (rect.height - dispH) / 2;
 
+      // Only magnify while the cursor is over the drawn image itself.
+      const relX = event.clientX - offX;
+      const relY = event.clientY - offY;
+      if (relX < 0 || relY < 0 || relX > dispW || relY > dispH) return clear();
+
       const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
-      const x = clamp(event.clientX - offX, 0, dispW);
-      const y = clamp(event.clientY - offY, 0, dispH);
+      // Amazon correspondence: the panel shows exactly the lens area, so the
+      // lens side is panel / zoom.
+      const panelW = Math.min(hostRect.width * 0.64, 540);
+      const lensW = Math.max(60, Math.min(panelW / MAG_ZOOM, dispW, dispH));
       const contentLeft = offX - hostRect.left;
       const contentTop = offY - hostRect.top;
-      const boxLeft = clamp(contentLeft + x - MAG_LENS / 2, contentLeft, contentLeft + dispW - MAG_LENS);
-      const boxTop = clamp(contentTop + y - MAG_LENS / 2, contentTop, contentTop + dispH - MAG_LENS);
-      const panelW = Math.min(hostRect.width * 0.46, 380);
+      const boxLeft = clamp(contentLeft + relX - lensW / 2, contentLeft, contentLeft + dispW - lensW);
+      const boxTop = clamp(contentTop + relY - lensW / 2, contentTop, contentTop + dispH - lensW);
 
-      setLens({ x, y, dispW, dispH, boxLeft, boxTop, panelW });
+      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, lensW });
     };
 
     const onMouseMove = (event: MouseEvent) => {
-      if (!magnifierEnabledRef.current) {
-        setLens(null);
-        return;
-      }
+      if (rotation !== 0) return clear();
       computeLens(event);
     };
-    const onMouseLeave = () => {
-      setLens(null);
-    };
 
-    wrapper.addEventListener("mousemove", onMouseMove);
-    wrapper.addEventListener("mouseleave", onMouseLeave);
+    host.addEventListener("mousemove", onMouseMove);
+    host.addEventListener("mouseleave", clear);
     return () => {
-      wrapper.removeEventListener("mousemove", onMouseMove);
-      wrapper.removeEventListener("mouseleave", onMouseLeave);
-      wrapper.style.cursor = "";
+      host.removeEventListener("mousemove", onMouseMove);
+      host.removeEventListener("mouseleave", clear);
     };
-  }, [isImageFullscreen]);
+  }, [isImageFullscreen, rotation]);
 
-  // The magnifier only makes sense on the unrotated, unzoomed image — the
-  // moment a transform kicks in, the pan/zoom controls take over.
-  const magnifierEnabled = zoomPercent === 100 && rotation === 0;
-  magnifierEnabledRef.current = magnifierEnabled;
-
-  useEffect(() => {
-    const wrapper = zoomHostRef.current?.querySelector<HTMLElement>(".react-transform-wrapper");
-    if (wrapper) wrapper.style.cursor = magnifierEnabled ? "crosshair" : "";
-  }, [magnifierEnabled, isImageFullscreen]);
-
-  // Native double-click: toggle between fit and 2.2x at the pointer.
   useEffect(() => {
     const host = zoomHostRef.current;
-    const wrapper = host?.querySelector<HTMLElement>(".react-transform-wrapper");
-    if (!host || !wrapper) return;
-
-    // Read the scale from the live DOM — the render-prop instance snapshot
-    // can lag behind the current transform.
-    const currentScale = () => {
-      const content = host.querySelector<HTMLElement>(".react-transform-component");
-      const match = content?.style.transform.match(/scale\(([\d.]+)\)/);
-      return match ? parseFloat(match[1]) : 1;
-    };
-
-    const onDblClick = (event: MouseEvent) => {
-      const api = zoomApiRef.current;
-      if (!api) return;
-      if (currentScale() > 1.05) {
-        api.resetTransform(250);
-        setZoomPercent(100);
-      } else {
-        api.zoomToPoint(2.2, event.clientX, event.clientY, 250);
-        setZoomPercent(220);
-      }
-    };
-
-    wrapper.addEventListener("dblclick", onDblClick);
-    return () => wrapper.removeEventListener("dblclick", onDblClick);
-  }, [isImageFullscreen]);
-
-  // Sync the zoom readout when zooming ends (wheel, pinch, buttons).
-  const syncZoomPercent = (ref: { transformState?: { scale?: number } } | undefined) => {
-    const scale = ref?.transformState?.scale;
-    if (typeof scale === "number") setZoomPercent(Math.round(scale * 100));
-  };
+    if (host) host.style.cursor = magnifierEnabled ? "crosshair" : "";
+  }, [magnifierEnabled, isImageFullscreen]);
 
   // Exit the receipt image fullscreen with Escape
   useEffect(() => {
@@ -1635,294 +1585,207 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 ref={zoomHostRef}
                 className={
                   isImageFullscreen
-                    ? "fixed inset-0 z-[60] bg-black/95 p-4 md:p-8"
-                    : "relative w-full h-full"
+                    ? "fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 md:p-8"
+                    : "relative flex h-full w-full items-center justify-center"
                 }
               >
-                <TransformWrapper
-                  initialScale={1}
-                  minScale={0.5}
-                  maxScale={8}
-                  centerOnInit={true}
-                  centerZoomedOut={true}
-                  limitToBounds={false}
-                  smooth={true}
-                  wheel={{ step: 0.08 }}
-                  pinch={{ step: 5 }}
-                  doubleClick={{ disabled: true }}
-                  autoAlignment={{ disabled: false }}
-                  onZoomStop={(ref) => syncZoomPercent(ref)}
-                >
-                  {({ zoomIn, zoomOut, resetTransform, setTransform, zoomToPoint, instance }) => {
-                    // Create a compatible transform state object that our overlay can use
-                    const transformState = instance?.transformState ? {
-                      scale: instance.transformState.scale,
-                      positionX: instance.transformState.positionX,
-                      positionY: instance.transformState.positionY
-                    } : undefined;
+                {/* Controls: rotation, fullscreen, overlays, file actions.
+                    The old pan/zoom controls are gone — hover magnifies. */}
+                <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={() => setRotation((rotation - 90) % 360)}
+                      title="Rotate Left"
+                    >
+                      <RotateCcw size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={() => setRotation((rotation + 90) % 360)}
+                      title="Rotate Right"
+                    >
+                      <RotateCw size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={() => setRotation(0)}
+                      disabled={rotation === 0}
+                      title="Reset rotation"
+                    >
+                      <RefreshCw size={16} />
+                    </Button>
+                  </div>
 
-                    // Keep the latest zoom API available to the native dblclick listener.
-                    zoomApiRef.current = {
-                      zoomToPoint: (scale, x, y, time) => {
-                        void zoomToPoint(scale, x, y, time);
-                      },
-                      resetTransform: (time) => {
-                        void resetTransform(time);
-                      },
-                      getScale: () => instance?.transformState?.scale ?? 1,
-                    };
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={() => setIsImageFullscreen((open) => !open)}
+                      title={isImageFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+                    >
+                      {isImageFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </Button>
+                  </div>
 
-                    return (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showBoundingBoxes ? 'text-primary' : ''}`}
+                      onClick={toggleBoundingBoxes}
+                      title={showBoundingBoxes ? "Hide Bounding Boxes" : "Show Bounding Boxes"}
+                    >
+                      {showBoundingBoxes ? <Eye size={16} /> : <Layers size={16} />}
+                    </Button>
+
+                    {showBoundingBoxes && (
                       <>
-                        <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="h-8 min-w-[3.25rem] bg-background/80 px-2 font-data text-xs tabular-nums backdrop-blur-sm"
-                              onClick={() => {
-                                resetTransform();
-                                setZoomPercent(100);
-                              }}
-                              disabled={zoomPercent === 100}
-                              title="Reset zoom (fit)"
-                            >
-                              {zoomPercent}%
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => zoomIn()}
-                              title="Zoom In"
-                            >
-                              <ZoomIn size={16} />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => zoomOut()}
-                              title="Zoom Out"
-                            >
-                              <ZoomOut size={16} />
-                            </Button>
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => setIsImageFullscreen((open) => !open)}
-                              title={isImageFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-                            >
-                              {isImageFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                            </Button>
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => {
-                                const newRotation = (rotation - 90) % 360;
-                                setRotation(newRotation);
-                                setTransform(0, 0, 1);
-                              }}
-                              title="Rotate Left"
-                            >
-                              <RotateCcw size={16} />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => {
-                                const newRotation = (rotation + 90) % 360;
-                                setRotation(newRotation);
-                                setTransform(0, 0, 1);
-                              }}
-                              title="Rotate Right"
-                            >
-                              <RotateCw size={16} />
-                            </Button>
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => {
-                                resetTransform();
-                                setRotation(0);
-                              }}
-                              title="Reset View"
-                            >
-                              <RefreshCw size={16} />
-                            </Button>
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showBoundingBoxes ? 'text-primary' : ''}`}
-                              onClick={toggleBoundingBoxes}
-                              title={showBoundingBoxes ? "Hide Bounding Boxes" : "Show Bounding Boxes"}
-                            >
-                              {showBoundingBoxes ? <Eye size={16} /> : <Layers size={16} />}
-                            </Button>
-
-                            {showBoundingBoxes && (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showVisualizationSettings ? 'text-primary' : ''}`}
-                                  onClick={toggleVisualizationSettings}
-                                  title="Visualization Settings"
-                                >
-                                  <Settings size={16} />
-                                </Button>
-
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showDocumentStructure ? 'text-primary' : ''}`}
-                                  onClick={toggleDocumentStructure}
-                                  title="Document Structure"
-                                  disabled={!receipt.document_structure || !receipt.document_structure.blocks || receipt.document_structure.blocks.length === 0}
-                                >
-                                  <Bug size={16} />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="flex gap-1">
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = receipt.image_url || ''; // Use the receipt image URL
-                                link.download = `receipt-${receipt.id}.jpg`;
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              }}
-                              title="Download Image"
-                            >
-                              <Download size={16} />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-ledger-danger/10 hover:text-ledger-danger"
-                              onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
-                                  deleteMutation.mutate();
-                                }
-                              }}
-                              disabled={deleteMutation.isPending}
-                              title="Delete Receipt"
-                            >
-                              {deleteMutation.isPending ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={16} />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                        {isImageFullscreen && (
-                          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
-                            Scroll to zoom &middot; double-click to toggle &middot; Esc to exit
-                          </div>
-                        )}
-                        {/* Amazon-style hover magnifier: lens on the image,
-                            zoomed panel docked to the right of the pane. */}
-                        {lens && magnifierEnabled && (
-                          <>
-                            <div
-                              aria-hidden="true"
-                              className="pointer-events-none absolute z-20 rounded-md border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-                              style={{
-                                left: lens.boxLeft,
-                                top: lens.boxTop,
-                                width: MAG_LENS,
-                                height: MAG_LENS,
-                              }}
-                            />
-                            <div
-                              aria-hidden="true"
-                              className="pointer-events-none absolute right-2 top-2 z-20 hidden overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
-                              style={{
-                                width: lens.panelW,
-                                height: lens.panelW,
-                                backgroundImage: `url(${receipt.image_url})`,
-                                backgroundRepeat: "no-repeat",
-                                backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
-                                backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
-                              }}
-                            />
-                          </>
-                        )}
-                        <TransformComponent
-                          wrapperClass="w-full h-full"
-                          contentClass="w-full h-full"
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showVisualizationSettings ? 'text-primary' : ''}`}
+                          onClick={toggleVisualizationSettings}
+                          title="Visualization Settings"
                         >
-                          <div className="relative w-full h-full">
-                            <ReceiptViewerImage
-                              ref={imageRef}
-                              src={receipt.image_url}
-                              alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                              className="receipt-image w-full h-full object-contain transition-transform"
-                              style={{ transform: `rotate(${rotation}deg)` }}
-                              onError={(e) => {
-                                console.error('Image failed to load:', receipt.image_url);
-                                console.error('Image error event:', e);
-                                setImageError(true);
-                              }}
-                              onLoad={(e) => {
-                                const img = e.currentTarget;
-                                console.log('Image loaded successfully:', receipt.image_url);
-                                setImageDimensions({
-                                  width: img.naturalWidth,
-                                  height: img.naturalHeight
-                                });
-                                setImageError(false); // Reset error state on successful load
-                              }}
-                              showSkeleton={true}
-                              showErrorState={false} // We handle error state separately
-                            />
-                            {/* Bounding Box Overlay */}
-                            {showBoundingBoxes && (
-                              <BoundingBoxOverlay
-                                fieldGeometry={receipt.field_geometry || {}}
-                                lineItems={editedReceipt.lineItems}
-                                imageWidth={imageDimensions.width}
-                                imageHeight={imageDimensions.height}
-                                visible={showBoundingBoxes}
-                                highlightedField={null}
-                                confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
-                                showPolygons={showPolygons}
-                                debugMode={debugMode}
-                                transformState={transformState}
-                                confidenceThreshold={confidenceThreshold}
-                                imageRef={imageRef}
-                              />
-                            )}
-                          </div>
-                        </TransformComponent>
+                          <Settings size={16} />
+                        </Button>
+
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className={`h-8 w-8 bg-background/80 backdrop-blur-sm ${showDocumentStructure ? 'text-primary' : ''}`}
+                          onClick={toggleDocumentStructure}
+                          title="Document Structure"
+                          disabled={!receipt.document_structure || !receipt.document_structure.blocks || receipt.document_structure.blocks.length === 0}
+                        >
+                          <Bug size={16} />
+                        </Button>
                       </>
-                    );
-                  }}
-                </TransformWrapper>
+                    )}
+                  </div>
+
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = receipt.image_url || '';
+                        link.download = `receipt-${receipt.id}.jpg`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      title="Download Image"
+                    >
+                      <Download size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-ledger-danger/10 hover:text-ledger-danger"
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+                          deleteMutation.mutate();
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      title="Delete Receipt"
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Fixed-size image box: the same dimensions for every
+                    receipt, whatever its natural size or aspect ratio. */}
+                <div className="relative h-full aspect-[3/4] max-w-full">
+                  <ReceiptViewerImage
+                    ref={imageRef}
+                    src={receipt.image_url}
+                    alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
+                    className="receipt-image h-full w-full object-contain"
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                    onError={(e) => {
+                      console.error('Image failed to load:', receipt.image_url);
+                      console.error('Image error event:', e);
+                      setImageError(true);
+                    }}
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      setImageDimensions({
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                      });
+                      setImageError(false);
+                    }}
+                    showSkeleton={true}
+                    showErrorState={false}
+                  />
+                  {showBoundingBoxes && (
+                    <BoundingBoxOverlay
+                      fieldGeometry={receipt.field_geometry || {}}
+                      lineItems={editedReceipt.lineItems}
+                      imageWidth={imageDimensions.width}
+                      imageHeight={imageDimensions.height}
+                      visible={showBoundingBoxes}
+                      highlightedField={null}
+                      confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
+                      showPolygons={showPolygons}
+                      debugMode={debugMode}
+                      transformState={{ scale: 1, positionX: 0, positionY: 0 }}
+                      confidenceThreshold={confidenceThreshold}
+                      imageRef={imageRef}
+                    />
+                  )}
+                </div>
+
+                {isImageFullscreen && (
+                  <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
+                    Hover to magnify &middot; Esc to exit
+                  </div>
+                )}
+                {/* Amazon-style hover magnifier: lens on the image, large
+                    zoomed panel docked to the right of the pane. */}
+                {lens && magnifierEnabled && (
+                  <>
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute z-20 rounded-md border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+                      style={{
+                        left: lens.boxLeft,
+                        top: lens.boxTop,
+                        width: lens.lensW,
+                        height: lens.lensW,
+                      }}
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-2 top-1/2 z-20 hidden -translate-y-1/2 overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
+                      style={{
+                        width: lens.panelW,
+                        height: lens.panelW,
+                        backgroundImage: `url(${receipt.image_url})`,
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
+                        backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
+                      }}
+                    />
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-muted-foreground p-4 h-full">
