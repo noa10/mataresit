@@ -1703,7 +1703,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 <div
                   className={
                     isLongReceipt
-                      ? "relative w-full"
+                      ? "relative mx-auto w-full max-w-[300px]"
                       : "relative h-full aspect-[3/4] max-w-full"
                   }
                 >
