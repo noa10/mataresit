@@ -317,6 +317,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [rotation, setRotation] = useState(0);
   const [isImageFullscreen, setIsImageFullscreen] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
+  // Amazon-style hover magnifier: lens coordinates are relative to the
+  // displayed (object-contain fitted) image; only active at fit + no rotation.
+  const [lens, setLens] = useState<{
+    x: number;
+    y: number;
+    dispW: number;
+    dispH: number;
+    boxLeft: number;
+    boxTop: number;
+    panelW: number;
+  } | null>(null);
+  const magnifierEnabledRef = useRef(false);
   // Latest zoom API from the TransformWrapper render prop; the dblclick
   // listener below reads it from a ref because React synthetic dblclick
   // events don't reach this pane reliably.
@@ -326,6 +338,73 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     getScale: () => number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
+
+  const MAG_ZOOM = 2.4;
+  const MAG_LENS = 150;
+
+  // Hover magnifier — native listeners on the transform wrapper so the pan/
+  // zoom gestures keep working underneath.
+  useEffect(() => {
+    const host = zoomHostRef.current;
+    const wrapper = host?.querySelector<HTMLElement>(".react-transform-wrapper");
+    if (!host || !wrapper) return;
+
+    const computeLens = (event: MouseEvent) => {
+      // Query per event — OptimizedImage can swap the img element when the
+      // real image loads, which orphans any reference captured at mount.
+      const img = host.querySelector<HTMLImageElement>(".receipt-image");
+      if (!img || !img.naturalWidth) return;
+      const rect = img.getBoundingClientRect();
+      const hostRect = host.getBoundingClientRect();
+      const natW = img.naturalWidth || rect.width;
+      const natH = img.naturalHeight || rect.height;
+      const drawScale = Math.min(rect.width / natW, rect.height / natH);
+      const dispW = natW * drawScale;
+      const dispH = natH * drawScale;
+      const offX = rect.left + (rect.width - dispW) / 2;
+      const offY = rect.top + (rect.height - dispH) / 2;
+
+      const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+      const x = clamp(event.clientX - offX, 0, dispW);
+      const y = clamp(event.clientY - offY, 0, dispH);
+      const contentLeft = offX - hostRect.left;
+      const contentTop = offY - hostRect.top;
+      const boxLeft = clamp(contentLeft + x - MAG_LENS / 2, contentLeft, contentLeft + dispW - MAG_LENS);
+      const boxTop = clamp(contentTop + y - MAG_LENS / 2, contentTop, contentTop + dispH - MAG_LENS);
+      const panelW = Math.min(hostRect.width * 0.46, 380);
+
+      setLens({ x, y, dispW, dispH, boxLeft, boxTop, panelW });
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      if (!magnifierEnabledRef.current) {
+        setLens(null);
+        return;
+      }
+      computeLens(event);
+    };
+    const onMouseLeave = () => {
+      setLens(null);
+    };
+
+    wrapper.addEventListener("mousemove", onMouseMove);
+    wrapper.addEventListener("mouseleave", onMouseLeave);
+    return () => {
+      wrapper.removeEventListener("mousemove", onMouseMove);
+      wrapper.removeEventListener("mouseleave", onMouseLeave);
+      wrapper.style.cursor = "";
+    };
+  }, [isImageFullscreen]);
+
+  // The magnifier only makes sense on the unrotated, unzoomed image — the
+  // moment a transform kicks in, the pan/zoom controls take over.
+  const magnifierEnabled = zoomPercent === 100 && rotation === 0;
+  magnifierEnabledRef.current = magnifierEnabled;
+
+  useEffect(() => {
+    const wrapper = zoomHostRef.current?.querySelector<HTMLElement>(".react-transform-wrapper");
+    if (wrapper) wrapper.style.cursor = magnifierEnabled ? "crosshair" : "";
+  }, [magnifierEnabled, isImageFullscreen]);
 
   // Native double-click: toggle between fit and 2.2x at the pointer.
   useEffect(() => {
@@ -1557,7 +1636,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                 className={
                   isImageFullscreen
                     ? "fixed inset-0 z-[60] bg-black/95 p-4 md:p-8"
-                    : "w-full h-full"
+                    : "relative w-full h-full"
                 }
               >
                 <TransformWrapper
@@ -1764,6 +1843,34 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                           <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
                             Scroll to zoom &middot; double-click to toggle &middot; Esc to exit
                           </div>
+                        )}
+                        {/* Amazon-style hover magnifier: lens on the image,
+                            zoomed panel docked to the right of the pane. */}
+                        {lens && magnifierEnabled && (
+                          <>
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none absolute z-20 rounded-md border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+                              style={{
+                                left: lens.boxLeft,
+                                top: lens.boxTop,
+                                width: MAG_LENS,
+                                height: MAG_LENS,
+                              }}
+                            />
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none absolute right-2 top-2 z-20 hidden overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
+                              style={{
+                                width: lens.panelW,
+                                height: lens.panelW,
+                                backgroundImage: `url(${receipt.image_url})`,
+                                backgroundRepeat: "no-repeat",
+                                backgroundSize: `${lens.dispW * MAG_ZOOM}px ${lens.dispH * MAG_ZOOM}px`,
+                                backgroundPosition: `${-(lens.x * MAG_ZOOM - lens.panelW / 2)}px ${-(lens.y * MAG_ZOOM - lens.panelW / 2)}px`,
+                              }}
+                            />
+                          </>
                         )}
                         <TransformComponent
                           wrapperClass="w-full h-full"
