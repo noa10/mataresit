@@ -79,10 +79,14 @@ export default function LeaderboardPage() {
   const [countryCode, setCountryCode] = useState<string | null>(null);
   const leaderboardLocale = LEADERBOARD_LOCALE_BY_LANGUAGE[language] ?? LEADERBOARD_LOCALE_BY_LANGUAGE.en;
 
+  const leaderboardOptIn = snapshot?.profile.leaderboardOptIn ?? false;
+
   const leaderboardQuery = useQuery({
     queryKey: gamificationQueryKeys.leaderboard(selectedMetric, countryCode),
     queryFn: () => getLeaderboard(selectedMetric, { countryCode, limit: LEADERBOARD_LIMIT }),
-    enabled: !isSnapshotLoading,
+    // The privacy gate renders when participation is off, so no ranking request
+    // (which returns other members' rows) should be made until a member opts in.
+    enabled: !isSnapshotLoading && leaderboardOptIn,
   });
 
   const metricMeta = useMemo(() => Object.fromEntries(METRIC_ORDER.map((metric) => [metric, {
@@ -98,7 +102,6 @@ export default function LeaderboardPage() {
   const topTableEntries = sortedEntries.filter((entry) => entry.rank <= LEADERBOARD_LIMIT);
   const currentUserEntry = sortedEntries.find((entry) => entry.isCurrentUser) ?? null;
   const podiumEntries = topTableEntries.slice(0, 3);
-  const leaderboardOptIn = snapshot?.profile.leaderboardOptIn ?? false;
 
   const renderMetricValue = (entry: LeaderboardEntry) => formatMetricValue(entry.metric, entry.value, leaderboardLocale, t);
 
