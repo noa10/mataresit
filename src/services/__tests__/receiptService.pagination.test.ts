@@ -157,6 +157,7 @@ describe("fetchReceiptsPage", () => {
       totalPages: 0,
       hasNextPage: false,
       hasPrevPage: false,
+      error: "boom",
     });
   });
 });

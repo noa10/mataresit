@@ -180,6 +180,8 @@ export interface ReceiptListResult {
   totalPages: number;
   hasNextPage: boolean;
   hasPrevPage: boolean;
+  /** Present when the query failed; pages render a retry state instead of empty. */
+  error?: string;
 }
 
 const normalizePageNumber = (page?: number): number => {
@@ -325,6 +327,7 @@ export const fetchReceiptsPage = async (
       totalPages: 0,
       hasNextPage: false,
       hasPrevPage: false,
+      error: error.message,
     };
   }
 

@@ -282,6 +282,9 @@
       "sort": "Sort",
       "emptyTitle": "No receipts yet",
       "emptyDescription": "Upload your first receipt and it will appear here, categorized and ready.",
+      "loadErrorTitle": "Couldn't load receipts",
+      "loadErrorDescription": "The receipts list could not be loaded. Check your connection and try again.",
+      "tryAgain": "Try again",
       "upload": "Upload receipts",
       "resultCount": "{{count}} receipts",
       "columns": {

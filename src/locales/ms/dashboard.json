@@ -282,6 +282,9 @@
       "sort": "Susun",
       "emptyTitle": "Belum ada resit",
       "emptyDescription": "Muat naik resit pertama anda dan ia akan muncul di sini, dikategorikan dan sedia.",
+      "loadErrorTitle": "Tidak dapat memuatkan resit",
+      "loadErrorDescription": "Senarai resit tidak dapat dimuatkan. Semak sambungan anda dan cuba lagi.",
+      "tryAgain": "Cuba lagi",
       "upload": "Muat naik resit",
       "resultCount": "{{count}} resit",
       "columns": {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Calendar as CalendarIcon, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, SlidersHorizontal, Trash2, Upload, X, AlertTriangle } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,17 @@ export default function ReceiptsPage() {
   const { user } = useAuth();
   const { currentTeam } = useTeam();
   const { openModal } = useBackgroundUpload();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // The marketing footer CTA links to /receipts?upload=1. Open the uploader,
+  // then strip the param so a refresh or back navigation does not reopen it.
+  useEffect(() => {
+    if (searchParams.get("upload") !== "1") return;
+    openModal();
+    const next = new URLSearchParams(searchParams);
+    next.delete("upload");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, openModal, setSearchParams]);
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -166,9 +178,14 @@ export default function ReceiptsPage() {
 
   const rows: WorkspaceReceiptSummary[] = useMemo(() => {
     return (data?.receipts ?? []).map((receipt) => {
-      const category = receipt.custom_category_id
-        ? categories.find((entry) => entry.id === receipt.custom_category_id)?.name
-        : null;
+      const joined = Array.isArray(receipt.custom_categories)
+        ? receipt.custom_categories[0]
+        : receipt.custom_categories;
+      const category =
+        joined?.name ||
+        (receipt.custom_category_id
+          ? categories.find((entry) => entry.id === receipt.custom_category_id)?.name
+          : null);
       return {
         id: receipt.id,
         merchant: receipt.merchant || t("workspace.detail.unknown"),
@@ -183,6 +200,7 @@ export default function ReceiptsPage() {
   }, [data, categories, t]);
 
   const total = data?.total ?? 0;
+  const loadError = data?.error ?? null;
   const totalPages = data?.totalPages ?? 0;
   const hasFilters =
     searchQuery.length > 0 || status !== "all" || activeFilterCount > 0;
@@ -534,6 +552,18 @@ export default function ReceiptsPage() {
               />
             ))}
           </div>
+        ) : loadError ? (
+          <EmptyState
+            title={t("workspace.receipts.loadErrorTitle")}
+            description={t("workspace.receipts.loadErrorDescription")}
+            icon={<AlertTriangle className="h-6 w-6" />}
+            className="rounded-none border-0 bg-transparent py-14"
+            action={
+              <Button variant="accent-outline" size="app" onClick={() => refetch()}>
+                {t("workspace.receipts.tryAgain")}
+              </Button>
+            }
+          />
         ) : rows.length === 0 ? (
           <EmptyState
             title={hasFilters ? t("workspace.receipts.noResults") : t("workspace.receipts.emptyTitle")}

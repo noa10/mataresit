@@ -68,6 +68,10 @@ export interface Receipt {
   predicted_category?: string;
   // Custom category support
   custom_category_id?: string | null;
+  custom_categories?:
+    | { id: string; name: string; color?: string | null; icon?: string | null }
+    | Array<{ id: string; name: string; color?: string | null; icon?: string | null }>
+    | null;
   // Payer (who paid) support
   paid_by_id?: string | null;
   // Team collaboration support
