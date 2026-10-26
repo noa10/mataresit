@@ -2063,7 +2063,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
               <CategorySelector
                 value={inputValues.custom_category_id}
                 onChange={handleCustomCategoryChange}
-                placeholder="Select category..."
                 className="bg-background/50"
               />
               <div className="flex justify-end">

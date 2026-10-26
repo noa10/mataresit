@@ -7,6 +7,10 @@ import {
   DeleteCategoryRequest 
 } from "@/types/receipt";
 import { toast } from "sonner";
+import i18n from "@/lib/i18n";
+
+const t = (key: string, options?: Record<string, unknown>): string =>
+  i18n.t(`categories:${key}`, options) as string;
 
 /**
  * Service for managing custom categories
@@ -32,7 +36,7 @@ export const fetchUserCategories = async (teamContext?: { currentTeam: { id: str
 
     if (error) {
       console.error("Error fetching categories:", error);
-      toast.error("Failed to load categories");
+      toast.error(t("error.loadFailed"));
       return [];
     }
 
@@ -64,7 +68,7 @@ export const fetchUserCategories = async (teamContext?: { currentTeam: { id: str
     return categories;
   } catch (error) {
     console.error("Error fetching categories:", error);
-    toast.error("Failed to load categories");
+    toast.error(t("error.loadFailed"));
     return [];
   }
 };
@@ -140,15 +144,15 @@ export const createCategory = async (
 
     if (error) {
       console.error("Error creating category:", error);
-      toast.error(error.message || "Failed to create category");
+      toast.error(error.message || t("error.createFailed"));
       return null;
     }
 
-    toast.success("Category created successfully");
+    toast.success(t("success.created"));
     return data;
   } catch (error: any) {
     console.error("Error creating category:", error);
-    toast.error(error.message || "Failed to create category");
+    toast.error(error.message || t("error.createFailed"));
     return null;
   }
 };
@@ -168,15 +172,15 @@ export const updateCategory = async (
 
     if (error) {
       console.error("Error updating category:", error);
-      toast.error(error.message || "Failed to update category");
+      toast.error(error.message || t("error.updateFailed"));
       return false;
     }
 
-    toast.success("Category updated successfully");
+    toast.success(t("success.updated"));
     return true;
   } catch (error: any) {
     console.error("Error updating category:", error);
-    toast.error(error.message || "Failed to update category");
+    toast.error(error.message || t("error.updateFailed"));
     return false;
   }
 };
@@ -194,15 +198,15 @@ export const deleteCategory = async (
 
     if (error) {
       console.error("Error deleting category:", error);
-      toast.error(error.message || "Failed to delete category");
+      toast.error(error.message || t("error.deleteFailed"));
       return false;
     }
 
-    toast.success("Category deleted successfully");
+    toast.success(t("success.deleted"));
     return true;
   } catch (error: any) {
     console.error("Error deleting category:", error);
-    toast.error(error.message || "Failed to delete category");
+    toast.error(error.message || t("error.deleteFailed"));
     return false;
   }
 };
@@ -220,20 +224,21 @@ export const bulkAssignCategory = async (
 
     if (error) {
       console.error("Error bulk assigning category:", error);
-      toast.error(error.message || "Failed to assign category");
+      toast.error(error.message || t("error.assignFailed"));
       return 0;
     }
 
     const updatedCount = data || 0;
     if (updatedCount > 0) {
-      const action = categoryId ? "assigned to category" : "removed from category";
-      toast.success(`${updatedCount} receipt(s) ${action}`);
+      toast.success(
+        t(categoryId ? "success.assigned" : "success.removed", { count: updatedCount })
+      );
     }
 
     return updatedCount;
   } catch (error: any) {
     console.error("Error bulk assigning category:", error);
-    toast.error(error.message || "Failed to assign category");
+    toast.error(error.message || t("error.assignFailed"));
     return 0;
   }
 };
@@ -265,14 +270,14 @@ export const validateCategoryData = (data: CreateCategoryRequest | UpdateCategor
 
   if ('name' in data && data.name !== undefined) {
     if (!data.name || data.name.trim().length === 0) {
-      errors.push("Category name is required");
+      errors.push(t("form.nameRequired"));
     } else if (data.name.trim().length > 50) {
-      errors.push("Category name cannot exceed 50 characters");
+      errors.push(t("form.nameTooLong"));
     }
   }
 
   if (data.color && !/^#[0-9A-Fa-f]{6}$/.test(data.color)) {
-    errors.push("Color must be a valid hex color (e.g., #3B82F6)");
+    errors.push(t("form.colorInvalid"));
   }
 
   return errors;

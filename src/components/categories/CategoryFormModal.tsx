@@ -25,6 +25,7 @@ import {
 import { fetchUserPayers } from "@/services/paidByService";
 import { CustomCategory, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/receipt";
 import { useTeam } from "@/contexts/TeamContext";
+import { useCategoriesTranslation } from "@/contexts/LanguageContext";
 
 interface CategoryFormModalProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   category,
 }) => {
   const { currentTeam } = useTeam();
+  const { t } = useCategoriesTranslation();
   const isEditing = !!category;
   const [formData, setFormData] = useState({
     name: "",
@@ -107,7 +109,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     const normalizedName = formData.name.trim().toLowerCase();
     const payerNameConflict = payers.some((payer) => payer.name.trim().toLowerCase() === normalizedName);
     if (payerNameConflict) {
-      setErrors(["Category name cannot match an existing payer name"]);
+      setErrors([t("form.payerConflict")]);
       return;
     }
 
@@ -127,30 +129,30 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Edit Category" : "Create New Category"}
+            {isEditing ? t("form.editTitle") : t("form.createTitle")}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Category Name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Category Name</Label>
+            <Label htmlFor="name">{t("form.name")}</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter category name"
+              placeholder={t("form.namePlaceholder")}
               maxLength={50}
               required
             />
             <div className="text-xs text-muted-foreground">
-              {formData.name.length}/50 characters
+              {t("form.characters", { count: formData.name.length })}
             </div>
           </div>
 
           {/* Color Selection */}
           <div className="space-y-3">
-            <Label>Color</Label>
+            <Label>{t("form.color")}</Label>
             <div className="grid grid-cols-5 gap-2">
               {DEFAULT_CATEGORY_COLORS.map((color) => (
                 <motion.button
@@ -180,14 +182,14 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 className="w-16 h-8 p-1 border rounded"
               />
               <span className="text-sm text-muted-foreground">
-                Or choose custom color
+                {t("form.customColor")}
               </span>
             </div>
           </div>
 
           {/* Icon Selection */}
           <div className="space-y-3">
-            <Label>Icon</Label>
+            <Label>{t("form.icon")}</Label>
             <div className="grid grid-cols-5 gap-2">
               {DEFAULT_CATEGORY_ICONS.map((icon) => (
                 <Button
@@ -206,7 +208,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
           {/* Preview */}
           <div className="space-y-2">
-            <Label>Preview</Label>
+            <Label>{t("form.preview")}</Label>
             <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
               <div
                 className="w-4 h-4 rounded-full"
@@ -214,7 +216,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               />
               <Badge variant="secondary" className="gap-1">
                 <Tag size={12} />
-                {formData.name || "Category Name"}
+                {formData.name || t("form.previewFallback")}
               </Badge>
             </div>
           </div>
@@ -232,10 +234,14 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : isEditing ? "Update" : "Create"}
+              {isLoading
+                ? t("form.saving")
+                : isEditing
+                  ? t("form.update")
+                  : t("form.create")}
             </Button>
           </DialogFooter>
         </form>

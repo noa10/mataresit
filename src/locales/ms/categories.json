@@ -4,7 +4,7 @@
   "actions": {
     "newCategory": "Kategori Baharu",
     "createCategory": "Cipta Kategori",
-    "edit": "Edit",
+    "edit": "Sunting",
     "delete": "Padam",
     "save": "Simpan",
     "cancel": "Batal"
@@ -15,7 +15,11 @@
   },
   "error": {
     "loadFailed": "Gagal memuatkan kategori",
-    "tryRefresh": "Sila cuba muat semula halaman."
+    "tryRefresh": "Sila cuba muat semula halaman.",
+    "createFailed": "Gagal mencipta kategori",
+    "updateFailed": "Gagal mengemas kini kategori",
+    "deleteFailed": "Gagal memadam kategori",
+    "assignFailed": "Gagal menetapkan kategori"
   },
   "form": {
     "name": "Nama Kategori",
@@ -25,7 +29,20 @@
     "nameRequired": "Nama kategori diperlukan",
     "nameMinLength": "Nama kategori mestilah sekurang-kurangnya 2 aksara",
     "nameMaxLength": "Nama kategori mestilah kurang dari 50 aksara",
-    "colorRequired": "Sila pilih warna"
+    "colorRequired": "Sila pilih warna",
+    "createTitle": "Cipta Kategori Baharu",
+    "editTitle": "Sunting Kategori",
+    "characters": "{{count}}/50 aksara",
+    "customColor": "Atau pilih warna tersuai",
+    "icon": "Ikon",
+    "preview": "Pratonton",
+    "previewFallback": "Nama Kategori",
+    "saving": "Menyimpan...",
+    "update": "Kemas Kini",
+    "create": "Cipta",
+    "payerConflict": "Nama kategori tidak boleh sama dengan nama pembayar sedia ada",
+    "nameTooLong": "Nama kategori tidak boleh melebihi 50 aksara",
+    "colorInvalid": "Warna mesti kod heks yang sah (cth. #3B82F6)"
   },
   "delete": {
     "title": "Padam Kategori",
@@ -35,13 +52,66 @@
     "reassignOption": "Pilih kategori",
     "noReassign": "Jangan tetapkan semula (resit akan menjadi tidak berkategori)",
     "confirmDelete": "Ya, padam kategori",
-    "deleting": "Memadam..."
+    "deleting": "Memadam...",
+    "cannotUndo": "Tindakan ini tidak boleh dibatalkan",
+    "assignedTo": "Kategori ini ditetapkan kepada {{count}} resit. Pilih tindakan untuk resit tersebut di bawah.",
+    "permanentlyDelete": "Kategori ini akan dipadam secara kekal.",
+    "whatHappens": "Apakah yang perlu berlaku kepada resit dalam kategori ini?",
+    "removeOption": "Buang kategori (resit menjadi tidak berkategori)",
+    "moveOption": "Pindahkan ke kategori lain",
+    "selectCategory": "Pilih kategori:",
+    "chooseCategory": "Pilih kategori"
   },
   "receipts": "resit",
   "receiptCount": "{{count}} resit",
   "success": {
     "created": "Kategori berjaya dicipta",
     "updated": "Kategori berjaya dikemas kini",
-    "deleted": "Kategori berjaya dipadam"
+    "deleted": "Kategori berjaya dipadam",
+    "assigned": "{{count}} resit ditetapkan kepada kategori",
+    "removed": "{{count}} resit dibuang daripada kategori"
+  },
+  "tabs": {
+    "categories": "Kategori",
+    "rules": "Peraturan",
+    "aliases": "Alias"
+  },
+  "rules": {
+    "newTitle": "Peraturan Baharu",
+    "pattern": "Corak",
+    "patternPlaceholder": "cth. shell, family mart",
+    "matchType": "Jenis Padanan",
+    "merchantExact": "Peniaga tepat",
+    "merchantContains": "Peniaga mengandungi",
+    "category": "Kategori",
+    "selectCategory": "Pilih kategori",
+    "save": "Simpan Peraturan",
+    "existingTitle": "Peraturan Sedia Ada",
+    "loading": "Memuatkan peraturan...",
+    "empty": "Belum ada peraturan dicipta.",
+    "unknownCategory": "Kategori tidak diketahui",
+    "archive": "Arkib"
+  },
+  "aliases": {
+    "newTitle": "Alias Baharu",
+    "label": "Label AI",
+    "placeholder": "cth. barangan runcit, makan",
+    "category": "Kategori",
+    "selectCategory": "Pilih kategori",
+    "save": "Simpan Alias",
+    "existingTitle": "Alias Sedia Ada",
+    "loading": "Memuatkan alias...",
+    "empty": "Belum ada alias dicipta.",
+    "unknownCategory": "Kategori tidak diketahui",
+    "delete": "Padam"
+  },
+  "selector": {
+    "selectPlaceholder": "Pilih kategori...",
+    "searchPlaceholder": "Cari kategori...",
+    "empty": "Tiada kategori ditemui.",
+    "remove": "Buang kategori",
+    "groupHeading": "Kategori",
+    "createNew": "Cipta kategori baharu",
+    "uncategorized": "Tidak Berkategori"
   }
 }

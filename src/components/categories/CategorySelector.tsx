@@ -25,6 +25,7 @@ import { fetchUserCategories } from "@/services/categoryService";
 import { CustomCategory } from "@/types/receipt";
 import { CategoryFormModal } from "./CategoryFormModal";
 import { useTeam } from "@/contexts/TeamContext";
+import { useCategoriesTranslation } from "@/contexts/LanguageContext";
 
 interface CategorySelectorProps {
   value?: string | null;
@@ -40,17 +41,19 @@ interface CategorySelectorProps {
 export const CategorySelector: React.FC<CategorySelectorProps> = ({
   value,
   onChange,
-  placeholder = "Select category...",
+  placeholder,
   disabled = false,
   allowCreate = true,
   className,
   compact = false,
 }) => {
+  const { t } = useCategoriesTranslation();
   const [open, setOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { currentTeam } = useTeam();
+  const resolvedPlaceholder = placeholder ?? t("selector.selectPlaceholder");
 
   // TEAM COLLABORATION FIX: Include team context in categories query
   const {
@@ -117,7 +120,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                 <span className="truncate">{selectedCategory.name}</span>
               </div>
             ) : (
-              <span className="truncate text-ledger-muted">{placeholder}</span>
+              <span className="truncate text-ledger-muted">{resolvedPlaceholder}</span>
             )}
             {compact ? (
               <ChevronDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -132,9 +135,9 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
           container={popoverContainer}
         >
           <Command>
-            <CommandInput placeholder="Search categories..." />
+            <CommandInput placeholder={t("selector.searchPlaceholder")} />
             <CommandList>
-              <CommandEmpty>No categories found.</CommandEmpty>
+              <CommandEmpty>{t("selector.empty")}</CommandEmpty>
               
               {/* Clear Selection */}
               {value && (
@@ -145,7 +148,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                       className="text-muted-foreground"
                     >
                       <X className="mr-2 h-4 w-4" />
-                      Remove category
+                      {t("selector.remove")}
                     </CommandItem>
                   </CommandGroup>
                   <CommandSeparator />
@@ -153,7 +156,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
               )}
 
               {/* Categories */}
-              <CommandGroup heading="Categories">
+              <CommandGroup heading={t("selector.groupHeading")}>
                 {categories.map((category) => (
                   <CommandItem
                     key={category.id}
@@ -189,7 +192,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                       className="text-primary"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Create new category
+                      {t("selector.createNew")}
                     </CommandItem>
                   </CommandGroup>
                 </>
@@ -221,6 +224,7 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   showCount = false,
   size = "md",
 }) => {
+  const { t } = useCategoriesTranslation();
   // Define size-specific classes using Tailwind utilities
   const sizeClasses = {
     sm: "text-[0.7rem] px-1.5 py-0.5 max-w-[90px]",
@@ -240,7 +244,7 @@ export const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
         data-size={size}
       >
         <Tag size={12} />
-        <span className="truncate">Uncategorized</span>
+        <span className="truncate">{t("selector.uncategorized")}</span>
       </div>
     );
   }
