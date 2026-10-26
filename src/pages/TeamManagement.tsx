@@ -1,8 +1,18 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, UserPlus } from "lucide-react";
+import { Clock3, Loader2, RotateCw, Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +38,7 @@ import { useDashboardTranslation, useLanguage } from "@/contexts/LanguageContext
 import { useTeam } from "@/contexts/TeamContext";
 import { useToast } from "@/hooks/use-toast";
 import { teamService } from "@/services/teamService";
-import type { TeamMember, TeamMemberRole } from "@/types/team";
+import type { TeamInvitation, TeamMember, TeamMemberRole } from "@/types/team";
 import { cn } from "@/lib/utils";
 
 const ASSIGNABLE_ROLES: TeamMemberRole[] = ["admin", "member", "viewer"];
@@ -58,6 +68,7 @@ export default function TeamManagement() {
     loading,
     hasPermission,
     updateTeamMemberRole,
+    removeTeamMember,
   } = useTeam();
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -65,10 +76,15 @@ export default function TeamManagement() {
   const [inviteRole, setInviteRole] = useState<TeamMemberRole>("member");
   const [isInviting, setIsInviting] = useState(false);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [invitationAction, setInvitationAction] = useState<string | null>(null);
+  const [invitationToRevoke, setInvitationToRevoke] = useState<TeamInvitation | null>(null);
 
   const canView = hasPermission("view_members");
   const canInvite = hasPermission("invite_members");
   const canManageRoles = hasPermission("update_member_roles");
+  const canRemoveMembers = hasPermission("remove_members");
 
   const invitationsKey = ["workspace", "team-invitations", currentTeam?.id ?? null] as const;
 
@@ -211,6 +227,68 @@ export default function TeamManagement() {
     }
   };
 
+  const handleRemoveMember = async () => {
+    if (!currentTeam || !memberToRemove) return;
+    setIsRemovingMember(true);
+    try {
+      await removeTeamMember(currentTeam.id, memberToRemove.user_id);
+      toast({
+        title: t("workspace.teams.memberRemoved"),
+        description: t("workspace.teams.memberRemovedDescription", {
+          name: memberName(memberToRemove),
+        }),
+      });
+      setMemberToRemove(null);
+    } catch {
+      // TeamContext already shows the failure toast.
+    } finally {
+      setIsRemovingMember(false);
+    }
+  };
+
+  const handleRevokeInvitation = async () => {
+    if (!invitationToRevoke) return;
+    const invitation = invitationToRevoke;
+    setInvitationAction(`${invitation.id}:revoke`);
+    try {
+      await teamService.cancelInvitation(invitation.id);
+      toast({
+        title: t("workspace.teams.inviteRevoked"),
+        description: t("workspace.teams.inviteRevokedDescription", { email: invitation.email }),
+      });
+      setInvitationToRevoke(null);
+      queryClient.invalidateQueries({ queryKey: invitationsKey });
+    } catch (error) {
+      toast({
+        title: t("workspace.teams.inviteRevokeFailed"),
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setInvitationAction(null);
+    }
+  };
+
+  const handleResendInvitation = async (invitation: TeamInvitation) => {
+    setInvitationAction(`${invitation.id}:resend`);
+    try {
+      await teamService.resendInvitationEnhanced(invitation.id, { sendEmail: true });
+      toast({
+        title: t("workspace.teams.inviteResent"),
+        description: t("workspace.teams.inviteResentDescription", { email: invitation.email }),
+      });
+      queryClient.invalidateQueries({ queryKey: invitationsKey });
+    } catch (error) {
+      toast({
+        title: t("workspace.teams.inviteResendFailed"),
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setInvitationAction(null);
+    }
+  };
+
   const memberCount = teamMembers.length;
 
   return (
@@ -281,7 +359,7 @@ export default function TeamManagement() {
               </div>
             ) : (
               <div>
-                <div className="hidden grid-cols-[minmax(0,2fr)_104px_96px_92px] items-center gap-3.5 border-b border-ledger-line bg-ledger-surface-2 px-4 py-2.5 lg:grid">
+                <div className="hidden grid-cols-[minmax(0,2fr)_104px_96px_92px_84px] items-center gap-3.5 border-b border-ledger-line bg-ledger-surface-2 px-4 py-2.5 lg:grid">
                   <span className="font-data text-[0.58rem] uppercase tracking-[0.16em] text-ledger-muted">
                     {t("workspace.teams.member")}
                   </span>
@@ -294,6 +372,7 @@ export default function TeamManagement() {
                   <span className="font-data text-[0.58rem] uppercase tracking-[0.16em] text-ledger-muted">
                     {t("workspace.teams.joined")}
                   </span>
+                  <span className="sr-only">{t("workspace.teams.actions")}</span>
                 </div>
 
                 <div className="divide-y divide-ledger-line">
@@ -304,7 +383,7 @@ export default function TeamManagement() {
                     return (
                       <div
                         key={member.id}
-                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 lg:grid-cols-[minmax(0,2fr)_104px_96px_92px] lg:gap-3.5"
+                        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 lg:grid-cols-[minmax(0,2fr)_104px_96px_92px_84px] lg:gap-3.5"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span
@@ -362,8 +441,35 @@ export default function TeamManagement() {
                         <span className="hidden font-data text-[0.6875rem] text-ledger-muted lg:block">
                           {formatMonth(member.joined_at)}
                         </span>
-                        <div className="flex justify-end lg:hidden">
+                        <div className="hidden justify-end lg:flex">
+                          {canRemoveMembers && member.role !== "owner" && member.user_id !== user?.id && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-danger/10 hover:text-ledger-danger"
+                              onClick={() => setMemberToRemove(member)}
+                              aria-label={t("workspace.teams.removeMemberAria", { name })}
+                              title={t("workspace.teams.removeMember")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-end gap-1 lg:hidden">
                           <StatusChip tone="reviewed" label={t("workspace.teams.active")} />
+                          {canRemoveMembers && member.role !== "owner" && member.user_id !== user?.id && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-danger/10 hover:text-ledger-danger"
+                              onClick={() => setMemberToRemove(member)}
+                              aria-label={t("workspace.teams.removeMemberAria", { name })}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -372,7 +478,7 @@ export default function TeamManagement() {
                   {pendingInvitations.map((invitation) => (
                     <div
                       key={invitation.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 lg:grid-cols-[minmax(0,2fr)_104px_96px_92px] lg:gap-3.5"
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 lg:grid-cols-[minmax(0,2fr)_104px_96px_92px_84px] lg:gap-3.5"
                     >
                       <div className="flex min-w-0 items-center gap-2.5">
                         <span
@@ -406,8 +512,72 @@ export default function TeamManagement() {
                       <span className="hidden font-data text-[0.6875rem] text-ledger-muted lg:block">
                         —
                       </span>
-                      <div className="flex justify-end lg:hidden">
+                      <div className="hidden items-center justify-end gap-1 lg:flex">
+                        {canInvite && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-surface-2 hover:text-ledger-ink"
+                              onClick={() => handleResendInvitation(invitation)}
+                              disabled={invitationAction !== null}
+                              aria-label={t("workspace.teams.resendInviteAria", { email: invitation.email })}
+                              title={t("workspace.teams.resendInvite")}
+                            >
+                              {invitationAction === `${invitation.id}:resend` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-danger/10 hover:text-ledger-danger"
+                              onClick={() => setInvitationToRevoke(invitation)}
+                              disabled={invitationAction !== null}
+                              aria-label={t("workspace.teams.revokeInviteAria", { email: invitation.email })}
+                              title={t("workspace.teams.revokeInvite")}
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-end gap-1 lg:hidden">
                         <StatusChip tone="unreviewed" label={t("workspace.teams.pendingStatus")} />
+                        {canInvite && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-surface-2 hover:text-ledger-ink"
+                              onClick={() => handleResendInvitation(invitation)}
+                              disabled={invitationAction !== null}
+                              aria-label={t("workspace.teams.resendInviteAria", { email: invitation.email })}
+                            >
+                              {invitationAction === `${invitation.id}:resend` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ledger-muted hover:bg-ledger-danger/10 hover:text-ledger-danger"
+                              onClick={() => setInvitationToRevoke(invitation)}
+                              disabled={invitationAction !== null}
+                              aria-label={t("workspace.teams.revokeInviteAria", { email: invitation.email })}
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -454,6 +624,80 @@ export default function TeamManagement() {
           </Panel>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(memberToRemove)}
+        onOpenChange={(open) => {
+          if (!open && !isRemovingMember) setMemberToRemove(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("workspace.teams.removeMemberTitle", {
+                name: memberToRemove ? memberName(memberToRemove) : "",
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("workspace.teams.removeMemberDescription", {
+                team: currentTeam?.name ?? "",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingMember}>
+              {t("workspace.profile.close")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleRemoveMember();
+              }}
+              disabled={isRemovingMember}
+            >
+              {isRemovingMember
+                ? t("workspace.teams.removingMember")
+                : t("workspace.teams.removeMember")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(invitationToRevoke)}
+        onOpenChange={(open) => {
+          if (!open && !invitationAction) setInvitationToRevoke(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("workspace.teams.revokeInviteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("workspace.teams.revokeInviteDescription", {
+                email: invitationToRevoke?.email ?? "",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(invitationAction)}>
+              {t("workspace.profile.close")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleRevokeInvitation();
+              }}
+              disabled={Boolean(invitationAction)}
+            >
+              {invitationAction === `${invitationToRevoke?.id}:revoke`
+                ? t("workspace.teams.revokingInvite")
+                : t("workspace.teams.revokeInvite")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="sm:max-w-[440px]">
