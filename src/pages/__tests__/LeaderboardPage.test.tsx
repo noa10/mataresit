@@ -114,13 +114,19 @@ function renderPage() {
     },
   });
 
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <LeaderboardPage />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+
+  const view = render(tree());
+
+  // Re-render against the same QueryClient so a snapshot change (e.g. the member
+  // opting in) can be exercised without discarding the query cache.
+  return { ...view, rerenderPage: () => view.rerender(tree()) };
 }
 
 describe("LeaderboardPage", () => {
@@ -142,9 +148,36 @@ describe("LeaderboardPage", () => {
 
     expect(await screen.findByText("Join the leaderboard when you're ready")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open rewards settings" })).toHaveAttribute("href", "/profile?tab=rewards");
-    await waitFor(() => {
-      expect(getLeaderboard).not.toHaveBeenCalled();
+    // Asserted directly rather than inside a waitFor: waitFor resolves on the
+    // first passing check, so it would not catch a request firing slightly later.
+    expect(getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it("starts fetching once the member opts in", async () => {
+    const getLeaderboard = vi.fn().mockResolvedValue([]);
+
+    mocks.useGamification.mockReturnValue({
+      snapshot: { profile: { leaderboardOptIn: false } },
+      isLoading: false,
+      getLeaderboard,
     });
+
+    const { rerenderPage } = renderPage();
+
+    expect(await screen.findByText("Join the leaderboard when you're ready")).toBeInTheDocument();
+    expect(getLeaderboard).not.toHaveBeenCalled();
+
+    mocks.useGamification.mockReturnValue({
+      snapshot: { profile: { leaderboardOptIn: true } },
+      isLoading: false,
+      getLeaderboard,
+    });
+    rerenderPage();
+
+    await waitFor(() => {
+      expect(getLeaderboard).toHaveBeenCalledTimes(1);
+    });
+    expect(getLeaderboard).toHaveBeenCalledWith("weekly_xp", { countryCode: null, limit: 100 });
   });
 
   it("loads leaderboard rows and supports switching to the Malaysia view", async () => {

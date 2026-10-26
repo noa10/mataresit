@@ -77,6 +77,11 @@ vi.mock("@/contexts/LanguageContext", () => ({
       return template.replace("{{count}}", String(options?.count ?? ""));
     },
   }),
+  // MissionsPage renders GamificationProgressCard, which reads dashboard keys.
+  useDashboardTranslation: () => ({
+    language: mocks.language,
+    t: (key: string) => key,
+  }),
 }));
 
 function renderPage() {
@@ -176,7 +181,7 @@ describe("MissionsPage", () => {
     const getMissions = vi.fn().mockResolvedValue(missions);
 
     mocks.useGamification.mockReturnValue({
-      snapshot: { profile: { userId: "user-1" }, activeMissions: missions },
+      snapshot: { profile: { userId: "user-1" }, badges: [], activeMissions: missions },
       isLoading: false,
       getMissions,
     });
@@ -229,7 +234,7 @@ describe("MissionsPage", () => {
     }];
 
     mocks.useGamification.mockReturnValue({
-      snapshot: { profile: { userId: "user-ms" }, activeMissions: missions },
+      snapshot: { profile: { userId: "user-ms" }, badges: [], activeMissions: missions },
       isLoading: false,
       getMissions: vi.fn().mockResolvedValue(missions),
     });

@@ -79,10 +79,17 @@ export default function LeaderboardPage() {
   const [countryCode, setCountryCode] = useState<string | null>(null);
   const leaderboardLocale = LEADERBOARD_LOCALE_BY_LANGUAGE[language] ?? LEADERBOARD_LOCALE_BY_LANGUAGE.en;
 
+  const leaderboardOptIn = snapshot?.profile.leaderboardOptIn ?? false;
+
   const leaderboardQuery = useQuery({
     queryKey: gamificationQueryKeys.leaderboard(selectedMetric, countryCode),
     queryFn: () => getLeaderboard(selectedMetric, { countryCode, limit: LEADERBOARD_LIMIT }),
-    enabled: !isSnapshotLoading,
+    // The privacy gate renders when participation is off, so don't issue a
+    // ranking request in that state. UI-level rule only: the
+    // get_gamification_leaderboard RPC does not require the *caller* to have
+    // opted in (it only lists members who did), so direct API callers are
+    // unaffected — see the migration if this needs enforcing server-side.
+    enabled: !isSnapshotLoading && leaderboardOptIn,
   });
 
   const metricMeta = useMemo(() => Object.fromEntries(METRIC_ORDER.map((metric) => [metric, {
@@ -98,7 +105,6 @@ export default function LeaderboardPage() {
   const topTableEntries = sortedEntries.filter((entry) => entry.rank <= LEADERBOARD_LIMIT);
   const currentUserEntry = sortedEntries.find((entry) => entry.isCurrentUser) ?? null;
   const podiumEntries = topTableEntries.slice(0, 3);
-  const leaderboardOptIn = snapshot?.profile.leaderboardOptIn ?? false;
 
   const renderMetricValue = (entry: LeaderboardEntry) => formatMetricValue(entry.metric, entry.value, leaderboardLocale, t);
 
