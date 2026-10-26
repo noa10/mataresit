@@ -643,6 +643,7 @@
         "clearHistory": "Clear all",
         "clearHistoryTitle": "Clear all recent chats?",
         "clearHistoryDescription": "This removes every saved chat from this browser. This cannot be undone.",
+        "persistenceFailed": "Couldn't save chat history in this browser. Recent chats may be incomplete.",
         "cancel": "Cancel",
         "justNow": "just now",
         "messageCount": "{{count}} messages",

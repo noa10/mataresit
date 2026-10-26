@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardTranslation } from '@/contexts/LanguageContext';
 import {
   SEARCH_CHAT_HISTORY_EVENT,
+  SEARCH_CHAT_PERSISTENCE_FAILED_EVENT,
   clearSearchChatHistory,
   deleteSearchChat,
   getSearchChatStorageKey,
@@ -14,6 +17,7 @@ import {
  * History is namespaced per signed-in user; signed-out visitors see nothing.
  */
 export function useSearchChatHistory() {
+  const { t } = useDashboardTranslation();
   const { user } = useAuth();
   const userId = user?.id ?? null;
 
@@ -46,6 +50,16 @@ export function useSearchChatHistory() {
       window.removeEventListener('storage', handleStorage);
     };
   }, [refresh, userId]);
+
+  useEffect(() => {
+    const handleFailure = () => {
+      toast.error(t('workspace.search.chat.persistenceFailed'));
+    };
+    window.addEventListener(SEARCH_CHAT_PERSISTENCE_FAILED_EVENT, handleFailure);
+    return () => {
+      window.removeEventListener(SEARCH_CHAT_PERSISTENCE_FAILED_EVENT, handleFailure);
+    };
+  }, [t]);
 
   const deleteConversation = useCallback(
     (id: string) => {

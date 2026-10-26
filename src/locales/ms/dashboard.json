@@ -643,6 +643,7 @@
         "clearHistory": "Kosongkan semua",
         "clearHistoryTitle": "Kosongkan semua sembang terkini?",
         "clearHistoryDescription": "Ini memadam setiap sembang yang disimpan dalam pelayar ini. Tindakan ini tidak boleh dibuat asal.",
+        "persistenceFailed": "Tidak dapat menyimpan sejarah sembang dalam pelayar ini. Sembang terkini mungkin tidak lengkap.",
         "cancel": "Batal",
         "justNow": "baru sahaja",
         "messageCount": "{{count}} mesej",

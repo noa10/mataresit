@@ -2,6 +2,7 @@ import type { SearchChatMessage } from '@/types/search-chat';
 import type { UnifiedSearchResult } from '@/types/unified-search';
 
 export const SEARCH_CHAT_HISTORY_EVENT = 'search-chat-history:changed';
+export const SEARCH_CHAT_PERSISTENCE_FAILED_EVENT = 'search-chat-history:persistence-failed';
 export const SEARCH_CHAT_STORAGE_PREFIX = 'mataresit_search_chat_history_v1';
 /** @deprecated Unscoped key from before per-user storage; only used for cleanup. */
 export const SEARCH_CHAT_STORAGE_KEY = SEARCH_CHAT_STORAGE_PREFIX;
@@ -17,6 +18,10 @@ const MAX_RESULTS_PER_MESSAGE = 40;
 const MAX_CONTENT_LENGTH = 20_000;
 const MAX_TITLE_LENGTH = 60;
 const MAX_MIGRATED_CONVERSATIONS = 10;
+// Leave headroom under the typical 5 MB localStorage quota.
+const MAX_STORAGE_BYTES = 4 * 1024 * 1024;
+
+let persistenceFailureNotified = false;
 
 interface LegacyChatMessage {
   id?: unknown;
@@ -126,19 +131,52 @@ const readStoredChats = (userId: string): StoredSearchChat[] => {
   }
 };
 
+const notifyPersistenceFailure = () => {
+  if (persistenceFailureNotified || typeof window === 'undefined') return;
+  persistenceFailureNotified = true;
+  window.dispatchEvent(new CustomEvent(SEARCH_CHAT_PERSISTENCE_FAILED_EVENT));
+};
+
+/**
+ * Trim the payload to an explicit byte budget before writing. Chats are stored
+ * newest-first, so drop from the tail; if one chat alone is too large, keep its
+ * most recent messages.
+ */
+const fitWithinBudget = (chats: StoredSearchChat[]): StoredSearchChat[] => {
+  let fitted = chats;
+  let serialized = JSON.stringify(fitted);
+
+  while (serialized.length > MAX_STORAGE_BYTES && fitted.length > 1) {
+    fitted = fitted.slice(0, fitted.length - 1);
+    serialized = JSON.stringify(fitted);
+  }
+  if (serialized.length <= MAX_STORAGE_BYTES) return fitted;
+
+  const [chat] = fitted;
+  if (!chat) return fitted;
+
+  let messages = chat.messages;
+  while (messages.length > 1) {
+    messages = messages.slice(-Math.max(1, Math.floor(messages.length / 2)));
+    serialized = JSON.stringify([{ ...chat, messages }]);
+    if (serialized.length <= MAX_STORAGE_BYTES) break;
+  }
+  return [{ ...chat, messages }];
+};
+
 const writeStoredChats = (userId: string, chats: StoredSearchChat[]): boolean => {
   if (!isBrowser() || !userId) return false;
   const key = getSearchChatStorageKey(userId);
+  const fitted = fitWithinBudget(chats);
   try {
-    window.localStorage.setItem(key, JSON.stringify(chats));
+    window.localStorage.setItem(key, JSON.stringify(fitted));
     return true;
   } catch (error) {
     console.error('Failed to save search chat history', error);
+    notifyPersistenceFailure();
     try {
-      window.localStorage.setItem(
-        key,
-        JSON.stringify(chats.slice(0, Math.max(1, Math.floor(MAX_CONVERSATIONS / 2))))
-      );
+      const fallback = fitted.slice(0, Math.max(1, Math.floor(fitted.length / 2)));
+      window.localStorage.setItem(key, JSON.stringify(fallback));
       return true;
     } catch (retryError) {
       console.error('Failed to save trimmed search chat history', retryError);
