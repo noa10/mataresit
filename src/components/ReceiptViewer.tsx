@@ -1,6 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +59,29 @@ import { upsertCategoryRule } from "@/services/categoryRuleService";
 import { format, isValid, parse } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
+
+function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+        return () => {};
+      }
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    [query]
+  );
+
+  const getSnapshot = useCallback(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return false;
+    }
+    return window.matchMedia(query).matches;
+  }, [query]);
+
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+}
 
 export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
@@ -315,8 +345,12 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
 
   // State for image manipulation
   const [isImageFullscreen, setIsImageFullscreen] = useState(false);
-  // Amazon-style hover magnifier: lens coordinates are relative to the
-  // displayed (object-contain fitted) image; active whenever unrotated.
+  // Gesture zoom for touch-first phones/tablets; mouse desktops keep the
+  // hover magnifier even in a narrow window.
+  const isGestureZoom = useMediaQuery("(pointer: coarse), (hover: none)");
+
+  // Desktop-only Amazon-style hover magnifier. Touch devices (mobile/tablet)
+  // use the pinch/pan surface instead.
   const [lens, setLens] = useState<{
     x: number;
     y: number;
@@ -334,10 +368,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const zoomHostRef = useRef<HTMLDivElement>(null);
   const MAG_ZOOM = 3;
 
-  // Hover magnifier — native listeners on the image pane.
   useEffect(() => {
     const host = zoomHostRef.current;
-    if (!host) return;
+    if (!host || isGestureZoom) return;
 
     const clear = () => setLens(null);
 
@@ -361,7 +394,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const relY = event.clientY - offY;
       if (relX < 0 || relY < 0 || relX > dispW || relY > dispH) return clear();
 
-      const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+      const clamp = (v: number, min: number, max: number) =>
+        Math.min(Math.max(v, min), max);
       // Amazon-sized panel: as large as the viewport allows beside the box,
       // never covering the receipt.
       const vw = window.innerWidth;
@@ -379,8 +413,16 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const lensH = Math.max(50, Math.min(panelH / MAG_ZOOM, dispH));
       const contentLeft = offX - hostRect.left;
       const contentTop = offY - hostRect.top;
-      const boxLeft = clamp(contentLeft + relX - lensW / 2, contentLeft, contentLeft + dispW - lensW);
-      const boxTop = clamp(contentTop + relY - lensH / 2, contentTop, contentTop + dispH - lensH);
+      const boxLeft = clamp(
+        contentLeft + relX - lensW / 2,
+        contentLeft,
+        contentLeft + dispW - lensW
+      );
+      const boxTop = clamp(
+        contentTop + relY - lensH / 2,
+        contentTop,
+        contentTop + dispH - lensH
+      );
 
       // The zoomed panel floats OUTSIDE the image box (Amazon-style), over
       // the adjacent column; flip to whichever side has more room.
@@ -389,7 +431,20 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         : Math.max(rect.left - panelW - 12, 8);
       const panelTop = clamp(event.clientY - panelH / 2, 8, vh - panelH - 8);
 
-      setLens({ x: relX, y: relY, dispW, dispH, boxLeft, boxTop, panelW, panelH, lensW, lensH, panelLeft, panelTop });
+      setLens({
+        x: relX,
+        y: relY,
+        dispW,
+        dispH,
+        boxLeft,
+        boxTop,
+        panelW,
+        panelH,
+        lensW,
+        lensH,
+        panelLeft,
+        panelTop,
+      });
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -404,7 +459,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       host.removeEventListener("mousemove", onMouseMove);
       host.removeEventListener("mouseleave", clear);
     };
-  }, [isImageFullscreen]);
+  }, [isImageFullscreen, isGestureZoom]);
 
   // Exit the receipt image fullscreen with Escape
   useEffect(() => {
@@ -506,9 +561,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   const [showDocumentStructure, setShowDocumentStructure] = useState(false);
   const [showVisualizationSettings, setShowVisualizationSettings] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  // Long receipts (taller than ~3:4) render too small inside the fixed box,
-  // so they get a full-width column at readable size instead; the pane
-  // scrolls only in that case.
+  // Long receipts (taller than ~3:4) get a readable full-width column. The
+  // gesture surface handles panning/zooming instead of native pane scroll.
   const isLongReceipt =
     imageDimensions.width > 0 && imageDimensions.width / imageDimensions.height < 0.7;
   // Removed unused state: const [showAiSuggestions, setShowAiSuggestions] = useState(true);
@@ -1586,7 +1640,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             <h3 className="font-medium">Receipt Image</h3>
             {renderProcessingStatus()}
           </div>
-          <div className={`flex-1 min-h-0 rounded-lg relative bg-secondary/30 ${isLongReceipt ? "overflow-y-auto" : "overflow-hidden"}`}>
+          <div className="relative flex-1 min-h-0 overflow-hidden rounded-lg bg-secondary/30">
             {isActiveReceiptProcessingStatus(processingStatus) && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 pointer-events-none">
                 <div className="bg-black/70 rounded-lg p-4 text-white flex flex-col items-center">
@@ -1608,9 +1662,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     : "relative flex h-full w-full items-center justify-center"
                 }
               >
-                {/* Controls: fullscreen, overlays, file actions. The old
-                    pan/zoom and rotation controls are gone — hover magnifies. */}
-                <div className="absolute top-2 right-2 z-10 flex flex-wrap gap-2">
+                {/* Controls stay outside the transform surface so pinch/pan
+                    never move the toolbar. */}
+                <div className="absolute right-2 top-2 z-20 flex flex-wrap gap-2">
                   <div className="flex gap-1">
                     <Button
                       variant="secondary"
@@ -1698,64 +1752,117 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   </div>
                 </div>
 
-                {/* Fixed-size image box: the same dimensions for every
-                    receipt, whatever its natural size or aspect ratio. */}
                 <div
                   className={
-                    isLongReceipt
-                      ? "relative mx-auto w-full max-w-[300px]"
-                      : "relative h-full aspect-[3/4] max-w-full"
+                    isGestureZoom
+                      ? "h-full w-full touch-none [&_*]:touch-none"
+                      : "h-full w-full"
                   }
                 >
-                  <ReceiptViewerImage
-                    ref={imageRef}
-                    src={receipt.image_url}
-                    alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
-                    containerClassName="h-full w-full"
-                    className="receipt-image h-full w-full object-contain"
-                    style={{ objectFit: "contain" }}
-                    onError={(e) => {
-                      console.error('Image failed to load:', receipt.image_url);
-                      console.error('Image error event:', e);
-                      setImageError(true);
-                    }}
-                    onLoad={(e) => {
-                      const img = e.currentTarget;
-                      setImageDimensions({
-                        width: img.naturalWidth,
-                        height: img.naturalHeight
-                      });
-                      setImageError(false);
-                    }}
-                    showSkeleton={true}
-                    showErrorState={false}
-                  />
-                  {showBoundingBoxes && (
-                    <BoundingBoxOverlay
-                      fieldGeometry={receipt.field_geometry || {}}
-                      lineItems={editedReceipt.lineItems}
-                      imageWidth={imageDimensions.width}
-                      imageHeight={imageDimensions.height}
-                      visible={showBoundingBoxes}
-                      highlightedField={null}
-                      confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
-                      showPolygons={showPolygons}
-                      debugMode={debugMode}
-                      transformState={{ scale: 1, positionX: 0, positionY: 0 }}
-                      confidenceThreshold={confidenceThreshold}
-                      imageRef={imageRef}
-                    />
-                  )}
+                  <TransformWrapper
+                    key={`${receipt.id}-${receipt.image_url ?? "no-image"}`}
+                    disabled={!isGestureZoom}
+                    initialScale={1}
+                    minScale={1}
+                    maxScale={4}
+                    centerOnInit
+                    limitToBounds
+                    doubleClick={{ mode: "toggle", step: 0.7, animationTime: 200 }}
+                    wheel={{ disabled: true }}
+                    panning={{ velocityDisabled: true }}
+                  >
+                    {() => (
+                      <TransformComponent
+                        wrapperStyle={{ width: "100%", height: "100%" }}
+                        contentStyle={
+                          isLongReceipt
+                            ? {
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }
+                            : {
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }
+                        }
+                      >
+                        {/* Fixed-size image box: the same dimensions for every
+                            receipt, whatever its natural size or aspect ratio. */}
+                        <div
+                          className={
+                            isLongReceipt
+                              ? "relative w-full max-w-[300px]"
+                              : "relative h-full aspect-[3/4] max-w-full"
+                          }
+                        >
+                          <ReceiptViewerImage
+                            ref={imageRef}
+                            src={receipt.image_url}
+                            alt={`Receipt from ${editedReceipt.merchant || 'Unknown Merchant'}`}
+                            containerClassName="h-full w-full"
+                            className="receipt-image h-full w-full select-none object-contain"
+                            style={{ objectFit: "contain" }}
+                            draggable={false}
+                            onError={(e) => {
+                              console.error('Image failed to load:', receipt.image_url);
+                              console.error('Image error event:', e);
+                              setImageError(true);
+                            }}
+                            onLoad={(e) => {
+                              const img = e.currentTarget;
+                              setImageDimensions({
+                                width: img.naturalWidth,
+                                height: img.naturalHeight
+                              });
+                              setImageError(false);
+                            }}
+                            showSkeleton={true}
+                            showErrorState={false}
+                          />
+                          {showBoundingBoxes && (
+                            <BoundingBoxOverlay
+                              fieldGeometry={receipt.field_geometry || {}}
+                              lineItems={editedReceipt.lineItems}
+                              imageWidth={imageDimensions.width}
+                              imageHeight={imageDimensions.height}
+                              visible={showBoundingBoxes}
+                              highlightedField={null}
+                              confidenceScores={typeof editedConfidence === 'object' ? editedConfidence : undefined}
+                              showPolygons={showPolygons}
+                              debugMode={debugMode}
+                              transformState={{ scale: 1, positionX: 0, positionY: 0 }}
+                              confidenceThreshold={confidenceThreshold}
+                              imageRef={imageRef}
+                            />
+                          )}
+                        </div>
+                      </TransformComponent>
+                    )}
+                  </TransformWrapper>
                 </div>
 
-                {isImageFullscreen && (
-                  <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
-                    Hover to magnify &middot; Esc to exit
+                {isImageFullscreen ? (
+                  <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
+                    {isGestureZoom
+                      ? "Pinch or double-tap to zoom · drag to pan · Esc to exit"
+                      : "Hover to magnify · Esc to exit"}
+                  </div>
+                ) : isGestureZoom ? (
+                  <div className="pointer-events-none absolute bottom-2 left-2 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.55rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
+                    Pinch or double-tap · drag to pan
+                  </div>
+                ) : (
+                  <div className="pointer-events-none absolute bottom-2 left-2 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.55rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
+                    Hover to magnify
                   </div>
                 )}
-                {/* Amazon-style hover magnifier: lens on the image, large
-                    zoomed panel docked to the right of the pane. */}
-                {lens && (
+
+                {!isGestureZoom && lens && (
                   <>
                     <div
                       aria-hidden="true"
