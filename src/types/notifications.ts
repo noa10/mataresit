@@ -143,6 +143,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   receipt_edited_by_team_member: '✏️',
   receipt_approved_by_team: '✅',
   receipt_flagged_for_review: '🚩',
+  gamification_streak_reminder: '🔥',
 };
 
 export const NOTIFICATION_TYPE_COLORS: Record<NotificationType, string> = {
@@ -172,6 +173,7 @@ export const NOTIFICATION_TYPE_COLORS: Record<NotificationType, string> = {
   receipt_edited_by_team_member: 'text-ledger-amber bg-ledger-amber-soft/50',
   receipt_approved_by_team: 'text-ledger-accent bg-ledger-accent-soft/50',
   receipt_flagged_for_review: 'text-ledger-danger bg-ledger-danger-soft/50',
+  gamification_streak_reminder: 'text-ledger-amber bg-ledger-amber-soft/50',
 };
 
 export const NOTIFICATION_PRIORITY_COLORS: Record<NotificationPriority, string> = {
@@ -187,6 +189,7 @@ export function getNotificationTypeDisplayName(type: NotificationType): string {
     team_invitation_accepted: 'Team Invitation Accepted',
     team_member_joined: 'Team Member Joined',
     team_member_left: 'Team Member Left',
+    team_member_removed: 'Team Member Removed',
     team_member_role_changed: 'Team Member Role Changed',
     claim_submitted: 'Claim Submitted',
     claim_approved: 'Claim Approved',
@@ -206,6 +209,7 @@ export function getNotificationTypeDisplayName(type: NotificationType): string {
     receipt_edited_by_team_member: 'Receipt Edited by Team Member',
     receipt_approved_by_team: 'Receipt Approved by Team',
     receipt_flagged_for_review: 'Receipt Flagged for Review',
+    gamification_streak_reminder: 'Streak Reminder',
   };
   return typeNames[type];
 }
