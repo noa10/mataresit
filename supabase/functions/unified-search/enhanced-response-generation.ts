@@ -676,7 +676,10 @@ function buildEnhancedPrompt(
 
   // Add conversation context
   if (context.conversationHistory && context.conversationHistory.length > 0) {
-    const recentHistory = context.conversationHistory.slice(-3).join('\n');
+    const recentHistory = context.conversationHistory
+      .slice(-3)
+      .map((entry) => String(entry).slice(0, 2000))
+      .join('\n');
     prompt += `\n\nRecent conversation:\n${recentHistory}`;
   }
 

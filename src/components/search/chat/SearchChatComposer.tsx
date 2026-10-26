@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Loader2, Send } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDashboardTranslation } from '@/contexts/LanguageContext';
 
 interface SearchChatComposerProps {
   onSend: (query: string) => Promise<void>;
+  onStop?: () => void;
   isLoading?: boolean;
   disabled?: boolean;
 }
 
 export function SearchChatComposer({
   onSend,
+  onStop,
   isLoading = false,
   disabled = false,
 }: SearchChatComposerProps) {
@@ -77,22 +79,31 @@ export function SearchChatComposer({
           disabled={isDisabled}
           className="max-h-[140px] min-h-[54px] flex-1 resize-none rounded-[8px] border border-ledger-line-strong bg-ledger-surface px-4 py-3 text-[0.9375rem] leading-relaxed text-ledger-ink placeholder:text-ledger-muted/80 focus:border-ledger-accent focus:outline-none focus:ring-[3px] focus:ring-ledger-accent/15 disabled:opacity-60"
         />
-        <Button
-          type="submit"
-          variant="accent"
-          size="app"
-          className="h-[54px] px-5"
-          disabled={isDisabled || !message.trim()}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
+        {isLoading ? (
+          <Button
+            type="button"
+            variant="accent-outline"
+            size="app"
+            className="h-[54px] px-5"
+            onClick={onStop}
+          >
+            <Square className="h-4 w-4" aria-hidden="true" />
+            <span className="ml-2 hidden sm:inline">
+              {t('workspace.search.chat.stop')}
+            </span>
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            variant="accent"
+            size="app"
+            className="h-[54px] px-5"
+            disabled={isDisabled || !message.trim()}
+          >
             <Send className="h-4 w-4" aria-hidden="true" />
-          )}
-          <span className="ml-2 hidden sm:inline">
-            {isLoading ? t('workspace.search.searching') : t('workspace.search.chat.send')}
-          </span>
-        </Button>
+            <span className="ml-2 hidden sm:inline">{t('workspace.search.chat.send')}</span>
+          </Button>
+        )}
       </div>
       <p className="font-data text-[0.6875rem] tracking-[0.02em] text-ledger-muted">
         {t('workspace.search.chat.hint')}

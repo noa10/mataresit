@@ -34,6 +34,7 @@ export default function AISearchPage() {
     loadMore,
     newChat,
     loadConversation,
+    stop,
   } = useSearchChat();
   const { conversations, deleteConversation, clearHistory } = useSearchChatHistory();
 
@@ -122,7 +123,7 @@ export default function AISearchPage() {
           />
 
           <div className="border-t border-ledger-line bg-ledger-surface p-[18px]">
-            <SearchChatComposer onSend={sendMessage} isLoading={isLoading} />
+            <SearchChatComposer onSend={sendMessage} onStop={stop} isLoading={isLoading} />
           </div>
         </div>
       </Panel>

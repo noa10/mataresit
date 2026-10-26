@@ -54,6 +54,7 @@ export function useSearchChat() {
   const requestIdRef = useRef(0);
   const loadingRef = useRef(false);
   const loadingMoreRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -109,6 +110,10 @@ export function useSearchChat() {
       loadingRef.current = true;
       setIsLoading(true);
 
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const conversationHistory = messagesRef.current
         .filter((message) => message.status === 'complete' && message.content.trim())
         .slice(-6)
@@ -136,6 +141,7 @@ export function useSearchChat() {
         const response = await unifiedSearch({
           ...buildParams(query, 0, true),
           conversationHistory,
+          signal: controller.signal,
         });
 
         if (requestId !== requestIdRef.current) return;
@@ -165,7 +171,7 @@ export function useSearchChat() {
           .filter((suggestion) => Boolean(suggestion?.trim()))
           .slice(0, 3);
         const followUpSuggestions =
-          hasAiNarrative && language !== 'ms' && serverSuggestions.length > 0
+          hasAiNarrative && serverSuggestions.length > 0
             ? serverSuggestions
             : localSuggestions();
 
@@ -186,6 +192,7 @@ export function useSearchChat() {
           )
         );
       } catch (error) {
+        if (controller.signal.aborted) return;
         if (requestId !== requestIdRef.current) return;
         console.error('AI search chat request failed', error);
         setMessages((previous) =>
@@ -200,6 +207,9 @@ export function useSearchChat() {
           )
         );
       } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
         if (requestId === requestIdRef.current) {
           loadingRef.current = false;
           setIsLoading(false);
@@ -285,6 +295,8 @@ export function useSearchChat() {
   );
 
   const newChat = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     requestIdRef.current += 1;
     loadingRef.current = false;
     loadingMoreRef.current = null;
@@ -299,6 +311,8 @@ export function useSearchChat() {
     const stored = getSearchChat(userId, id);
     if (!stored) return false;
 
+    abortRef.current?.abort();
+    abortRef.current = null;
     requestIdRef.current += 1;
     loadingRef.current = false;
     loadingMoreRef.current = null;
@@ -308,6 +322,28 @@ export function useSearchChat() {
     setMessages(toSearchChatMessages(stored));
     return true;
   }, [userId]);
+
+  const stop = useCallback(() => {
+    if (!loadingRef.current) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    requestIdRef.current += 1;
+    loadingRef.current = false;
+    loadingMoreRef.current = null;
+    setIsLoading(false);
+    setLoadingMoreId(null);
+    setMessages((previous) =>
+      previous.map((message) =>
+        message.status === 'loading'
+          ? {
+              ...message,
+              status: 'error',
+              content: t('workspace.search.chat.stopped'),
+            }
+          : message
+      )
+    );
+  }, [t]);
 
   return {
     messages,
@@ -319,5 +355,6 @@ export function useSearchChat() {
     loadMore,
     newChat,
     loadConversation,
+    stop,
   };
 }

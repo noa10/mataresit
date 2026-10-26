@@ -173,6 +173,27 @@ describe('search chat history', () => {
     expect(listSearchChats(USER_A).map((chat) => chat.id)).toEqual(['chat_1']);
   });
 
+  it('clamps restored result offsets to the persisted window', () => {
+    const manyResults = Array.from({ length: 60 }, (_, index) =>
+      receiptResult(`receipt-${index}`)
+    );
+
+    saveSearchChat({
+      userId: USER_A,
+      id: 'chat_many',
+      messages: [
+        user('many results'),
+        { ...assistant('Showing the first page.'), results: manyResults, offset: 60, hasMore: false },
+      ],
+    });
+
+    const stored = getSearchChat(USER_A, 'chat_many');
+
+    expect(stored?.messages[1].results).toHaveLength(40);
+    expect(stored?.messages[1].offset).toBe(40);
+    expect(stored?.messages[1].hasMore).toBe(true);
+  });
+
   it('imports legacy conversations once', () => {
     localStorage.setItem(
       'paperless_chat_conversations',

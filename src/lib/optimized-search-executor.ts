@@ -274,6 +274,11 @@ class OptimizedSearchExecutor {
       return result;
 
     } catch (error) {
+      // Cancellation must not fall through to the emergency fallback.
+      if (params.signal?.aborted) {
+        throw error;
+      }
+
       console.error('❌ Search execution failed, attempting emergency fallback:', error);
 
       // Emergency fallback: try to get any cached results or recent data
@@ -469,6 +474,7 @@ class OptimizedSearchExecutor {
     const startTime = performance.now();
     const maxRetries = 2;
     let lastError: Error | null = null;
+    const { signal, ...serializableParams } = params;
 
     // 🔧 TEMPORAL FIX: Add retry logic for temporal queries
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -477,7 +483,7 @@ class OptimizedSearchExecutor {
 
         // Map frontend source names to backend source names
         const mappedParams = {
-          ...params,
+          ...serializableParams,
           sources: params.sources ? mapFrontendSourcesToBackend(params.sources) : undefined
         };
 
@@ -500,7 +506,8 @@ class OptimizedSearchExecutor {
         mappedParams,
         undefined,
         1, // Only 1 retry for speed
-        15000 // 15 second timeout instead of 90
+        15000, // 15 second timeout instead of 90
+        signal
       );
 
       metrics.edgeFunctionTime = performance.now() - startTime;
@@ -515,6 +522,11 @@ class OptimizedSearchExecutor {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.warn(`⚠️ Edge function search attempt ${attempt} failed:`, lastError.message);
+
+        // A caller cancellation is terminal: do not retry or wait.
+        if (signal?.aborted) {
+          throw lastError;
+        }
 
         // If this is the last attempt, don't retry
         if (attempt === maxRetries) {

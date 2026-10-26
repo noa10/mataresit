@@ -15,8 +15,9 @@ export interface UnifiedSearchParams {
   useEnhancedPrompting?: boolean; // Ask the Edge Function for an AI-written narrative + UI components
   conversationHistory?: string[]; // Recent turns, used as LLM context
   responseLanguage?: 'en' | 'ms'; // Language for the AI-written response
-  cacheBuster?: number; // Forces a fresh Edge Function call
   bypassCache?: boolean; // Skip the client-side search cache entirely
+  /** Client-side cancellation; never serialized to the Edge Function. */
+  signal?: AbortSignal;
 }
 
 export interface SearchFilters {

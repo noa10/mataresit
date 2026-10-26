@@ -222,19 +222,30 @@ const toStoredResult = (result: UnifiedSearchResult): StoredSearchChatResult => 
   };
 };
 
-const toStoredMessage = (message: SearchChatMessage): StoredSearchChatMessage => ({
-  id: message.id,
-  role: message.role,
-  content: message.content.slice(0, MAX_CONTENT_LENGTH),
-  createdAt: safeIso(message.createdAt, new Date().toISOString()),
-  status: message.status === 'error' ? 'error' : 'complete',
-  query: message.query,
-  results: message.results?.slice(0, MAX_RESULTS_PER_MESSAGE).map(toStoredResult),
-  totalResults: message.totalResults,
-  offset: message.offset,
-  hasMore: message.hasMore,
-  followUpSuggestions: message.followUpSuggestions?.slice(0, 5),
-});
+const toStoredMessage = (message: SearchChatMessage): StoredSearchChatMessage => {
+  const persistedResults = message.results?.slice(0, MAX_RESULTS_PER_MESSAGE);
+  const resultsWereTruncated =
+    (message.results?.length ?? 0) > (persistedResults?.length ?? 0);
+  // Align the stored cursor with what actually survived the result cap so a
+  // restored conversation resumes at 40, not at an in-memory offset like 60.
+  const persistedOffset = persistedResults?.length
+    ? Math.min(message.offset ?? persistedResults.length, persistedResults.length)
+    : undefined;
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content.slice(0, MAX_CONTENT_LENGTH),
+    createdAt: safeIso(message.createdAt, new Date().toISOString()),
+    status: message.status === 'error' ? 'error' : 'complete',
+    query: message.query,
+    results: persistedResults?.map(toStoredResult),
+    totalResults: message.totalResults,
+    offset: persistedOffset,
+    hasMore: resultsWereTruncated ? true : message.hasMore,
+    followUpSuggestions: message.followUpSuggestions?.slice(0, 5),
+  };
+};
 
 const toRuntimeResult = (result: StoredSearchChatResult): UnifiedSearchResult => ({
   id: result.id,
@@ -368,6 +379,11 @@ function migrateLegacyChats(userId: string) {
   }
 }
 
+/**
+ * Search chat persistence is intentionally single-tab for v1: each tab writes
+ * its full message array, so the last writer wins and a conversation deleted in
+ * another tab can be re-created by this tab's next save.
+ */
 export function createSearchChatId(): string {
   return createId('chat_');
 }
