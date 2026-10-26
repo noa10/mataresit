@@ -2,6 +2,13 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/ledger/EmptyState";
 import { KpiCard } from "@/components/ledger/KpiCard";
 import { Panel } from "@/components/ledger/Panel";
@@ -15,7 +22,7 @@ import { EditClaimDialog } from "@/components/claims/EditClaimDialog";
 import { useDashboardTranslation, useLanguage } from "@/contexts/LanguageContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { claimService } from "@/services/claimService";
-import type { Claim, ClaimStatus } from "@/types/claims";
+import type { Claim, ClaimPriority, ClaimStatus } from "@/types/claims";
 import { cn } from "@/lib/utils";
 import { formatCurrencySafe } from "@/utils/currency";
 
@@ -23,6 +30,9 @@ type ClaimTab = "all" | "pending" | "approved" | "draft" | "rejected";
 
 const TAB_ORDER: ClaimTab[] = ["all", "pending", "approved", "draft", "rejected"];
 const PENDING_STATUSES: ClaimStatus[] = ["submitted", "under_review"];
+const PRIORITIES: ClaimPriority[] = ["low", "medium", "high", "urgent"];
+const CLAIM_PAGE_SIZE = 100;
+const CLAIM_MAX_ROWS = 2000;
 
 const TAB_LABEL_KEY: Record<ClaimTab, string> = {
   all: "workspace.claims.tabAll",
@@ -51,12 +61,26 @@ const matchesTab = (claim: Claim, tab: ClaimTab) => {
   return claim.status === "rejected";
 };
 
+/** Page through the RPC so a team with >100 claims is not silently cut off. */
+const fetchAllTeamClaims = async (teamId: string) => {
+  const claims: Claim[] = [];
+  for (let offset = 0; offset < CLAIM_MAX_ROWS; offset += CLAIM_PAGE_SIZE) {
+    const page = await claimService.getTeamClaims(teamId, undefined, CLAIM_PAGE_SIZE, offset);
+    claims.push(...page);
+    if (page.length < CLAIM_PAGE_SIZE) {
+      return { claims, truncated: false };
+    }
+  }
+  return { claims, truncated: claims.length >= CLAIM_MAX_ROWS };
+};
+
 export default function ClaimsManagement() {
   const { t } = useDashboardTranslation();
   const { language } = useLanguage();
   const { currentTeam, teamMembers } = useTeam();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ClaimTab>("all");
+  const [priorityFilter, setPriorityFilter] = useState<ClaimPriority | "all">("all");
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -67,13 +91,16 @@ export default function ClaimsManagement() {
 
   const claimsKey = ["workspace", "claims", currentTeam?.id ?? null] as const;
 
-  const { data: claims = [], isLoading, isError, refetch } = useQuery({
+  const { data: claimsResult, isLoading, isError, refetch } = useQuery({
     queryKey: claimsKey,
-    queryFn: () => claimService.getTeamClaims(currentTeam!.id, undefined, 100, 0),
+    queryFn: () => fetchAllTeamClaims(currentTeam!.id),
     enabled: Boolean(currentTeam?.id),
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  const claims = claimsResult?.claims ?? [];
+  const claimsTruncated = claimsResult?.truncated ?? false;
 
   const counts = useMemo(() => {
     const base: Record<ClaimTab, number> = {
@@ -101,8 +128,13 @@ export default function ClaimsManagement() {
   );
 
   const visibleClaims = useMemo(
-    () => claims.filter((claim) => matchesTab(claim, activeTab)),
-    [claims, activeTab]
+    () =>
+      claims.filter(
+        (claim) =>
+          matchesTab(claim, activeTab) &&
+          (priorityFilter === "all" || claim.priority === priorityFilter)
+      ),
+    [claims, activeTab, priorityFilter]
   );
 
   const approverName = (claim: Claim) => {
@@ -239,30 +271,59 @@ export default function ClaimsManagement() {
             title={t("workspace.claims.listTitle")}
             flush
           >
-            <div
-              className="flex flex-wrap gap-2 px-[18px] pb-3 pt-4"
-              role="group"
-              aria-label={t("workspace.claims.status")}
-            >
-              {TAB_ORDER.map((tab) => {
-                const active = tab === activeTab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setActiveTab(tab)}
-                    className={cn(
-                      "rounded-full border px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] transition-colors",
-                      active
-                        ? "border-ledger-ink bg-ledger-ink text-ledger-paper"
-                        : "border-ledger-line-strong text-ledger-ink-2 hover:border-ledger-accent hover:text-ledger-accent"
-                    )}
-                  >
-                    {t(TAB_LABEL_KEY[tab])} · {counts[tab]}
-                  </button>
-                );
-              })}
+            {claimsTruncated && (
+              <p
+                role="status"
+                className="border-b border-ledger-line px-[18px] py-2 text-xs text-ledger-muted"
+              >
+                {t("workspace.claims.truncated")}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-[18px] pb-3 pt-4">
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label={t("workspace.claims.status")}
+              >
+                {TAB_ORDER.map((tab) => {
+                  const active = tab === activeTab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setActiveTab(tab)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] transition-colors",
+                        active
+                          ? "border-ledger-ink bg-ledger-ink text-ledger-paper"
+                          : "border-ledger-line-strong text-ledger-ink-2 hover:border-ledger-accent hover:text-ledger-accent"
+                      )}
+                    >
+                      {t(TAB_LABEL_KEY[tab])} · {counts[tab]}
+                    </button>
+                  );
+                })}
+              </div>
+              <Select
+                value={priorityFilter}
+                onValueChange={(value) => setPriorityFilter(value as ClaimPriority | "all")}
+              >
+                <SelectTrigger
+                  aria-label={t("workspace.claims.priority")}
+                  className="h-8 w-[150px] rounded-full border-ledger-line-strong bg-transparent font-data text-[0.6875rem] text-ledger-ink-2"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("workspace.claims.allPriorities")}</SelectItem>
+                  {PRIORITIES.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {t(`workspace.claims.priorities.${priority}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {isLoading ? (
