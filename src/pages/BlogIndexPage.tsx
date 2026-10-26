@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { BookOpen, Loader2, Rss } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
 import {
   useLanguage,
   useHomepageTranslation,
@@ -203,20 +203,7 @@ export default function BlogIndexPage() {
           titleLead={copy("blog.hero.titleLead")}
           titleAccent={copy("blog.hero.titleAccent")}
           lede={copy("blog.hero.lede")}
-        >
-          <p className="mt-2 flex flex-wrap items-center gap-2.5 font-data text-[0.6875rem] text-ledger-muted">
-            <Rss aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.6} />
-            {copy("blog.hero.rssFollow")}
-            <a
-              href="/api/blog-rss"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-ledger-accent underline underline-offset-[3px]"
-            >
-              {copy("blog.hero.rssLink")}
-            </a>
-          </p>
-        </MarketingPageHero>
+        />
 
         <section className="border-b border-ledger-line">
           <div className={`${shell} grid gap-11 pb-[88px] pt-10 min-[881px]:gap-14 min-[881px]:pt-[52px]`}>

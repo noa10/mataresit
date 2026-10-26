@@ -258,9 +258,36 @@ export default function ApiReferencePage() {
           note={copy("api.hero.note")}
         />
 
+        <nav
+          aria-label={copy("api.onThisPage")}
+          className="sticky top-[60px] z-30 border-b border-ledger-line bg-ledger-paper/95 backdrop-blur"
+        >
+          <div className={`${shell} flex items-center gap-1 overflow-x-auto py-2`}>
+            <span className="mr-1 shrink-0 font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+              {copy("api.onThisPage")}
+            </span>
+            {[
+              ["quick-start", "api.quickStart.title"],
+              ["authentication", "api.auth.title"],
+              ["endpoints", "api.endpoints.title"],
+              ["examples", "api.example.title"],
+              ["errors", "api.meta.errorsTitle"],
+              ["plans", "api.plans.title"],
+            ].map(([id, key]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-ledger-ink-2 transition-colors hover:bg-ledger-surface-2 hover:text-ledger-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+              >
+                {copy(key)}
+              </a>
+            ))}
+          </div>
+        </nav>
+
         <section className="border-b border-ledger-line">
           <div className={`${shell} grid gap-12 py-10 min-[881px]:gap-16 min-[881px]:py-14`}>
-            <div className="grid gap-6">
+            <div id="quick-start" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading
                 title={copy("api.quickStart.title")}
                 lede={copy("api.quickStart.lede")}
@@ -283,7 +310,7 @@ export default function ApiReferencePage() {
               </div>
             </div>
 
-            <div className="grid gap-6">
+            <div id="authentication" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading
                 title={copy("api.auth.title")}
                 lede={copy("api.auth.lede")}
@@ -325,7 +352,7 @@ export default function ApiReferencePage() {
               </p>
             </div>
 
-            <div className="grid gap-6">
+            <div id="endpoints" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading
                 title={copy("api.endpoints.title")}
                 lede={copy("api.endpoints.lede")}
@@ -377,7 +404,7 @@ export default function ApiReferencePage() {
               </p>
             </div>
 
-            <div className="grid gap-6">
+            <div id="examples" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading
                 title={copy("api.example.title")}
                 lede={copy("api.example.lede")}
@@ -400,7 +427,7 @@ export default function ApiReferencePage() {
               </div>
             </div>
 
-            <div className="grid gap-6">
+            <div id="errors" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading title={copy("api.meta.errorsTitle")} />
               <div className="grid gap-3 min-[881px]:grid-cols-2">
                 <div className="rounded-[10px] border border-ledger-line bg-ledger-surface px-5 py-[18px]">
@@ -450,7 +477,7 @@ export default function ApiReferencePage() {
               </div>
             </div>
 
-            <div className="grid gap-6">
+            <div id="plans" className="grid scroll-mt-[120px] gap-6">
               <SectionHeading
                 title={copy("api.plans.title")}
                 lede={copy("api.plans.lede")}

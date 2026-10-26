@@ -204,19 +204,6 @@ export function BlogAnalytics() {
                 <div className="text-sm text-muted-foreground">{t('diagnostics.blogAnalytics.viewBlogDescription')}</div>
               </div>
             </a>
-            
-            <a
-              href="/api/blog-rss"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-4 rounded-lg border hover:bg-secondary/50 transition-colors"
-            >
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <div>
-                <div className="font-medium">{t('diagnostics.blogAnalytics.rssFeed')}</div>
-                <div className="text-sm text-muted-foreground">{t('diagnostics.blogAnalytics.rssFeedDescription')}</div>
-              </div>
-            </a>
           </div>
         </CardContent>
       </Card>

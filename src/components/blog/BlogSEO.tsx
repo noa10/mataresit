@@ -17,7 +17,7 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
   const defaultTitle = title || String(tResources('meta.blog.title'));
   const defaultDescription =
     description || String(tResources('meta.blog.description'));
-  const defaultImage = '/og-blog.jpg';
+  const defaultImage = '/mataresit-icon.png';
   const siteUrl = window.location.origin;
 
   // Generate SEO values based on whether it's index or individual post
