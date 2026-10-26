@@ -84,8 +84,11 @@ export default function LeaderboardPage() {
   const leaderboardQuery = useQuery({
     queryKey: gamificationQueryKeys.leaderboard(selectedMetric, countryCode),
     queryFn: () => getLeaderboard(selectedMetric, { countryCode, limit: LEADERBOARD_LIMIT }),
-    // The privacy gate renders when participation is off, so no ranking request
-    // (which returns other members' rows) should be made until a member opts in.
+    // The privacy gate renders when participation is off, so don't issue a
+    // ranking request in that state. UI-level rule only: the
+    // get_gamification_leaderboard RPC does not require the *caller* to have
+    // opted in (it only lists members who did), so direct API callers are
+    // unaffected — see the migration if this needs enforcing server-side.
     enabled: !isSnapshotLoading && leaderboardOptIn,
   });
 
