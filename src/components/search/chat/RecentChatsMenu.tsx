@@ -24,6 +24,7 @@ interface RecentChatsMenuProps {
   currentConversationId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onClearAll: () => void;
 }
 
 const formatWhen = (iso: string, language: string, justNow: string): string => {
@@ -51,11 +52,13 @@ export function RecentChatsMenu({
   currentConversationId,
   onSelect,
   onDelete,
+  onClearAll,
 }: RecentChatsMenuProps) {
   const { t } = useDashboardTranslation();
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
 
   return (
     <>
@@ -137,6 +140,22 @@ export function RecentChatsMenu({
             })}
           </ul>
         )}
+
+        {conversations.length > 0 && (
+          <div className="border-t border-ledger-line p-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setClearOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-xs font-medium text-ledger-muted transition-colors hover:bg-ledger-surface-2 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/30"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('workspace.search.chat.clearHistory')}
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
 
@@ -165,6 +184,36 @@ export function RecentChatsMenu({
             }}
           >
             {t('workspace.search.chat.deleteChat')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog
+      open={clearOpen}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setClearOpen(false);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('workspace.search.chat.clearHistoryTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('workspace.search.chat.clearHistoryDescription')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            {t('workspace.search.chat.cancel')}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              onClearAll();
+              setClearOpen(false);
+            }}
+          >
+            {t('workspace.search.chat.clearHistory')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

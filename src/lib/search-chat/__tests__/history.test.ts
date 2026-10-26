@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SEARCH_CHAT_STORAGE_KEY,
+  clearSearchChatHistory,
   deleteSearchChat,
   getSearchChat,
+  getSearchChatStorageKey,
   listSearchChats,
   saveSearchChat,
   toSearchChatMessages,
 } from '@/lib/search-chat/history';
 import type { SearchChatMessage } from '@/types/search-chat';
 import type { UnifiedSearchResult } from '@/types/unified-search';
+
+const USER_A = 'user-a';
+const USER_B = 'user-b';
 
 const receiptResult = (id = 'receipt-1'): UnifiedSearchResult => ({
   id,
@@ -59,11 +64,12 @@ describe('search chat history', () => {
 
   it('saves, lists and restores a conversation', () => {
     saveSearchChat({
+      userId: USER_A,
       id: 'chat_1',
       messages: [user('coffee this month'), assistant('I found one receipt.')],
     });
 
-    const summaries = listSearchChats();
+    const summaries = listSearchChats(USER_A);
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
       id: 'chat_1',
@@ -71,7 +77,7 @@ describe('search chat history', () => {
       messageCount: 2,
     });
 
-    const stored = getSearchChat('chat_1');
+    const stored = getSearchChat(USER_A, 'chat_1');
     expect(stored?.messages).toHaveLength(2);
     expect(stored?.messages[1].results?.[0].metadata.total).toBe(12.5);
     expect(stored?.messages[1].results?.[0].metadata.raw_text).toBeUndefined();
@@ -84,6 +90,7 @@ describe('search chat history', () => {
 
   it('does not persist loading placeholders or conversations without a user message', () => {
     saveSearchChat({
+      userId: USER_A,
       id: 'chat_2',
       messages: [
         user('parking'),
@@ -97,34 +104,73 @@ describe('search chat history', () => {
       ],
     });
 
-    expect(getSearchChat('chat_2')?.messages).toHaveLength(1);
+    expect(getSearchChat(USER_A, 'chat_2')?.messages).toHaveLength(1);
 
     saveSearchChat({
+      userId: USER_A,
       id: 'chat_3',
       messages: [assistant('orphan answer')],
     });
-    expect(getSearchChat('chat_3')).toBeNull();
+    expect(getSearchChat(USER_A, 'chat_3')).toBeNull();
   });
 
   it('updates the existing conversation and keeps its title', () => {
-    saveSearchChat({ id: 'chat_1', messages: [user('coffee')] });
-    const createdAt = getSearchChat('chat_1')?.createdAt;
+    saveSearchChat({ userId: USER_A, id: 'chat_1', messages: [user('coffee')] });
+    const createdAt = getSearchChat(USER_A, 'chat_1')?.createdAt;
 
     saveSearchChat({
+      userId: USER_A,
       id: 'chat_1',
       messages: [user('coffee'), assistant('I found one receipt.')],
     });
 
-    expect(listSearchChats()).toHaveLength(1);
-    expect(getSearchChat('chat_1')?.title).toBe('coffee');
-    expect(getSearchChat('chat_1')?.createdAt).toBe(createdAt);
+    expect(listSearchChats(USER_A)).toHaveLength(1);
+    expect(getSearchChat(USER_A, 'chat_1')?.title).toBe('coffee');
+    expect(getSearchChat(USER_A, 'chat_1')?.createdAt).toBe(createdAt);
   });
 
   it('deletes a conversation', () => {
-    saveSearchChat({ id: 'chat_1', messages: [user('coffee'), assistant('Found.')] });
-    deleteSearchChat('chat_1');
-    expect(listSearchChats()).toEqual([]);
-    expect(localStorage.getItem(SEARCH_CHAT_STORAGE_KEY)).toBe('[]');
+    saveSearchChat({
+      userId: USER_A,
+      id: 'chat_1',
+      messages: [user('coffee'), assistant('Found.')],
+    });
+    deleteSearchChat(USER_A, 'chat_1');
+    expect(listSearchChats(USER_A)).toEqual([]);
+    expect(localStorage.getItem(getSearchChatStorageKey(USER_A))).toBe('[]');
+  });
+
+  it('isolates histories per user and clears only the signed-out user', () => {
+    saveSearchChat({
+      userId: USER_A,
+      id: 'chat_a',
+      messages: [user('user a private receipt')],
+    });
+    saveSearchChat({
+      userId: USER_B,
+      id: 'chat_b',
+      messages: [user('user b private receipt')],
+    });
+
+    expect(listSearchChats(USER_A).map((chat) => chat.id)).toEqual(['chat_a']);
+    expect(listSearchChats(USER_B).map((chat) => chat.id)).toEqual(['chat_b']);
+
+    clearSearchChatHistory(USER_A);
+
+    expect(listSearchChats(USER_A)).toEqual([]);
+    expect(listSearchChats(USER_B).map((chat) => chat.id)).toEqual(['chat_b']);
+  });
+
+  it('drops the pre-namespacing shared history key', () => {
+    localStorage.setItem(
+      SEARCH_CHAT_STORAGE_KEY,
+      JSON.stringify([{ id: 'stale', title: 'shared', createdAt: '', updatedAt: '', messages: [] }])
+    );
+
+    saveSearchChat({ userId: USER_A, id: 'chat_1', messages: [user('coffee')] });
+
+    expect(localStorage.getItem(SEARCH_CHAT_STORAGE_KEY)).toBeNull();
+    expect(listSearchChats(USER_A).map((chat) => chat.id)).toEqual(['chat_1']);
   });
 
   it('imports legacy conversations once', () => {
@@ -145,18 +191,18 @@ describe('search chat history', () => {
       ])
     );
 
-    const summaries = listSearchChats();
+    const summaries = listSearchChats(USER_A);
     expect(summaries[0]).toMatchObject({
       id: 'legacy_conv_1',
       title: 'Legacy coffee',
       messageCount: 2,
     });
 
-    const stored = getSearchChat('legacy_conv_1');
+    const stored = getSearchChat(USER_A, 'legacy_conv_1');
     expect(stored?.messages[0]).toMatchObject({ role: 'user', content: 'old coffee' });
 
     // Once migrated, removing the legacy key must not lose the imported chat.
     localStorage.removeItem('paperless_chat_conversations');
-    expect(listSearchChats()[0].id).toBe('legacy_conv_1');
+    expect(listSearchChats(USER_A)[0].id).toBe('legacy_conv_1');
   });
 });

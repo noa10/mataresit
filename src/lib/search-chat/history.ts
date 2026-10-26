@@ -2,11 +2,17 @@ import type { SearchChatMessage } from '@/types/search-chat';
 import type { UnifiedSearchResult } from '@/types/unified-search';
 
 export const SEARCH_CHAT_HISTORY_EVENT = 'search-chat-history:changed';
-export const SEARCH_CHAT_STORAGE_KEY = 'mataresit_search_chat_history_v1';
+export const SEARCH_CHAT_STORAGE_PREFIX = 'mataresit_search_chat_history_v1';
+/** @deprecated Unscoped key from before per-user storage; only used for cleanup. */
+export const SEARCH_CHAT_STORAGE_KEY = SEARCH_CHAT_STORAGE_PREFIX;
+
+export const getSearchChatStorageKey = (userId: string): string =>
+  `${SEARCH_CHAT_STORAGE_PREFIX}_${userId}`;
 
 const LEGACY_STORAGE_KEY = 'paperless_chat_conversations';
 const LEGACY_MIGRATION_FLAG = 'mataresit_search_chat_migrated_v1';
 const MAX_CONVERSATIONS = 20;
+const MAX_MESSAGES_PER_CONVERSATION = 100;
 const MAX_RESULTS_PER_MESSAGE = 40;
 const MAX_CONTENT_LENGTH = 20_000;
 const MAX_TITLE_LENGTH = 60;
@@ -107,10 +113,10 @@ const buildTitle = (messages: StoredSearchChatMessage[]): string => {
     : '';
 };
 
-const readStoredChats = (): StoredSearchChat[] => {
-  if (!isBrowser()) return [];
+const readStoredChats = (userId: string): StoredSearchChat[] => {
+  if (!isBrowser() || !userId) return [];
   try {
-    const raw = window.localStorage.getItem(SEARCH_CHAT_STORAGE_KEY);
+    const raw = window.localStorage.getItem(getSearchChatStorageKey(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as StoredSearchChat[]) : [];
@@ -120,16 +126,17 @@ const readStoredChats = (): StoredSearchChat[] => {
   }
 };
 
-const writeStoredChats = (chats: StoredSearchChat[]): boolean => {
-  if (!isBrowser()) return false;
+const writeStoredChats = (userId: string, chats: StoredSearchChat[]): boolean => {
+  if (!isBrowser() || !userId) return false;
+  const key = getSearchChatStorageKey(userId);
   try {
-    window.localStorage.setItem(SEARCH_CHAT_STORAGE_KEY, JSON.stringify(chats));
+    window.localStorage.setItem(key, JSON.stringify(chats));
     return true;
   } catch (error) {
     console.error('Failed to save search chat history', error);
     try {
       window.localStorage.setItem(
-        SEARCH_CHAT_STORAGE_KEY,
+        key,
         JSON.stringify(chats.slice(0, Math.max(1, Math.floor(MAX_CONVERSATIONS / 2))))
       );
       return true;
@@ -225,21 +232,29 @@ export function toSearchChatMessages(stored: StoredSearchChat): SearchChatMessag
  * its conversations in `paperless_chat_conversations` as localStorage too).
  * Only message text is imported; legacy result payloads are intentionally
  * dropped because their shape is not compatible with the ledger result rows.
+ *
+ * Migration is per user. The old unscoped history key is removed rather than
+ * imported: it cannot be attributed to an account, and this data includes
+ * receipts, merchants and amounts.
  */
-function migrateLegacyChats() {
-  if (!isBrowser()) return;
+function migrateLegacyChats(userId: string) {
+  if (!isBrowser() || !userId) return;
+  const migrationKey = `${LEGACY_MIGRATION_FLAG}_${userId}`;
   try {
-    if (window.localStorage.getItem(LEGACY_MIGRATION_FLAG)) return;
+    if (window.localStorage.getItem(migrationKey)) return;
+
+    // Drop any history written before per-user namespacing.
+    window.localStorage.removeItem(SEARCH_CHAT_STORAGE_KEY);
 
     const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) {
-      window.localStorage.setItem(LEGACY_MIGRATION_FLAG, '1');
+      window.localStorage.setItem(migrationKey, '1');
       return;
     }
 
     const legacy: unknown = JSON.parse(raw);
     if (!Array.isArray(legacy)) {
-      window.localStorage.setItem(LEGACY_MIGRATION_FLAG, '1');
+      window.localStorage.setItem(migrationKey, '1');
       return;
     }
 
@@ -298,17 +313,17 @@ function migrateLegacyChats() {
       });
     });
 
-    const existing = readStoredChats();
+    const existing = readStoredChats(userId);
     const merged = [...migrated.slice(0, MAX_MIGRATED_CONVERSATIONS), ...existing]
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, MAX_CONVERSATIONS);
 
-    writeStoredChats(merged);
-    window.localStorage.setItem(LEGACY_MIGRATION_FLAG, '1');
+    writeStoredChats(userId, merged);
+    window.localStorage.setItem(migrationKey, '1');
   } catch (error) {
     console.warn('Failed to migrate legacy search chats', error);
     try {
-      window.localStorage.setItem(LEGACY_MIGRATION_FLAG, '1');
+      window.localStorage.setItem(migrationKey, '1');
     } catch {
       // Ignore storage failures during migration.
     }
@@ -319,9 +334,10 @@ export function createSearchChatId(): string {
   return createId('chat_');
 }
 
-export function listSearchChats(): SearchChatSummary[] {
-  migrateLegacyChats();
-  return readStoredChats()
+export function listSearchChats(userId: string): SearchChatSummary[] {
+  if (!userId) return [];
+  migrateLegacyChats(userId);
+  return readStoredChats(userId)
     .map((chat) => ({
       id: chat.id,
       title: chat.title,
@@ -332,28 +348,34 @@ export function listSearchChats(): SearchChatSummary[] {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
-export function getSearchChat(id: string): StoredSearchChat | null {
-  migrateLegacyChats();
-  return readStoredChats().find((chat) => chat.id === id) ?? null;
+export function getSearchChat(userId: string, id: string): StoredSearchChat | null {
+  if (!userId) return null;
+  migrateLegacyChats(userId);
+  return readStoredChats(userId).find((chat) => chat.id === id) ?? null;
 }
 
 export function saveSearchChat({
+  userId,
   id,
   messages,
 }: {
+  userId: string;
   id: string;
   messages: SearchChatMessage[];
 }): void {
-  migrateLegacyChats();
+  if (!userId) return;
+  migrateLegacyChats(userId);
 
   const persistable = messages.filter(
     (message) => message.status !== 'loading' && message.content.trim()
   );
   if (!persistable.some((message) => message.role === 'user')) return;
 
-  const existing = readStoredChats();
+  const existing = readStoredChats(userId);
   const previous = existing.find((chat) => chat.id === id);
-  const storedMessages = persistable.map(toStoredMessage);
+  const storedMessages = persistable
+    .slice(-MAX_MESSAGES_PER_CONVERSATION)
+    .map(toStoredMessage);
   const now = new Date().toISOString();
 
   const record: StoredSearchChat = {
@@ -369,22 +391,27 @@ export function saveSearchChat({
     MAX_CONVERSATIONS
   );
 
-  if (writeStoredChats(next)) {
+  if (writeStoredChats(userId, next)) {
     notifyHistoryChanged();
   }
 }
 
-export function deleteSearchChat(id: string): void {
-  migrateLegacyChats();
-  const next = readStoredChats().filter((chat) => chat.id !== id);
-  if (writeStoredChats(next)) {
+export function deleteSearchChat(userId: string, id: string): void {
+  if (!userId) return;
+  migrateLegacyChats(userId);
+  const next = readStoredChats(userId).filter((chat) => chat.id !== id);
+  if (writeStoredChats(userId, next)) {
     notifyHistoryChanged();
   }
 }
 
-export function clearSearchChatHistory(): void {
+export function clearSearchChatHistory(userId?: string): void {
   if (!isBrowser()) return;
   try {
+    if (userId) {
+      window.localStorage.removeItem(getSearchChatStorageKey(userId));
+    }
+    // Always drop the pre-namespacing key; it cannot be attributed to an account.
     window.localStorage.removeItem(SEARCH_CHAT_STORAGE_KEY);
     notifyHistoryChanged();
   } catch (error) {

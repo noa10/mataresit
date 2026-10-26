@@ -7,10 +7,15 @@ import type { UnifiedSearchResponse, UnifiedSearchResult } from '@/types/unified
 const mocks = vi.hoisted(() => ({
   unifiedSearch: vi.fn(),
   language: 'en' as 'en' | 'ms',
+  userId: 'test-user',
 }));
 
 vi.mock('@/lib/ai-search', () => ({
   unifiedSearch: mocks.unifiedSearch,
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: mocks.userId } }),
 }));
 
 vi.mock('@/lib/search-chat/summary', () => ({
@@ -113,7 +118,7 @@ describe('useSearchChat', () => {
     expect(hook.current.messages[1].results).toHaveLength(1);
     expect(hook.current.messages[1].followUpSuggestions).toEqual(['Show me last month']);
 
-    const summaries = listSearchChats();
+    const summaries = listSearchChats(mocks.userId);
     expect(summaries).toHaveLength(1);
     expect(summaries[0]).toMatchObject({
       id: hook.current.conversationId,
@@ -257,7 +262,7 @@ describe('useSearchChat', () => {
     expect(hook.current.messages).toEqual([]);
     expect(hook.current.conversationId).toBeNull();
     expect(hook.current.isLoading).toBe(false);
-    expect(listSearchChats()[0]?.id).toBe(conversationId);
+    expect(listSearchChats(mocks.userId)[0]?.id).toBe(conversationId);
   });
 
   it('loads a stored conversation', async () => {

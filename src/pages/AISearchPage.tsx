@@ -35,7 +35,7 @@ export default function AISearchPage() {
     newChat,
     loadConversation,
   } = useSearchChat();
-  const { conversations, deleteConversation } = useSearchChatHistory();
+  const { conversations, deleteConversation, clearHistory } = useSearchChatHistory();
 
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
 
@@ -89,6 +89,10 @@ export default function AISearchPage() {
               currentConversationId={conversationId}
               onSelect={loadConversation}
               onDelete={handleDeleteConversation}
+              onClearAll={() => {
+                newChat();
+                clearHistory();
+              }}
             />
             <Button
               type="button"

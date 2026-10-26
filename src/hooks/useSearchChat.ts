@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardTranslation, useLanguage } from '@/contexts/LanguageContext';
 import { unifiedSearch } from '@/lib/ai-search';
 import {
@@ -41,6 +42,8 @@ const createMessage = (
 export function useSearchChat() {
   const { t } = useDashboardTranslation();
   const { language } = useLanguage();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   const [messages, setMessages] = useState<SearchChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -57,9 +60,9 @@ export function useSearchChat() {
   }, [messages]);
 
   useEffect(() => {
-    if (!conversationId) return;
-    saveSearchChat({ id: conversationId, messages });
-  }, [conversationId, messages]);
+    if (!conversationId || !userId) return;
+    saveSearchChat({ userId, id: conversationId, messages });
+  }, [conversationId, messages, userId]);
 
   const buildParams = useCallback(
     (
@@ -292,7 +295,8 @@ export function useSearchChat() {
   }, []);
 
   const loadConversation = useCallback((id: string): boolean => {
-    const stored = getSearchChat(id);
+    if (!userId) return false;
+    const stored = getSearchChat(userId, id);
     if (!stored) return false;
 
     requestIdRef.current += 1;
@@ -303,7 +307,7 @@ export function useSearchChat() {
     setConversationId(id);
     setMessages(toSearchChatMessages(stored));
     return true;
-  }, []);
+  }, [userId]);
 
   return {
     messages,
