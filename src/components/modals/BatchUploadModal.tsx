@@ -1,14 +1,27 @@
+import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   MobileDialog as Dialog,
   MobileDialogContent as DialogContent,
   MobileDialogHeader as DialogHeader,
   MobileDialogTitle as DialogTitle,
-  MobileDialogDescription as DialogDescription
+  MobileDialogDescription as DialogDescription,
 } from "@/components/ui/mobile-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import BatchUploadZone from "@/components/BatchUploadZone";
-import { useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
+import { cn } from "@/lib/utils";
 
 interface BatchUploadModalProps {
   onUploadComplete?: () => void;
@@ -16,55 +29,91 @@ interface BatchUploadModalProps {
 
 export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
   const isMobile = useIsMobile();
-
-  // Consume upload state & modal control from the background context.
-  // The context persists state across modal open/close cycles.
+  const navigate = useNavigate();
   const backgroundUpload = useBackgroundUpload();
-  const { isModalOpen, closeModal } = backgroundUpload;
+  const { isModalOpen, closeModal, hasActiveUpload } = backgroundUpload;
+  const [confirmClose, setConfirmClose] = useState(false);
 
-  // Create a custom upload complete handler that doesn't close the modal
   const handleUploadComplete = useCallback(() => {
-    // Call the original onUploadComplete callback to refresh data
-    // but don't close the modal
-    if (onUploadComplete) {
-      onUploadComplete();
-    }
-
-    // We're intentionally NOT closing the modal here
-    // This allows users to see the results and take further actions
-    console.log("Upload complete, keeping modal open for review");
+    // Refresh the workspace data but keep the sheet open for review.
+    onUploadComplete?.();
   }, [onUploadComplete]);
 
+  const requestClose = useCallback(() => {
+    if (hasActiveUpload) {
+      setConfirmClose(true);
+      return;
+    }
+    closeModal();
+  }, [closeModal, hasActiveUpload]);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) requestClose();
+    },
+    [requestClose]
+  );
+
+  const handleOpenReceipt = useCallback(
+    (receiptId: string) => {
+      closeModal();
+      navigate(`/receipt/${receiptId}`);
+    },
+    [closeModal, navigate]
+  );
+
   return (
-    <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
-      <DialogContent className={`
-        ${isMobile
-          ? "w-full h-full max-w-none max-h-none p-4"
-          : "sm:max-w-[900px] w-[95vw] max-w-[95vw] h-[85vh] max-h-[95vh] min-h-[600px] p-6"
-        }
-        flex flex-col overflow-hidden border-ledger-line bg-ledger-paper
-      `}>
-        <DialogHeader className={`flex-shrink-0 border-b border-ledger-line ${isMobile ? "pb-2" : "pb-4"}`}>
-          <p className="font-data text-[0.58rem] uppercase tracking-[0.18em] text-ledger-muted">
-            Add to the ledger
-          </p>
-          <DialogTitle
-            className={`font-display text-ledger-ink ${isMobile ? "text-xl" : "text-[1.7rem] leading-tight"}`}
-          >
-            Upload Receipts
-          </DialogTitle>
-          <DialogDescription className="text-sm text-ledger-muted">
-            Add one receipt or many — drop them here and the batch queue handles the rest.
+    <Dialog open={isModalOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        hideClose
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden border-ledger-line-strong bg-ledger-surface p-0",
+          isMobile
+            ? "h-full w-full max-h-none max-w-none rounded-none"
+            : "h-[85vh] min-h-[520px] max-h-[860px] w-[95vw] max-w-[1000px] sm:max-w-[1000px]"
+        )}
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Batch upload</DialogTitle>
+          <DialogDescription>
+            Add one receipt or many. Every file is read, categorised and filed in
+            one pass.
           </DialogDescription>
         </DialogHeader>
 
-        <div className={`flex-grow flex flex-col min-h-0 pt-4 ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
-          <BatchUploadZone
-            onUploadComplete={handleUploadComplete}
-            backgroundUpload={backgroundUpload}
-          />
-        </div>
+        <BatchUploadZone
+          onUploadComplete={handleUploadComplete}
+          backgroundUpload={backgroundUpload}
+          onRequestClose={requestClose}
+          onOpenReceipt={handleOpenReceipt}
+        />
       </DialogContent>
+
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent className="z-[70] border-ledger-line bg-ledger-surface sm:max-w-[440px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-2xl font-normal text-ledger-ink">
+              Uploads are still running
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed text-ledger-muted">
+              Closing this sheet won’t stop the batch. You can reopen it from
+              the workspace and keep working while it finishes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep uploading</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-ledger-accent text-white hover:bg-ledger-accent-hover dark:text-ledger-panel"
+              onClick={() => {
+                setConfirmClose(false);
+                closeModal();
+              }}
+            >
+              Close and continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

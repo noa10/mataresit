@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Plus, Tag, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Tag, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,8 @@ interface CategorySelectorProps {
   disabled?: boolean;
   allowCreate?: boolean;
   className?: string;
+  /** Inline text-style trigger for the batch summary band. */
+  compact?: boolean;
 }
 
 export const CategorySelector: React.FC<CategorySelectorProps> = ({
@@ -41,6 +44,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   disabled = false,
   allowCreate = true,
   className,
+  compact = false,
 }) => {
   const [open, setOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -70,47 +74,63 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     setIsCreateModalOpen(false);
   };
 
-  useEffect(() => {
-    if (!open) {
-      setPopoverContainer(null);
-      return;
-    }
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) return;
 
     const dialogContainer = triggerRef.current?.closest('[role="dialog"]');
     setPopoverContainer(dialogContainer instanceof HTMLElement ? dialogContainer : null);
-  }, [open]);
+  };
 
   if (isLoading) {
-    return <Skeleton className="h-10 w-full" />;
+    return (
+      <Skeleton className={compact ? "h-4 w-24" : "h-10 w-full"} />
+    );
   }
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             ref={triggerRef}
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={`w-full justify-between ${className}`}
+            className={cn(
+              "w-full justify-between",
+              compact &&
+                "h-7 min-h-0 border-0 bg-transparent px-0 py-0 text-[13px] font-medium shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ledger-accent focus-visible:ring-offset-0 disabled:cursor-default disabled:opacity-100",
+              className
+            )}
             disabled={disabled}
           >
             {selectedCategory ? (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className={cn(
+                    "shrink-0 rounded-full",
+                    compact ? "h-2.5 w-2.5" : "h-3 w-3"
+                  )}
                   style={{ backgroundColor: selectedCategory.color }}
                 />
-                <span>{selectedCategory.name}</span>
+                <span className="truncate">{selectedCategory.name}</span>
               </div>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="truncate text-ledger-muted">{placeholder}</span>
             )}
-            <Tag className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            {compact ? (
+              <ChevronDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-60" />
+            ) : (
+              <Tag className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start" container={popoverContainer}>
+        <PopoverContent
+          className={cn("p-0", compact ? "w-[260px]" : "w-full")}
+          align="start"
+          container={popoverContainer}
+        >
           <Command>
             <CommandInput placeholder="Search categories..." />
             <CommandList>

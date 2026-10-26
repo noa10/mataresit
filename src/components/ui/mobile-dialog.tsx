@@ -42,10 +42,16 @@ function supportsVisualViewport(): boolean {
   return typeof window !== 'undefined' && 'visualViewport' in window;
 }
 
+interface MobileDialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** Hide the built-in close button when the content renders its own header. */
+  hideClose?: boolean;
+}
+
 const MobileDialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
+  MobileDialogContentProps
+>(({ className, children, hideClose = false, ...props }, ref) => {
   const isMobile = useIsMobile()
   const { height, width, isLandscape } = useMobileViewport()
 
@@ -152,17 +158,19 @@ const MobileDialogContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DialogPrimitive.Close 
-          className={cn(
-            "absolute rounded-sm opacity-70 ring-offset-background transition-opacity",
-            "hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-            "disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground",
-            isMobile ? "right-4 top-4" : "right-4 top-4"
-          )}
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
+        {!hideClose && (
+          <DialogPrimitive.Close
+            className={cn(
+              "absolute rounded-sm opacity-70 ring-offset-background transition-opacity",
+              "hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+              "disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground",
+              isMobile ? "right-4 top-4" : "right-4 top-4"
+            )}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
       </DialogPrimitive.Content>
     </MobileDialogPortal>
   )

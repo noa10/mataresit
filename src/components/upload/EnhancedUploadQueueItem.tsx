@@ -219,10 +219,10 @@ export function EnhancedUploadQueueItem({
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span>{stageInfo?.label || 'Processing...'}</span>
-                  <span>{upload.progress}%</span>
+                  <span>{upload.uploadProgress}%</span>
                 </div>
                 <Progress 
-                  value={upload.progress} 
+                  value={upload.uploadProgress} 
                   className="h-1.5"
                 />
                 

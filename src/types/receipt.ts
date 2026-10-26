@@ -12,6 +12,18 @@ export type ProcessingStatus =
   | 'complete'
   | null;
 
+/**
+ * Lightweight receipt fields extracted after AI processing. Kept on the
+ * upload item so the batch ledger can show merchant, date and total without
+ * issuing a second query for every row.
+ */
+export interface ReceiptUploadSummary {
+  merchant?: string;
+  date?: string;
+  total?: number;
+  currency?: string;
+}
+
 // Interface for managing the state during file upload and processing
 export interface ReceiptUpload {
   id: string; // Unique ID for tracking the upload instance
@@ -22,6 +34,7 @@ export interface ReceiptUpload {
   categoryId?: string | null; // Optional category assignment
   retryCount?: number; // Number of retry attempts
   processingStartedAt?: Date; // When processing started
+  summary?: ReceiptUploadSummary; // Extracted merchant/date/total for the ledger
   error?: {
     code: 'FILE_TYPE' | 'SIZE_LIMIT' | 'UPLOAD_FAILED' | 'PROCESSING_FAILED' | string;
     message: string;

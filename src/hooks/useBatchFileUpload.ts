@@ -1,6 +1,6 @@
 import { useReducer, useRef, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ReceiptUpload, ProcessingStatus, ProcessingLog } from "@/types/receipt";
+import { ReceiptUpload, ReceiptUploadSummary, ProcessingStatus, ProcessingLog } from "@/types/receipt";
 import { useFileUpload } from "./useFileUpload";
 import {
   createReceipt,
@@ -123,6 +123,8 @@ const LOG_PROGRESS_MAP: Record<string, Record<string, number>> = {
  */
 type BatchUploadAction =
   | { type: 'ADD_FILES'; files: File[]; recommendations: Record<string, ProcessingRecommendation>; categoryId?: string | null }
+  | { type: 'SET_CATEGORY'; categoryId: string | null }
+  | { type: 'SET_UPLOAD_SUMMARY'; uploadId: string; summary: ReceiptUploadSummary }
   | { type: 'REMOVE_UPLOAD'; uploadId: string }
   | { type: 'CLEAR_PENDING' }
   | { type: 'CLEAR_ALL' }
@@ -251,6 +253,30 @@ function batchUploadReducer(state: BatchUploadState, action: BatchUploadAction):
         },
         // Generate a new batch ID if this is the first batch or if starting a new batch
         batchId: state.batchId || `batch_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+      };
+    }
+
+    case 'SET_CATEGORY': {
+      // The category is applied when a receipt record is created, so only
+      // pending rows can still be changed. Active rows have already started.
+      return {
+        ...state,
+        uploads: state.uploads.map(upload =>
+          upload.status === 'pending'
+            ? { ...upload, categoryId: action.categoryId }
+            : upload
+        )
+      };
+    }
+
+    case 'SET_UPLOAD_SUMMARY': {
+      return {
+        ...state,
+        uploads: state.uploads.map(upload =>
+          upload.id === action.uploadId
+            ? { ...upload, summary: action.summary }
+            : upload
+        )
       };
     }
 
@@ -926,6 +952,11 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     dispatch({ type: 'REMOVE_UPLOAD', uploadId });
   }, []);
 
+  // Apply a batch-wide category to receipts that have not started yet.
+  const updateBatchCategory = useCallback((categoryId: string | null) => {
+    dispatch({ type: 'SET_CATEGORY', categoryId });
+  }, []);
+
   // Clear all pending uploads
   const clearBatchQueue = useCallback(() => {
     dispatch({ type: 'CLEAR_PENDING' });
@@ -1274,6 +1305,17 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
         // If we got a successful result, update the status to completed
         // This is a fallback in case the realtime subscription doesn't catch the update
         if (result) {
+          dispatch({
+            type: 'SET_UPLOAD_SUMMARY',
+            uploadId: upload.id,
+            summary: {
+              merchant: result.merchant || undefined,
+              date: result.date || undefined,
+              total: typeof result.total === 'number' ? result.total : undefined,
+              currency: result.currency || 'MYR',
+            },
+          });
+
           // Phase 3: Record successful API call for rate limiting
           if (enableRateLimiting && batchSessionService && batchSession) {
             const actualTokens = estimateTokensFromImageSize(upload.file.size);
@@ -1836,7 +1878,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     updateSessionData();
 
     // Set up periodic updates if real-time updates are enabled
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (enableRealTimeUpdates && isProcessing) {
       interval = setInterval(updateSessionData, 5000); // Update every 5 seconds
     }
@@ -1953,6 +1995,7 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
     // Batch-specific methods
     addToBatchQueue,
     removeFromBatchQueue,
+    updateBatchCategory,
     clearBatchQueue,
     clearAllUploads,
     startBatchProcessing,
