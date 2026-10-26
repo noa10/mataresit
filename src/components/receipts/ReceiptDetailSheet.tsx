@@ -1,10 +1,28 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { Check, ExternalLink, Loader2, RotateCcw } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  FileText,
+  Loader2,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CreateClaimDialog } from "@/components/claims/CreateClaimDialog";
 import {
   Sheet,
   SheetContent,
@@ -19,7 +37,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardTranslation } from "@/contexts/LanguageContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { getReceiptConfidence } from "@/lib/receipts/confidence";
-import { fetchReceiptById, updateReceiptStatus } from "@/services/receiptService";
+import {
+  deleteReceipt,
+  fetchReceiptById,
+  updateReceiptStatus,
+} from "@/services/receiptService";
 import type { ReceiptStatus } from "@/types/receipt";
 import { formatCurrencySafe } from "@/utils/currency";
 
@@ -53,8 +75,10 @@ function FieldRow({ label, children }: { label: string; children: ReactNode }) {
 export function ReceiptDetailSheet({ receiptId, onOpenChange }: ReceiptDetailSheetProps) {
   const { t } = useDashboardTranslation();
   const { user } = useAuth();
-  const { currentTeam } = useTeam();
+  const { currentTeam, hasPermission } = useTeam();
   const queryClient = useQueryClient();
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: receipt, isLoading, isError, refetch } = useQuery({
     queryKey: ["receipt", receiptId, currentTeam?.id ?? null],
@@ -96,13 +120,38 @@ export function ReceiptDetailSheet({ receiptId, onOpenChange }: ReceiptDetailShe
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!receipt) throw new Error("No receipt loaded");
+      const deleted = await deleteReceipt(receipt.id, { silent: true });
+      if (!deleted) throw new Error("Delete failed");
+      return receipt.id;
+    },
+    onSuccess: async () => {
+      toast.success(t("workspace.detail.deletedToast"));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["receipts"] }),
+        queryClient.invalidateQueries({ queryKey: ["receipt"] }),
+        queryClient.invalidateQueries({ queryKey: ["receipt-counts"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+      ]);
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast.error(t("workspace.detail.deleteFailedToast"));
+    },
+  });
+
   const confidence = receipt ? getReceiptConfidence(receipt) : null;
   const category = receipt?.custom_category?.name || receipt?.predicted_category || null;
   const isReviewed = receipt?.status === "reviewed";
   const isPending = statusMutation.isPending;
+  const canCreateClaim =
+    Boolean(currentTeam) && hasPermission?.("create_claims") === true;
 
   return (
-    <Sheet open={Boolean(receiptId)} onOpenChange={onOpenChange}>
+    <>
+      <Sheet open={Boolean(receiptId)} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         className="flex w-full flex-col gap-0 overflow-y-auto border-l border-ledger-line bg-ledger-paper p-0 sm:max-w-[920px] [&>button]:z-20"
@@ -204,50 +253,136 @@ export function ReceiptDetailSheet({ receiptId, onOpenChange }: ReceiptDetailShe
                 <ConfidenceBar value={confidence} className="mt-2" />
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {isReviewed ? (
-                  <Button
-                    variant="accent-outline"
-                    size="app"
-                    onClick={() => statusMutation.mutate("unreviewed")}
-                    disabled={isPending}
-                  >
-                    {isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                    )}
-                    {t("workspace.detail.moveToReview")}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="accent"
-                    size="app"
-                    onClick={() => statusMutation.mutate("reviewed")}
-                    disabled={isPending}
-                  >
-                    {isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Check className="mr-2 h-4 w-4" />
-                    )}
-                    {isPending
-                      ? t("workspace.review.approving")
-                      : t("workspace.detail.approve")}
-                  </Button>
-                )}
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {isReviewed ? (
+                    <Button
+                      variant="accent-outline"
+                      size="app"
+                      onClick={() => statusMutation.mutate("unreviewed")}
+                      disabled={isPending}
+                    >
+                      {isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                      )}
+                      {t("workspace.detail.moveToReview")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="accent"
+                      size="app"
+                      onClick={() => statusMutation.mutate("reviewed")}
+                      disabled={isPending}
+                    >
+                      {isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="mr-2 h-4 w-4" />
+                      )}
+                      {isPending
+                        ? t("workspace.review.approving")
+                        : t("workspace.detail.approve")}
+                    </Button>
+                  )}
 
-                <Button variant="accent-outline" size="app" asChild>
-                  <Link to={`/receipt/${receipt.id}`} onClick={() => onOpenChange(false)}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    {t("workspace.detail.openEditor")}
-                  </Link>
-                </Button>
+                  {canCreateClaim && (
+                    <Button
+                      variant="accent-outline"
+                      size="app"
+                      onClick={() => setClaimDialogOpen(true)}
+                      disabled={isPending || deleteMutation.isPending}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      {t("workspace.detail.createClaim")}
+                    </Button>
+                  )}
+
+                  <Button variant="accent-outline" size="app" asChild>
+                    <Link to={`/receipt/${receipt.id}`} onClick={() => onOpenChange(false)}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      {t("workspace.detail.openEditor")}
+                    </Link>
+                  </Button>
+                </div>
+
+                <div className="border-t border-ledger-line pt-3">
+                  <Button
+                    variant="ghost"
+                    size="app"
+                    className="w-full justify-start text-ledger-danger hover:bg-ledger-danger-soft hover:text-ledger-danger sm:w-auto"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    disabled={deleteMutation.isPending || isPending}
+                  >
+                    {deleteMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    {t("workspace.detail.deleteReceipt")}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         )}
       </SheetContent>
     </Sheet>
-  );
+
+    {receipt && canCreateClaim && (
+      <CreateClaimDialog
+        open={claimDialogOpen}
+        onOpenChange={setClaimDialogOpen}
+        prefilledData={{
+          title: `Expense - ${receipt.merchant || t("workspace.detail.unknown")}`,
+          description: `Expense claim for ${
+            receipt.merchant || t("workspace.detail.unknown")
+          } on ${formatDetailDate(receipt.date)}`,
+          amount: receipt.total,
+          currency: receipt.currency || "MYR",
+          category:
+            receipt.predicted_category ||
+            receipt.custom_category?.name ||
+            undefined,
+          attachedReceipts: [receipt],
+        }}
+        onSuccess={() => {
+          setClaimDialogOpen(false);
+          void queryClient.invalidateQueries({ queryKey: ["claims"] });
+          void queryClient.invalidateQueries({
+            queryKey: ["receipt-claims", receipt.id],
+          });
+          void queryClient.invalidateQueries({ queryKey: ["receipt-usage"] });
+        }}
+      />
+    )}
+
+    <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <AlertDialogContent className="border-ledger-line bg-ledger-surface">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display text-2xl font-normal text-ledger-ink">
+            {t("workspace.detail.deleteConfirmTitle")}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm leading-relaxed text-ledger-muted">
+            {t("workspace.detail.deleteConfirmDescription")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("workspace.detail.cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-ledger-danger text-white hover:bg-ledger-danger/90 dark:text-ledger-panel"
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {t("workspace.detail.deleteConfirmAction")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
+);
 }

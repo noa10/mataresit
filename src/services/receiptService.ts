@@ -2014,7 +2014,10 @@ export const processReceiptWithAI = async (
 
 
 // Delete a receipt
-export const deleteReceipt = async (id: string): Promise<boolean> => {
+export const deleteReceipt = async (
+  id: string,
+  options: { silent?: boolean } = {}
+): Promise<boolean> => {
   try {
     // First get the receipt to get the image URL and user_id
     const { data: receipt, error: fetchError } = await supabase
@@ -2091,11 +2094,15 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
       }
     }
 
-    toast.success("Receipt deleted successfully");
+    if (!options.silent) {
+      toast.success("Receipt deleted successfully");
+    }
     return true;
   } catch (error) {
     console.error("Error deleting receipt:", error);
-    toast.error("Failed to delete receipt");
+    if (!options.silent) {
+      toast.error("Failed to delete receipt");
+    }
     return false;
   }
 };
