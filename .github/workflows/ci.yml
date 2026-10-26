@@ -301,13 +301,22 @@ jobs:
       - name: Run unit tests
         id: unit-tests
         run: |
-          # Run unit tests if they exist
-          if npm run test:unit --dry-run 2>/dev/null; then
-            npm run test:unit 2>&1 | tee unit-test-results.txt
-            echo "passed=true" >> $GITHUB_OUTPUT
-          else
+          # `npm run <script> --dry-run` only prints the command and always exits
+          # 0, so it can never detect a missing script. Read package.json instead.
+          if [[ -z "$(node -p "require('./package.json').scripts['test:unit'] || ''")" ]]; then
             echo "Unit tests not configured, skipping"
-            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Record the real exit code. Reporting passed=true unconditionally hid
+          # failing suites from the deployment gate.
+          npm run test:unit 2>&1 | tee unit-test-results.txt
+          if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Unit tests failed — see the quality-reports artifact for details."
           fi
         continue-on-error: true
 
@@ -316,12 +325,15 @@ jobs:
         run: |
           # Skip integration tests if test secrets are not available (e.g. fork/dependabot PRs)
           if [ -z "$TEST_SUPABASE_URL" ] || [ -z "$TEST_SUPABASE_ANON_KEY" ] || [ -z "$TEST_SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "⚠️ Test secrets not available. Skipping integration tests."
-            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Test secrets not available (Dependabot/fork PR). Integration tests did NOT run."
+            echo "::warning::Integration tests skipped: test secrets unavailable, so this run has no integration coverage."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "passed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Run integration tests if they exist
-          if npm run test:integration --dry-run 2>/dev/null; then
+          # `--dry-run` only prints the command and always exits 0, so read the
+          # script from package.json instead.
+          if [[ -n "$(node -p "require('./package.json').scripts['test:integration'] || ''")" ]]; then
             npm run test:integration 2>&1 | tee integration-test-results.txt
             if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
               echo "passed=true" >> $GITHUB_OUTPUT
