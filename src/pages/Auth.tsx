@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -12,7 +12,6 @@ import { captureReferralCodeFromSearch } from "@/lib/referralTracking";
 import { useToast } from "@/hooks/use-toast";
 import { AuthBrandingPanel } from "@/components/auth/AuthBrandingPanel";
 import { LanguageSelector } from "@/components/LanguageSelector";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -24,9 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Sun, Moon, Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, Eye, EyeOff, Loader2, Moon, Sun } from "lucide-react";
 
 // Schema factory functions that use translations
 const createLoginSchema = (t: (key: string) => string) => z.object({
@@ -56,18 +54,152 @@ const createResetPasswordSchema = (t: (key: string) => string) => z.object({
   path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
-type SignupFormValues = z.infer<typeof signupSchema>;
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
-type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;
+type SignupFormValues = z.infer<ReturnType<typeof createSignupSchema>>;
+type ForgotPasswordFormValues = z.infer<ReturnType<typeof createForgotPasswordSchema>>;
+type ResetPasswordFormValues = z.infer<ReturnType<typeof createResetPasswordSchema>>;
+
+type AuthMode = "login" | "signup";
+type SummaryErrors = Record<string, { message?: string } | undefined>;
+
+function hasRecoveryHash() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hash = window.location.hash;
+  return Boolean(hash && hash.includes('type=recovery') && hash.includes('access_token'));
+}
+
+const authLabelClass = "text-[0.8125rem] font-semibold text-ledger-ink-2";
+const authInputClass =
+  "h-[46px] rounded-lg border-ledger-line-strong bg-ledger-surface px-3.5 text-base text-ledger-ink placeholder:text-ledger-muted/80 focus-visible:border-ledger-accent focus-visible:ring-2 focus-visible:ring-ledger-accent/25 focus-visible:ring-offset-0 aria-[invalid=true]:border-ledger-danger aria-[invalid=true]:bg-ledger-danger-soft/25 aria-[invalid=true]:focus-visible:border-ledger-danger aria-[invalid=true]:focus-visible:ring-ledger-danger/25 md:text-base";
+const authMessageClass = "text-[0.8125rem] font-normal leading-[1.45] text-ledger-danger";
+const authLinkClass =
+  "inline-flex min-h-11 items-center text-sm font-semibold text-ledger-accent underline decoration-1 underline-offset-[3px] transition-colors hover:text-ledger-accent-hover";
+const authBackLinkClass =
+  "inline-flex min-h-11 w-fit items-center text-sm font-medium text-ledger-muted transition-colors hover:text-ledger-ink hover:underline hover:underline-offset-[3px]";
+
+function GoogleMark() {
+  return (
+    <svg className="h-[18px] w-[18px]" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
+      />
+    </svg>
+  );
+}
+
+function PasswordToggle({
+  visible,
+  onToggle,
+  showLabel,
+  hideLabel,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+  showLabel: string;
+  hideLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={visible}
+      aria-label={visible ? hideLabel : showLabel}
+      onClick={onToggle}
+      className="absolute right-0.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-md text-ledger-muted transition-colors hover:bg-ledger-surface-2 hover:text-ledger-ink"
+    >
+      {visible ? (
+        <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
+      ) : (
+        <Eye className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
+      )}
+    </button>
+  );
+}
+
+function AuthThemeToggle({ label }: { label: string }) {
+  const { isDarkMode, toggleMode } = useTheme();
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void toggleMode();
+      }}
+      aria-label={label}
+      title={label}
+      aria-pressed={isDarkMode}
+      className="grid h-9 w-9 place-items-center rounded-lg text-ledger-ink-2 transition-colors hover:bg-ledger-surface-2 hover:text-ledger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+    >
+      {isDarkMode ? (
+        <Sun aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.7} />
+      ) : (
+        <Moon aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.7} />
+      )}
+    </button>
+  );
+}
+
+function AuthErrorSummary({
+  errors,
+  title,
+  onFocus,
+}: {
+  errors: SummaryErrors;
+  title: string;
+  onFocus: (field: string) => void;
+}) {
+  const entries = Object.entries(errors).filter(([, error]) => Boolean(error?.message));
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-ledger-danger/30 bg-ledger-danger-soft px-3.5 py-3"
+    >
+      <p className="text-[0.8125rem] font-bold text-ledger-danger">{title}</p>
+      <ul className="mt-1.5 grid gap-[3px]">
+        {entries.map(([field, error]) => (
+          <li key={field}>
+            <button
+              type="button"
+              onClick={() => onFocus(field)}
+              className="text-left text-[0.8125rem] leading-[1.45] text-ledger-danger underline underline-offset-2"
+            >
+              {String(error?.message)}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
-  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isForgotView, setIsForgotView] = useState(false);
   const [isPasswordResetSent, setIsPasswordResetSent] = useState(false);
-  const [isRecoverySession, setIsRecoverySession] = useState(false);
+  const [isRecoverySession, setIsRecoverySession] = useState(hasRecoveryHash);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(hasRecoveryHash);
+  const recoveryToastShown = useRef(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -76,8 +208,7 @@ export default function Auth() {
   const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
   const { user, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { t } = useAuthTranslation();
-  const { isDarkMode, toggleMode } = useTheme();
-  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [activeMode, setActiveMode] = useState<AuthMode>("login");
   const location = useLocation();
   const { toast } = useToast();
 
@@ -86,6 +217,15 @@ export default function Auth() {
   const signupSchema = createSignupSchema(t);
   const forgotPasswordSchema = createForgotPasswordSchema(t);
   const resetPasswordSchema = createResetPasswordSchema(t);
+
+  // Keep the latest translator and toast callback available to the auth
+  // subscription without re-subscribing on every render.
+  const tRef = useRef(t);
+  const toastRef = useRef(toast);
+  useEffect(() => {
+    tRef.current = t;
+    toastRef.current = toast;
+  }, [t, toast]);
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -119,52 +259,58 @@ export default function Auth() {
     },
   });
 
-  // Function to check for recovery mode based on URL hash
-  // This is primarily for the initial page load.
-  const checkForRecoveryModeOnMount = useCallback(() => {
-    console.log("Auth.tsx: checkForRecoveryModeOnMount running...");
-    const hash = window.location.hash;
+  const openForgotPassword = useCallback(() => {
+    setIsForgotView(true);
+    setIsPasswordResetSent(false);
+    forgotPasswordForm.reset({ email: loginForm.getValues("email") });
+    forgotPasswordForm.clearErrors();
+  }, [forgotPasswordForm, loginForm]);
 
-    // Supabase password recovery flow puts tokens and type=recovery in the hash.
-    // e.g., #access_token=...&refresh_token=...&expires_in=...&token_type=bearer&type=recovery
-    if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
-      console.log("Auth.tsx: checkForRecoveryModeOnMount - Found 'type=recovery' and 'access_token' in hash.");
-      // Check if already in recovery mode to avoid redundant toasts/state sets if called multiple times
-      if (!isRecoverySession && !isResetPasswordOpen) {
-        setIsRecoverySession(true);
-        setIsResetPasswordOpen(true);
-        toast({
-          title: t("toasts.passwordReset"),
-          description: t("toasts.passwordResetDescription"),
-        });
-      }
-      // It's important NOT to clear the hash here; onResetPasswordSubmit needs it.
-      return true;
-    }
-    console.log("Auth.tsx: checkForRecoveryModeOnMount - No clear recovery indicators in hash.");
-    return false;
-  }, [isRecoverySession, isResetPasswordOpen, t, toast]);
+  const backToLogin = useCallback(() => {
+    setIsForgotView(false);
+    setIsPasswordResetSent(false);
+    forgotPasswordForm.clearErrors();
+  }, [forgotPasswordForm]);
+
+  const selectMode = useCallback((mode: AuthMode) => {
+    setActiveMode(mode);
+    setIsForgotView(false);
+    setIsPasswordResetSent(false);
+    loginForm.clearErrors();
+    signupForm.clearErrors();
+  }, [loginForm, signupForm]);
 
   useEffect(() => {
     captureReferralCodeFromSearch(location.search);
   }, [location.search]);
 
   useEffect(() => {
-    // Initial check on mount for recovery hash.
-    checkForRecoveryModeOnMount();
+    const translate = (key: string) => tRef.current(key);
+    const showToast = (...args: Parameters<typeof toast>) => toastRef.current(...args);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth.tsx: onAuthStateChange event:", event, "Session:", session ? "exists" : "null");
+    // Supabase password recovery flow puts tokens and type=recovery in the hash.
+    // e.g., #access_token=...&refresh_token=...&expires_in=...&token_type=bearer&type=recovery
+    // The hash is not cleared here because onResetPasswordSubmit needs it.
+    if (hasRecoveryHash() && !recoveryToastShown.current) {
+      recoveryToastShown.current = true;
+      showToast({
+        title: translate("toasts.passwordReset"),
+        description: translate("toasts.passwordResetDescription"),
+      });
+    }
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("Auth.tsx: PASSWORD_RECOVERY event detected by onAuthStateChange.");
         // This event implies Supabase has processed the recovery link and established a recovery session.
         setIsRecoverySession(true);
         setIsResetPasswordOpen(true);
-        toast({
-          title: t("toasts.passwordRecoveryConfirmed"),
-          description: t("toasts.passwordRecoveryDescription"),
-        });
+        if (!recoveryToastShown.current) {
+          recoveryToastShown.current = true;
+          showToast({
+            title: translate("toasts.passwordRecoveryConfirmed"),
+            description: translate("toasts.passwordRecoveryDescription"),
+          });
+        }
         // Don't clear URL hash here; onResetPasswordSubmit needs it.
       } else if (event === 'SIGNED_IN') {
         // This event occurs for any successful sign-in (manual, OAuth, magic link, or session restoration).
@@ -172,45 +318,27 @@ export default function Auth() {
         const currentHash = window.location.hash;
         const isActualRecoveryHash = currentHash && currentHash.includes('type=recovery') && currentHash.includes('access_token');
 
-        if (isActualRecoveryHash) {
-          // If SIGNED_IN occurs and it IS a recovery hash, ensure recovery UI is active.
-          // This might be redundant if PASSWORD_RECOVERY event or checkForRecoveryModeOnMount already handled it, but acts as a safeguard.
-          if (!isRecoverySession) {
-            console.log("Auth.tsx: SIGNED_IN event with recovery hash, but recovery state not set. Setting it now.");
-            setIsRecoverySession(true);
-            setIsResetPasswordOpen(true);
-          }
-        } else {
-          // If it's a SIGNED_IN event (e.g. Google login) and NOT a recovery hash scenario,
-          // ensure recovery mode is turned OFF. This prevents the loop.
-          if (isRecoverySession || isResetPasswordOpen) {
-            console.log("Auth.tsx: SIGNED_IN event, but no active recovery hash. Resetting recovery state.");
-            setIsRecoverySession(false);
-            setIsResetPasswordOpen(false);
-          }
-          // AuthContext should handle clearing non-recovery auth hashes (like from OAuth).
-        }
-
-        // The 'session' object is available directly from the onAuthStateChange callback parameters.
-        if (session?.user) {
-          console.log('Current frontend user ID (auth.uid()):', session.user.id);
-        }
+        // If SIGNED_IN occurs and it IS a recovery hash, ensure recovery UI is active.
+        // This might be redundant if the PASSWORD_RECOVERY event already handled it, but acts as a safeguard.
+        setIsRecoverySession(Boolean(isActualRecoveryHash));
+        setIsResetPasswordOpen(Boolean(isActualRecoveryHash));
+        // AuthContext should handle clearing non-recovery auth hashes (like from OAuth).
       } else if (event === 'SIGNED_OUT') {
         // If user signs out for any reason, clear any recovery state.
         setIsRecoverySession(false);
         setIsResetPasswordOpen(false);
+        setIsForgotView(false);
+        if (!hasRecoveryHash()) {
+          recoveryToastShown.current = false;
+        }
         resetPasswordForm.reset(); // Clear the form fields
-        // The component/logic that triggered sign-out should handle navigation/URL cleanup.
-        // onResetPasswordSubmit specifically handles this after password update.
       }
-      // USER_UPDATED events are generally not directly tied to starting/stopping recovery UI flow.
-      // The specific action (like password update) handles its own state.
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [checkForRecoveryModeOnMount, isRecoverySession, isResetPasswordOpen, t, toast, resetPasswordForm]); // Added resetPasswordForm to deps for reset call
+  }, [resetPasswordForm]);
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
@@ -230,8 +358,8 @@ export default function Auth() {
     try {
       await signUp(data.email, data.password);
       // Successful signUp will show a toast (from AuthContext) and user needs to verify email.
-      // Optionally, switch to login tab or show a message.
-      setActiveTab("login");
+      // Bring the user back to the login form while they confirm their address.
+      setActiveMode("login");
     } catch (error) {
       // Error toast is handled by signUp in AuthContext
       console.error("Signup error in Auth.tsx:", error);
@@ -259,7 +387,7 @@ export default function Auth() {
     try {
       await resetPassword(data.email); // This is resetPasswordForEmail from AuthContext
       setIsPasswordResetSent(true);
-      // Keep the dialog open to show success message.
+      // Keep the view open to show the confirmation status.
     } catch (error) {
       // Error toast handled by resetPassword in AuthContext
       console.error("Forgot password error in Auth.tsx:", error);
@@ -272,21 +400,17 @@ export default function Auth() {
   const onResetPasswordSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
     try {
-      console.log("Auth.tsx: Updating password during recovery flow...");
-
       // Step 1: Ensure there's a session. Supabase's recovery link creates one.
       // If getSession doesn't immediately return it (e.g. race condition on load),
       // try to set it manually from the hash (which contains tokens for recovery).
       let { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        console.warn("Auth.tsx: No active session from getSession(). Attempting to set session from URL hash for recovery.");
         const hash = window.location.hash;
         const accessToken = hash.match(/access_token=([^&]*)/)?.[1];
         const refreshToken = hash.match(/refresh_token=([^&]*)/)?.[1];
 
         if (accessToken && refreshToken) {
-          console.log("Auth.tsx: Found access_token and refresh_token in hash. Attempting supabase.auth.setSession().");
           const { data: manualSessionData, error: setError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -295,21 +419,20 @@ export default function Auth() {
           if (setError) {
             console.error("Auth.tsx: Error manually setting session:", setError);
             toast({
-              title: "Session Error",
-              description: `Failed to establish recovery session: ${setError.message}. Please try the link again.`,
+              title: t("toasts.sessionError"),
+              description: t("errors.sessionRecoveryFailed", { message: setError.message }),
               variant: "destructive",
             });
             setIsLoading(false);
             return;
           }
           session = manualSessionData.session;
-          console.log("Auth.tsx: Manual session set successfully for recovery.");
 
           if (!session) {
             console.error("Auth.tsx: Session still null after attempting manual setSession for recovery.");
             toast({
-              title: "Session Error",
-              description: "Could not verify recovery session. Please try the link again.",
+              title: t("toasts.sessionError"),
+              description: t("errors.sessionVerificationFailed"),
               variant: "destructive",
             });
             setIsLoading(false);
@@ -318,41 +441,35 @@ export default function Auth() {
         } else {
           console.error("Auth.tsx: Access token or refresh token missing in hash. Cannot manually set recovery session.");
           toast({
-            title: "Recovery Error",
-            description: "Incomplete recovery information. Please use the link from your email again.",
+            title: t("toasts.recoveryError"),
+            description: t("errors.incompleteRecoveryInfo"),
             variant: "destructive",
           });
           setIsLoading(false);
           return;
         }
-      } else {
-        console.log("Auth.tsx: Active session found via getSession() for recovery.");
       }
 
       // Step 2: Update the user's password.
       // We use supabase.auth.updateUser directly here because this is part of the recovery flow,
       // which is more specialized than the generic updatePassword in AuthContext.
-      console.log("Auth.tsx: Proceeding with password update using the recovery session...");
-      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await supabase.auth.updateUser({
         password: data.password
       });
 
       if (updateError) {
         console.error("Auth.tsx: Supabase updateUser error during recovery:", updateError);
-        // Check for common errors like weak password, expired token, etc.
         let message = updateError.message;
         if (message.includes("session is not a recovery session")) {
-            message = "Invalid or expired recovery session. Please request a new password reset link.";
+          message = t("errors.invalidRecoverySession");
         } else if (message.includes("Password should be at least 6 characters")) {
-            message = "Password is too short. It must be at least 6 characters.";
+          message = t("errors.weakPassword");
         }
-        toast({ title: "Password Update Failed", description: message, variant: "destructive" });
+        toast({ title: t("toasts.passwordUpdateFailed"), description: message, variant: "destructive" });
         setIsLoading(false); // Release loading state
         // Do not clear recovery state here, user might want to try again with a different password.
         return;
       }
-
-      console.log("Auth.tsx: Password update successful during recovery:", updateData ? "User updated" : "No update data returned");
 
       // Step 3: Clean up and sign out.
       setIsRecoverySession(false);
@@ -360,8 +477,8 @@ export default function Auth() {
       resetPasswordForm.reset();
 
       toast({
-        title: "Password Updated",
-        description: "Your password has been successfully updated. You will be signed out and can now log in with your new password.",
+        title: t("toasts.passwordUpdated"),
+        description: t("toasts.passwordUpdatedDescription"),
       });
 
       // Clean the recovery tokens from the URL hash as they are no longer needed and sensitive.
@@ -369,587 +486,633 @@ export default function Auth() {
 
       // Sign out the user from the recovery session. This is crucial.
       await supabase.auth.signOut();
-      console.log("Auth.tsx: User signed out after password recovery.");
 
       // Redirect to the login page to force a fresh login with the new password.
       // A full page reload ensures all state is fresh.
-      window.location.assign('/auth'); // Using assign for a full reload effect.
-
+      window.location.assign('/auth');
     } catch (error: unknown) {
       const message = error instanceof Error
         ? error.message
-        : "An unexpected error occurred while updating password. Please try again.";
+        : t("errors.unexpectedError");
 
       console.error("Auth.tsx: Unexpected error in onResetPasswordSubmit:", error);
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: message,
         variant: "destructive",
       });
     } finally {
-      // Ensure isLoading is always reset, unless an early return happened due to error.
-      // If an early return happened, setIsLoading(false) should have been called there.
-      // If the flow reaches here, it implies either success or a fall-through error.
-      // Given the redirects and potential early returns, this might not always execute as expected
-      // for the success path. It's more critical for error paths that don't navigate away.
-      // The early returns for errors already handle setIsLoading(false).
-      // For the success path, navigation occurs, so this might be redundant or not hit.
-      setIsLoading(false); // This will be hit if an error is thrown and caught by the outer catch.
+      setIsLoading(false);
     }
   };
+
+  const onCancelRecovery = async () => {
+    resetPasswordForm.reset();
+    window.history.replaceState(null, '', '/auth');
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Auth.tsx: Error signing out of recovery session:", error);
+    }
+    window.location.assign('/auth');
+  };
+
+  const showRecovery = isRecoverySession || isResetPasswordOpen;
+  const view: "auth" | "forgot" | "reset" = showRecovery
+    ? "reset"
+    : isForgotView
+      ? "forgot"
+      : "auth";
+
+  useEffect(() => {
+    const pageTitle = view === "reset"
+      ? t("resetPassword.title")
+      : view === "forgot"
+        ? t("forgotPassword.title")
+        : activeMode === "login"
+          ? t("signIn.title")
+          : t("signUp.title");
+    document.title = `${pageTitle} — Mataresit`;
+  }, [activeMode, t, view]);
 
   // Redirect if user is logged in AND not in an active recovery flow
   if (user && !isRecoverySession && !isResetPasswordOpen) {
     const from = location.state?.from?.pathname || "/dashboard";
-    console.log(`Auth.tsx: User is logged in and not in recovery. Redirecting to ${from}.`);
     return <Navigate to={from} replace />;
   }
 
-  // If in recovery mode, ensure the reset password dialog is open.
-  // This handles cases where onAuthStateChange sets isRecoverySession but dialog state might lag.
-  if (isRecoverySession && !isResetPasswordOpen) {
-      setIsResetPasswordOpen(true);
-  }
+  const headerCopy = view === "reset"
+    ? {
+        eyebrow: t("resetEyebrow"),
+        title: t("resetPassword.title"),
+        subtitle: t("resetPassword.subtitle"),
+      }
+    : view === "forgot"
+      ? {
+          eyebrow: t("eyebrow"),
+          title: t("forgotPassword.title"),
+          subtitle: t("forgotPassword.subtitle"),
+        }
+      : {
+          eyebrow: t("eyebrow"),
+          title: t("welcome"),
+          subtitle: activeMode === "login" ? t("signIn.subtitle") : t("signUp.subtitle"),
+        };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Minimal auth header */}
-      <div className="absolute top-0 left-0 right-0 z-10 p-4 md:p-6 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/mataresit-icon.png" alt="Mataresit" className="h-7 w-7" />
-          <span className="font-bold text-lg">Mataresit</span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <LanguageSelector variant="compact" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleMode}
-            title="Toggle theme"
-          >
-            {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 flex">
-        {/* Left: Branding panel (hidden on mobile) */}
-        <div className="hidden lg:flex lg:w-1/2 xl:w-[55%]">
-          <AuthBrandingPanel />
-        </div>
-
-        {/* Right: Auth form */}
-        <div className="w-full lg:w-1/2 xl:w-[45%] flex items-center justify-center p-6 md:p-12 pt-20 md:pt-24">
-          <div className="w-full max-w-md">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-          <h1 className="text-2xl font-bold text-center mb-6">{t("welcome")}</h1>
-
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")}>
-            <TabsList className="grid grid-cols-2 mb-6">
-              <TabsTrigger value="login" className="data-[state=active]:shadow-sm">{t("tabs.login")}</TabsTrigger>
-              <TabsTrigger value="signup" className="data-[state=active]:shadow-sm">{t("tabs.signup")}</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                  <FormField
-                    control={loginForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("signIn.email")}</FormLabel>
-                        <FormControl>
-                          <Input
-                            className="h-11"
-                            type="email"
-                            autoComplete="email"
-                            placeholder={t("signIn.emailPlaceholder")}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("signIn.password")}</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              className="h-11 pr-10"
-                              type={showLoginPassword ? "text" : "password"}
-                              autoComplete="current-password"
-                              placeholder={t("signIn.passwordPlaceholder")}
-                              {...field}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              tabIndex={-1}
-                              aria-label={showLoginPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
-                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                              onClick={() => setShowLoginPassword((prev) => !prev)}
-                            >
-                              {showLoginPassword ? (
-                                <EyeOff className="h-4 w-4" aria-hidden="true" />
-                              ) : (
-                                <Eye className="h-4 w-4" aria-hidden="true" />
-                              )}
-                            </Button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="rememberMe"
-                        checked={rememberMe}
-                        onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="rememberMe"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {t("signIn.rememberMe")}
-                      </label>
-                    </div>
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto text-sm text-muted-foreground"
-                      type="button"
-                      onClick={() => {
-                        setIsForgotPasswordOpen(true);
-                        setIsPasswordResetSent(false);
-                        forgotPasswordForm.reset();
-                      }}
-                    >
-                      {t("signIn.forgotPassword")}
-                    </Button>
-                  </div>
-
-                  <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("signIn.buttonLoading")}
-                      </>
-                    ) : (
-                      t("signIn.button")
-                    )}
-                  </Button>
-                </form>
-              </Form>
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      {t("common.orContinueWith")}
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isGoogleLoading}
-                  className="w-full mt-4"
-                  onClick={handleGoogleSignIn}
-                >
-                  {isGoogleLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                      <path d="M1 1h22v22H1z" fill="none" />
-                    </svg>
-                  )}
-                  {t("signIn.withGoogle")}
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="signup">
-              <Form {...signupForm}>
-                <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
-                  <FormField
-                    control={signupForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("signUp.email")}</FormLabel>
-                        <FormControl>
-                          <Input
-                            className="h-11"
-                            type="email"
-                            autoComplete="email"
-                            placeholder={t("signUp.emailPlaceholder")}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={signupForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("signUp.password")}</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              className="h-11 pr-10"
-                              type={showSignupPassword ? "text" : "password"}
-                              autoComplete="new-password"
-                              placeholder={t("signUp.passwordPlaceholder")}
-                              {...field}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              tabIndex={-1}
-                              aria-label={showSignupPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
-                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                              onClick={() => setShowSignupPassword((prev) => !prev)}
-                            >
-                              {showSignupPassword ? (
-                                <EyeOff className="h-4 w-4" aria-hidden="true" />
-                              ) : (
-                                <Eye className="h-4 w-4" aria-hidden="true" />
-                              )}
-                            </Button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={signupForm.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("signUp.confirmPassword")}</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              className="h-11 pr-10"
-                              type={showSignupConfirmPassword ? "text" : "password"}
-                              autoComplete="new-password"
-                              placeholder={t("signUp.passwordPlaceholder")}
-                              {...field}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              tabIndex={-1}
-                              aria-label={showSignupConfirmPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
-                              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                              onClick={() => setShowSignupConfirmPassword((prev) => !prev)}
-                            >
-                              {showSignupConfirmPassword ? (
-                                <EyeOff className="h-4 w-4" aria-hidden="true" />
-                              ) : (
-                                <Eye className="h-4 w-4" aria-hidden="true" />
-                              )}
-                            </Button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("signUp.buttonLoading")}
-                      </>
-                    ) : (
-                      t("signUp.button")
-                    )}
-                  </Button>
-                </form>
-              </Form>
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      {t("common.orContinueWith")}
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isGoogleLoading}
-                  className="w-full mt-4"
-                  onClick={handleGoogleSignIn}
-                >
-                  {isGoogleLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                      <path d="M1 1h22v22H1z" fill="none" />
-                    </svg>
-                  )}
-                  {t("signUp.withGoogle")}
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-            </motion.div>
-          </div>
-        </div>
-      </div>
-
-      {/* Forgot Password Dialog */}
-      <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isPasswordResetSent ? t("forgotPassword.titleSent") : t("forgotPassword.title")}</DialogTitle>
-            <DialogDescription>
-              {isPasswordResetSent
-                ? t("forgotPassword.subtitleSent")
-                : t("forgotPassword.subtitle")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {!isPasswordResetSent ? (
-            <Form {...forgotPasswordForm}>
-              <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
-                <FormField
-                  control={forgotPasswordForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("forgotPassword.email")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          autoComplete="email"
-                          placeholder={t("forgotPassword.emailPlaceholder")}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsForgotPasswordOpen(false)}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("common.sending")}
-                      </>
-                    ) : (
-                      t("forgotPassword.button")
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          ) : (
-            <DialogFooter>
-              <Button
-                type="button"
-                onClick={() => setIsForgotPasswordOpen(false)}
-                className="w-full"
-              >
-                {t("common.close")}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Reset Password Dialog - Only shown during recovery flow */}
-      <Dialog
-        open={isResetPasswordOpen}
-        onOpenChange={(open) => {
-          // Only allow closing if not in recovery mode
-          if (!isRecoverySession || !open) {
-            setIsResetPasswordOpen(open);
-          }
-        }}
+    <div className="min-h-svh bg-ledger-paper text-ledger-ink">
+      <a
+        href="#auth-panel"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper transition-[top] focus:top-3"
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("resetPassword.title")}</DialogTitle>
-            <DialogDescription>
-              {t("resetPassword.subtitle")}
-            </DialogDescription>
-          </DialogHeader>
+        {t("common.skipToSignIn")}
+      </a>
 
-          <Form {...resetPasswordForm}>
-            <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
-              <FormField
-                control={resetPasswordForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("resetPassword.password")}</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          className="pr-10"
-                          type={showResetPassword ? "text" : "password"}
-                          autoComplete="new-password"
-                          placeholder={t("resetPassword.passwordPlaceholder")}
-                          {...field}
-                          autoFocus
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          tabIndex={-1}
-                          aria-label={showResetPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
-                          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                          onClick={() => setShowResetPassword((prev) => !prev)}
-                        >
-                          {showResetPassword ? (
-                            <EyeOff className="h-4 w-4" aria-hidden="true" />
-                          ) : (
-                            <Eye className="h-4 w-4" aria-hidden="true" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+      <div className="grid min-h-svh content-start min-[980px]:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+        <AuthBrandingPanel />
+
+        <main
+          id="auth-panel"
+          className="flex flex-col px-5 pb-8 pt-3 min-[980px]:min-h-svh min-[980px]:px-8 min-[980px]:pb-10 min-[980px]:pt-5"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1">
+              <LanguageSelector
+                variant="globe-code"
+                showFlag={false}
+                ariaLabel={t("common.language")}
+                menuClassName="w-60"
+                className="h-9 rounded-lg px-2.5 text-ledger-ink-2 hover:bg-ledger-surface-2 hover:text-ledger-ink"
               />
+              <AuthThemeToggle label={t("common.toggleTheme")} />
+            </div>
 
-              <FormField
-                control={resetPasswordForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("resetPassword.confirmPassword")}</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          className="pr-10"
-                          type={showResetConfirmPassword ? "text" : "password"}
-                          autoComplete="new-password"
-                          placeholder={t("resetPassword.passwordPlaceholder")}
-                          {...field}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          tabIndex={-1}
-                          aria-label={showResetConfirmPassword ? t("signIn.hidePassword") : t("signIn.showPassword")}
-                          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-                          onClick={() => setShowResetConfirmPassword((prev) => !prev)}
-                        >
-                          {showResetConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" aria-hidden="true" />
-                          ) : (
-                            <Eye className="h-4 w-4" aria-hidden="true" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <Link
+              to="/"
+              className="inline-flex min-h-11 items-center gap-[7px] rounded-[7px] px-2.5 text-sm font-medium text-ledger-muted transition-colors hover:bg-ledger-surface-2 hover:text-ledger-ink"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {t("common.backToSite")}
+            </Link>
+          </div>
 
-              <div className="text-sm text-muted-foreground mt-2">
-                <p>{t("resetPassword.requirements")}</p>
-                <p className="mt-1">
-                  {t("resetPassword.recoveryNote")}
+          <div className="mx-auto flex w-full max-w-[440px] flex-1 flex-col justify-center py-7 min-[980px]:py-8">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+            >
+              <header className="grid gap-2 text-center">
+                <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+                  {headerCopy.eyebrow}
                 </p>
-              </div>
+                <h1 className="font-display text-[clamp(1.85rem,2.6vw,2.2rem)] font-normal leading-[1.1] tracking-[-0.02em] text-ledger-ink">
+                  {headerCopy.title}
+                </h1>
+                <p className="mx-auto max-w-[36ch] text-[0.9375rem] leading-[1.55] text-ledger-muted">
+                  {headerCopy.subtitle}
+                </p>
+              </header>
 
-              <DialogFooter>
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? (
+              {view === "auth" && (
+                <>
+                  <div
+                    role="group"
+                    aria-label={t("common.accountAccess")}
+                    className="mt-[26px] grid grid-cols-2 gap-1 rounded-[9px] border border-ledger-line bg-ledger-surface-2 p-1"
+                  >
+                    {(["login", "signup"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={activeMode === mode}
+                        onClick={() => selectMode(mode)}
+                        className={cn(
+                          "min-h-11 rounded-md text-[0.9375rem] font-semibold transition-colors",
+                          activeMode === mode
+                            ? "bg-ledger-surface text-ledger-ink shadow-[inset_0_0_0_1px_var(--ledger-line),0_1px_2px_rgba(18,23,21,0.06)]"
+                            : "text-ledger-muted hover:text-ledger-ink"
+                        )}
+                      >
+                        {mode === "login" ? t("tabs.login") : t("tabs.signup")}
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeMode === "login" ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("common.updating")}
+                      <Form {...loginForm}>
+                        <form
+                          noValidate
+                          onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                          className="mt-6 grid gap-[18px]"
+                        >
+                          {loginForm.formState.isSubmitted && Object.keys(loginForm.formState.errors).length > 0 && (
+                            <AuthErrorSummary
+                              title={t("errors.checkDetails")}
+                              errors={loginForm.formState.errors as SummaryErrors}
+                              onFocus={(field) => loginForm.setFocus(field as "email" | "password")}
+                            />
+                          )}
+
+                          <FormField
+                            control={loginForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1.5">
+                                <FormLabel className={authLabelClass}>
+                                  {t("signIn.email")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    className={authInputClass}
+                                    type="email"
+                                    inputMode="email"
+                                    autoComplete="email"
+                                    aria-required="true"
+                                    placeholder={t("signIn.emailPlaceholder")}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage className={authMessageClass} />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={loginForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1.5">
+                                <FormLabel className={authLabelClass}>
+                                  {t("signIn.password")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                                </FormLabel>
+                                <div className="relative">
+                                  <FormControl>
+                                    <Input
+                                      className={cn(authInputClass, "pr-12")}
+                                      type={showLoginPassword ? "text" : "password"}
+                                      autoComplete="current-password"
+                                      aria-required="true"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <PasswordToggle
+                                    visible={showLoginPassword}
+                                    onToggle={() => setShowLoginPassword((prev) => !prev)}
+                                    showLabel={t("signIn.showPassword")}
+                                    hideLabel={t("signIn.hidePassword")}
+                                  />
+                                </div>
+                                <FormMessage className={authMessageClass} />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="flex flex-wrap items-center justify-between gap-x-3">
+                            <label
+                              htmlFor="rememberMe"
+                              className="inline-flex min-h-11 cursor-pointer items-center gap-[9px] text-sm text-ledger-ink-2"
+                            >
+                              <Checkbox
+                                id="rememberMe"
+                                size="sm"
+                                checked={rememberMe}
+                                onCheckedChange={(checked) => setRememberMe(checked === true)}
+                                className="rounded-[3px] border-ledger-line-strong data-[state=checked]:border-ledger-accent data-[state=checked]:bg-ledger-accent data-[state=checked]:text-white dark:data-[state=checked]:text-ledger-panel"
+                              />
+                              {t("signIn.rememberMe")}
+                            </label>
+                            <button type="button" className={authLinkClass} onClick={openForgotPassword}>
+                              {t("signIn.forgotPassword")}
+                            </button>
+                          </div>
+
+                          <Button
+                            type="submit"
+                            variant="accent"
+                            disabled={isLoading}
+                            aria-busy={isLoading}
+                            className="h-12 w-full rounded-lg text-[0.9375rem] font-semibold disabled:opacity-75"
+                          >
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t("signIn.buttonLoading")}
+                              </>
+                            ) : (
+                              t("signIn.button")
+                            )}
+                          </Button>
+                        </form>
+                      </Form>
+
+                      <div className="mt-[26px] grid grid-cols-[1fr_auto_1fr] items-center gap-3.5">
+                        <span className="border-t border-ledger-line" />
+                        <span className="font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+                          {t("common.orContinueWith")}
+                        </span>
+                        <span className="border-t border-ledger-line" />
+                      </div>
+
+                      <Button
+                        variant="accent-outline"
+                        type="button"
+                        disabled={isGoogleLoading}
+                        aria-busy={isGoogleLoading}
+                        className="mt-4 h-12 w-full gap-2.5 rounded-lg border-ledger-line-strong bg-ledger-surface text-[0.9375rem] font-semibold hover:border-ledger-ink-2 hover:bg-ledger-surface-2 disabled:opacity-75"
+                        onClick={handleGoogleSignIn}
+                      >
+                        {isGoogleLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <GoogleMark />
+                        )}
+                        {t("signIn.withGoogle")}
+                      </Button>
+
+                      <p className="mt-5 text-center text-sm text-ledger-muted">
+                        {t("signIn.noAccount")}{" "}
+                        <button
+                          type="button"
+                          onClick={() => selectMode("signup")}
+                          className={cn(authLinkClass, "ml-1")}
+                        >
+                          {t("signIn.signUp")}
+                        </button>
+                      </p>
                     </>
                   ) : (
-                    t("resetPassword.button")
+                    <>
+                      <Form {...signupForm}>
+                        <form
+                          noValidate
+                          onSubmit={signupForm.handleSubmit(onSignupSubmit)}
+                          className="mt-6 grid gap-[18px]"
+                        >
+                          {signupForm.formState.isSubmitted && Object.keys(signupForm.formState.errors).length > 0 && (
+                            <AuthErrorSummary
+                              title={t("errors.checkDetails")}
+                              errors={signupForm.formState.errors as SummaryErrors}
+                              onFocus={(field) => signupForm.setFocus(field as "email" | "password" | "confirmPassword")}
+                            />
+                          )}
+
+                          <FormField
+                            control={signupForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1.5">
+                                <FormLabel className={authLabelClass}>
+                                  {t("signUp.email")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    className={authInputClass}
+                                    type="email"
+                                    inputMode="email"
+                                    autoComplete="email"
+                                    aria-required="true"
+                                    placeholder={t("signUp.emailPlaceholder")}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage className={authMessageClass} />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={signupForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1.5">
+                                <FormLabel className={authLabelClass}>
+                                  {t("signUp.password")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                                </FormLabel>
+                                <div className="relative">
+                                  <FormControl>
+                                    <Input
+                                      className={cn(authInputClass, "pr-12")}
+                                      type={showSignupPassword ? "text" : "password"}
+                                      autoComplete="new-password"
+                                      aria-required="true"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <PasswordToggle
+                                    visible={showSignupPassword}
+                                    onToggle={() => setShowSignupPassword((prev) => !prev)}
+                                    showLabel={t("signIn.showPassword")}
+                                    hideLabel={t("signIn.hidePassword")}
+                                  />
+                                </div>
+                                <FormMessage className={authMessageClass} />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={signupForm.control}
+                            name="confirmPassword"
+                            render={({ field }) => (
+                              <FormItem className="space-y-1.5">
+                                <FormLabel className={authLabelClass}>
+                                  {t("signUp.confirmPassword")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                                </FormLabel>
+                                <div className="relative">
+                                  <FormControl>
+                                    <Input
+                                      className={cn(authInputClass, "pr-12")}
+                                      type={showSignupConfirmPassword ? "text" : "password"}
+                                      autoComplete="new-password"
+                                      aria-required="true"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <PasswordToggle
+                                    visible={showSignupConfirmPassword}
+                                    onToggle={() => setShowSignupConfirmPassword((prev) => !prev)}
+                                    showLabel={t("signIn.showPassword")}
+                                    hideLabel={t("signIn.hidePassword")}
+                                  />
+                                </div>
+                                <FormMessage className={authMessageClass} />
+                              </FormItem>
+                            )}
+                          />
+
+                          <p className="text-[0.8125rem] leading-[1.55] text-ledger-muted">
+                            {t("signUp.termsNotice")}
+                          </p>
+
+                          <Button
+                            type="submit"
+                            variant="accent"
+                            disabled={isLoading}
+                            aria-busy={isLoading}
+                            className="h-12 w-full rounded-lg text-[0.9375rem] font-semibold disabled:opacity-75"
+                          >
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {t("signUp.buttonLoading")}
+                              </>
+                            ) : (
+                              t("signUp.button")
+                            )}
+                          </Button>
+                        </form>
+                      </Form>
+
+                      <div className="mt-[26px] grid grid-cols-[1fr_auto_1fr] items-center gap-3.5">
+                        <span className="border-t border-ledger-line" />
+                        <span className="font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+                          {t("common.orContinueWith")}
+                        </span>
+                        <span className="border-t border-ledger-line" />
+                      </div>
+
+                      <Button
+                        variant="accent-outline"
+                        type="button"
+                        disabled={isGoogleLoading}
+                        aria-busy={isGoogleLoading}
+                        className="mt-4 h-12 w-full gap-2.5 rounded-lg border-ledger-line-strong bg-ledger-surface text-[0.9375rem] font-semibold hover:border-ledger-ink-2 hover:bg-ledger-surface-2 disabled:opacity-75"
+                        onClick={handleGoogleSignIn}
+                      >
+                        {isGoogleLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <GoogleMark />
+                        )}
+                        {t("signUp.withGoogle")}
+                      </Button>
+
+                      <p className="mt-5 text-center text-sm text-ledger-muted">
+                        {t("signUp.hasAccount")}{" "}
+                        <button
+                          type="button"
+                          onClick={() => selectMode("login")}
+                          className={cn(authLinkClass, "ml-1")}
+                        >
+                          {t("signUp.signIn")}
+                        </button>
+                      </p>
+                    </>
                   )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+                </>
+              )}
+
+              {view === "forgot" && (
+                <div className="mt-[26px] grid gap-4">
+                  <Form {...forgotPasswordForm}>
+                    <form
+                      noValidate
+                      onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)}
+                      className="grid gap-[18px]"
+                    >
+                      <FormField
+                        control={forgotPasswordForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1.5">
+                            <FormLabel className={authLabelClass}>
+                              {t("forgotPassword.email")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                className={authInputClass}
+                                type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                aria-required="true"
+                                placeholder={t("forgotPassword.emailPlaceholder")}
+                                {...field}
+                                autoFocus
+                              />
+                            </FormControl>
+                            <FormMessage className={authMessageClass} />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="submit"
+                        variant="accent"
+                        disabled={isLoading}
+                        aria-busy={isLoading}
+                        className="h-12 w-full rounded-lg text-[0.9375rem] font-semibold disabled:opacity-75"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t("common.sending")}
+                          </>
+                        ) : (
+                          t("forgotPassword.button")
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+
+                  {isPasswordResetSent && (
+                    <p
+                      role="status"
+                      className="rounded-lg border border-ledger-accent/20 bg-ledger-accent-soft px-3.5 py-3 text-[0.8125rem] leading-[1.5] text-ledger-accent"
+                    >
+                      {t("forgotPassword.subtitleSent")}
+                    </p>
+                  )}
+
+                  <button type="button" onClick={backToLogin} className={authBackLinkClass}>
+                    {t("forgotPassword.backToSignIn")}
+                  </button>
+                </div>
+              )}
+
+              {view === "reset" && (
+                <div className="mt-[26px] grid gap-4">
+                  <Form {...resetPasswordForm}>
+                    <form
+                      noValidate
+                      onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)}
+                      className="grid gap-[18px]"
+                    >
+                      <FormField
+                        control={resetPasswordForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1.5">
+                            <FormLabel className={authLabelClass}>
+                              {t("resetPassword.password")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                            </FormLabel>
+                            <div className="relative">
+                              <FormControl>
+                                <Input
+                                  className={cn(authInputClass, "pr-12")}
+                                  type={showResetPassword ? "text" : "password"}
+                                  autoComplete="new-password"
+                                  aria-required="true"
+                                  {...field}
+                                  autoFocus
+                                />
+                              </FormControl>
+                              <PasswordToggle
+                                visible={showResetPassword}
+                                onToggle={() => setShowResetPassword((prev) => !prev)}
+                                showLabel={t("signIn.showPassword")}
+                                hideLabel={t("signIn.hidePassword")}
+                              />
+                            </div>
+                            <FormMessage className={authMessageClass} />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={resetPasswordForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1.5">
+                            <FormLabel className={authLabelClass}>
+                              {t("resetPassword.confirmPassword")} <span aria-hidden="true" className="font-normal text-ledger-muted">*</span>
+                            </FormLabel>
+                            <div className="relative">
+                              <FormControl>
+                                <Input
+                                  className={cn(authInputClass, "pr-12")}
+                                  type={showResetConfirmPassword ? "text" : "password"}
+                                  autoComplete="new-password"
+                                  aria-required="true"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <PasswordToggle
+                                visible={showResetConfirmPassword}
+                                onToggle={() => setShowResetConfirmPassword((prev) => !prev)}
+                                showLabel={t("signIn.showPassword")}
+                                hideLabel={t("signIn.hidePassword")}
+                              />
+                            </div>
+                            <FormMessage className={authMessageClass} />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="text-[0.8125rem] leading-[1.55] text-ledger-muted">
+                        <p>{t("resetPassword.requirements")}</p>
+                        <p className="mt-1">{t("resetPassword.recoveryNote")}</p>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        variant="accent"
+                        disabled={isLoading}
+                        aria-busy={isLoading}
+                        className="h-12 w-full rounded-lg text-[0.9375rem] font-semibold disabled:opacity-75"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t("common.updating")}
+                          </>
+                        ) : (
+                          t("resetPassword.button")
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+
+                  <button type="button" onClick={onCancelRecovery} className={authBackLinkClass}>
+                    {t("forgotPassword.backToSignIn")}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
