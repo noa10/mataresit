@@ -4,15 +4,16 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
+import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, CreditCard, DollarSign, Maximize2, Minimize2, Plus, Minus, Receipt, RotateCw, RotateCcw, ZoomIn, ZoomOut, History, Loader2, AlertTriangle, BarChart2, Check, CheckCircle, Sparkles, Download, Trash2, Eye, Layers, Settings, Bug, RefreshCw, ChevronDown, Calculator, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ReceiptWithDetails, ReceiptLineItem, ProcessingLog, AISuggestions, ProcessingStatus, ConfidenceScore } from "@/types/receipt";
@@ -335,6 +336,8 @@ const toDisplayDate = (value: string): string => {
   return parsed ? format(parsed, DISPLAY_DATE_FORMAT) : "";
 };
 
+const MAG_ZOOM = 3;
+
 export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
   // Get user settings for processing method
   const { settings } = useSettings();
@@ -366,19 +369,22 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     panelTop: number;
   } | null>(null);
   const zoomHostRef = useRef<HTMLDivElement>(null);
-  const MAG_ZOOM = 3;
+  const transformRef = useRef<ReactZoomPanPinchRef>(null);
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const lensFrameRef = useRef<number | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    const host = zoomHostRef.current;
-    if (!host || isGestureZoom) return;
+  const clearLens = useCallback(() => setLens(null), []);
 
-    const clear = () => setLens(null);
+  const computeLens = useCallback(
+    (clientX: number, clientY: number) => {
+      const host = zoomHostRef.current;
+      if (!host) return;
 
-    const computeLens = (event: MouseEvent) => {
       // Query per event — OptimizedImage can swap the img element when the
       // real image loads, which orphans any reference captured at mount.
       const img = host.querySelector<HTMLImageElement>(".receipt-image");
-      if (!img || !img.naturalWidth) return clear();
+      if (!img || !img.naturalWidth) return clearLens();
       const rect = img.getBoundingClientRect();
       const hostRect = host.getBoundingClientRect();
       const natW = img.naturalWidth;
@@ -390,9 +396,9 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const offY = rect.top + (rect.height - dispH) / 2;
 
       // Only magnify while the cursor is over the drawn image itself.
-      const relX = event.clientX - offX;
-      const relY = event.clientY - offY;
-      if (relX < 0 || relY < 0 || relX > dispW || relY > dispH) return clear();
+      const relX = clientX - offX;
+      const relY = clientY - offY;
+      if (relX < 0 || relY < 0 || relX > dispW || relY > dispH) return clearLens();
 
       const clamp = (v: number, min: number, max: number) =>
         Math.min(Math.max(v, min), max);
@@ -429,7 +435,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       const panelLeft = preferRight
         ? Math.min(rect.right + 12, vw - panelW - 8)
         : Math.max(rect.left - panelW - 12, 8);
-      const panelTop = clamp(event.clientY - panelH / 2, 8, vh - panelH - 8);
+      const panelTop = clamp(clientY - panelH / 2, 8, vh - panelH - 8);
 
       setLens({
         x: relX,
@@ -445,21 +451,57 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         panelLeft,
         panelTop,
       });
-    };
+    },
+    [clearLens]
+  );
 
-    const onMouseMove = (event: MouseEvent) => {
-      computeLens(event);
-    };
+  const handleMagnifierMove = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (isGestureZoom || isImageZoomed) {
+        clearLens();
+        return;
+      }
+      lastPointerRef.current = { x: event.clientX, y: event.clientY };
+      if (lensFrameRef.current !== null) return;
+      lensFrameRef.current = window.requestAnimationFrame(() => {
+        lensFrameRef.current = null;
+        const point = lastPointerRef.current;
+        if (point) computeLens(point.x, point.y);
+      });
+    },
+    [clearLens, computeLens, isGestureZoom, isImageZoomed]
+  );
 
-    host.style.cursor = "crosshair";
-    host.addEventListener("mousemove", onMouseMove);
-    host.addEventListener("mouseleave", clear);
-    return () => {
-      host.style.cursor = "";
-      host.removeEventListener("mousemove", onMouseMove);
-      host.removeEventListener("mouseleave", clear);
-    };
-  }, [isImageFullscreen, isGestureZoom]);
+  const handleMagnifierLeave = useCallback(() => {
+    lastPointerRef.current = null;
+    if (lensFrameRef.current !== null) {
+      window.cancelAnimationFrame(lensFrameRef.current);
+      lensFrameRef.current = null;
+    }
+    clearLens();
+  }, [clearLens]);
+
+  useEffect(
+    () => () => {
+      if (lensFrameRef.current !== null) {
+        window.cancelAnimationFrame(lensFrameRef.current);
+      }
+    },
+    []
+  );
+
+  const handleZoomIn = useCallback(() => {
+    void transformRef.current?.zoomIn(0.35, 200);
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    void transformRef.current?.zoomOut(0.35, 200);
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    void transformRef.current?.resetTransform(200);
+    clearLens();
+  }, [clearLens]);
 
   // Exit the receipt image fullscreen with Escape
   useEffect(() => {
@@ -1656,15 +1698,67 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             {receipt.image_url && !imageError ? (
               <div
                 ref={zoomHostRef}
-                className={
+                role="group"
+                tabIndex={0}
+                aria-label="Receipt image — press + or - to zoom, 0 to reset"
+                onMouseMove={handleMagnifierMove}
+                onMouseLeave={handleMagnifierLeave}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "+" || event.key === "=") {
+                    event.preventDefault();
+                    handleZoomIn();
+                  } else if (event.key === "-" || event.key === "_") {
+                    event.preventDefault();
+                    handleZoomOut();
+                  } else if (event.key === "0") {
+                    event.preventDefault();
+                    handleZoomReset();
+                  }
+                }}
+                className={`${
                   isImageFullscreen
                     ? "fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 md:p-8"
                     : "relative flex h-full w-full items-center justify-center"
-                }
+                } cursor-crosshair outline-none focus-visible:ring-2 focus-visible:ring-primary/60`}
               >
                 {/* Controls stay outside the transform surface so pinch/pan
                     never move the toolbar. */}
                 <div className="absolute right-2 top-2 z-20 flex flex-wrap gap-2">
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={handleZoomIn}
+                      title="Zoom in (+)"
+                      aria-label="Zoom in"
+                    >
+                      <ZoomIn size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={handleZoomOut}
+                      title="Zoom out (-)"
+                      aria-label="Zoom out"
+                    >
+                      <ZoomOut size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 bg-background/80 backdrop-blur-sm"
+                      onClick={handleZoomReset}
+                      title="Reset zoom (0)"
+                      aria-label="Reset zoom"
+                      disabled={!isImageZoomed}
+                    >
+                      <RotateCcw size={16} />
+                    </Button>
+                  </div>
+
                   <div className="flex gap-1">
                     <Button
                       variant="secondary"
@@ -1760,16 +1854,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   }
                 >
                   <TransformWrapper
+                    ref={transformRef}
                     key={`${receipt.id}-${receipt.image_url ?? "no-image"}`}
-                    disabled={!isGestureZoom}
+                    disabled={false}
                     initialScale={1}
                     minScale={1}
                     maxScale={4}
                     centerOnInit
                     limitToBounds
                     doubleClick={{ mode: "toggle", step: 0.7, animationTime: 200 }}
-                    wheel={{ disabled: true }}
-                    panning={{ velocityDisabled: true }}
+                    wheel={{ disabled: !isImageFullscreen, step: 0.2 }}
+                    panning={{ disabled: !isImageZoomed, velocityDisabled: true }}
+                    onTransform={(_ref, state) => setIsImageZoomed(state.scale > 1.01)}
                   >
                     {() => (
                       <TransformComponent
@@ -1850,7 +1946,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.6rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
                     {isGestureZoom
                       ? "Pinch or double-tap to zoom · drag to pan · Esc to exit"
-                      : "Hover to magnify · Esc to exit"}
+                      : "Scroll or use +/− to zoom · +/− keys · Esc to exit"}
                   </div>
                 ) : isGestureZoom ? (
                   <div className="pointer-events-none absolute bottom-2 left-2 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.55rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
@@ -1858,11 +1954,11 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                   </div>
                 ) : (
                   <div className="pointer-events-none absolute bottom-2 left-2 z-20 rounded-md bg-background/70 px-2 py-1 font-data text-[0.55rem] uppercase tracking-[0.08em] text-muted-foreground backdrop-blur-sm">
-                    Hover to magnify
+                    Hover to magnify · +/− to zoom
                   </div>
                 )}
 
-                {!isGestureZoom && lens && (
+                {!isGestureZoom && !isImageZoomed && lens && (
                   <>
                     <div
                       aria-hidden="true"
@@ -1877,7 +1973,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
                     {createPortal(
                       <div
                         aria-hidden="true"
-                        className="pointer-events-none z-[70] hidden overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl md:block"
+                        className="pointer-events-none z-[70] overflow-hidden rounded-md border border-ledger-line bg-white shadow-2xl"
                         style={{
                           position: "fixed",
                           left: lens.panelLeft,
