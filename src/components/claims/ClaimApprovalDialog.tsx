@@ -28,12 +28,12 @@ import { claimService } from '@/services/claimService';
 import {
   Claim,
   CLAIM_STATUS_COLORS,
-  getClaimStatusDisplayName,
 } from '@/types/claims';
 import { cn } from '@/lib/utils';
+import { formatCurrencySafe } from '@/utils/currency';
 import {
   CheckCircle,
-  DollarSign,
+  Banknote,
   User,
   FileText,
 } from 'lucide-react';
@@ -68,12 +68,8 @@ export function ClaimApprovalDialog({
     },
   });
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency: string) =>
+    formatCurrencySafe(amount, currency);
 
   const onSubmit = async (data: ApprovalFormData) => {
     if (!claim) return;
@@ -132,13 +128,13 @@ export function ClaimApprovalDialog({
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{claim.title}</h3>
               <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
-                {getClaimStatusDisplayName(claim.status)}
+                {t(`list.status.${claim.status}`)}
               </Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Banknote className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{t('approval.details.amount')}:</span>
                 <span className="font-semibold text-lg">
                   {formatCurrency(claim.amount, claim.currency)}

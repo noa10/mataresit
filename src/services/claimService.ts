@@ -22,7 +22,7 @@ export class ClaimService {
       _title: request.title,
       _description: request.description || null,
       _amount: request.amount,
-      _currency: request.currency || 'USD',
+      _currency: request.currency || 'MYR',
       _category: request.category || null,
       _priority: request.priority || 'medium',
       _attachments: JSON.stringify(request.attachments || []),

@@ -88,7 +88,7 @@ export function CreateClaimDialog({
       title: '',
       description: '',
       amount: 0,
-      currency: 'USD',
+      currency: 'MYR',
       category: '',
       priority: 'medium',
     },
@@ -297,10 +297,10 @@ export function CreateClaimDialog({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
+                                <SelectItem value="MYR">MYR</SelectItem>
                                 <SelectItem value="USD">USD</SelectItem>
                                 <SelectItem value="EUR">EUR</SelectItem>
                                 <SelectItem value="GBP">GBP</SelectItem>
-                                <SelectItem value="MYR">MYR</SelectItem>
                                 <SelectItem value="SGD">SGD</SelectItem>
                               </SelectContent>
                             </Select>

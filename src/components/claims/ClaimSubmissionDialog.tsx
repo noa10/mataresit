@@ -16,13 +16,12 @@ import {
   Claim,
   CLAIM_STATUS_COLORS,
   CLAIM_PRIORITY_COLORS,
-  getClaimStatusDisplayName,
-  getClaimPriorityDisplayName,
 } from '@/types/claims';
 import { cn } from '@/lib/utils';
+import { formatCurrencySafe } from '@/utils/currency';
 import {
   Send,
-  DollarSign,
+  Banknote,
   User,
   Calendar,
   AlertCircle,
@@ -44,17 +43,14 @@ export function ClaimSubmissionDialog({
 }: ClaimSubmissionDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { t } = useClaimsTranslation();
+  const { t, language } = useClaimsTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency: string) =>
+    formatCurrencySafe(amount, currency);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(dateLocale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -119,17 +115,17 @@ export function ClaimSubmissionDialog({
               <h3 className="font-semibold text-lg text-ledger-ink">{claim.title}</h3>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
-                  {getClaimStatusDisplayName(claim.status)}
+                  {t(`list.status.${claim.status}`)}
                 </Badge>
                 <Badge variant="outline" className={cn(CLAIM_PRIORITY_COLORS[claim.priority])}>
-                  {getClaimPriorityDisplayName(claim.priority)}
+                  {t(`create.priority.${claim.priority}`)}
                 </Badge>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <Banknote className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                 <span className="font-medium text-gray-900 dark:text-gray-100">{t('submission.details.amount')}:</span>
                 <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                   {formatCurrency(claim.amount, claim.currency)}
