@@ -122,6 +122,14 @@ export default function OverviewPage() {
           </Panel>
         ) : (
           <>
+            {summary?.truncated && (
+              <p
+                role="status"
+                className="mb-3 rounded-[8px] border border-ledger-amber/40 bg-ledger-amber-soft/40 px-3 py-2 text-xs text-ledger-ink-2"
+              >
+                {t("workspace.overview.truncated")}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <KpiCard
                 label={t("workspace.overview.kpi.spend")}
@@ -194,10 +202,10 @@ export default function OverviewPage() {
                           onClick={() => setSelectedReceiptId(receipt.id)}
                           className="flex w-full items-center gap-3 border-t border-ledger-line px-5 py-3.5 text-left transition-colors first:border-t-0 hover:bg-ledger-surface-2"
                         >
-                          <MonogramTile name={receipt.merchant} />
+                          <MonogramTile name={receipt.merchant || t("workspace.detail.unknownMerchant")} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[0.95rem] font-medium text-ledger-ink">
-                              {receipt.merchant}
+                              {receipt.merchant || t("workspace.detail.unknownMerchant")}
                             </span>
                             <ConfidenceBar
                               value={receipt.confidence}

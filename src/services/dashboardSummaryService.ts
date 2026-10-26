@@ -50,6 +50,8 @@ export interface DashboardSummary {
   categories: WorkspaceCategoryTotal[];
   recent: WorkspaceReceiptSummary[];
   reviewPreview: WorkspaceReceiptSummary[];
+  /** True when the period has more receipts than MAX_ROWS; totals are partial. */
+  truncated: boolean;
 }
 
 export interface DashboardSummaryRow {
@@ -99,16 +101,16 @@ const toNumber = (value: number | string | null | undefined): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const resolveCategoryName = (row: DashboardSummaryRow): string => {
+const resolveCategoryName = (row: DashboardSummaryRow): string | null => {
   const relation = Array.isArray(row.custom_categories)
     ? row.custom_categories[0]
     : row.custom_categories;
-  return relation?.name?.trim() || row.predicted_category?.trim() || "Uncategorized";
+  return relation?.name?.trim() || row.predicted_category?.trim() || null;
 };
 
 const toReceiptSummary = (row: DashboardSummaryRow): WorkspaceReceiptSummary => ({
   id: row.id,
-  merchant: row.merchant?.trim() || "Unknown merchant",
+  merchant: row.merchant?.trim() || "",
   date: row.date,
   total: toNumber(row.total),
   currency: row.currency?.toUpperCase() || "MYR",
@@ -127,14 +129,15 @@ const fetchSummaryRows = async (
   params: DashboardSummaryParams,
   fromDate: string,
   toDate: string
-): Promise<DashboardSummaryRow[]> => {
+): Promise<{ rows: DashboardSummaryRow[]; truncated: boolean }> => {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
 
   const userId = authData.user?.id;
-  if (!userId) return [];
+  if (!userId) return { rows: [], truncated: false };
 
   const rows: DashboardSummaryRow[] = [];
+  let truncated = false;
 
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
     let query = supabase
@@ -144,6 +147,7 @@ const fetchSummaryRows = async (
       .lte("date", toDate)
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
     if (params.currentTeam?.id) {
@@ -162,9 +166,10 @@ const fetchSummaryRows = async (
     rows.push(...page);
 
     if (page.length < PAGE_SIZE) break;
+    if (offset + PAGE_SIZE >= MAX_ROWS) truncated = true;
   }
 
-  return rows;
+  return { rows, truncated };
 };
 
 export const getMonthRange = (month: Date = new Date()) => ({
@@ -179,7 +184,8 @@ export const getMonthRange = (month: Date = new Date()) => ({
 export const buildDashboardSummary = (
   rows: DashboardSummaryRow[],
   fromDate: string,
-  toDate: string
+  toDate: string,
+  truncated = false
 ): DashboardSummary => {
   const totalsByCurrency = new Map<string, WorkspaceCurrencyTotal>();
   const categoryTotals = new Map<string, number>();
@@ -212,7 +218,7 @@ export const buildDashboardSummary = (
   for (const row of rows) {
     const currency = row.currency?.toUpperCase() || "MYR";
     if (currency !== primaryCurrency) continue;
-    const name = resolveCategoryName(row);
+    const name = resolveCategoryName(row) ?? "";
     categoryTotals.set(name, (categoryTotals.get(name) ?? 0) + toNumber(row.total));
   }
 
@@ -251,6 +257,7 @@ export const buildDashboardSummary = (
     categories,
     recent,
     reviewPreview,
+    truncated,
   };
 };
 
@@ -261,8 +268,8 @@ export const fetchDashboardSummary = async (
   const fromDate = params.fromDate ?? getMonthRange(range).fromDate;
   const toDate = params.toDate ?? getMonthRange(range).toDate;
 
-  const rows = await fetchSummaryRows(params, fromDate, toDate);
-  return buildDashboardSummary(rows, fromDate, toDate);
+  const { rows, truncated } = await fetchSummaryRows(params, fromDate, toDate);
+  return buildDashboardSummary(rows, fromDate, toDate, truncated);
 };
 
 export interface WorkspaceReceiptCounts {

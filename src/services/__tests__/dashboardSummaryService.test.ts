@@ -84,14 +84,26 @@ describe("buildDashboardSummary", () => {
     ]);
   });
 
-  it("falls back to Uncategorized when no category is present", () => {
+  it("leaves an empty category name for the UI to localize", () => {
     const summary = buildDashboardSummary(
       [makeRow({ predicted_category: null, custom_categories: null })],
       "2026-10-01",
       "2026-10-31"
     );
 
-    expect(summary.categories[0]).toEqual({ name: "Uncategorized", total: 25 });
+    expect(summary.categories[0]).toEqual({ name: "", total: 25 });
+  });
+
+  it("carries the truncation flag and leaves missing merchants empty", () => {
+    const summary = buildDashboardSummary(
+      [makeRow({ merchant: null })],
+      "2026-10-01",
+      "2026-10-31",
+      true
+    );
+
+    expect(summary.truncated).toBe(true);
+    expect(summary.recent[0].merchant).toBe("");
   });
 
   it("sorts the review preview by confidence, unknown scores last", () => {
