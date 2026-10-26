@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
@@ -72,20 +72,11 @@ export default function ReviewQueuePage() {
     enabled: Boolean(user),
   });
 
-  const receipts = useMemo(() => {
-    const rows = [...(data?.receipts ?? [])];
-    return rows.sort((a, b) => {
-      const aConfidence = getReceiptConfidence(a);
-      const bConfidence = getReceiptConfidence(b);
-      if (aConfidence === null && bConfidence === null) {
-        return (a.date ?? "").localeCompare(b.date ?? "");
-      }
-      if (aConfidence === null) return 1;
-      if (bConfidence === null) return -1;
-      if (aConfidence !== bConfidence) return aConfidence - bConfidence;
-      return (a.date ?? "").localeCompare(b.date ?? "");
-    });
-  }, [data]);
+  // Oldest-first is the queue's contract: the service sorts by date ascending,
+  // so do not re-sort the page by confidence (that would hide newer receipts).
+  const receipts = data?.receipts ?? [];
+  const totalPending = data?.total ?? receipts.length;
+  const loadError = data?.error ?? null;
 
   const approveMutation = useMutation({
     mutationFn: async (receipt: Receipt) => {
@@ -152,9 +143,9 @@ export default function ReviewQueuePage() {
         <h2 className="text-[1rem] font-semibold text-ledger-ink">
           {t("workspace.review.waitingOnYou")}
         </h2>
-        {receipts.length > 0 && (
+        {totalPending > 0 && (
           <span className="font-data text-[0.6875rem] tracking-[0.04em] text-ledger-muted">
-            {t("workspace.review.count", { count: receipts.length })}
+            {t("workspace.review.count", { count: totalPending })}
           </span>
         )}
       </div>
@@ -168,7 +159,7 @@ export default function ReviewQueuePage() {
               aria-hidden="true"
             />
           ))
-        ) : isError ? (
+        ) : isError || loadError ? (
           <EmptyState
             title={t("workspace.review.loadErrorTitle")}
             description={t("workspace.review.loadErrorDescription")}
