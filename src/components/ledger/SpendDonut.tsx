@@ -116,7 +116,7 @@ export function SpendDonut({ data, currency, total, className }: SpendDonutProps
                 className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
                 style={{ backgroundColor: CHART_COLORS[index] }}
               />
-              <span className="min-w-0 truncate text-ledger-ink-2">{entry.name}</span>
+              <span className="min-w-0 truncate text-ledger-ink-2">{entry.name || t("workspace.detail.uncategorized")}</span>
               <span className="font-data text-xs tabular-nums text-ledger-ink">
                 {formatCurrencySafe(entry.total, currency)}
               </span>

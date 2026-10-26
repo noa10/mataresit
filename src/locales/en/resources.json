@@ -526,6 +526,13 @@
       "edge": "All functions are responsive.",
       "ai": "Connection successful."
     },
+    "serviceNames": {
+      "database": "Supabase Database",
+      "auth": "Supabase Auth",
+      "storage": "Supabase Storage",
+      "edge": "Edge Functions",
+      "ai": "Google Gemini API"
+    },
     "history": {
       "title": "Uptime history",
       "unavailable": "Historical uptime and incident records are not collected yet. This page reports live service checks only."

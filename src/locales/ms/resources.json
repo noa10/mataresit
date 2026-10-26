@@ -6,7 +6,7 @@
     },
     "api": {
       "title": "Rujukan API — Mataresit",
-      "description": "API REST Mataresit: 13 endpoint produksi untuk resit, carian, pasukan, tuntutan dan analitik perbelanjaan. Berkunci, JSON, terhad kadar."
+      "description": "API REST Mataresit: 13 endpoint produksi untuk resit, carian, pasukan, tuntutan dan analitik perbelanjaan. Berkunci, JSON, dengan had kadar."
     },
     "help": {
       "title": "Pusat bantuan — Mataresit",
@@ -525,6 +525,13 @@
       "storage": "Bucket boleh diakses.",
       "edge": "Semua fungsi responsif.",
       "ai": "Sambungan berjaya."
+    },
+    "serviceNames": {
+      "database": "Pangkalan Data Supabase",
+      "auth": "Pengesahan Supabase",
+      "storage": "Storan Supabase",
+      "edge": "Fungsi Edge",
+      "ai": "API Google Gemini"
     },
     "history": {
       "title": "Sejarah masa operasi",

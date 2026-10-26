@@ -34,7 +34,7 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
 
     if (!post) {
       return {
-        title: title || 'Blog post not found — Mataresit',
+        title: title || `${tResources('blogPost.notFoundTitle')} — Mataresit`,
         description: description || defaultDescription,
         url: `${siteUrl}/blog`,
         image: defaultImage,

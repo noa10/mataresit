@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { useDashboardTranslation } from "@/contexts/LanguageContext";
 import { formatCurrencySafe } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,8 @@ export function ReceiptPaper({
   payment,
   className,
 }: ReceiptPaperProps) {
+  const { t } = useDashboardTranslation();
+
   return (
     <article
       className={cn(
@@ -52,7 +55,7 @@ export function ReceiptPaper({
     >
       <header className="text-center">
         <p className="font-data text-[0.58rem] uppercase tracking-[0.2em] text-[#7A7F75]">
-          Receipt
+          {t("workspace.detail.receipt")}
         </p>
         <h3 className="mt-2 font-display text-[1.7rem] leading-tight">{merchant}</h3>
         {location && <p className="mt-1 text-xs text-[#6B7168]">{location}</p>}
@@ -93,24 +96,24 @@ export function ReceiptPaper({
       <dl className="space-y-1.5 font-data text-xs">
         {subtotal !== null && subtotal !== undefined && (
           <div className="flex items-center justify-between text-[#4C534B]">
-            <dt>Subtotal</dt>
+            <dt>{t("workspace.detail.subtotal")}</dt>
             <dd className="tabular-nums">{formatCurrencySafe(subtotal, currency)}</dd>
           </div>
         )}
         {tax !== null && tax !== undefined && (
           <div className="flex items-center justify-between text-[#4C534B]">
-            <dt>Tax</dt>
+            <dt>{t("workspace.detail.tax")}</dt>
             <dd className="tabular-nums">{formatCurrencySafe(tax, currency)}</dd>
           </div>
         )}
         <div className="flex items-baseline justify-between pt-2 text-[0.95rem] font-medium text-[#121715]">
-          <dt className="font-sans text-sm">Total</dt>
+          <dt className="font-sans text-sm">{t("workspace.detail.total")}</dt>
           <dd className="tabular-nums">{formatCurrencySafe(total, currency)}</dd>
         </div>
       </dl>
 
       <p className="mt-6 text-center font-data text-[0.56rem] uppercase tracking-[0.2em] text-[#9AA096]">
-        Thank you
+        {t("workspace.detail.thankYou")}
       </p>
     </article>
   );

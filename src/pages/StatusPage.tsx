@@ -33,6 +33,14 @@ const serviceMessageKeys: Record<string, string> = {
   "Google Gemini API": "ai",
 };
 
+const serviceNameKeys: Record<string, string> = {
+  "Supabase Database": "database",
+  "Supabase Auth": "auth",
+  "Supabase Storage": "storage",
+  "Edge Functions": "edge",
+  "Google Gemini API": "ai",
+};
+
 function statusDot(status: ServiceStatus) {
   switch (status) {
     case "operational":
@@ -249,7 +257,9 @@ export default function StatusPage() {
                     )}
                   />
                   <span className="row-start-1 text-[0.9375rem] font-semibold leading-[1.4] text-ledger-on-panel">
-                    {service.name}
+                    {serviceNameKeys[service.name]
+                      ? copy(`status.serviceNames.${serviceNameKeys[service.name]}`)
+                      : service.name}
                   </span>
                   <span className="col-span-2 col-start-2 row-start-2 text-sm leading-[1.5] text-ledger-on-panel-muted min-[881px]:col-span-1 min-[881px]:col-start-3 min-[881px]:row-start-1">
                     {message}

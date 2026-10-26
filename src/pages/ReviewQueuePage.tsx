@@ -202,7 +202,7 @@ export default function ReviewQueuePage() {
                   <MonogramTile name={receipt.merchant} />
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate text-[0.98rem] font-medium text-ledger-ink">
-                      {receipt.merchant || "Unknown merchant"}
+                      {receipt.merchant || t("workspace.detail.unknownMerchant")}
                     </h2>
                     <p className="mt-0.5 truncate text-xs text-ledger-muted">
                       {formatReviewDate(receipt.date)}

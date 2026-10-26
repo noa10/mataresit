@@ -188,7 +188,7 @@ export default function ReceiptsPage() {
           : null);
       return {
         id: receipt.id,
-        merchant: receipt.merchant || t("workspace.detail.unknown"),
+        merchant: receipt.merchant || t("workspace.detail.unknownMerchant"),
         date: receipt.date,
         total: Number(receipt.total) || 0,
         currency: receipt.currency || "MYR",

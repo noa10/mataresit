@@ -34,6 +34,9 @@ export function ReceiptRow({
 }: ReceiptRowProps) {
   const { t } = useDashboardTranslation();
   const dateLabel = formatRowDate(receipt.date);
+  const merchantLabel = receipt.merchant || t("workspace.detail.unknownMerchant");
+  const categoryLabel = receipt.category || t("workspace.detail.uncategorized");
+
   const isReviewed = receipt.status === "reviewed";
   const statusLabel = (isReviewed
     ? t("workspace.status.approved")
@@ -75,13 +78,13 @@ export function ReceiptRow({
         </span>
       )}
       <span className="flex min-w-0 items-center gap-[11px]">
-        <MonogramTile name={receipt.merchant} />
+        <MonogramTile name={merchantLabel} />
         <span className="min-w-0">
           <span className="block truncate text-[0.875rem] font-semibold leading-[1.35] text-ledger-ink">
-            {receipt.merchant}
+            {merchantLabel}
           </span>
           <span className="block truncate text-xs leading-[1.35] text-ledger-muted">
-            {receipt.category}
+            {categoryLabel}
           </span>
         </span>
       </span>
