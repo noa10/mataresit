@@ -256,6 +256,7 @@ jobs:
     environment: Production
     outputs:
       tests-passed: ${{ steps.test-results.outputs.passed }}
+      integration-skipped: ${{ steps.integration-tests.outputs.skipped }}
 
     steps:
       - name: Checkout code
@@ -301,8 +302,11 @@ jobs:
       - name: Run unit tests
         id: unit-tests
         run: |
-          # `npm run <script> --dry-run` only prints the command and always exits
-          # 0, so it can never detect a missing script. Read package.json instead.
+          # `npm run <script> --dry-run` is not a dry run: npm forwards the flag
+          # to the script and executes it. The old guard therefore ran the whole
+          # suite, and a *failing* run (stderr discarded) sent control to the else
+          # branch, which logged "not configured, skipping" and wrote passed=true.
+          # Read package.json for a real presence check instead.
           if [[ -z "$(node -p "require('./package.json').scripts['test:unit'] || ''")" ]]; then
             echo "Unit tests not configured, skipping"
             echo "passed=true" >> "$GITHUB_OUTPUT"
@@ -316,7 +320,7 @@ jobs:
             echo "passed=true" >> "$GITHUB_OUTPUT"
           else
             echo "passed=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Unit tests failed — see the quality-reports artifact for details."
+            echo "::error::Unit tests failed — see the test-results artifact (unit-test-results.txt) for details."
           fi
         continue-on-error: true
 
@@ -331,8 +335,8 @@ jobs:
             echo "passed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # `--dry-run` only prints the command and always exits 0, so read the
-          # script from package.json instead.
+          # Same non-dry-run caveat as the unit-test step: the old guard executed
+          # the suite as its `if` condition. Check package.json for presence.
           if [[ -n "$(node -p "require('./package.json').scripts['test:integration'] || ''")" ]]; then
             npm run test:integration 2>&1 | tee integration-test-results.txt
             if [[ ${PIPESTATUS[0]} -eq 0 ]]; then
@@ -562,7 +566,20 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Check Results" >> $GITHUB_STEP_SUMMARY
           echo "- **Code Quality**: ${{ needs.code-quality.outputs.quality-passed == 'true' && '✅ Passed' || '⚠️ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tests**: ${{ needs.test.outputs.tests-passed == 'true' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+
+          # Surface a skipped integration run instead of a bare "Passed": on
+          # Dependabot/fork PRs the secrets are absent, so the unit suite is all
+          # that actually ran and the summary should say so.
+          TESTS_LABEL="❌ Failed"
+          if [[ "${{ needs.test.outputs.tests-passed }}" == "true" ]]; then
+            if [[ "${{ needs.test.outputs.integration-skipped }}" == "true" ]]; then
+              TESTS_LABEL="✅ Passed (integration skipped)"
+            else
+              TESTS_LABEL="✅ Passed"
+            fi
+          fi
+          echo "- **Tests**: $TESTS_LABEL" >> $GITHUB_STEP_SUMMARY
+
           echo "- **Build**: ${{ needs.build.outputs.build-success == 'true' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
