@@ -1,6 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { addDays, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
@@ -24,22 +23,15 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import Lucide icons
-import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, Eye, BarChart2, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Terminal, Download, CreditCard, TrendingUp, Receipt, BarChart2, Loader2 } from "lucide-react";
 
 // Import services and types
-import { fetchDailyExpenses, fetchExpensesByCategory, DailyExpenseData, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
+import { fetchExpensesByCategory, CategoryExpenseData, fetchReceiptDetailsForRange, ReceiptSummary } from '@/services/supabase/analysis';
 import { fetchUserPayers } from '@/services/paidByService';
 import { PaidBy } from '@/types/receipt';
 import { useTeam } from '@/contexts/TeamContext';
 import { PieChart, Pie, Cell, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, ReferenceLine, Area, BarChart, Bar, RadialBarChart, RadialBar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-
-// Import ReceiptViewer and related types/functions
-import ReceiptViewer from '@/components/ReceiptViewer';
-import { fetchReceiptById } from '@/services/receiptService';
-import { ReceiptWithDetails } from '@/types/receipt';
-
-import { supabase } from '@/integrations/supabase/client'; // Corrected supabase client import path
 
 // Import the new DailyReceiptBrowserModal
 import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
@@ -376,9 +368,10 @@ interface ExpenseChartProps {
   isLoading?: boolean;
   dateRange: DateRange | undefined;
   onDateRangeChange: (range: DateRange | undefined) => void;
+  showDatePicker?: boolean;
 }
 
-const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange, onDateRangeChange }) => {
+const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange, onDateRangeChange, showDatePicker = true }) => {
   const { t, language } = useDashboardTranslation();
   // Add state for chart type toggle
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
@@ -422,7 +415,6 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
   const totalExpenses = chartData.reduce((sum, day) => sum + day.amount, 0);
   const avgExpenses = totalExpenses / (chartData.length || 1);
   const maxExpenses = Math.max(...chartData.map(d => d.amount), 0);
-  const peakDay = chartData.find(d => d.amount === maxExpenses);
 
   // Custom tooltip to display more information
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -484,44 +476,44 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
         </div>
         {/* Date Range Picker and Chart Type Toggle */}
         <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <CalendarIcon className="w-4 h-4" />
-                <span className="text-xs hidden xs:inline">{formattedDateRange}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-3">
-                <Calendar
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={(range) => {
-                    console.log('Calendar onSelect called with:', range);
-                    console.log('Current dateRange:', dateRange);
-                    handleDateSelect(range);
-                  }}
-                  numberOfMonths={2}
-                  showOutsideDays={true}
-                />
-                {dateRange?.from && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-3 w-full"
-                    onClick={() => handleDateSelect(undefined)}
-                  >
-                    {t('analysisAdvanced.clearSelection')}
-                  </Button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+          {showDatePicker && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  <span className="text-xs hidden xs:inline">{formattedDateRange}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="p-3">
+                  <Calendar
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={(range) => {
+                      handleDateSelect(range);
+                    }}
+                    numberOfMonths={2}
+                    showOutsideDays={true}
+                  />
+                  {dateRange?.from && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => handleDateSelect(undefined)}
+                    >
+                      {t('analysisAdvanced.clearSelection')}
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -989,8 +981,6 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
     );
   }
 
-  const totalSpent = payerData.reduce((sum, p) => sum + p.total_spent, 0);
-
   // Build chart data with explicit color assignment for consistent legend
   const chartData = payerData.map((p, index) => ({
     ...p,
@@ -1050,13 +1040,24 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
   );
 };
 
-const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
+const AnalysisPage = ({
+  embedded = false,
+  teamId: teamIdProp,
+  initialRange,
+}: {
+  embedded?: boolean;
+  teamId?: string | null;
+  initialRange?: DateRange;
+}) => {
   const { t, language } = useDashboardTranslation();
   const queryClient = useQueryClient();
   const { currentTeam } = useTeam();
+  const resolvedTeamId = teamIdProp !== undefined ? teamIdProp : currentTeam?.id ?? null;
 
-  // State for date range picker
+  // State for date range picker. When embedded in the workspace analysis page,
+  // the parent range chips are the single source of truth.
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
+    if (initialRange?.from && initialRange?.to) return initialRange;
     const today = new Date();
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(today.getMonth() - 1);
@@ -1066,13 +1067,17 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   });
 
+  React.useEffect(() => {
+    if (!embedded || !initialRange?.from || !initialRange?.to) return;
+    setDate({ from: initialRange.from, to: initialRange.to });
+    // Compare by timestamp so a new object with the same range does not reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, initialRange?.from?.getTime(), initialRange?.to?.getTime()]);
+
   // Handle date change
   const handleDateChange = React.useCallback((newDate: DateRange | undefined) => {
     setDate(newDate);
   }, []);
-
-  // State for managing the active tab
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'details'
 
   // NEW STATE: For the DailyReceiptBrowserModal
   const [dailyReceiptBrowserData, setDailyReceiptBrowserData] = useState<{ date: string; receiptIds: string[] } | null>(null);
@@ -1087,8 +1092,8 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
     Error,
     EnhancedDailyExpenseData[] // Select transforms to this
   >({
-    queryKey: ['dailyExpenseDetails', startDateISO, endDateISO], // Updated queryKey
-    queryFn: () => fetchReceiptDetailsForRange(startDateISO, endDateISO), // Use the new fetch function
+    queryKey: ['dailyExpenseDetails', resolvedTeamId, startDateISO, endDateISO],
+    queryFn: () => fetchReceiptDetailsForRange(startDateISO, endDateISO, resolvedTeamId), // Use the new fetch function
     select: (receipts) => { // Apply the transformation logic
       const grouped = receipts.reduce((acc, receipt) => {
         // Ensure date is handled correctly (extract date part)
@@ -1124,12 +1129,10 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   // Fetch category breakdown data (updated to use new function)
   const { data: categoryData, isLoading: isLoadingCategories, error: categoriesError } = useQuery<CategoryExpenseData[], Error>({
-    queryKey: ['expensesByCategory', startDateISO, endDateISO],
-    queryFn: () => fetchExpensesByCategory(startDateISO, endDateISO),
+    queryKey: ['expensesByCategory', resolvedTeamId, startDateISO, endDateISO],
+    queryFn: () => fetchExpensesByCategory(startDateISO, endDateISO, resolvedTeamId),
     enabled: !!date,
   });
-
-  const totalCategoryExpenses = React.useMemo(() => categoryData?.reduce((sum, entry) => sum + entry.total_spent, 0) || 0, [categoryData]);
 
   // Fetch all user payers (uses RPC with proper permissions)
   const { data: allPayers = [], isSuccess: payersLoaded } = useQuery<PaidBy[]>({
@@ -1147,7 +1150,12 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
       return [];
     }
 
-    const rawReceipts = queryClient.getQueryData<any[]>(['dailyExpenseDetails', startDateISO, endDateISO]);
+    const rawReceipts = queryClient.getQueryData<any[]>([
+      'dailyExpenseDetails',
+      resolvedTeamId,
+      startDateISO,
+      endDateISO,
+    ]);
     if (!rawReceipts) return [];
 
     const payerMap = new Map<string, { total: number; count: number }>();
@@ -1182,7 +1190,7 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
     });
 
     return result.sort((a, b) => b.total_spent - a.total_spent);
-  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, startDateISO, endDateISO, t, language]);
+  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, resolvedTeamId, startDateISO, endDateISO, t, language]);
 
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
@@ -1300,6 +1308,7 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
                   isLoading={isLoadingDaily}
                   dateRange={date}
                   onDateRangeChange={handleDateChange}
+                  showDatePicker={!embedded}
                 />
               </div>
 

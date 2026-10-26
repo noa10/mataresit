@@ -521,7 +521,11 @@ export default function AnalysisPage() {
           {t("workspace.analysis.deepDive", { defaultValue: "Deep dive" })}
         </p>
         <div className="mt-3">
-          <AnalysisAdvancedView embedded />
+          <AnalysisAdvancedView
+            embedded
+            teamId={currentTeam?.id ?? null}
+            initialRange={{ from: rangeConfig.start, to: rangeConfig.end }}
+          />
         </div>
       </section>
     </div>
