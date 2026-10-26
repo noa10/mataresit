@@ -526,22 +526,9 @@
       "edge": "Semua fungsi responsif.",
       "ai": "Sambungan berjaya."
     },
-    "uptime": {
-      "title": "Masa operasi — 90 hari lepas",
-      "overall": "99.98% keseluruhan",
-      "daysAgo": "90 hari lalu",
-      "sixty": "60",
-      "thirty": "30",
-      "today": "hari ini",
-      "aria": "Bar masa operasi 90 hari: semua hari beroperasi kecuali satu hari terjejas pada awal Oktober"
-    },
-    "incidents": {
-      "title": "Sejarah insiden",
-      "resolved": "Selesai",
-      "date": "02 Okt 2026",
-      "incidentTitle": "Kependaman pemprosesan meningkat",
-      "incidentBody": "Permulaan sejuk fungsi edge memperlahankan pemprosesan resit selama kira-kira 41 minit (14:02–14:43 MYT). Resit dalam baris gilir selesai secara automatik; tiada data hilang.",
-      "none": "Tiada insiden lain dilaporkan dalam 90 hari lepas."
+    "history": {
+      "title": "Sejarah masa operasi",
+      "unavailable": "Rekod masa operasi dan insiden sejarah belum dikumpul. Halaman ini hanya melaporkan semakan perkhidmatan secara langsung."
     },
     "footnote": {
       "lead": "Mengalami sesuatu yang tidak dipaparkan di sini? Lawati",

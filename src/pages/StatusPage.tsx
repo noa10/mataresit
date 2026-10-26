@@ -163,15 +163,6 @@ export default function StatusPage() {
 
   const shownServices = services.length > 0 ? services : fallbackServices;
 
-  const uptimeDays = useMemo(
-    () =>
-      Array.from({ length: 90 }, (_, index) => ({
-        key: index,
-        degraded: index === 21,
-      })),
-    [],
-  );
-
   return (
     <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
       <Helmet>
@@ -276,62 +267,12 @@ export default function StatusPage() {
               })}
             </div>
 
-            <div className="mt-10">
-              <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-4">
-                <p className="font-data text-[0.6875rem] uppercase tracking-[0.14em] text-ledger-on-panel-muted">
-                  {copy("status.uptime.title")}
-                </p>
-                <p className="font-data text-[0.8125rem] text-[#9FE0BC]">
-                  {copy("status.uptime.overall")}
-                </p>
-              </div>
-              <div
-                role="img"
-                aria-label={copy("status.uptime.aria")}
-                className="grid h-[26px] gap-[1.5px] min-[881px]:h-[34px] min-[881px]:gap-0.5"
-                style={{ gridTemplateColumns: "repeat(90, minmax(0, 1fr))" }}
-              >
-                {uptimeDays.map((day) => (
-                  <i
-                    key={day.key}
-                    className={
-                      day.degraded
-                        ? "block rounded-[2px] bg-[#C08A3E]"
-                        : "block rounded-[2px] bg-[#3E9E6E]"
-                    }
-                  />
-                ))}
-              </div>
-              <div className="mt-2 flex justify-between font-data text-[0.625rem] text-ledger-on-panel-muted">
-                <span>{copy("status.uptime.daysAgo")}</span>
-                <span>{copy("status.uptime.sixty")}</span>
-                <span>{copy("status.uptime.thirty")}</span>
-                <span>{copy("status.uptime.today")}</span>
-              </div>
-            </div>
-
-            <div className="mt-11 border-t border-[rgba(241,242,238,0.12)] pt-[34px]">
-              <p className="mb-[18px] font-data text-[0.6875rem] uppercase tracking-[0.14em] text-ledger-on-panel-muted">
-                {copy("status.incidents.title")}
+            <div className="mt-10 border-t border-[rgba(241,242,238,0.12)] pt-[30px]">
+              <p className="font-data text-[0.6875rem] uppercase tracking-[0.14em] text-ledger-on-panel-muted">
+                {copy("status.history.title")}
               </p>
-              <div className="grid gap-[18px] border-b border-dashed border-[rgba(241,242,238,0.14)] py-3.5 min-[641px]:grid-cols-[96px_1fr]">
-                <span className="pt-0.5 font-data text-[0.6875rem] text-ledger-on-panel-muted">
-                  {copy("status.incidents.date")}
-                </span>
-                <div>
-                  <p className="flex flex-wrap items-center gap-2.5 text-[0.9375rem] font-semibold text-ledger-on-panel">
-                    {copy("status.incidents.incidentTitle")}
-                    <span className="rounded-full border border-[rgba(85,195,138,0.3)] px-2 py-[3px] font-data text-[0.5625rem] uppercase tracking-[0.1em] text-[#9FE0BC]">
-                      {copy("status.incidents.resolved")}
-                    </span>
-                  </p>
-                  <p className="mt-[5px] text-sm leading-[1.6] text-ledger-on-panel-muted">
-                    {copy("status.incidents.incidentBody")}
-                  </p>
-                </div>
-              </div>
-              <p className="py-2 font-data text-xs text-ledger-on-panel-muted">
-                {copy("status.incidents.none")}
+              <p className="mt-2 max-w-[70ch] text-sm leading-[1.6] text-ledger-on-panel-muted">
+                {copy("status.history.unavailable")}
               </p>
             </div>
 

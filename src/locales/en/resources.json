@@ -526,22 +526,9 @@
       "edge": "All functions are responsive.",
       "ai": "Connection successful."
     },
-    "uptime": {
-      "title": "Uptime — last 90 days",
-      "overall": "99.98% overall",
-      "daysAgo": "90 days ago",
-      "sixty": "60",
-      "thirty": "30",
-      "today": "today",
-      "aria": "90-day uptime bar: all days operational except one degraded day in early October"
-    },
-    "incidents": {
-      "title": "Incident history",
-      "resolved": "Resolved",
-      "date": "02 Oct 2026",
-      "incidentTitle": "Elevated processing latency",
-      "incidentBody": "Edge function cold starts slowed receipt processing for roughly 41 minutes (14:02–14:43 MYT). Queued receipts completed automatically; no data was lost.",
-      "none": "No other incidents reported in the last 90 days."
+    "history": {
+      "title": "Uptime history",
+      "unavailable": "Historical uptime and incident records are not collected yet. This page reports live service checks only."
     },
     "footnote": {
       "lead": "Experiencing something that isn't showing here? Visit the",
