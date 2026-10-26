@@ -83,7 +83,7 @@ export function AppHeader() {
   const workspaceMark = (currentTeam?.name || displayName || "M").trim().charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-ledger-line bg-ledger-paper/95 backdrop-blur supports-[backdrop-filter]:bg-ledger-paper/85">
+    <header className="border-b border-ledger-line bg-ledger-paper/95 backdrop-blur supports-[backdrop-filter]:bg-ledger-paper/85">
       <div className="flex min-h-16 items-center gap-3 px-4 py-2.5 min-[980px]:px-7">
         <Link
           to="/"

@@ -19,8 +19,10 @@ export function AppLayout() {
       <WorkspaceSidebar />
 
       <div className="flex min-h-screen min-w-0 flex-col">
-        <AppHeader />
-        <WorkspaceTabs />
+        <div className="sticky top-0 z-30">
+          <AppHeader />
+          <WorkspaceTabs />
+        </div>
         <main className="flex-1 overflow-x-hidden bg-ledger-paper">
           <Outlet />
         </main>
