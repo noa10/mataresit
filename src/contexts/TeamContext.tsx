@@ -366,11 +366,6 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     try {
       await teamService.removeTeamMember(teamId, userId);
       dispatch({ type: 'REMOVE_TEAM_MEMBER', payload: userId });
-      
-      toast({
-        title: 'Success',
-        description: 'Team member removed successfully',
-      });
     } catch (error: any) {
       toast({
         title: 'Error',
