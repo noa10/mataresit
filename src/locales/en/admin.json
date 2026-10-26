@@ -210,5 +210,22 @@
       "businessRegistration": "Malaysian Business Registration",
       "taxCompliance": "GST/SST Compliance"
     }
+  },
+  "settingsPage": {
+    "title": "Admin Settings",
+    "description": "Manage AI processing, model providers, embeddings and platform integrations.",
+    "aiProcessing": "AI Processing",
+    "aiProcessingDescription": "Choose the AI model and batch behaviour used to process receipts.",
+    "batchProcessing": "Batch processing",
+    "resetDefaults": "Reset to defaults",
+    "resetTitle": "Reset processing settings?",
+    "resetDescription": "This will restore the default processing and batch upload settings.",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "resetToast": "Processing settings reset.",
+    "embeddings": "Embedding Management",
+    "embeddingsDescription": "Generate and manage vector embeddings for semantic search functionality. Embeddings enable intelligent search across receipts and line items.",
+    "stripe": "Stripe Integration Testing",
+    "stripeDescription": "Test and validate Stripe payment integration functionality including checkout sessions and webhooks."
   }
 }

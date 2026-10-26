@@ -210,5 +210,22 @@
       "businessRegistration": "Pendaftaran Perniagaan Malaysia",
       "taxCompliance": "Pematuhan GST/SST"
     }
+  },
+  "settingsPage": {
+    "title": "Tetapan Pentadbir",
+    "description": "Urus pemprosesan AI, penyedia model, embedding dan integrasi platform.",
+    "aiProcessing": "Pemprosesan AI",
+    "aiProcessingDescription": "Pilih model AI dan tingkah laku kelompok yang digunakan untuk memproses resit.",
+    "batchProcessing": "Pemprosesan kelompok",
+    "resetDefaults": "Set semula ke lalai",
+    "resetTitle": "Set semula tetapan pemprosesan?",
+    "resetDescription": "Ini akan memulihkan tetapan pemprosesan dan muat naik kelompok lalai.",
+    "cancel": "Batal",
+    "continue": "Teruskan",
+    "resetToast": "Tetapan pemprosesan diset semula.",
+    "embeddings": "Pengurusan Embedding",
+    "embeddingsDescription": "Jana dan urus embedding vektor untuk fungsi carian semantik. Embedding membolehkan carian pintar merentas resit dan item baris.",
+    "stripe": "Ujian Integrasi Stripe",
+    "stripeDescription": "Uji dan sahkan fungsi integrasi pembayaran Stripe termasuk sesi pembayaran dan webhook."
   }
 }
