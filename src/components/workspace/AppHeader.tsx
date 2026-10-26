@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   CircleHelp,
   LogOut,
   Moon,
+  Plus,
   Settings,
   ShieldCheck,
   Sun,
@@ -16,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +35,7 @@ import {
   useDashboardTranslation,
   useLanguage,
   useNavigationTranslation,
+  useTeamTranslation,
 } from "@/contexts/LanguageContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -66,6 +69,8 @@ export function AppHeader() {
   const { t: tNav } = useNavigationTranslation();
   const { t: tCommon } = useCommonTranslation();
   const { t: tDash } = useDashboardTranslation();
+  const { t: tTeam } = useTeamTranslation();
+  const [createTeamOpen, setCreateTeamOpen] = useState(false);
 
   const avatarUrl = user ? getAvatarUrl(user) : null;
   const userInitials = user ? getUserInitials(user) : "";
@@ -146,6 +151,14 @@ export function AppHeader() {
                 ))}
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => setCreateTeamOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              {tTeam("actions.createTeam")}
+            </DropdownMenuItem>
             {currentTeamRole && (
               <>
                 <DropdownMenuSeparator />
@@ -260,6 +273,8 @@ export function AppHeader() {
           </DropdownMenu>
         </div>
       </div>
+
+      <CreateTeamDialog open={createTeamOpen} onOpenChange={setCreateTeamOpen} />
     </header>
   );
 }
