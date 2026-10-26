@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
 import { UnifiedSearchResultsProps, UnifiedSearchResult } from '@/types/unified-search';
 import { ResultCard } from './ResultCard';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 export function UnifiedSearchResults({
   results,
@@ -20,6 +21,7 @@ export function UnifiedSearchResults({
   totalResults,
   className
 }: UnifiedSearchResultsProps) {
+  const { t } = useCommonTranslation();
 
   // Group results by the specified criteria
   const groupedResults = useMemo(() => {
@@ -29,9 +31,18 @@ export function UnifiedSearchResults({
       case 'date':
         return groupResultsByDate(results);
       default:
-        return { 'All Results': results };
+        return { all: results };
     }
   }, [results, groupBy]);
+
+  const getGroupLabel = (groupName: string) => {
+    if (groupBy === 'date') {
+      return t(`unifiedSearch.results.${groupName}`, { defaultValue: groupName });
+    }
+    return t(`unifiedSearch.results.sourceNames.${groupName}`, {
+      defaultValue: groupName,
+    });
+  };
 
   // Loading skeleton
   if (isLoading && results.length === 0) {
@@ -69,20 +80,19 @@ export function UnifiedSearchResults({
       <div className={cn("text-center py-12", className)}>
         <div className="max-w-md mx-auto space-y-4">
           <div className="text-6xl">🔍</div>
-          <h3 className="text-lg font-semibold">No results found</h3>
+          <h3 className="text-lg font-semibold">{t('unifiedSearch.results.noResults')}</h3>
           <p className="text-muted-foreground">
-            {searchQuery 
-              ? `No results found for "${searchQuery}". Try adjusting your search terms or filters.`
-              : 'Try entering a search query to find your data.'
-            }
+            {searchQuery
+              ? t('unifiedSearch.results.noResultsFor', { query: searchQuery })
+              : t('unifiedSearch.results.noResultsHint')}
           </p>
           <div className="text-sm text-muted-foreground space-y-1">
-            <p>Suggestions:</p>
+            <p>{t('unifiedSearch.results.suggestions')}</p>
             <ul className="list-disc text-left pl-6 space-y-1">
-              <li>Check your spelling</li>
-              <li>Try different keywords</li>
-              <li>Use broader search terms</li>
-              <li>Clear some filters</li>
+              <li>{t('unifiedSearch.results.checkSpelling')}</li>
+              <li>{t('unifiedSearch.results.differentKeywords')}</li>
+              <li>{t('unifiedSearch.results.broaderTerms')}</li>
+              <li>{t('unifiedSearch.results.clearFilters')}</li>
             </ul>
           </div>
         </div>
@@ -96,26 +106,28 @@ export function UnifiedSearchResults({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
-            Found {totalResults.toLocaleString()} result{totalResults !== 1 ? 's' : ''}
-            {searchQuery && ` for "${searchQuery}"`}
+            {t('unifiedSearch.found', { count: totalResults })}
+            {searchQuery && ` ${t('unifiedSearch.results.forQuery', { query: searchQuery })}`}
           </p>
           {Object.keys(groupedResults).length > 1 && (
             <p className="text-xs text-muted-foreground">
-              Across {Object.keys(groupedResults).length} source{Object.keys(groupedResults).length !== 1 ? 's' : ''}
+              {t('unifiedSearch.results.acrossSources', {
+                count: Object.keys(groupedResults).length,
+              })}
             </p>
           )}
         </div>
         
         <div className="flex items-center gap-2">
-          <Label htmlFor="groupBy" className="text-sm">Group by:</Label>
+          <Label htmlFor="groupBy" className="text-sm">{t('unifiedSearch.results.groupBy')}</Label>
           <Select value={groupBy} onValueChange={(value) => onResultAction('change_grouping', { groupBy: value } as any)}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="relevance">Relevance</SelectItem>
-              <SelectItem value="source">Source</SelectItem>
-              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="relevance">{t('unifiedSearch.results.relevance')}</SelectItem>
+              <SelectItem value="source">{t('unifiedSearch.results.source')}</SelectItem>
+              <SelectItem value="date">{t('unifiedSearch.results.date')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -126,7 +138,7 @@ export function UnifiedSearchResults({
         <div key={groupName} className="space-y-4">
           {groupBy !== 'relevance' && (
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">{formatGroupName(groupName)}</h3>
+              <h3 className="text-lg font-semibold">{getGroupLabel(groupName)}</h3>
               <Badge variant="secondary">{groupResults.length}</Badge>
             </div>
           )}
@@ -155,10 +167,10 @@ export function UnifiedSearchResults({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading more...
+                {t('unifiedSearch.results.loadingMore')}
               </>
             ) : (
-              'Load More Results'
+              t('unifiedSearch.results.loadMore')
             )}
           </Button>
         </div>
@@ -215,15 +227,15 @@ function groupResultsByDate(results: UnifiedSearchResult[]): Record<string, Unif
 
     let groupKey: string;
     if (date.toDateString() === today.toDateString()) {
-      groupKey = 'Today';
+      groupKey = 'today';
     } else if (date.toDateString() === yesterday.toDateString()) {
-      groupKey = 'Yesterday';
+      groupKey = 'yesterday';
     } else if (date >= lastWeek) {
-      groupKey = 'This Week';
+      groupKey = 'thisWeek';
     } else if (date >= lastMonth) {
-      groupKey = 'This Month';
+      groupKey = 'thisMonth';
     } else {
-      groupKey = 'Older';
+      groupKey = 'older';
     }
 
     if (!groups[groupKey]) {
@@ -234,7 +246,7 @@ function groupResultsByDate(results: UnifiedSearchResult[]): Record<string, Unif
 
   // Sort groups by recency
   const sortedGroups: Record<string, UnifiedSearchResult[]> = {};
-  const dateOrder = ['Today', 'Yesterday', 'This Week', 'This Month', 'Older'];
+  const dateOrder = ['today', 'yesterday', 'thisWeek', 'thisMonth', 'older'];
   
   dateOrder.forEach(period => {
     if (groups[period]) {
@@ -243,18 +255,4 @@ function groupResultsByDate(results: UnifiedSearchResult[]): Record<string, Unif
   });
 
   return sortedGroups;
-}
-
-// Helper function to format group names
-function formatGroupName(groupName: string): string {
-  const formatMap: Record<string, string> = {
-    'receipts': 'Receipts',
-    'claims': 'Claims',
-    'team_members': 'Team Members',
-    'custom_categories': 'Categories',
-    'business_directory': 'Business Directory',
-    'conversations': 'Conversations'
-  };
-
-  return formatMap[groupName] || groupName;
 }

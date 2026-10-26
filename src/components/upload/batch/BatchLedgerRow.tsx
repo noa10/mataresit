@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { ReceiptUpload } from "@/types/receipt";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import {
   fileKind,
   formatAmount,
@@ -45,33 +46,39 @@ export function BatchLedgerRow({
   onRetry,
   onView,
 }: BatchLedgerRowProps) {
+  const { t, language } = useReceiptsTranslation();
   const reduceMotion = useReducedMotion();
   const state = rowState(upload);
-  const statusLabel = rowStateLabel(upload);
+  const statusLabel = rowStateLabel(upload, t);
   const kind = fileKind(upload.file.type);
   const size = formatFileSize(upload.file.size);
-  const detailText = rowDetail(upload, detail);
+  const detailText = rowDetail(
+    upload,
+    detail,
+    t,
+    language === "ms" ? "ms-MY" : "en-MY"
+  );
   const name =
     mode === "results"
       ? upload.summary?.merchant || upload.file.name
       : upload.file.name;
   const sub = mode === "results" ? upload.file.name : detailText;
-  const date = summaryDate(upload);
+  const date = summaryDate(upload, language === "ms" ? "ms-MY" : "en-MY");
   const amount = formatAmount(upload.summary?.total, upload.summary?.currency);
   const progress = Math.max(0, Math.min(100, Math.round(upload.uploadProgress || 0)));
 
   const mobileMeta =
     mode === "results"
       ? state === "failed"
-        ? `Failed · ${detailText}`
-        : `Ready · ${date} · ${amount}`
+        ? t("batch.row.failedMeta", { detail: detailText })
+        : t("batch.row.readyMeta", { date, amount })
       : state === "working"
-        ? `Working · ${detailText}`
+        ? t("batch.row.workingMeta", { detail: detailText })
         : state === "queued"
-          ? "Queued · Waiting for a free slot"
+          ? t("batch.row.queuedMeta")
           : state === "failed"
-            ? `Failed · ${detailText}`
-            : `Ready · ${kind} · ${size}`;
+            ? t("batch.row.failedMeta", { detail: detailText })
+            : t("batch.row.readyFileMeta", { kind, size });
 
   const action =
     state === "ready" ? (
@@ -80,29 +87,29 @@ export function BatchLedgerRow({
           type="button"
           className="batch-row-action"
           onClick={() => onView(receiptId)}
-          aria-label={`View ${name}`}
+          aria-label={t("batch.row.viewAria", { name })}
         >
-          View
+          {t("batch.row.view")}
         </button>
       ) : (
-        <span className="batch-row-posted">Posted</span>
+        <span className="batch-row-posted">{t("batch.row.posted")}</span>
       )
     ) : state === "failed" && onRetry ? (
       <button
         type="button"
         className="batch-row-action batch-row-action-danger"
         onClick={() => onRetry(upload.id)}
-        aria-label={`Retry ${upload.file.name}`}
+        aria-label={t("batch.row.retryAria", { name: upload.file.name })}
       >
         <RotateCcw className="batch-action-icon" aria-hidden="true" />
-        Retry
+        {t("batch.row.retry")}
       </button>
     ) : state === "queued" && onRemove ? (
       <button
         type="button"
         className="batch-row-action batch-row-action-icon"
         onClick={() => onRemove(upload.id)}
-        aria-label={`Remove ${upload.file.name}`}
+        aria-label={t("batch.row.removeAria", { name: upload.file.name })}
       >
         <X className="batch-action-icon" aria-hidden="true" />
       </button>
@@ -111,7 +118,7 @@ export function BatchLedgerRow({
         type="button"
         className="batch-row-action batch-row-action-icon"
         onClick={() => onCancel(upload.id)}
-        aria-label={`Cancel ${upload.file.name}`}
+        aria-label={t("batch.row.cancelAria", { name: upload.file.name })}
       >
         <X className="batch-action-icon" aria-hidden="true" />
       </button>

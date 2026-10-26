@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { FileText, Eye, Calendar, TrendingUp, Tag } from 'lucide-react';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export function BlogAnalytics() {
+  const { t } = useAdminTranslation();
   // Fetch blog statistics
   const { data: stats, isLoading } = useQuery({
     queryKey: ['blogAnalytics'],
@@ -87,38 +89,38 @@ export function BlogAnalytics() {
 
   const statCards = [
     {
-      title: 'Total Posts',
+      title: t('diagnostics.blogAnalytics.totalPosts'),
       value: stats?.totalPosts || 0,
       icon: FileText,
-      description: 'All blog posts',
+      description: t('diagnostics.blogAnalytics.allBlogPosts'),
       color: 'text-blue-600',
     },
     {
-      title: 'Published',
+      title: t('diagnostics.blogAnalytics.published'),
       value: stats?.publishedPosts || 0,
       icon: Eye,
-      description: 'Live on website',
+      description: t('diagnostics.blogAnalytics.liveOnWebsite'),
       color: 'text-green-600',
     },
     {
-      title: 'Drafts',
+      title: t('diagnostics.blogAnalytics.drafts'),
       value: stats?.draftPosts || 0,
       icon: Calendar,
-      description: 'Unpublished posts',
+      description: t('diagnostics.blogAnalytics.unpublishedPosts'),
       color: 'text-yellow-600',
     },
     {
-      title: 'Recent Posts',
+      title: t('diagnostics.blogAnalytics.recentPosts'),
       value: stats?.recentPosts || 0,
       icon: TrendingUp,
-      description: 'Last 30 days',
+      description: t('diagnostics.blogAnalytics.last30Days'),
       color: 'text-purple-600',
     },
     {
-      title: 'Total Tags',
+      title: t('diagnostics.blogAnalytics.totalTags'),
       value: stats?.totalTags || 0,
       icon: Tag,
-      description: 'Unique tags used',
+      description: t('diagnostics.blogAnalytics.uniqueTagsUsed'),
       color: 'text-indigo-600',
     },
   ];
@@ -154,7 +156,7 @@ export function BlogAnalytics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5" />
-              Most Used Tags
+              {t('diagnostics.blogAnalytics.mostUsedTags')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -175,7 +177,7 @@ export function BlogAnalytics() {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>{t('diagnostics.blogAnalytics.quickActions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -185,8 +187,8 @@ export function BlogAnalytics() {
             >
               <FileText className="h-5 w-5 text-primary" />
               <div>
-                <div className="font-medium">Manage Posts</div>
-                <div className="text-sm text-muted-foreground">Create and edit blog posts</div>
+                <div className="font-medium">{t('diagnostics.blogAnalytics.managePosts')}</div>
+                <div className="text-sm text-muted-foreground">{t('diagnostics.blogAnalytics.managePostsDescription')}</div>
               </div>
             </a>
             
@@ -198,8 +200,8 @@ export function BlogAnalytics() {
             >
               <Eye className="h-5 w-5 text-primary" />
               <div>
-                <div className="font-medium">View Blog</div>
-                <div className="text-sm text-muted-foreground">See live blog page</div>
+                <div className="font-medium">{t('diagnostics.blogAnalytics.viewBlog')}</div>
+                <div className="text-sm text-muted-foreground">{t('diagnostics.blogAnalytics.viewBlogDescription')}</div>
               </div>
             </a>
             
@@ -211,8 +213,8 @@ export function BlogAnalytics() {
             >
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
-                <div className="font-medium">RSS Feed</div>
-                <div className="text-sm text-muted-foreground">View RSS feed</div>
+                <div className="font-medium">{t('diagnostics.blogAnalytics.rssFeed')}</div>
+                <div className="text-sm text-muted-foreground">{t('diagnostics.blogAnalytics.rssFeedDescription')}</div>
               </div>
             </a>
           </div>

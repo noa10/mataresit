@@ -35,7 +35,7 @@ export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
-  const { t } = useAdminTranslation();
+  const { t, language } = useAdminTranslation();
 
   useEffect(() => {
     fetchUsers();
@@ -61,16 +61,18 @@ export default function UsersManagement() {
     try {
       await adminService.updateUserRole(userId, newRole);
       toast({
-        title: "Success",
-        description: `User role updated to ${newRole}`,
+        title: t("usersPage.toasts.success"),
+        description: t("usersPage.toasts.roleUpdated", {
+          role: t(`usersPage.roles.${newRole}`, { defaultValue: newRole }),
+        }),
       });
       // Refresh the users list
       fetchUsers();
       setRoleDialogOpen(false);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update user role",
+        title: t("usersPage.toasts.error"),
+        description: error.message || t("usersPage.toasts.roleUpdateFailed"),
         variant: "destructive",
       });
     }
@@ -85,20 +87,18 @@ export default function UsersManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-        <p className="text-muted-foreground">
-          Manage user accounts and permissions
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("usersPage.title")}</h1>
+        <p className="text-muted-foreground">{t("usersPage.description")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
+          <CardTitle>{t("usersPage.cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
             <Input
-              placeholder="Search users..."
+              placeholder={t("usersPage.searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-md"
@@ -142,18 +142,26 @@ export default function UsersManagement() {
                                 key={role}
                                 variant={role === 'admin' ? 'default' : 'outline'}
                               >
-                                {role}
+                                {t(`usersPage.roles.${role}`, { defaultValue: role })}
                               </Badge>
                             ))
                           ) : (
-                            <Badge variant="outline">user</Badge>
+                            <Badge variant="outline">{t("usersPage.roles.user")}</Badge>
                           )}
                         </TableCell>
                         <TableCell>
-                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+                          {user.created_at
+                            ? new Date(user.created_at).toLocaleDateString(
+                                language === 'ms' ? 'ms-MY' : 'en-MY'
+                              )
+                            : '—'}
                         </TableCell>
                         <TableCell>
-                          {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : '—'}
+                          {user.last_sign_in_at
+                            ? new Date(user.last_sign_in_at).toLocaleDateString(
+                                language === 'ms' ? 'ms-MY' : 'en-MY'
+                              )
+                            : '—'}
                         </TableCell>
                         <TableCell>
                           <Dialog open={roleDialogOpen && selectedUser?.id === user.id} onOpenChange={(open) => {
@@ -169,14 +177,16 @@ export default function UsersManagement() {
                                   setRoleDialogOpen(true);
                                 }}
                               >
-                                Change Role
+                                {t("usersPage.actions.changeRole")}
                               </Button>
                             </DialogTrigger>
                             <DialogContent>
                               <DialogHeader>
-                                <DialogTitle>Update User Role</DialogTitle>
+                                <DialogTitle>{t("usersPage.dialog.title")}</DialogTitle>
                                 <DialogDescription>
-                                  Change the role for {selectedUser?.email}. This will affect their permissions.
+                                  {t("usersPage.dialog.description", {
+                                    email: selectedUser?.email,
+                                  })}
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="flex flex-col gap-4 py-4">
@@ -189,7 +199,7 @@ export default function UsersManagement() {
                                     className="flex-1"
                                   >
                                     <Shield className="mr-2 h-4 w-4" />
-                                    Admin
+                                    {t("usersPage.roles.admin")}
                                   </Button>
                                   <Button
                                     variant={
@@ -199,13 +209,13 @@ export default function UsersManagement() {
                                     className="flex-1"
                                   >
                                     <ShieldOff className="mr-2 h-4 w-4" />
-                                    User
+                                    {t("usersPage.roles.user")}
                                   </Button>
                                 </div>
                               </div>
                               <DialogFooter>
                                 <Button variant="outline" onClick={() => setRoleDialogOpen(false)}>
-                                  Cancel
+                                  {t("usersPage.actions.cancel")}
                                 </Button>
                               </DialogFooter>
                             </DialogContent>
@@ -216,7 +226,7 @@ export default function UsersManagement() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-4">
-                        No users found
+                        {t("usersPage.noUsers")}
                       </TableCell>
                     </TableRow>
                   )}

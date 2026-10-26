@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import type { ReceiptUpload } from "@/types/receipt";
 import type { FileProgressDetail } from "@/lib/progress-tracking";
 import { BatchLedgerRow } from "./BatchLedgerRow";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchLedgerProps {
   uploads: ReceiptUpload[];
@@ -21,36 +22,38 @@ export function BatchLedger({
   mode,
   receiptIds,
   details,
-  emptyMessage = "No receipts in this view.",
+  emptyMessage,
   onRemove,
   onCancel,
   onRetry,
   onView,
 }: BatchLedgerProps) {
+  const { t } = useReceiptsTranslation();
   const isResults = mode === "results";
+  const message = emptyMessage || t("batch.ledger.empty");
 
   return (
     <section
       className={`batch-ledger${isResults ? " is-results" : ""}`}
-      aria-label="Batch receipt ledger"
+      aria-label={t("batch.ledger.label")}
     >
       <div
         className="batch-scroll"
         tabIndex={0}
         role="region"
-        aria-label="Batch receipts"
+        aria-label={t("batch.ledger.region")}
       >
         <div className="batch-ledger-head" aria-hidden="true">
           <span>#</span>
-          <span>Receipt</span>
-          <span>{isResults ? "Date" : "Size"}</span>
-          <span>Status</span>
-          <span>{isResults ? "Total" : "Total"}</span>
+          <span>{t("batch.ledger.receipt")}</span>
+          <span>{isResults ? t("batch.ledger.date") : t("batch.ledger.size")}</span>
+          <span>{t("batch.ledger.status")}</span>
+          <span>{t("batch.ledger.total")}</span>
           <span />
         </div>
 
         {uploads.length === 0 ? (
-          <div className="batch-filter-empty">{emptyMessage}</div>
+          <div className="batch-filter-empty">{message}</div>
         ) : (
           <ul className="batch-rows">
             <AnimatePresence initial={false}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
 import type { BatchFilter } from "./utils";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchResultsBandProps {
   ready: number;
@@ -46,14 +47,17 @@ export function BatchResultsBand({
   batchName,
   batchDate,
 }: BatchResultsBandProps) {
+  const { t } = useReceiptsTranslation();
   const countedReady = useCountUp(ready);
   const failureCopy =
     failed === 0
-      ? "Every receipt in this batch is posted."
-      : `${failed} receipt${failed === 1 ? "" : "s"} need${failed === 1 ? "s" : ""} another try.`;
+      ? t("batch.results.allPosted")
+      : failed === 1
+        ? t("batch.results.needRetryOne", { count: failed })
+        : t("batch.results.needRetryMany", { count: failed });
 
   return (
-    <section className="batch-band batch-band-results" aria-label="Batch results">
+    <section className="batch-band batch-band-results" aria-label={t("batch.results.label")}>
       <div className="batch-results-main">
         <p className="batch-micro">
           {batchName} · {batchDate}
@@ -62,21 +66,25 @@ export function BatchResultsBand({
           <span className="batch-rb-num mono">{countedReady}</span>
           <span className="batch-rb-slash">/</span>
           <span className="batch-rb-total mono">{total}</span>
-          <span className="batch-rb-ready">ready</span>
+          <span className="batch-rb-ready">{t("batch.results.ready")}</span>
         </div>
         <p className="batch-rb-sub">
-          {ready} of {total} receipts posted to the ledger. {failureCopy}
+          {t("batch.results.posted", {
+            ready,
+            total,
+            failureCopy,
+          })}
         </p>
       </div>
 
-      <div className="batch-filters" role="group" aria-label="Filter results">
+      <div className="batch-filters" role="group" aria-label={t("batch.results.filter")}>
         <button
           type="button"
           className={`batch-filter${filter === "all" ? " is-on" : ""}`}
           aria-pressed={filter === "all"}
           onClick={() => onFilter("all")}
         >
-          All <span className="batch-filter-count">{ready + failed}</span>
+          {t("batch.results.filterAll")} <span className="batch-filter-count">{ready + failed}</span>
         </button>
         <button
           type="button"
@@ -84,7 +92,7 @@ export function BatchResultsBand({
           aria-pressed={filter === "ready"}
           onClick={() => onFilter("ready")}
         >
-          Ready <span className="batch-filter-count">{ready}</span>
+          {t("batch.results.filterReady")} <span className="batch-filter-count">{ready}</span>
         </button>
         <button
           type="button"
@@ -92,7 +100,7 @@ export function BatchResultsBand({
           aria-pressed={filter === "failed"}
           onClick={() => onFilter("failed")}
         >
-          Failed <span className="batch-filter-count">{failed}</span>
+          {t("batch.results.filterFailed")} <span className="batch-filter-count">{failed}</span>
         </button>
       </div>
     </section>

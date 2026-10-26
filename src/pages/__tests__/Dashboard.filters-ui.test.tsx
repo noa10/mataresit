@@ -94,6 +94,7 @@ vi.mock("@/contexts/LanguageContext", () => ({
   useDashboardTranslation: () => ({ t }),
   useCommonTranslation: () => ({ t }),
   useReceiptsTranslation: () => ({ t }),
+  useCategoriesTranslation: () => ({ t }),
 }));
 
 vi.mock("@/services/receiptService", () => ({

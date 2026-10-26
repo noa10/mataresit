@@ -42,45 +42,39 @@ interface ProviderStatus {
 const PROVIDER_INFO = {
   gemini: {
     name: 'Google Gemini',
-    description: 'Google\'s advanced AI models with excellent vision capabilities',
     icon: '🔍',
     color: 'bg-ledger-accent-soft text-ledger-accent',
     setupUrl: 'https://aistudio.google.com/app/apikey',
     keyRequired: false,
     keyOptional: true,
     serverSide: true,
-    features: ['Vision', 'Fast Processing', 'High Accuracy'],
-    requirements: 'Free tier available with Google AI Studio account'
+    features: ['vision', 'fastProcessing', 'highAccuracy'],
   },
   openrouter: {
     name: 'OpenRouter',
-    description: 'Access to multiple AI providers through a unified API',
     icon: '🌐',
     color: 'bg-ledger-amber-soft text-ledger-amber',
     setupUrl: 'https://openrouter.ai/keys',
     keyRequired: true,
     keyOptional: false,
     serverSide: false,
-    features: ['Multiple Providers', 'Free Models', 'Pay-per-use'],
-    requirements: '⚠️ Requires payment method or credits on file (even for free models)'
+    features: ['multipleProviders', 'freeModels', 'payPerUse'],
   },
   groq: {
     name: 'Groq',
-    description: 'Fast OpenAI-compatible inference for multimodal models',
     icon: '⚙️',
     color: 'bg-emerald-100 text-emerald-800',
     setupUrl: 'https://console.groq.com/keys',
     keyRequired: true,
     keyOptional: false,
     serverSide: false,
-    features: ['Vision', 'Low Latency', 'OpenAI Compatible'],
-    requirements: 'Requires a Groq API key from Groq Console'
+    features: ['vision', 'lowLatency', 'openAiCompatible'],
   }
 };
 
 export function ModelProviderStatus() {
   const { settings, updateSettings } = useSettings();
-  const { t } = useSettingsTranslation();
+  const { t, language } = useSettingsTranslation();
   const tString = (key: string, options?: Record<string, unknown>) => String(t(key, options));
   const [providerStatuses, setProviderStatuses] = useState<ProviderStatus[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -92,7 +86,10 @@ export function ModelProviderStatus() {
     const modelConfig = AVAILABLE_MODELS['gemini-2.5-flash-lite']
       || Object.values(AVAILABLE_MODELS).find((model) => model.provider === 'gemini');
     if (!modelConfig) {
-      return { success: false, message: 'No Gemini model available for testing.' };
+      return {
+        success: false,
+        message: tString("providersExtra.errors.noGeminiModel"),
+      };
     }
 
     const response = await fetch(`${modelConfig.endpoint}?key=${apiKey}`, {
@@ -109,14 +106,22 @@ export function ModelProviderStatus() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      return { success: false, message: `Gemini API error: ${response.status} - ${errorText}` };
+      return {
+        success: false,
+        message: tString("providersExtra.errors.geminiApiError", {
+          status: response.status,
+          detail: errorText,
+        }),
+      };
     }
 
     const data = await response.json();
     const hasCandidates = Array.isArray(data?.candidates) && data.candidates.length > 0;
     return {
       success: hasCandidates,
-      message: hasCandidates ? 'Client-side key test successful' : 'Gemini API responded without candidates'
+      message: hasCandidates
+        ? tString("providersExtra.errors.keyTestSuccess")
+        : tString("providersExtra.errors.geminiNoCandidates"),
     };
   };
 
@@ -124,7 +129,10 @@ export function ModelProviderStatus() {
     const modelConfig = AVAILABLE_MODELS['groq/qwen/qwen3.8-27b']
       || Object.values(AVAILABLE_MODELS).find((model) => model.provider === 'groq');
     if (!modelConfig) {
-      return { success: false, message: 'No Groq model available for testing.' };
+      return {
+        success: false,
+        message: tString("providersExtra.errors.noGroqModel"),
+      };
     }
 
     const response = await fetch(modelConfig.endpoint, {
@@ -143,14 +151,22 @@ export function ModelProviderStatus() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      return { success: false, message: `Groq API error: ${response.status} - ${errorText}` };
+      return {
+        success: false,
+        message: tString("providersExtra.errors.groqApiError", {
+          status: response.status,
+          detail: errorText,
+        }),
+      };
     }
 
     const data = await response.json();
     const hasChoices = Array.isArray(data?.choices) && data.choices.length > 0;
     return {
       success: hasChoices,
-      message: hasChoices ? 'Groq key test successful' : 'Groq API responded without choices'
+      message: hasChoices
+        ? tString("providersExtra.errors.groqKeyTestSuccess")
+        : tString("providersExtra.errors.groqNoChoices"),
     };
   };
 
@@ -179,7 +195,9 @@ export function ModelProviderStatus() {
 
     setProviderStatuses(initialStatuses);
     checkProviderAvailability(initialStatuses);
-  }, []);
+    // Re-check when the language changes so provider error messages are not
+    // left in the previous language.
+  }, [language]);
 
   // Check provider availability
   const checkProviderAvailability = async (statuses: ProviderStatus[]) => {
@@ -217,12 +235,16 @@ export function ModelProviderStatus() {
                   console.log('Gemini connection successful:', geminiResult.message);
                 } else {
                   available = false;
-                  error = `Gemini connection failed: ${geminiResult.message}`;
+                  error = tString("providersExtra.errors.geminiConnectionFailed", {
+                    detail: geminiResult.message,
+                  });
                   console.error('Gemini connection failed:', geminiResult.message);
                 }
               } catch (e: any) {
                 available = false;
-                error = `Gemini test error: ${e.message}`;
+                error = tString("providersExtra.errors.geminiTestError", {
+                  detail: e.message,
+                });
                 console.error('Gemini connection test error:', e);
               }
               break;
@@ -277,36 +299,38 @@ export function ModelProviderStatus() {
                       // Provide specific error message based on error type
                       switch (err.type) {
                         case 'no_credits':
-                          error = 'OpenRouter requires a payment method or credits. Even free models need account verification. Add a payment method at openrouter.ai/settings/payment';
+                          error = tString("providersExtra.errors.openRouterPaymentRequired");
                           break;
                         case 'invalid_key':
-                          error = 'Invalid API key. Please verify your key at openrouter.ai/keys';
+                          error = tString("providersExtra.errors.invalidKey");
                           break;
                         case 'rate_limit':
-                          error = 'Rate limit exceeded. Please wait a moment and try again.';
+                          error = tString("providersExtra.errors.rateLimit");
                           break;
                         case 'model_unavailable':
-                          error = 'The test model is currently unavailable. Please try again later.';
+                          error = tString("providersExtra.errors.modelUnavailable");
                           break;
                         case 'network':
-                          error = 'Network error. Please check your internet connection.';
+                          error = tString("providersExtra.errors.networkError");
                           break;
                         default:
-                          error = err.message || 'API key test failed. Please verify your key is valid.';
+                          error = err.message || tString("providersExtra.errors.apiKeyTestFailed");
                       }
                     } else {
-                      error = 'API key test failed. Please verify your key is valid and has sufficient credits.';
+                      error = tString("providersExtra.errors.openRouterTestFailed");
                     }
                     console.error('OpenRouter connection test returned false');
                   }
                 } catch (e: any) {
                   available = false;
-                  error = `Connection test error: ${e.message}`;
+                  error = tString("providersExtra.errors.connectionTestError", {
+                    detail: e.message,
+                  });
                   console.error('OpenRouter connection test error:', e);
                 }
               } else {
                 available = false;
-                error = 'OpenRouter API key not provided. Please enter your API key and save it.';
+                error = tString("providersExtra.errors.openRouterKeyMissing");
                 console.log('No OpenRouter API key found');
               }
               break;
@@ -325,22 +349,28 @@ export function ModelProviderStatus() {
                       available = true;
                     } else {
                       available = false;
-                      error = `Groq connection failed: ${groqResult.message}`;
+                      error = tString("providersExtra.errors.groqConnectionFailed", {
+                        detail: groqResult.message,
+                      });
                     }
                   } catch (e: any) {
                     available = false;
-                    error = `Groq test error: ${e.message}`;
+                    error = tString("providersExtra.errors.groqTestError", {
+                      detail: e.message,
+                    });
                   }
                 } else {
                   available = false;
-                  error = 'Groq API key not provided. Please enter your API key and save it.';
+                  error = tString("providersExtra.errors.groqKeyMissing");
                 }
               }
               break;
 
             default:
               available = false;
-              error = `Provider ${status.provider} is not supported`;
+              error = tString("providersExtra.errors.unsupportedProvider", {
+                provider: status.provider,
+              });
               console.warn(`Unsupported provider: ${status.provider}`);
           }
 
@@ -357,7 +387,7 @@ export function ModelProviderStatus() {
             ...status,
             available: false,
             testing: false,
-            error: e instanceof Error ? e.message : 'Unknown error',
+            error: e instanceof Error ? e.message : tString("providersExtra.errors.unknownError"),
             lastChecked: new Date()
           };
         }
@@ -474,10 +504,16 @@ export function ModelProviderStatus() {
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return date.toLocaleDateString();
+    if (diffInSeconds < 60) return tString("providersExtra.justNow");
+    if (diffInSeconds < 3600)
+      return tString("providersExtra.minutesAgo", {
+        count: Math.floor(diffInSeconds / 60),
+      });
+    if (diffInSeconds < 86400)
+      return tString("providersExtra.hoursAgo", {
+        count: Math.floor(diffInSeconds / 3600),
+      });
+    return date.toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-MY');
   };
 
   return (
@@ -528,17 +564,21 @@ export function ModelProviderStatus() {
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-lg">{info.name}</CardTitle>
                         <Badge variant="secondary" className="text-xs">
-                          {usesClientKey ? 'Client-side' : 'Server-side'}
+                          {usesClientKey
+                            ? tString("providersExtra.clientSide")
+                            : tString("providersExtra.serverSide")}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{info.description}</p>
-                      {info.requirements && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{info.requirements}</p>
-                      )}
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {tString(`providersExtra.providers.${status.provider}.description`)}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        {tString(`providersExtra.providers.${status.provider}.requirements`)}
+                      </p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {info.features.map((feature, idx) => (
                           <Badge key={idx} variant="outline" className="text-xs">
-                            {feature}
+                            {tString(`providersExtra.features.${feature}`)}
                           </Badge>
                         ))}
                       </div>
@@ -582,7 +622,7 @@ export function ModelProviderStatus() {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>High accuracy models</p>
+                          <p>{tString("providersExtra.highAccuracy")}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -596,7 +636,7 @@ export function ModelProviderStatus() {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Economical models (&lt;$1/1M tokens)</p>
+                          <p>{tString("providersExtra.economical")}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -609,11 +649,13 @@ export function ModelProviderStatus() {
                     <div className="flex items-center justify-between">
                       <Label htmlFor={`${status.provider}-key`} className="text-sm font-medium flex items-center gap-2 text-ledger-ink">
                         <Key className="h-3 w-3" />
-                        {info.keyOptional ? 'API Key (Optional)' : 'API Key'}
+                        {info.keyOptional
+                          ? tString("providersExtra.apiKeyOptional")
+                          : tString("providersExtra.apiKey")}
                       </Label>
                       {configured && (
                         <Badge variant="outline" className="text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900 text-xs">
-                          Configured
+                          {tString("providersExtra.configured")}
                         </Badge>
                       )}
                     </div>
@@ -624,7 +666,9 @@ export function ModelProviderStatus() {
                         type={showApiKeys[status.provider] ? 'text' : 'password'}
                         value={apiKeys[status.provider] || ''}
                         onChange={(e) => handleApiKeyChange(status.provider, e.target.value)}
-                        placeholder={info.keyOptional ? 'Enter your API key (optional)...' : 'Enter your API key...'}
+                        placeholder={info.keyOptional
+                          ? tString("providersExtra.enterKeyOptional")
+                          : tString("providersExtra.enterKey")}
                         className="pr-10 text-sm bg-ledger-surface border-ledger-line-strong text-ledger-ink"
                       />
                       <Button
@@ -650,7 +694,9 @@ export function ModelProviderStatus() {
                         className="flex items-center gap-1 text-xs"
                       >
                         <Save className="h-3 w-3" />
-                        {savingKeys[status.provider] ? 'Saving...' : 'Save'}
+                        {savingKeys[status.provider]
+                          ? tString("providersExtra.saving")
+                          : tString("providersExtra.save")}
                       </Button>
 
                       {configured && (
@@ -660,7 +706,7 @@ export function ModelProviderStatus() {
                           onClick={() => handleClearApiKey(status.provider)}
                           className="text-red-600 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200 text-xs border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/40"
                         >
-                          Clear
+                          {tString("providersExtra.clear")}
                         </Button>
                       )}
 
@@ -670,7 +716,7 @@ export function ModelProviderStatus() {
                         onClick={() => window.open(info.setupUrl, '_blank')}
                         className="flex items-center gap-1 text-xs ml-auto text-ledger-muted hover:text-ledger-ink"
                       >
-                        Get Key
+                        {tString("providersExtra.getKey")}
                         <ExternalLink className="h-3 w-3" />
                       </Button>
                     </div>
@@ -683,7 +729,7 @@ export function ModelProviderStatus() {
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-300 mt-0.5 flex-shrink-0" />
                       <div className="text-sm text-red-700 dark:text-red-200">
-                        <p className="font-medium">Connection Error</p>
+                        <p className="font-medium">{tString("providersExtra.connectionError")}</p>
                         <p className="text-xs mt-1 text-red-600 dark:text-red-300">{status.error}</p>
                       </div>
                     </div>
@@ -692,12 +738,16 @@ export function ModelProviderStatus() {
                     {status.provider === 'openrouter' && status.error.includes('payment method') && (
                       <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded text-xs">
                         <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                          💡 Quick Fix Options:
+                          {tString("providersExtra.quickFix")}
                         </p>
                         <ul className="text-amber-700 dark:text-amber-300 space-y-1 list-disc list-inside">
-                          <li>Add a payment method at <a href="https://openrouter.ai/settings/payment" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-100">openrouter.ai/settings/payment</a> (recommended - no charge for free models)</li>
-                          <li>Or add credits at <a href="https://openrouter.ai/credits" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-100">openrouter.ai/credits</a></li>
-                          <li>Or use Google Gemini directly (free tier, no payment required)</li>
+                          <li>
+                            {tString("providersExtra.quickFixPayment")}
+                          </li>
+                          <li>
+                            {tString("providersExtra.quickFixCredits")}
+                          </li>
+                          <li>{tString("providersExtra.quickFixGemini")}</li>
                         </ul>
                       </div>
                     )}
@@ -709,13 +759,19 @@ export function ModelProviderStatus() {
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {status.lastChecked ? (
-                      <span>Checked {getRelativeTime(status.lastChecked)}</span>
+                      <span>
+                        {tString("providersExtra.checked", {
+                          time: getRelativeTime(status.lastChecked),
+                        })}
+                      </span>
                     ) : (
-                      <span>Not checked yet</span>
+                      <span>{tString("providersExtra.notChecked")}</span>
                     )}
                   </div>
                   {!info.keyRequired && !configured && (
-                    <span className="text-ledger-accent">Server-managed</span>
+                    <span className="text-ledger-accent">
+                      {tString("providersExtra.serverManaged")}
+                    </span>
                   )}
                 </div>
               </CardContent>
@@ -732,35 +788,41 @@ export function ModelProviderStatus() {
               <Info className="h-5 w-5 text-ledger-accent" />
             </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-ledger-ink mb-2">AI Provider Configuration Guide</h4>
+              <h4 className="font-semibold text-ledger-ink mb-2">
+                {tString("providersExtra.guideTitle")}
+              </h4>
               <div className="text-sm text-ledger-ink-2 space-y-2">
                 <p>
-                  <strong className="text-ledger-ink">Google Gemini:</strong> Uses server-side keys by default.
-                  Add your own key here to switch to client-side processing.
+                  <strong className="text-ledger-ink">Google Gemini:</strong>{" "}
+                  {tString("providersExtra.guideGemini")}
                 </p>
                 <p>
-                  <strong className="text-ledger-ink">OpenRouter:</strong> Requires your API key for client-side access.
-                  Provides access to multiple AI providers through a single unified API.
+                  <strong className="text-ledger-ink">OpenRouter:</strong>{" "}
+                  {tString("providersExtra.guideOpenRouter")}
                 </p>
                 <p>
-                  <strong className="text-ledger-ink">Status Indicators:</strong> Green border = connected and working,
-                  Yellow border = configured but not tested, Gray border = needs configuration.
+                  <strong className="text-ledger-ink">
+                    {tString("providersExtra.statusIndicators")}:
+                  </strong>{" "}
+                  {tString("providersExtra.guideStatus")}
                 </p>
               </div>
               <div className="flex items-center gap-2 mt-3">
                 <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <Zap className="h-3 w-3 mr-1" />
-                  Fast
+                  {tString("providersExtra.fast")}
                 </Badge>
                 <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <Brain className="h-3 w-3 mr-1" />
-                  Accurate
+                  {tString("providersExtra.accurate")}
                 </Badge>
                 <Badge variant="outline" className="text-xs border-ledger-accent/30 text-ledger-accent">
                   <DollarSign className="h-3 w-3 mr-1" />
-                  Economical
+                  {tString("providersExtra.economicalBadge")}
                 </Badge>
-                <span className="text-xs text-ledger-muted ml-2">Model capability indicators</span>
+                <span className="text-xs text-ledger-muted ml-2">
+                  {tString("providersExtra.capabilityIndicators")}
+                </span>
               </div>
             </div>
           </div>

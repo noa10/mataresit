@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Post } from '@/types/blog';
 import { BlogPostEditor } from '@/components/admin/BlogPostEditor';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export default function BlogManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +20,7 @@ export default function BlogManagement() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const { toast } = useToast();
+  const { t, language } = useAdminTranslation();
   const queryClient = useQueryClient();
 
   // Fetch all posts (admin can see drafts)
@@ -68,14 +70,14 @@ export default function BlogManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminBlogPosts'] });
       toast({
-        title: 'Success',
-        description: 'Blog post deleted successfully.',
+        title: t('blogPage.toasts.success'),
+        description: t('blogPage.toasts.deleted'),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: 'Failed to delete blog post.',
+        title: t('blogPage.toasts.error'),
+        description: t('blogPage.toasts.deleteFailed'),
         variant: 'destructive',
       });
     },
@@ -96,18 +98,21 @@ export default function BlogManagement() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    return new Date(dateString).toLocaleDateString(
+      language === 'ms' ? 'ms-MY' : 'en-MY',
+      {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }
+    );
   };
 
   const getStatusBadge = (status: string) => {
     return status === 'published' ? (
-      <Badge variant="default">Published</Badge>
+      <Badge variant="default">{t('blogPage.statuses.published')}</Badge>
     ) : (
-      <Badge variant="secondary">Draft</Badge>
+      <Badge variant="secondary">{t('blogPage.statuses.draft')}</Badge>
     );
   };
 
@@ -133,14 +138,12 @@ export default function BlogManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Blog Management</h1>
-          <p className="text-muted-foreground">
-            Create and manage blog posts for your website.
-          </p>
+          <h1 className="text-3xl font-bold">{t('blogPage.title')}</h1>
+          <p className="text-muted-foreground">{t('blogPage.description')}</p>
         </div>
         <Button onClick={handleNewPost} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
-          New Post
+          {t('blogPage.newPost')}
         </Button>
       </div>
 
@@ -149,7 +152,7 @@ export default function BlogManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filters
+            {t('blogPage.filters.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -158,7 +161,7 @@ export default function BlogManagement() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search posts..."
+                  placeholder={t('blogPage.filters.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -167,12 +170,14 @@ export default function BlogManagement() {
             </div>
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('blogPage.filters.statusPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Posts</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="draft">Drafts</SelectItem>
+                <SelectItem value="all">{t('blogPage.filters.all')}</SelectItem>
+                <SelectItem value="published">
+                  {t('blogPage.filters.published')}
+                </SelectItem>
+                <SelectItem value="draft">{t('blogPage.filters.drafts')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -182,7 +187,9 @@ export default function BlogManagement() {
       {/* Posts Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Blog Posts ({posts?.length || 0})</CardTitle>
+          <CardTitle>
+            {t('blogPage.postsTitle', { count: posts?.length || 0 })}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -194,12 +201,14 @@ export default function BlogManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Published</TableHead>
-                    <TableHead>Tags</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('blogPage.table.title')}</TableHead>
+                    <TableHead>{t('blogPage.table.status')}</TableHead>
+                    <TableHead>{t('blogPage.table.author')}</TableHead>
+                    <TableHead>{t('blogPage.table.published')}</TableHead>
+                    <TableHead>{t('blogPage.table.tags')}</TableHead>
+                    <TableHead className="text-right">
+                      {t('blogPage.table.actions')}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -216,14 +225,17 @@ export default function BlogManagement() {
                       <TableCell>{getStatusBadge(post.status)}</TableCell>
                       <TableCell>
                         {post.author ? 
-                          `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim() || 'Unknown'
-                          : 'Unknown'
+                          `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim() ||
+                          t('blogPage.unknownAuthor')
+                          : t('blogPage.unknownAuthor')
                         }
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          {post.published_at ? formatDate(post.published_at) : 'Not published'}
+                          {post.published_at
+                            ? formatDate(post.published_at)
+                            : t('blogPage.notPublished')}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -268,18 +280,24 @@ export default function BlogManagement() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Blog Post</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                  {t('blogPage.deleteDialog.title')}
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete "{post.title}"? This action cannot be undone.
+                                  {t('blogPage.deleteDialog.description', {
+                                    title: post.title,
+                                  })}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>
+                                  {t('blogPage.deleteDialog.cancel')}
+                                </AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleDeletePost(post.id)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
-                                  Delete
+                                  {t('blogPage.deleteDialog.delete')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -293,9 +311,9 @@ export default function BlogManagement() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="text-muted-foreground">No blog posts found.</div>
+              <div className="text-muted-foreground">{t('blogPage.noPosts')}</div>
               <Button onClick={handleNewPost} className="mt-4">
-                Create your first post
+                {t('blogPage.createFirst')}
               </Button>
             </div>
           )}

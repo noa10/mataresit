@@ -1,4 +1,5 @@
 import { formatEta } from "./utils";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchProgressBandProps {
   percent: number;
@@ -19,36 +20,37 @@ export function BatchProgressBand({
   queued,
   failed,
 }: BatchProgressBandProps) {
+  const { t } = useReceiptsTranslation();
   const value = Math.max(0, Math.min(100, Math.round(percent)));
-  const eta = formatEta(etaMs);
+  const eta = formatEta(etaMs, t);
 
   return (
-    <section className="batch-band batch-band-progress" aria-label="Batch progress">
+    <section className="batch-band batch-band-progress" aria-label={t("batch.progress.label")}>
       <div className="batch-pb-top">
         <div className="batch-pb-count">
           <span className="batch-pb-num mono">{value}%</span>
           <span className="batch-pb-meta">
-            <span className="batch-micro">Progress</span>
+            <span className="batch-micro">{t("batch.progress.progress")}</span>
             {eta && <span className="batch-pb-eta-text">{eta}</span>}
           </span>
         </div>
 
-        <div className="batch-legend" aria-label="Receipt status">
+        <div className="batch-legend" aria-label={t("batch.progress.status")}>
           <span className="batch-lg" data-k="ready">
             <i aria-hidden="true" />
-            <span className="batch-lg-n mono">{pad(ready)}</span> ready
+            <span className="batch-lg-n mono">{pad(ready)}</span> {t("batch.progress.ready")}
           </span>
           <span className="batch-lg" data-k="working">
             <i aria-hidden="true" />
-            <span className="batch-lg-n mono">{pad(working)}</span> working
+            <span className="batch-lg-n mono">{pad(working)}</span> {t("batch.progress.working")}
           </span>
           <span className="batch-lg" data-k="queued">
             <i aria-hidden="true" />
-            <span className="batch-lg-n mono">{pad(queued)}</span> queued
+            <span className="batch-lg-n mono">{pad(queued)}</span> {t("batch.progress.queued")}
           </span>
           <span className="batch-lg" data-k="failed">
             <i aria-hidden="true" />
-            <span className="batch-lg-n mono">{pad(failed)}</span> failed
+            <span className="batch-lg-n mono">{pad(failed)}</span> {t("batch.progress.failed")}
           </span>
         </div>
       </div>
@@ -56,7 +58,7 @@ export function BatchProgressBand({
       <div
         className="batch-track"
         role="progressbar"
-        aria-label="Batch upload progress"
+        aria-label={t("batch.progress.progressAria")}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={value}

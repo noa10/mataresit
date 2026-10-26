@@ -24,6 +24,8 @@ import {
 import DailyReceiptBrowserModal from "@/components/DailyReceiptBrowserModal";
 import { useSettings } from "@/hooks/useSettings";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAuth } from "@/contexts/AuthContext";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import type { BatchUploadHookReturn } from "@/contexts/BackgroundUploadContext";
 
 import { BatchFooter } from "./BatchFooter";
@@ -49,9 +51,11 @@ export function BatchUploadSheet({
   onRequestClose,
   onOpenReceipt,
 }: BatchUploadSheetProps) {
+  const { t, language } = useReceiptsTranslation();
   const navigate = useNavigate();
   const { settings } = useSettings();
   const { limits, getCurrentTier } = useSubscription();
+  const { isAdmin } = useAuth();
 
   const {
     batchUploads,
@@ -122,12 +126,16 @@ export function BatchUploadSheet({
   const percent = Math.round(totalProgress);
   const etaText = allComplete
     ? null
-    : formatEta(etaCalculation?.estimatedTimeRemainingMs);
+    : formatEta(etaCalculation?.estimatedTimeRemainingMs, t);
   const tier = getCurrentTier();
   const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
   const batchName =
-    batchSession?.sessionName || (fileCount === 0 ? "New batch" : "Batch");
-  const batchDate = formatBatchDate(batchSession?.createdAt);
+    batchSession?.sessionName ||
+    (fileCount === 0 ? t("batch.newBatch") : t("batch.batch"));
+  const batchDate = formatBatchDate(
+    batchSession?.createdAt,
+    language === "ms" ? "ms-MY" : "en-MY"
+  );
 
   const displayMode = batchUploads.length === 0 ? "queue" : mode;
   const resultUploads =
@@ -142,10 +150,10 @@ export function BatchUploadSheet({
   const ledgerUploads = displayMode === "results" ? resultUploads : batchUploads;
   const emptyMessage =
     filter === "failed"
-      ? "No failed receipts in this batch."
+      ? t("batch.ledger.noFailed")
       : filter === "ready"
-        ? "No receipts have posted yet."
-        : "No receipts in this batch.";
+        ? t("batch.ledger.noPosted")
+        : t("batch.ledger.noReceipts");
 
   const totalBytes = batchUploads.reduce(
     (sum, item) => sum + item.file.size,
@@ -209,7 +217,7 @@ export function BatchUploadSheet({
       .filter(Boolean) as string[];
 
     if (ids.length === 0) {
-      toast.info("No posted receipts to open yet.");
+      toast.info(t("batch.toast.noPosted"));
       return;
     }
 
@@ -226,7 +234,7 @@ export function BatchUploadSheet({
   };
 
   const handleOpenSettings = () => {
-    window.open("/settings?tab=processing", "_blank", "noopener,noreferrer");
+    window.open("/admin/settings", "_blank", "noopener,noreferrer");
   };
 
   const handleUploadMore = () => {
@@ -245,14 +253,14 @@ export function BatchUploadSheet({
   };
 
   const liveMessage = intake.isCompressing
-    ? "Optimising selected receipts"
+    ? t("batch.live.optimising")
     : isProcessing
-      ? `${ready} of ${fileCount} receipts posted`
+      ? t("batch.live.posted", { ready, total: fileCount })
       : allComplete
-        ? "Batch complete"
+        ? t("batch.live.complete")
         : fileCount > 0
-          ? "Ready to process the batch"
-          : "Ready to add receipts";
+          ? t("batch.live.readyProcess")
+          : t("batch.live.readyAdd");
 
   return (
     <div
@@ -277,14 +285,14 @@ export function BatchUploadSheet({
 
       <header className="batch-head">
         <div className="batch-head-top">
-          <p className="batch-eyebrow">Add to the ledger</p>
+          <p className="batch-eyebrow">{t("batch.eyebrow")}</p>
           <div className="batch-head-tools">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className="batch-icon-btn"
-                  aria-label="More batch actions"
+                  aria-label={t("batch.moreActions")}
                 >
                   <MoreHorizontal className="h-[18px] w-[18px]" aria-hidden="true" />
                 </button>
@@ -295,14 +303,14 @@ export function BatchUploadSheet({
                   onSelect={handleChoose}
                   disabled={atCapacity || intake.isCompressing}
                 >
-                  Add receipts
+                  {t("batch.menu.add")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="batch-menu-item"
                   onSelect={retryAllFailed}
                   disabled={failed === 0}
                 >
-                  Retry all failed
+                  {t("batch.menu.retryAll")}
                   <span className="batch-menu-count mono">{failed}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -310,7 +318,7 @@ export function BatchUploadSheet({
                   onSelect={() => clearBatchQueue()}
                   disabled={queued === 0}
                 >
-                  Clear queued
+                  {t("batch.menu.clearQueued")}
                   <span className="batch-menu-count mono">{queued}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -319,7 +327,7 @@ export function BatchUploadSheet({
                   onSelect={() => setClearConfirmOpen(true)}
                   disabled={isProcessing}
                 >
-                  Clear batch…
+                  {t("batch.menu.clearBatch")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -329,7 +337,7 @@ export function BatchUploadSheet({
                 type="button"
                 className="batch-icon-btn"
                 onClick={onRequestClose}
-                aria-label="Close batch upload"
+                aria-label={t("batch.close")}
               >
                 <X className="h-[18px] w-[18px]" aria-hidden="true" />
               </button>
@@ -337,11 +345,8 @@ export function BatchUploadSheet({
           </div>
         </div>
 
-        <h2 className="batch-title">Batch upload</h2>
-        <p className="batch-desc">
-          Post a stack of receipts. Every file is read, categorised and filed in
-          one pass.
-        </p>
+        <h2 className="batch-title">{t("batch.title")}</h2>
+        <p className="batch-desc">{t("batch.description")}</p>
       </header>
 
       <BatchSummaryBand
@@ -361,7 +366,7 @@ export function BatchUploadSheet({
         maxConcurrent={settings?.batchUpload?.maxConcurrent || 2}
         autoStart={settings?.batchUpload?.autoStart || false}
         timeoutSeconds={settings?.batchUpload?.timeoutSeconds || 120}
-        onOpenSettings={handleOpenSettings}
+        onOpenSettings={isAdmin ? handleOpenSettings : undefined}
       />
 
       {displayMode === "results" ? (
@@ -457,20 +462,19 @@ export function BatchUploadSheet({
         <AlertDialogContent className="z-[70] border-ledger-line bg-ledger-surface sm:max-w-[420px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-2xl font-normal text-ledger-ink">
-              Clear this batch?
+              {t("batch.clear.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm leading-relaxed text-ledger-muted">
-              This removes the queue from the sheet. Receipts that already
-              posted stay in your ledger.
+              {t("batch.clear.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep batch</AlertDialogCancel>
+            <AlertDialogCancel>{t("batch.clear.keep")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-ledger-danger text-white hover:bg-ledger-danger/90 dark:text-ledger-panel"
               onClick={handleClearBatch}
             >
-              Clear batch
+              {t("batch.clear.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

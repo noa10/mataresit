@@ -201,7 +201,7 @@
       "intermediate": "Pertengahan",
       "advanced": "Lanjutan"
     },
-    "readingTime": "{{count}} min",
+    "readingTime": "{{count}} minit",
     "cta": {
       "eyebrow": "Cukup membaca",
       "title": "Manual ini lebih pendek daripada timbunan akhir bulan.",

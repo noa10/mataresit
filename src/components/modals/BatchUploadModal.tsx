@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import BatchUploadZone from "@/components/BatchUploadZone";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ interface BatchUploadModalProps {
 }
 
 export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
+  const { t } = useReceiptsTranslation();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const backgroundUpload = useBackgroundUpload();
@@ -74,11 +76,8 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
         )}
       >
         <DialogHeader className="sr-only">
-          <DialogTitle>Batch upload</DialogTitle>
-          <DialogDescription>
-            Add one receipt or many. Every file is read, categorised and filed in
-            one pass.
-          </DialogDescription>
+          <DialogTitle>{t("batch.title")}</DialogTitle>
+          <DialogDescription>{t("batch.description")}</DialogDescription>
         </DialogHeader>
 
         <BatchUploadZone
@@ -93,15 +92,14 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
         <AlertDialogContent className="z-[70] border-ledger-line bg-ledger-surface sm:max-w-[440px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-2xl font-normal text-ledger-ink">
-              Uploads are still running
+              {t("batch.modal.closeTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm leading-relaxed text-ledger-muted">
-              Closing this sheet won’t stop the batch. You can reopen it from
-              the workspace and keep working while it finishes.
+              {t("batch.modal.closeDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep uploading</AlertDialogCancel>
+            <AlertDialogCancel>{t("batch.modal.keepUploading")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-ledger-accent text-white hover:bg-ledger-accent-hover dark:text-ledger-panel"
               onClick={() => {
@@ -109,7 +107,7 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
                 closeModal();
               }}
             >
-              Close and continue
+              {t("batch.modal.closeAndContinue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

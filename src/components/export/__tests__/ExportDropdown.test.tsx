@@ -28,6 +28,12 @@ vi.mock("@/contexts/TeamContext", () => ({
   useTeam: () => ({ currentTeam: null }),
 }));
 
+vi.mock("@/contexts/LanguageContext", () => ({
+  useCommonTranslation: () => ({
+    t: (key: string) => (key === "buttons.export" ? "Export" : key),
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: mocks.toastSuccess,

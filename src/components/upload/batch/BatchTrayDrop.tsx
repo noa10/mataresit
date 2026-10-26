@@ -1,4 +1,5 @@
 import type { DragEvent } from "react";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchTrayDropProps {
   isDragging: boolean;
@@ -27,21 +28,22 @@ export function BatchTrayDrop({
   onDragLeave,
   onDrop,
 }: BatchTrayDropProps) {
+  const { t } = useReceiptsTranslation();
   const heading = disabled
-    ? "This batch is full"
+    ? t("batch.tray.fullTitle")
     : isCompressing
-      ? "Optimising your receipts"
+      ? t("batch.tray.optimisingTitle")
       : isDragging
-        ? "Drop them on the ledger"
-        : "Lay the receipts on the ledger";
+        ? t("batch.tray.dropTitle")
+        : t("batch.tray.idleTitle");
 
   const description = disabled
-    ? "Post this batch or clear it to make room for more receipts."
+    ? t("batch.tray.fullDescription")
     : isCompressing
-      ? "We’re preparing the files before they join the queue."
+      ? t("batch.tray.optimisingDescription")
       : isDragging
-        ? "Release to add these receipts to the batch."
-        : "One receipt per photo or PDF. We read the merchant, date and total, then post each one.";
+        ? t("batch.tray.dropDescription")
+        : t("batch.tray.idleDescription");
 
   return (
     <div
@@ -58,7 +60,7 @@ export function BatchTrayDrop({
         data-dragging={isDragging || undefined}
         disabled={disabled || isCompressing}
         onClick={onChoose}
-        aria-label="Choose receipt files. JPG, PNG or PDF, up to 5 MB each."
+        aria-label={t("batch.tray.chooseAria")}
       >
         <svg
           className="batch-tray-art"
@@ -82,10 +84,15 @@ export function BatchTrayDrop({
         <span className="batch-tray-title">{heading}</span>
         <span className="batch-tray-copy">{description}</span>
         <span className="batch-tray-cta">
-          {disabled ? "Batch full" : isCompressing ? "Optimising…" : "Choose receipts"}
+          {disabled
+            ? t("batch.tray.full")
+            : isCompressing
+              ? t("batch.tray.optimising")
+              : t("batch.tray.choose")}
         </span>
         <span className="batch-tray-note mono">
-          {capacityUsed} of {batchLimit} used · JPG, PNG, PDF · 5 MB each
+          {t("batch.tray.used", { used: capacityUsed, limit: batchLimit })} ·{" "}
+          {t("batch.tray.formats")} · {t("batch.tray.each")}
         </span>
       </button>
 

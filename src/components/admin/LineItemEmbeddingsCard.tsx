@@ -6,9 +6,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Alert, AlertDescription } from '../ui/alert';
 import { checkLineItemEmbeddings, generateLineItemEmbeddings } from '@/lib/ai-search';
 import { formatDistanceToNow } from 'date-fns';
+import { ms as msLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export function LineItemEmbeddingsCard() {
+  const { t, language } = useAdminTranslation();
   // Line item embedding state
   const [isGeneratingEmbeddings, setIsGeneratingEmbeddings] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -29,7 +32,7 @@ export function LineItemEmbeddingsCard() {
   });
 
   // Function to check line item embedding statistics
-  const checkEmbeddingStats = async () => {
+  const checkEmbeddingStats = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -44,12 +47,16 @@ export function LineItemEmbeddingsCard() {
         withoutEmbeddings: result.withoutEmbeddings || 0
       });
       setLastUpdated(new Date());
-      toast.success('Line item embedding stats refreshed');
+      if (!silent) {
+        toast.success(t('embeddingsCard.refreshLineItemSuccess'));
+      }
     } catch (error) {
       console.error('Error checking line item embedding stats:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to check embedding stats';
+      const errorMessage = error instanceof Error ? error.message : t('embeddingsCard.checkFailed');
       setError(errorMessage);
-      toast.error(`Failed to refresh stats: ${errorMessage}`);
+      if (!silent) {
+        toast.error(t('embeddingsCard.refreshFailed', { error: errorMessage }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -64,8 +71,11 @@ export function LineItemEmbeddingsCard() {
       setProcessedLineItems(0);
       setError(null);
 
-      const actionType = regenerate ? 'Regenerating' : 'Generating';
-      toast.info(`${actionType} line item embeddings...`);
+      toast.info(
+        regenerate
+          ? t('embeddingsCard.regeneratingLineItemToast')
+          : t('embeddingsCard.generatingLineItemToast')
+      );
 
       // Get current stats to know how many items need processing
       await checkEmbeddingStats();
@@ -93,21 +103,23 @@ export function LineItemEmbeddingsCard() {
           const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
           setEmbeddingProgress(progress);
 
-          toast.success(`Successfully processed ${result.processed} line items`);
+          toast.success(
+            t('embeddingsCard.processedLineItems', { count: result.processed })
+          );
         } else {
-          toast.info('No line items needed processing');
+          toast.info(t('embeddingsCard.noLineItemsNeeded'));
         }
       } else {
-        toast.info('No line items available for processing');
+        toast.info(t('embeddingsCard.noLineItemsAvailable'));
       }
 
       // Final check to update stats
       await checkEmbeddingStats();
     } catch (error) {
       console.error('Error generating line item embeddings:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate embeddings';
+      const errorMessage = error instanceof Error ? error.message : t('embeddingsCard.generateFailed', { error: '' });
       setError(errorMessage);
-      toast.error(`Failed to generate embeddings: ${errorMessage}`);
+      toast.error(t('embeddingsCard.generateFailed', { error: errorMessage }));
     } finally {
       setIsGeneratingEmbeddings(false);
       setIsRegenerating(false);
@@ -116,27 +128,27 @@ export function LineItemEmbeddingsCard() {
 
   // Initial check when component mounts
   React.useEffect(() => {
-    checkEmbeddingStats();
+    checkEmbeddingStats({ silent: true });
   }, []);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Line Item Embeddings</span>
+          <span>{t('embeddingsCard.lineItemTitle')}</span>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <InfoIcon className="h-4 w-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-80">
-                <p>Vector embeddings enable semantic search for individual line items on receipts. This allows searching for specific products or services.</p>
+                <p>{t('embeddingsCard.lineItemTooltip')}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
         <CardDescription>
-          Generate vector embeddings for line items to enable semantic search
+          {t('embeddingsCard.lineItemDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,13 +162,13 @@ export function LineItemEmbeddingsCard() {
 
           <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2 xs:justify-between text-sm">
             <div className="whitespace-nowrap">
-              <span className="font-medium">Total Line Items:</span> {embeddingStats?.total || 0}
+              <span className="font-medium">{t('embeddingsCard.totalLineItems')}</span> {embeddingStats?.total || 0}
             </div>
             <div className="whitespace-nowrap">
-              <span className="font-medium">With Embeddings:</span> {embeddingStats?.withEmbeddings || 0}
+              <span className="font-medium">{t('embeddingsCard.withEmbeddings')}</span> {embeddingStats?.withEmbeddings || 0}
             </div>
             <div className="whitespace-nowrap">
-              <span className="font-medium">Without Embeddings:</span> {embeddingStats?.withoutEmbeddings || 0}
+              <span className="font-medium">{t('embeddingsCard.withoutEmbeddings')}</span> {embeddingStats?.withoutEmbeddings || 0}
             </div>
           </div>
 
@@ -169,7 +181,12 @@ export function LineItemEmbeddingsCard() {
 
           {lastUpdated && (
             <div className="text-xs text-muted-foreground">
-              Stats last updated: {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+              {t('embeddingsCard.statsUpdated', {
+                time: formatDistanceToNow(lastUpdated, {
+                  addSuffix: true,
+                  locale: language === 'ms' ? msLocale : undefined,
+                }),
+              })}
             </div>
           )}
 
@@ -177,9 +194,16 @@ export function LineItemEmbeddingsCard() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>
-                  {isRegenerating ? 'Regenerating embeddings...' : 'Generating embeddings...'}
+                  {isRegenerating
+                    ? t('embeddingsCard.regenerating')
+                    : t('embeddingsCard.generating')}
                 </span>
-                <span>{processedLineItems} of {totalLineItems}</span>
+                <span>
+                  {t('embeddingsCard.of', {
+                    processed: processedLineItems,
+                    total: totalLineItems,
+                  })}
+                </span>
               </div>
               <div className="w-full overflow-hidden rounded-full bg-ledger-surface-2 h-2">
                 <div
@@ -203,7 +227,7 @@ export function LineItemEmbeddingsCard() {
               ) : (
                 <RefreshCw className="h-3.5 w-3.5 mr-2" />
               )}
-              Refresh Stats
+              {t('embeddingsCard.refreshStats')}
             </Button>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -220,15 +244,15 @@ export function LineItemEmbeddingsCard() {
                       {isGeneratingEmbeddings && isRegenerating ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                          Regenerating...
+                          {t('embeddingsCard.regenerating')}
                         </>
                       ) : (
-                        <>Regenerate All</>
+                        <>{t('embeddingsCard.regenerateAll')}</>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
-                    Reprocess all line items with the latest embedding algorithm, even those that already have embeddings
+                    {t('embeddingsCard.reprocessLineItemsTooltip')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -246,15 +270,15 @@ export function LineItemEmbeddingsCard() {
                       {isGeneratingEmbeddings && !isRegenerating ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                          Generating...
+                          {t('embeddingsCard.generating')}
                         </>
                       ) : (
-                        <>Generate Missing</>
+                        <>{t('embeddingsCard.generateMissing')}</>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
-                    Only generate embeddings for line items that don't have them yet
+                    {t('embeddingsCard.missingLineItemsTooltip')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

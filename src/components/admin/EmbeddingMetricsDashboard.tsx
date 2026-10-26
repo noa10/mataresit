@@ -39,13 +39,15 @@ import { EmbeddingQueueMetrics } from './EmbeddingQueueMetrics';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { toast } from 'sonner';
 import { getAutoRefreshClasses } from '@/lib/darkModeUtils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export function EmbeddingMetricsDashboard() {
+  const { t } = useAdminTranslation();
   return (
     <ErrorBoundary
       onError={(error, errorInfo) => {
         console.error('Embedding Metrics Dashboard Error:', error, errorInfo);
-        toast.error('Dashboard encountered an error. Please refresh the page.');
+        toast.error(t('embeddingMetrics.dashboard.errorToast'));
       }}
     >
       <EmbeddingMetricsDashboardContent />
@@ -54,6 +56,7 @@ export function EmbeddingMetricsDashboard() {
 }
 
 function EmbeddingMetricsDashboardContent() {
+  const { t } = useAdminTranslation();
   const {
     healthStatus,
     summary,
@@ -83,7 +86,7 @@ function EmbeddingMetricsDashboardContent() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading embedding metrics...</p>
+          <p className="text-muted-foreground">{t('embeddingMetrics.dashboard.loading')}</p>
         </div>
       </div>
     );
@@ -97,12 +100,12 @@ function EmbeddingMetricsDashboardContent() {
           <CardContent className="p-6 text-center space-y-4">
             <AlertTriangle className="h-12 w-12 text-red-600 mx-auto" />
             <div>
-              <h3 className="font-semibold text-red-800">Failed to Load Dashboard</h3>
+              <h3 className="font-semibold text-red-800">{t('embeddingMetrics.dashboard.failedToLoad')}</h3>
               <p className="text-red-700 text-sm mt-1">{error}</p>
             </div>
             <Button onClick={refreshData} variant="outline" className="border-red-300 text-red-700">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
+              {t('embeddingMetrics.common.retry')}
             </Button>
           </CardContent>
         </Card>
@@ -112,7 +115,7 @@ function EmbeddingMetricsDashboardContent() {
 
   const handleExportData = () => {
     if (!summary || !healthStatus) {
-      toast.error('No data available to export');
+      toast.error(t('embeddingMetrics.dashboard.noDataToExport'));
       return;
     }
 
@@ -136,7 +139,7 @@ function EmbeddingMetricsDashboardContent() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success('Metrics data exported successfully');
+    toast.success(t('embeddingMetrics.dashboard.exportedSuccess'));
   };
 
   const getStatusColor = (status: string) => {
@@ -164,9 +167,9 @@ function EmbeddingMetricsDashboardContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Embedding Performance Dashboard</h1>
+          <h1 className="text-3xl font-bold">{t('embeddingMetrics.dashboard.title')}</h1>
           <p className="text-muted-foreground">
-            Real-time monitoring of embedding generation performance and quality
+            {t('embeddingMetrics.dashboard.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -184,11 +187,11 @@ function EmbeddingMetricsDashboardContent() {
             className={getAutoRefreshClasses(autoRefresh)}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
-            Auto Refresh
+            {t('embeddingMetrics.dashboard.autoRefresh')}
           </Button>
           <Button variant="outline" onClick={handleExportData}>
             <Download className="h-4 w-4 mr-2" />
-            Export Data
+            {t('embeddingMetrics.dashboard.exportData')}
           </Button>
           <Button
             onClick={refreshData}
@@ -196,7 +199,7 @@ function EmbeddingMetricsDashboardContent() {
             className="relative"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('embeddingMetrics.common.refresh')}
           </Button>
         </div>
       </div>
@@ -208,12 +211,12 @@ function EmbeddingMetricsDashboardContent() {
           <AlertDescription>
             <div className="flex items-center justify-between">
               <div>
-                <strong className="text-yellow-800 dark:text-yellow-200">Partial Data Load Issue</strong>
+                <strong className="text-yellow-800 dark:text-yellow-200">{t('embeddingMetrics.dashboard.partialDataIssue')}</strong>
                 <p className="text-yellow-700 dark:text-yellow-300 text-sm mt-1">{error}</p>
               </div>
               <Button onClick={refreshData} variant="outline" size="sm" className="border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
+                {t('embeddingMetrics.common.retry')}
               </Button>
             </div>
           </AlertDescription>
@@ -227,7 +230,13 @@ function EmbeddingMetricsDashboardContent() {
           <AlertDescription>
             <div className="flex items-center justify-between">
               <div>
-                <strong>System Status: {healthStatus.status.toUpperCase()}</strong>
+                <strong>
+                  {t('embeddingMetrics.dashboard.systemStatus', {
+                    status: t(`embeddingMetrics.common.${healthStatus.status}`, {
+                      defaultValue: healthStatus.status,
+                    }).toUpperCase(),
+                  })}
+                </strong>
                 {healthStatus.issues.length > 0 && (
                   <ul className="mt-1 text-sm">
                     {healthStatus.issues.map((issue, index) => (
@@ -248,12 +257,14 @@ function EmbeddingMetricsDashboardContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Health Score</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.dashboard.healthScore')}</p>
                 <p className="text-2xl font-bold">{summary?.healthScore || 0}/100</p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(healthStatus?.status || 'unknown')}>
-                  {healthStatus?.status || 'unknown'}
+                  {t(`embeddingMetrics.common.${healthStatus?.status || 'unknown'}`, {
+                    defaultValue: healthStatus?.status || 'unknown',
+                  })}
                 </Badge>
                 <EmbeddingHealthIndicator status={healthStatus?.status || 'unknown'} />
               </div>
@@ -266,13 +277,17 @@ function EmbeddingMetricsDashboardContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.dashboard.successRate')}</p>
                 <p className="text-2xl font-bold">{summary?.successRate.toFixed(1) || 0}%</p>
               </div>
               <Target className="h-8 w-8 text-green-500" />
             </div>
             <div className="flex items-center mt-2 text-sm text-muted-foreground">
-              <span>{summary?.totalEmbeddings || 0} total embeddings</span>
+              <span>
+                {t('embeddingMetrics.dashboard.totalEmbeddings', {
+                  count: summary?.totalEmbeddings || 0,
+                })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -281,14 +296,18 @@ function EmbeddingMetricsDashboardContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Duration</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.dashboard.avgDuration')}</p>
                 <p className="text-2xl font-bold">{summary?.avgDuration || 0}ms</p>
               </div>
               <Clock className="h-8 w-8 text-blue-500" />
             </div>
             <div className="flex items-center mt-2 text-sm text-muted-foreground">
               <TrendingUp className="h-3 w-3 mr-1" />
-              <span>{summary?.performanceTrend || 'stable'}</span>
+              <span>
+                {t(`embeddingMetrics.common.${summary?.performanceTrend || 'stable'}`, {
+                  defaultValue: summary?.performanceTrend || 'stable',
+                })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -297,13 +316,13 @@ function EmbeddingMetricsDashboardContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Cost</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.dashboard.totalCost')}</p>
                 <p className="text-2xl font-bold">${summary?.totalCost.toFixed(4) || 0}</p>
               </div>
               <DollarSign className="h-8 w-8 text-purple-500" />
             </div>
             <div className="flex items-center mt-2 text-sm text-muted-foreground">
-              <span>Last 7 days</span>
+              <span>{t('embeddingMetrics.dashboard.last7Days')}</span>
             </div>
           </CardContent>
         </Card>
@@ -315,12 +334,12 @@ function EmbeddingMetricsDashboardContent() {
       {/* Detailed Metrics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="quality">Quality</TabsTrigger>
-          <TabsTrigger value="costs">Costs</TabsTrigger>
-          <TabsTrigger value="queue">Queue</TabsTrigger>
-          <TabsTrigger value="health">Health</TabsTrigger>
+          <TabsTrigger value="overview">{t('embeddingMetrics.dashboard.tabs.overview')}</TabsTrigger>
+          <TabsTrigger value="performance">{t('embeddingMetrics.dashboard.tabs.performance')}</TabsTrigger>
+          <TabsTrigger value="quality">{t('embeddingMetrics.dashboard.tabs.quality')}</TabsTrigger>
+          <TabsTrigger value="costs">{t('embeddingMetrics.dashboard.tabs.costs')}</TabsTrigger>
+          <TabsTrigger value="queue">{t('embeddingMetrics.dashboard.tabs.queue')}</TabsTrigger>
+          <TabsTrigger value="health">{t('embeddingMetrics.dashboard.tabs.health')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -333,22 +352,34 @@ function EmbeddingMetricsDashboardContent() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5" />
-                  Recent Activity
+                  {t('embeddingMetrics.dashboard.recentActivity')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm">Last 24 hours</span>
-                    <span className="font-mono">{healthStatus?.metrics.raw_metrics_24h || 0} embeddings</span>
+                    <span className="text-sm">{t('embeddingMetrics.dashboard.last24Hours')}</span>
+                    <span className="font-mono">
+                      {t('embeddingMetrics.dashboard.embeddingsCount', {
+                        count: healthStatus?.metrics.raw_metrics_24h || 0,
+                      })}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm">Hourly stats (7d)</span>
-                    <span className="font-mono">{healthStatus?.metrics.hourly_stats_7d || 0} records</span>
+                    <span className="text-sm">{t('embeddingMetrics.dashboard.hourlyStats7d')}</span>
+                    <span className="font-mono">
+                      {t('embeddingMetrics.dashboard.recordsCount', {
+                        count: healthStatus?.metrics.hourly_stats_7d || 0,
+                      })}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm">Daily stats (30d)</span>
-                    <span className="font-mono">{healthStatus?.metrics.daily_stats_30d || 0} records</span>
+                    <span className="text-sm">{t('embeddingMetrics.dashboard.dailyStats30d')}</span>
+                    <span className="font-mono">
+                      {t('embeddingMetrics.dashboard.recordsCount', {
+                        count: healthStatus?.metrics.daily_stats_30d || 0,
+                      })}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -359,7 +390,7 @@ function EmbeddingMetricsDashboardContent() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Top Error Types
+                  {t('embeddingMetrics.dashboard.topErrorTypes')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -367,12 +398,16 @@ function EmbeddingMetricsDashboardContent() {
                   {summary?.topErrors.length === 0 ? (
                     <div className="text-center text-muted-foreground py-4">
                       <CheckCircle className="h-6 w-6 mx-auto mb-2 text-green-500" />
-                      No errors detected
+                      {t('embeddingMetrics.dashboard.noErrors')}
                     </div>
                   ) : (
                     summary?.topErrors.map((error, index) => (
                       <div key={index} className="flex justify-between items-center">
-                        <span className="text-sm capitalize">{error.type.replace('_', ' ')}</span>
+                        <span className="text-sm">
+                          {t(`embeddingMetrics.dashboard.errorTypes.${error.type}`, {
+                            defaultValue: error.type.replace('_', ' '),
+                          })}
+                        </span>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">{error.count}</span>
                           <Badge variant="outline">{error.percentage.toFixed(1)}%</Badge>

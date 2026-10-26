@@ -8,6 +8,47 @@ import { describe, expect, it, vi } from "vitest";
 import type { ReceiptUpload } from "@/types/receipt";
 import { BatchLedgerRow } from "../BatchLedgerRow";
 
+const batchMessages: Record<string, string> = {
+  "batch.row.view": "View",
+  "batch.row.posted": "Posted",
+  "batch.row.retry": "Retry",
+  "batch.row.viewAria": "View {{name}}",
+  "batch.row.retryAria": "Retry {{name}}",
+  "batch.row.removeAria": "Remove {{name}}",
+  "batch.row.cancelAria": "Cancel {{name}}",
+  "batch.row.failedMeta": "Failed · {{detail}}",
+  "batch.row.readyMeta": "Ready · {{date}} · {{amount}}",
+  "batch.row.workingMeta": "Working · {{detail}}",
+  "batch.row.queuedMeta": "Queued · Waiting for a free slot",
+  "batch.row.readyFileMeta": "Ready · {{kind}} · {{size}}",
+  "batch.row.statusReady": "Ready",
+  "batch.row.statusUploading": "Uploading",
+  "batch.row.statusWorking": "Working",
+  "batch.row.statusFailed": "Failed",
+  "batch.row.statusQueued": "Queued",
+  "batch.row.stageUploading": "Uploading to cloud storage",
+  "batch.row.stageProcessing": "AI processing and analysis",
+  "batch.row.stageEmbedding": "Generating embeddings",
+  "batch.row.stageStoring": "Storing receipt data",
+  "batch.row.stageCompleted": "Posted to the ledger",
+  "batch.row.waiting": "Waiting for a free slot",
+  "batch.row.postedOn": "Posted · {{date}}",
+  "batch.row.postedLedger": "Posted to the ledger",
+  "batch.row.uploadFailed": "Upload failed. Try again.",
+  "batch.row.etaUnder": "under {{seconds}}s left",
+  "batch.row.etaMinutes": "~{{minutes}} min left",
+};
+
+vi.mock("@/contexts/LanguageContext", () => ({
+  useReceiptsTranslation: () => ({
+    language: "en",
+    t: (key: string, options: Record<string, unknown> = {}) =>
+      (batchMessages[key] ?? key).replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        options[name] === undefined ? "" : String(options[name])
+      ),
+  }),
+}));
+
 const file = new File(["receipt"], "village-grocer.jpg", { type: "image/jpeg" });
 
 const baseUpload: ReceiptUpload = {

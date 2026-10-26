@@ -6,9 +6,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Alert, AlertDescription } from '../ui/alert';
 import { checkReceiptEmbeddings, generateReceiptEmbeddings } from '@/lib/ai-search';
 import { formatDistanceToNow } from 'date-fns';
+import { ms as msLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export function ReceiptEmbeddingsCard() {
+  const { t, language } = useAdminTranslation();
   // Receipt embedding state
   const [isGeneratingEmbeddings, setIsGeneratingEmbeddings] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -29,7 +32,7 @@ export function ReceiptEmbeddingsCard() {
   });
 
   // Function to check receipt embedding statistics
-  const checkEmbeddingStats = async () => {
+  const checkEmbeddingStats = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -44,12 +47,16 @@ export function ReceiptEmbeddingsCard() {
         withoutEmbeddings: result.withoutEmbeddings || 0
       });
       setLastUpdated(new Date());
-      toast.success('Receipt embedding stats refreshed');
+      if (!silent) {
+        toast.success(t('embeddingsCard.refreshReceiptSuccess'));
+      }
     } catch (error) {
       console.error('Error checking receipt embedding stats:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to check embedding stats';
+      const errorMessage = error instanceof Error ? error.message : t('embeddingsCard.checkFailed');
       setError(errorMessage);
-      toast.error(`Failed to refresh stats: ${errorMessage}`);
+      if (!silent) {
+        toast.error(t('embeddingsCard.refreshFailed', { error: errorMessage }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -64,8 +71,11 @@ export function ReceiptEmbeddingsCard() {
       setProcessedReceipts(0);
       setError(null);
 
-      const actionType = regenerate ? 'Regenerating' : 'Generating';
-      toast.info(`${actionType} receipt embeddings...`);
+      toast.info(
+        regenerate
+          ? t('embeddingsCard.regeneratingReceiptToast')
+          : t('embeddingsCard.generatingReceiptToast')
+      );
 
       // Get current stats to know how many items need processing
       await checkEmbeddingStats();
@@ -93,21 +103,23 @@ export function ReceiptEmbeddingsCard() {
           const progress = Math.min(100, Math.round((totalProcessed / targetCount) * 100));
           setEmbeddingProgress(progress);
 
-          toast.success(`Successfully processed ${result.processed} receipts`);
+          toast.success(
+            t('embeddingsCard.processedReceipts', { count: result.processed })
+          );
         } else {
-          toast.info('No receipts needed processing');
+          toast.info(t('embeddingsCard.noReceiptsNeeded'));
         }
       } else {
-        toast.info('No receipts available for processing');
+        toast.info(t('embeddingsCard.noReceiptsAvailable'));
       }
 
       // Final check to update stats
       await checkEmbeddingStats();
     } catch (error) {
       console.error('Error generating receipt embeddings:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate embeddings';
+      const errorMessage = error instanceof Error ? error.message : t('embeddingsCard.generateFailed', { error: '' });
       setError(errorMessage);
-      toast.error(`Failed to generate embeddings: ${errorMessage}`);
+      toast.error(t('embeddingsCard.generateFailed', { error: errorMessage }));
     } finally {
       setIsGeneratingEmbeddings(false);
       setIsRegenerating(false);
@@ -116,27 +128,27 @@ export function ReceiptEmbeddingsCard() {
 
   // Initial check when component mounts
   React.useEffect(() => {
-    checkEmbeddingStats();
+    checkEmbeddingStats({ silent: true });
   }, []);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Receipt Embeddings</span>
+          <span>{t('embeddingsCard.receiptTitle')}</span>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <InfoIcon className="h-4 w-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-80">
-                <p>Vector embeddings enable semantic search for receipts. They convert text into numerical vectors that capture meaning.</p>
+                <p>{t('embeddingsCard.receiptTooltip')}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
         <CardDescription>
-          Generate vector embeddings for receipts to enable semantic search
+          {t('embeddingsCard.receiptDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,13 +162,13 @@ export function ReceiptEmbeddingsCard() {
 
           <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2 xs:justify-between text-sm">
             <div className="whitespace-nowrap">
-              <span className="font-medium">Total Receipts:</span> {embeddingStats?.total || 0}
+              <span className="font-medium">{t('embeddingsCard.totalReceipts')}</span> {embeddingStats?.total || 0}
             </div>
             <div className="whitespace-nowrap">
-              <span className="font-medium">With Embeddings:</span> {embeddingStats?.withEmbeddings || 0}
+              <span className="font-medium">{t('embeddingsCard.withEmbeddings')}</span> {embeddingStats?.withEmbeddings || 0}
             </div>
             <div className="whitespace-nowrap">
-              <span className="font-medium">Without Embeddings:</span> {embeddingStats?.withoutEmbeddings || 0}
+              <span className="font-medium">{t('embeddingsCard.withoutEmbeddings')}</span> {embeddingStats?.withoutEmbeddings || 0}
             </div>
           </div>
 
@@ -169,7 +181,12 @@ export function ReceiptEmbeddingsCard() {
 
           {lastUpdated && (
             <div className="text-xs text-muted-foreground">
-              Stats last updated: {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+              {t('embeddingsCard.statsUpdated', {
+                time: formatDistanceToNow(lastUpdated, {
+                  addSuffix: true,
+                  locale: language === 'ms' ? msLocale : undefined,
+                }),
+              })}
             </div>
           )}
 
@@ -177,9 +194,16 @@ export function ReceiptEmbeddingsCard() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>
-                  {isRegenerating ? 'Regenerating embeddings...' : 'Generating embeddings...'}
+                  {isRegenerating
+                    ? t('embeddingsCard.regenerating')
+                    : t('embeddingsCard.generating')}
                 </span>
-                <span>{processedReceipts} of {totalReceipts}</span>
+                <span>
+                  {t('embeddingsCard.of', {
+                    processed: processedReceipts,
+                    total: totalReceipts,
+                  })}
+                </span>
               </div>
               <div className="w-full overflow-hidden rounded-full bg-ledger-surface-2 h-2">
                 <div
@@ -203,7 +227,7 @@ export function ReceiptEmbeddingsCard() {
               ) : (
                 <RefreshCw className="h-3.5 w-3.5 mr-2" />
               )}
-              Refresh Stats
+              {t('embeddingsCard.refreshStats')}
             </Button>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -220,15 +244,15 @@ export function ReceiptEmbeddingsCard() {
                       {isGeneratingEmbeddings && isRegenerating ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                          Regenerating...
+                          {t('embeddingsCard.regenerating')}
                         </>
                       ) : (
-                        <>Regenerate All</>
+                        <>{t('embeddingsCard.regenerateAll')}</>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
-                    Reprocess all receipts with the latest embedding algorithm, even those that already have embeddings
+                    {t('embeddingsCard.reprocessReceiptsTooltip')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -246,15 +270,15 @@ export function ReceiptEmbeddingsCard() {
                       {isGeneratingEmbeddings && !isRegenerating ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                          Generating...
+                          {t('embeddingsCard.generating')}
                         </>
                       ) : (
-                        <>Generate Missing</>
+                        <>{t('embeddingsCard.generateMissing')}</>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
-                    Only generate embeddings for receipts that don't have them yet
+                    {t('embeddingsCard.missingReceiptsTooltip')}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

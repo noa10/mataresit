@@ -20,7 +20,9 @@ import {
   Crown
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ms as msLocale } from 'date-fns/locale';
 import { AdvancedFilterPanelProps, SearchFilters } from '@/types/unified-search';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 export function AdvancedFilterPanel({
   filters,
@@ -32,6 +34,8 @@ export function AdvancedFilterPanel({
   subscriptionFeatures,
   className
 }: AdvancedFilterPanelProps) {
+  const { t, language } = useCommonTranslation();
+  const dateLocale = language === 'ms' ? msLocale : undefined;
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
 
   const hasAdvancedFilters = subscriptionFeatures.includes('advanced_filters');
@@ -61,16 +65,24 @@ export function AdvancedFilterPanel({
 
   const renderDateRangeFilter = () => (
     <div className="space-y-2">
-      <Label>Date Range</Label>
+      <Label>{t('unifiedSearch.filters.dateRange')}</Label>
       <div className="flex gap-2">
         <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-full justify-start text-left font-normal">
               <CalendarIcon className="mr-2 h-4 w-4" />
               {filters.dateRange ? (
-                `${format(new Date(filters.dateRange.start), 'MMM dd')} - ${format(new Date(filters.dateRange.end), 'MMM dd')}`
+                `${format(
+                  new Date(filters.dateRange.start),
+                  language === 'ms' ? 'dd MMM' : 'MMM dd',
+                  { locale: dateLocale }
+                )} - ${format(
+                  new Date(filters.dateRange.end),
+                  language === 'ms' ? 'dd MMM' : 'MMM dd',
+                  { locale: dateLocale }
+                )}`
               ) : (
-                'Select date range'
+                t('unifiedSearch.filters.selectDateRange')
               )}
             </Button>
           </PopoverTrigger>
@@ -114,7 +126,7 @@ export function AdvancedFilterPanel({
                       setDateRangeOpen(false);
                     }}
                   >
-                    {preset.charAt(0).toUpperCase() + preset.slice(1)}
+                    {t(`unifiedSearch.filters.${preset}`)}
                   </Button>
                 ))}
               </div>
@@ -155,11 +167,11 @@ export function AdvancedFilterPanel({
 
   const renderAmountRangeFilter = () => (
     <div className="space-y-2">
-      <Label>Amount Range (MYR)</Label>
+      <Label>{t('unifiedSearch.filters.amountRange')}</Label>
       <div className="flex gap-2">
         <Input
           type="number"
-          placeholder="Min"
+          placeholder={t('unifiedSearch.filters.min')}
           value={filters.amountRange?.min || ''}
           onChange={(e) => updateFilters({
             amountRange: {
@@ -172,7 +184,7 @@ export function AdvancedFilterPanel({
         />
         <Input
           type="number"
-          placeholder="Max"
+          placeholder={t('unifiedSearch.filters.max')}
           value={filters.amountRange?.max || ''}
           onChange={(e) => updateFilters({
             amountRange: {
@@ -202,7 +214,7 @@ export function AdvancedFilterPanel({
         <Button variant="outline" className="w-full justify-between">
           <span className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
-            Advanced Filters
+            {t('unifiedSearch.filters.title')}
             {getActiveFilterCount() > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {getActiveFilterCount()}
@@ -223,20 +235,20 @@ export function AdvancedFilterPanel({
           
           {/* Language Toggle */}
           <div className="space-y-2">
-            <Label>Language</Label>
+            <Label>{t('unifiedSearch.filters.language')}</Label>
             <ToggleGroup
               type="single"
               value={filters.language || 'en'}
               onValueChange={(language) => updateFilters({ language: language as 'en' | 'ms' })}
             >
-              <ToggleGroupItem value="en">English</ToggleGroupItem>
-              <ToggleGroupItem value="ms">Bahasa Malaysia</ToggleGroupItem>
+              <ToggleGroupItem value="en">{t('unifiedSearch.filters.english')}</ToggleGroupItem>
+              <ToggleGroupItem value="ms">{t('unifiedSearch.filters.malay')}</ToggleGroupItem>
             </ToggleGroup>
           </div>
 
           {/* Sort Options */}
           <div className="space-y-2">
-            <Label>Sort By</Label>
+            <Label>{t('unifiedSearch.filters.sortBy')}</Label>
             <div className="flex gap-2">
               <Select
                 value={filters.sortBy || 'relevance'}
@@ -246,10 +258,10 @@ export function AdvancedFilterPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="relevance">Relevance</SelectItem>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="amount">Amount</SelectItem>
-                  <SelectItem value="alphabetical">Alphabetical</SelectItem>
+                  <SelectItem value="relevance">{t('unifiedSearch.filters.relevance')}</SelectItem>
+                  <SelectItem value="date">{t('unifiedSearch.filters.date')}</SelectItem>
+                  <SelectItem value="amount">{t('unifiedSearch.filters.amount')}</SelectItem>
+                  <SelectItem value="alphabetical">{t('unifiedSearch.filters.alphabetical')}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -276,14 +288,14 @@ export function AdvancedFilterPanel({
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />
-                <Label className="text-sm font-medium">Advanced Filters</Label>
+                <Label className="text-sm font-medium">{t('unifiedSearch.filters.title')}</Label>
               </div>
 
               {renderAmountRangeFilter()}
 
               {/* Category Multi-Select */}
               <div className="space-y-2">
-                <Label>Categories</Label>
+                <Label>{t('unifiedSearch.filters.categories')}</Label>
                 <Select
                   value={filters.categories?.[0] || ''}
                   onValueChange={(categoryId) => {
@@ -297,7 +309,7 @@ export function AdvancedFilterPanel({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select categories..." />
+                    <SelectValue placeholder={t('unifiedSearch.filters.selectCategories')} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCategories.map(category => (
@@ -334,16 +346,16 @@ export function AdvancedFilterPanel({
               {/* Team Scope (Pro/Max only) */}
               {hasTeamSearch && (
                 <div className="space-y-2">
-                  <Label>Team Scope</Label>
+                  <Label>{t('unifiedSearch.filters.teamScope')}</Label>
                   <Select
                     value={filters.teamId || ''}
                     onValueChange={(teamId) => updateFilters({ teamId })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="All teams" />
+                      <SelectValue placeholder={t('unifiedSearch.filters.allTeams')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All teams</SelectItem>
+                      <SelectItem value="">{t('unifiedSearch.filters.allTeams')}</SelectItem>
                       {availableTeams.map(team => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.name}
@@ -366,7 +378,7 @@ export function AdvancedFilterPanel({
               onClick={() => onFiltersChange({})}
               className="w-full"
             >
-              Clear All Filters
+              {t('unifiedSearch.filters.clearAll')}
             </Button>
           </>
         )}

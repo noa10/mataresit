@@ -31,6 +31,40 @@ import { useSettingsTranslation } from '@/contexts/LanguageContext';
 import { NotificationSetupGuide } from '@/components/notifications/NotificationSetupGuide';
 import { NotificationTestPanel } from '@/components/notifications/NotificationTestPanel';
 
+const CATEGORY_I18N_KEYS: Record<string, string> = {
+  RECEIPT_PROCESSING: 'receiptProcessing',
+  TEAM_COLLABORATION: 'teamCollaboration',
+  CLAIMS_AND_BILLING: 'claimsAndBilling',
+  SYSTEM: 'system',
+  GAMIFICATION: 'gamification',
+};
+
+const NOTIFICATION_TYPE_I18N_KEYS: Record<string, string> = {
+  receipt_processing_started: 'receiptProcessingStarted',
+  receipt_processing_completed: 'receiptProcessingCompleted',
+  receipt_processing_failed: 'receiptProcessingFailed',
+  receipt_ready_for_review: 'receiptReadyForReview',
+  receipt_batch_completed: 'receiptBatchCompleted',
+  receipt_batch_failed: 'receiptBatchFailed',
+  team_invitation_sent: 'teamInvitationSent',
+  team_invitation_accepted: 'teamInvitationAccepted',
+  team_member_joined: 'teamMemberJoined',
+  team_member_left: 'teamMemberLeft',
+  team_member_removed: 'teamMemberRemoved',
+  team_member_role_changed: 'teamMemberRoleChanged',
+  receipt_shared: 'receiptShared',
+  receipt_comment_added: 'receiptCommentAdded',
+  receipt_edited_by_team_member: 'receiptEditedByTeamMember',
+  receipt_approved_by_team: 'receiptApprovedByTeam',
+  receipt_flagged_for_review: 'receiptFlaggedForReview',
+  claim_submitted: 'claimSubmitted',
+  claim_approved: 'claimApproved',
+  claim_rejected: 'claimRejected',
+  claim_review_requested: 'claimReviewRequested',
+  team_settings_updated: 'teamSettingsUpdated',
+  gamification_streak_reminder: 'gamificationStreakReminder',
+};
+
 export function NotificationPreferences() {
   const { t } = useSettingsTranslation();
   const { preferences, preferencesLoading: isLoading, updatePreferences } = useNotifications();
@@ -89,9 +123,9 @@ export function NotificationPreferences() {
   const handleTestNotification = async () => {
     try {
       await pushContext.showTestNotification();
-      toast.success('Test notification sent');
+      toast.success(t('notifications.push.testSent'));
     } catch (error) {
-      toast.error('Failed to send test notification');
+      toast.error(t('notifications.push.testFailed'));
     }
   };
 
@@ -141,7 +175,7 @@ export function NotificationPreferences() {
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Push notifications are not supported in your browser or are not available.
+                {t('notifications.push.unsupported')}
               </AlertDescription>
             </Alert>
           )}
@@ -151,7 +185,7 @@ export function NotificationPreferences() {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Push notifications are blocked. Please enable them in your browser settings.
+                {t('notifications.push.blocked')}
               </AlertDescription>
             </Alert>
           )}
@@ -163,7 +197,7 @@ export function NotificationPreferences() {
                 {t('notifications.push.enabled') || 'Enable push notifications'}
               </Label>
               <p className="text-xs text-muted-foreground">
-                Receive notifications even when the app is closed
+                {t('notifications.push.closedDescription')}
               </p>
             </div>
             <Switch
@@ -178,8 +212,7 @@ export function NotificationPreferences() {
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Push notifications are disabled. You can still configure your preferences below,
-                but you won't receive push notifications until you enable them above.
+                {t('notifications.push.disabledNotice')}
               </AlertDescription>
             </Alert>
           )}
@@ -194,7 +227,7 @@ export function NotificationPreferences() {
                 disabled={!pushStatus.isEnabled}
               >
                 <Bell className="h-4 w-4 mr-2" />
-                Send Test Notification
+                {t('notifications.push.sendTest')}
               </Button>
             </div>
           )}
@@ -219,9 +252,9 @@ export function NotificationPreferences() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label className="text-sm font-medium">Enable email notifications</Label>
+              <Label className="text-sm font-medium">{t('notifications.email.enabled')}</Label>
               <p className="text-xs text-muted-foreground">
-                Master switch for all email notifications
+                {t('notifications.email.enabledDescription')}
               </p>
             </div>
             <Switch
@@ -245,8 +278,12 @@ export function NotificationPreferences() {
                 {categoryKey === 'GAMIFICATION' && <Bell className="h-5 w-5 text-ledger-accent" />}
               </div>
               <div>
-                <CardTitle className="text-lg">{category.label}</CardTitle>
-                <CardDescription>{category.description}</CardDescription>
+                <CardTitle className="text-lg">
+                  {t(`notifications.categories.${CATEGORY_I18N_KEYS[categoryKey] ?? categoryKey}`)}
+                </CardTitle>
+                <CardDescription>
+                  {t(`notifications.categories.${CATEGORY_I18N_KEYS[categoryKey] ?? categoryKey}Description`)}
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -255,7 +292,7 @@ export function NotificationPreferences() {
             <div className="space-y-3">
               <h4 className="text-sm font-medium flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                Email Notifications
+                {t('notifications.email.title')}
               </h4>
               <div className="grid gap-3">
                 {category.types.map((notificationType) => {
@@ -268,7 +305,7 @@ export function NotificationPreferences() {
                     <div key={notificationType} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-sm">
-                          {getNotificationTypeLabel(notificationType)}
+                          {t(`notifications.types.${NOTIFICATION_TYPE_I18N_KEYS[notificationType] ?? notificationType}`)}
                         </Label>
                         <div className="flex gap-2">
                           {emailKey && (
@@ -317,9 +354,9 @@ export function NotificationPreferences() {
               <Moon className="h-5 w-5 text-ledger-accent" />
             </div>
             <div>
-              <CardTitle>Quiet Hours</CardTitle>
+              <CardTitle>{t('notifications.quietHours.title')}</CardTitle>
               <CardDescription>
-                Disable notifications during specific hours
+                {t('notifications.quietHours.description')}
               </CardDescription>
             </div>
           </div>
@@ -327,9 +364,9 @@ export function NotificationPreferences() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label className="text-sm font-medium">Enable quiet hours</Label>
+              <Label className="text-sm font-medium">{t('notifications.quietHours.enabled')}</Label>
               <p className="text-xs text-muted-foreground">
-                Notifications will be silenced during these hours
+                {t('notifications.quietHours.enabledDescription')}
               </p>
             </div>
             <Switch
@@ -341,7 +378,7 @@ export function NotificationPreferences() {
           {localPreferences.quiet_hours_enabled && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">Start time</Label>
+                <Label className="text-sm">{t('notifications.quietHours.startTime')}</Label>
                 <Input
                   type="time"
                   value={localPreferences.quiet_hours_start || '22:00'}
@@ -349,7 +386,7 @@ export function NotificationPreferences() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">End time</Label>
+                <Label className="text-sm">{t('notifications.quietHours.endTime')}</Label>
                 <Input
                   type="time"
                   value={localPreferences.quiet_hours_end || '08:00'}
@@ -362,7 +399,7 @@ export function NotificationPreferences() {
           <div className="space-y-2">
             <Label className="text-sm flex items-center gap-2">
               <Globe className="h-4 w-4" />
-              Timezone
+              {t('notifications.quietHours.timezone')}
             </Label>
             <Select
               value={localPreferences.timezone || 'Asia/Kuala_Lumpur'}
@@ -373,14 +410,15 @@ export function NotificationPreferences() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Asia/Kuala_Lumpur">
-                  Malaysia (UTC+8) <Badge variant="secondary" className="ml-2">Default</Badge>
+                  {t('notifications.categories.timezoneMalaysia', { defaultValue: 'Malaysia (UTC+8)' })}{" "}
+                  <Badge variant="secondary" className="ml-2">{t('notifications.quietHours.default')}</Badge>
                 </SelectItem>
-                <SelectItem value="Asia/Singapore">Singapore (UTC+8)</SelectItem>
-                <SelectItem value="Asia/Jakarta">Jakarta (UTC+7)</SelectItem>
-                <SelectItem value="Asia/Bangkok">Bangkok (UTC+7)</SelectItem>
+                <SelectItem value="Asia/Singapore">{t('notifications.categories.timezoneSingapore', { defaultValue: 'Singapore (UTC+8)' })}</SelectItem>
+                <SelectItem value="Asia/Jakarta">{t('notifications.categories.timezoneJakarta', { defaultValue: 'Jakarta (UTC+7)' })}</SelectItem>
+                <SelectItem value="Asia/Bangkok">{t('notifications.categories.timezoneBangkok', { defaultValue: 'Bangkok (UTC+7)' })}</SelectItem>
                 <SelectItem value="UTC">UTC (UTC+0)</SelectItem>
-                <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
-                <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
+                <SelectItem value="America/New_York">{t('notifications.categories.timezoneNewYork', { defaultValue: 'New York (UTC-5)' })}</SelectItem>
+                <SelectItem value="Europe/London">{t('notifications.categories.timezoneLondon', { defaultValue: 'London (UTC+0)' })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -394,7 +432,7 @@ export function NotificationPreferences() {
           disabled={isSaving}
           className="min-w-[120px]"
         >
-          {isSaving ? 'Saving...' : 'Save Preferences'}
+          {isSaving ? t('billingPreferences.saving') : t('billingPreferences.save')}
         </Button>
       </div>
 
@@ -404,43 +442,4 @@ export function NotificationPreferences() {
       )}
     </div>
   );
-}
-
-// Helper function to get user-friendly notification type labels
-function getNotificationTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    // Receipt processing
-    'receipt_processing_started': 'Processing started',
-    'receipt_processing_completed': 'Processing completed',
-    'receipt_processing_failed': 'Processing failed',
-    'receipt_ready_for_review': 'Ready for review',
-    'receipt_batch_completed': 'Batch completed',
-    'receipt_batch_failed': 'Batch failed',
-    
-    // Team collaboration
-    'team_invitation_sent': 'Team invitations',
-    'team_invitation_accepted': 'Invitation accepted',
-    'team_member_joined': 'Member joined',
-    'team_member_left': 'Member left',
-    'team_member_role_changed': 'Role changed',
-    'receipt_shared': 'Receipt shared',
-    'receipt_comment_added': 'Comments added',
-    'receipt_edited_by_team_member': 'Receipt edited',
-    'receipt_approved_by_team': 'Receipt approved',
-    'receipt_flagged_for_review': 'Flagged for review',
-    
-    // Claims and billing
-    'claim_submitted': 'Claim submitted',
-    'claim_approved': 'Claim approved',
-    'claim_rejected': 'Claim rejected',
-    'claim_review_requested': 'Review requested',
-    
-    // System
-    'team_settings_updated': 'Settings updated',
-
-    // Gamification
-    'gamification_streak_reminder': 'Streak reminders',
-  };
-  
-  return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }

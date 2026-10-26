@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   CheckCircle 
 } from 'lucide-react';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface PerformanceDurationChartProps {
   hourlyStats: EmbeddingHourlyStats[];
@@ -38,10 +39,21 @@ export function PerformanceDurationChart({
   onRefresh,
   className = ''
 }: PerformanceDurationChartProps) {
+  const { t } = useAdminTranslation();
+
   // Transform data and calculate metrics
   const { chartConfig, metrics } = useMemo(() => {
-    const series = transformHourlyStatsToDuration(hourlyStats);
-    const config = generateChartConfig('duration', series);
+    const series = transformHourlyStatsToDuration(hourlyStats).map((item, index) => ({
+      ...item,
+      name: index === 0
+        ? t('embeddingMetrics.charts.common.seriesAverageDuration')
+        : t('embeddingMetrics.charts.common.seriesP95Duration')
+    }));
+    const config = {
+      ...generateChartConfig('duration', series),
+      title: t('embeddingMetrics.charts.common.titleDuration'),
+      subtitle: t('embeddingMetrics.charts.common.subtitleDuration')
+    };
     
     // Calculate performance metrics
     const durations = hourlyStats.map(stat => stat.avg_duration_ms).filter(d => d > 0);
@@ -97,7 +109,7 @@ export function PerformanceDurationChart({
         p95PerformanceScore: Math.max(0, 100 - Math.max(0, (avgP95Duration - targetP95Duration) / targetP95Duration * 100))
       }
     };
-  }, [hourlyStats]);
+  }, [hourlyStats, t]);
 
   const getPerformanceStatus = (duration: number, target: number) => {
     const ratio = duration / target;
@@ -108,9 +120,9 @@ export function PerformanceDurationChart({
   };
 
   const getTrendStatus = (change: number) => {
-    if (Math.abs(change) < 5) return { icon: Clock, color: 'text-gray-500', text: 'Stable' };
-    if (change < 0) return { icon: TrendingDown, color: 'text-green-500', text: `${Math.abs(change).toFixed(1)}% faster` };
-    return { icon: TrendingUp, color: 'text-red-500', text: `${change.toFixed(1)}% slower` };
+    if (Math.abs(change) < 5) return { icon: Clock, color: 'text-gray-500', text: t('embeddingMetrics.charts.common.trendStable') };
+    if (change < 0) return { icon: TrendingDown, color: 'text-green-500', text: t('embeddingMetrics.charts.duration.faster', { change: Math.abs(change).toFixed(1) }) };
+    return { icon: TrendingUp, color: 'text-red-500', text: t('embeddingMetrics.charts.duration.slower', { change: change.toFixed(1) }) };
   };
 
   const avgStatus = getPerformanceStatus(metrics.avgDuration, metrics.targetAvgDuration);
@@ -152,19 +164,19 @@ export function PerformanceDurationChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Average Duration</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.duration.averageDuration')}</p>
                 <p className="text-2xl font-bold">{metrics.avgDuration}ms</p>
               </div>
               <div className="flex items-center gap-2">
                 <AvgStatusIcon className="h-6 w-6 text-gray-400" />
                 <Badge className={avgStatus.color}>
-                  {avgStatus.status}
+                  {t(`embeddingMetrics.charts.status.${avgStatus.status}`)}
                 </Badge>
               </div>
             </div>
             <div className="mt-2">
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>vs Target ({metrics.targetAvgDuration}ms)</span>
+                <span>{t('embeddingMetrics.charts.duration.vsTarget', { target: metrics.targetAvgDuration })}</span>
                 <span>{metrics.avgPerformanceScore.toFixed(0)}%</span>
               </div>
               <Progress value={metrics.avgPerformanceScore} className="h-2" />
@@ -176,19 +188,19 @@ export function PerformanceDurationChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">P95 Duration</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.duration.p95Duration')}</p>
                 <p className="text-2xl font-bold">{metrics.avgP95Duration}ms</p>
               </div>
               <div className="flex items-center gap-2">
                 <P95StatusIcon className="h-6 w-6 text-gray-400" />
                 <Badge className={p95Status.color}>
-                  {p95Status.status}
+                  {t(`embeddingMetrics.charts.status.${p95Status.status}`)}
                 </Badge>
               </div>
             </div>
             <div className="mt-2">
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>vs Target ({metrics.targetP95Duration}ms)</span>
+                <span>{t('embeddingMetrics.charts.duration.vsTarget', { target: metrics.targetP95Duration })}</span>
                 <span>{metrics.p95PerformanceScore.toFixed(0)}%</span>
               </div>
               <Progress value={metrics.p95PerformanceScore} className="h-2" />
@@ -200,7 +212,7 @@ export function PerformanceDurationChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Recent Trend</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.duration.recentTrend')}</p>
                 <p className="text-2xl font-bold">{metrics.recentAvgDuration}ms</p>
               </div>
               <div className="flex items-center gap-1">
@@ -217,15 +229,15 @@ export function PerformanceDurationChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Duration Range</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.duration.durationRange')}</p>
                 <p className="text-lg font-bold">
                   {metrics.minDuration} - {metrics.maxDuration}ms
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Min - Max Avg</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.charts.duration.minMaxAvg')}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  P95: {metrics.minP95Duration} - {metrics.maxP95Duration}ms
+                  {t('embeddingMetrics.charts.duration.p95Range', { min: metrics.minP95Duration, max: metrics.maxP95Duration })}
                 </p>
               </div>
             </div>
@@ -246,7 +258,7 @@ export function PerformanceDurationChart({
       {/* Performance Insights */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Performance Insights</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.duration.insightsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -254,9 +266,12 @@ export function PerformanceDurationChart({
               <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-800">Excellent Performance</p>
+                  <p className="font-medium text-green-800">{t('embeddingMetrics.charts.duration.excellentTitle')}</p>
                   <p className="text-sm text-green-700">
-                    Average duration of {metrics.avgDuration}ms is within the target of {metrics.targetAvgDuration}ms.
+                    {t('embeddingMetrics.charts.duration.excellentDesc', {
+                      duration: metrics.avgDuration,
+                      target: metrics.targetAvgDuration
+                    })}
                   </p>
                 </div>
               </div>
@@ -266,9 +281,9 @@ export function PerformanceDurationChart({
               <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-800">Performance Issue Detected</p>
+                  <p className="font-medium text-red-800">{t('embeddingMetrics.charts.duration.issueTitle')}</p>
                   <p className="text-sm text-red-700">
-                    Average duration of {metrics.avgDuration}ms is significantly above target. Consider optimizing API calls or content processing.
+                    {t('embeddingMetrics.charts.duration.issueDesc', { duration: metrics.avgDuration })}
                   </p>
                 </div>
               </div>
@@ -278,9 +293,12 @@ export function PerformanceDurationChart({
               <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">P95 Duration Above Target</p>
+                  <p className="font-medium text-yellow-800">{t('embeddingMetrics.charts.duration.p95AboveTitle')}</p>
                   <p className="text-sm text-yellow-700">
-                    P95 duration of {metrics.avgP95Duration}ms exceeds the {metrics.targetP95Duration}ms target. Some requests are taking longer than expected.
+                    {t('embeddingMetrics.charts.duration.p95AboveDesc', {
+                      duration: metrics.avgP95Duration,
+                      target: metrics.targetP95Duration
+                    })}
                   </p>
                 </div>
               </div>
@@ -290,10 +308,15 @@ export function PerformanceDurationChart({
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
                 <TrendIcon className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-800">Significant Performance Change</p>
+                  <p className="font-medium text-blue-800">{t('embeddingMetrics.charts.duration.significantTitle')}</p>
                   <p className="text-sm text-blue-700">
-                    Performance has {metrics.trendChange > 0 ? 'degraded' : 'improved'} by {Math.abs(metrics.trendChange).toFixed(1)}% recently.
-                    {metrics.trendChange > 0 && ' Monitor for potential issues or increased load.'}
+                    {t('embeddingMetrics.charts.duration.significantDesc', {
+                      direction: metrics.trendChange > 0
+                        ? t('embeddingMetrics.charts.duration.degraded')
+                        : t('embeddingMetrics.charts.duration.improved'),
+                      change: Math.abs(metrics.trendChange).toFixed(1)
+                    })}
+                    {metrics.trendChange > 0 && ` ${t('embeddingMetrics.charts.duration.monitor')}`}
                   </p>
                 </div>
               </div>
@@ -303,9 +326,9 @@ export function PerformanceDurationChart({
               <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <Clock className="h-5 w-5 text-gray-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-gray-800">No Performance Data</p>
+                  <p className="font-medium text-gray-800">{t('embeddingMetrics.charts.duration.noDataTitle')}</p>
                   <p className="text-sm text-gray-700">
-                    No performance metrics are available yet. Data will appear once embedding generation begins.
+                    {t('embeddingMetrics.charts.duration.noDataDesc')}
                   </p>
                 </div>
               </div>
@@ -317,17 +340,17 @@ export function PerformanceDurationChart({
       {/* Performance Targets */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Performance Targets</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.duration.targetsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Average Duration Target</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.duration.avgTarget')}</span>
                 <span className="text-sm text-muted-foreground">{metrics.targetAvgDuration}ms</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Current Average</span>
+                <span className="text-sm">{t('embeddingMetrics.charts.duration.currentAverage')}</span>
                 <span className={`text-sm font-medium ${metrics.avgDuration <= metrics.targetAvgDuration ? 'text-green-600' : 'text-red-600'}`}>
                   {metrics.avgDuration}ms
                 </span>
@@ -336,11 +359,11 @@ export function PerformanceDurationChart({
             
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">P95 Duration Target</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.duration.p95Target')}</span>
                 <span className="text-sm text-muted-foreground">{metrics.targetP95Duration}ms</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Current P95</span>
+                <span className="text-sm">{t('embeddingMetrics.charts.duration.currentP95')}</span>
                 <span className={`text-sm font-medium ${metrics.avgP95Duration <= metrics.targetP95Duration ? 'text-green-600' : 'text-red-600'}`}>
                   {metrics.avgP95Duration}ms
                 </span>

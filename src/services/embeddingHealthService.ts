@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import i18n from '@/lib/i18n';
 import { embeddingMetricsErrorHandler } from './embeddingMetricsErrorHandler';
 import { embeddingMetricsCacheService, EmbeddingMetricsCacheService } from './embeddingMetricsCacheService';
 
@@ -66,6 +67,16 @@ class EmbeddingHealthService {
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private healthHistory: HealthCheckResult[] = [];
   private maxHistorySize = 100;
+
+  private translate(key: string, options?: Record<string, unknown>): string {
+    return i18n.t(`admin:embeddingMetrics.healthService.${key}`, options) as string;
+  }
+
+  private translateComponent(component: string): string {
+    return i18n.t(`admin:embeddingMetrics.healthDashboard.components.${component}`, {
+      defaultValue: component
+    }) as string;
+  }
 
   /**
    * Perform comprehensive health check
@@ -130,13 +141,18 @@ class EmbeddingHealthService {
         components: [{
           component: 'health_check',
           status: 'critical',
-          message: `Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: this.translate('healthCheckFailed', {
+            error: error instanceof Error ? error.message : this.translate('unknownError')
+          }),
           timestamp: new Date().toISOString(),
           responseTime: Date.now() - startTime
         }],
-        issues: ['Health check system failure'],
-        recommendations: ['Investigate health check system', 'Check database connectivity'],
-        uptime: { percentage: 0, duration: 'Unknown' }
+        issues: [this.translate('healthCheckSystemFailure')],
+        recommendations: [
+          this.translate('recInvestigateHealthCheck'),
+          this.translate('recCheckDbConnectivity')
+        ],
+        uptime: { percentage: 0, duration: this.translate('unknown') }
       };
     }
   }
@@ -159,7 +175,7 @@ class EmbeddingHealthService {
         return {
           component: 'database',
           status: 'warning',
-          message: 'Database query failed - tables may not exist yet',
+          message: this.translate('databaseQueryFailed'),
           details: { error: error.message, responseTime },
           timestamp: new Date().toISOString(),
           responseTime
@@ -171,7 +187,7 @@ class EmbeddingHealthService {
       return {
         component: 'database',
         status,
-        message: status === 'healthy' ? 'Database responding normally' : 'Database response time elevated',
+        message: status === 'healthy' ? this.translate('databaseHealthy') : this.translate('databaseSlow'),
         details: { responseTime, tablesAccessible: true },
         timestamp: new Date().toISOString(),
         responseTime
@@ -181,8 +197,8 @@ class EmbeddingHealthService {
       return {
         component: 'database',
         status: 'critical',
-        message: 'Database connection failed',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('databaseConnectionFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -207,7 +223,7 @@ class EmbeddingHealthService {
             const { error } = await supabase.from(table).select('count').limit(1);
             return { table, exists: !error, error: error?.message };
           } catch (err) {
-            return { table, exists: false, error: err instanceof Error ? err.message : 'Unknown error' };
+            return { table, exists: false, error: err instanceof Error ? err.message : this.translate('unknownError') };
           }
         })
       );
@@ -220,13 +236,13 @@ class EmbeddingHealthService {
 
       if (existingTables.length === tables.length) {
         status = 'healthy';
-        message = 'All embedding tables are accessible';
+        message = this.translate('allTablesAccessible');
       } else if (existingTables.length > 0) {
         status = 'warning';
-        message = `${missingTables.length} embedding tables are missing or inaccessible`;
+        message = this.translate('tablesMissing', { count: missingTables.length });
       } else {
         status = 'critical';
-        message = 'No embedding tables are accessible';
+        message = this.translate('noTablesAccessible');
       }
 
       return {
@@ -246,8 +262,8 @@ class EmbeddingHealthService {
       return {
         component: 'embedding_tables',
         status: 'critical',
-        message: 'Failed to check embedding tables',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('tablesCheckFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -270,7 +286,7 @@ class EmbeddingHealthService {
         return {
           component: 'aggregation_functions',
           status: 'warning',
-          message: 'Aggregation functions not available - may not be deployed yet',
+          message: this.translate('aggregationUnavailable'),
           details: { error: error.message, responseTime },
           timestamp: new Date().toISOString(),
           responseTime
@@ -280,7 +296,7 @@ class EmbeddingHealthService {
       return {
         component: 'aggregation_functions',
         status: 'healthy',
-        message: 'Aggregation functions are available and responding',
+        message: this.translate('aggregationAvailable'),
         details: { responseTime, healthData: data },
         timestamp: new Date().toISOString(),
         responseTime
@@ -290,8 +306,8 @@ class EmbeddingHealthService {
       return {
         component: 'aggregation_functions',
         status: 'warning',
-        message: 'Aggregation functions check failed',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('aggregationCheckFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -313,13 +329,13 @@ class EmbeddingHealthService {
 
       if (cacheHealth.status === 'healthy') {
         status = 'healthy';
-        message = 'Cache system operating normally';
+        message = this.translate('cacheHealthy');
       } else if (cacheHealth.status === 'degraded') {
         status = 'warning';
-        message = 'Cache system performance degraded';
+        message = this.translate('cacheDegraded');
       } else {
         status = 'critical';
-        message = 'Cache system experiencing issues';
+        message = this.translate('cacheCritical');
       }
 
       return {
@@ -339,8 +355,8 @@ class EmbeddingHealthService {
       return {
         component: 'cache_system',
         status: 'critical',
-        message: 'Cache system check failed',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('cacheCheckFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -362,13 +378,13 @@ class EmbeddingHealthService {
 
       if (errorHealth.status === 'healthy') {
         status = 'healthy';
-        message = 'Error handling system operating normally';
+        message = this.translate('errorHandlerHealthy');
       } else if (errorHealth.status === 'degraded') {
         status = 'warning';
-        message = 'Error handling system showing degraded performance';
+        message = this.translate('errorHandlerDegraded');
       } else {
         status = 'critical';
-        message = 'Error handling system experiencing critical issues';
+        message = this.translate('errorHandlerCritical');
       }
 
       return {
@@ -388,8 +404,8 @@ class EmbeddingHealthService {
       return {
         component: 'error_handler',
         status: 'critical',
-        message: 'Error handler check failed',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('errorHandlerCheckFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -426,7 +442,7 @@ class EmbeddingHealthService {
         return {
           component: 'recent_data',
           status: 'warning',
-          message: 'No recent metrics data found',
+          message: this.translate('recentDataMissing'),
           details: { responseTime, hasData: false },
           timestamp: new Date().toISOString(),
           responseTime
@@ -441,13 +457,13 @@ class EmbeddingHealthService {
 
       if (hoursSinceLastMetric < 1) {
         status = 'healthy';
-        message = 'Recent metrics data is available';
+        message = this.translate('recentDataAvailable');
       } else if (hoursSinceLastMetric < 24) {
         status = 'warning';
-        message = `Last metrics data is ${hoursSinceLastMetric.toFixed(1)} hours old`;
+        message = this.translate('lastMetricsOld', { hours: hoursSinceLastMetric.toFixed(1) });
       } else {
         status = 'critical';
-        message = `No metrics data for ${hoursSinceLastMetric.toFixed(1)} hours`;
+        message = this.translate('noMetricsFor', { hours: hoursSinceLastMetric.toFixed(1) });
       }
 
       return {
@@ -467,8 +483,8 @@ class EmbeddingHealthService {
       return {
         component: 'recent_data',
         status: 'warning',
-        message: 'Unable to check recent data - tables may not exist',
-        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        message: this.translate('recentDataCheckFailed'),
+        details: { error: error instanceof Error ? error.message : this.translate('unknownError') },
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime
       };
@@ -516,7 +532,7 @@ class EmbeddingHealthService {
   private extractIssues(components: HealthCheckResult[]): string[] {
     return components
       .filter(c => c.status === 'warning' || c.status === 'critical')
-      .map(c => `${c.component}: ${c.message}`);
+      .map(c => `${this.translateComponent(c.component)}: ${c.message}`);
   }
 
   /**
@@ -528,39 +544,39 @@ class EmbeddingHealthService {
     // Database issues
     const dbComponent = components.find(c => c.component === 'database');
     if (dbComponent?.status === 'critical') {
-      recommendations.push('Check database connectivity and credentials');
+      recommendations.push(this.translate('recCheckDbConnectivity'));
     } else if (dbComponent?.status === 'warning') {
-      recommendations.push('Monitor database performance and consider optimization');
+      recommendations.push(this.translate('recMonitorDbPerformance'));
     }
 
     // Missing tables
     const tablesComponent = components.find(c => c.component === 'embedding_tables');
     if (tablesComponent?.status === 'critical' || tablesComponent?.status === 'warning') {
-      recommendations.push('Deploy embedding metrics database schema');
-      recommendations.push('Run database migrations to create required tables');
+      recommendations.push(this.translate('recDeploySchema'));
+      recommendations.push(this.translate('recRunMigrations'));
     }
 
     // Missing functions
     const functionsComponent = components.find(c => c.component === 'aggregation_functions');
     if (functionsComponent?.status === 'warning') {
-      recommendations.push('Deploy Supabase functions for metrics aggregation');
+      recommendations.push(this.translate('recDeployFunctions'));
     }
 
     // Cache issues
     const cacheComponent = components.find(c => c.component === 'cache_system');
     if (cacheComponent?.status === 'warning' || cacheComponent?.status === 'critical') {
-      recommendations.push('Clear cache or restart application to resolve cache issues');
+      recommendations.push(this.translate('recClearCache'));
     }
 
     // Data freshness issues
     const dataComponent = components.find(c => c.component === 'recent_data');
     if (dataComponent?.status === 'warning' || dataComponent?.status === 'critical') {
-      recommendations.push('Check embedding generation pipeline');
-      recommendations.push('Verify metrics collection is active');
+      recommendations.push(this.translate('recCheckPipeline'));
+      recommendations.push(this.translate('recVerifyMetrics'));
     }
 
     if (recommendations.length === 0) {
-      recommendations.push('System is operating normally');
+      recommendations.push(this.translate('recOperatingNormally'));
     }
 
     return recommendations;
@@ -576,7 +592,9 @@ class EmbeddingHealthService {
     const totalChecks = this.healthHistory.length;
     
     const percentage = totalChecks > 0 ? (healthyComponents / totalChecks) * 100 : 100;
-    const duration = totalChecks > 0 ? `${totalChecks} checks` : 'No history';
+    const duration = totalChecks > 0
+      ? this.translate('uptimeChecks', { count: totalChecks })
+      : this.translate('uptimeNoHistory');
 
     return { percentage: Math.round(percentage * 100) / 100, duration };
   }

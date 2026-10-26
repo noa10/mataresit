@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { format, addDays, startOfDay } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
 
@@ -43,6 +43,7 @@ import { supabase } from '@/integrations/supabase/client'; // Corrected supabase
 
 // Import the new DailyReceiptBrowserModal
 import DailyReceiptBrowserModal from '@/components/DailyReceiptBrowserModal';
+import { useDashboardTranslation } from '@/contexts/LanguageContext';
 
 // Import currency utility
 import { formatCurrencySafe } from '@/utils/currency';
@@ -55,21 +56,31 @@ const formatCurrency = (amount: number, currencyCode: string = 'MYR') => {
   return formatCurrencySafe(amount, currencyCode, 'en-US', 'MYR');
 };
 
+const getLocale = (language?: string) => (language === 'ms' ? 'ms-MY' : 'en-MY');
+
+const formatMonthDay = (date: Date, language?: string) =>
+  date.toLocaleDateString(getLocale(language), { month: 'short', day: 'numeric' });
+
+const formatLongDate = (date: Date, language?: string) =>
+  date.toLocaleDateString(getLocale(language), {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
 // Date formatting function for charts (short format)
-const formatChartDate = (dateString: string) => {
+const formatChartDate = (dateString: string, language?: string) => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatMonthDay(new Date(dateString), language);
   } catch (e) {
     return dateString;
   }
 };
 
 // Date formatting function for table (full format)
-const formatFullDate = (dateString: string) => {
+const formatFullDate = (dateString: string, language?: string) => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return formatLongDate(new Date(dateString), language);
   } catch (e) {
     return dateString;
   }
@@ -97,14 +108,15 @@ interface ExpenseStatsProps {
 }
 
 const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipts, averagePerReceipt, dateRange, onDateRangeClick }) => {
+  const { t, language } = useDashboardTranslation();
   // Format date range for display
   const formattedDateRange = dateRange?.from && dateRange?.to
-    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-    : 'All time';
+    ? `${formatMonthDay(dateRange.from, language)} - ${formatLongDate(dateRange.to, language)}`
+    : t('analysisAdvanced.allTime');
 
   const stats = [
     {
-      title: "Total Expenses",
+      title: t("analysisAdvanced.totalExpenses"),
       value: formatCurrency(totalExpenses),
       period: formattedDateRange,
       icon: CreditCard,
@@ -112,7 +124,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
       trendUp: true
     },
     {
-      title: "Total Receipts",
+      title: t("analysisAdvanced.totalReceipts"),
       value: totalReceipts.toString(),
       period: formattedDateRange,
       icon: Receipt,
@@ -120,7 +132,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
       trendUp: true
     },
     {
-      title: "Average Per Receipt",
+      title: t("analysisAdvanced.averagePerReceipt"),
       value: formatCurrency(averagePerReceipt),
       period: formattedDateRange,
       icon: Receipt,
@@ -132,7 +144,7 @@ const ExpenseStats: React.FC<ExpenseStatsProps> = ({ totalExpenses, totalReceipt
   return (
     <Card className="border border-border/40 shadow-sm h-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base sm:text-lg">Financial Summary</CardTitle>
+        <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.financialSummary')}</CardTitle>
       </CardHeader>
       <CardContent className="p-4 sm:p-6 pt-2">
         <div className="grid gap-4 sm:gap-6">
@@ -168,12 +180,13 @@ interface CategoryPieChartProps {
 }
 
 const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoading, dateCaption }) => {
+  const { t } = useDashboardTranslation();
   if (isLoading) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
           <div>
-            <CardTitle>Expenses by Category</CardTitle>
+            <CardTitle>{t('analysisAdvanced.expensesByCategory')}</CardTitle>
             {dateCaption && (
               <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
                 {dateCaption}
@@ -182,14 +195,14 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[300px]">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t('analysisAdvanced.loading')}</p>
         </CardContent>
       </Card>
     );
   }
 
   const chartData = categoryData.map((category, index) => ({
-    name: category.category || 'Uncategorized',
+    name: category.category || t('analysisAdvanced.uncategorized'),
     value: category.total_spent,
     color: COLORS[index % COLORS.length],
   }));
@@ -198,7 +211,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
     <Card className="border border-border/40 shadow-sm h-full">
       <CardHeader className="pb-3">
         <div>
-          <CardTitle className="text-base sm:text-lg">Expenses by Category</CardTitle>
+          <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.expensesByCategory')}</CardTitle>
           {dateCaption && (
             <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
               {dateCaption}
@@ -237,7 +250,7 @@ const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ categoryData, isLoa
             </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No category data available</p>
+              <p className="text-muted-foreground">{t('analysisAdvanced.noCategoryData')}</p>
             </div>
           )}
         </div>
@@ -254,16 +267,17 @@ interface CategoryRadialChartProps {
 }
 
 const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData, isLoading, dateCaption }) => {
+  const { t } = useDashboardTranslation();
   // Use same date caption as Financial Summary for consistency
   const formatDateRangeForCaption = dateCaption || ''
   if (isLoading) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Category Analysis</CardTitle>
+          <CardTitle>{t('analysisAdvanced.categoryAnalysis')}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[300px]">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t('analysisAdvanced.loading')}</p>
         </CardContent>
       </Card>
     );
@@ -275,7 +289,7 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
   const total = categoryData.reduce((s, c) => s + c.total_spent, 0)
 
   const ringData = top3.map((c, idx) => ({
-    name: c.category || 'Uncategorized',
+    name: c.category || t('analysisAdvanced.uncategorized'),
     value: total > 0 ? Math.round((c.total_spent / total) * 100) : 0,
     color: COLORS[idx % COLORS.length]
   }))
@@ -295,7 +309,7 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
     <Card className="border border-border/40 shadow-sm h-full">
       <CardHeader className="pb-3">
         <div>
-          <CardTitle className="text-base sm:text-lg">Category Analysis</CardTitle>
+          <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.categoryAnalysis')}</CardTitle>
           <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">
             {formatDateRangeForCaption}
           </CardDescription>
@@ -308,7 +322,7 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
               <RadialBarChart data={ringData} cx="50%" cy="50%" innerRadius="20%" outerRadius="90%" startAngle={90} endAngle={-270}>
                 {/* Center label */}
                 <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm">
-                  Top 3
+                  {t('analysisAdvanced.top3')}
                 </text>
                 {/* Ring 1: Top category */}
                 <RadialBar data={ring1} dataKey="value" nameKey="name" cornerRadius={10}
@@ -325,7 +339,7 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
                 <ChartTooltip
                   content={<ChartTooltipContent className="bg-background text-foreground" />}
                   formatter={(value: any, _name: any, item: any) => [
-                    `${value}%`, item?.payload?.name ?? 'Category'
+                    `${value}%`, item?.payload?.name ?? t('analysisAdvanced.category')
                   ]}
                   labelFormatter={() => ''}
                 />
@@ -333,7 +347,7 @@ const CategoryRadialChart: React.FC<CategoryRadialChartProps> = ({ categoryData,
             </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No category data available</p>
+              <p className="text-muted-foreground">{t('analysisAdvanced.noCategoryData')}</p>
             </div>
           )}
         </div>
@@ -365,13 +379,14 @@ interface ExpenseChartProps {
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateRange, onDateRangeChange }) => {
+  const { t, language } = useDashboardTranslation();
   // Add state for chart type toggle
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
 
   // Format date range for display (must be before any early returns to maintain hooks order)
   const formattedDateRange = dateRange?.from && dateRange?.to
-    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
-    : 'Filter Date Range';
+    ? `${formatMonthDay(dateRange.from, language)} - ${formatLongDate(dateRange.to, language)}`
+    : t('analysisAdvanced.filterDateRange');
 
   // Handle date selection
   const handleDateSelect = React.useCallback((range: DateRange | undefined) => {
@@ -384,10 +399,10 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
     return (
       <Card className="border border-border/40 shadow-sm">
         <CardHeader>
-          <CardTitle>Daily Expense Trend</CardTitle>
+          <CardTitle>{t('analysisAdvanced.dailyExpenseTrend')}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[350px]">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t('analysisAdvanced.loading')}</p>
         </CardContent>
       </Card>
     );
@@ -397,7 +412,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
   const sortedData = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const chartData = sortedData.map(day => ({
-    date: formatChartDate(day.date),
+    date: formatChartDate(day.date, language),
     fullDate: day.date,
     amount: day.total,
     receipts: day.receiptIds.length
@@ -415,21 +430,25 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
       const data = payload[0].payload;
       return (
         <div className="p-3 bg-popover border border-border rounded-md shadow-md">
-          <p className="font-medium text-sm mb-1 text-popover-foreground">{format(new Date(data.fullDate), 'MMM d, yyyy')}</p>
+          <p className="font-medium text-sm mb-1 text-popover-foreground">{formatLongDate(new Date(data.fullDate), language)}</p>
           <p className="text-sm text-popover-foreground mb-1">
-            <span className="font-medium">Expenses:</span> {formatCurrency(data.amount)}
+            <span className="font-medium">{t('analysisAdvanced.expenses')}:</span> {formatCurrency(data.amount)}
           </p>
           <p className="text-xs text-popover-foreground/80">
-            {data.receipts} {data.receipts === 1 ? 'receipt' : 'receipts'}
+            {t('analysisAdvanced.receiptCount', { count: data.receipts })}
           </p>
           {data.amount > avgExpenses && (
             <p className="text-xs text-destructive mt-1">
-              {((data.amount / avgExpenses - 1) * 100).toFixed(0)}% above average
+              {t('analysisAdvanced.aboveAverage', {
+                percent: ((data.amount / avgExpenses - 1) * 100).toFixed(0),
+              })}
             </p>
           )}
           {data.amount < avgExpenses && (
             <p className="text-xs text-green-500 mt-1">
-              {((1 - data.amount / avgExpenses) * 100).toFixed(0)}% below average
+              {t('analysisAdvanced.belowAverage', {
+                percent: ((1 - data.amount / avgExpenses) * 100).toFixed(0),
+              })}
             </p>
           )}
         </div>
@@ -449,13 +468,15 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
     <Card className="border border-border/40 shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
-          <CardTitle className="text-base sm:text-lg">Daily Expense Trend</CardTitle>
+          <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.dailyExpenseTrend')}</CardTitle>
           {chartData.length > 0 && (
             <p className="text-xs text-muted-foreground mt-1 break-words">
-              Average daily expenses: {formatCurrency(avgExpenses)}
+              {t('analysisAdvanced.averageDailyExpenses', {
+                amount: formatCurrency(avgExpenses),
+              })}
               {dateRange?.from && dateRange?.to && (
                 <span className="hidden sm:inline">
-                  {` (${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')})`}
+                  {` (${formatMonthDay(dateRange.from, language)} - ${formatLongDate(dateRange.to, language)})`}
                 </span>
               )}
             </p>
@@ -495,7 +516,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     className="mt-3 w-full"
                     onClick={() => handleDateSelect(undefined)}
                   >
-                    Clear Selection
+                    {t('analysisAdvanced.clearSelection')}
                   </Button>
                 )}
               </div>
@@ -510,12 +531,12 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
             {chartType === 'line' ? (
               <>
                 <BarChart2 className="h-4 w-4" />
-                <span className="text-xs hidden xs:inline">Bar View</span>
+                <span className="text-xs hidden xs:inline">{t('analysisAdvanced.barView')}</span>
               </>
             ) : (
               <>
                 <TrendingUp className="h-4 w-4" />
-                <span className="text-xs hidden xs:inline">Line View</span>
+                <span className="text-xs hidden xs:inline">{t('analysisAdvanced.lineView')}</span>
               </>
             )}
           </Button>
@@ -587,7 +608,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     strokeDasharray="3 3"
                     className="dark:stroke-gray-400"
                     label={{
-                      value: 'Average',
+                      value: t('analysisAdvanced.average'),
                       position: 'insideTopRight',
                       fill: 'var(--muted-foreground)',
                       fontSize: 11,
@@ -686,7 +707,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
                     strokeDasharray="3 3"
                     className="stroke-muted-foreground stroke-opacity-100 stroke-dasharray-3 dark:stroke-gray-400"
                     label={{
-                      value: 'Average',
+                      value: t('analysisAdvanced.average'),
                       position: 'insideTopRight',
                       fill: 'var(--muted-foreground)',
                       fontSize: 11,
@@ -718,7 +739,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No expense data available</p>
+              <p className="text-muted-foreground">{t('analysisAdvanced.noExpenseData')}</p>
             </div>
           )}
         </div>
@@ -739,6 +760,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   onViewReceipts,
   isLoading
 }) => {
+  const { t, language } = useDashboardTranslation();
   // State to track which download button is currently loading
   const [downloadingDate, setDownloadingDate] = useState<string | null>(null);
 
@@ -780,10 +802,10 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
     return (
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Daily Expense Details</CardTitle>
+          <CardTitle>{t('analysisAdvanced.dailyExpenseDetails')}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[200px]">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t('analysisAdvanced.loading')}</p>
         </CardContent>
       </Card>
     );
@@ -792,19 +814,19 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
   return (
     <Card className="border border-border/40 shadow-sm">
       <CardHeader>
-        <CardTitle className="text-base sm:text-lg">Daily Expense Details</CardTitle>
+        <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.dailyExpenseDetails')}</CardTitle>
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
         <div className="rounded-md border overflow-x-auto">
           <Table className="relative">
             <TableHeader>
               <TableRow className="border-b border-border/50">
-                <TableHead className="min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Date</TableHead>
-                <TableHead className="min-w-[120px] font-semibold text-foreground/90 py-3 px-4">Receipts</TableHead>
-                <TableHead className="min-w-[120px] hidden sm:table-cell font-semibold text-foreground/90 py-3 px-4">Top Merchant</TableHead>
-                <TableHead className="min-w-[100px] hidden md:table-cell font-semibold text-foreground/90 py-3 px-4">Payment Method</TableHead>
-                <TableHead className="text-right min-w-[100px] font-semibold text-foreground/90 py-3 px-4">Total Expenses</TableHead>
-                <TableHead className="text-center min-w-[80px] w-[80px] hidden xs:table-cell font-semibold text-foreground/90 py-3 px-4">Actions</TableHead>
+                <TableHead className="min-w-[100px] font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.date')}</TableHead>
+                <TableHead className="min-w-[120px] font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.receipts')}</TableHead>
+                <TableHead className="min-w-[120px] hidden sm:table-cell font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.topMerchant')}</TableHead>
+                <TableHead className="min-w-[100px] hidden md:table-cell font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.paymentMethod')}</TableHead>
+                <TableHead className="text-right min-w-[100px] font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.totalExpenses')}</TableHead>
+                <TableHead className="text-center min-w-[80px] w-[80px] hidden xs:table-cell font-semibold text-foreground/90 py-3 px-4">{t('analysisAdvanced.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -817,10 +839,10 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                     border-b border-border/30 last:border-b-0
                   `}
                 >
-                  <TableCell data-label="Date" className="font-medium py-3 px-4">
+                  <TableCell data-label={t('analysisAdvanced.date')} className="font-medium py-3 px-4">
                     <div className="flex flex-col">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm">{formatFullDate(date)}</span>
+                        <span className="text-sm">{formatFullDate(date, language)}</span>
                         {/* Show download button on very small screens (xs) */}
                         {receiptIds.length > 0 && (
                           <Button
@@ -829,7 +851,13 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                             onClick={() => handleDownloadReport(date)}
                             disabled={downloadingDate === date}
                             className="h-6 w-6 p-0 xs:hidden hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50 ml-2"
-                            title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
+                            title={
+                              downloadingDate === date
+                                ? t('analysisAdvanced.generatingReport')
+                                : t('analysisAdvanced.downloadReportFor', {
+                                    date: formatFullDate(date, language),
+                                  })
+                            }
                           >
                             {downloadingDate === date ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -846,27 +874,34 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell data-label="Receipts" className="py-3 px-4">
+                  <TableCell data-label={t('analysisAdvanced.receipts')} className="py-3 px-4">
                     {receiptIds.length > 0 ? (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onViewReceipts(date, receiptIds)}
                         className="h-auto py-1 px-2 text-xs flex items-center gap-1"
-                        title={`View ${receiptIds.length} receipts for ${formatFullDate(date)}`}
+                        title={t('analysisAdvanced.viewReceiptsFor', {
+                          count: receiptIds.length,
+                          date: formatFullDate(date, language),
+                        })}
                       >
                         <Receipt className="w-3 h-3" />
-                        <span className="hidden xs:inline">{receiptIds.length} Receipt{receiptIds.length !== 1 ? 's' : ''}</span>
+                        <span className="hidden xs:inline">
+                          {t('analysisAdvanced.receiptCount', {
+                            count: receiptIds.length,
+                          })}
+                        </span>
                         <span className="xs:hidden">{receiptIds.length}</span>
                       </Button>
                     ) : (
-                      <span className="text-xs text-muted-foreground">No Receipts</span>
+                      <span className="text-xs text-muted-foreground">{t('analysisAdvanced.noReceipts')}</span>
                     )}
                   </TableCell>
-                  <TableCell data-label="Top Merchant" className="hidden sm:table-cell py-3 px-4">{topMerchant}</TableCell>
-                  <TableCell data-label="Payment Method" className="hidden md:table-cell py-3 px-4">{paymentMethod}</TableCell>
-                  <TableCell data-label="Total Expenses" className="text-right font-medium py-3 px-4">{formatCurrency(total)}</TableCell>
-                  <TableCell data-label="Actions" className="text-center hidden xs:table-cell py-3 px-4">
+                  <TableCell data-label={t('analysisAdvanced.topMerchant')} className="hidden sm:table-cell py-3 px-4">{topMerchant}</TableCell>
+                  <TableCell data-label={t('analysisAdvanced.paymentMethod')} className="hidden md:table-cell py-3 px-4">{paymentMethod}</TableCell>
+                  <TableCell data-label={t('analysisAdvanced.totalExpenses')} className="text-right font-medium py-3 px-4">{formatCurrency(total)}</TableCell>
+                  <TableCell data-label={t('analysisAdvanced.actions')} className="text-center hidden xs:table-cell py-3 px-4">
                     {receiptIds.length > 0 ? (
                       <Button
                         variant="ghost"
@@ -874,7 +909,13 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
                         onClick={() => handleDownloadReport(date)}
                         disabled={downloadingDate === date}
                         className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-md disabled:opacity-50"
-                        title={downloadingDate === date ? 'Generating report...' : `Download report for ${formatFullDate(date)}`}
+                        title={
+                          downloadingDate === date
+                            ? t('analysisAdvanced.generatingReport')
+                            : t('analysisAdvanced.downloadReportFor', {
+                                date: formatFullDate(date, language),
+                              })
+                        }
                       >
                         {downloadingDate === date ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -890,7 +931,7 @@ const ExpenseTable: React.FC<ExpenseTableProps> = ({
               )) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
-                    No expense data available for this period
+                    {t('analysisAdvanced.noExpenseDataPeriod')}
                   </TableCell>
                 </TableRow>
               )}
@@ -915,12 +956,13 @@ interface PayerPieChartProps {
 }
 
 const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dateCaption }) => {
+  const { t } = useDashboardTranslation();
   if (isLoading) {
     return (
       <Card className="border border-border/40 shadow-sm h-full">
         <CardHeader className="pb-3">
           <div>
-            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+            <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.spendingByPayer')}</CardTitle>
             <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
           </div>
         </CardHeader>
@@ -936,12 +978,12 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
       <Card className="border border-border/40 shadow-sm h-full">
         <CardHeader className="pb-3">
           <div>
-            <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+            <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.spendingByPayer')}</CardTitle>
             <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-[250px]">
-          <p className="text-muted-foreground text-sm">No payer data available</p>
+          <p className="text-muted-foreground text-sm">{t('analysisAdvanced.noPayerData')}</p>
         </CardContent>
       </Card>
     );
@@ -959,7 +1001,7 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
     <Card className="border border-border/40 shadow-sm h-full">
       <CardHeader className="pb-3">
         <div>
-          <CardTitle className="text-base sm:text-lg">Spending by Payer</CardTitle>
+          <CardTitle className="text-base sm:text-lg">{t('analysisAdvanced.spendingByPayer')}</CardTitle>
           <CardDescription className="text-xs sm:text-sm mt-1 text-muted-foreground">{dateCaption}</CardDescription>
         </div>
       </CardHeader>
@@ -1009,6 +1051,7 @@ const PayerPieChart: React.FC<PayerPieChartProps> = ({ payerData, isLoading, dat
 };
 
 const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
+  const { t, language } = useDashboardTranslation();
   const queryClient = useQueryClient();
   const { currentTeam } = useTeam();
 
@@ -1065,9 +1108,9 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
           ? dayReceipts.reduce((max, r) => ((r.total || 0) > (max?.total || 0) ? r : max), dayReceipts[0])
           : null; // Handle cases with no receipts for a day
 
-        const topMerchant = topReceipt?.merchant || 'Unknown';
+        const topMerchant = topReceipt?.merchant || t('analysisAdvanced.unknown');
         // Use payment_method from top receipt, default to N/A
-        const paymentMethod = topReceipt?.payment_method || 'N/A';
+        const paymentMethod = topReceipt?.payment_method || t('analysisAdvanced.na', { defaultValue: 'N/A' });
 
         return { date, total, receiptIds, topMerchant, paymentMethod };
       });
@@ -1127,7 +1170,9 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
 
     const result: PayerExpenseData[] = [];
     payerMap.forEach((val, key) => {
-      const payerName = key === '__none__' ? 'No Payer' : (payerNameMap[key] ?? 'Unknown Payer');
+      const payerName = key === '__none__'
+        ? t('analysisAdvanced.noPayer')
+        : (payerNameMap[key] ?? t('analysisAdvanced.unknownPayer'));
       console.log(`[PayerData] Mapping ${key} -> ${payerName}`);
       result.push({
         payer_name: payerName,
@@ -1137,7 +1182,7 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
     });
 
     return result.sort((a, b) => b.total_spent - a.total_spent);
-  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, startDateISO, endDateISO]);
+  }, [enhancedDailyExpenseData, allPayers, payersLoaded, queryClient, startDateISO, endDateISO, t, language]);
 
   // Data for the line chart (needs adjustment if data source changes)
   const aggregatedChartData = React.useMemo(() => {
@@ -1162,12 +1207,12 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
   const formattedDateRange = React.useMemo(() => {
     if (date?.from) {
       if (date.to) {
-        return `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`;
+        return `${formatLongDate(date.from, language)} - ${formatLongDate(date.to, language)}`;
       }
-      return format(date.from, "LLL dd, y");
+      return formatLongDate(date.from, language);
     }
-    return "Select Date Range";
-  }, [date]);
+    return t('analysisAdvanced.selectDateRange');
+  }, [date, language, t]);
 
   // Sort the daily expense data for the table (default descending by date)
   const sortedDailyExpenseDataForTable = React.useMemo(() => {
@@ -1217,8 +1262,8 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
         {/* Dashboard Header — skipped when embedded in the analysis page */}
         {!embedded && (
           <div className="mb-4 sm:mb-6">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">Expense Analysis</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">Track and analyze your expense patterns</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">{t('analysisAdvanced.expenseAnalysis')}</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">{t('analysisAdvanced.trackAnalyze')}</p>
           </div>
         )}
 
@@ -1226,9 +1271,9 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
         {(dailyError || categoriesError) && (
           <Alert variant="destructive" className="mb-6 sm:mb-8">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>{t('analysisAdvanced.error')}</AlertTitle>
             <AlertDescription className="text-sm">
-              {dailyError?.message || categoriesError?.message || "An unknown error occurred."}
+              {dailyError?.message || categoriesError?.message || t('analysisAdvanced.unknownError')}
             </AlertDescription>
           </Alert>
         )}
@@ -1236,12 +1281,12 @@ const AnalysisPage = ({ embedded = false }: { embedded?: boolean }) => {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-2 h-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm py-2 sm:py-3">
-              <span className="hidden xs:inline">Expense Overview</span>
-              <span className="xs:hidden">Overview</span>
+              <span className="hidden xs:inline">{t('analysisAdvanced.expenseOverview')}</span>
+              <span className="xs:hidden">{t('analysisAdvanced.overview')}</span>
             </TabsTrigger>
             <TabsTrigger value="details" className="text-xs sm:text-sm py-2 sm:py-3">
-              <span className="hidden xs:inline">Daily Expense Details</span>
-              <span className="xs:hidden">Details</span>
+              <span className="hidden xs:inline">{t('analysisAdvanced.dailyExpenseDetails')}</span>
+              <span className="xs:hidden">{t('analysisAdvanced.details')}</span>
             </TabsTrigger>
           </TabsList>
 

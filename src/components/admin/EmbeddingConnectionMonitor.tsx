@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { embeddingMetricsRealtimeService } from '@/services/embeddingMetricsRealtimeService';
 import { embeddingMetricsErrorHandler } from '@/services/embeddingMetricsErrorHandler';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface ConnectionMetrics {
   latency: number;
@@ -31,6 +32,7 @@ interface ConnectionMetrics {
 }
 
 export function EmbeddingConnectionMonitor() {
+  const { t, language } = useAdminTranslation();
   const [connectionStatus, setConnectionStatus] = useState(embeddingMetricsRealtimeService.getConnectionStatus());
   const [metrics, setMetrics] = useState<ConnectionMetrics>({
     latency: 0,
@@ -112,11 +114,11 @@ export function EmbeddingConnectionMonitor() {
     const secs = seconds % 60;
     
     if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return t('embeddingMetrics.connection.uptimeHoursMinutes', { hours, minutes });
     } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return t('embeddingMetrics.connection.uptimeMinutesSeconds', { minutes, seconds: secs });
     } else {
-      return `${secs}s`;
+      return t('embeddingMetrics.connection.uptimeSeconds', { seconds: secs });
     }
   };
 
@@ -134,18 +136,22 @@ export function EmbeddingConnectionMonitor() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Connection Monitor
+            {t('embeddingMetrics.connection.title')}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant={getHealthBadgeVariant(healthStatus)} className={getHealthColor(healthStatus)}>
-              {healthStatus.toUpperCase()}
+              {t(`embeddingMetrics.common.${healthStatus}`, {
+                defaultValue: healthStatus,
+              }).toUpperCase()}
             </Badge>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
             >
-              {isExpanded ? 'Collapse' : 'Expand'}
+              {isExpanded
+                ? t('embeddingMetrics.connection.collapse')
+                : t('embeddingMetrics.connection.expand')}
             </Button>
           </div>
         </div>
@@ -154,7 +160,7 @@ export function EmbeddingConnectionMonitor() {
         {/* Health Score */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Connection Health</span>
+            <span className="text-sm font-medium">{t('embeddingMetrics.connection.connectionHealth')}</span>
             <span className={`text-sm font-bold ${getHealthColor(healthStatus)}`}>
               {healthScore}/100
             </span>
@@ -172,9 +178,11 @@ export function EmbeddingConnectionMonitor() {
                 <WifiOff className="h-4 w-4 text-red-500" />
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Status</p>
+            <p className="text-xs text-muted-foreground">{t('embeddingMetrics.common.status')}</p>
             <p className="text-sm font-medium">
-              {connectionStatus.isConnected ? 'Connected' : 'Disconnected'}
+              {connectionStatus.isConnected
+                ? t('embeddingMetrics.common.connected')
+                : t('embeddingMetrics.common.disconnected')}
             </p>
           </div>
 
@@ -182,7 +190,7 @@ export function EmbeddingConnectionMonitor() {
             <div className="flex items-center justify-center mb-1">
               <Clock className="h-4 w-4 text-blue-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Latency</p>
+            <p className="text-xs text-muted-foreground">{t('embeddingMetrics.connection.latency')}</p>
             <p className="text-sm font-medium">{metrics.latency.toFixed(0)}ms</p>
           </div>
 
@@ -190,7 +198,7 @@ export function EmbeddingConnectionMonitor() {
             <div className="flex items-center justify-center mb-1">
               <Zap className="h-4 w-4 text-purple-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Channels</p>
+            <p className="text-xs text-muted-foreground">{t('embeddingMetrics.connection.channels')}</p>
             <p className="text-sm font-medium">{connectionStatus.activeChannels}</p>
           </div>
 
@@ -198,7 +206,7 @@ export function EmbeddingConnectionMonitor() {
             <div className="flex items-center justify-center mb-1">
               <RefreshCw className="h-4 w-4 text-orange-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Reconnects</p>
+            <p className="text-xs text-muted-foreground">{t('embeddingMetrics.connection.reconnects')}</p>
             <p className="text-sm font-medium">{connectionStatus.reconnectAttempts}</p>
           </div>
         </div>
@@ -209,37 +217,41 @@ export function EmbeddingConnectionMonitor() {
             {/* Detailed Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
-                <h4 className="font-medium text-sm">Connection Metrics</h4>
+                <h4 className="font-medium text-sm">{t('embeddingMetrics.connection.connectionMetrics')}</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Uptime</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.connection.uptime')}</span>
                     <span className="font-mono">{formatUptime(metrics.uptime)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Active Subscriptions</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.connection.activeSubscriptions')}</span>
                     <span className="font-mono">{connectionStatus.activeSubscriptions}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Messages Received</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.connection.messagesReceived')}</span>
                     <span className="font-mono">{metrics.messagesReceived}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Data Transferred</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.connection.dataTransferred')}</span>
                     <span className="font-mono">{formatBytes(metrics.dataTransferred)}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-medium text-sm">Error Statistics</h4>
+                <h4 className="font-medium text-sm">{t('embeddingMetrics.connection.errorStatistics')}</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Errors</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.connection.totalErrors')}</span>
                     <span className="font-mono">{errorStats.totalErrors}</span>
                   </div>
                   {Object.entries(errorStats.errorsByType).map(([type, count]) => (
                     <div key={type} className="flex justify-between">
-                      <span className="text-muted-foreground capitalize">{type.replace('_', ' ')}</span>
+                      <span className="text-muted-foreground">
+                        {t(`embeddingMetrics.connection.errorTypes.${type}`, {
+                          defaultValue: type.replace('_', ' '),
+                        })}
+                      </span>
                       <span className="font-mono">{count}</span>
                     </div>
                   ))}
@@ -250,7 +262,7 @@ export function EmbeddingConnectionMonitor() {
             {/* Recent Errors */}
             {errorStats.recentErrors.length > 0 && (
               <div className="space-y-3">
-                <h4 className="font-medium text-sm">Recent Errors</h4>
+                <h4 className="font-medium text-sm">{t('embeddingMetrics.connection.recentErrors')}</h4>
                 <div className="space-y-2">
                   {errorStats.recentErrors.slice(0, 3).map((error, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
@@ -263,7 +275,11 @@ export function EmbeddingConnectionMonitor() {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{error.count}x</span>
-                        <span>{error.timestamp.toLocaleTimeString()}</span>
+                        <span>
+                          {error.timestamp.toLocaleTimeString(
+                            language === 'ms' ? 'ms-MY' : 'en-MY'
+                          )}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -278,14 +294,14 @@ export function EmbeddingConnectionMonitor() {
                 size="sm"
                 onClick={() => embeddingMetricsErrorHandler.clearErrorStatistics()}
               >
-                Clear Error Stats
+                {t('embeddingMetrics.connection.clearErrorStats')}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.location.reload()}
               >
-                Reset Connection
+                {t('embeddingMetrics.connection.resetConnection')}
               </Button>
             </div>
           </div>

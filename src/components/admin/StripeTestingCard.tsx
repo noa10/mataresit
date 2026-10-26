@@ -6,8 +6,10 @@ import { toast } from 'sonner';
 import { PRICE_IDS } from '@/config/stripe';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export function StripeTestingCard() {
+  const { t } = useAdminTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -33,7 +35,7 @@ export function StripeTestingCard() {
       });
 
       if (!sessionData.session) {
-        throw new Error('No active session found. Please log in first.');
+        throw new Error(t('stripeCard.noSession'));
       }
 
       // Test the function call with detailed logging
@@ -53,15 +55,16 @@ export function StripeTestingCard() {
 
       if (error) {
         setResult({ error: error.message, details: error });
-        toast.error(`Function error: ${error.message}`);
+        toast.error(t('stripeCard.functionError', { message: error.message }));
       } else {
         setResult({ success: true, data });
-        toast.success('Function called successfully!');
+        toast.success(t('stripeCard.functionSuccess'));
       }
     } catch (error: any) {
       console.error('Error calling function:', error);
-      setResult({ error: error.message, details: error });
-      toast.error(`Error: ${error.message}`);
+      const message = error?.message || t('stripeCard.unknownError');
+      setResult({ error: message, details: error });
+      toast.error(t('stripeCard.error', { message }));
     } finally {
       setIsLoading(false);
     }
@@ -94,14 +97,15 @@ export function StripeTestingCard() {
       });
 
       if (response.ok) {
-        toast.success('Webhook endpoint is accessible!');
+        toast.success(t('stripeCard.webhookAccessible'));
       } else {
-        toast.error(`Webhook returned status: ${response.status}`);
+        toast.error(t('stripeCard.webhookStatus', { status: response.status }));
       }
     } catch (error: any) {
       console.error('Error testing webhook:', error);
-      setResult({ error: error.message, details: error });
-      toast.error(`Error: ${error.message}`);
+      const message = error?.message || t('stripeCard.unknownError');
+      setResult({ error: message, details: error });
+      toast.error(t('stripeCard.error', { message }));
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +134,7 @@ export function StripeTestingCard() {
       });
 
       if (!sessionData.session) {
-        throw new Error('No active session found. Please log in first.');
+        throw new Error(t('stripeCard.noSession'));
       }
 
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
@@ -147,16 +151,17 @@ export function StripeTestingCard() {
       if (error) {
         console.error('Function error details:', error);
         setResult({ error: error.message, details: error });
-        toast.error(`Function error: ${error.message}`);
+        toast.error(t('stripeCard.functionError', { message: error.message }));
       } else {
         console.log('Success! Data received:', data);
         setResult({ success: true, data });
-        toast.success('Function called successfully!');
+        toast.success(t('stripeCard.functionSuccess'));
       }
     } catch (error: any) {
       console.error('=== Caught error ===', error);
-      setResult({ error: error.message, details: error });
-      toast.error(`Error: ${error.message}`);
+      const message = error?.message || t('stripeCard.unknownError');
+      setResult({ error: message, details: error });
+      toast.error(t('stripeCard.error', { message }));
     } finally {
       setIsLoading(false);
     }
@@ -167,19 +172,19 @@ export function StripeTestingCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CheckCircle className="h-5 w-5 text-primary" />
-          Stripe Integration Testing
+          {t('stripeCard.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="text-sm text-muted-foreground">
-          Test Stripe integration functionality including checkout sessions and webhook endpoints.
+          {t('stripeCard.description')}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <h4 className="font-medium text-sm">Checkout Session</h4>
+            <h4 className="font-medium text-sm">{t('stripeCard.checkoutTitle')}</h4>
             <p className="text-xs text-muted-foreground">
-              Test the create-checkout-session Edge Function with valid price ID
+              {t('stripeCard.checkoutDescription')}
             </p>
             <Button
               onClick={testCreateCheckoutSession}
@@ -190,18 +195,18 @@ export function StripeTestingCard() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Testing...
+                  {t('stripeCard.testing')}
                 </>
               ) : (
-                'Test Checkout'
+                t('stripeCard.testCheckout')
               )}
             </Button>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium text-sm">Real Price ID</h4>
+            <h4 className="font-medium text-sm">{t('stripeCard.realPriceTitle')}</h4>
             <p className="text-xs text-muted-foreground">
-              Test with actual price ID from environment variables
+              {t('stripeCard.realPriceDescription')}
             </p>
             <Button
               onClick={testWithRealPriceId}
@@ -213,18 +218,18 @@ export function StripeTestingCard() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Testing...
+                  {t('stripeCard.testing')}
                 </>
               ) : (
-                'Test Real Price'
+                t('stripeCard.testRealPrice')
               )}
             </Button>
           </div>
 
           <div className="space-y-2">
-            <h4 className="font-medium text-sm">Webhook</h4>
+            <h4 className="font-medium text-sm">{t('stripeCard.webhookTitle')}</h4>
             <p className="text-xs text-muted-foreground">
-              Test the stripe-webhook Edge Function accessibility
+              {t('stripeCard.webhookDescription')}
             </p>
             <Button
               onClick={testStripeWebhook}
@@ -236,10 +241,10 @@ export function StripeTestingCard() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                  Testing...
+                  {t('stripeCard.testing')}
                 </>
               ) : (
-                'Test Webhook'
+                t('stripeCard.testWebhook')
               )}
             </Button>
           </div>
@@ -247,19 +252,19 @@ export function StripeTestingCard() {
 
         {result && (
           <div className="space-y-2">
-            <h4 className="font-medium text-sm">Test Result</h4>
+            <h4 className="font-medium text-sm">{t('stripeCard.testResult')}</h4>
             {result.error ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Error: {result.error}
+                  {t('stripeCard.error', { message: result.error })}
                 </AlertDescription>
               </Alert>
             ) : (
               <Alert>
                 <CheckCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Test completed successfully!
+                  {t('stripeCard.success')}
                 </AlertDescription>
               </Alert>
             )}

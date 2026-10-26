@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchFooterProps {
   mode: "queue" | "results";
@@ -58,18 +59,19 @@ export function BatchFooter({
   onOpenReceipts,
   onRetryAll,
 }: BatchFooterProps) {
+  const { t } = useReceiptsTranslation();
   const isResults = mode === "results";
   const addDisabled = atCapacity || isCompressing;
 
   const note = isResults
     ? failed > 0
-      ? "Failed receipts stay in this batch until they post."
-      : "Every receipt in this batch is posted."
+      ? t("batch.footer.failedStay")
+      : t("batch.footer.allPosted")
     : isProcessing
-      ? "Uploads keep running if you close this sheet."
+      ? t("batch.footer.keepRunning")
       : allComplete
-        ? "Review the batch before opening the receipts."
-        : "Images are optimised before upload.";
+        ? t("batch.footer.review")
+        : t("batch.footer.optimising");
 
   const primary = isResults ? (
     ready > 0 ? (
@@ -80,7 +82,9 @@ export function BatchFooter({
         className="batch-primary-btn"
         onClick={onOpenReceipts}
       >
-        Open {ready} receipt{ready === 1 ? "" : "s"}
+        {ready === 1
+          ? t("batch.footer.openReceiptOne", { count: ready })
+          : t("batch.footer.openReceipts", { count: ready })}
         <ArrowRight className="batch-btn-icon" aria-hidden="true" />
       </Button>
     ) : failed > 0 ? (
@@ -91,7 +95,7 @@ export function BatchFooter({
         className="batch-primary-btn"
         onClick={onRetryAll}
       >
-        Retry failed
+        {t("batch.footer.retryFailed")}
         <RotateCcw className="batch-btn-icon" aria-hidden="true" />
       </Button>
     ) : null
@@ -103,7 +107,7 @@ export function BatchFooter({
       className="batch-primary-btn"
       onClick={onReview}
     >
-      Review batch
+      {t("batch.footer.reviewBatch")}
       <ClipboardList className="batch-btn-icon" aria-hidden="true" />
     </Button>
   ) : isProcessing && !isPaused ? (
@@ -114,7 +118,7 @@ export function BatchFooter({
       className="batch-primary-btn"
       onClick={onPause}
     >
-      Pause uploads
+      {t("batch.footer.pause")}
       <Pause className="batch-btn-icon" aria-hidden="true" />
     </Button>
   ) : (
@@ -126,7 +130,7 @@ export function BatchFooter({
       onClick={onStart}
       disabled={queued === 0 && failed === 0}
     >
-      {isPaused ? "Resume uploads" : "Start processing"}
+      {isPaused ? t("batch.footer.resume") : t("batch.footer.start")}
       <Play className="batch-btn-icon" aria-hidden="true" />
     </Button>
   );
@@ -139,7 +143,7 @@ export function BatchFooter({
       className="batch-secondary-btn"
       onClick={onUploadMore}
     >
-      Upload more
+      {t("batch.footer.uploadMore")}
     </Button>
   ) : (
     <Button
@@ -151,7 +155,7 @@ export function BatchFooter({
       disabled={addDisabled}
     >
       <Plus className="batch-btn-icon" aria-hidden="true" />
-      <span className="batch-add-label">Add receipts</span>
+      <span className="batch-add-label">{t("batch.footer.add")}</span>
     </Button>
   );
 
@@ -159,7 +163,10 @@ export function BatchFooter({
     <footer className="batch-footer">
       <div className="batch-footer-meta">
         <p className="batch-micro">
-          {batchName} · {batchDate} · {fileCount} file{fileCount === 1 ? "" : "s"}
+          {batchName} · {batchDate} ·{" "}
+          {fileCount === 1
+            ? t("batch.footer.fileOne", { count: fileCount })
+            : t("batch.footer.files", { count: fileCount })}
         </p>
         <p className="batch-footer-note">{note}</p>
       </div>
@@ -169,8 +176,8 @@ export function BatchFooter({
         <span className="batch-micro">
           {etaText ||
             (isResults && failed > 0
-              ? `${failed} failed`
-              : `${ready} of ${total} ready`)}
+              ? t("batch.footer.failedCount", { count: failed })
+              : t("batch.footer.readyOfTotal", { ready, total }))}
         </span>
       </div>
 

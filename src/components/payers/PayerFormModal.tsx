@@ -32,6 +32,7 @@ import {
 } from "@/services/paidByService";
 import { PaidBy } from "@/types/receipt";
 import { useTeam } from "@/contexts/TeamContext";
+import { useSettingsTranslation } from "@/contexts/LanguageContext";
 
 interface PayerFormModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export const PayerFormModal: React.FC<PayerFormModalProps> = ({
   payer,
   initialName = "",
 }) => {
+  const { t } = useSettingsTranslation();
   const { currentTeam } = useTeam();
   const isEditing = !!payer;
   const [name, setName] = useState("");
@@ -118,7 +120,13 @@ export const PayerFormModal: React.FC<PayerFormModalProps> = ({
 
     const validationErrors = validatePayerData({ name: name.trim() });
     if (validationErrors.length > 0) {
-      setErrors(validationErrors);
+      setErrors(
+        validationErrors.map((error) =>
+          error.toLowerCase().includes("required")
+            ? t("payers.form.nameRequired")
+            : t("payers.form.nameTooLong")
+        )
+      );
       return;
     }
 
@@ -134,29 +142,29 @@ export const PayerFormModal: React.FC<PayerFormModalProps> = ({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {isEditing ? "Edit Payer" : "Create New Payer"}
+              {isEditing ? t("payers.form.editTitle") : t("payers.form.createTitle")}
             </DialogTitle>
             <DialogDescription>
               {isEditing
-                ? "Update the payer name."
-                : "Add a new payer to track who paid for receipts."}
+                ? t("payers.form.editDescription")
+                : t("payers.form.createDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="payer-name">Payer Name</Label>
+              <Label htmlFor="payer-name">{t("payers.form.name")}</Label>
               <Input
                 id="payer-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter payer name"
+                placeholder={t("payers.form.namePlaceholder")}
                 maxLength={50}
                 required
                 autoFocus
               />
               <div className="text-xs text-muted-foreground">
-                {name.length}/50 characters
+                {t("payers.form.characters", { count: name.length })}
               </div>
             </div>
 
@@ -172,10 +180,14 @@ export const PayerFormModal: React.FC<PayerFormModalProps> = ({
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                {t("payers.form.cancel")}
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Saving..." : isEditing ? "Update" : "Create"}
+                {isLoading
+                  ? t("payers.form.saving")
+                  : isEditing
+                    ? t("payers.form.update")
+                    : t("payers.form.create")}
               </Button>
             </DialogFooter>
           </form>
@@ -187,22 +199,21 @@ export const PayerFormModal: React.FC<PayerFormModalProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Duplicate Payer Name
+              {t("payers.form.duplicateTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              A payer named "{name.trim()}" already exists. Do you want to create
-              another payer with the same name?
+              {t("payers.form.duplicateDescription", { name: name.trim() })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("payers.form.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setDuplicateConfirmOpen(false);
                 performSubmit();
               }}
             >
-              Create Anyway
+              {t("payers.form.createAnyway")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

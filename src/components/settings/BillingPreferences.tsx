@@ -124,7 +124,7 @@ export function BillingPreferences() {
 
       if (error) {
         console.error('Error loading billing preferences:', error);
-        toast.error('Failed to load billing preferences');
+        toast.error(t('billingPreferences.loadFailed'));
         return;
       }
 
@@ -148,7 +148,7 @@ export function BillingPreferences() {
       }
     } catch (error) {
       console.error('Error loading billing preferences:', error);
-      toast.error('Failed to load billing preferences');
+      toast.error(t('billingPreferences.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -227,10 +227,10 @@ export function BillingPreferences() {
         throw error;
       }
 
-      toast.success('Billing preferences updated successfully');
+      toast.success(t('billingPreferences.saved'));
     } catch (error) {
       console.error('Error saving preferences:', error);
-      toast.error('Failed to save billing preferences');
+      toast.error(t('billingPreferences.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -295,9 +295,9 @@ export function BillingPreferences() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Billing Preferences</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{t('billingPreferences.title')}</h2>
         <p className="text-muted-foreground">
-          Manage your subscription, payment methods, and billing notifications.
+          {t('billingPreferences.description')}
         </p>
       </div>
 
@@ -307,11 +307,9 @@ export function BillingPreferences() {
           <Info className="h-4 w-4 text-ledger-accent" />
           <AlertDescription className="text-ledger-ink-2">
             <div className="space-y-2">
-              <p className="font-medium">Demo Mode - Simulated Subscription</p>
+              <p className="font-medium">{t('billingPreferences.demoTitle')}</p>
               <p className="text-sm">
-                You're viewing a simulated subscription for testing purposes.
-                To access the full Stripe billing portal and manage real payments,
-                please upgrade to a paid plan.
+                {t('billingPreferences.demoDescription')}
               </p>
             </div>
           </AlertDescription>
@@ -322,19 +320,19 @@ export function BillingPreferences() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="auto-renewal" className="flex items-center gap-2">
             <RefreshCw className="h-4 w-4" />
-            Auto-Renewal
+            {t('billingPreferences.tabs.autoRenewal')}
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Notifications
+            {t('billingPreferences.tabs.notifications')}
           </TabsTrigger>
           <TabsTrigger value="payment-methods" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            Payment
+            {t('billingPreferences.tabs.payment')}
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="h-4 w-4" />
-            History
+            {t('billingPreferences.tabs.history')}
           </TabsTrigger>
         </TabsList>
 
@@ -352,14 +350,14 @@ export function BillingPreferences() {
                         <span className="font-medium">{issue.message}</span>
                         {issue.expires_at && (
                           <Badge variant="outline" className="text-xs">
-                            Expires {formatDate(issue.expires_at)}
+                            {t('billingPreferences.health.expires', { date: formatDate(issue.expires_at) })}
                           </Badge>
                         )}
                       </div>
                     ))}
                     {subscriptionHealth.next_actions.length > 0 && (
                       <div className="mt-3 pt-2 border-t">
-                        <p className="text-sm font-medium mb-1">Recommended actions:</p>
+                        <p className="text-sm font-medium mb-1">{t('billingPreferences.health.recommended')}</p>
                         <ul className="text-sm space-y-1">
                           {subscriptionHealth.next_actions.map((action, index) => (
                             <li key={index} className="flex items-center gap-2">
@@ -388,16 +386,22 @@ export function BillingPreferences() {
                   ) : (
                     <Shield className="h-5 w-5 text-gray-600" />
                   )}
-                  <CardTitle>Current Subscription</CardTitle>
+                  <CardTitle>{t('billingPreferences.current.title')}</CardTitle>
                 </div>
                 <Badge variant={subscriptionData?.status === 'active' ? 'default' : 'secondary'}>
-                  {subscriptionData?.tier?.charAt(0).toUpperCase() + subscriptionData?.tier?.slice(1) || 'Free'}
+                  {subscriptionData?.tier?.charAt(0).toUpperCase() + subscriptionData?.tier?.slice(1) || t('billingPreferences.current.freePlan')}
                 </Badge>
               </div>
               <CardDescription>
-                Status: {subscriptionData?.status || 'Free plan'} •
+                {t('billingPreferences.current.status', {
+                  status: subscriptionData?.status
+                    ? t(`billingPreferences.current.statuses.${subscriptionData.status}`, {
+                        defaultValue: subscriptionData.status,
+                      })
+                    : t('billingPreferences.current.freePlan'),
+                })} •
                 {subscriptionData?.next_billing_date && (
-                  <span> Next billing: {formatDate(subscriptionData.next_billing_date)}</span>
+                  <span> {t('billingPreferences.current.nextBilling', { date: formatDate(subscriptionData.next_billing_date) })}</span>
                 )}
               </CardDescription>
             </CardHeader>
@@ -407,9 +411,9 @@ export function BillingPreferences() {
                   {/* Auto-renewal toggle */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="auto-renewal">Auto-renewal</Label>
+                      <Label htmlFor="auto-renewal">{t('billingPreferences.current.autoRenewal')}</Label>
                       <p className="text-sm text-muted-foreground">
-                        Automatically renew your subscription to avoid service interruption
+                        {t('billingPreferences.current.autoRenewalDescription')}
                       </p>
                     </div>
                     <Switch
@@ -423,7 +427,7 @@ export function BillingPreferences() {
 
                   {/* Renewal frequency */}
                   <div className="space-y-2">
-                    <Label>Billing Frequency</Label>
+                    <Label>{t('billingPreferences.current.billingFrequency')}</Label>
                     <Select
                       value={preferences.auto_renewal_frequency}
                       onValueChange={(value: 'monthly' | 'annual') => updatePreference('auto_renewal_frequency', value)}
@@ -433,8 +437,8 @@ export function BillingPreferences() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="annual">Annual (Save 20%)</SelectItem>
+                        <SelectItem value="monthly">{t('billingPreferences.current.monthly')}</SelectItem>
+                        <SelectItem value="annual">{t('billingPreferences.current.annual')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -443,9 +447,9 @@ export function BillingPreferences() {
 
                   {/* Grace period settings */}
                   <div className="space-y-2">
-                    <Label>Grace Period</Label>
+                    <Label>{t('billingPreferences.current.gracePeriod')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Days to keep your subscription active after payment failure
+                      {t('billingPreferences.current.gracePeriodDescription')}
                     </p>
                     <div className="flex items-center gap-2">
                       <Input
@@ -456,7 +460,7 @@ export function BillingPreferences() {
                         onChange={(e) => updatePreference('grace_period_days', parseInt(e.target.value))}
                         className="w-20"
                       />
-                      <span className="text-sm text-muted-foreground">days</span>
+                      <span className="text-sm text-muted-foreground">{t('billingPreferences.current.days')}</span>
                     </div>
                   </div>
 
@@ -465,9 +469,9 @@ export function BillingPreferences() {
                   {/* Payment retry settings */}
                   <div className="space-y-4">
                     <div>
-                      <Label>Payment Retry Attempts</Label>
+                      <Label>{t('billingPreferences.current.retryAttempts')}</Label>
                       <p className="text-sm text-muted-foreground">
-                        Number of times to retry failed payments
+                        {t('billingPreferences.current.retryAttemptsDescription')}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <Input
@@ -478,14 +482,14 @@ export function BillingPreferences() {
                           onChange={(e) => updatePreference('max_payment_retry_attempts', parseInt(e.target.value))}
                           className="w-20"
                         />
-                        <span className="text-sm text-muted-foreground">attempts</span>
+                        <span className="text-sm text-muted-foreground">{t('billingPreferences.current.attempts')}</span>
                       </div>
                     </div>
 
                     <div>
-                      <Label>Retry Interval</Label>
+                      <Label>{t('billingPreferences.current.retryInterval')}</Label>
                       <p className="text-sm text-muted-foreground">
-                        Hours between payment retry attempts
+                        {t('billingPreferences.current.retryIntervalDescription')}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <Input
@@ -496,7 +500,7 @@ export function BillingPreferences() {
                           onChange={(e) => updatePreference('retry_interval_hours', parseInt(e.target.value))}
                           className="w-20"
                         />
-                        <span className="text-sm text-muted-foreground">hours</span>
+                        <span className="text-sm text-muted-foreground">{t('billingPreferences.current.hours')}</span>
                       </div>
                     </div>
                   </div>
@@ -512,7 +516,7 @@ export function BillingPreferences() {
                   variant="outline"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  Manage Subscription & Payment Methods
+                  {t('billingPreferences.current.manage')}
                 </Button>
               </div>
             </CardContent>
@@ -525,19 +529,19 @@ export function BillingPreferences() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
-                Email Notifications
+                {t('billingPreferences.email.title')}
               </CardTitle>
               <CardDescription>
-                Configure when and how you receive billing-related emails
+                {t('billingPreferences.email.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Master email toggle */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="billing-emails">Billing Email Notifications</Label>
+                  <Label htmlFor="billing-emails">{t('billingPreferences.email.billingEnabled')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive important billing updates and reminders
+                    {t('billingPreferences.email.billingEnabledDescription')}
                   </p>
                 </div>
                 <Switch
@@ -553,9 +557,9 @@ export function BillingPreferences() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>Payment Failure Notifications</Label>
+                    <Label>{t('billingPreferences.email.paymentFailure')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Get notified when payments fail and retry attempts
+                      {t('billingPreferences.email.paymentFailureDescription')}
                     </p>
                   </div>
                   <Switch
@@ -567,9 +571,9 @@ export function BillingPreferences() {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>Grace Period Notifications</Label>
+                    <Label>{t('billingPreferences.email.gracePeriod')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive alerts during grace period before subscription cancellation
+                      {t('billingPreferences.email.gracePeriodDescription')}
                     </p>
                   </div>
                   <Switch
@@ -585,9 +589,9 @@ export function BillingPreferences() {
               {/* Reminder timing */}
               <div className="space-y-4">
                 <div>
-                  <Label>Renewal Reminder Schedule</Label>
+                  <Label>{t('billingPreferences.email.reminderSchedule')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Choose when to receive renewal reminders before your billing date
+                    {t('billingPreferences.email.reminderScheduleDescription')}
                   </p>
                 </div>
 
@@ -610,7 +614,9 @@ export function BillingPreferences() {
                         className="rounded border-gray-300"
                       />
                       <Label htmlFor={`reminder-${days}`} className="text-sm">
-                        {days} day{days > 1 ? 's' : ''} before
+                        {days === 1
+                          ? t('billingPreferences.email.dayBefore', { count: days })
+                          : t('billingPreferences.email.daysBefore', { count: days })}
                       </Label>
                     </div>
                   ))}
@@ -622,7 +628,7 @@ export function BillingPreferences() {
               {/* Language and timezone */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Email Language</Label>
+                  <Label>{t('billingPreferences.email.language')}</Label>
                   <Select
                     value={preferences.preferred_language}
                     onValueChange={(value: 'en' | 'ms') => updatePreference('preferred_language', value)}
@@ -632,14 +638,14 @@ export function BillingPreferences() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="ms">Bahasa Malaysia</SelectItem>
+                      <SelectItem value="en">{t('general.language.options.en')}</SelectItem>
+                      <SelectItem value="ms">{t('general.language.options.ms')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Timezone</Label>
+                  <Label>{t('billingPreferences.email.timezone')}</Label>
                   <Select
                     value={preferences.timezone}
                     onValueChange={(value) => updatePreference('timezone', value)}
@@ -650,11 +656,11 @@ export function BillingPreferences() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="UTC">UTC</SelectItem>
-                      <SelectItem value="Asia/Kuala_Lumpur">Malaysia (GMT+8)</SelectItem>
-                      <SelectItem value="Asia/Singapore">Singapore (GMT+8)</SelectItem>
-                      <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                      <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                      <SelectItem value="Europe/London">London (GMT)</SelectItem>
+                      <SelectItem value="Asia/Kuala_Lumpur">{t('billingPreferences.timezones.malaysia')}</SelectItem>
+                      <SelectItem value="Asia/Singapore">{t('billingPreferences.timezones.singapore')}</SelectItem>
+                      <SelectItem value="America/New_York">{t('billingPreferences.timezones.eastern')}</SelectItem>
+                      <SelectItem value="America/Los_Angeles">{t('billingPreferences.timezones.pacific')}</SelectItem>
+                      <SelectItem value="Europe/London">{t('billingPreferences.timezones.london')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -665,15 +671,15 @@ export function BillingPreferences() {
               {/* Quiet hours */}
               <div className="space-y-4">
                 <div>
-                  <Label>Quiet Hours</Label>
+                  <Label>{t('billingPreferences.email.quietHours')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Avoid sending emails during these hours (in your timezone)
+                    {t('billingPreferences.email.quietHoursDescription')}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="quiet-start">Start Time</Label>
+                    <Label htmlFor="quiet-start">{t('billingPreferences.email.startTime')}</Label>
                     <Input
                       id="quiet-start"
                       type="time"
@@ -684,7 +690,7 @@ export function BillingPreferences() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="quiet-end">End Time</Label>
+                    <Label htmlFor="quiet-end">{t('billingPreferences.email.endTime')}</Label>
                     <Input
                       id="quiet-end"
                       type="time"
@@ -708,10 +714,10 @@ export function BillingPreferences() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Payment Methods
+                {t('billingPreferences.payment.title')}
               </CardTitle>
               <CardDescription>
-                Manage your payment methods and billing information
+                {t('billingPreferences.payment.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -723,14 +729,17 @@ export function BillingPreferences() {
                       <CreditCard className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="font-medium">
-                          {subscriptionData?.payment_method_brand || 'Card'} ending in {subscriptionData?.payment_method_last_four || '****'}
+                          {t('billingPreferences.payment.cardEnding', {
+                            brand: subscriptionData?.payment_method_brand || t('billingPreferences.payment.card'),
+                            last4: subscriptionData?.payment_method_last_four || '****',
+                          })}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Primary payment method
+                          {t('billingPreferences.payment.primary')}
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline">Active</Badge>
+                    <Badge variant="outline">{t('billingPreferences.payment.active')}</Badge>
                   </div>
 
                   {/* Manage payment methods */}
@@ -742,22 +751,22 @@ export function BillingPreferences() {
                       variant="outline"
                     >
                       <Settings className="h-4 w-4 mr-2" />
-                      Manage Payment Methods
+                      {t('billingPreferences.payment.manage')}
                     </Button>
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Add, remove, or update your payment methods securely through Stripe
+                      {t('billingPreferences.payment.manageHint')}
                     </p>
                   </div>
                 </>
               ) : (
                 <div className="text-center py-8">
                   <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Payment Methods</h3>
+                  <h3 className="text-lg font-medium mb-2">{t('billingPreferences.payment.noMethods')}</h3>
                   <p className="text-muted-foreground mb-4">
-                    You're currently on the free plan. Upgrade to add payment methods.
+                    {t('billingPreferences.payment.noMethodsDescription')}
                   </p>
                   <Button asChild>
-                    <a href="/pricing">View Pricing Plans</a>
+                    <a href="/pricing">{t('billingPreferences.payment.viewPlans')}</a>
                   </Button>
                 </div>
               )}
@@ -767,9 +776,9 @@ export function BillingPreferences() {
           {/* Billing Address */}
           <Card>
             <CardHeader>
-              <CardTitle>Billing Information</CardTitle>
+              <CardTitle>{t('billingPreferences.payment.billingInfo')}</CardTitle>
               <CardDescription>
-                Your billing address and tax information
+                {t('billingPreferences.payment.billingInfoDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -777,8 +786,7 @@ export function BillingPreferences() {
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Billing information is managed through Stripe's secure portal.
-                    Click "Manage Payment Methods" above to update your billing details.
+                    {t('billingPreferences.payment.billingManaged')}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -794,10 +802,10 @@ export function BillingPreferences() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <History className="h-5 w-5" />
-                    Payment History
+                    {t('billingPreferences.history.title')}
                   </CardTitle>
                   <CardDescription>
-                    View your recent billing transactions and invoices
+                    {t('billingPreferences.history.description')}
                   </CardDescription>
                 </div>
                 <Button
@@ -805,11 +813,11 @@ export function BillingPreferences() {
                   size="sm"
                   onClick={() => {
                     loadPaymentHistory();
-                    toast.success('Payment history refreshed');
+                    toast.success(t('billingPreferences.history.refreshed'));
                   }}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                  {t('billingPreferences.history.refresh')}
                 </Button>
               </div>
             </CardHeader>
@@ -836,7 +844,9 @@ export function BillingPreferences() {
                         </p>
                         <div className="flex items-center gap-2">
                           <Badge variant={payment.status === 'succeeded' ? 'default' : 'destructive'}>
-                            {payment.status}
+                            {t(`billingPreferences.paymentStatuses.${payment.status}`, {
+                              defaultValue: payment.status,
+                            })}
                           </Badge>
                           {payment.invoice_url && (
                             <Button variant="ghost" size="sm" asChild>
@@ -853,9 +863,9 @@ export function BillingPreferences() {
               ) : (
                 <div className="text-center py-8">
                   <History className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Payment History</h3>
+                  <h3 className="text-lg font-medium mb-2">{t('billingPreferences.history.emptyTitle')}</h3>
                   <p className="text-muted-foreground">
-                    Your payment transactions will appear here once you have an active subscription.
+                    {t('billingPreferences.history.emptyDescription')}
                   </p>
                 </div>
               )}
@@ -866,9 +876,9 @@ export function BillingPreferences() {
           {subscriptionData?.tier !== 'free' && (
             <Card>
               <CardHeader>
-                <CardTitle>Invoices & Receipts</CardTitle>
+                <CardTitle>{t('billingPreferences.history.invoices')}</CardTitle>
                 <CardDescription>
-                  Download your billing invoices and tax receipts
+                  {t('billingPreferences.history.invoicesDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -879,7 +889,7 @@ export function BillingPreferences() {
                   className="w-full"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  View All Invoices
+                  {t('billingPreferences.history.viewAll')}
                 </Button>
               </CardContent>
             </Card>
@@ -896,12 +906,12 @@ export function BillingPreferences() {
             {isSaving ? (
               <>
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                {t('billingPreferences.saving')}
               </>
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Save Preferences
+                {t('billingPreferences.save')}
               </>
             )}
           </Button>
