@@ -1,4 +1,5 @@
 import { useDashboardTranslation } from "@/contexts/LanguageContext";
+import { REVIEW_CONFIDENCE_THRESHOLD } from "@/lib/receipts/confidence";
 import { cn } from "@/lib/utils";
 
 interface ConfidenceBarProps {
@@ -25,7 +26,7 @@ export function ConfidenceBar({ value, className, showLabel = true }: Confidence
     );
   }
 
-  const tone = value >= 85 ? "bg-ledger-accent" : "bg-ledger-amber";
+  const tone = value >= REVIEW_CONFIDENCE_THRESHOLD ? "bg-ledger-accent" : "bg-ledger-amber";
 
   return (
     <div className={cn("space-y-1.5", className)}>
