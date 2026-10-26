@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
  */
 export function WorkspaceTabs() {
   const { t } = useNavigationTranslation();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin } = useAuth();
   const { data: counts } = useWorkspaceReceiptCounts();
-  const isAdminUser = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
+  const isAdminUser = Boolean(isAdmin);
   const navRef = useRef<HTMLElement | null>(null);
   const { pathname } = useLocation();
 

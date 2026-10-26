@@ -91,7 +91,7 @@ export function WorkspaceSidebar() {
     refetchOnWindowFocus: false,
   });
 
-  const isAdminUser = Boolean(isAdmin || user?.email === "k.anwarbakar@gmail.com");
+  const isAdminUser = Boolean(isAdmin);
   const avatarUrl = user ? getAvatarUrl(user) : null;
   const userInitials = user ? getUserInitials(user) : "";
   const displayName =
