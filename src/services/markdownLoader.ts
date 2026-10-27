@@ -7,8 +7,10 @@
 
 export interface MarkdownContent {
   content: string;
-  frontmatter?: Record<string, any>;
+  frontmatter?: Record<string, unknown>;
   lastModified?: Date;
+  /** True when the requested file could not be fetched and placeholder copy is returned. */
+  fallback?: boolean;
 }
 
 class MarkdownLoader {
@@ -49,7 +51,8 @@ class MarkdownLoader {
       // Return fallback content that references our comprehensive guides
       const fallbackContent: MarkdownContent = {
         content: this.generateFallbackContent(path),
-        lastModified: new Date()
+        lastModified: new Date(),
+        fallback: true
       };
       
       return fallbackContent;
