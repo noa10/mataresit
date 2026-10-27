@@ -321,6 +321,7 @@
       "bulkApprovedToast": "{{count}} resit diluluskan",
       "bulkDeletedToast": "{{count}} resit dipadam",
       "bulkFailedToast": "{{count}} gagal",
+      "exportTruncated": "{{exported}} daripada {{total}} resit dieksport. Cuba julat tarikh yang lebih sempit untuk selebihnya.",
       "duplicateDetection": "Pengesanan pendua"
     },
     "detail": {

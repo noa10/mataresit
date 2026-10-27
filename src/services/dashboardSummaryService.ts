@@ -139,7 +139,11 @@ const fetchSummaryRows = async (
   const rows: DashboardSummaryRow[] = [];
   let truncated = false;
 
-  for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
+  for (let offset = 0; offset <= MAX_ROWS; offset += PAGE_SIZE) {
+    // Fetch one extra row past the cap so a period with exactly MAX_ROWS rows
+    // is not reported as truncated.
+    const isProbe = offset === MAX_ROWS;
+    const pageSize = isProbe ? 1 : PAGE_SIZE;
     let query = supabase
       .from("receipts")
       .select(SUMMARY_COLUMNS)
@@ -148,7 +152,7 @@ const fetchSummaryRows = async (
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
+      .range(offset, offset + pageSize - 1);
 
     if (params.currentTeam?.id) {
       query = query.eq("team_id", params.currentTeam.id);
@@ -163,10 +167,13 @@ const fetchSummaryRows = async (
     }
 
     const page = (data ?? []) as unknown as DashboardSummaryRow[];
-    rows.push(...page);
+    if (isProbe) {
+      truncated = page.length > 0;
+      break;
+    }
 
+    rows.push(...page);
     if (page.length < PAGE_SIZE) break;
-    if (offset + PAGE_SIZE >= MAX_ROWS) truncated = true;
   }
 
   return { rows, truncated };

@@ -192,9 +192,9 @@ const normalizePageNumber = (page?: number): number => {
   return Math.floor(parsed);
 };
 
-const normalizePageLimit = (limit?: number): 10 | 25 | 50 => {
+const normalizePageLimit = (limit?: number): 10 | 25 | 50 | 100 => {
   const parsed = Number(limit ?? 25);
-  if (parsed === 10 || parsed === 25 || parsed === 50) {
+  if (parsed === 10 || parsed === 25 || parsed === 50 || parsed === 100) {
     return parsed;
   }
   return 25;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useSearchParams } from "react-router-dom";
 import { Calendar as CalendarIcon, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, SlidersHorizontal, Trash2, Upload, X, AlertTriangle } from "lucide-react";
 import { DateRange } from "react-day-picker";
@@ -43,6 +43,30 @@ type ReceiptFiltersState = {
   processingStatus: string | null;
 };
 
+const parseSearchDate = (value: string | null): Date | undefined => {
+  if (!value) return undefined;
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const parseSearchPage = (value: string | null): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1;
+};
+
+/** Map the old /dashboard receipt filters into this page's initial state. */
+const readInitialStatus = (params: URLSearchParams): StatusFilter => {
+  const tab = params.get("tab");
+  return tab === "reviewed" || tab === "unreviewed" ? tab : "all";
+};
+
+const readInitialSort = (params: URLSearchParams): ReceiptSortOrder => {
+  const sort = params.get("sort");
+  return sort === "oldest" || sort === "highest" || sort === "lowest"
+    ? sort
+    : "newest";
+};
+
 export default function ReceiptsPage() {
   const { t } = useDashboardTranslation();
   const { user } = useAuth();
@@ -60,19 +84,27 @@ export default function ReceiptsPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, openModal, setSearchParams]);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [sortOrder, setSortOrder] = useState<ReceiptSortOrder>("newest");
-  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState(
+    () => searchParams.get("q")?.trim() ?? ""
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    () => searchParams.get("q")?.trim() ?? ""
+  );
+  const [status, setStatus] = useState<StatusFilter>(() => readInitialStatus(searchParams));
+  const [sortOrder, setSortOrder] = useState<ReceiptSortOrder>(() => readInitialSort(searchParams));
+  const [page, setPage] = useState(() => parseSearchPage(searchParams.get("page")));
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [filters, setFilters] = useState<ReceiptFiltersState>({
-    currency: null,
-    categoryId: null,
-    paidById: null,
-    processingStatus: null,
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const from = parseSearchDate(searchParams.get("from"));
+    const to = parseSearchDate(searchParams.get("to"));
+    return from || to ? { from, to } : undefined;
   });
+  const [filters, setFilters] = useState<ReceiptFiltersState>(() => ({
+    currency: searchParams.get("currency"),
+    categoryId: searchParams.get("category"),
+    paidById: searchParams.get("paidBy"),
+    processingStatus: searchParams.get("ps"),
+  }));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dupOpen, setDupOpen] = useState(false);
   const duplicateRef = useRef<HTMLElement>(null);
@@ -127,7 +159,7 @@ export default function ReceiptsPage() {
     filters.processingStatus,
   ] as const;
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: listKey,
     queryFn: () =>
       fetchReceiptsPage(
@@ -464,12 +496,10 @@ export default function ReceiptsPage() {
             }}
             totalCount={total}
             getReceiptsForExport={async () => {
-              const all: Receipt[] = [];
-              let cursor = 1;
-              for (let guard = 0; guard < 40; guard += 1) {
-                const result = await fetchReceiptsPage(
+              const fetchPage = (page: number) =>
+                fetchReceiptsPage(
                   {
-                    page: cursor,
+                    page,
                     limit: 100,
                     searchQuery,
                     status,
@@ -482,9 +512,22 @@ export default function ReceiptsPage() {
                   },
                   { currentTeam }
                 );
+
+              const firstPage = await fetchPage(1);
+              const all: Receipt[] = [...(firstPage.receipts as Receipt[])];
+              for (let cursor = 2; cursor <= firstPage.totalPages; cursor += 1) {
+                const result = await fetchPage(cursor);
+                if (result.receipts.length === 0) break;
                 all.push(...(result.receipts as Receipt[]));
-                if (!result.hasNextPage || result.receipts.length === 0) break;
-                cursor += 1;
+              }
+
+              if (firstPage.total > all.length) {
+                toast.warning(
+                  t("workspace.receipts.exportTruncated", {
+                    exported: all.length,
+                    total: firstPage.total,
+                  })
+                );
               }
               return all;
             }}
@@ -552,7 +595,7 @@ export default function ReceiptsPage() {
               />
             ))}
           </div>
-        ) : loadError ? (
+        ) : isError || loadError ? (
           <EmptyState
             title={t("workspace.receipts.loadErrorTitle")}
             description={t("workspace.receipts.loadErrorDescription")}

@@ -96,6 +96,18 @@ describe("fetchReceiptsPage", () => {
     expect(mockQueryBuilder.range).toHaveBeenCalledWith(50, 74);
   });
 
+  it("keeps the 100-row page size used by exports", async () => {
+    await fetchReceiptsPage({ page: 2, limit: 100 });
+
+    expect(mockQueryBuilder.range).toHaveBeenCalledWith(100, 199);
+  });
+
+  it("falls back to 25 rows for unsupported page sizes", async () => {
+    await fetchReceiptsPage({ page: 1, limit: 1000 });
+
+    expect(mockQueryBuilder.range).toHaveBeenCalledWith(0, 24);
+  });
+
   it("returns total count and pagination metadata", async () => {
     mockQueryBuilder.range.mockResolvedValue({
       data: defaultReceipts,

@@ -321,6 +321,7 @@
       "bulkApprovedToast": "{{count}} receipts approved",
       "bulkDeletedToast": "{{count}} receipts deleted",
       "bulkFailedToast": "{{count}} failed",
+      "exportTruncated": "Exported {{exported}} of {{total}} receipts. Try a narrower date range for the rest.",
       "duplicateDetection": "Duplicate detection"
     },
     "detail": {
