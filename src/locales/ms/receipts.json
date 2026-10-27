@@ -219,6 +219,15 @@
     "description": "Hantar sekumpulan resit. Setiap fail dibaca, dikategorikan dan difailkan dalam satu proses.",
     "newBatch": "Kelompok baharu",
     "batch": "Kelompok",
+    "indicator": {
+      "background": "Di latar belakang",
+      "reopenAria": "Buka semula muat naik kelompok",
+      "reopen": "Buka semula kelompok",
+      "defaultName": "Kelompok",
+      "postedStatus": "{{count}} dihantar",
+      "postedProgress": "{{ready}} daripada {{total}} dihantar",
+      "failed": "{{count}} gagal"
+    },
     "moreActions": "Lebih banyak tindakan kelompok",
     "close": "Tutup muat naik kelompok",
     "menu": {

@@ -83,9 +83,9 @@ export function WorkspaceSidebar() {
   const { currentTeam } = useTeam();
   const { t } = useNavigationTranslation();
   const { data: counts } = useWorkspaceReceiptCounts();
-  const { data: claimStats } = useQuery({
-    queryKey: ["claim-stats", currentTeam?.id ?? null],
-    queryFn: () => claimService.getTeamClaimStats(currentTeam!.id),
+  const { data: pendingClaimCount } = useQuery({
+    queryKey: ["claim-pending-count", currentTeam?.id ?? null],
+    queryFn: () => claimService.getTeamPendingClaimCount(currentTeam!.id),
     enabled: Boolean(currentTeam?.id),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
@@ -147,7 +147,7 @@ export function WorkspaceSidebar() {
               to="/claims"
               label={t("mainMenu.claims")}
               icon={FileText}
-              count={claimStats?.pending_claims}
+              count={pendingClaimCount}
             />
             <SidebarLink to="/teams" label={t("mainMenu.teams")} icon={Users} />
           </SidebarGroup>

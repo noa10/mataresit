@@ -44,8 +44,9 @@ export function ReceiptRow({
 
   return (
     <div
-      role={selectable ? undefined : "button"}
-      tabIndex={selectable ? undefined : 0}
+      role={selectable ? "checkbox" : "button"}
+      aria-checked={selectable ? selected : undefined}
+      tabIndex={0}
       onClick={() => (selectable ? onToggleSelect?.(receipt.id, !selected) : onOpen?.(receipt.id))}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {

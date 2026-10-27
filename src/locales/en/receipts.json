@@ -219,6 +219,15 @@
     "description": "Post a stack of receipts. Every file is read, categorised and filed in one pass.",
     "newBatch": "New batch",
     "batch": "Batch",
+    "indicator": {
+      "background": "In the background",
+      "reopenAria": "Reopen batch upload",
+      "reopen": "Reopen batch",
+      "defaultName": "Batch",
+      "postedStatus": "{{count}} posted",
+      "postedProgress": "{{ready}} of {{total}} posted",
+      "failed": "{{count}} failed"
+    },
     "moreActions": "More batch actions",
     "close": "Close batch upload",
     "menu": {

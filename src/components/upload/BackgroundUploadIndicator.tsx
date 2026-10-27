@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { useBackgroundUpload } from '@/contexts/BackgroundUploadContext';
+import { useReceiptsTranslation } from '@/contexts/LanguageContext';
 import { formatBatchDate } from '@/components/upload/batch/utils';
 
 /**
@@ -15,6 +16,7 @@ import { formatBatchDate } from '@/components/upload/batch/utils';
  */
 export function BackgroundUploadIndicator() {
   const reduceMotion = useReducedMotion();
+  const { t } = useReceiptsTranslation();
   const {
     isModalOpen,
     openModal,
@@ -47,8 +49,8 @@ export function BackgroundUploadIndicator() {
 
   const statusLabel = isComplete
     ? failed > 0
-      ? `${failed} failed`
-      : `${ready} posted`
+      ? t('batch.indicator.failed', { count: failed })
+      : t('batch.indicator.postedStatus', { count: ready })
     : `${percent}%`;
 
   const StatusIcon = isComplete
@@ -63,7 +65,7 @@ export function BackgroundUploadIndicator() {
       ? 'text-ledger-accent'
       : 'text-ledger-accent';
 
-  const title = batchSession?.sessionName || 'Batch';
+  const title = batchSession?.sessionName || t('batch.indicator.defaultName');
   const date = formatBatchDate(batchSession?.createdAt);
 
   return (
@@ -78,12 +80,12 @@ export function BackgroundUploadIndicator() {
         <button
           type="button"
           onClick={openModal}
-          aria-label="Reopen batch upload"
+          aria-label={t('batch.indicator.reopenAria')}
           className="group block w-full rounded-[10px] border border-ledger-line-strong bg-ledger-surface p-3.5 text-left shadow-[0_1px_2px_rgba(18,23,21,.06),0_18px_40px_-24px_rgba(18,23,21,.32)] transition-colors hover:bg-ledger-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent focus-visible:ring-offset-2"
         >
           <div className="flex items-center justify-between gap-3">
             <span className="font-data text-[8px] uppercase tracking-[0.16em] text-ledger-muted">
-              In the background
+              {t('batch.indicator.background')}
             </span>
             <span className={`flex items-center gap-1 font-data text-[8.5px] uppercase tracking-[0.1em] ${statusColor}`}>
               <StatusIcon
@@ -98,8 +100,10 @@ export function BackgroundUploadIndicator() {
             {title} <span className="text-ledger-muted">· {date}</span>
           </div>
           <p className="mt-1 font-data text-[9.5px] text-ledger-muted">
-            {ready} of {total} posted
-            {failed > 0 ? ` · ${failed} failed` : ''}
+            {t('batch.indicator.postedProgress', { ready, total })}
+            {failed > 0
+              ? ` · ${t('batch.indicator.failed', { count: failed })}`
+              : ''}
           </p>
 
           <div className="mt-3 h-[2px] w-full overflow-hidden bg-ledger-line" aria-hidden="true">
@@ -112,7 +116,7 @@ export function BackgroundUploadIndicator() {
           </div>
 
           <span className="mt-3 flex items-center justify-between font-data text-[8.5px] uppercase tracking-[0.12em] text-ledger-accent">
-            Reopen batch
+            {t('batch.indicator.reopen')}
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </span>
         </button>
