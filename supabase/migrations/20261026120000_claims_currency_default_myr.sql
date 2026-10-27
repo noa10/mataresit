@@ -1,16 +1,14 @@
 -- Claims are filed in Malaysian Ringgit across the app (receipts, pricing and
 -- ledger all use MYR). The original schema defaulted the currency column and
 -- the create_claim RPC to USD, so claims created without an explicit currency
--- rendered with a dollar sign. Align both with MYR and normalise legacy rows.
+-- rendered with a dollar sign. Align both with MYR.
 
 ALTER TABLE public.claims
   ALTER COLUMN currency SET DEFAULT 'MYR'::character varying;
 
--- Existing claims that still carry the old default were entered as ringgit
--- amounts in a MYR-only workflow; normalise them so they render as RM.
-UPDATE public.claims
-SET currency = 'MYR', updated_at = now()
-WHERE currency = 'USD';
+-- Do not rewrite existing rows. USD/EUR/GBP/SGD claims are genuine (the create
+-- dialog and ClaimFromReceiptButton both persist the selected currency), so
+-- relabelling them without an FX conversion would change their value.
 
 CREATE OR REPLACE FUNCTION public.create_claim(
   _team_id uuid,
