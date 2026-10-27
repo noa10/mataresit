@@ -2,6 +2,19 @@ import { supabase } from '@/integrations/supabase/client';
 // No need for Receipt type here if we select specific columns
 // import { Receipt } from '@/types/receipt';
 
+/**
+ * Personal mode must not inherit team rows. The receipts RLS policy also
+ * returns team receipts for members, so scope to the signed-in user's own,
+ * team-less receipts explicitly.
+ */
+const getPersonalUserId = async (): Promise<string> => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  const userId = data.user?.id;
+  if (!userId) throw new Error('Not authenticated');
+  return userId;
+};
+
 // Update DailyExpenseData to include receipt IDs
 export interface DailyExpenseData {
   date: string;
@@ -27,6 +40,8 @@ export const fetchDailyExpenses = async (startDateISO?: string | null, endDateIS
   }
   if (teamId) {
     query = query.eq('team_id', teamId);
+  } else {
+    query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
   }
 
 
@@ -95,6 +110,8 @@ export const fetchExpensesByCategory = async (startDateISO?: string | null, endD
     }
     if (teamId) {
       query = query.eq('team_id', teamId);
+    } else {
+      query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
     }
 
     const { data, error } = await query;
@@ -159,6 +176,8 @@ export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, 
   }
   if (teamId) {
     query = query.eq('team_id', teamId);
+  } else {
+    query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
   }
 
   // Order by date for easier processing in the select function

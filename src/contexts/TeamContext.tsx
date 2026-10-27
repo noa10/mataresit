@@ -6,6 +6,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearReceiptCaches } from '@/services/receiptService';
 
+const CURRENT_TEAM_STORAGE_KEY = 'currentTeamId';
+// Teams are stored by id; this sentinel keeps an explicit "Personal workspace"
+// choice from being mistaken for "no choice yet" on the next mount.
+const PERSONAL_WORKSPACE_STORAGE_VALUE = 'personal';
+
 // =============================================
 // TYPES
 // =============================================
@@ -42,7 +47,7 @@ type TeamAction =
   | { type: 'UPDATE_TEAM'; payload: Partial<Team> & { id: string } }
   | { type: 'REMOVE_TEAM'; payload: string }
   | { type: 'ADD_TEAM_MEMBER'; payload: TeamMember }
-  | { type: 'UPDATE_TEAM_MEMBER'; payload: Partial<TeamMember> & { id: string } }
+  | { type: 'UPDATE_TEAM_MEMBER'; payload: Partial<TeamMember> & { user_id: string } }
   | { type: 'REMOVE_TEAM_MEMBER'; payload: string };
 
 interface TeamContextType extends TeamState {
@@ -152,14 +157,14 @@ function teamReducer(state: TeamState, action: TeamAction): TeamState {
       return {
         ...state,
         teamMembers: state.teamMembers.map(member =>
-          member.id === action.payload.id ? { ...member, ...action.payload } : member
+          member.user_id === action.payload.user_id ? { ...member, ...action.payload } : member
         ),
       };
       
     case 'REMOVE_TEAM_MEMBER':
       return {
         ...state,
-        teamMembers: state.teamMembers.filter(member => member.id !== action.payload),
+        teamMembers: state.teamMembers.filter(member => member.user_id !== action.payload),
       };
       
     default:
@@ -205,8 +210,10 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_USER_TEAMS', payload: teams });
       
       // Check if there's a stored current team
-      const storedTeamId = localStorage.getItem('currentTeamId');
-      if (storedTeamId && teams.some(team => team.id === storedTeamId)) {
+      const storedTeamId = localStorage.getItem(CURRENT_TEAM_STORAGE_KEY);
+      if (storedTeamId === PERSONAL_WORKSPACE_STORAGE_VALUE) {
+        await switchTeam(null);
+      } else if (storedTeamId && teams.some(team => team.id === storedTeamId)) {
         await switchTeam(storedTeamId);
       } else if (!state.currentTeam && teams.length > 0) {
         // If no current team is selected and user has teams, select the first one
@@ -232,6 +239,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       if (!teamId) {
         dispatch({ type: 'SET_CURRENT_TEAM', payload: { team: null, role: null } });
         dispatch({ type: 'SET_TEAM_MEMBERS', payload: [] });
+        localStorage.setItem(CURRENT_TEAM_STORAGE_KEY, PERSONAL_WORKSPACE_STORAGE_VALUE);
         return;
       }
       
@@ -250,7 +258,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       await loadTeamMembers(teamId);
       
       // Store current team in localStorage
-      localStorage.setItem('currentTeamId', teamId);
+      localStorage.setItem(CURRENT_TEAM_STORAGE_KEY, teamId);
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
       toast({
@@ -379,7 +387,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   const updateTeamMemberRole = async (teamId: string, userId: string, role: TeamMemberRole) => {
     try {
       await teamService.updateTeamMemberRole({ team_id: teamId, user_id: userId, role });
-      dispatch({ type: 'UPDATE_TEAM_MEMBER', payload: { id: userId, role } });
+      dispatch({ type: 'UPDATE_TEAM_MEMBER', payload: { user_id: userId, role } });
       
       toast({
         title: 'Success',
