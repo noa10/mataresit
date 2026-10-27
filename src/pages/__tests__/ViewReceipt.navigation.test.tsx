@@ -68,7 +68,7 @@ function renderViewReceipt(initialEntry: string) {
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/receipt/:id" element={<ViewReceipt />} />
-          <Route path="/dashboard" element={<LocationObserver />} />
+          <Route path="/receipts" element={<LocationObserver />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -98,7 +98,7 @@ describe("ViewReceipt dashboard navigation", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toBe(
-        "/dashboard?q=groceries&tab=reviewed&currency=MYR&category=cat-team&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table",
+        "/receipts?q=groceries&tab=reviewed&currency=MYR&category=cat-team&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table",
       );
     });
   });
@@ -111,7 +111,7 @@ describe("ViewReceipt dashboard navigation", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toBe(
-        "/dashboard?q=office&currency=USD&page=3&limit=25&view=list",
+        "/receipts?q=office&currency=USD&page=3&limit=25&view=list",
       );
     });
   });

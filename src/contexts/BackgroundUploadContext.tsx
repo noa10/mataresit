@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
-import { useBatchFileUpload, type BatchUploadOptions } from '@/hooks/useBatchFileUpload';
+import { useBatchFileUpload } from '@/hooks/useBatchFileUpload';
 import { useSettings } from '@/hooks/useSettings';
 import { toast } from 'sonner';
 
@@ -110,7 +110,7 @@ export function BackgroundUploadProvider({ children }: BackgroundUploadProviderP
             {
               duration: 8000,
               action: {
-                label: 'View Results',
+                label: 'Review batch',
                 onClick: () => setIsModalOpen(true),
               },
             },
@@ -121,7 +121,7 @@ export function BackgroundUploadProvider({ children }: BackgroundUploadProviderP
             {
               duration: 10000,
               action: {
-                label: 'View Results',
+                label: 'Review batch',
                 onClick: () => setIsModalOpen(true),
               },
             },

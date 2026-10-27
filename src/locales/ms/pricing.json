@@ -135,5 +135,371 @@
     "subtitle": "Sertai ribuan perniagaan yang sudah menggunakan Mataresit",
     "button": "Mula Percubaan Percuma",
     "contact": "Hubungi Jualan"
+  },
+  "page": {
+    "meta": {
+      "title": "Harga — Mataresit",
+      "description": "Harga Mataresit: mula percuma dengan 50 resit sebulan, Pro pada RM 10 sebulan untuk pasukan, Max pada RM 20 sebulan untuk volum, tuntutan dan akses API."
+    },
+    "hero": {
+      "eyebrow": "Harga",
+      "titleLead": "Tiga pelan.",
+      "titleAccent": "Satu lejar bersih.",
+      "lede": "Mula percuma dengan 50 resit sebulan. Beralih ke Pro apabila pasukan menyertai. Pergi Max apabila anda perlukan volum, tuntutan dan API.",
+      "monthly": "Bulanan",
+      "annual": "Tahunan",
+      "save": "Jimat 10%",
+      "noteMonthly": "Dibilkan bulanan. Harga dalam ringgit Malaysia.",
+      "noteAnnual": "Dibilkan sekali untuk dua belas bulan. Harga dalam ringgit Malaysia."
+    },
+    "plans": {
+      "free": {
+        "name": "Percuma",
+        "description": "Untuk satu orang yang sedang menguji tabiat pada resit sendiri.",
+        "cta": "Mula percuma",
+        "priceNote": "50 resit setiap bulan",
+        "features": [
+          {
+            "text": "50 resit sebulan",
+            "off": false
+          },
+          {
+            "text": "Sehingga 5 fail setiap kelompok",
+            "off": false
+          },
+          {
+            "text": "Pengekstrakan item baris dengan skor keyakinan",
+            "off": false
+          },
+          {
+            "text": "Pengesanan berbilang mata wang",
+            "off": false
+          },
+          {
+            "text": "Kategori standard",
+            "off": false
+          },
+          {
+            "text": "Eksport CSV",
+            "off": false
+          },
+          {
+            "text": "Pengguna tunggal",
+            "off": false
+          },
+          {
+            "text": "Tiada ciri pasukan",
+            "off": true
+          }
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Untuk pasukan kecil yang menutup bulan bersama.",
+        "cta": "Pilih Pro",
+        "priceNote": "Dibilkan bulanan",
+        "features": [
+          {
+            "text": "500 resit sebulan",
+            "off": false
+          },
+          {
+            "text": "Sehingga 50 fail setiap kelompok",
+            "off": false
+          },
+          {
+            "text": "Carian pintar merentas resit dan item baris",
+            "off": false
+          },
+          {
+            "text": "Jemputan pasukan dan resit dikongsi",
+            "off": false
+          },
+          {
+            "text": "Analisis peniaga dan trend bulanan / suku tahunan",
+            "off": false
+          },
+          {
+            "text": "Penjenamaan tersuai",
+            "off": false
+          },
+          {
+            "text": "Sokongan keutamaan",
+            "off": false
+          }
+        ],
+        "badge": "Paling popular"
+      },
+      "max": {
+        "name": "Max",
+        "description": "Untuk pasukan kewangan dengan volum, tuntutan dan jejak audit.",
+        "cta": "Pilih Max",
+        "priceNote": "Dibilkan bulanan",
+        "features": [
+          {
+            "text": "Resit tanpa had",
+            "off": false
+          },
+          {
+            "text": "Sehingga 100 fail setiap kelompok",
+            "off": false
+          },
+          {
+            "text": "Akses API dan integrasi",
+            "off": false
+          },
+          {
+            "text": "Pengurusan tuntutan",
+            "off": false
+          },
+          {
+            "text": "Kebenaran berdasarkan peranan",
+            "off": false
+          },
+          {
+            "text": "Perbandingan tahun ke tahun dan pengenalpastian potongan cukai",
+            "off": false
+          },
+          {
+            "text": "Sokongan dedikasi",
+            "off": false
+          }
+        ]
+      }
+    },
+    "forever": "selamanya",
+    "perMonth": "/ bulan",
+    "perYear": "/ tahun",
+    "billedMonthly": "Dibilkan bulanan",
+    "annualMonthly": "{{amount}} / bulan · jimat 10%",
+    "current": "Pelan semasa",
+    "choose": "Pilih {{plan}}",
+    "note": "Setiap pelan membaca item baris, SST dan butiran pembayaran. Volum dan alat pasukan yang berubah.",
+    "compare": {
+      "eyebrow": "Bandingkan",
+      "title": "Apa yang berubah antara pelan.",
+      "lede": "Volum dan kawalan pasukan berskala. Bacaannya sendiri tidak.",
+      "tableLabel": "Jadual perbandingan pelan",
+      "caption": "Perbandingan ciri pelan Percuma, Pro dan Max",
+      "columns": {
+        "feature": "Ciri",
+        "free": "Percuma",
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "groups": [
+        {
+          "label": "Resit & tangkapan",
+          "rows": [
+            {
+              "label": "Resit sebulan",
+              "free": "50",
+              "pro": "500",
+              "max": "Tanpa had"
+            },
+            {
+              "label": "Muat naik pukal",
+              "free": "Sehingga 5 fail",
+              "pro": "Sehingga 50 fail",
+              "max": "Sehingga 100 fail"
+            },
+            {
+              "label": "Pengekstrakan item baris",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Skor keyakinan",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Pengesanan berbilang mata wang",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "SST ditangkap berasingan",
+              "free": true,
+              "pro": true,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Cari & lapor",
+          "rows": [
+            {
+              "label": "Carian pintar",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Kategori",
+              "free": "Standard",
+              "pro": "Tersuai",
+              "max": "Tersuai"
+            },
+            {
+              "label": "Eksport CSV",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Analisis peniaga",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Trend bulanan & suku tahunan",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Perbandingan tahun ke tahun",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Pengenalpastian potongan cukai",
+              "free": false,
+              "pro": false,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Pasukan & kawalan",
+          "rows": [
+            {
+              "label": "Pengguna",
+              "free": "Pengguna tunggal",
+              "pro": "Pasukan",
+              "max": "Pasukan + peranan"
+            },
+            {
+              "label": "Jemputan pasukan",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Akses resit dikongsi",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Pengurusan tuntutan",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Kebenaran berdasarkan peranan",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Penjenamaan tersuai",
+              "free": false,
+              "pro": true,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Platform & sokongan",
+          "rows": [
+            {
+              "label": "Akses API",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Integrasi",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Sokongan",
+              "free": "E-mel",
+              "pro": "Keutamaan",
+              "max": "Dedikasi"
+            }
+          ]
+        }
+      ],
+      "included": "Termasuk",
+      "notIncluded": "Tidak termasuk"
+    },
+    "faq": {
+      "eyebrow": "Soalan",
+      "title": "Sebelum anda pilih satu.",
+      "lede": "Jawapan ringkas. Jika masih ada yang tidak jelas, pusat bantuan merangkumi persediaan dengan lebih terperinci.",
+      "items": [
+        {
+          "question": "Adakah pelan percuma benar-benar percuma?",
+          "answer": "Ya. Ia meliputi 50 resit sebulan untuk satu pengguna, dengan kelompok 5 fail dan eksport CSV. Pelan berbayar menambah volum, alat pasukan dan laporan yang lebih mendalam — bukan model bacaan yang berbeza."
+        },
+        {
+          "question": "Bagaimana pengebilan tahunan berfungsi?",
+          "answer": "Pengebilan tahunan mengenakan bayaran sekali untuk dua belas bulan. Pro ialah RM 108 setahun berbanding RM 120, dan Max ialah RM 216 berbanding RM 240 — 10% diskaun sama ada."
+        },
+        {
+          "question": "Apa yang dikira sebagai resit?",
+          "answer": "Satu imbasan yang dimuat naik atau resit e-mel dikira sekali, tidak kira berapa banyak item baris di dalamnya. Max menghapuskan had bulanan."
+        },
+        {
+          "question": "Bolehkah saya tukar pelan kemudian?",
+          "answer": "Boleh. Perubahan pelan dan tempoh pengebilan tersedia dalam tetapan langganan, jadi anda boleh beralih dari bulanan ke tahunan tanpa bermula semula."
+        },
+        {
+          "question": "Apa yang ada pada setiap pelan?",
+          "answer": "Pengekstrakan item baris, skor keyakinan, pengesanan berbilang mata wang, tangkapan SST dan eksport CSV. Bacaannya sama; had dan kawalan pasukan tidak."
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Mula kecil",
+      "title": "Mula dengan 50 resit.",
+      "lede": "Pelan percuma ialah ruang kerja sebenar, bukan kira detik. Tambah pasukan apabila timbunan bertambah.",
+      "workspace": "Buka ruang kerja",
+      "features": "Bandingkan ciri"
+    },
+    "downgrade": {
+      "title": "Tukar pelan anda?",
+      "description": "Anda sedang beralih ke {{plan}}.",
+      "freeWarningTitle": "Apa yang berlaku jika anda beralih ke Percuma",
+      "freeWarning": [
+        "Langganan anda akan dibatalkan",
+        "Anda akan kehilangan akses kepada ciri premium",
+        "Pengekalan data akan terhad kepada 7 hari",
+        "Had resit bulanan akan dikurangkan kepada 50"
+      ],
+      "paidWarning": [
+        "Anda akan kehilangan akses kepada ciri peringkat lebih tinggi",
+        "Had bulanan anda akan dikurangkan",
+        "Anda akan menerima kredit berkadar untuk masa yang tidak digunakan"
+      ],
+      "billingNote": "Anda dibilkan secara bulanan atau tahunan berdasarkan pelan pilihan anda. Anda boleh naik taraf, turun taraf, atau batal bila-bila masa.",
+      "cancel": "Kekalkan pelan semasa",
+      "confirm": "Sahkan perubahan",
+      "paidWarningTitle": "Apa yang berubah dengan {{plan}}"
+    },
+    "alreadyOnPlan": "Anda sudah menggunakan pelan {{plan}}.",
+    "checkoutError": "Kami tidak dapat memulakan pembayaran. Sila cuba lagi.",
+    "plansLabel": "Pelan"
   }
 }

@@ -22,7 +22,7 @@ export class ClaimService {
       _title: request.title,
       _description: request.description || null,
       _amount: request.amount,
-      _currency: request.currency || 'USD',
+      _currency: request.currency || 'MYR',
       _category: request.category || null,
       _priority: request.priority || 'medium',
       _attachments: JSON.stringify(request.attachments || []),
@@ -256,6 +256,24 @@ export class ClaimService {
   // =============================================
   // CLAIM STATISTICS
   // =============================================
+
+  /**
+   * Head-only count for the sidebar badge. Avoids downloading the team's whole
+   * claim history just to show how many are waiting on a reviewer.
+   */
+  async getTeamPendingClaimCount(teamId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('claims')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_id', teamId)
+      .in('status', ['submitted', 'under_review']);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return count ?? 0;
+  }
 
   async getTeamClaimStats(teamId: string): Promise<ClaimStats> {
     const { data, error } = await supabase

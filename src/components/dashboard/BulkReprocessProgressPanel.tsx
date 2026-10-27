@@ -48,7 +48,7 @@ export function BulkReprocessProgressPanel() {
                         ) : failedCount > 0 ? (
                             <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
                         ) : (
-                            <Check className="h-4 w-4 text-green-500 shrink-0" />
+                            <Check className="h-4 w-4 text-ledger-accent shrink-0" />
                         )}
                         <span className="text-sm font-medium truncate">
                             {isProcessing
@@ -92,7 +92,7 @@ export function BulkReprocessProgressPanel() {
                             {/* Progress bar */}
                             <div className="space-y-1.5">
                                 <Progress value={progress} className="h-2" />
-                                <div className="flex justify-between text-xs text-muted-foreground">
+                                <div className="flex justify-between text-xs text-ledger-muted">
                                     <span>{progress}% complete</span>
                                     <span>{succeededCount + failedCount}/{totalCount}</span>
                                 </div>
@@ -102,19 +102,19 @@ export function BulkReprocessProgressPanel() {
                             <div className="grid grid-cols-4 gap-2 text-center">
                                 <div className="space-y-0.5">
                                     <div className="text-lg font-semibold tabular-nums">{queuedCount}</div>
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Queued</div>
+                                    <div className="text-[10px] text-ledger-muted uppercase tracking-wider">Queued</div>
                                 </div>
                                 <div className="space-y-0.5">
                                     <div className="text-lg font-semibold tabular-nums text-primary">{activeCount}</div>
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</div>
+                                    <div className="text-[10px] text-ledger-muted uppercase tracking-wider">Active</div>
                                 </div>
                                 <div className="space-y-0.5">
-                                    <div className="text-lg font-semibold tabular-nums text-green-500">{succeededCount}</div>
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Done</div>
+                                    <div className="text-lg font-semibold tabular-nums text-ledger-accent">{succeededCount}</div>
+                                    <div className="text-[10px] text-ledger-muted uppercase tracking-wider">Done</div>
                                 </div>
                                 <div className="space-y-0.5">
                                     <div className="text-lg font-semibold tabular-nums text-destructive">{failedCount}</div>
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Failed</div>
+                                    <div className="text-[10px] text-ledger-muted uppercase tracking-wider">Failed</div>
                                 </div>
                             </div>
 

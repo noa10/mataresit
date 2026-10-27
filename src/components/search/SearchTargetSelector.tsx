@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SearchTargetSelectorProps } from '@/types/unified-search';
 import { subscriptionLimits } from '@/config/search-targets';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 // Icon mapping
 const iconMap = {
@@ -38,7 +39,14 @@ export function SearchTargetSelector({
   layout = 'horizontal',
   className
 }: SearchTargetSelectorProps) {
+  const { t } = useCommonTranslation();
   const limits = subscriptionLimits[subscriptionTier];
+  const targetLabel = (target: any) =>
+    t(`unifiedSearch.targets.labels.${target.id}`, { defaultValue: target.label });
+  const targetDescription = (target: any) =>
+    t(`unifiedSearch.targets.descriptions.${target.id}`, {
+      defaultValue: target.description,
+    });
 
   const handleTargetToggle = (targetId: string, checked: boolean) => {
     if (disabled) return;
@@ -104,7 +112,7 @@ export function SearchTargetSelector({
                   "text-sm font-medium cursor-pointer",
                   isDisabled && "cursor-not-allowed"
                 )}>
-                  {target.label}
+                  {targetLabel(target)}
                 </Label>
                 {!isAvailable && (
                   <div className="flex items-center gap-1">
@@ -114,7 +122,7 @@ export function SearchTargetSelector({
                 )}
               </div>
               <p className="text-xs text-muted-foreground line-clamp-1">
-                {target.description}
+                {targetDescription(target)}
               </p>
             </div>
           )}
@@ -127,7 +135,7 @@ export function SearchTargetSelector({
                 "text-xs font-medium cursor-pointer text-center",
                 isDisabled && "cursor-not-allowed"
               )}>
-                {target.label}
+                {targetLabel(target)}
               </Label>
               {!isAvailable && (
                 <div className="flex items-center gap-1">
@@ -137,7 +145,7 @@ export function SearchTargetSelector({
               )}
             </div>
             <p className="text-xs text-muted-foreground text-center line-clamp-2">
-              {target.description}
+              {targetDescription(target)}
             </p>
           </div>
         )}
@@ -162,7 +170,11 @@ export function SearchTargetSelector({
               {targetButton}
             </TooltipTrigger>
             <TooltipContent>
-              <p>Requires {target.subscriptionRequired.toUpperCase()} plan</p>
+              <p>
+                {t('unifiedSearch.targets.requiresPlan', {
+                  tier: target.subscriptionRequired.toUpperCase(),
+                })}
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -213,6 +225,7 @@ export function SearchTargetQuickSelect({
   subscriptionTier,
   className
 }: Omit<SearchTargetSelectorProps, 'layout'>) {
+  const { t } = useCommonTranslation();
   const limits = subscriptionLimits[subscriptionTier];
   
   const handleSelectAll = () => {
@@ -242,7 +255,7 @@ export function SearchTargetQuickSelect({
         onClick={handleSelectAll}
         className="text-xs"
       >
-        Select All
+        {t('unifiedSearch.targets.selectAll')}
       </Button>
       <Button
         variant="outline"
@@ -250,7 +263,7 @@ export function SearchTargetQuickSelect({
         onClick={handleSelectNone}
         className="text-xs"
       >
-        Clear
+        {t('unifiedSearch.targets.clear')}
       </Button>
       <Button
         variant="outline"
@@ -258,12 +271,14 @@ export function SearchTargetQuickSelect({
         onClick={handleSelectDefault}
         className="text-xs"
       >
-        Default
+        {t('unifiedSearch.targets.default')}
       </Button>
       
       {selectedTargets.length > 0 && (
         <Badge variant="secondary" className="text-xs">
-          {selectedTargets.length} selected
+          {t('unifiedSearch.targets.selected', {
+            count: selectedTargets.length,
+          })}
         </Badge>
       )}
     </div>

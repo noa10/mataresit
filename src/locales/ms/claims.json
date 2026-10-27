@@ -26,7 +26,7 @@
     "subtitle": "Urus tuntutan perbelanjaan anda dan jejak status mereka",
     "actions": {
       "createClaim": "Cipta Tuntutan",
-      "editClaim": "Edit Tuntutan",
+      "editClaim": "Sunting Tuntutan",
       "deleteClaim": "Padam Tuntutan",
       "submitClaim": "Hantar Tuntutan",
       "approveClaim": "Luluskan Tuntutan",
@@ -50,7 +50,8 @@
       "approved": "Diluluskan",
       "rejected": "Ditolak",
       "paid": "Dibayar",
-      "cancelled": "Dibatalkan"
+      "cancelled": "Dibatalkan",
+      "under_review": "Dalam Semakan"
     },
     "filters": {
       "all": "Semua Tuntutan",
@@ -76,7 +77,8 @@
       "currency": "Mata Wang",
       "expenseDate": "Tarikh Perbelanjaan",
       "businessPurpose": "Tujuan Perniagaan",
-      "notes": "Nota Tambahan"
+      "notes": "Nota Tambahan",
+      "priority": "Keutamaan"
     },
     "placeholders": {
       "title": "Masukkan tajuk tuntutan",
@@ -133,7 +135,22 @@
       "approver": "Pelulus",
       "status": "Status",
       "businessPurpose": "Tujuan Perniagaan",
-      "notes": "Nota"
+      "notes": "Nota",
+      "amount": "Jumlah",
+      "claimant": "Penuntut",
+      "created": "Dicipta",
+      "submitted": "Dihantar",
+      "reviewed": "Disemak",
+      "approved": "Diluluskan",
+      "rejected": "Ditolak",
+      "workflowTimeline": "Garis Masa Aliran Kerja",
+      "submittedOn": "Dihantar: {{date}}",
+      "reviewedOn": "Disemak: {{date}}",
+      "approvedOn": "Diluluskan: {{date}}",
+      "rejectedReason": "Ditolak: {{reason}}",
+      "onDate": "pada {{date}}",
+      "reviewedBy": "Disemak oleh: {{name}}",
+      "approvedBy": "Diluluskan oleh: {{name}}"
     },
     "receipts": {
       "title": "Resit Dilampirkan",
@@ -148,7 +165,52 @@
       "approved": "Tuntutan diluluskan",
       "rejected": "Tuntutan ditolak",
       "paid": "Tuntutan dibayar",
-      "cancelled": "Tuntutan dibatalkan"
+      "cancelled": "Tuntutan dibatalkan",
+      "empty": "Belum ada aktiviti direkodkan",
+      "emptyDialog": "Tiada sejarah aktiviti tersedia",
+      "loading": "Memuatkan sejarah aktiviti...",
+      "by": "oleh {{name}}",
+      "statusChanged": "Status berubah daripada {{from}} kepada {{to}}",
+      "actions": {
+        "created": "dicipta",
+        "submitted": "dihantar",
+        "reviewed": "disemak",
+        "approved": "diluluskan",
+        "rejected": "ditolak",
+        "cancelled": "dibatalkan",
+        "updated": "dikemas kini",
+        "deleted": "dipadam"
+      },
+      "comments": {
+        "created": "Tuntutan dicipta",
+        "submitted": "Tuntutan dihantar untuk semakan",
+        "approved": "Tuntutan diluluskan",
+        "rejected": "Tuntutan ditolak"
+      }
+    },
+    "description": "Butiran tuntutan dan maklumat aliran kerja",
+    "loading": "Memuatkan butiran tuntutan...",
+    "errorTitle": "Ralat Memuatkan Tuntutan",
+    "notFoundDescription": "Tuntutan yang diminta tidak dijumpai atau anda tiada kebenaran untuk melihatnya.",
+    "backToClaims": "Kembali ke Tuntutan",
+    "actions": {
+      "edit": "Sunting",
+      "submit": "Hantar untuk Semakan",
+      "reject": "Tolak",
+      "approve": "Luluskan",
+      "close": "Tutup"
+    },
+    "attachments": {
+      "title": "Lampiran",
+      "receiptFrom": "Resit daripada {{merchant}}",
+      "unknownMerchant": "Peniaga Tidak Diketahui"
+    },
+    "workflow": {
+      "title": "Status Aliran Kerja",
+      "reviewedBy": "Disemak oleh:",
+      "approvedBy": "Diluluskan oleh:",
+      "rejectionReason": "Sebab Penolakan:",
+      "on": "pada {{date}}"
     }
   },
   "approval": {
@@ -271,6 +333,133 @@
     "submissionFailed": "Gagal menghantar tuntutan",
     "noTeamSelected": "Tiada pasukan dipilih",
     "createFailed": "Gagal mencipta tuntutan",
-    "approveFailed": "Gagal meluluskan tuntutan"
+    "approveFailed": "Gagal meluluskan tuntutan",
+    "loadHistoryFailed": "Gagal memuatkan sejarah tuntutan",
+    "loadReceiptsFailed": "Gagal memuatkan resit dilampirkan",
+    "loadFailed": "Gagal memuatkan tuntutan",
+    "differentTeam": "Tuntutan ini milik pasukan lain",
+    "rejectFailed": "Gagal menolak tuntutan"
+  },
+  "rejection": {
+    "title": "Tolak Tuntutan",
+    "subtitle": "Berikan sebab untuk menolak tuntutan perbelanjaan ini. Penuntut akan dimaklumkan.",
+    "reasonLabel": "Sebab Penolakan *",
+    "reasonPlaceholder": "Sila berikan sebab yang jelas untuk menolak tuntutan ini...",
+    "reasonHint": "Nyatakan dengan jelas mengapa tuntutan ditolak. Ini akan membantu penuntut memahami apa yang perlu diperbaiki.",
+    "noticeTitle": "Notis Penolakan",
+    "noticeMessage": "Menolak tuntutan ini akan memaklumkan penuntut melalui e-mel dan pemberitahuan dalam aplikasi. Mereka boleh menghantar semula tuntutan selepas menangani isu yang dinyatakan dalam sebab penolakan anda.",
+    "actions": {
+      "cancel": "Batal",
+      "reject": "Tolak Tuntutan",
+      "rejecting": "Menolak..."
+    },
+    "validation": {
+      "min": "Sebab penolakan mestilah sekurang-kurangnya 10 aksara",
+      "max": "Sebab penolakan mestilah kurang daripada 500 aksara"
+    }
+  },
+  "edit": {
+    "title": "Sunting Tuntutan",
+    "subtitle": "Kemas kini butiran tuntutan perbelanjaan anda. Hanya tuntutan draf boleh disunting.",
+    "form": {
+      "title": "Tajuk *",
+      "amount": "Jumlah *",
+      "currency": "Mata Wang *",
+      "category": "Kategori",
+      "priority": "Keutamaan",
+      "description": "Penerangan"
+    },
+    "placeholders": {
+      "title": "Masukkan tajuk tuntutan",
+      "currency": "Pilih mata wang",
+      "category": "cth., Perjalanan, Makanan, Bekalan Pejabat",
+      "priority": "Pilih keutamaan",
+      "description": "Berikan butiran tentang tuntutan perbelanjaan ini..."
+    },
+    "descriptions": {
+      "category": "Kategori perbelanjaan pilihan untuk pengurusan lebih baik",
+      "description": "Penerangan pilihan untuk memberikan konteks lebih tentang perbelanjaan"
+    },
+    "validation": {
+      "titleMin": "Tajuk mestilah sekurang-kurangnya 3 aksara",
+      "titleMax": "Tajuk mestilah kurang daripada 255 aksara",
+      "amountMin": "Jumlah mesti lebih besar daripada 0",
+      "currency": "Mata wang diperlukan"
+    },
+    "actions": {
+      "cancel": "Batal",
+      "update": "Kemas Kini Tuntutan",
+      "updating": "Mengemas kini..."
+    },
+    "notifications": {
+      "updated": "Tuntutan berjaya dikemas kini"
+    },
+    "errors": {
+      "updateFailed": "Gagal mengemas kini tuntutan"
+    }
+  },
+  "receiptPreview": {
+    "attachedCount": "Resit Dilampirkan ({{count}})",
+    "viewFullImage": "Lihat imej penuh",
+    "removeReceipt": "Buang resit",
+    "viewDetails": "Lihat Butiran",
+    "receiptFrom": "Resit daripada {{merchant}}",
+    "merchant": "Peniaga",
+    "date": "Tarikh",
+    "total": "Jumlah",
+    "tax": "Cukai",
+    "status": "Status",
+    "paymentMethod": "Kaedah Pembayaran",
+    "unknownMerchant": "Peniaga Tidak Diketahui",
+    "imageUnavailable": "Imej resit tidak tersedia"
+  },
+  "receiptStatus": {
+    "unreviewed": "Belum Disemak",
+    "reviewed": "Disemak",
+    "approved": "Diluluskan",
+    "rejected": "Ditolak",
+    "processing": "Sedang Diproses",
+    "failed": "Gagal"
+  },
+  "claimFromReceipt": {
+    "button": "Cipta Tuntutan",
+    "title": "Cipta Tuntutan daripada Resit",
+    "subtitle": "Semak butiran resit yang akan digunakan untuk mencipta tuntutan anda.",
+    "receiptDetails": "Butiran Resit",
+    "merchant": "Peniaga:",
+    "date": "Tarikh:",
+    "amount": "Jumlah:",
+    "payment": "Pembayaran:",
+    "claimPreview": "Tuntutan yang Akan Dicipta",
+    "titleLabel": "Tajuk:",
+    "categoryLabel": "Kategori:",
+    "attachmentsLabel": "Lampiran:",
+    "oneReceipt": "1 resit",
+    "untitled": "Perbelanjaan - {{merchant}}",
+    "generalCategory": "Umum",
+    "cancel": "Batal",
+    "description": "Tuntutan perbelanjaan untuk {{merchant}} pada {{date}}"
+  },
+  "receiptPicker": {
+    "selectReceipts": "Pilih Resit",
+    "selectedCount": "{{count}} dipilih",
+    "clear": "Kosongkan",
+    "searchPlaceholder": "Cari resit mengikut peniaga, jumlah atau tarikh...",
+    "status": "Status",
+    "allStatus": "Semua Status",
+    "unreviewed": "Belum Disemak",
+    "reviewed": "Disemak",
+    "approved": "Diluluskan",
+    "dateRange": "Julat Tarikh",
+    "allTime": "Sepanjang Masa",
+    "lastWeek": "Minggu Lalu",
+    "lastMonth": "Bulan Lalu",
+    "lastQuarter": "Suku Tahun Lalu",
+    "noReceipts": "Tiada resit ditemui",
+    "adjustFilters": "Cuba laraskan carian atau penapis anda",
+    "usedInClaim": "Digunakan dalam Tuntutan",
+    "usedIn": "Digunakan dalam:",
+    "loadingReceipts": "Memuatkan resit...",
+    "checkingUsage": "Menyemak penggunaan..."
   }
 }

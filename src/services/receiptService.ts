@@ -180,6 +180,8 @@ export interface ReceiptListResult {
   totalPages: number;
   hasNextPage: boolean;
   hasPrevPage: boolean;
+  /** Present when the query failed; pages render a retry state instead of empty. */
+  error?: string;
 }
 
 const normalizePageNumber = (page?: number): number => {
@@ -190,9 +192,9 @@ const normalizePageNumber = (page?: number): number => {
   return Math.floor(parsed);
 };
 
-const normalizePageLimit = (limit?: number): 10 | 25 | 50 => {
+const normalizePageLimit = (limit?: number): 10 | 25 | 50 | 100 => {
   const parsed = Number(limit ?? 25);
-  if (parsed === 10 || parsed === 25 || parsed === 50) {
+  if (parsed === 10 || parsed === 25 || parsed === 50 || parsed === 100) {
     return parsed;
   }
   return 25;
@@ -325,6 +327,7 @@ export const fetchReceiptsPage = async (
       totalPages: 0,
       hasNextPage: false,
       hasPrevPage: false,
+      error: error.message,
     };
   }
 
@@ -2014,7 +2017,10 @@ export const processReceiptWithAI = async (
 
 
 // Delete a receipt
-export const deleteReceipt = async (id: string): Promise<boolean> => {
+export const deleteReceipt = async (
+  id: string,
+  options: { silent?: boolean } = {}
+): Promise<boolean> => {
   try {
     // First get the receipt to get the image URL and user_id
     const { data: receipt, error: fetchError } = await supabase
@@ -2091,17 +2097,25 @@ export const deleteReceipt = async (id: string): Promise<boolean> => {
       }
     }
 
-    toast.success("Receipt deleted successfully");
+    if (!options.silent) {
+      toast.success("Receipt deleted successfully");
+    }
     return true;
   } catch (error) {
     console.error("Error deleting receipt:", error);
-    toast.error("Failed to delete receipt");
+    if (!options.silent) {
+      toast.error("Failed to delete receipt");
+    }
     return false;
   }
 };
 
 // Update receipt status
-export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Promise<boolean> => {
+export const updateReceiptStatus = async (
+  id: string,
+  status: ReceiptStatus,
+  options: { silent?: boolean } = {}
+): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from("receipts")
@@ -2112,11 +2126,15 @@ export const updateReceiptStatus = async (id: string, status: ReceiptStatus): Pr
       throw error;
     }
 
-    toast.success(`Receipt marked as ${status}`);
+    if (!options.silent) {
+      toast.success(`Receipt marked as ${status}`);
+    }
     return true;
   } catch (error) {
     console.error("Error updating receipt status:", error);
-    toast.error("Failed to update receipt status");
+    if (!options.silent) {
+      toast.error("Failed to update receipt status");
+    }
     return false;
   }
 };

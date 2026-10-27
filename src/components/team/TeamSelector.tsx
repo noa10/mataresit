@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTeam } from '@/contexts/TeamContext';
 import { useTeamTranslation } from '@/contexts/LanguageContext';
+import { CreateTeamDialog } from '@/components/team/CreateTeamDialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,17 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   ChevronDown,
@@ -44,44 +34,15 @@ export function TeamSelector({ className, showCreateButton = true }: TeamSelecto
     userTeams,
     loading,
     switchTeam,
-    createTeam,
-    hasPermission,
   } = useTeam();
 
   const { t } = useTeamTranslation();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    description: '',
-  });
-  const [creating, setCreating] = useState(false);
-
-  const handleCreateTeam = async () => {
-    if (!createForm.name.trim()) return;
-
-    try {
-      setCreating(true);
-      const teamId = await createTeam(createForm.name.trim(), createForm.description.trim() || undefined);
-      
-      // Switch to the new team
-      await switchTeam(teamId);
-      
-      // Reset form and close dialog
-      setCreateForm({ name: '', description: '' });
-      setCreateDialogOpen(false);
-    } catch (error) {
-      // Error is handled by the context
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleTeamSwitch = async (teamId: string | null) => {
     await switchTeam(teamId);
   };
-
-
 
   return (
     <>
@@ -178,57 +139,10 @@ export function TeamSelector({ className, showCreateButton = true }: TeamSelecto
       </div>
 
       {/* Create Team Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('create.title')}</DialogTitle>
-            <DialogDescription>
-              {t('create.description')}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="team-name">{t('create.fields.name')}</Label>
-              <Input
-                id="team-name"
-                placeholder={t('create.placeholders.name')}
-                value={createForm.name}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="team-description">{t('create.fields.description')}</Label>
-              <Textarea
-                id="team-description"
-                placeholder={t('create.placeholders.description')}
-                value={createForm.description}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-                disabled={creating}
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCreateDialogOpen(false)}
-              disabled={creating}
-            >
-              {t('create.actions.cancel')}
-            </Button>
-            <Button
-              onClick={handleCreateTeam}
-              disabled={!createForm.name.trim() || creating}
-            >
-              {creating ? t('create.actions.creating') : t('create.actions.create')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateTeamDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
     </>
   );
 }

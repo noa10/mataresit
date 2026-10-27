@@ -12,12 +12,35 @@ const mocks = vi.hoisted(() => ({
 
 const translationMap: Record<string, string> = {
   title: "Admin Panel",
+  "shell.skipToContent": "Skip to admin content",
+  "shell.adminConsole": "Admin console",
+  "shell.adminArea": "Admin area",
+  "shell.adminNavigation": "Admin navigation",
+  "shell.navigationDescription": "Browse admin sections and account actions.",
+  "shell.sheetDescription":
+    "Browse admin sections, review account context, or exit the admin area.",
+  "shell.openNavigation": "Open admin navigation menu",
+  "shell.closeNavigation": "Close admin navigation menu",
+  "shell.sidebarLabel": "Admin sidebar",
+  "shell.contentLabel": "Admin content",
+  "shell.headerDescription": "Manage users, content, and operational visibility.",
+  "shell.mobileMenuTitle": "{{title}} navigation menu",
   "navigation.dashboard": "Dashboard",
   "navigation.users": "Users",
   "navigation.receipts": "Receipts",
   "navigation.blog": "Blog",
   "navigation.analytics": "Analytics",
+  "navigation.embeddingMetrics": "Embedding Metrics",
   "navigation.settings": "Settings",
+  "navigation.descriptions.dashboard": "Overview of admin tools and system status.",
+  "navigation.descriptions.users": "Manage user access, roles, and accounts.",
+  "navigation.descriptions.receipts": "Review receipt records and operational data.",
+  "navigation.descriptions.blog": "Publish and maintain blog content.",
+  "navigation.descriptions.analytics": "Monitor analytics and reporting metrics.",
+  "navigation.descriptions.embeddingMetrics":
+    "Inspect embedding performance and health.",
+  "navigation.descriptions.settings":
+    "Configure AI processing, model providers, embeddings and integrations.",
   "actions.signedInAs": "Signed in as",
   "actions.signOut": "Sign out",
   "actions.exitAdmin": "Exit admin",
@@ -34,7 +57,13 @@ vi.mock("@/contexts/AuthContext", () => ({
 
 vi.mock("@/contexts/LanguageContext", () => ({
   useAdminTranslation: () => ({
-    t: (key: string) => translationMap[key] ?? key,
+    t: (key: string, options?: Record<string, string>) => {
+      const value = translationMap[key] ?? key;
+
+      return value.replace(/\{\{(\w+)\}\}/g, (match, name) =>
+        options?.[name] != null ? String(options[name]) : match,
+      );
+    },
   }),
 }));
 

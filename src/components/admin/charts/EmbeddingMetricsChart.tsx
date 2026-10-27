@@ -35,6 +35,7 @@ import {
   Minus
 } from 'lucide-react';
 import { ChartConfig, ChartSeries, formatTooltipContent } from '@/utils/chartUtils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingMetricsChartProps {
   config: ChartConfig;
@@ -100,6 +101,9 @@ export function EmbeddingMetricsChart({
   onExpand,
   className = ''
 }: EmbeddingMetricsChartProps) {
+  const { t, language } = useAdminTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
+
   // Transform series data to recharts format
   const chartData = useMemo(() => {
     if (!config.series || config.series.length === 0) return [];
@@ -152,7 +156,7 @@ export function EmbeddingMetricsChart({
       return (
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-          <span className="ml-2 text-gray-500">Loading chart data...</span>
+          <span className="ml-2 text-gray-500">{t('embeddingMetrics.charts.common.loading')}</span>
         </div>
       );
     }
@@ -161,12 +165,12 @@ export function EmbeddingMetricsChart({
       return (
         <div className="flex items-center justify-center h-64 text-center">
           <div>
-            <p className="text-red-500 font-medium">Failed to load chart data</p>
+            <p className="text-red-500 font-medium">{t('embeddingMetrics.charts.common.failedToLoad')}</p>
             <p className="text-gray-500 text-sm mt-1">{error}</p>
             {onRefresh && (
               <Button variant="outline" size="sm" onClick={onRefresh} className="mt-3">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
+                {t('embeddingMetrics.charts.common.retry')}
               </Button>
             )}
           </div>
@@ -178,8 +182,8 @@ export function EmbeddingMetricsChart({
       return (
         <div className="flex items-center justify-center h-64 text-center">
           <div>
-            <p className="text-gray-500 font-medium">No data available</p>
-            <p className="text-gray-400 text-sm mt-1">Chart will appear when data is available</p>
+            <p className="text-gray-500 font-medium">{t('embeddingMetrics.charts.common.noData')}</p>
+            <p className="text-gray-400 text-sm mt-1">{t('embeddingMetrics.charts.common.noDataHint')}</p>
           </div>
         </div>
       );
@@ -198,7 +202,7 @@ export function EmbeddingMetricsChart({
               {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />}
               <XAxis 
                 dataKey="timestamp" 
-                tickFormatter={(value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                tickFormatter={(value) => new Date(value).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
                 stroke="#666"
               />
               <YAxis stroke="#666" />
@@ -226,7 +230,7 @@ export function EmbeddingMetricsChart({
               {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />}
               <XAxis 
                 dataKey="timestamp" 
-                tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                tickFormatter={(value) => new Date(value).toLocaleDateString(dateLocale)}
                 stroke="#666"
               />
               <YAxis stroke="#666" />
@@ -254,7 +258,7 @@ export function EmbeddingMetricsChart({
               {config.showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />}
               <XAxis 
                 dataKey="timestamp" 
-                tickFormatter={(value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                tickFormatter={(value) => new Date(value).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
                 stroke="#666"
               />
               <YAxis stroke="#666" />
@@ -302,7 +306,7 @@ export function EmbeddingMetricsChart({
         );
 
       default:
-        return <div>Unsupported chart type: {config.chartType}</div>;
+        return <div>{t('embeddingMetrics.charts.common.unsupported', { type: config.chartType })}</div>;
     }
   };
 
@@ -321,7 +325,11 @@ export function EmbeddingMetricsChart({
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={getTrendColor()}>
-              {trend === 'stable' ? 'Stable' : trend === 'up' ? 'Trending Up' : 'Trending Down'}
+              {trend === 'stable'
+                ? t('embeddingMetrics.charts.common.trendStable')
+                : trend === 'up'
+                  ? t('embeddingMetrics.charts.common.trendUp')
+                  : t('embeddingMetrics.charts.common.trendDown')}
             </Badge>
             <div className="flex items-center gap-1">
               {onRefresh && (

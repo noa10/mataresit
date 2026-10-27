@@ -49,7 +49,7 @@ export default function ViewReceipt() {
     });
 
     const queryString = dashboardParams.toString();
-    return queryString ? `/dashboard?${queryString}` : "/dashboard";
+    return queryString ? `/receipts?${queryString}` : "/receipts";
   }, [location.search]);
 
   // Determine if there's a history entry to go back to
@@ -115,14 +115,14 @@ export default function ViewReceipt() {
 
   if (error || !receipt) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+      <div className="min-h-screen bg-ledger-paper">
         <div className="container flex flex-col items-center justify-center min-h-[80vh] text-center">
-          <h2 className="text-2xl font-bold mb-4">Receipt Not Found</h2>
-          <p className="text-muted-foreground mb-6">
+          <h2 className="text-2xl font-bold mb-4 text-ledger-ink">Receipt Not Found</h2>
+          <p className="text-ledger-muted mb-6">
             The receipt you're looking for doesn't exist or has been removed.
           </p>
           <Button asChild>
-            <a href="/dashboard">Go Back to Dashboard</a>
+            <a href="/receipts">Go Back to Receipts</a>
           </Button>
         </div>
       </div>
@@ -150,8 +150,8 @@ export default function ViewReceipt() {
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{receipt.merchant || "Unnamed Receipt"}</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-bold text-ledger-ink">{receipt.merchant || "Unnamed Receipt"}</h1>
+              <p className="text-ledger-muted">
                 {receipt.date ? new Date(receipt.date).toLocaleDateString('en-GB') : "No date"} • {receipt.total ? formatCurrencySafe(receipt.total, receipt.currency, 'en-US', 'MYR') : formatCurrencySafe(0, 'MYR')}
               </p>
             </div>
@@ -201,10 +201,10 @@ export default function ViewReceipt() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border/40 mt-12">
+      <footer className="border-t border-ledger-line mt-12">
         <div className="container px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-ledger-muted">
               © {new Date().getFullYear()} ReceiptScan. All rights reserved.
             </div>
           </div>

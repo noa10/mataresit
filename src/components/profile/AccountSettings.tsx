@@ -67,24 +67,24 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
       
       if (result.success) {
         toast({
-          title: "Account deletion requested",
-          description: "Your account deletion request has been submitted. You will receive an email with further instructions.",
+          title: t("account.deletionRequested"),
+          description: t("account.deletionRequestedDescription"),
         });
         // For now, we'll sign out the user
         await signOut();
         navigate('/auth');
       } else {
         toast({
-          title: "Deletion request failed",
-          description: result.error || "Failed to process account deletion request. Please try again.",
+          title: t("account.deletionFailed"),
+          description: result.error || t("account.deletionFailedDescription"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Account deletion error:", error);
       toast({
-        title: "Deletion request failed",
-        description: "An unexpected error occurred. Please try again.",
+        title: t("account.deletionFailed"),
+        description: t("account.deletionUnexpected"),
         variant: "destructive",
       });
     } finally {
@@ -128,9 +128,9 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
           {isGoogleUser && (
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-medium">Google Account</h4>
+                <h4 className="font-medium">{t("account.googleAccount")}</h4>
                 <p className="text-sm text-muted-foreground">
-                  You signed in with Google. Manage your password in your Google account.
+                  {t("account.googleAccountDescription")}
                 </p>
               </div>
               <Button
@@ -144,7 +144,7 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
                   rel="noopener noreferrer"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Google Security
+                  {t("account.googleSecurity")}
                 </a>
               </Button>
             </div>
@@ -154,9 +154,9 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
 
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium">Active Sessions</h4>
+              <h4 className="font-medium">{t("account.activeSessions")}</h4>
               <p className="text-sm text-muted-foreground">
-                Sign out from all devices and sessions
+                {t("account.activeSessionsDescription")}
               </p>
             </div>
             <Button
@@ -165,7 +165,7 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
               className="gap-2"
             >
               <LogOut className="h-4 w-4" />
-              Sign Out Everywhere
+              {t("account.signOutEverywhere")}
             </Button>
           </div>
         </CardContent>
@@ -176,15 +176,15 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            Danger Zone
+            {t("account.dangerZone")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-destructive">Delete Account</h4>
+              <h4 className="font-medium text-destructive">{t("account.deleteAccount")}</h4>
               <p className="text-sm text-muted-foreground">
-                Permanently delete your account and all associated data. This action cannot be undone.
+                {t("account.deleteAccountDescription")}
               </p>
             </div>
             <AlertDialog>
@@ -199,29 +199,26 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
                   ) : (
                     <Trash2 className="h-4 w-4" />
                   )}
-                  {isDeletingAccount ? "Processing..." : "Delete Account"}
+                  {isDeletingAccount ? t("account.processing") : t("account.deleteAccount")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogTitle>{t("account.confirmTitle")}</AlertDialogTitle>
                   <AlertDialogDescription className="space-y-2">
-                    <p>
-                      This action cannot be undone. This will permanently delete your account
-                      and remove all your data from our servers.
-                    </p>
-                    <p className="font-medium">This includes:</p>
+                    <p>{t("account.confirmDescription")}</p>
+                    <p className="font-medium">{t("account.confirmIncludes")}</p>
                     <ul className="list-disc list-inside text-sm space-y-1">
-                      <li>All uploaded receipts and documents</li>
-                      <li>Processing history and AI analysis</li>
-                      <li>Team memberships and claims</li>
-                      <li>Account settings and preferences</li>
-                      <li>Subscription and billing information</li>
+                      <li>{t("account.includeReceipts")}</li>
+                      <li>{t("account.includeHistory")}</li>
+                      <li>{t("account.includeTeams")}</li>
+                      <li>{t("account.includeSettings")}</li>
+                      <li>{t("account.includeBilling")}</li>
                     </ul>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t("account.cancel")}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleAccountDeletion}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -230,10 +227,10 @@ export function AccountSettings({ userId }: AccountSettingsProps) {
                     {isDeletingAccount ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Deleting...
+                        {t("account.deleting")}
                       </>
                     ) : (
-                      "Yes, delete my account"
+                      t("account.confirmDeleteAction")
                     )}
                   </AlertDialogAction>
                 </AlertDialogFooter>

@@ -1,694 +1,963 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useSubscription } from '@/hooks/useSubscription';
-import { useFeaturesTranslation } from '@/contexts/LanguageContext';
+import type { ReactNode } from "react";
+import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import {
-  Brain,
-  Upload,
-  Search,
-  BarChart3,
-  Eye,
-  Shield,
-  Zap,
-  MessageSquare,
-  FileText,
-  Settings,
-  Users,
-  Crown,
-  CheckCircle,
-  ArrowRight,
-  Sparkles,
-  Camera,
-  PieChart,
-  Download,
-  Clock,
-  Globe,
-  Bell,
-  MapPin,
-  Smartphone,
-  Monitor,
-  CreditCard,
-  HelpCircle
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+  useFeaturesTranslation,
+  useHomepageTranslation,
+} from "@/contexts/LanguageContext";
+import { MarketingCtaBand } from "@/components/marketing/MarketingCtaBand";
+import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { ArrowRight, CheckMark } from "@/components/marketing/MarketingIcons";
 
-export default function FeaturesPage() {
-  const { getCurrentTier, isFeatureAvailable } = useSubscription();
-  const { t } = useFeaturesTranslation();
-  const tier = getCurrentTier();
+type FieldPair = { label: string; value: string };
+type ReceiptItem = { name: string; amount: string };
+type SearchResult = { title: string; meta: string; amount: string };
+type QueueRow = {
+  file: string;
+  state: string;
+  tag: string;
+  progress: number;
+  tone: string;
+};
+type TrailStep = { title: string; meta: string };
+type SpendCategory = { name: string; amount: string; value: string };
+type PlatformItem = { icon: string; title: string; description: string };
+type PlanFact = { name: string; price: string; note: string };
 
-  // Generate core features with translations
-  const coreFeatures = [
-    {
-      icon: <Upload className="h-8 w-8 text-green-500" />,
-      title: t('features.batchProcessing.title'),
-      description: t('features.batchProcessing.description'),
-      benefitsList: [
-        t('features.batchProcessing.benefits.0'),
-        t('features.batchProcessing.benefits.1'),
-        t('features.batchProcessing.benefits.2'),
-        t('features.batchProcessing.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <Bell className="h-8 w-8 text-blue-500" />,
-      title: t('features.realTimeNotifications.title'),
-      description: t('features.realTimeNotifications.description'),
-      benefitsList: [
-        t('features.realTimeNotifications.benefits.0'),
-        t('features.realTimeNotifications.benefits.1'),
-        t('features.realTimeNotifications.benefits.2'),
-        t('features.realTimeNotifications.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <PieChart className="h-8 w-8 text-teal-500" />,
-      title: t('features.customCategories.title'),
-      description: t('features.customCategories.description'),
-      benefitsList: [
-        t('features.customCategories.benefits.0'),
-        t('features.customCategories.benefits.1'),
-        t('features.customCategories.benefits.2'),
-        t('features.customCategories.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <Shield className="h-8 w-8 text-green-600" />,
-      title: t('features.secureStorage.title'),
-      description: t('features.secureStorage.description'),
-      benefitsList: [
-        t('features.secureStorage.benefits.0'),
-        t('features.secureStorage.benefits.1'),
-        t('features.secureStorage.benefits.2'),
-        t('features.secureStorage.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
+const shell = "mx-auto w-full max-w-[1240px] px-5 min-[881px]:px-6";
+const eyebrow =
+  "font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted";
+const sectionTitle =
+  "font-display text-[clamp(2rem,3.6vw,3rem)] font-normal leading-[1.06] tracking-[-0.02em] text-ledger-ink";
+const sectionLede = "text-[1.0625rem] leading-[1.65] text-ledger-muted";
+const uiCard =
+  "overflow-hidden rounded-xl border border-ledger-line bg-ledger-surface shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)]";
+const uiHead =
+  "flex items-center justify-between gap-4 border-b border-ledger-line px-[18px] py-[13px] font-data text-[0.625rem] uppercase tracking-[0.13em] text-ledger-muted";
+const uiFoot =
+  "flex flex-wrap justify-between gap-x-3 gap-y-2 border-t border-ledger-line bg-ledger-surface-2 px-[18px] py-[11px] font-data text-[0.6875rem] text-ledger-muted";
+const statusDot = "h-1.5 w-1.5 rounded-full bg-ledger-accent";
+const statusText = "inline-flex items-center gap-1.5 text-ledger-accent";
 
-  // Generate AI features with translations
-  const aiFeatures = [
-    {
-      icon: <Brain className="h-8 w-8 text-blue-500" />,
-      title: t('features.aiProcessing.title'),
-      description: t('features.aiProcessing.description'),
-      benefitsList: [
-        t('features.aiProcessing.benefits.0'),
-        t('features.aiProcessing.benefits.1'),
-        t('features.aiProcessing.benefits.2'),
-        t('features.aiProcessing.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <Search className="h-8 w-8 text-purple-500" />,
-      title: t('features.smartSearch.title'),
-      description: t('features.smartSearch.description'),
-      benefitsList: [
-        t('features.smartSearch.benefits.0'),
-        t('features.smartSearch.benefits.1'),
-        t('features.smartSearch.benefits.2'),
-        t('features.smartSearch.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <MapPin className="h-8 w-8 text-red-500" />,
-      title: t('features.malaysianIntelligence.title'),
-      description: t('features.malaysianIntelligence.description'),
-      benefitsList: [
-        t('features.malaysianIntelligence.benefits.0'),
-        t('features.malaysianIntelligence.benefits.1'),
-        t('features.malaysianIntelligence.benefits.2'),
-        t('features.malaysianIntelligence.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <BarChart3 className="h-8 w-8 text-indigo-500" />,
-      title: t('features.advancedAnalytics.title'),
-      description: t('features.advancedAnalytics.description'),
-      benefitsList: [
-        t('features.advancedAnalytics.benefits.0'),
-        t('features.advancedAnalytics.benefits.1'),
-        t('features.advancedAnalytics.benefits.2'),
-        t('features.advancedAnalytics.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  // Generate collaboration features with translations
-  const collaborationFeatures = [
-    {
-      icon: <Users className="h-8 w-8 text-blue-600" />,
-      title: t('features.teamCollaboration.title'),
-      description: t('features.teamCollaboration.description'),
-      benefitsList: [
-        t('features.teamCollaboration.benefits.0'),
-        t('features.teamCollaboration.benefits.1'),
-        t('features.teamCollaboration.benefits.2'),
-        t('features.teamCollaboration.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <MessageSquare className="h-8 w-8 text-green-600" />,
-      title: t('features.claimsManagement.title'),
-      description: t('features.claimsManagement.description'),
-      benefitsList: [
-        t('features.claimsManagement.benefits.0'),
-        t('features.claimsManagement.benefits.1'),
-        t('features.claimsManagement.benefits.2'),
-        t('features.claimsManagement.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  // Generate reporting features with translations
-  const reportingFeatures = [
-    {
-      icon: <FileText className="h-8 w-8 text-orange-500" />,
-      title: t('features.exportOptions.title'),
-      description: t('features.exportOptions.description'),
-      benefitsList: [
-        t('features.exportOptions.benefits.0'),
-        t('features.exportOptions.benefits.1'),
-        t('features.exportOptions.benefits.2'),
-        t('features.exportOptions.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  // Generate platform features with translations
-  const platformFeatures = [
-    {
-      icon: <Smartphone className="h-8 w-8 text-purple-600" />,
-      title: t('features.progressiveWebApp.title'),
-      description: t('features.progressiveWebApp.description'),
-      benefitsList: [
-        t('features.progressiveWebApp.benefits.0'),
-        t('features.progressiveWebApp.benefits.1'),
-        t('features.progressiveWebApp.benefits.2'),
-        t('features.progressiveWebApp.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <Monitor className="h-8 w-8 text-teal-600" />,
-      title: t('features.mobileResponsive.title'),
-      description: t('features.mobileResponsive.description'),
-      benefitsList: [
-        t('features.mobileResponsive.benefits.0'),
-        t('features.mobileResponsive.benefits.1'),
-        t('features.mobileResponsive.benefits.2'),
-        t('features.mobileResponsive.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <CreditCard className="h-8 w-8 text-indigo-600" />,
-      title: t('features.subscriptionManagement.title'),
-      description: t('features.subscriptionManagement.description'),
-      benefitsList: [
-        t('features.subscriptionManagement.benefits.0'),
-        t('features.subscriptionManagement.benefits.1'),
-        t('features.subscriptionManagement.benefits.2'),
-        t('features.subscriptionManagement.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    },
-    {
-      icon: <HelpCircle className="h-8 w-8 text-yellow-600" />,
-      title: t('features.helpCenter.title'),
-      description: t('features.helpCenter.description'),
-      benefitsList: [
-        t('features.helpCenter.benefits.0'),
-        t('features.helpCenter.benefits.1'),
-        t('features.helpCenter.benefits.2'),
-        t('features.helpCenter.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  // Generate integration features with translations
-  const integrationFeatures = [
-    {
-      icon: <Globe className="h-8 w-8 text-gray-600" />,
-      title: t('features.apiAccess.title'),
-      description: t('features.apiAccess.description'),
-      benefitsList: [
-        t('features.apiAccess.benefits.0'),
-        t('features.apiAccess.benefits.1'),
-        t('features.apiAccess.benefits.2'),
-        t('features.apiAccess.benefits.3')
-      ],
-      available: true,
-      status: t('status.available')
-    }
-  ];
-
-  const renderFeatureCard = (feature: any, index: number) => (
-    <motion.div
-      key={feature.title}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
+function SearchIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
     >
-      <Card className="h-full hover:shadow-lg transition-all duration-300 border-l-4 border-l-transparent hover:border-l-primary">
-        <CardHeader>
-          <div className="flex items-start gap-4">
-            <div className="p-2 rounded-lg bg-background/50">
-              {feature.icon}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="text-lg">{feature.title}</CardTitle>
-                {feature.available && (
-                  <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    {feature.status || t('status.available')}
-                  </Badge>
-                )}
-              </div>
-              <CardDescription className="text-sm leading-relaxed">
-                {feature.description}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {feature.benefitsList.map((benefit: string, idx: number) => (
-              <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                {benefit}
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </svg>
+  );
+}
+
+function FileIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
+function PlatformGlyph({ name }: { name: string }) {
+  const props = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.6,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+    className: "mb-3 h-5 w-5 text-ledger-accent",
+  };
+
+  switch (name) {
+    case "categories":
+      return (
+        <svg {...props}>
+          <path d="M3 11V4h7l9 9-6 6-10-9Z" />
+          <circle cx="7.5" cy="7.5" r="1.2" />
+        </svg>
+      );
+    case "storage":
+      return (
+        <svg {...props}>
+          <rect x="4" y="10" width="16" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </svg>
+      );
+    case "notifications":
+      return (
+        <svg {...props}>
+          <path d="M18 8a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+          <path d="M10.5 20a2 2 0 0 0 3 0" />
+        </svg>
+      );
+    case "mobile":
+      return (
+        <svg {...props}>
+          <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+          <path d="M11 18.5h2" />
+        </svg>
+      );
+    case "api":
+      return (
+        <svg {...props}>
+          <path d="M8 3H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2" />
+          <path d="M16 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2" />
+        </svg>
+      );
+    case "subscription":
+      return (
+        <svg {...props}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 10h18" />
+        </svg>
+      );
+    case "help":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9a2.5 2.5 0 1 1 4 2c-.9.6-1.5 1.2-1.5 2.2" />
+          <path d="M12 17h.01" />
+        </svg>
+      );
+    case "export":
+      return (
+        <svg {...props}>
+          <path d="M12 3v12" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M4 20h16" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function FeatureBlock({
+  id,
+  tint = false,
+  reverse = false,
+  num,
+  title,
+  lede,
+  checks,
+  children,
+}: {
+  id: string;
+  tint?: boolean;
+  reverse?: boolean;
+  num: string;
+  title: string;
+  lede: string;
+  checks: string[];
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className={`scroll-mt-[164px] border-b border-ledger-line py-16 min-[881px]:scroll-mt-[84px] min-[881px]:py-[88px] ${
+        tint ? "bg-ledger-surface" : ""
+      }`}
+    >
+      <div
+        className={`${shell} grid grid-cols-1 items-center gap-9 min-[881px]:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] min-[881px]:gap-10 min-[1025px]:gap-16`}
+      >
+        <div className={reverse ? "min-[881px]:order-2" : ""}>
+          <p className="font-data text-[0.6875rem] uppercase tracking-[0.12em] text-ledger-accent">
+            {num}
+          </p>
+          <h2 className={`${sectionTitle} mb-4 mt-3.5`}>{title}</h2>
+          <p className={`${sectionLede} max-w-[46ch]`}>{lede}</p>
+          <ul className="mt-6 grid gap-2.5">
+            {checks.map((check) => (
+              <li
+                key={check}
+                className="flex items-start gap-2.5 text-[0.9375rem] leading-[1.5] text-ledger-ink-2"
+              >
+                <CheckMark className="mt-[3px] h-4 w-4 shrink-0 text-ledger-accent" />
+                <span>{check}</span>
               </li>
             ))}
           </ul>
-        </CardContent>
-      </Card>
-    </motion.div>
+        </div>
+        <div className={reverse ? "min-[881px]:order-1" : ""}>{children}</div>
+      </div>
+    </section>
+  );
+}
+
+export default function FeaturesPage() {
+  const { user } = useAuth();
+  const { t } = useFeaturesTranslation();
+  const { t: tHome } = useHomepageTranslation();
+
+  const copy = (key: string) => String(t(key));
+  const list = <T,>(key: string): T[] =>
+    t(key, { returnObjects: true }) as unknown as T[];
+
+  const workspaceTarget = user ? "/dashboard" : "/auth";
+
+  const extractionFieldKeys = [
+    "merchant",
+    "date",
+    "lineItems",
+    "subtotal",
+    "sst",
+    "total",
+    "payment",
+    "category",
+    "confidence",
+  ];
+
+  const extractionFields: FieldPair[] = extractionFieldKeys.map((key) => ({
+    label: copy(`page.extractionCard.fields.${key}.label`),
+    value: copy(`page.extractionCard.fields.${key}.value`),
+  }));
+
+  const extractionReceipt = {
+    label: copy("page.blocks.extraction.receipt.label"),
+    status: copy("page.blocks.extraction.receipt.status"),
+    merchant: copy("page.blocks.extraction.receipt.merchant"),
+    meta: copy("page.blocks.extraction.receipt.meta"),
+    items: list<ReceiptItem>("page.blocks.extraction.receipt.items"),
+    totalLabel: copy("page.blocks.extraction.receipt.totalLabel"),
+    total: copy("page.blocks.extraction.receipt.total"),
+    fields: ["merchant", "date", "total", "category"].map((key) => ({
+      label: copy(`page.blocks.extraction.receipt.fields.${key}.label`),
+      value: copy(`page.blocks.extraction.receipt.fields.${key}.value`),
+    })),
+    footLeft: copy("page.blocks.extraction.receipt.footLeft"),
+    footRight: copy("page.blocks.extraction.receipt.footRight"),
+  };
+
+  const searchMock = {
+    label: copy("page.blocks.search.mock.label"),
+    shortcut: copy("page.blocks.search.mock.shortcut"),
+    query: copy("page.blocks.search.mock.query"),
+    chips: list<string>("page.blocks.search.mock.chips"),
+    results: list<SearchResult>("page.blocks.search.mock.results"),
+    footLeft: copy("page.blocks.search.mock.footLeft"),
+    footRight: copy("page.blocks.search.mock.footRight"),
+  };
+
+  const taxRows = list<{ label: string; value: string; total: boolean }>(
+    "page.blocks.malaysia.mock.rows",
+  );
+  const taxTags = list<string>("page.blocks.malaysia.mock.tags");
+
+  const queueRows = list<QueueRow>("page.blocks.batch.mock.rows");
+
+  const trailReceipt = {
+    merchant: copy("page.blocks.team.mock.receipt.merchant"),
+    meta: copy("page.blocks.team.mock.receipt.meta"),
+    amount: copy("page.blocks.team.mock.receipt.amount"),
+  };
+  const trailSteps = list<TrailStep>("page.blocks.team.mock.trail");
+
+  const spendCategories = list<SpendCategory>(
+    "page.blocks.reporting.mock.categories",
   );
 
+  const platformItems = list<PlatformItem>("page.platform.items");
+  const planFacts = list<PlanFact>("page.plans.facts");
+
+  const indexLinks = [
+    { id: "extraction", label: copy("page.index.extraction") },
+    { id: "search", label: copy("page.index.search") },
+    { id: "malaysia", label: copy("page.index.malaysia") },
+    { id: "batch", label: copy("page.index.batch") },
+    { id: "team", label: copy("page.index.team") },
+    { id: "reporting", label: copy("page.index.reporting") },
+    { id: "platform", label: copy("page.index.platform") },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/10">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold">{t('hero.title')}</h1>
-          </div>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            {t('hero.subtitle')}
-          </p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <Badge className={`${
-              tier === 'pro' ? 'bg-blue-500 text-white' :
-              tier === 'max' ? 'bg-purple-500 text-white' :
-              'bg-green-500 text-white'
-            } px-3 py-1`}>
-              {tier === 'pro' ? (
-                <>
-                  <Zap className="h-4 w-4 mr-1" />
-                  {t('categories.ai.title')}
-                </>
-              ) : tier === 'max' ? (
-                <>
-                  <Crown className="h-4 w-4 mr-1" />
-                  {t('categories.integration.title')}
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-1" />
-                  {t('categories.core.title')}
-                </>
-              )}
-            </Badge>
-          </div>
-        </motion.div>
+    <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
+      <Helmet>
+        <title>{copy("page.meta.title")}</title>
+        <meta name="description" content={copy("page.meta.description")} />
+      </Helmet>
 
-        {/* Core Features Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.core.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.core.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {coreFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
+      <a
+        href="#main"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper focus:top-3"
+      >
+        {String(tHome("skipToContent"))}
+      </a>
 
-        {/* AI Features Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.ai.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.ai.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {aiFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
+      <MarketingHeader active="features" />
 
-        {/* Team Collaboration Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.collaboration.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.collaboration.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {collaborationFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
-
-        {/* Export & Reporting Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.reporting.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.reporting.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-6">
-            {reportingFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
-
-        {/* Platform Features Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.platform.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.platform.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {platformFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
-
-        {/* Integration Features Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.2 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('categories.integration.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('categories.integration.description')}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-6">
-            {integrationFeatures.map((feature, index) => renderFeatureCard(feature, index))}
-          </div>
-        </motion.section>
-
-        {/* Subscription Tiers Overview */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.4 }}
-          className="mb-16"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">{t('cta.title')}</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {t('cta.subtitle')}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Free Tier */}
-            <Card className={`${tier === 'free' ? 'ring-2 ring-green-500 bg-green-50/50' : ''}`}>
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Upload className="h-6 w-6 text-green-500" />
-                  <CardTitle>{t('categories.core.title')}</CardTitle>
-                  {tier === 'free' && <Badge className="bg-green-500 text-white">{t('status.available')}</Badge>}
-                </div>
-                <CardDescription>{t('categories.core.description')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    50 receipts per month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    Batch upload (up to 5 files)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    Basic AI processing
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    Standard analytics
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    Email support
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Pro Tier */}
-            <Card className={`${tier === 'pro' ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}`}>
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-6 w-6 text-blue-500" />
-                  <CardTitle>{t('categories.ai.title')}</CardTitle>
-                  {tier === 'pro' && <Badge className="bg-blue-500 text-white">{t('status.available')}</Badge>}
-                </div>
-                <CardDescription>{t('categories.ai.description')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    500 receipts per month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    Batch upload (up to 50 files)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    Advanced AI models
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    Enhanced analytics
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    Priority support
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Max Tier */}
-            <Card className={`${tier === 'max' ? 'ring-2 ring-purple-500 bg-purple-50/50' : ''}`}>
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Crown className="h-6 w-6 text-purple-500" />
-                  <CardTitle>{t('categories.integration.title')}</CardTitle>
-                  {tier === 'max' && <Badge className="bg-purple-500 text-white">{t('status.available')}</Badge>}
-                </div>
-                <CardDescription>{t('categories.integration.description')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-purple-500" />
-                    Unlimited receipts
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-purple-500" />
-                    Batch upload (up to 100 files)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-purple-500" />
-                    Premium AI models
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-purple-500" />
-                    Advanced analytics
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-purple-500" />
-                    Dedicated support
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </motion.section>
-
-        {/* Call to Action */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.6 }}
-          className="text-center"
-        >
-          <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5">
-            <CardHeader>
-              <CardTitle className="text-2xl flex items-center justify-center gap-2">
-                <Sparkles className="h-6 w-6 text-primary" />
-                {t('cta.title')}
-              </CardTitle>
-              <CardDescription className="text-lg">
-                {t('cta.subtitle')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Button asChild size="lg" className="gap-2">
-                  <Link to="/dashboard">
-                    <Upload className="h-5 w-5" />
-                    {t('cta.button')}
+      <main id="main">
+        <section className="overflow-hidden">
+          <div
+            className={`${shell} grid grid-cols-1 items-center gap-10 pb-12 pt-10 min-[641px]:pb-[56px] min-[641px]:pt-[52px] min-[881px]:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] min-[881px]:pb-[72px] min-[881px]:pt-[72px] min-[1025px]:gap-16`}
+          >
+            <div>
+              <p className={eyebrow}>{copy("page.hero.eyebrow")}</p>
+              <h1 className="mb-5 mt-[18px] max-w-[18ch] font-display text-[clamp(2.6rem,5vw,4.25rem)] font-normal leading-[1.02] tracking-[-0.026em] min-[881px]:max-w-[15ch]">
+                {copy("page.hero.titleLead")}{" "}
+                <em className="italic text-ledger-accent">
+                  {copy("page.hero.titleAccent")}
+                </em>{" "}
+                {copy("page.hero.titleTail")}
+              </h1>
+              <p className="max-w-[48ch] text-[1.125rem] leading-[1.6] text-ledger-muted">
+                {copy("page.hero.lede")}
+              </p>
+              <div className="mt-[30px] flex flex-wrap gap-3 max-[640px]:flex-col max-[640px]:items-start">
+                <Button
+                  asChild
+                  variant="accent"
+                  className="h-[46px] rounded-lg px-5 text-[0.9375rem] font-semibold"
+                >
+                  <Link to={workspaceTarget}>
+                    {copy("page.hero.workspace")}
+                    <ArrowRight className="ml-2 h-[18px] w-[18px]" />
                   </Link>
                 </Button>
-                {tier === 'free' && (
-                  <Button asChild variant="outline" size="lg" className="gap-2">
-                    <Link to="/pricing">
-                      <Crown className="h-5 w-5" />
-                      {t('cta.contact')}
-                    </Link>
-                  </Button>
-                )}
-                <Button asChild variant="ghost" size="lg" className="gap-2">
-                  <Link to="/help">
-                    <MessageSquare className="h-5 w-5" />
-                    {t('cta.contact')}
-                  </Link>
+                <Button
+                  asChild
+                  variant="accent-outline"
+                  className="h-[46px] rounded-lg border-ledger-line-strong px-5 text-[0.9375rem] font-semibold"
+                >
+                  <Link to="/pricing">{copy("page.hero.pricing")}</Link>
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </motion.section>
+              <p className="mt-[26px] border-t border-ledger-line pt-[18px] font-data text-[0.6875rem] tracking-[0.06em] text-ledger-muted">
+                {copy("page.hero.note")}
+              </p>
+            </div>
 
-        {/* Future Enhancements Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.8 }}
-          className="mt-16 text-center"
-        >
-          <h2 className="text-2xl font-bold mb-4 text-muted-foreground">Future Enhancements</h2>
-          <p className="text-muted-foreground mb-6">
-            We're continuously improving Mataresit with new features and capabilities
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="opacity-60">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Camera className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">Native Mobile Apps</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Dedicated iOS and Android apps with offline capabilities
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Download className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">Advanced Integrations</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Direct connections with accounting software and ERP systems
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-sm">AI Insights</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Predictive analytics and spending pattern insights
-                </p>
-              </CardContent>
-            </Card>
+            <aside
+              aria-label={copy("page.extractionCard.label")}
+              className="w-full max-w-[560px] overflow-hidden rounded-xl border border-ledger-line bg-ledger-surface shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)] min-[881px]:max-w-none"
+            >
+              <div className="flex items-center justify-between gap-4 border-b border-ledger-line px-[18px] py-3.5 font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+                <span>{copy("page.extractionCard.label")}</span>
+                <span className={statusText}>
+                  <span aria-hidden="true" className={statusDot} />
+                  {copy("page.extractionCard.status")}
+                </span>
+              </div>
+              <div className="px-[18px] py-1">
+                {extractionFields.map((field) => (
+                  <div
+                    key={field.label}
+                    className="grid grid-cols-[78px_minmax(0,1fr)_16px] items-center gap-2.5 border-b border-ledger-line py-[9px] last:border-b-0 min-[641px]:grid-cols-[92px_minmax(0,1fr)_16px] min-[641px]:gap-3"
+                  >
+                    <span className="font-data text-[0.625rem] uppercase tracking-[0.1em] text-ledger-muted">
+                      {field.label}
+                    </span>
+                    <span className="text-[0.9375rem] font-medium">
+                      {field.value}
+                    </span>
+                    <CheckMark className="h-4 w-4 text-ledger-accent" />
+                  </div>
+                ))}
+              </div>
+              <p className="border-t border-ledger-line bg-ledger-surface-2 px-[18px] py-3 text-[0.8125rem] text-ledger-muted">
+                {copy("page.extractionCard.foot")}
+              </p>
+            </aside>
           </div>
-        </motion.section>
-      </div>
+        </section>
+
+        <nav
+          aria-label={copy("page.index.label")}
+          className="border-b border-ledger-line bg-ledger-surface"
+        >
+          <div
+            className={`${shell} flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+          >
+            <span className="mr-2.5 whitespace-nowrap font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+              {copy("page.index.label")}
+            </span>
+            {indexLinks.map((link) => (
+              <a
+                key={link.id}
+                href={`#${link.id}`}
+                className="inline-flex min-h-[52px] items-center whitespace-nowrap border-b-2 border-transparent px-3 text-sm font-medium text-ledger-ink-2 transition-colors hover:border-ledger-line-strong hover:text-ledger-accent"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </nav>
+
+        <FeatureBlock
+          id="extraction"
+          num={copy("page.blocks.extraction.num")}
+          title={copy("page.blocks.extraction.title")}
+          lede={copy("page.blocks.extraction.lede")}
+          checks={list<string>("page.blocks.extraction.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{extractionReceipt.label}</span>
+              <span className={statusText}>
+                <span aria-hidden="true" className={statusDot} />
+                {extractionReceipt.status}
+              </span>
+            </div>
+            <div className="p-[18px]">
+              <div className="rounded-lg border border-dashed border-[#C9CEC4] bg-[#FBFBF7] px-4 py-3.5 font-data text-xs leading-[1.6] text-[#1A211E]">
+                <p className="text-center text-xs font-medium uppercase leading-[1.6] tracking-[0.14em]">
+                  {extractionReceipt.merchant}
+                </p>
+                <p className="mt-0.5 text-center text-[0.6875rem] text-[#5F675F]">
+                  {extractionReceipt.meta}
+                </p>
+                <div className="my-2.5 border-t border-dashed border-[#C9CEC4]" />
+                <ul className="grid gap-0.5">
+                  {extractionReceipt.items.map((item) => (
+                    <li
+                      key={item.name}
+                      className="flex justify-between gap-3 py-0.5"
+                    >
+                      <span>{item.name}</span>
+                      <span>{item.amount}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 flex justify-between gap-3 border-t border-[#1A211E] pt-1.5 font-medium">
+                  <span>{extractionReceipt.totalLabel}</span>
+                  <span>{extractionReceipt.total}</span>
+                </div>
+              </div>
+              <ul className="mt-3.5 border-t border-ledger-line">
+                {extractionReceipt.fields.map((field) => (
+                  <li
+                    key={field.label}
+                    className="grid grid-cols-[82px_minmax(0,1fr)_16px] items-center gap-2.5 border-b border-ledger-line py-2 text-sm leading-[1.6] last:border-b-0"
+                  >
+                    <span className="font-data text-[0.625rem] uppercase tracking-[0.1em] text-ledger-muted">
+                      {field.label}
+                    </span>
+                    <b className="font-medium">{field.value}</b>
+                    <CheckMark className="h-4 w-4 text-ledger-accent" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={uiFoot}>
+              <span>{extractionReceipt.footLeft}</span>
+              <span>{extractionReceipt.footRight}</span>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <FeatureBlock
+          id="search"
+          tint
+          reverse
+          num={copy("page.blocks.search.num")}
+          title={copy("page.blocks.search.title")}
+          lede={copy("page.blocks.search.lede")}
+          checks={list<string>("page.blocks.search.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{searchMock.label}</span>
+              <span className="rounded border border-ledger-line px-1.5 py-0.5 font-data text-[0.625rem] text-ledger-muted">
+                {searchMock.shortcut}
+              </span>
+            </div>
+            <div className="p-[18px]">
+              <div className="flex items-center gap-2.5 rounded-lg border border-ledger-line-strong bg-ledger-surface-2 px-3 py-2.5">
+                <SearchIcon className="h-4 w-4 text-ledger-muted" />
+                <span className="text-[0.9375rem] font-medium">
+                  {searchMock.query}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="ledger-caret h-[18px] w-px bg-ledger-accent"
+                />
+              </div>
+              <div className="my-3 flex flex-wrap gap-1.5" aria-hidden="true">
+                {searchMock.chips.map((chip, index) => (
+                  <span
+                    key={chip}
+                    className={
+                      index === 0
+                        ? "inline-flex min-h-7 items-center rounded-full border border-[#BBD9C9] bg-ledger-accent-soft px-2.5 text-xs font-semibold text-ledger-accent dark:border-ledger-accent/35"
+                        : "inline-flex min-h-7 items-center rounded-full border border-ledger-line bg-ledger-surface px-2.5 text-xs text-ledger-muted"
+                    }
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+              <ul className="grid">
+                {searchMock.results.map((result) => (
+                  <li
+                    key={result.title}
+                    className="flex items-center justify-between gap-4 border-t border-ledger-line py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <b className="block text-sm font-semibold leading-[1.6]">
+                        {result.title}
+                      </b>
+                      <span className="block text-xs leading-[1.6] text-ledger-muted">
+                        {result.meta}
+                      </span>
+                    </div>
+                    <span className="whitespace-nowrap font-data text-[0.8125rem] text-ledger-ink">
+                      {result.amount}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={uiFoot}>
+              <span>{searchMock.footLeft}</span>
+              <span>{searchMock.footRight}</span>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <FeatureBlock
+          id="malaysia"
+          num={copy("page.blocks.malaysia.num")}
+          title={copy("page.blocks.malaysia.title")}
+          lede={copy("page.blocks.malaysia.lede")}
+          checks={list<string>("page.blocks.malaysia.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{copy("page.blocks.malaysia.mock.label")}</span>
+              <span>{copy("page.blocks.malaysia.mock.date")}</span>
+            </div>
+            <div className="p-[18px]">
+              <dl className="grid gap-2.5">
+                {taxRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className={
+                      row.total
+                        ? "mt-0.5 flex items-baseline justify-between gap-4 border-t border-ledger-ink pt-2.5"
+                        : "flex items-baseline justify-between gap-4"
+                    }
+                  >
+                    <dt
+                      className={
+                        row.total
+                          ? "font-semibold text-ledger-ink"
+                          : "text-sm text-ledger-muted"
+                      }
+                    >
+                      {row.label}
+                    </dt>
+                    <dd
+                      className={
+                        row.total
+                          ? "font-data text-lg font-semibold text-ledger-ink"
+                          : "font-data text-[0.9375rem] text-ledger-ink"
+                      }
+                    >
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-[18px] flex flex-wrap gap-1.5">
+                {taxTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex min-h-7 items-center rounded-full border border-ledger-line bg-ledger-surface-2 px-2.5 text-xs text-ledger-ink-2"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className={uiFoot}>
+              <span>{copy("page.blocks.malaysia.mock.footLeft")}</span>
+              <span>{copy("page.blocks.malaysia.mock.footRight")}</span>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <FeatureBlock
+          id="batch"
+          tint
+          reverse
+          num={copy("page.blocks.batch.num")}
+          title={copy("page.blocks.batch.title")}
+          lede={copy("page.blocks.batch.lede")}
+          checks={list<string>("page.blocks.batch.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{copy("page.blocks.batch.mock.label")}</span>
+              <span>{copy("page.blocks.batch.mock.count")}</span>
+            </div>
+            <div className="p-[18px]">
+              <div className="grid gap-3.5">
+                {queueRows.map((row) => (
+                  <div
+                    key={row.file}
+                    className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1"
+                  >
+                    <FileIcon className="h-4 w-4 text-ledger-muted" />
+                    <div>
+                      <b className="block text-[0.8125rem] font-semibold">
+                        {row.file}
+                      </b>
+                      <span className="block text-xs leading-[1.6] text-ledger-muted">
+                        {row.state}
+                      </span>
+                    </div>
+                    <span
+                      className={
+                        row.tone === "reading"
+                          ? "font-data text-[0.625rem] uppercase tracking-[0.06em] text-ledger-accent"
+                          : "font-data text-[0.625rem] uppercase tracking-[0.06em] text-ledger-muted"
+                      }
+                    >
+                      {row.tag}
+                    </span>
+                    <div className="col-[2/-1] h-1 overflow-hidden rounded-sm bg-ledger-surface-2">
+                      <span
+                        className={
+                          row.tone === "wait"
+                            ? "block h-full bg-ledger-line-strong"
+                            : "block h-full bg-ledger-accent"
+                        }
+                        style={{ width: `${row.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className={uiFoot}>
+              <span>{copy("page.blocks.batch.mock.footLeft")}</span>
+              <span>{copy("page.blocks.batch.mock.footRight")}</span>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <FeatureBlock
+          id="team"
+          num={copy("page.blocks.team.num")}
+          title={copy("page.blocks.team.title")}
+          lede={copy("page.blocks.team.lede")}
+          checks={list<string>("page.blocks.team.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{copy("page.blocks.team.mock.label")}</span>
+              <span className={statusText}>
+                <span aria-hidden="true" className={statusDot} />
+                {copy("page.blocks.team.mock.status")}
+              </span>
+            </div>
+            <div className="p-[18px]">
+              <div className="flex items-center justify-between gap-4 border-b border-ledger-line pb-3.5">
+                <div>
+                  <b className="block text-[0.9375rem] font-semibold">
+                    {trailReceipt.merchant}
+                  </b>
+                  <span className="block text-xs leading-[1.6] text-ledger-muted">
+                    {trailReceipt.meta}
+                  </span>
+                </div>
+                <strong className="whitespace-nowrap font-data text-[0.9375rem] font-medium">
+                  {trailReceipt.amount}
+                </strong>
+              </div>
+              <ol className="mt-1.5 grid">
+                {trailSteps.map((step) => (
+                  <li
+                    key={step.title}
+                    className="relative flex gap-3 py-3 [&:not(:last-child)]:before:absolute [&:not(:last-child)]:before:bottom-[-4px] [&:not(:last-child)]:before:left-[5px] [&:not(:last-child)]:before:top-[30px] [&:not(:last-child)]:before:w-px [&:not(:last-child)]:before:bg-ledger-line"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-ledger-accent bg-ledger-surface"
+                    />
+                    <div>
+                      <b className="block text-[0.8125rem] font-semibold">
+                        {step.title}
+                      </b>
+                      <span className="block text-xs leading-[1.6] text-ledger-muted">
+                        {step.meta}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <FeatureBlock
+          id="reporting"
+          tint
+          reverse
+          num={copy("page.blocks.reporting.num")}
+          title={copy("page.blocks.reporting.title")}
+          lede={copy("page.blocks.reporting.lede")}
+          checks={list<string>("page.blocks.reporting.checks")}
+        >
+          <div className={uiCard}>
+            <div className={uiHead}>
+              <span>{copy("page.blocks.reporting.mock.label")}</span>
+              <span>{copy("page.blocks.reporting.mock.total")}</span>
+            </div>
+            <div className="p-[18px]">
+              <svg
+                className="h-auto w-full"
+                viewBox="0 0 320 170"
+                role="img"
+                aria-label={copy("page.blocks.reporting.mock.chartLabel")}
+              >
+                <line
+                  x1="20"
+                  y1="36"
+                  x2="304"
+                  y2="36"
+                  stroke="var(--ledger-line)"
+                />
+                <line
+                  x1="20"
+                  y1="68"
+                  x2="304"
+                  y2="68"
+                  stroke="var(--ledger-line)"
+                />
+                <line
+                  x1="20"
+                  y1="100"
+                  x2="304"
+                  y2="100"
+                  stroke="var(--ledger-line)"
+                />
+                <line
+                  x1="20"
+                  y1="132"
+                  x2="304"
+                  y2="132"
+                  stroke="var(--ledger-line-strong)"
+                />
+                <rect
+                  x="44"
+                  y="36"
+                  width="56"
+                  height="96"
+                  rx="2"
+                  fill="var(--ledger-chart-1)"
+                />
+                <rect
+                  x="136"
+                  y="65"
+                  width="56"
+                  height="67"
+                  rx="2"
+                  fill="var(--ledger-chart-2)"
+                />
+                <rect
+                  x="228"
+                  y="96"
+                  width="56"
+                  height="36"
+                  rx="2"
+                  fill="var(--ledger-chart-3)"
+                />
+                <text
+                  x="72"
+                  y="27"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-ink-2)"
+                >
+                  {spendCategories[0]?.amount}
+                </text>
+                <text
+                  x="164"
+                  y="56"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-ink-2)"
+                >
+                  {spendCategories[1]?.amount}
+                </text>
+                <text
+                  x="256"
+                  y="87"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-ink-2)"
+                >
+                  {spendCategories[2]?.amount}
+                </text>
+                <text
+                  x="72"
+                  y="148"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-muted)"
+                >
+                  {spendCategories[0]?.name}
+                </text>
+                <text
+                  x="164"
+                  y="148"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-muted)"
+                >
+                  {spendCategories[1]?.name}
+                </text>
+                <text
+                  x="256"
+                  y="148"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono, monospace"
+                  fontSize="9"
+                  fill="var(--ledger-muted)"
+                >
+                  {spendCategories[2]?.name}
+                </text>
+              </svg>
+              <ul className="mt-3.5 grid gap-2">
+                {spendCategories.map((category, index) => (
+                  <li
+                    key={category.name}
+                    className="grid grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-2 text-[0.8125rem] text-ledger-ink-2"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 rounded-[2px]"
+                      style={{
+                        backgroundColor: `var(--ledger-chart-${index + 1})`,
+                      }}
+                    />
+                    <span>{category.name}</span>
+                    <b className="font-data font-medium">{category.value}</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={uiFoot}>
+              <span>{copy("page.blocks.reporting.mock.footLeft")}</span>
+              <span>{copy("page.blocks.reporting.mock.footRight")}</span>
+            </div>
+          </div>
+        </FeatureBlock>
+
+        <section
+          id="platform"
+          className="scroll-mt-[164px] border-b border-ledger-line bg-ledger-surface py-16 min-[881px]:scroll-mt-[84px] min-[881px]:py-[88px]"
+        >
+          <div className={shell}>
+            <div className="mb-10 flex flex-wrap items-end justify-between gap-8">
+              <div>
+                <p className={eyebrow}>{copy("page.platform.eyebrow")}</p>
+                <h2 className={`${sectionTitle} mt-3.5`}>
+                  {copy("page.platform.title")}
+                </h2>
+              </div>
+              <p className={`${sectionLede} max-w-[46ch]`}>
+                {copy("page.platform.lede")}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-x-8 min-[641px]:grid-cols-2 min-[1025px]:grid-cols-4">
+              {platformItems.map((item) => (
+                <article
+                  key={item.title}
+                  className="border-t border-ledger-line pb-2.5 pt-5"
+                >
+                  <PlatformGlyph name={item.icon} />
+                  <h3 className="mb-1.5 text-base font-semibold leading-[1.6] tracking-[-0.005em]">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm leading-[1.55] text-ledger-muted">
+                    {item.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-20">
+          <div
+            className={`${shell} grid grid-cols-1 items-center gap-8 min-[881px]:grid-cols-2 min-[881px]:gap-10 min-[1025px]:gap-16`}
+          >
+            <div>
+              <p className={eyebrow}>{copy("page.plans.eyebrow")}</p>
+              <h2 className={`${sectionTitle} mb-4 mt-3.5`}>
+                {copy("page.plans.title")}
+              </h2>
+              <p className={`${sectionLede} max-w-[54ch]`}>
+                {copy("page.plans.lede")}
+              </p>
+              <Button
+                asChild
+                variant="accent"
+                className="mt-6 h-[46px] rounded-lg px-5 text-[0.9375rem] font-semibold"
+              >
+                <Link to="/pricing">{copy("page.plans.cta")}</Link>
+              </Button>
+            </div>
+            <div className="grid border-t border-ledger-line">
+              {planFacts.map((fact) => (
+                <div
+                  key={fact.name}
+                  className="grid grid-cols-[56px_minmax(0,1fr)] items-baseline gap-x-4 gap-y-4 border-b border-ledger-line py-4 min-[641px]:grid-cols-[64px_minmax(0,1fr)_auto]"
+                >
+                  <span className="font-data text-[0.6875rem] uppercase tracking-[0.12em] text-ledger-muted">
+                    {fact.name}
+                  </span>
+                  <span className="font-data text-base font-medium leading-[1.6]">
+                    {fact.price}
+                  </span>
+                  <span className="col-start-2 text-[0.8125rem] text-ledger-muted min-[641px]:col-start-3 min-[641px]:text-right">
+                    {fact.note}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <MarketingCtaBand
+          eyebrow={copy("page.cta.eyebrow")}
+          title={copy("page.cta.title")}
+          lede={copy("page.cta.lede")}
+          primary={{ label: copy("page.cta.workspace"), to: workspaceTarget }}
+          secondary={{ label: copy("page.cta.pricing"), to: "/pricing" }}
+        />
+      </main>
+
+      <MarketingFooter />
     </div>
   );
 }

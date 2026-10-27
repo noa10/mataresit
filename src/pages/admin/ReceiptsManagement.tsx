@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { adminService } from "@/services/adminService";
+import { useAdminTranslation } from "@/contexts/LanguageContext";
 import { Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -15,6 +16,7 @@ export default function ReceiptsManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const { t, language } = useAdminTranslation();
 
   useEffect(() => {
     fetchReceipts();
@@ -27,8 +29,8 @@ export default function ReceiptsManagement() {
       setReceipts(data || []);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to load receipts",
+        title: t("receiptsPage.toasts.error"),
+        description: error.message || t("receiptsPage.toasts.loadFailed"),
         variant: "destructive",
       });
     } finally {
@@ -44,20 +46,18 @@ export default function ReceiptsManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Receipt Management</h1>
-        <p className="text-muted-foreground">
-          View and manage all receipts in the system
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("receiptsPage.title")}</h1>
+        <p className="text-muted-foreground">{t("receiptsPage.description")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Receipts</CardTitle>
+          <CardTitle>{t("receiptsPage.cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
             <Input
-              placeholder="Search by merchant or user email..."
+              placeholder={t("receiptsPage.searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-md"
@@ -73,12 +73,12 @@ export default function ReceiptsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Merchant</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{t("receiptsPage.table.date")}</TableHead>
+                    <TableHead>{t("receiptsPage.table.merchant")}</TableHead>
+                    <TableHead>{t("receiptsPage.table.amount")}</TableHead>
+                    <TableHead>{t("receiptsPage.table.user")}</TableHead>
+                    <TableHead>{t("receiptsPage.table.status")}</TableHead>
+                    <TableHead>{t("receiptsPage.table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -86,22 +86,26 @@ export default function ReceiptsManagement() {
                     filteredReceipts.map((receipt) => (
                       <TableRow key={receipt.id}>
                         <TableCell>
-                          {new Date(receipt.date).toLocaleDateString()}
+                          {new Date(receipt.date).toLocaleDateString(
+                            language === 'ms' ? 'ms-MY' : 'en-MY'
+                          )}
                         </TableCell>
                         <TableCell>{receipt.merchant}</TableCell>
                         <TableCell>
                           {typeof receipt.total === 'number'
-                            ? `$${receipt.total.toFixed(2)}`
-                            : '$0.00'}
+                            ? `RM ${receipt.total.toFixed(2)}`
+                            : 'RM 0.00'}
                         </TableCell>
                         <TableCell>
-                          {receipt.profiles?.email || 'Unknown User'}
+                          {receipt.profiles?.email || t("receiptsPage.unknownUser")}
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant={receipt.status === 'reviewed' ? 'default' : 'outline'}
                           >
-                            {receipt.status || 'unreviewed'}
+                            {t(`receiptsPage.statuses.${receipt.status || 'unreviewed'}`, {
+                              defaultValue: receipt.status || 'unreviewed',
+                            })}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -112,7 +116,7 @@ export default function ReceiptsManagement() {
                           >
                             <Link to={`/receipt/${receipt.id}`}>
                               <Eye className="h-4 w-4 mr-2" />
-                              View
+                              {t("receiptsPage.actions.view")}
                             </Link>
                           </Button>
                         </TableCell>
@@ -121,7 +125,7 @@ export default function ReceiptsManagement() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-4">
-                        No receipts found
+                        {t("receiptsPage.noReceipts")}
                       </TableCell>
                     </TableRow>
                   )}

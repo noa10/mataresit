@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { applyTheme, shouldUseDarkMode, setupSystemThemeListener, validateThemeConfig } from '@/lib/themeManager';
-import { getAvailableThemeVariants, getThemeVariantInfo } from '@/lib/themeManager';
 
 // Theme types
 export type ThemeMode = 'light' | 'dark' | 'auto';
@@ -18,13 +17,10 @@ interface ThemeContextType {
   isDarkMode: boolean;
   isLoading: boolean;
   error: string | null;
-  availableVariants: ThemeVariant[];
   setTheme: (config: Partial<ThemeConfig>) => Promise<boolean>;
   toggleMode: () => Promise<boolean>;
   setMode: (mode: ThemeMode) => Promise<boolean>;
-  setVariant: (variant: ThemeVariant) => Promise<boolean>;
   resetToDefaults: () => Promise<boolean>;
-  getVariantInfo: (variant: ThemeVariant) => any;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -81,7 +77,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [isDarkMode, setIsDarkMode] = useState(() => shouldUseDarkMode(getInitialTheme().mode));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableVariants] = useState<ThemeVariant[]>(getAvailableThemeVariants);
 
   // Load user's theme preference from database
   useEffect(() => {
@@ -210,19 +205,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return setTheme({ mode });
   };
 
-  // Set theme variant
-  const setVariant = async (variant: ThemeVariant): Promise<boolean> => {
-    return setTheme({ variant });
-  };
-
   // Reset to default theme
   const resetToDefaults = async (): Promise<boolean> => {
     return setTheme(DEFAULT_THEME);
-  };
-
-  // Get theme variant information
-  const getVariantInfo = (variant: ThemeVariant) => {
-    return getThemeVariantInfo(variant);
   };
 
   const contextValue: ThemeContextType = {
@@ -230,13 +215,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     isDarkMode,
     isLoading,
     error,
-    availableVariants,
     setTheme,
     toggleMode,
     setMode,
-    setVariant,
-    resetToDefaults,
-    getVariantInfo
+    resetToDefaults
   };
 
   return (

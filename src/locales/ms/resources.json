@@ -1,0 +1,624 @@
+{
+  "meta": {
+    "docs": {
+      "title": "Dokumentasi — Mataresit",
+      "description": "Dokumentasi Mataresit: muat naik resit, baca skor keyakinan, proses secara kelompok, cari dalam bahasa semula jadi dan selesaikan masalah — panduan lengkap."
+    },
+    "api": {
+      "title": "Rujukan API — Mataresit",
+      "description": "API REST Mataresit: 13 endpoint produksi untuk resit, carian, pasukan, tuntutan dan analitik perbelanjaan. Berkunci, JSON, dengan had kadar."
+    },
+    "help": {
+      "title": "Pusat bantuan — Mataresit",
+      "description": "Pusat bantuan Mataresit: bermula, akaun dan bil, pemprosesan AI — jawapan daripada pasukan sokongan, biasanya dalam sehari."
+    },
+    "status": {
+      "title": "Status sistem — Mataresit",
+      "description": "Status langsung perkhidmatan Mataresit dan integrasi pihak ketiga: pangkalan data, pengesahan, storan, fungsi edge dan pemprosesan AI."
+    },
+    "blog": {
+      "title": "Blog — Mataresit",
+      "description": "Blog Mataresit: nota produk, tip cukai Malaysia, kajian mendalam AI dan berita keluaran dari medan pemprosesan resit."
+    },
+    "blogPost": {
+      "title": "Blog — Mataresit",
+      "description": "Nota daripada lejar Mataresit."
+    }
+  },
+  "shared": {
+    "openGuide": "Buka panduan",
+    "readMore": "Baca lagi",
+    "copy": "Salin",
+    "copied": "Disalin"
+  },
+  "docs": {
+    "hero": {
+      "eyebrow": "Dokumentasi",
+      "titleLead": "Baca manual,",
+      "titleAccent": "kemudian lupakan.",
+      "lede": "Semua yang Mataresit lakukan, mengikut urutan yang anda perlukan — dari muat naik pertama hingga jejak audit. Ditulis untuk orang yang mempunyai resit untuk difailkan, bukan masa untuk dibazirkan.",
+      "note": "Dikemas kini Oktober 2026 · 5 bahagian · ~8 min baca"
+    },
+    "search": {
+      "label": "Cari dalam dokumentasi",
+      "placeholder": "Cari dalam manual…",
+      "clear": "Kosongkan carian",
+      "results": "Hasil carian",
+      "count_one": "{{count}} panduan",
+      "count_other": "{{count}} panduan",
+      "searching": "Mencari…",
+      "empty": "Tiada panduan sepadan dengan frasa itu. Cuba carian lain, atau tanya pusat bantuan.",
+      "error": "Pustaka panduan tidak dapat dimuatkan. Manual di bawah masih berfungsi."
+    },
+    "toc": {
+      "title": "Pada halaman ini",
+      "overview": "Gambaran keseluruhan",
+      "gettingStarted": "Bermula",
+      "coreFeatures": "Ciri teras",
+      "troubleshooting": "Penyelesaian masalah",
+      "glossary": "Glosari"
+    },
+    "overview": {
+      "title": "Gambaran keseluruhan",
+      "whatIsTitle": "Apakah Mataresit?",
+      "whatIsLede": "Mataresit menghapuskan kemasukan data manual daripada pengurusan resit dan perbelanjaan. Muat naik foto atau PDF, dan AI membaca peniaga, tarikh, jumlah serta item baris, mengkategorikan perbelanjaan dan menyerahkan lejar yang bersih — cukup tepat untuk difailkan, cukup boleh diedit untuk dipercayai.",
+      "keyFeaturesTitle": "Ciri utama",
+      "features": [
+        {
+          "title": "Pengekstrakan data automatik",
+          "description": "Muat naik JPEG, PNG atau PDF; sistem menarik peniaga, tarikh, jumlah dan item baris dengan sendirinya."
+        },
+        {
+          "title": "Peningkatan berkuasa AI",
+          "description": "Nama peniaga dinormalkan, kaedah pembayaran diseragamkan dan kategori diramal — dengan cadangan pembetulan untuk kesilapan OCR."
+        },
+        {
+          "title": "Skor keyakinan",
+          "description": "Setiap medan yang diekstrak membawa skor keyakinan, jadi anda nampak sekilas apa yang selamat dan apa yang perlukan semakan kedua."
+        },
+        {
+          "title": "Pemprosesan masa nyata",
+          "description": "Garis masa status mengikuti setiap resit dari muat naik hingga selesai — tiada tekaan tentang apa yang sedang dilakukan baris gilir."
+        },
+        {
+          "title": "Carian semantik",
+          "description": "Tanya dalam bahasa biasa: \"kopi minggu lepas\" atau \"apa yang saya beli di Watsons?\" akan menemui item baris itu."
+        },
+        {
+          "title": "Pemprosesan kelompok",
+          "description": "Lepaskan timbunan resit sekali gus; semuanya diproses secara selari dengan kawalan penuh ke atas baris gilir."
+        },
+        {
+          "title": "Analisis & pelaporan",
+          "description": "Papan pemuka perbelanjaan serta laporan PDF diringkaskan mengikut kategori atau pembayar, sedia untuk akauntan."
+        },
+        {
+          "title": "Model AI fleksibel",
+          "description": "Pilih antara saluran AI Vision dan OCR+AI untuk mengimbangi kelajuan, kos dan ketepatan bagi setiap muat naik."
+        }
+      ],
+      "quickStartTitle": "Panduan mula pantas",
+      "quickStartLede": "Empat panduan yang paling kerap dibuka oleh ruang kerja baharu."
+    },
+    "gettingStarted": {
+      "title": "Bermula",
+      "firstUploadTitle": "Muat naik pertama anda",
+      "steps": [
+        {
+          "title": "Pergi ke papan pemuka",
+          "description": "Selepas log masuk, anda mendarat di ruang kerja utama — peti masuk resit."
+        },
+        {
+          "title": "Buka modal muat naik",
+          "description": "Klik \"Muat naik\". Dua tab muncul: Muat naik tunggal dan Muat naik kelompok."
+        },
+        {
+          "title": "Pilih fail",
+          "description": "Seret dan lepas JPG, PNG atau PDF, atau klik untuk melayari peranti anda."
+        },
+        {
+          "title": "Pemprosesan bermula",
+          "description": "Muat naik dan pengekstrakan bermula secara automatik. Ikuti kemajuan pada garis masa pemprosesan."
+        },
+        {
+          "title": "Semak dan simpan",
+          "description": "Apabila pemprosesan selesai, anda dibawa ke paparan resit untuk menyemak, membetulkan dan menyimpan."
+        }
+      ],
+      "dashboardTitle": "Memahami papan pemuka",
+      "dashboardItems": [
+        "Kad resit — setiap kad menunjukkan peniaga, tarikh, jumlah dan thumbnail imej.",
+        "Penunjuk status — Belum disemak (amber) perlukan kelulusan anda; Disemak (biru) telah disahkan.",
+        "Penapisan & susunan — kawalan di atas mencari, menapis dan menyusun seluruh pustaka.",
+        "Mod paparan — tukar antara paparan grid, senarai dan jadual untuk bulan yang padat."
+      ]
+    },
+    "coreFeatures": {
+      "title": "Ciri teras",
+      "batchTitle": "Muat naik resit — tunggal & kelompok",
+      "batchBody": "Muat naik kelompok memproses banyak resit secara selari, dengan kawalan untuk mula, jeda dan cuba semula item yang gagal — dibina untuk bulan kotak kasut. Pelan Percuma menyusun 5 fail sekali gus, Pro 50, Max 100.",
+      "confidenceTitle": "Cadangan AI & skor keyakinan",
+      "confidenceBody": "Apabila AI mengesyaki kesilapan OCR, ia menawarkan pembetulan satu klik. Setiap medan utama juga menunjukkan bar keyakinan:",
+      "high": "Tinggi",
+      "highRange": "80–100%",
+      "medium": "Sederhana",
+      "mediumRange": "60–79%",
+      "low": "Rendah",
+      "lowRange": "< 60%",
+      "confidenceNote": "Mengedit medan secara manual menetapkan keyakinannya kepada 100%.",
+      "visionTitle": "Pemprosesan AI Vision",
+      "visionBody": "AI Vision menyerahkan imej mentah terus kepada model — tanpa pengekstrakan teks perantaraan. Ia lebih baik menangani susun atur kompleks, tulisan tangan dan pelbagai bahasa, yang merangkumi kebanyakan format resit Malaysia dari gerai mamak hingga pembekal perkakasan.",
+      "searchTitle": "Carian AI",
+      "searchBody": "Tanya apa yang anda ingat, dengan kata-kata yang anda akan ucapkan:",
+      "queries": [
+        "\"perbelanjaan kopi bulan lepas\"",
+        "\"barang runcit melebihi RM 20\"",
+        "\"resit minyak di Selangor\""
+      ],
+      "featuredTitle": "Panduan pilihan",
+      "featuredLede": "Panduan lebih panjang untuk aliran kerja yang paling kerap ditanya oleh pasukan."
+    },
+    "troubleshooting": {
+      "title": "Penyelesaian masalah",
+      "items": [
+        {
+          "question": "Mengapa resit saya tersekat atau gagal?",
+          "answer": "Status pemprosesan pada kad atau paparan menunjukkan peringkat semasa. Peringkat failed_ai biasanya bermaksud imej berkualiti rendah. Proses semula resit, atau masukkan data secara manual — kedua-duanya satu klik dari paparan resit."
+        },
+        {
+          "question": "Mengapa hasil carian saya tidak seperti yang dijangka?",
+          "answer": "Carian semantik bergantung pada embedding. Resit yang dimuat naik sebelum ciri ini diaktifkan mungkin belum memilikinya — pentadbir boleh menjana embedding untuk katalog lama dari Admin → Tetapan."
+        },
+        {
+          "question": "Bagaimana saya menukar langganan?",
+          "answer": "Urus langganan, lihat invois dan kemas kini kaedah pembayaran dari portal bil Stripe. Bukanya melalui mana-mana kad pelan di halaman harga, atau skrin pembayaran berjaya selepas transaksi."
+        }
+      ]
+    },
+    "glossary": {
+      "title": "Glosari",
+      "items": [
+        {
+          "term": "ai-vision",
+          "definition": "Kaedah pemprosesan di mana model AI membaca imej secara langsung untuk mengekstrak dan memahami kandungannya."
+        },
+        {
+          "term": "embedding",
+          "definition": "Perwakilan berangka bagi teks yang menangkap makna semantik — enjin di sebalik carian AI."
+        },
+        {
+          "term": "semantic-search",
+          "definition": "Carian yang mentafsir niat dan konteks dan bukan hanya memadankan kata kunci tepat."
+        },
+        {
+          "term": "confidence-score",
+          "definition": "Kebarangkalian bagi setiap medan bahawa nilai yang diekstrak adalah betul, dipaparkan sebagai bar berkod warna."
+        }
+      ]
+    },
+    "difficulty": {
+      "beginner": "Pemula",
+      "intermediate": "Pertengahan",
+      "advanced": "Lanjutan"
+    },
+    "readingTime": "{{count}} minit",
+    "cta": {
+      "eyebrow": "Cukup membaca",
+      "title": "Manual ini lebih pendek daripada timbunan akhir bulan.",
+      "lede": "Buka ruang kerja, masukkan satu resit, dan lihat lejar membina dirinya sendiri.",
+      "primary": "Buka ruang kerja",
+      "secondary": "Tanya pusat bantuan"
+    }
+  },
+  "api": {
+    "onThisPage": "Di halaman ini",
+    "hero": {
+      "eyebrow": "Rujukan API",
+      "titleLead": "Tiga belas endpoint,",
+      "titleAccent": "satu lejar bersih.",
+      "lede": "Tarik resit, pasukan, tuntutan dan analitik perbelanjaan terus ke dalam sistem anda dengan API REST berkunci. JSON masuk, JSON keluar, tanpa kod gam diperlukan.",
+      "note": "REST · JSON · v1 · 13 endpoint · 22/22 ujian integrasi lulus"
+    },
+    "quickStart": {
+      "title": "Mula pantas",
+      "lede": "Dua pengepala dan anda sudah bersedia. Halakan klien anda ke URL asas dan sahkan dengan pemeriksaan kesihatan.",
+      "baseUrlLabel": "URL asas",
+      "baseUrlMeta": "semua permintaan",
+      "testLabel": "Ujian pantas",
+      "testMeta": "curl",
+      "testComment": "# → { \"status\": \"ok\", \"service\": \"external-api\" }"
+    },
+    "auth": {
+      "title": "Pengesahan",
+      "lede": "Setiap permintaan membawa kedua-dua token sesi dan kunci API — token membuktikan siapa anda, kunci menentukan skop dan had kadar.",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer <access-token> — wajib, mengenal pasti pemanggil"
+        },
+        {
+          "name": "X-API-Key",
+          "value": "<api-key> — wajib, pengesahan skop dan had kadar"
+        }
+      ],
+      "scopesLabel": "Skop tersedia",
+      "scopes": [
+        "receipts:read",
+        "receipts:write",
+        "teams:read",
+        "claims:read",
+        "claims:write"
+      ],
+      "note": "Jana kunci dari Tetapan → Kunci API dalam ruang kerja, pilih hanya skop yang anda perlukan. Skop pentadbir wujud tetapi disahkan secara berasingan."
+    },
+    "endpoints": {
+      "title": "Endpoint",
+      "lede": "Semua endpoint di bawah beroperasi di produksi. Pilih satu baris untuk parameter dan permintaan yang boleh disalin.",
+      "groups": {
+        "health": "Kesihatan",
+        "receipts": "Resit",
+        "search": "Carian",
+        "teams": "Pasukan",
+        "claims": "Tuntutan",
+        "analytics": "Analitik"
+      },
+      "items": {
+        "health": {
+          "desc": "Semak status API dan sahkan pengesahan",
+          "params": "Tiada parameter."
+        },
+        "receiptsList": {
+          "desc": "Senaraikan resit dengan penapisan dan penomboran",
+          "params": "limit · offset · start_date · end_date"
+        },
+        "receiptCreate": {
+          "desc": "Cipta resit baharu",
+          "params": "merchant · date · currency · total · category · payment_method"
+        },
+        "receiptsBatch": {
+          "desc": "Cipta berbilang resit dalam satu permintaan",
+          "params": "receipts[] · sehingga 5 pada Percuma, 50 pada Pro, 100 pada Max"
+        },
+        "searchSuggestions": {
+          "desc": "Cadangan carian untuk sesuatu pertanyaan",
+          "params": "q · limit"
+        },
+        "searchSources": {
+          "desc": "Sumber carian yang tersedia",
+          "params": "Tiada parameter."
+        },
+        "teamsList": {
+          "desc": "Senaraikan pasukan anda",
+          "params": "Tiada parameter."
+        },
+        "teamDetails": {
+          "desc": "Butiran pasukan",
+          "params": "id (laluan)"
+        },
+        "teamStats": {
+          "desc": "Statistik pasukan",
+          "params": "id (laluan)"
+        },
+        "claimsList": {
+          "desc": "Senaraikan tuntutan dengan penapisan",
+          "params": "status · limit · offset"
+        },
+        "claimsCreate": {
+          "desc": "Cipta tuntutan baharu",
+          "params": "title · amount · currency · receipt_ids[]"
+        },
+        "analyticsSpending": {
+          "desc": "Analitik perbelanjaan",
+          "params": "start_date · end_date · group_by"
+        },
+        "analyticsTrends": {
+          "desc": "Trend perbelanjaan dari semasa ke semasa",
+          "params": "period · months"
+        }
+      },
+      "note": "Endpoint analitik terhad kepada pelan langganan Pro dan Max.",
+      "dialog": {
+        "title": "Butiran endpoint",
+        "parameters": "Parameter",
+        "sample": "Contoh permintaan",
+        "auth": "Hantar kedua-dua pengepala Authorization dan X-API-Key dengan setiap permintaan.",
+        "close": "Tutup"
+      }
+    },
+    "example": {
+      "title": "Contoh — cipta resit",
+      "lede": "POST ke /receipts dengan peniaga, jumlah dan mata wang. Respons memantulkan rekod yang dicipta bersama id dan status pemprosesannya.",
+      "requestCaption": "Permintaan",
+      "requestMeta": "POST /receipts",
+      "responseCaption": "Respons",
+      "responseMeta": "201 Dicipta"
+    },
+    "meta": {
+      "errorsTitle": "Kod ralat",
+      "errors": [
+        {
+          "code": "400",
+          "text": "Badan permintaan atau pertanyaan tidak sah"
+        },
+        {
+          "code": "401",
+          "text": "Token / kunci API hilang atau tidak sah"
+        },
+        {
+          "code": "403",
+          "text": "Skop atau tahap langganan tidak mencukupi"
+        },
+        {
+          "code": "404",
+          "text": "Sumber tidak ditemui"
+        },
+        {
+          "code": "429",
+          "text": "Had kadar melebihi — berundur dan cuba lagi"
+        }
+      ],
+      "limitsTitle": "Had kadar & spesifikasi",
+      "limitsBody": "Had berskala dengan pelan anda dan dikuatkuasakan bagi setiap kunci API. Setiap respons menyertakan pengepala dengan kuota yang tinggal. Dokumen OpenAPI 3.1 penuh diterbitkan bersama API — jana klien TypeScript atau Python dengan satu arahan.",
+      "openapiCommand": "openapi-generator-cli generate -i openapi.json -g typescript-axios",
+      "openapiLink": "Muat turun dokumen OpenAPI"
+    },
+    "plans": {
+      "title": "Pelan & had",
+      "lede": "Apa yang boleh dipanggil oleh setiap tahap, dan berapa kerap. Elaun semburan ialah 5, 20 dan 100 permintaan masing-masing.",
+      "plan": "Pelan",
+      "access": "Akses API",
+      "rate": "Had kadar",
+      "batch": "Kelompok",
+      "rows": [
+        {
+          "plan": "Percuma",
+          "access": "Kesihatan, resit (25/bulan), carian, pasukan baca sahaja",
+          "rate": "100/jam · 1,000/hari",
+          "batch": "—"
+        },
+        {
+          "plan": "Pro",
+          "access": "Semua dalam Percuma, tuntutan, analitik, pengurusan pasukan",
+          "rate": "1,000/jam · 10,000/hari",
+          "batch": "50 resit"
+        },
+        {
+          "plan": "Max",
+          "access": "Semua dalam Pro, pemprosesan keutamaan, webhook",
+          "rate": "5,000/jam · 50,000/hari",
+          "batch": "100 resit"
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Bina di atas lejar",
+      "title": "Sistem anda, membaca resit secara asli.",
+      "lede": "Jana kunci API dalam ruang kerja dan dapatkan resit pertama di terminal anda sebelum kopi sejuk.",
+      "primary": "Dapatkan kunci API",
+      "secondary": "Baca dokumentasi"
+    }
+  },
+  "help": {
+    "hero": {
+      "eyebrow": "Pusat bantuan",
+      "titleLead": "Tersekat?",
+      "titleAccent": "Terlerai.",
+      "lede": "Sepuluh soalan yang paling kerap kami dengar, dijawab dengan jelas. Jika soalan anda tiada di sini, seorang manusia akan mengambilnya — biasanya dalam sehari."
+    },
+    "search": {
+      "label": "Cari artikel bantuan",
+      "placeholder": "Cari bantuan…",
+      "results_one": "{{count}} hasil",
+      "results_other": "{{count}} hasil",
+      "clear": "Kosongkan penapis"
+    },
+    "categories": {
+      "label": "Layari mengikut kategori",
+      "gettingStarted": {
+        "title": "Bermula",
+        "description": "Muat naik, eksport dan aliran harian."
+      },
+      "accountBilling": {
+        "title": "Akaun & bil",
+        "description": "Langganan, invois dan keselamatan."
+      },
+      "aiProcessing": {
+        "title": "AI & pemprosesan",
+        "description": "Model, ketepatan dan kualiti carian."
+      },
+      "count_one": "{{count}} artikel",
+      "count_other": "{{count}} artikel"
+    },
+    "faq": {
+      "title": "Soalan lazim",
+      "lede": "Klik soalan untuk membuka jawapannya.",
+      "empty": "Tiada yang sepadan. Cuba frasa lain, atau kosongkan penapis.",
+      "emptyAction": "Tanya kami terus"
+    },
+    "faqs": [
+      {
+        "category": "gettingStarted",
+        "question": "Bagaimana saya memuat naik resit?",
+        "answer": "Pergi ke ruang kerja dan gunakan butang Muat naik. Seret dan lepas fail atau pilih dari peranti anda — JPEG, PNG dan PDF semuanya disokong."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "Apakah perbezaan antara OCR+AI dan AI Vision?",
+        "answer": "AI Vision menganalisis imej resit secara langsung untuk ketepatan lebih tinggi, terutamanya dengan susun atur kompleks. OCR+AI mengekstrak teks dahulu, kemudian menyusunnya dengan AI. Kami mengesyorkan AI Vision untuk hasil terbaik."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "Bagaimana saya boleh menambah baik hasil carian?",
+        "answer": "Gunakan bahasa semula jadi — \"kopi minggu lepas\" atau \"barang runcit dari Watsons melebihi RM 50\". Jika resit lama mendahului carian semantik, pentadbir boleh menjana embedding mereka dari Admin → Tetapan."
+      },
+      {
+        "category": "accountBilling",
+        "question": "Bagaimana saya mengurus langganan?",
+        "answer": "Buka halaman harga dan klik \"Urus langganan\" — ia membawa anda ke portal bil Stripe yang selamat di mana anda boleh menukar pelan, melihat invois dan mengemas kini kaedah pembayaran."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "Apakah format fail yang disokong?",
+        "answer": "JPEG, PNG dan PDF. Untuk pengekstrakan paling bersih, pastikan imej tajam dan terang dengan setiap baris teks kelihatan."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "Sejauh mana ketepatan pengekstrakan AI?",
+        "answer": "Ketepatan tinggi pada resit yang jelas dan terang. Setiap medan membawa skor keyakinan supaya anda boleh mengenal pasti yang perlu disemak semula, dan anda boleh membetulkan apa-apa sebelum menyimpan."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "Bolehkah saya mengeksport data resit?",
+        "answer": "Boleh — laporan CSV, JSON dan PDF. Eksport berada di halaman analisis, di mana anda boleh membentuk laporan mengikut kategori atau pembayar terlebih dahulu."
+      },
+      {
+        "category": "accountBilling",
+        "question": "Adakah data saya selamat?",
+        "answer": "Ya. Storan disulitkan, endpoint dilindungi, dan akses dihadkan secara ketat. Data anda tidak pernah dikongsi dengan pihak ketiga."
+      },
+      {
+        "category": "aiProcessing",
+        "question": "Model AI apa yang disokong?",
+        "answer": "Google Gemini ialah enjin lalai dan utama pada setiap pelan, jadi kualiti pemprosesan tidak bergantung pada tahap langganan anda."
+      },
+      {
+        "category": "gettingStarted",
+        "question": "Bagaimana saya menyediakan pemprosesan kelompok?",
+        "answer": "Pemprosesan kelompok tersedia pada Pro dan Max. Pilih berbilang resit dalam ruang kerja dan jalankannya melalui pilihan kelompok — baris gilir menguruskan selebihnya."
+      }
+    ],
+    "contact": {
+      "title": "Tidak menemui apa yang anda cari?",
+      "lede": "Pasukan sokongan kami sedia membantu.",
+      "email": "E-mel sokongan",
+      "chat": "Sembang langsung",
+      "docs": "Baca dokumentasi",
+      "note": "Balasan biasanya dalam satu hari bekerja · waktu Malaysia (GMT+8)"
+    }
+  },
+  "status": {
+    "hero": {
+      "eyebrow": "Status sistem",
+      "titleLead": "Paipnya,",
+      "titleAccent": "dipantau.",
+      "lede": "Status langsung setiap perkhidmatan yang bergantung pada Mataresit — milik kami dan pihak ketiga. Apabila sesuatu tersekat, ia muncul di sini sebelum ia muncul di peti masuk anda."
+    },
+    "banner": {
+      "operational": "Semua sistem beroperasi",
+      "degraded": "Sesetengah sistem terjejas",
+      "outage": "Gangguan besar dikesan",
+      "checking": "Menyemak status sistem…",
+      "lastChecked": "Terakhir disemak {{time}} · semakan setiap 5 minit",
+      "justNow": "sebentar tadi",
+      "minutesAgo": "{{count}} min lalu",
+      "refresh": "Muat semula",
+      "refreshing": "Menyemak perkhidmatan…"
+    },
+    "serviceStatus": {
+      "operational": "Beroperasi",
+      "degraded": "Terjejas",
+      "outage": "Gangguan",
+      "loading": "Menyemak"
+    },
+    "serviceMessages": {
+      "database": "Sambungan berjaya.",
+      "auth": "Perkhidmatan responsif.",
+      "storage": "Bucket boleh diakses.",
+      "edge": "Semua fungsi responsif.",
+      "ai": "Sambungan berjaya."
+    },
+    "serviceNames": {
+      "database": "Pangkalan Data Supabase",
+      "auth": "Pengesahan Supabase",
+      "storage": "Storan Supabase",
+      "edge": "Fungsi Edge",
+      "ai": "API Google Gemini"
+    },
+    "history": {
+      "title": "Sejarah masa operasi",
+      "unavailable": "Rekod masa operasi dan insiden sejarah belum dikumpul. Halaman ini hanya melaporkan semakan perkhidmatan secara langsung."
+    },
+    "footnote": {
+      "lead": "Mengalami sesuatu yang tidak dipaparkan di sini? Lawati",
+      "link": "pusat bantuan",
+      "tail": "atau hubungi sokongan — kami akan uruskannya."
+    }
+  },
+  "blog": {
+    "hero": {
+      "eyebrow": "Blog Mataresit",
+      "titleLead": "Nota daripada",
+      "titleAccent": "lejar.",
+      "lede": "Nota produk, tip cukai Malaysia dan kadang-kadang kajian mendalam dari medan pemprosesan resit. Catatan baharu kira-kira dua kali sebulan.",
+      "rssFollow": "Ikuti:",
+      "rssLink": "Suapan RSS"
+    },
+    "filter": {
+      "label": "Tapis mengikut topik",
+      "all": "Semua",
+      "searchLabel": "Cari dalam blog",
+      "searchPlaceholder": "Cari catatan…",
+      "empty": "Belum ada catatan di bawah topik ini — cuba chip lain.",
+      "noSearch": "Tiada catatan sepadan dengan carian anda. Cuba frasa lain atau kosongkan penapis.",
+      "emptyAction": "Kosongkan penapis"
+    },
+    "featured": {
+      "latest": "Catatan terkini",
+      "read": "Baca catatan"
+    },
+    "post": {
+      "by": "Oleh {{author}}",
+      "minRead": "{{count}} min baca"
+    },
+    "states": {
+      "loading": "Memuatkan lejar…",
+      "errorTitle": "Blog tidak dapat dimuatkan",
+      "errorBody": "Kami menghadapi masalah untuk mencapai catatan sekarang. Cuba lagi sebentar.",
+      "emptyTitle": "Belum ada catatan",
+      "emptyBody": "Kembali semula tidak lama lagi untuk nota dari medan pemprosesan resit."
+    },
+    "receipt": {
+      "merchant": "NASI KANDAR PELITA",
+      "address": "Jalan Ampang, Kuala Lumpur · 24.10.2026",
+      "items": [
+        {
+          "name": "Nasi lemak ayam",
+          "amount": "14.50",
+          "tax": "SST 6%",
+          "taxZero": false
+        },
+        {
+          "name": "Teh tarik × 2",
+          "amount": "7.00",
+          "tax": "SST 0%",
+          "taxZero": true
+        },
+        {
+          "name": "Roti canai",
+          "amount": "4.50",
+          "tax": "SST 6%",
+          "taxZero": false
+        }
+      ],
+      "totalLabel": "JUMLAH · MYR",
+      "total": "27.56",
+      "foot": "— KOD SST DITANGKAP —"
+    },
+    "cta": {
+      "eyebrow": "Kurang membaca, lebih memfail",
+      "title": "Blog menulis dirinya daripada lejar.",
+      "lede": "Setiap catatan ciri di sini bermula sebagai timbunan resit yang seseorang tidak mahu taip. Buka ruang kerja dan langkau ceritanya.",
+      "primary": "Buka ruang kerja",
+      "secondary": "Lihat harga"
+    }
+  },
+  "blogPost": {
+    "back": "Blog",
+    "loading": "Memuatkan catatan…",
+    "notFoundTitle": "Catatan tidak ditemui",
+    "notFoundBody": "Catatan blog yang anda cari tidak wujud atau telah dialih keluar.",
+    "notFoundCta": "Kembali ke blog",
+    "filedUnder": "Difailkan di bawah",
+    "endNote": "Itu penghujung catatan ini. Lejar menyimpan selebihnya."
+  }
+}

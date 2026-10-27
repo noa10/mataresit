@@ -5,7 +5,7 @@
   },
   "hero": {
     "title": "Ciri Berkuasa untuk Perniagaan Moden",
-    "subtitle": "Semua yang anda perlukan untuk mengubah pengurusan resit dan memperlancar aliran kerja kewangan anda."
+    "subtitle": "Semua yang anda perlukan untuk mengubah pengurusan resit dan melancarkan aliran kerja kewangan anda."
   },
   "categories": {
     "core": {
@@ -238,5 +238,394 @@
     "subtitle": "Mulakan percubaan percuma anda hari ini dan lihat bagaimana Mataresit boleh mengubah perniagaan anda.",
     "button": "Mula Percubaan Percuma",
     "contact": "Hubungi Jualan"
+  },
+  "page": {
+    "meta": {
+      "title": "Ciri-ciri — Mataresit",
+      "description": "Pengekstrakan item baris, carian pintar, kecerdasan SST Malaysia, muat naik pukal, semakan pasukan, tuntutan dan analitik — keupayaan di sebalik lejar resit yang bersih."
+    },
+    "hero": {
+      "eyebrow": "Ciri-ciri",
+      "titleLead": "Setiap baris pada resit,",
+      "titleAccent": "dibaca sekali",
+      "titleTail": "dan difailkan dengan betul.",
+      "lede": "Mataresit mengambil foto, e-mel atau folder imbasan dan mengembalikan item baris, SST, peniaga dan kategori — dengan skor keyakinan pada setiap medan dan jejak semakan di belakangnya.",
+      "workspace": "Buka ruang kerja",
+      "pricing": "Lihat harga",
+      "note": "Resit Malaysia · SST · berbilang mata wang"
+    },
+    "extractionCard": {
+      "label": "Resit 04 · pengekstrakan",
+      "status": "Dibaca",
+      "fields": {
+        "merchant": {
+          "label": "Peniaga",
+          "value": "Nasi Kandar Pelita"
+        },
+        "date": {
+          "label": "Tarikh",
+          "value": "18 / 10 / 2026"
+        },
+        "lineItems": {
+          "label": "Item baris",
+          "value": "3 item"
+        },
+        "subtotal": {
+          "label": "Jumlah kecil",
+          "value": "RM 26.00"
+        },
+        "sst": {
+          "label": "SST 6%",
+          "value": "RM 1.56"
+        },
+        "total": {
+          "label": "Jumlah",
+          "value": "RM 27.56"
+        },
+        "payment": {
+          "label": "Pembayaran",
+          "value": "Visa ·· 4821"
+        },
+        "category": {
+          "label": "Kategori",
+          "value": "Makanan"
+        },
+        "confidence": {
+          "label": "Keyakinan",
+          "value": "96% · tinggi"
+        }
+      },
+      "foot": "Setiap medan kekal boleh diedit sebelum masuk ke lejar."
+    },
+    "index": {
+      "label": "Di halaman ini",
+      "extraction": "Pengekstrakan",
+      "search": "Carian",
+      "malaysia": "Malaysia",
+      "batch": "Pukal",
+      "team": "Pasukan",
+      "reporting": "Pelaporan",
+      "platform": "Platform"
+    },
+    "blocks": {
+      "extraction": {
+        "num": "01 — Tangkap",
+        "title": "Item baris, bukan sekadar jumlah.",
+        "lede": "Kebanyakan alat membaca peniaga dan jumlah keseluruhan. Mataresit membaca apa sebenarnya dibelanjakan: setiap baris, baris cukai dan pembayaran, kemudian menilai keyakinannya sendiri supaya medan yang tidak pasti terserlah.",
+        "checks": [
+          "Peniaga, tarikh, item baris, cukai dan pembayaran diekstrak",
+          "Skor keyakinan pada setiap medan, bukan hanya pengepala",
+          "Apa-apa di bawah garis dihantar ke semakan, bukan ke lejar"
+        ],
+        "receipt": {
+          "label": "Resit 04 · diimbas",
+          "status": "Dibaca",
+          "merchant": "Nasi Kandar Pelita",
+          "meta": "Jalan Ampang · 18/10/2026",
+          "items": [
+            {
+              "name": "Nasi lemak ayam",
+              "amount": "14.50"
+            },
+            {
+              "name": "Teh tarik × 2",
+              "amount": "7.00"
+            },
+            {
+              "name": "Roti canai",
+              "amount": "4.50"
+            }
+          ],
+          "totalLabel": "Jumlah",
+          "total": "RM 27.56",
+          "fields": {
+            "merchant": {
+              "label": "Peniaga",
+              "value": "Nasi Kandar Pelita"
+            },
+            "date": {
+              "label": "Tarikh",
+              "value": "18 / 10 / 2026"
+            },
+            "total": {
+              "label": "Jumlah",
+              "value": "RM 27.56"
+            },
+            "category": {
+              "label": "Kategori",
+              "value": "Makanan"
+            }
+          },
+          "footLeft": "3 item baris · SST 6%",
+          "footRight": "Keyakinan 96%"
+        }
+      },
+      "search": {
+        "num": "02 — Cari",
+        "title": "Satu medan yang tahu di mana sesuatu berada.",
+        "lede": "Cari peniaga, item, kategori, kaedah pembayaran atau jumlah. Mataresit meneliti resit dan item barisnya, jadi “nasi lemak” menemui resit walaupun nama peniaga tidak pernah menyebutnya.",
+        "checks": [
+          "Cari peniaga, item, kategori, pembayaran dan jumlah",
+          "Tapis mengikut status, bulan dan kategori tanpa kehilangan pertanyaan",
+          "Hasil mengekalkan item baris yang sepadan, bukan hanya peniaga"
+        ],
+        "mock": {
+          "label": "Carian",
+          "shortcut": "⌘ K",
+          "query": "makanan",
+          "chips": [
+            "Semua",
+            "Makanan",
+            "Oktober",
+            "Diluluskan"
+          ],
+          "results": [
+            {
+              "title": "Nasi Kandar Pelita",
+              "meta": "Nasi lemak ayam · 18 Okt",
+              "amount": "RM 27.56"
+            },
+            {
+              "title": "Restoran Devi’s",
+              "meta": "Roti canai & teh tarik · 12 Okt",
+              "amount": "RM 41.80"
+            },
+            {
+              "title": "Tealive",
+              "meta": "Teh susu gula perang · 4 Okt",
+              "amount": "RM 18.90"
+            },
+            {
+              "title": "Kopitiam Kita",
+              "meta": "Nasi kerabu · 27 Okt",
+              "amount": "RM 23.40"
+            }
+          ],
+          "footLeft": "4 resit",
+          "footRight": "Jumlah RM 111.66"
+        }
+      },
+      "malaysia": {
+        "num": "03 — Kecerdasan tempatan",
+        "title": "Dibina mengikut cara resit Malaysia dicetak.",
+        "lede": "Nama kopitiam, baris SST, tarikh hari-dahulu, ringgit dan kad slip mata wang asing sekali-sekala. Model pengekstrakan ditala untuk resit yang benar-benar dibawa pulang oleh pasukan anda.",
+        "checks": [
+          "SST ditangkap sebagai baris tersendiri, bukan dilipat ke dalam jumlah",
+          "Nama peniaga tempatan, alamat dan tarikh hari-dahulu dikenali",
+          "Pengesanan berbilang mata wang apabila slip kad dan resit tidak sepadan"
+        ],
+        "mock": {
+          "label": "Pecahan SST",
+          "date": "18 Okt 2026",
+          "rows": [
+            {
+              "label": "Jumlah kecil",
+              "value": "RM 26.00",
+              "total": false
+            },
+            {
+              "label": "SST 6%",
+              "value": "RM 1.56",
+              "total": false
+            },
+            {
+              "label": "Jumlah",
+              "value": "RM 27.56",
+              "total": true
+            }
+          ],
+          "tags": [
+            "SST ditangkap berasingan",
+            "DD / MM / YYYY",
+            "MYR + kad asing"
+          ],
+          "footLeft": "Dibaca daripada resit kopitiam Kuala Lumpur",
+          "footRight": "SST 6%"
+        }
+      },
+      "batch": {
+        "num": "04 — Pukal",
+        "title": "Sebulan resit, bukan sebulan menaip.",
+        "lede": "Lepaskan sekumpulan fail dan biarkan baris gilir memprosesnya. Setiap fail membawa statusnya sendiri, dan apa-apa yang model tidak pasti akan masuk ke semakan, bukan ke lejar.",
+        "checks": [
+          "Muat naik pukal 5, 50 atau 100 fail bergantung pada pelan",
+          "Kemajuan setiap fail, jadi imbasan perlahan tidak menyekat yang lain",
+          "Resit tidak pasti dihantar ke semakan, bukan diluluskan secara senyap"
+        ],
+        "mock": {
+          "label": "Baris gilir muat naik",
+          "count": "18 fail",
+          "rows": [
+            {
+              "file": "pelita-oct-18.jpg",
+              "state": "Dibaca · 3 item baris",
+              "tag": "Selesai",
+              "progress": 100,
+              "tone": "done"
+            },
+            {
+              "file": "village-grocer-oct-16.pdf",
+              "state": "Membaca item baris…",
+              "tag": "62%",
+              "progress": 62,
+              "tone": "reading"
+            },
+            {
+              "file": "tealive-oct-14.jpg",
+              "state": "Dalam giliran",
+              "tag": "Menunggu",
+              "progress": 0,
+              "tone": "wait"
+            }
+          ],
+          "footLeft": "16 dibaca · 2 dalam semakan",
+          "footRight": "Kelompok 04"
+        }
+      },
+      "team": {
+        "num": "05 — Pasukan",
+        "title": "Satu resit, satu jejak yang jelas.",
+        "lede": "Jemput pasukan, kongsi resit, dan biarkan kebenaran berdasarkan peranan menentukan siapa boleh meluluskan. Tuntutan bergerak dalam ruang kerja yang sama, jadi resit yang diluluskan dan tuntutannya tidak pernah terpisah.",
+        "checks": [
+          "Jemputan pasukan dan akses resit dikongsi",
+          "Kebenaran berdasarkan peranan pada Max",
+          "Pengurusan tuntutan di sebelah resit yang memulakannya"
+        ],
+        "mock": {
+          "label": "Jejak kelulusan",
+          "status": "Diluluskan",
+          "receipt": {
+            "merchant": "Nasi Kandar Pelita",
+            "meta": "18 Okt 2026 · Makanan",
+            "amount": "RM 27.56"
+          },
+          "trail": [
+            {
+              "title": "Aina menyerahkan",
+              "meta": "09:42 · muat naik resit"
+            },
+            {
+              "title": "Marcus meluluskan",
+              "meta": "10:03 · pengurus"
+            },
+            {
+              "title": "Tuntutan MY-2841 dicipta",
+              "meta": "10:05 · tuntutan Oktober"
+            }
+          ]
+        }
+      },
+      "reporting": {
+        "num": "06 — Pelaporan",
+        "title": "Nombor yang bertahan sehingga akhir bulan.",
+        "lede": "Perbelanjaan mengikut kategori, analisis peniaga, trend bulanan dan suku tahunan — dan pada Max, perbandingan tahun ke tahun serta pengenalpastian potongan cukai. Eksport lejar sebagai CSV bila kewangan meminta.",
+        "checks": [
+          "Analisis peniaga dan jumlah kategori",
+          "Trend bulanan dan suku tahunan",
+          "Eksport CSV pada setiap pelan"
+        ],
+        "mock": {
+          "label": "Perbelanjaan Oktober",
+          "total": "RM 855.50",
+          "chartLabel": "Perbelanjaan Oktober mengikut kategori: Makanan RM 412.30, Perjalanan RM 289.00, Pejabat RM 154.20.",
+          "categories": [
+            {
+              "name": "Makanan",
+              "amount": "412.30",
+              "value": "RM 412.30"
+            },
+            {
+              "name": "Perjalanan",
+              "amount": "289.00",
+              "value": "RM 289.00"
+            },
+            {
+              "name": "Pejabat",
+              "amount": "154.20",
+              "value": "RM 154.20"
+            }
+          ],
+          "footLeft": "Trend bulanan · Oktober 2026",
+          "footRight": "Sedia CSV"
+        }
+      }
+    },
+    "platform": {
+      "eyebrow": "Platform",
+      "title": "Juga dalam kotak.",
+      "lede": "Kepingan kecil yang memastikan ruang kerja resit boleh digunakan pada petang Selasa, bukan hanya dalam siaran pelancaran.",
+      "items": [
+        {
+          "icon": "categories",
+          "title": "Kategori tersuai",
+          "description": "Bina carta akaun yang sudah digunakan oleh pasukan kewangan anda, kemudian biarkan resit jatuh ke dalamnya."
+        },
+        {
+          "icon": "storage",
+          "title": "Storan selamat",
+          "description": "Resit dan item baris tinggal bersama ruang kerja anda, bukan dalam pemacu kongsi atau peti masuk seseorang."
+        },
+        {
+          "icon": "notifications",
+          "title": "Pemberitahuan masa nyata",
+          "description": "Ketahui apabila resit masuk, kelompok selesai, atau medan memerlukan semakan kedua."
+        },
+        {
+          "icon": "mobile",
+          "title": "Mudah alih & PWA",
+          "description": "Pasang Mataresit pada skrin utama dan tangkap daripada baris gilir, bukan dari beg komputer riba."
+        },
+        {
+          "icon": "api",
+          "title": "Akses API",
+          "description": "Masukkan resit dan tarik data berstruktur keluar, pada Max, tanpa mengeksport hamparan dahulu."
+        },
+        {
+          "icon": "subscription",
+          "title": "Pengurusan langganan",
+          "description": "Tukar pelan atau tempoh pengebilan dari ruang kerja, tanpa urutan e-mel."
+        },
+        {
+          "icon": "help",
+          "title": "Pusat bantuan",
+          "description": "Panduan untuk persediaan, carian, tuntutan dan eksport — ditulis untuk orang yang membuat pemfailan."
+        },
+        {
+          "icon": "export",
+          "title": "Pilihan eksport",
+          "description": "Bawa lejar bersama anda sebagai CSV, termasuk item baris dan cukai yang ditangkap."
+        }
+      ]
+    },
+    "plans": {
+      "eyebrow": "Pelan",
+      "title": "Bacaan sama. Tiga saiz.",
+      "lede": "Setiap pelan termasuk pengekstrakan item baris, skor keyakinan, pengesanan berbilang mata wang dan eksport CSV. Bezanya ialah volum, alat pasukan dan kedalaman laporan.",
+      "cta": "Bandingkan pelan",
+      "facts": [
+        {
+          "name": "Percuma",
+          "price": "RM 0",
+          "note": "50 resit / bulan"
+        },
+        {
+          "name": "Pro",
+          "price": "RM 10 / bln",
+          "note": "500 resit / bulan"
+        },
+        {
+          "name": "Max",
+          "price": "RM 20 / bln",
+          "note": "Resit tanpa had"
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Bawa kotak kasut",
+      "title": "Bulan menutup sendiri.",
+      "lede": "Lepaskan resit bulan ini, semak apa yang tidak pasti, dan tutup buku dengan jejak di belakang setiap nombor.",
+      "workspace": "Buka ruang kerja",
+      "pricing": "Lihat harga"
+    }
   }
 }

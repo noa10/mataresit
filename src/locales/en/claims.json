@@ -50,7 +50,8 @@
       "approved": "Approved",
       "rejected": "Rejected",
       "paid": "Paid",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "under_review": "Under Review"
     },
     "filters": {
       "all": "All Claims",
@@ -76,7 +77,8 @@
       "currency": "Currency",
       "expenseDate": "Expense Date",
       "businessPurpose": "Business Purpose",
-      "notes": "Additional Notes"
+      "notes": "Additional Notes",
+      "priority": "Priority"
     },
     "placeholders": {
       "title": "Enter claim title",
@@ -133,7 +135,22 @@
       "approver": "Approver",
       "status": "Status",
       "businessPurpose": "Business Purpose",
-      "notes": "Notes"
+      "notes": "Notes",
+      "amount": "Amount",
+      "claimant": "Claimant",
+      "created": "Created",
+      "submitted": "Submitted",
+      "reviewed": "Reviewed",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "workflowTimeline": "Workflow Timeline",
+      "submittedOn": "Submitted: {{date}}",
+      "reviewedOn": "Reviewed: {{date}}",
+      "approvedOn": "Approved: {{date}}",
+      "rejectedReason": "Rejected: {{reason}}",
+      "onDate": "on {{date}}",
+      "reviewedBy": "Reviewed by: {{name}}",
+      "approvedBy": "Approved by: {{name}}"
     },
     "receipts": {
       "title": "Attached Receipts",
@@ -148,7 +165,52 @@
       "approved": "Claim approved",
       "rejected": "Claim rejected",
       "paid": "Claim paid",
-      "cancelled": "Claim cancelled"
+      "cancelled": "Claim cancelled",
+      "empty": "No activity recorded yet",
+      "emptyDialog": "No activity history available",
+      "loading": "Loading activity history...",
+      "by": "by {{name}}",
+      "statusChanged": "Status changed from {{from}} to {{to}}",
+      "actions": {
+        "created": "created",
+        "submitted": "submitted",
+        "reviewed": "reviewed",
+        "approved": "approved",
+        "rejected": "rejected",
+        "cancelled": "cancelled",
+        "updated": "updated",
+        "deleted": "deleted"
+      },
+      "comments": {
+        "created": "Claim created",
+        "submitted": "Claim submitted for review",
+        "approved": "Claim approved",
+        "rejected": "Claim rejected"
+      }
+    },
+    "description": "Claim details and workflow information",
+    "loading": "Loading claim details...",
+    "errorTitle": "Error Loading Claim",
+    "notFoundDescription": "The requested claim could not be found or you don't have permission to view it.",
+    "backToClaims": "Back to Claims",
+    "actions": {
+      "edit": "Edit",
+      "submit": "Submit for Review",
+      "reject": "Reject",
+      "approve": "Approve",
+      "close": "Close"
+    },
+    "attachments": {
+      "title": "Attachments",
+      "receiptFrom": "Receipt from {{merchant}}",
+      "unknownMerchant": "Unknown Merchant"
+    },
+    "workflow": {
+      "title": "Workflow Status",
+      "reviewedBy": "Reviewed by:",
+      "approvedBy": "Approved by:",
+      "rejectionReason": "Rejection Reason:",
+      "on": "on {{date}}"
     }
   },
   "approval": {
@@ -271,6 +333,133 @@
     "submissionFailed": "Failed to submit claim",
     "noTeamSelected": "No team selected",
     "createFailed": "Failed to create claim",
-    "approveFailed": "Failed to approve claim"
+    "approveFailed": "Failed to approve claim",
+    "loadHistoryFailed": "Failed to load claim history",
+    "loadReceiptsFailed": "Failed to load attached receipts",
+    "loadFailed": "Failed to load claim",
+    "differentTeam": "This claim belongs to a different team",
+    "rejectFailed": "Failed to reject claim"
+  },
+  "rejection": {
+    "title": "Reject Claim",
+    "subtitle": "Provide a reason for rejecting this expense claim. The claimant will be notified.",
+    "reasonLabel": "Rejection Reason *",
+    "reasonPlaceholder": "Please provide a clear reason for rejecting this claim...",
+    "reasonHint": "Be specific about why the claim is being rejected. This will help the claimant understand what needs to be corrected.",
+    "noticeTitle": "Rejection Notice",
+    "noticeMessage": "Rejecting this claim will notify the claimant via email and in-app notification. They may resubmit the claim after addressing the issues mentioned in your rejection reason.",
+    "actions": {
+      "cancel": "Cancel",
+      "reject": "Reject Claim",
+      "rejecting": "Rejecting..."
+    },
+    "validation": {
+      "min": "Rejection reason must be at least 10 characters",
+      "max": "Rejection reason must be less than 500 characters"
+    }
+  },
+  "edit": {
+    "title": "Edit Claim",
+    "subtitle": "Update the details of your expense claim. Only draft claims can be edited.",
+    "form": {
+      "title": "Title *",
+      "amount": "Amount *",
+      "currency": "Currency *",
+      "category": "Category",
+      "priority": "Priority",
+      "description": "Description"
+    },
+    "placeholders": {
+      "title": "Enter claim title",
+      "currency": "Select currency",
+      "category": "e.g., Travel, Meals, Office Supplies",
+      "priority": "Select priority",
+      "description": "Provide details about this expense claim..."
+    },
+    "descriptions": {
+      "category": "Optional expense category for better organization",
+      "description": "Optional description to provide more context about the expense"
+    },
+    "validation": {
+      "titleMin": "Title must be at least 3 characters",
+      "titleMax": "Title must be less than 255 characters",
+      "amountMin": "Amount must be greater than 0",
+      "currency": "Currency is required"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "update": "Update Claim",
+      "updating": "Updating..."
+    },
+    "notifications": {
+      "updated": "Claim updated successfully"
+    },
+    "errors": {
+      "updateFailed": "Failed to update claim"
+    }
+  },
+  "receiptPreview": {
+    "attachedCount": "Attached Receipts ({{count}})",
+    "viewFullImage": "View full image",
+    "removeReceipt": "Remove receipt",
+    "viewDetails": "View Details",
+    "receiptFrom": "Receipt from {{merchant}}",
+    "merchant": "Merchant",
+    "date": "Date",
+    "total": "Total",
+    "tax": "Tax",
+    "status": "Status",
+    "paymentMethod": "Payment Method",
+    "unknownMerchant": "Unknown Merchant",
+    "imageUnavailable": "Receipt image unavailable"
+  },
+  "receiptStatus": {
+    "unreviewed": "Unreviewed",
+    "reviewed": "Reviewed",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "processing": "Processing",
+    "failed": "Failed"
+  },
+  "claimFromReceipt": {
+    "button": "Create Claim",
+    "title": "Create Claim from Receipt",
+    "subtitle": "Review the receipt details that will be used to create your claim.",
+    "receiptDetails": "Receipt Details",
+    "merchant": "Merchant:",
+    "date": "Date:",
+    "amount": "Amount:",
+    "payment": "Payment:",
+    "claimPreview": "Claim to be Created",
+    "titleLabel": "Title:",
+    "categoryLabel": "Category:",
+    "attachmentsLabel": "Attachments:",
+    "oneReceipt": "1 receipt",
+    "untitled": "Expense - {{merchant}}",
+    "generalCategory": "General",
+    "cancel": "Cancel",
+    "description": "Expense claim for {{merchant}} on {{date}}"
+  },
+  "receiptPicker": {
+    "selectReceipts": "Select Receipts",
+    "selectedCount": "{{count}} selected",
+    "clear": "Clear",
+    "searchPlaceholder": "Search receipts by merchant, amount, or date...",
+    "status": "Status",
+    "allStatus": "All Status",
+    "unreviewed": "Unreviewed",
+    "reviewed": "Reviewed",
+    "approved": "Approved",
+    "dateRange": "Date Range",
+    "allTime": "All Time",
+    "lastWeek": "Last Week",
+    "lastMonth": "Last Month",
+    "lastQuarter": "Last Quarter",
+    "noReceipts": "No receipts found",
+    "adjustFilters": "Try adjusting your search or filters",
+    "usedInClaim": "Used in Claim",
+    "usedIn": "Used in:",
+    "loadingReceipts": "Loading receipts...",
+    "checkingUsage": "Checking usage..."
   }
 }

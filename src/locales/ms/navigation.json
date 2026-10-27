@@ -5,6 +5,9 @@
   },
   "mainMenu": {
     "dashboard": "Papan Pemuka",
+    "overview": "Gambaran keseluruhan",
+    "receipts": "Resit",
+    "review": "Perlu semakan",
     "leaderboard": "Papan pendahulu",
     "missions": "Misi & Ganjaran",
     "search": "Carian",
@@ -21,7 +24,8 @@
     "features": "Ciri-ciri",
     "blog": "Blog",
     "status": "Status",
-    "resources": "Sumber"
+    "resources": "Sumber",
+    "aiSearch": "Carian AI"
   },
   "userMenu": {
     "profile": "Profil",
@@ -35,9 +39,23 @@
   },
   "sidebar": {
     "navigation": "Navigasi",
+    "groups": {
+      "workspace": "Ruang kerja",
+      "tools": "Alatan",
+      "rewards": "Ganjaran",
+      "account": "Akaun"
+    },
+    "backToSite": "Kembali ke laman",
+    "personalWorkspace": "Ruang kerja peribadi",
     "collapse": "Kuncup",
     "expand": "Kembang",
     "close": "Tutup"
+  },
+  "selector": {
+    "switchWorkspace": "Tukar ruang kerja",
+    "personalWorkspace": "Ruang kerja peribadi",
+    "teams": "Pasukan",
+    "currentRole": "Log masuk sebagai {{role}}"
   },
   "breadcrumbs": {
     "home": "Laman Utama",
@@ -102,7 +120,19 @@
         "active": "Misi aktif",
         "completed": "Selesai",
         "rewards": "XP tersedia"
-      }
+      },
+      "eyebrow": "Ganjaran — Minggu ini",
+      "leaderboard": "Papan pendahulu",
+      "scanStreak": "Rentetan imbasan",
+      "scanStreakValue": "{{count}} hari",
+      "availableXp": "XP tersedia",
+      "reset": "Set semula {{date}}",
+      "noMissions": "Tiada misi dalam tetingkap ini",
+      "noMissionsLede": "Misi baharu muncul apabila kalendar ganjaran berubah.",
+      "claimed": "dituntut",
+      "title": "Misi & Ganjaran",
+      "scanStreakValue_one": "{{count}} hari",
+      "scanStreakValue_other": "{{count}} hari"
     },
     "leaderboard": {
       "privacyBadge": "Kedudukan peka privasi",
@@ -146,7 +176,14 @@
           "label": "Jumlah boleh ditolak",
           "description": "Jumlah boleh ditolak semasa yang dijejaki dalam profil ganjaran anda."
         }
-      }
+      },
+      "eyebrow": "Ganjaran — Papan pendahulu",
+      "weekOf": "Minggu {{date}}",
+      "optedIn": "Menyertai",
+      "podiumNote": "Tiga teratas minggu ini",
+      "anonymousNote": "Mod anonim menyembunyikan nama peribadi. Urus privasi ganjaran dalam Tetapan.",
+      "retry": "Cuba lagi",
+      "tableNote": "Hanya ahli yang menyertai dipaparkan"
     }
   }
 }

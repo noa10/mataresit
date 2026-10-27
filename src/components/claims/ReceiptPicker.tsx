@@ -18,6 +18,7 @@ import { checkReceiptClaimUsage, ReceiptClaimUsage } from '@/services/receiptCla
 import { formatCurrencySafe } from '@/utils/currency';
 import { getFormattedImageUrlSync } from '@/utils/imageUtils';
 import { useQuery } from '@tanstack/react-query';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 
 interface ReceiptPickerProps {
   selectedReceiptIds: string[];
@@ -45,6 +46,8 @@ export function ReceiptPicker({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [showUsedReceipts, setShowUsedReceipts] = useState(false);
+  const { t, language } = useClaimsTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 
   // Fetch receipts
   const { data: receipts = [], isLoading } = useQuery({
@@ -158,7 +161,7 @@ export function ReceiptPicker({
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         <span className="ml-2 text-sm text-muted-foreground">
-          {isLoading ? 'Loading receipts...' : 'Checking usage...'}
+          {isLoading ? t('receiptPicker.loadingReceipts') : t('receiptPicker.checkingUsage')}
         </span>
       </div>
     );
@@ -179,17 +182,17 @@ export function ReceiptPicker({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Receipt className="h-5 w-5" />
-          <h3 className="font-medium">Select Receipts</h3>
+          <h3 className="font-medium">{t('receiptPicker.selectReceipts')}</h3>
           {selectedReceiptIds.length > 0 && (
             <Badge variant="secondary">
-              {selectedReceiptIds.length} selected
+              {t('receiptPicker.selectedCount', { count: selectedReceiptIds.length })}
             </Badge>
           )}
         </div>
         {selectedReceiptIds.length > 0 && (
           <Button variant="ghost" size="sm" onClick={clearSelection}>
             <X className="h-4 w-4 mr-1" />
-            Clear
+            {t('receiptPicker.clear')}
           </Button>
         )}
       </div>
@@ -199,7 +202,7 @@ export function ReceiptPicker({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search receipts by merchant, amount, or date..."
+            placeholder={t('receiptPicker.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -209,25 +212,25 @@ export function ReceiptPicker({
         <div className="flex flex-col sm:flex-row gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t('receiptPicker.status')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="unreviewed">Unreviewed</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="all">{t('receiptPicker.allStatus')}</SelectItem>
+              <SelectItem value="unreviewed">{t('receiptPicker.unreviewed')}</SelectItem>
+              <SelectItem value="reviewed">{t('receiptPicker.reviewed')}</SelectItem>
+              <SelectItem value="approved">{t('receiptPicker.approved')}</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Date Range" />
+              <SelectValue placeholder={t('receiptPicker.dateRange')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="week">Last Week</SelectItem>
-              <SelectItem value="month">Last Month</SelectItem>
-              <SelectItem value="quarter">Last Quarter</SelectItem>
+              <SelectItem value="all">{t('receiptPicker.allTime')}</SelectItem>
+              <SelectItem value="week">{t('receiptPicker.lastWeek')}</SelectItem>
+              <SelectItem value="month">{t('receiptPicker.lastMonth')}</SelectItem>
+              <SelectItem value="quarter">{t('receiptPicker.lastQuarter')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -244,6 +247,7 @@ export function ReceiptPicker({
                 isSelected={selectedReceiptIds.includes(receipt.id)}
                 onToggle={() => handleReceiptToggle(receipt.id)}
                 multiSelect={multiSelect}
+                dateLocale={dateLocale}
               />
             ))}
           </AnimatePresence>
@@ -251,8 +255,8 @@ export function ReceiptPicker({
           {filteredReceipts.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Receipt className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No receipts found</p>
-              <p className="text-sm">Try adjusting your search or filters</p>
+              <p>{t('receiptPicker.noReceipts')}</p>
+              <p className="text-sm">{t('receiptPicker.adjustFilters')}</p>
             </div>
           )}
         </div>
@@ -266,9 +270,11 @@ interface ReceiptPickerItemProps {
   isSelected: boolean;
   onToggle: () => void;
   multiSelect: boolean;
+  dateLocale: string;
 }
 
-function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect }: ReceiptPickerItemProps) {
+function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect, dateLocale }: ReceiptPickerItemProps) {
+  const { t } = useClaimsTranslation();
   const [imageUrl, setImageUrl] = useState<string>('/placeholder.svg');
 
   useEffect(() => {
@@ -327,7 +333,7 @@ function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect }: Recei
       <div className="flex-shrink-0">
         <img
           src={imageUrl}
-          alt={`Receipt from ${receipt.merchant}`}
+          alt={t('receiptPreview.receiptFrom', { merchant: receipt.merchant })}
           className="w-12 h-12 object-cover rounded border"
           onError={() => setImageUrl('/placeholder.svg')}
         />
@@ -339,11 +345,11 @@ function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect }: Recei
           <Building2 className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium truncate">{receipt.merchant}</span>
           <Badge variant="outline" className="text-xs">
-            {receipt.status}
+            {t(`receiptStatus.${receipt.status}`)}
           </Badge>
           {receipt.isUsedInClaim && (
             <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-              Used in Claim
+              {t('receiptPicker.usedInClaim')}
             </Badge>
           )}
         </div>
@@ -351,7 +357,7 @@ function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect }: Recei
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            <span>{new Date(receipt.date).toLocaleDateString()}</span>
+            <span>{new Date(receipt.date).toLocaleDateString(dateLocale)}</span>
           </div>
           <div className="flex items-center gap-1">
             <DollarSign className="h-3 w-3" />
@@ -362,10 +368,10 @@ function ReceiptPickerItem({ receipt, isSelected, onToggle, multiSelect }: Recei
         {/* Show claim info if used */}
         {receipt.isUsedInClaim && receipt.claimTitle && (
           <div className="mt-2 text-xs text-muted-foreground">
-            Used in: <span className="font-medium">{receipt.claimTitle}</span>
+            {t('receiptPicker.usedIn')} <span className="font-medium">{receipt.claimTitle}</span>
             {receipt.claimStatus && (
               <Badge variant="outline" className="ml-1 text-xs">
-                {receipt.claimStatus}
+                {t(`list.status.${receipt.claimStatus}`)}
               </Badge>
             )}
           </div>

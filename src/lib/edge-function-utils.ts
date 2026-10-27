@@ -22,7 +22,8 @@ export async function callEdgeFunction<T = any>(
   body?: any,
   queryParams?: Record<string, string>,
   retries: number = 2, // Add retries parameter with default of 2 retries
-  timeout: number = 60000 // Increased timeout to 60 seconds for complex search operations
+  timeout: number = 60000, // Increased timeout to 60 seconds for complex search operations
+  signal?: AbortSignal
 ): Promise<T> {
   try {
     // Get the session for the current user to include the auth token
@@ -95,6 +96,11 @@ export async function callEdgeFunction<T = any>(
 
     // Create an AbortController for timeout handling
     const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
@@ -183,8 +189,14 @@ export async function callEdgeFunction<T = any>(
     } finally {
       // Ensure timeout is cleared in all cases
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', onExternalAbort);
     }
   } catch (error) {
+    // A caller-triggered abort is not a timeout and must not be retried.
+    if (error.name === 'AbortError' && signal?.aborted) {
+      throw new Error('Search cancelled');
+    }
+
     // Check if this was a timeout
     if (error.name === 'AbortError') {
       console.error(`Edge function ${functionName} call timed out after ${timeout}ms`);
@@ -192,7 +204,7 @@ export async function callEdgeFunction<T = any>(
       // If we have retries left, try again
       if (retries > 0) {
         console.log(`Retrying edge function ${functionName} call (${retries} retries left)...`);
-        return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout);
+        return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout, signal);
       }
 
       throw new Error(`Edge function ${functionName} call timed out after ${timeout}ms and ${2 - retries} retries`);
@@ -223,7 +235,7 @@ export async function callEdgeFunction<T = any>(
         console.log(`Retrying after network error for ${functionName} (${retries} retries left)...`);
         // Add a short delay before retrying to allow any temporary network issues to resolve
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout);
+        return callEdgeFunction(functionName, method, body, queryParams, retries - 1, timeout, signal);
       }
 
       // Create a more informative error

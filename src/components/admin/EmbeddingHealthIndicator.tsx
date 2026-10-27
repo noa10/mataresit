@@ -6,6 +6,7 @@
 import React from 'react';
 import { CheckCircle, AlertTriangle, XCircle, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingHealthIndicatorProps {
   status: 'healthy' | 'warning' | 'error' | 'unknown';
@@ -20,6 +21,7 @@ export function EmbeddingHealthIndicator({
   showLabel = false,
   className 
 }: EmbeddingHealthIndicatorProps) {
+  const { t } = useAdminTranslation();
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -27,7 +29,7 @@ export function EmbeddingHealthIndicator({
           icon: CheckCircle,
           color: 'text-green-500 dark:text-green-400',
           bgColor: 'bg-green-100 dark:bg-green-950/30',
-          label: 'Healthy',
+          label: t('embeddingMetrics.common.healthy'),
           pulse: false
         };
       case 'warning':
@@ -35,7 +37,7 @@ export function EmbeddingHealthIndicator({
           icon: AlertTriangle,
           color: 'text-yellow-500 dark:text-yellow-400',
           bgColor: 'bg-yellow-100 dark:bg-yellow-950/30',
-          label: 'Warning',
+          label: t('embeddingMetrics.common.warning'),
           pulse: true
         };
       case 'error':
@@ -43,7 +45,7 @@ export function EmbeddingHealthIndicator({
           icon: XCircle,
           color: 'text-red-500 dark:text-red-400',
           bgColor: 'bg-red-100 dark:bg-red-950/30',
-          label: 'Error',
+          label: t('embeddingMetrics.common.error'),
           pulse: true
         };
       default:
@@ -51,7 +53,7 @@ export function EmbeddingHealthIndicator({
           icon: Activity,
           color: 'text-gray-500 dark:text-gray-400',
           bgColor: 'bg-gray-100 dark:bg-gray-950/30',
-          label: 'Unknown',
+          label: t('embeddingMetrics.common.unknown'),
           pulse: false
         };
     }

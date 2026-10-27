@@ -128,7 +128,7 @@ export function BatchUploadDemo({ className }: BatchUploadDemoProps) {
     id: 'upload-1',
     file: new File([''], 'receipt-example.jpg', { type: 'image/jpeg' }),
     status: 'processing' as const,
-    progress: 75,
+    uploadProgress: 75,
     error: null,
     processingStartedAt: new Date(Date.now() - 60000)
   };
@@ -273,7 +273,7 @@ export function BatchUploadDemo({ className }: BatchUploadDemoProps) {
                   ...mockUpload,
                   id: 'upload-2',
                   status: 'completed',
-                  progress: 100,
+                  uploadProgress: 100,
                   file: new File([''], 'receipt-completed.pdf', { type: 'application/pdf' })
                 }}
                 receiptId="receipt-124"
@@ -298,7 +298,7 @@ export function BatchUploadDemo({ className }: BatchUploadDemoProps) {
                   ...mockUpload,
                   id: 'upload-3',
                   status: 'error',
-                  progress: 0,
+                  uploadProgress: 0,
                   error: { code: 'PROCESSING_ERROR', message: 'Failed to process receipt - invalid format' },
                   file: new File([''], 'receipt-failed.jpg', { type: 'image/jpeg' })
                 }}

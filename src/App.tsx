@@ -44,7 +44,9 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 const AuthDebugPage = lazy(() => import("./pages/AuthDebugPage"));
 
 // Lazy load heavy components for better performance
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+const OverviewPage = lazy(() => import("./pages/OverviewPage"));
+const ReviewQueuePage = lazy(() => import("./pages/ReviewQueuePage"));
+const ReceiptsPage = lazy(() => import("./pages/ReceiptsPage"));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
 const MissionsPage = lazy(() => import("./pages/MissionsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -63,7 +65,7 @@ const BlogManagement = lazy(() => import("./pages/admin/BlogManagement"));
 const ViewReceipt = lazy(() => import("./pages/ViewReceipt"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage"));
-const SemanticSearch = lazy(() => import("./pages/SemanticSearch"));
+const AISearchPage = lazy(() => import("./pages/AISearchPage"));
 const UnifiedSearchPage = lazy(() => import("./pages/UnifiedSearchPage"));
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -138,24 +140,51 @@ const App = () => (
                                     {/* Debug info disabled - uncomment to enable: <MobileDebugInfo /> */}
                                     <BrowserRouter>
                                       <Routes>
+                                      {/* Marketing pages render their own header and footer */}
+                                      <Route path="/" element={<Index />} />
+                                      <Route path="/features" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <FeaturesPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/pricing" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <PricingPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/help" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <HelpCenter />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/docs" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <NewDocumentationPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/api-reference" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <ApiReferencePage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/status" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <StatusPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/blog" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <BlogIndexPage />
+                                        </Suspense>
+                                      } />
+                                      <Route path="/blog/:slug" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <BlogPostPage />
+                                        </Suspense>
+                                      } />
+
                                       {/* Public Routes with Layout */}
                                       <Route element={<PublicLayout />}>
-                                        <Route path="/" element={<Index />} />
-                                        <Route path="/pricing" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <PricingPage />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/help" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <HelpCenter />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/docs" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <NewDocumentationPage />
-                                          </Suspense>
-                                        } />
                                         <Route path="/docs/guide/:guideId" element={
                                           <Suspense fallback={<PageLoading />}>
                                             <GuideDetailPage />
@@ -166,34 +195,9 @@ const App = () => (
                                             <DocumentationPage />
                                           </Suspense>
                                         } />
-                                        <Route path="/api-reference" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <ApiReferencePage />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/status" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <StatusPage />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/blog" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <BlogIndexPage />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/blog/:slug" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <BlogPostPage />
-                                          </Suspense>
-                                        } />
                                         <Route path="/payment-success" element={
                                           <Suspense fallback={<PageLoading />}>
                                             <PaymentSuccessPage />
-                                          </Suspense>
-                                        } />
-                                        <Route path="/features" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <FeaturesPage />
                                           </Suspense>
                                         } />
                                         <Route path="/privacy-policy" element={
@@ -232,7 +236,17 @@ const App = () => (
                                         <Route element={<AppLayout />}>
                                           <Route path="/dashboard" element={
                                             <Suspense fallback={<PageLoading />}>
-                                              <Dashboard />
+                                              <OverviewPage />
+                                            </Suspense>
+                                          } />
+                                          <Route path="/receipts" element={
+                                            <Suspense fallback={<PageLoading />}>
+                                              <ReceiptsPage />
+                                            </Suspense>
+                                          } />
+                                          <Route path="/review" element={
+                                            <Suspense fallback={<PageLoading />}>
+                                              <ReviewQueuePage />
                                             </Suspense>
                                           } />
                                           <Route path="/leaderboard" element={
@@ -245,12 +259,13 @@ const App = () => (
                                               <MissionsPage />
                                             </Suspense>
                                           } />
-                                          <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
+                                          <Route path="/upload" element={<Navigate to="/receipts" replace />} />
                                           <Route path="/settings" element={
                                             <Suspense fallback={<PageLoading />}>
                                               <SettingsPage />
                                             </Suspense>
                                           } />
+                                          <Route path="/settings/advanced" element={<Navigate to="/settings" replace />} />
                                           <Route path="/account/billing" element={<Navigate to="/settings?tab=billing" replace />} />
                                           <Route path="/performance-test" element={
                                             <Suspense fallback={<PageLoading />}>
@@ -272,14 +287,16 @@ const App = () => (
                                               <Profile />
                                             </Suspense>
                                           } />
+                                          <Route path="/profile/advanced" element={<Navigate to="/profile" replace />} />
                                           <Route path="/analysis" element={
                                             <Suspense fallback={<PageLoading />}>
                                               <AnalysisPage />
                                             </Suspense>
                                           } />
+                                          <Route path="/analysis/advanced" element={<Navigate to="/analysis" replace />} />
                                           <Route path="/search" element={
                                             <Suspense fallback={<PageLoading />}>
-                                              <SemanticSearch />
+                                              <AISearchPage />
                                             </Suspense>
                                           } />
                                           <Route path="/unified-search" element={

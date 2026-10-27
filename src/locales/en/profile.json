@@ -74,7 +74,33 @@
     "managePlan": "Manage Plan",
     "unableToLoad": "Unable to load subscription information.",
     "currentPlan": "Current Plan",
-    "planName": "{{tier}} Plan"
+    "planName": "{{tier}} Plan",
+    "receiptsThisMonth": "Receipts this month",
+    "resetsOn": "Resets on {{date}}",
+    "planFeatures": "Plan Features",
+    "monthlyReceipts": "Monthly Receipts",
+    "storage": "Storage",
+    "dataRetention": "Data Retention",
+    "batchUpload": "Batch Upload",
+    "unlimited": "Unlimited",
+    "na": "N/A",
+    "forever": "Forever",
+    "days": "{{count}} days",
+    "files": "{{count}} files",
+    "started": "Started",
+    "renews": "Renews",
+    "trialEnds": "Trial Ends",
+    "status": "Status:",
+    "statuses": {
+      "active": "Active",
+      "trialing": "Trialing",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "incomplete": "Incomplete",
+      "incomplete_expired": "Expired",
+      "unpaid": "Unpaid",
+      "free": "Free"
+    }
   },
   "settings": {
     "security": {
@@ -125,16 +151,73 @@
       "unlocked": "Unlocked",
       "locked": "Locked",
       "catalog": {
-        "first_scan": { "name": "First scan", "description": "Complete your first successful scan." },
-        "night_owl": { "name": "Night owl", "description": "Log a qualifying scan during the late-night window." },
-        "early_bird": { "name": "Early bird", "description": "Start your day with an early successful scan." },
-        "seven_day_streak": { "name": "7-day streak", "description": "Maintain a seven-day login or scan streak." },
-        "thirty_day_streak": { "name": "30-day streak", "description": "Stay consistent long enough to hit a full month streak." },
-        "referral_starter": { "name": "Referral starter", "description": "Invite your first friend who completes sign-up." },
-        "referral_champion": { "name": "Referral champion", "description": "Rack up multiple successful referrals." },
-        "power_scanner": { "name": "Power scanner", "description": "Reach a major receipt-scanning milestone." },
-        "receipt_historian": { "name": "Receipt historian", "description": "Build a rich archive of organized receipts." },
-        "community_helper": { "name": "Community helper", "description": "Contribute to referral and engagement milestones." }
+        "first_scan": {
+          "name": "First scan",
+          "description": "Complete your first successful scan."
+        },
+        "night_owl": {
+          "name": "Night owl",
+          "description": "Log a qualifying scan during the late-night window."
+        },
+        "early_bird": {
+          "name": "Early bird",
+          "description": "Start your day with an early successful scan."
+        },
+        "seven_day_streak": {
+          "name": "7-day streak",
+          "description": "Maintain a seven-day login or scan streak."
+        },
+        "thirty_day_streak": {
+          "name": "30-day streak",
+          "description": "Stay consistent long enough to hit a full month streak."
+        },
+        "referral_starter": {
+          "name": "Referral starter",
+          "description": "Invite your first friend who completes sign-up."
+        },
+        "referral_champion": {
+          "name": "Referral champion",
+          "description": "Rack up multiple successful referrals."
+        },
+        "power_scanner": {
+          "name": "Power scanner",
+          "description": "Reach a major receipt-scanning milestone."
+        },
+        "receipt_historian": {
+          "name": "Receipt historian",
+          "description": "Build a rich archive of organized receipts."
+        },
+        "community_helper": {
+          "name": "Community helper",
+          "description": "Contribute to referral and engagement milestones."
+        },
+        "scanner_pro_100": {
+          "name": "Scanner Pro"
+        },
+        "receipt_marathon_30": {
+          "name": "Receipt Marathon"
+        },
+        "level_5": {
+          "name": "Level 5"
+        },
+        "level_10": {
+          "name": "Level 10"
+        },
+        "tax_saver_10": {
+          "name": "Tax Saver"
+        },
+        "tax_warrior_7": {
+          "name": "Tax Warrior"
+        },
+        "malaysia_tax_hero_5000": {
+          "name": "Malaysia Tax Hero"
+        },
+        "mission_master": {
+          "name": "Mission Master"
+        },
+        "recruiter": {
+          "name": "Recruiter"
+        }
       }
     },
     "themes": {
@@ -144,10 +227,22 @@
       "unlocked": "Unlocked",
       "locked": "Locked",
       "options": {
-        "default": { "title": "Classic", "description": "The familiar scanner look available from day one." },
-        "ocean": { "title": "Ocean", "description": "A cool blue theme for focused scanning sessions." },
-        "forest": { "title": "Forest", "description": "A calm green theme earned through sustained streaks." },
-        "sunset": { "title": "Sunset", "description": "A warm premium look reserved for higher progression." }
+        "default": {
+          "title": "Classic",
+          "description": "The familiar scanner look available from day one."
+        },
+        "ocean": {
+          "title": "Ocean",
+          "description": "A cool blue theme for focused scanning sessions."
+        },
+        "forest": {
+          "title": "Forest",
+          "description": "A calm green theme earned through sustained streaks."
+        },
+        "sunset": {
+          "title": "Sunset",
+          "description": "A warm premium look reserved for higher progression."
+        }
       }
     },
     "privacy": {
@@ -210,5 +305,34 @@
   "signOutSuccess": {
     "title": "Signed out successfully",
     "description": "You have been signed out of your account."
+  },
+  "account": {
+    "googleAccount": "Google Account",
+    "googleAccountDescription": "You signed in with Google. Manage your password in your Google account.",
+    "googleSecurity": "Google Security",
+    "activeSessions": "Active Sessions",
+    "activeSessionsDescription": "Sign out from all devices and sessions",
+    "signOutEverywhere": "Sign Out Everywhere",
+    "dangerZone": "Danger Zone",
+    "deleteAccount": "Delete Account",
+    "deleteAccountDescription": "Permanently delete your account and all associated data. This action cannot be undone.",
+    "processing": "Processing...",
+    "deletionRequested": "Account deletion requested",
+    "deletionRequestedDescription": "Your account deletion request has been submitted. You will receive an email with further instructions.",
+    "deletionFailed": "Deletion request failed",
+    "deletionFailedDescription": "Failed to process account deletion request. Please try again.",
+    "deletionUnexpected": "An unexpected error occurred. Please try again.",
+    "confirmTitle": "Are you absolutely sure?",
+    "confirmDescription": "This action cannot be undone. This will permanently delete your account and remove all your data from our servers.",
+    "confirmIncludes": "This includes:",
+    "includeReceipts": "All uploaded receipts and documents",
+    "includeHistory": "Processing history and AI analysis",
+    "includeTeams": "Team memberships and claims",
+    "includeSettings": "Account settings and preferences",
+    "includeBilling": "Subscription and billing information",
+    "cancel": "Cancel",
+    "confirmDelete": "Delete Account",
+    "deleting": "Deleting...",
+    "confirmDeleteAction": "Yes, delete my account"
   }
 }

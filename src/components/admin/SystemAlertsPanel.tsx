@@ -29,6 +29,7 @@ import {
   getMutedTextClasses,
   getEmphasisTextClasses
 } from '@/lib/darkModeUtils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 export interface SystemAlert {
   id: string;
@@ -51,6 +52,7 @@ export function SystemAlertsPanel({
   className, 
   maxAlerts = 50 
 }: SystemAlertsPanelProps) {
+  const { t, language } = useAdminTranslation();
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [filter, setFilter] = useState<'all' | 'unresolved' | 'critical'>('unresolved');
   const [isAlertsEnabled, setIsAlertsEnabled] = useState(true);
@@ -61,8 +63,8 @@ export function SystemAlertsPanel({
       {
         id: '1',
         type: 'warning',
-        title: 'Database Response Time Elevated',
-        message: 'Database queries are taking longer than usual (avg: 2.5s)',
+        title: 'embeddingMetrics.alerts.mock.databaseSlow.title',
+        message: 'embeddingMetrics.alerts.mock.databaseSlow.message',
         component: 'database',
         timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
         acknowledged: false,
@@ -72,8 +74,8 @@ export function SystemAlertsPanel({
       {
         id: '2',
         type: 'info',
-        title: 'Embedding Tables Not Found',
-        message: 'Embedding metrics tables are not yet deployed',
+        title: 'embeddingMetrics.alerts.mock.tablesMissing.title',
+        message: 'embeddingMetrics.alerts.mock.tablesMissing.message',
         component: 'embedding_tables',
         timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
         acknowledged: true,
@@ -83,8 +85,8 @@ export function SystemAlertsPanel({
       {
         id: '3',
         type: 'success',
-        title: 'Cache System Optimized',
-        message: 'Cache hit rate improved to 95.2%',
+        title: 'embeddingMetrics.alerts.mock.cacheOptimized.title',
+        message: 'embeddingMetrics.alerts.mock.cacheOptimized.message',
         component: 'cache_system',
         timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
         acknowledged: true,
@@ -94,8 +96,8 @@ export function SystemAlertsPanel({
       {
         id: '4',
         type: 'warning',
-        title: 'Aggregation Functions Missing',
-        message: 'Supabase functions for metrics aggregation are not deployed',
+        title: 'embeddingMetrics.alerts.mock.functionsMissing.title',
+        message: 'embeddingMetrics.alerts.mock.functionsMissing.message',
         component: 'aggregation_functions',
         timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
         acknowledged: false,
@@ -105,8 +107,8 @@ export function SystemAlertsPanel({
       {
         id: '5',
         type: 'info',
-        title: 'Health Monitoring Started',
-        message: 'System health monitoring is now active',
+        title: 'embeddingMetrics.alerts.mock.monitoringStarted.title',
+        message: 'embeddingMetrics.alerts.mock.monitoringStarted.message',
         component: 'health_monitor',
         timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         acknowledged: true,
@@ -137,10 +139,12 @@ export function SystemAlertsPanel({
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return time.toLocaleDateString();
+    if (diffMins < 1) return t('embeddingMetrics.common.justNow');
+    if (diffMins < 60)
+      return t('embeddingMetrics.common.minutesAgo', { count: diffMins });
+    if (diffHours < 24)
+      return t('embeddingMetrics.common.hoursAgo', { count: diffHours });
+    return time.toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-MY');
   };
 
   const filteredAlerts = alerts.filter(alert => {
@@ -180,7 +184,7 @@ export function SystemAlertsPanel({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            System Alerts
+            {t('embeddingMetrics.alerts.title')}
             {unacknowledgedCount > 0 && (
               <Badge variant="destructive" className="ml-2">
                 {unacknowledgedCount}
@@ -215,21 +219,23 @@ export function SystemAlertsPanel({
             size="sm"
             onClick={() => setFilter('all')}
           >
-            All ({alerts.length})
+            {t('embeddingMetrics.alerts.all', { count: alerts.length })}
           </Button>
           <Button
             variant={filter === 'unresolved' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilter('unresolved')}
           >
-            Unresolved ({alerts.filter(a => !a.resolved).length})
+            {t('embeddingMetrics.alerts.unresolved', {
+              count: alerts.filter(a => !a.resolved).length,
+            })}
           </Button>
           <Button
             variant={filter === 'critical' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilter('critical')}
           >
-            Critical ({criticalCount})
+            {t('embeddingMetrics.alerts.critical', { count: criticalCount })}
           </Button>
         </div>
 
@@ -239,11 +245,13 @@ export function SystemAlertsPanel({
             {filteredAlerts.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle className="h-12 w-12 mx-auto text-green-600 dark:text-green-400 mb-4" />
-                <p className={getEmphasisTextClasses()}>No alerts to display</p>
+                <p className={getEmphasisTextClasses()}>{t('embeddingMetrics.alerts.noAlerts')}</p>
                 <p className={getMutedTextClasses("text-sm")}>
-                  {filter === 'all' ? 'System is running smoothly' :
-                   filter === 'critical' ? 'No critical issues detected' :
-                   'All issues have been resolved'}
+                  {filter === 'all'
+                    ? t('embeddingMetrics.alerts.systemRunningSmoothly')
+                    : filter === 'critical'
+                      ? t('embeddingMetrics.alerts.noCriticalIssues')
+                      : t('embeddingMetrics.alerts.allIssuesResolved')}
                 </p>
               </div>
             ) : (
@@ -267,28 +275,34 @@ export function SystemAlertsPanel({
                       {getAlertIcon(alert.type)}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium text-sm">{alert.title}</h4>
+                          <h4 className="font-medium text-sm">
+                            {t(alert.title, { defaultValue: alert.title })}
+                          </h4>
                           <Badge variant="outline" className="text-xs">
-                            {alert.component}
+                            {t(`embeddingMetrics.healthDashboard.components.${alert.component}`, {
+                              defaultValue: alert.component,
+                            })}
                           </Badge>
                           {alert.acknowledged && (
                             <Badge variant="secondary" className="text-xs">
-                              Acknowledged
+                              {t('embeddingMetrics.alerts.acknowledged')}
                             </Badge>
                           )}
                           {alert.resolved && (
                             <Badge variant="default" className="text-xs bg-green-600">
-                              Resolved
+                              {t('embeddingMetrics.alerts.resolved')}
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm mb-2">{alert.message}</p>
+                        <p className="text-sm mb-2">
+                          {t(alert.message, { defaultValue: alert.message })}
+                        </p>
                         <p className="text-xs opacity-75">{formatTimeAgo(alert.timestamp)}</p>
                         
                         {alert.details && (
                           <details className="mt-2">
                             <summary className="text-xs cursor-pointer opacity-75 hover:opacity-100">
-                              View Details
+                              {t('embeddingMetrics.common.viewDetails')}
                             </summary>
                             <pre className="text-xs bg-black/10 p-2 rounded mt-1 overflow-auto">
                               {JSON.stringify(alert.details, null, 2)}
@@ -305,7 +319,7 @@ export function SystemAlertsPanel({
                           size="sm"
                           onClick={() => acknowledgeAlert(alert.id)}
                           className="h-8 w-8 p-0"
-                          title="Acknowledge"
+                          title={t('embeddingMetrics.alerts.acknowledge')}
                         >
                           <CheckCircle className="h-3 w-3" />
                         </Button>
@@ -316,7 +330,7 @@ export function SystemAlertsPanel({
                           size="sm"
                           onClick={() => resolveAlert(alert.id)}
                           className="h-8 w-8 p-0"
-                          title="Mark as Resolved"
+                          title={t('embeddingMetrics.alerts.markResolved')}
                         >
                           <Archive className="h-3 w-3" />
                         </Button>
@@ -326,7 +340,7 @@ export function SystemAlertsPanel({
                         size="sm"
                         onClick={() => dismissAlert(alert.id)}
                         className="h-8 w-8 p-0"
-                        title="Dismiss"
+                        title={t('embeddingMetrics.alerts.dismiss')}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -345,25 +359,25 @@ export function SystemAlertsPanel({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">{criticalCount}</p>
-                <p className="text-xs text-muted-foreground">Critical</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.alerts.criticalLabel')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                   {alerts.filter(a => a.type === 'warning' && !a.resolved).length}
                 </p>
-                <p className="text-xs text-muted-foreground">Warnings</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.alerts.warnings')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {alerts.filter(a => a.type === 'info' && !a.resolved).length}
                 </p>
-                <p className="text-xs text-muted-foreground">Info</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.alerts.info')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {alerts.filter(a => a.resolved).length}
                 </p>
-                <p className="text-xs text-muted-foreground">Resolved</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.alerts.resolved')}</p>
               </div>
             </div>
           </div>

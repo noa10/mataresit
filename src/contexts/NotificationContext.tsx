@@ -4,6 +4,7 @@ import { useTeam } from '@/contexts/TeamContext';
 import { notificationService } from '@/services/notificationService';
 import { Notification, NotificationFilters, NotificationType, NotificationPriority, shouldShowNotificationWithPreferences, NotificationPreferences } from '@/types/notifications';
 import { toast } from 'sonner';
+import i18n from '@/lib/i18n';
 import { performanceMonitor } from '@/services/realTimePerformanceMonitor';
 
 // OPTIMIZATION: Enhanced rate limiting and throttling utilities
@@ -584,12 +585,12 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       setPreferences(prefs);
       preferencesLoadedRef.current = true;
 
-      toast.success('Notification preferences updated');
+      toast.success(i18n.t('common:notifications.preferencesUpdated'));
       if (import.meta.env.DEV) {
         console.log('✅ Notification preferences updated and reloaded');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update preferences';
+      const errorMessage = err instanceof Error ? err.message : i18n.t('common:notifications.preferencesUpdateFailed');
       setPreferencesError(errorMessage);
       toast.error(errorMessage);
       console.error('❌ Error updating notification preferences:', err);
@@ -617,7 +618,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       dispatch({ type: 'SET_NOTIFICATIONS', payload: notifications });
       dispatch({ type: 'SET_UNREAD_COUNT', payload: unreadCount });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load notifications';
+      const errorMessage = error instanceof Error ? error.message : i18n.t('common:notifications.connectionFailed');
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       console.error('Error loading notifications:', error);
     }
@@ -688,7 +689,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         broadcastToOtherTabs('update', notificationId, { ...notification, read_at: null });
       }
 
-      toast.error('Failed to mark notification as read');
+      toast.error(i18n.t('common:notifications.markReadFailed'));
     }
   }, [broadcastToOtherTabs, state.notifications]);
 
@@ -712,7 +713,11 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       const duration = performance.now() - startTime;
       console.log(`✅ Mark all as read operation completed in ${duration.toFixed(2)}ms`);
 
-      toast.success(`Marked ${count || unreadNotifications.length} notifications as read`);
+      toast.success(
+        i18n.t('common:notifications.markedRead', {
+          count: count || unreadNotifications.length,
+        })
+      );
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
 
@@ -727,7 +732,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         });
       });
 
-      toast.error('Failed to mark all notifications as read');
+      toast.error(i18n.t('common:notifications.markAllFailed'));
     }
   }, [currentTeam?.id, broadcastToOtherTabs, state.notifications]);
 
@@ -747,7 +752,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       performanceMetrics.current.recordArchiveOperation(duration);
       console.log(`✅ Archive operation completed in ${duration.toFixed(2)}ms`);
 
-      toast.success('Notification archived');
+      toast.success(i18n.t('common:notifications.archived'));
     } catch (error) {
       console.error('Error archiving notification:', error);
 
@@ -764,7 +769,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         broadcastToOtherTabs('update', notificationId, { ...notification, archived_at: null });
       }
 
-      toast.error('Failed to archive notification');
+      toast.error(i18n.t('common:notifications.archiveFailed'));
     }
   }, [broadcastToOtherTabs, state.notifications]);
 
@@ -787,7 +792,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       performanceMetrics.current.recordDeleteOperation(duration);
       console.log(`✅ Delete operation completed in ${duration.toFixed(2)}ms`);
 
-      toast.success('Notification deleted');
+      toast.success(i18n.t('common:notifications.deleted'));
     } catch (error) {
       console.error('Error deleting notification:', error);
 
@@ -797,7 +802,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
         broadcastToOtherTabs('add', notificationId, notification);
       }
 
-      toast.error('Failed to delete notification');
+      toast.error(i18n.t('common:notifications.deleteFailed'));
     }
   }, [broadcastToOtherTabs, state.notifications]);
 
@@ -854,7 +859,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
         // Only show toast in development or if explicitly requested
         if (import.meta.env.DEV || import.meta.env.VITE_SHOW_REALTIME_STATUS === 'true') {
-          toast.info('Real-time notifications unavailable. Using manual refresh mode.', {
+          toast.info(i18n.t('common:notifications.realtimeUnavailable'), {
             duration: 3000,
           });
         }
@@ -1026,7 +1031,10 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       } catch (error) {
         isSetupInProgress = false;
         console.error('Failed to setup real-time subscriptions:', error);
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to connect to real-time updates' });
+        dispatch({
+          type: 'SET_ERROR',
+          payload: i18n.t('common:notifications.connectionFailed'),
+        });
         dispatch({ type: 'SET_CONNECTED', payload: false });
 
         // Retry connection with exponential backoff and max attempts
@@ -1054,7 +1062,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
           console.log('📱 Real-time notifications disabled. Using fallback mode.');
 
           // Show user-friendly message about fallback mode
-          toast.info('Real-time notifications unavailable. Using manual refresh mode.', {
+          toast.info(i18n.t('common:notifications.realtimeUnavailable'), {
             duration: 5000,
           });
         }

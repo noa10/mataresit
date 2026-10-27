@@ -212,5 +212,178 @@
       "sen": "sen",
       "format": "RM {{amount}}"
     }
+  },
+  "batch": {
+    "eyebrow": "Add to the ledger",
+    "title": "Batch upload",
+    "description": "Post a stack of receipts. Every file is read, categorised and filed in one pass.",
+    "newBatch": "New batch",
+    "batch": "Batch",
+    "indicator": {
+      "background": "In the background",
+      "reopenAria": "Reopen batch upload",
+      "reopen": "Reopen batch",
+      "defaultName": "Batch",
+      "postedStatus": "{{count}} posted",
+      "postedProgress": "{{ready}} of {{total}} posted",
+      "failed": "{{count}} failed"
+    },
+    "moreActions": "More batch actions",
+    "close": "Close batch upload",
+    "menu": {
+      "add": "Add receipts",
+      "retryAll": "Retry all failed",
+      "clearQueued": "Clear queued",
+      "clearBatch": "Clear batch…"
+    },
+    "summary": {
+      "label": "Batch summary",
+      "batch": "Batch",
+      "files": "{{count}} files",
+      "capacity": "Capacity · {{tier}}",
+      "of": "of {{limit}}",
+      "size": "Batch size",
+      "category": "Category",
+      "uncategorised": "Uncategorised",
+      "settings": "Batch settings"
+    },
+    "settings": {
+      "label": "Batch settings",
+      "short": "Settings",
+      "summary": "{{count}} at a time · auto-start {{state}}",
+      "on": "on",
+      "off": "off",
+      "title": "Batch defaults",
+      "concurrent": "Concurrent uploads",
+      "autoStart": "Auto-start",
+      "timeout": "Timeout",
+      "note": "Workspace defaults. Managed by your workspace administrator.",
+      "openAdmin": "Open admin settings",
+      "seconds": "{{count}}s"
+    },
+    "progress": {
+      "label": "Batch progress",
+      "progress": "Progress",
+      "status": "Receipt status",
+      "ready": "ready",
+      "working": "working",
+      "queued": "queued",
+      "failed": "failed",
+      "progressAria": "Batch upload progress"
+    },
+    "results": {
+      "label": "Batch results",
+      "allPosted": "Every receipt in this batch is posted.",
+      "needRetryOne": "{{count}} receipt needs another try.",
+      "needRetryMany": "{{count}} receipts need another try.",
+      "ready": "ready",
+      "posted": "{{ready}} of {{total}} receipts posted to the ledger. {{failureCopy}}",
+      "filter": "Filter results",
+      "filterAll": "All",
+      "filterReady": "Ready",
+      "filterFailed": "Failed"
+    },
+    "ledger": {
+      "label": "Batch receipt ledger",
+      "region": "Batch receipts",
+      "receipt": "Receipt",
+      "date": "Date",
+      "size": "Size",
+      "status": "Status",
+      "total": "Total",
+      "empty": "No receipts in this view.",
+      "noFailed": "No failed receipts in this batch.",
+      "noPosted": "No receipts have posted yet.",
+      "noReceipts": "No receipts in this batch."
+    },
+    "row": {
+      "view": "View",
+      "posted": "Posted",
+      "retry": "Retry",
+      "viewAria": "View {{name}}",
+      "retryAria": "Retry {{name}}",
+      "removeAria": "Remove {{name}}",
+      "cancelAria": "Cancel {{name}}",
+      "failedMeta": "Failed · {{detail}}",
+      "readyMeta": "Ready · {{date}} · {{amount}}",
+      "workingMeta": "Working · {{detail}}",
+      "queuedMeta": "Queued · Waiting for a free slot",
+      "readyFileMeta": "Ready · {{kind}} · {{size}}",
+      "statusReady": "Ready",
+      "statusUploading": "Uploading",
+      "statusWorking": "Working",
+      "statusFailed": "Failed",
+      "statusQueued": "Queued",
+      "stageUploading": "Uploading to cloud storage",
+      "stageProcessing": "AI processing and analysis",
+      "stageEmbedding": "Generating embeddings",
+      "stageStoring": "Storing receipt data",
+      "stageCompleted": "Posted to the ledger",
+      "waiting": "Waiting for a free slot",
+      "postedOn": "Posted · {{date}}",
+      "postedLedger": "Posted to the ledger",
+      "uploadFailed": "Upload failed. Try again.",
+      "etaUnder": "under {{seconds}}s left",
+      "etaMinutes": "~{{minutes}} min left"
+    },
+    "footer": {
+      "failedStay": "Failed receipts stay in this batch until they post.",
+      "allPosted": "Every receipt in this batch is posted.",
+      "keepRunning": "Uploads keep running if you close this sheet.",
+      "review": "Review the batch before opening the receipts.",
+      "optimising": "Images are optimised before upload.",
+      "openReceiptOne": "Open {{count}} receipt",
+      "openReceipts": "Open {{count}} receipts",
+      "retryFailed": "Retry failed",
+      "reviewBatch": "Review batch",
+      "pause": "Pause uploads",
+      "resume": "Resume uploads",
+      "start": "Start processing",
+      "uploadMore": "Upload more",
+      "add": "Add receipts",
+      "fileOne": "{{count}} file",
+      "files": "{{count}} files",
+      "failedCount": "{{count}} failed",
+      "readyOfTotal": "{{ready}} of {{total}} ready"
+    },
+    "tray": {
+      "fullTitle": "This batch is full",
+      "optimisingTitle": "Optimising your receipts",
+      "dropTitle": "Drop them on the ledger",
+      "idleTitle": "Lay the receipts on the ledger",
+      "fullDescription": "Post this batch or clear it to make room for more receipts.",
+      "optimisingDescription": "We’re preparing the files before they join the queue.",
+      "dropDescription": "Release to add these receipts to the batch.",
+      "idleDescription": "One receipt per photo or PDF. We read the merchant, date and total, then post each one.",
+      "chooseAria": "Choose receipt files. JPG, PNG or PDF, up to 5 MB each.",
+      "full": "Batch full",
+      "optimising": "Optimising…",
+      "choose": "Choose receipts",
+      "used": "{{used}} of {{limit}} used",
+      "formats": "JPG, PNG, PDF",
+      "each": "5 MB each"
+    },
+    "live": {
+      "optimising": "Optimising selected receipts",
+      "posted": "{{ready}} of {{total}} receipts posted",
+      "complete": "Batch complete",
+      "readyProcess": "Ready to process the batch",
+      "readyAdd": "Ready to add receipts"
+    },
+    "clear": {
+      "title": "Clear this batch?",
+      "description": "This removes the queue from the sheet. Receipts that already posted stay in your ledger.",
+      "keep": "Keep batch",
+      "confirm": "Clear batch"
+    },
+    "toast": {
+      "noPosted": "No posted receipts to open yet."
+    },
+    "modal": {
+      "closeTitle": "Uploads are still running",
+      "closeDescription": "Closing this sheet won’t stop the batch. You can reopen it from the workspace and keep working while it finishes.",
+      "keepUploading": "Keep uploading",
+      "closeAndContinue": "Close and continue"
+    }
   }
 }

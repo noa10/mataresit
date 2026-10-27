@@ -44,7 +44,7 @@ const tierIcons = {
 export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { t } = useProfileTranslation();
+  const { t, language } = useProfileTranslation();
 
   useEffect(() => {
     const fetchSubscriptionInfo = async () => {
@@ -108,9 +108,13 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
     : 0;
 
   const isUnlimited = limits?.monthly_receipts === -1;
-  const resetDate = new Date(monthly_reset_date).toLocaleDateString('en-US', {
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
+  const resetDate = new Date(monthly_reset_date).toLocaleDateString(dateLocale, {
     month: 'short',
     day: 'numeric'
+  });
+  const statusLabel = t(`subscription.statuses.${subscription_status}`, {
+    defaultValue: subscription_status,
   });
 
   return (
@@ -142,7 +146,7 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
         {/* Usage Stats */}
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Receipts this month</span>
+            <span className="text-muted-foreground">{t('subscription.receiptsThisMonth')}</span>
             <span className="font-medium">
               {receipts_used_this_month} {!isUnlimited && `/ ${limits?.monthly_receipts}`}
             </span>
@@ -152,7 +156,7 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
             <div className="space-y-2">
               <Progress value={usagePercentage} className="h-2" />
               <p className="text-xs text-muted-foreground">
-                Resets on {resetDate}
+                {t('subscription.resetsOn', { date: resetDate })}
               </p>
             </div>
           )}
@@ -162,36 +166,36 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
 
         {/* Plan Features */}
         <div className="space-y-3">
-          <h4 className="font-medium text-sm">Plan Features</h4>
+          <h4 className="font-medium text-sm">{t('subscription.planFeatures')}</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-muted-foreground">Monthly Receipts</span>
+              <span className="text-muted-foreground">{t('subscription.monthlyReceipts')}</span>
               <p className="font-medium">
-                {isUnlimited ? 'Unlimited' : limits?.monthly_receipts || 'N/A'}
+                {isUnlimited ? t('subscription.unlimited') : limits?.monthly_receipts || t('subscription.na')}
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">Storage</span>
+              <span className="text-muted-foreground">{t('subscription.storage')}</span>
               <p className="font-medium">
                 {limits?.storage_limit_mb === -1 
-                  ? 'Unlimited' 
+                  ? t('subscription.unlimited')
                   : `${(limits?.storage_limit_mb || 0) / 1024}GB`
                 }
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">Data Retention</span>
+              <span className="text-muted-foreground">{t('subscription.dataRetention')}</span>
               <p className="font-medium">
                 {limits?.retention_days === -1 
-                  ? 'Forever' 
-                  : `${limits?.retention_days || 0} days`
+                  ? t('subscription.forever')
+                  : t('subscription.days', { count: limits?.retention_days || 0 })
                 }
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">Batch Upload</span>
+              <span className="text-muted-foreground">{t('subscription.batchUpload')}</span>
               <p className="font-medium">
-                {limits?.batch_upload_limit || 0} files
+                {t('subscription.files', { count: limits?.batch_upload_limit || 0 })}
               </p>
             </div>
           </div>
@@ -204,25 +208,25 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
             <div className="space-y-2 text-sm">
               {subscription_start_date && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Started</span>
+                  <span className="text-muted-foreground">{t('subscription.started')}</span>
                   <span className="font-medium">
-                    {new Date(subscription_start_date).toLocaleDateString()}
+                    {new Date(subscription_start_date).toLocaleDateString(dateLocale)}
                   </span>
                 </div>
               )}
               {subscription_end_date && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Renews</span>
+                  <span className="text-muted-foreground">{t('subscription.renews')}</span>
                   <span className="font-medium">
-                    {new Date(subscription_end_date).toLocaleDateString()}
+                    {new Date(subscription_end_date).toLocaleDateString(dateLocale)}
                   </span>
                 </div>
               )}
               {trial_end_date && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Trial Ends</span>
+                  <span className="text-muted-foreground">{t('subscription.trialEnds')}</span>
                   <span className="font-medium">
-                    {new Date(trial_end_date).toLocaleDateString()}
+                    {new Date(trial_end_date).toLocaleDateString(dateLocale)}
                   </span>
                 </div>
               )}
@@ -232,12 +236,12 @@ export function SubscriptionInfo({ userId }: SubscriptionInfoProps) {
 
         {/* Status */}
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Status:</span>
+          <span className="text-muted-foreground">{t('subscription.status')}</span>
           <Badge 
             variant={subscription_status === 'active' ? 'default' : 'secondary'}
             className="text-xs"
           >
-            {subscription_status?.charAt(0).toUpperCase() + subscription_status?.slice(1)}
+            {statusLabel}
           </Badge>
         </div>
       </CardContent>

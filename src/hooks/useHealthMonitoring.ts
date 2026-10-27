@@ -14,6 +14,7 @@ import {
 } from '@/services/embeddingHealthService';
 import { SystemAlert } from '@/components/admin/SystemAlertsPanel';
 import { toast } from 'sonner';
+import i18n from '@/lib/i18n';
 
 interface UseHealthMonitoringOptions {
   autoRefresh?: boolean;
@@ -115,10 +116,17 @@ export function useHealthMonitoring(options: UseHealthMonitoringOptions = {}): U
     const alertType = component.status === 'critical' ? 'critical' : 
                      component.status === 'warning' ? 'warning' : 'info';
 
+    const componentLabel = i18n.t(
+      `admin:embeddingMetrics.healthDashboard.components.${component.component}`,
+      { defaultValue: component.component.replace('_', ' ') }
+    ) as string;
+
     return {
       id: generateAlertId(),
       type: alertType,
-      title: `${component.component.replace('_', ' ').toUpperCase()} Issue`,
+      title: i18n.t('admin:embeddingMetrics.healthAlerts.componentIssue', {
+        component: componentLabel
+      }) as string,
       message: component.message,
       component: component.component,
       timestamp: component.timestamp,
@@ -139,8 +147,10 @@ export function useHealthMonitoring(options: UseHealthMonitoringOptions = {}): U
       newAlerts.push({
         id: generateAlertId(),
         type: health.healthScore < 50 ? 'critical' : 'warning',
-        title: 'Low Health Score',
-        message: `System health score is ${health.healthScore}/100`,
+        title: i18n.t('admin:embeddingMetrics.healthAlerts.lowHealthScoreTitle') as string,
+        message: i18n.t('admin:embeddingMetrics.healthAlerts.lowHealthScoreMessage', {
+          score: health.healthScore
+        }) as string,
         component: 'system',
         timestamp: new Date().toISOString(),
         acknowledged: false,
@@ -172,12 +182,16 @@ export function useHealthMonitoring(options: UseHealthMonitoringOptions = {}): U
           // Show toast for critical alerts
           uniqueNewAlerts.forEach(alert => {
             if (alert.type === 'critical') {
-              toast.error(`Critical: ${alert.title}`, {
+              toast.error(i18n.t('admin:embeddingMetrics.healthAlerts.criticalPrefix', {
+                title: alert.title
+              }) as string, {
                 description: alert.message,
                 duration: 10000
               });
             } else if (alert.type === 'warning') {
-              toast.warning(`Warning: ${alert.title}`, {
+              toast.warning(i18n.t('admin:embeddingMetrics.healthAlerts.warningPrefix', {
+                title: alert.title
+              }) as string, {
                 description: alert.message,
                 duration: 5000
               });
@@ -213,7 +227,7 @@ export function useHealthMonitoring(options: UseHealthMonitoringOptions = {}): U
       processHealthStatus(health);
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = err instanceof Error ? err.message : i18n.t('admin:embeddingMetrics.healthService.unknownError') as string;
       console.error('Health monitoring error:', err);
       
       safeSetState(() => {
@@ -221,7 +235,7 @@ export function useHealthMonitoring(options: UseHealthMonitoringOptions = {}): U
       });
 
       if (enableAlerts) {
-        toast.error('Health Check Failed', {
+        toast.error(i18n.t('admin:embeddingMetrics.healthAlerts.healthCheckFailed') as string, {
           description: errorMessage,
           duration: 5000
         });

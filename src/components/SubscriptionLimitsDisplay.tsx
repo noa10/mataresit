@@ -18,6 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSettingsTranslation } from '@/contexts/LanguageContext';
 
 interface SubscriptionLimitsDisplayProps {
   showUpgradePrompts?: boolean;
@@ -30,6 +31,7 @@ export default function SubscriptionLimitsDisplay({
   compact = false,
   className = ""
 }: SubscriptionLimitsDisplayProps) {
+  const { t, language } = useSettingsTranslation();
   const { limits, usage, isLoading, error, getCurrentTier, refreshUsage, lastFetchTime, dataUpdatedAt } = useSubscription();
   const [realTimeUsage, setRealTimeUsage] = useState<SubscriptionUsageInfo | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -70,10 +72,10 @@ export default function SubscriptionLimitsDisplay({
         setRealTimeUsage(usageInfo);
       }
 
-      toast.success("Usage information refreshed");
+      toast.success(t('usageDisplay.refreshed'));
     } catch (error) {
       console.error('Error refreshing usage:', error);
-      toast.error("Failed to refresh usage information");
+      toast.error(t('usageDisplay.refreshFailed'));
     } finally {
       setIsRefreshing(false);
     }
@@ -102,11 +104,11 @@ export default function SubscriptionLimitsDisplay({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Usage & Limits
+            {t('usageDisplay.title')}
             <Loader2 className="h-4 w-4 animate-spin" />
           </CardTitle>
           <CardDescription>
-            Loading your usage statistics...
+            {t('usageDisplay.loadingDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -159,7 +161,7 @@ export default function SubscriptionLimitsDisplay({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
-              Usage & Limits
+              {t('usageDisplay.title')}
             </CardTitle>
             <Button
               variant="outline"
@@ -179,7 +181,7 @@ export default function SubscriptionLimitsDisplay({
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Failed to load usage statistics: {error}
+              {t('usageDisplay.loadFailed', { error })}
               <br />
               <Button
                 variant="link"
@@ -187,7 +189,7 @@ export default function SubscriptionLimitsDisplay({
                 onClick={handleRefreshUsage}
                 disabled={isRefreshing}
               >
-                Try refreshing
+                {t('usageDisplay.tryRefresh')}
               </Button>
             </AlertDescription>
           </Alert>
@@ -221,22 +223,16 @@ export default function SubscriptionLimitsDisplay({
     return (
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Monthly Receipts</span>
+          <span className="text-sm font-medium">{t('usageDisplay.monthlyReceiptsCompact')}</span>
           <span className={`text-sm ${getUsageColor(receiptsPercentage)}`}>
             {currentUsage.receipts_this_month}
-            {currentUsage.monthly_receipts_limit === -1 
-              ? ' / Unlimited' 
-              : ` / ${currentUsage.monthly_receipts_limit}`
+            {currentUsage.monthly_receipts_limit === -1              ? ` / ${t('usageDisplay.unlimited')}`              : ` / ${currentUsage.monthly_receipts_limit}`
             }
           </span>
         </div>
         {currentUsage.monthly_receipts_limit !== -1 && (
-          <Progress 
-            value={receiptsPercentage} 
-            className="h-2"
-            style={{ 
-              background: `linear-gradient(to right, ${getProgressColor(receiptsPercentage)} ${receiptsPercentage}%, #e5e7eb ${receiptsPercentage}%)` 
-            }}
+          <Progress            value={receiptsPercentage}            className="h-2"
+            style={{              background: `linear-gradient(to right, ${getProgressColor(receiptsPercentage)} ${receiptsPercentage}%, #e5e7eb ${receiptsPercentage}%)`            }}
           />
         )}
       </div>
@@ -249,7 +245,7 @@ export default function SubscriptionLimitsDisplay({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            <CardTitle>Usage & Limits</CardTitle>
+            <CardTitle>{t('usageDisplay.title')}</CardTitle>
           </div>
           <Button
             variant="outline"
@@ -265,13 +261,17 @@ export default function SubscriptionLimitsDisplay({
           </Button>
         </div>
         <CardDescription>
-          Current usage for your {tier.charAt(0).toUpperCase() + tier.slice(1)} plan
+          {t('usageDisplay.planUsage', { tier: tier.charAt(0).toUpperCase() + tier.slice(1) })}
           {(dataUpdatedAt || lastFetchTime) && (
             <span className="text-xs text-muted-foreground ml-2">
-              • Updated {new Date(dataUpdatedAt || lastFetchTime).toLocaleTimeString()}
+              • {t('usageDisplay.updated', {
+                time: new Date(dataUpdatedAt || lastFetchTime).toLocaleTimeString(
+                  language === 'ms' ? 'ms-MY' : 'en-MY'
+                ),
+              })}
               {dataUpdatedAt && (
                 <span className="ml-1 text-green-600">
-                  (cached)
+                  {t('usageDisplay.cached')}
                 </span>
               )}
             </span>
@@ -284,9 +284,9 @@ export default function SubscriptionLimitsDisplay({
           <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
             <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
             <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-              You're approaching your plan limits. Consider upgrading to avoid interruptions.
+              {t('usageDisplay.nearLimit')}
               <Link to="/pricing" className="ml-2 underline hover:no-underline">
-                View Plans
+                {t('usageDisplay.viewPlans')}
               </Link>
             </AlertDescription>
           </Alert>
@@ -297,23 +297,17 @@ export default function SubscriptionLimitsDisplay({
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
-              Receipts this month
+              {t('usageDisplay.monthlyReceipts')}
             </span>
             <span className={getUsageColor(receiptsPercentage)}>
               {currentUsage.receipts_this_month}
-              {currentUsage.monthly_receipts_limit === -1 
-                ? ' / Unlimited' 
-                : ` / ${currentUsage.monthly_receipts_limit}`
+              {currentUsage.monthly_receipts_limit === -1                ? ` / ${t('usageDisplay.unlimited')}`                : ` / ${currentUsage.monthly_receipts_limit}`
               }
             </span>
           </div>
           {currentUsage.monthly_receipts_limit !== -1 && (
-            <Progress 
-              value={receiptsPercentage} 
-              className="h-2"
-              style={{ 
-                background: `linear-gradient(to right, ${getProgressColor(receiptsPercentage)} ${receiptsPercentage}%, #e5e7eb ${receiptsPercentage}%)` 
-              }}
+            <Progress              value={receiptsPercentage}              className="h-2"
+              style={{                background: `linear-gradient(to right, ${getProgressColor(receiptsPercentage)} ${receiptsPercentage}%, #e5e7eb ${receiptsPercentage}%)`              }}
             />
           )}
         </div>
@@ -323,23 +317,17 @@ export default function SubscriptionLimitsDisplay({
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-2">
               <Database className="h-4 w-4" />
-              Storage used
+              {t('usageDisplay.storageUsed')}
             </span>
             <span className={getUsageColor(storagePercentage)}>
               {currentUsage.storage_used_mb.toFixed(1)} MB
-              {currentUsage.storage_limit_mb === -1 
-                ? ' / Unlimited' 
-                : ` / ${(currentUsage.storage_limit_mb / 1024).toFixed(1)} GB`
+              {currentUsage.storage_limit_mb === -1                ? ` / ${t('usageDisplay.unlimited')}`                : ` / ${(currentUsage.storage_limit_mb / 1024).toFixed(1)} GB`
               }
             </span>
           </div>
           {currentUsage.storage_limit_mb !== -1 && (
-            <Progress 
-              value={storagePercentage} 
-              className="h-2"
-              style={{ 
-                background: `linear-gradient(to right, ${getProgressColor(storagePercentage)} ${storagePercentage}%, #e5e7eb ${storagePercentage}%)` 
-              }}
+            <Progress              value={storagePercentage}              className="h-2"
+              style={{                background: `linear-gradient(to right, ${getProgressColor(storagePercentage)} ${storagePercentage}%, #e5e7eb ${storagePercentage}%)`              }}
             />
           )}
         </div>
@@ -349,12 +337,11 @@ export default function SubscriptionLimitsDisplay({
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
-              Batch upload limit
+              {t('usageDisplay.batchLimit')}
             </span>
             <span className="text-muted-foreground">
-              {currentUsage.batch_upload_limit === -1 
-                ? 'Unlimited files' 
-                : `${currentUsage.batch_upload_limit} files`
+              {currentUsage.batch_upload_limit === -1                ? t('usageDisplay.unlimitedFiles')
+                : t('usageDisplay.files', { count: currentUsage.batch_upload_limit })
               }
             </span>
           </div>
@@ -365,7 +352,7 @@ export default function SubscriptionLimitsDisplay({
           <div className="pt-4 border-t">
             <Button asChild className="w-full">
               <Link to="/pricing">
-                Upgrade for More Receipts & Storage
+                {t('usageDisplay.upgrade')}
               </Link>
             </Button>
           </div>

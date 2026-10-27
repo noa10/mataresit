@@ -105,7 +105,8 @@
         "description": "Dalam **Tetapan → Pemprosesan**, anda boleh memilih kaedah pilihan anda:",
         "methods": {
           "aiVision": "AI Vision (Lalai): Model AI secara langsung menganalisis imej resit, menawarkan ketepatan yang unggul untuk resit yang kompleks atau tulisan tangan.",
-          "compare": "Bandingkan dengan Alternatif: Untuk ketepatan maksimum, sistem menjalankan kedua-dua AI Vision dan kaedah OCR + AI tradisional, menonjolkan sebarang perbezaan untuk semakan anda."
+          "compare": "Bandingkan dengan Alternatif: Untuk ketepatan maksimum, sistem menjalankan kedua-dua AI Vision dan kaedah OCR + AI tradisional, menonjolkan sebarang perbezaan untuk semakan anda.",
+          "benefits": "Faedah: Tiada langkah pengekstrakan teks perantaraan, pengendalian elemen visual yang lebih baik, dan ketepatan yang lebih tinggi untuk format resit yang mencabar."
         }
       },
       "aiSearch": {
@@ -140,7 +141,8 @@
         "ocr": "OCR (Pengecaman Aksara Optik): Teknologi untuk menukar imej teks kepada teks yang boleh dibaca oleh mesin.",
         "aiVision": "AI Vision: Kaedah pemprosesan di mana model AI secara langsung menganalisis imej untuk memahami kandungannya.",
         "embedding": "Embedding: Perwakilan berangka teks yang menangkap makna semantiknya, menggerakkan Carian AI kami.",
-        "semanticSearch": "Carian Semantik: Teknik carian yang memahami niat pengguna dan makna kontekstual perkataan."
+        "semanticSearch": "Carian Semantik: Teknik carian yang memahami niat pengguna dan makna kontekstual perkataan.",
+        "aiVisionProcessing": "Pemprosesan AI Vision: Teknologi AI lanjutan yang menganalisis imej resit secara langsung untuk mengekstrak data tanpa memerlukan langkah pengecaman teks berasingan."
       }
     }
   }

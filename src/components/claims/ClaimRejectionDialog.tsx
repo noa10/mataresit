@@ -27,21 +27,20 @@ import { claimService } from '@/services/claimService';
 import {
   Claim,
   CLAIM_STATUS_COLORS,
-  getClaimStatusDisplayName,
 } from '@/types/claims';
 import { cn } from '@/lib/utils';
+import { formatCurrencySafe } from '@/utils/currency';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 import {
   XCircle,
-  DollarSign,
+  Banknote,
   User,
   AlertTriangle,
 } from 'lucide-react';
 
-const rejectionSchema = z.object({
-  rejection_reason: z.string().min(10, 'Rejection reason must be at least 10 characters').max(500, 'Rejection reason must be less than 500 characters'),
-});
-
-type RejectionFormData = z.infer<typeof rejectionSchema>;
+type RejectionFormData = {
+  rejection_reason: string;
+};
 
 interface ClaimRejectionDialogProps {
   claim: Claim | null;
@@ -58,6 +57,14 @@ export function ClaimRejectionDialog({
 }: ClaimRejectionDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useClaimsTranslation();
+
+  const rejectionSchema = z.object({
+    rejection_reason: z
+      .string()
+      .min(10, t('rejection.validation.min'))
+      .max(500, t('rejection.validation.max')),
+  });
 
   const form = useForm<RejectionFormData>({
     resolver: zodResolver(rejectionSchema),
@@ -66,12 +73,8 @@ export function ClaimRejectionDialog({
     },
   });
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency: string) =>
+    formatCurrencySafe(amount, currency);
 
   const onSubmit = async (data: RejectionFormData) => {
     if (!claim) return;
@@ -85,8 +88,8 @@ export function ClaimRejectionDialog({
       });
 
       toast({
-        title: 'Success',
-        description: 'Claim rejected successfully',
+        title: t('notifications.success'),
+        description: t('notifications.claimRejected'),
       });
 
       form.reset();
@@ -95,8 +98,8 @@ export function ClaimRejectionDialog({
     } catch (error) {
       console.error('Error rejecting claim:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to reject claim',
+        title: t('errors.title'),
+        description: t('errors.rejectFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -117,10 +120,10 @@ export function ClaimRejectionDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <XCircle className="h-5 w-5 text-red-600" />
-            Reject Claim
+            {t('rejection.title')}
           </DialogTitle>
           <DialogDescription>
-            Provide a reason for rejecting this expense claim. The claimant will be notified.
+            {t('rejection.subtitle')}
           </DialogDescription>
         </DialogHeader>
 
@@ -130,14 +133,14 @@ export function ClaimRejectionDialog({
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">{claim.title}</h3>
               <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
-                {getClaimStatusDisplayName(claim.status)}
+                {t(`list.status.${claim.status}`)}
               </Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Amount:</span>
+                <Banknote className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{t('details.information.amount')}:</span>
                 <span className="font-semibold text-lg">
                   {formatCurrency(claim.amount, claim.currency)}
                 </span>
@@ -145,21 +148,21 @@ export function ClaimRejectionDialog({
               
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Claimant:</span>
-                <span>{claim.claimant_name || 'Unknown'}</span>
+                <span className="font-medium">{t('details.information.claimant')}:</span>
+                <span>{claim.claimant_name || t('approval.details.unknown')}</span>
               </div>
             </div>
 
             {claim.category && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">Category:</span>
+                <span className="font-medium">{t('details.information.category')}:</span>
                 <span>{claim.category}</span>
               </div>
             )}
 
             {claim.description && (
               <div className="text-sm">
-                <span className="font-medium">Description:</span>
+                <span className="font-medium">{t('details.information.description')}:</span>
                 <p className="mt-1 text-muted-foreground">{claim.description}</p>
               </div>
             )}
@@ -173,16 +176,16 @@ export function ClaimRejectionDialog({
                 name="rejection_reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Rejection Reason *</FormLabel>
+                    <FormLabel>{t('rejection.reasonLabel')}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Please provide a clear reason for rejecting this claim..."
+                        placeholder={t('rejection.reasonPlaceholder')}
                         className="min-h-[120px]"
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      Be specific about why the claim is being rejected. This will help the claimant understand what needs to be corrected.
+                      {t('rejection.reasonHint')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -196,10 +199,9 @@ export function ClaimRejectionDialog({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-red-800 dark:text-red-200">Rejection Notice</p>
+                <p className="font-medium text-red-800 dark:text-red-200">{t('rejection.noticeTitle')}</p>
                 <p className="text-red-700 dark:text-red-300 mt-1">
-                  Rejecting this claim will notify the claimant via email and in-app notification. 
-                  They may resubmit the claim after addressing the issues mentioned in your rejection reason.
+                  {t('rejection.noticeMessage')}
                 </p>
               </div>
             </div>
@@ -208,7 +210,7 @@ export function ClaimRejectionDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={loading}>
-            Cancel
+            {t('rejection.actions.cancel')}
           </Button>
           <Button 
             variant="destructive"
@@ -218,12 +220,12 @@ export function ClaimRejectionDialog({
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Rejecting...
+                {t('rejection.actions.rejecting')}
               </>
             ) : (
               <>
                 <XCircle className="h-4 w-4 mr-2" />
-                Reject Claim
+                {t('rejection.actions.reject')}
               </>
             )}
           </Button>

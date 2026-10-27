@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Info, Upload, Clock, RotateCcw } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useSettingsTranslation } from "@/contexts/LanguageContext";
 
 interface BatchUploadSettingsProps {
   maxConcurrent: number;
@@ -38,6 +39,7 @@ export function BatchUploadSettings({
   onMaxRetriesChange,
   onPreserveImageQualityChange,
 }: BatchUploadSettingsProps) {
+  const { t } = useSettingsTranslation();
   const [concurrentValue, setConcurrentValue] = useState(maxConcurrent);
   const [timeoutValue, setTimeoutValue] = useState(timeoutSeconds);
   const [retriesValue, setRetriesValue] = useState(maxRetries);
@@ -95,30 +97,34 @@ export function BatchUploadSettings({
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Upload className="h-4 w-4" />
-              Batch Upload Limits
+              {t('batchSettings.limitsTitle')}
             </CardTitle>
             <Badge variant="outline" className={getTierBadgeColor(currentTier)}>
-              {currentTier.toUpperCase()} Plan
+              {t('batchSettings.plan', { tier: currentTier.toUpperCase() })}
             </Badge>
           </div>
           <CardDescription>
-            Your current subscription allows batch uploads with the following limits
+            {t('batchSettings.limitsDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Max batch size:</span>
-              <Badge variant="secondary">{limits?.batchUploadLimit || 5} receipts</Badge>
+              <span className="text-muted-foreground">{t('batchSettings.maxBatchSize')}</span>
+              <Badge variant="secondary">
+                {t('batchSettings.receipts', { count: limits?.batchUploadLimit || 5 })}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Concurrent uploads:</span>
-              <Badge variant="secondary">Up to {concurrentValue}</Badge>
+              <span className="text-muted-foreground">{t('batchSettings.concurrent')}</span>
+              <Badge variant="secondary">
+                {t('batchSettings.upTo', { count: concurrentValue })}
+              </Badge>
             </div>
           </div>
           {currentTier === 'free' && (
             <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded border border-blue-200">
-              💡 Upgrade to Pro or Max plan for larger batch uploads and more concurrent processing
+              {t('batchSettings.upgradeHint')}
             </div>
           )}
         </CardContent>
@@ -129,7 +135,7 @@ export function BatchUploadSettings({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Label htmlFor="max-concurrent" className="text-sm font-medium">
-              Maximum Concurrent Uploads
+              {t('batchSettings.maxConcurrent')}
             </Label>
             <TooltipProvider>
               <Tooltip>
@@ -137,10 +143,7 @@ export function BatchUploadSettings({
                   <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>
-                    Controls how many receipts can be processed simultaneously.
-                    Higher values may speed up batch uploads but could use more system resources.
-                  </p>
+                  <p>{t('batchSettings.maxConcurrentTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -157,7 +160,7 @@ export function BatchUploadSettings({
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
-          Processing multiple receipts at once can speed up batch uploads but may use more resources.
+          {t('batchSettings.maxConcurrentDescription')}
         </p>
       </div>
 
@@ -166,7 +169,7 @@ export function BatchUploadSettings({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Label htmlFor="timeout-setting" className="text-sm font-medium">
-              Processing Timeout
+              {t('batchSettings.timeout')}
             </Label>
             <TooltipProvider>
               <Tooltip>
@@ -174,15 +177,14 @@ export function BatchUploadSettings({
                   <Clock className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>
-                    Maximum time to wait for each receipt to process before timing out.
-                    Longer timeouts allow for more complex receipts but may slow down batch processing.
-                  </p>
+                  <p>{t('batchSettings.timeoutTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
-          <span className="text-sm font-medium">{timeoutValue}s</span>
+          <span className="text-sm font-medium">
+            {t('batchSettings.seconds', { count: timeoutValue })}
+          </span>
         </div>
         <Slider
           id="timeout-setting"
@@ -194,7 +196,7 @@ export function BatchUploadSettings({
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
-          Timeout range: 30 seconds (fast) to 5 minutes (thorough processing)
+          {t('batchSettings.timeoutDescription')}
         </p>
       </div>
 
@@ -203,7 +205,7 @@ export function BatchUploadSettings({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Label htmlFor="retry-setting" className="text-sm font-medium">
-              Maximum Retries
+              {t('batchSettings.retries')}
             </Label>
             <TooltipProvider>
               <Tooltip>
@@ -211,10 +213,7 @@ export function BatchUploadSettings({
                   <RotateCcw className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>
-                    Number of times to retry processing a failed receipt before marking it as failed.
-                    More retries increase success rate but may slow down batch processing.
-                  </p>
+                  <p>{t('batchSettings.retriesTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -231,7 +230,7 @@ export function BatchUploadSettings({
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
-          0 = No retries, 5 = Maximum resilience
+          {t('batchSettings.retriesDescription')}
         </p>
       </div>
 
@@ -240,7 +239,7 @@ export function BatchUploadSettings({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Label htmlFor="auto-start" className="text-sm font-medium">
-              Auto-Start Processing
+              {t('batchSettings.autoStart')}
             </Label>
             <TooltipProvider>
               <Tooltip>
@@ -248,15 +247,13 @@ export function BatchUploadSettings({
                   <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>
-                    When enabled, receipt processing will start automatically as soon as files are added to the queue.
-                  </p>
+                  <p>{t('batchSettings.autoStartTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           <p className="text-xs text-muted-foreground">
-            Automatically start processing when files are added
+            {t('batchSettings.autoStartDescription')}
           </p>
         </div>
         <Switch
@@ -271,7 +268,7 @@ export function BatchUploadSettings({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Label htmlFor="preserve-quality" className="text-sm font-medium">
-              Preserve Original Image Quality
+              {t('batchSettings.preserveQuality')}
             </Label>
             <TooltipProvider>
               <Tooltip>
@@ -279,16 +276,13 @@ export function BatchUploadSettings({
                   <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p>
-                    When enabled, images will be uploaded without compression to preserve maximum quality for reports and analysis.
-                    This may result in larger file sizes and longer upload times.
-                  </p>
+                  <p>{t('batchSettings.preserveQualityTooltip')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           <p className="text-xs text-muted-foreground">
-            Skip image compression during batch uploads for maximum quality
+            {t('batchSettings.preserveQualityDescription')}
           </p>
         </div>
         <Switch

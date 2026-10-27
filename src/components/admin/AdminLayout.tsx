@@ -69,6 +69,7 @@ function focusAdminMainContent() {
 
 function AdminNavigationOpenTrigger({ className }: { className?: string }) {
   const { openMobile } = useSidebar();
+  const { t } = useAdminTranslation();
 
   return (
     <SidebarTrigger
@@ -76,24 +77,27 @@ function AdminNavigationOpenTrigger({ className }: { className?: string }) {
       aria-controls={ADMIN_NAVIGATION_ID}
       aria-expanded={openMobile}
       aria-haspopup="dialog"
-      aria-label="Open admin navigation menu"
+      aria-label={t("shell.openNavigation")}
     />
   );
 }
 
 function AdminNavigationCloseTrigger({ className }: { className?: string }) {
+  const { t } = useAdminTranslation();
+
   return (
     <SidebarTrigger
       className={className}
       aria-controls={ADMIN_NAVIGATION_ID}
       aria-expanded="true"
-      aria-label="Close admin navigation menu"
+      aria-label={t("shell.closeNavigation")}
     />
   );
 }
 
 function AdminNavigationSheetMetadata({ title }: { title: string }) {
   const { isMobile } = useSidebar();
+  const { t } = useAdminTranslation();
 
   if (!isMobile) {
     return null;
@@ -101,9 +105,11 @@ function AdminNavigationSheetMetadata({ title }: { title: string }) {
 
   return (
     <>
-      <SheetTitle className="sr-only">{`${title} navigation menu`}</SheetTitle>
+      <SheetTitle className="sr-only">
+        {t("shell.mobileMenuTitle", { title })}
+      </SheetTitle>
       <SheetDescription className="sr-only">
-        Browse admin sections, review account context, or exit the admin area.
+        {t("shell.sheetDescription")}
       </SheetDescription>
     </>
   );
@@ -117,6 +123,7 @@ function AdminNavigationMenu({
   pathname: string;
 }) {
   const { isMobile, setOpenMobile } = useSidebar();
+  const { t } = useAdminTranslation();
   const navigationLabelId = useId();
   const navigationDescriptionId = useId();
 
@@ -135,7 +142,7 @@ function AdminNavigationMenu({
         id={navigationLabelId}
         className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80"
       >
-        Admin navigation
+        {t("shell.adminNavigation")}
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <nav
@@ -145,7 +152,7 @@ function AdminNavigationMenu({
           className="px-2"
         >
           <p id={navigationDescriptionId} className="sr-only">
-            Browse admin sections and account actions.
+            {t("shell.navigationDescription")}
           </p>
           <SidebarMenu className="gap-1.5">
             {navigationItems.map((item) => {
@@ -196,44 +203,44 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
       path: "/admin",
       label: t("navigation.dashboard"),
       icon: Home,
-      description: "Overview of admin tools and system status.",
+      description: t("navigation.descriptions.dashboard"),
       exact: true,
     },
     {
       path: "/admin/users",
       label: t("navigation.users"),
       icon: Users,
-      description: "Manage user access, roles, and accounts.",
+      description: t("navigation.descriptions.users"),
     },
     {
       path: "/admin/receipts",
       label: t("navigation.receipts"),
       icon: FileText,
-      description: "Review receipt records and operational data.",
+      description: t("navigation.descriptions.receipts"),
     },
     {
       path: "/admin/blog",
       label: t("navigation.blog"),
       icon: BookOpen,
-      description: "Publish and maintain blog content.",
+      description: t("navigation.descriptions.blog"),
     },
     {
       path: "/admin/analytics",
       label: t("navigation.analytics"),
       icon: BarChart3,
-      description: "Monitor analytics and reporting metrics.",
+      description: t("navigation.descriptions.analytics"),
     },
     {
       path: "/admin/embedding-metrics",
-      label: "Embedding Metrics",
+      label: t("navigation.embeddingMetrics"),
       icon: Activity,
-      description: "Inspect embedding performance and health.",
+      description: t("navigation.descriptions.embeddingMetrics"),
     },
     {
       path: "/admin/settings",
       label: t("navigation.settings"),
       icon: Settings,
-      description: "Configure admin-facing settings and controls.",
+      description: t("navigation.descriptions.settings"),
     },
   ];
 
@@ -252,7 +259,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
         className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm font-medium text-foreground shadow-md ring-1 ring-border focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={handleSkipToContent}
       >
-        Skip to admin content
+        {t("shell.skipToContent")}
       </a>
       {(() => {
         const sidebarPanel = (
@@ -266,12 +273,12 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
                   </div>
                   <div className="min-w-0 space-y-1">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Admin console
+                      {t("shell.adminConsole")}
                     </p>
                     <div className="space-y-1">
                       <h1 className="truncate text-base font-semibold leading-none">{t("title")}</h1>
                       <p className="text-sm text-muted-foreground">
-                        Manage users, content, and operational visibility.
+                        {t("shell.headerDescription")}
                       </p>
                     </div>
                   </div>
@@ -323,7 +330,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
         return (
           <aside
-            aria-label="Admin sidebar"
+            aria-label={t("shell.sidebarLabel")}
             className="hidden h-svh w-64 shrink-0 border-r border-sidebar-border/70 bg-sidebar/95 text-sidebar-foreground md:flex"
           >
             <div className="flex h-full w-full flex-col">{sidebarPanel}</div>
@@ -333,7 +340,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
       <main
         id={ADMIN_MAIN_CONTENT_ID}
-        aria-label="Admin content"
+        aria-label={t("shell.contentLabel")}
         tabIndex={-1}
         className="flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden bg-background focus:outline-none"
       >
@@ -341,7 +348,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
           <AdminNavigationOpenTrigger className="-ml-1 md:hidden" />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Admin area
+              {t("shell.adminArea")}
             </p>
             <div className="min-w-0">
               <h2 className="truncate text-sm font-semibold md:text-base">

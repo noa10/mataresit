@@ -1,107 +1,117 @@
+import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   MobileDialog as Dialog,
   MobileDialogContent as DialogContent,
   MobileDialogHeader as DialogHeader,
   MobileDialogTitle as DialogTitle,
-  MobileDialogDescription as DialogDescription
+  MobileDialogDescription as DialogDescription,
 } from "@/components/ui/mobile-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import BatchUploadZone from "@/components/BatchUploadZone";
-import UploadZone from "@/components/UploadZone";
-import { useCallback, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Files } from "lucide-react";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useBackgroundUpload } from "@/contexts/BackgroundUploadContext";
+import { cn } from "@/lib/utils";
 
 interface BatchUploadModalProps {
   onUploadComplete?: () => void;
 }
 
 export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
-  const [activeTab, setActiveTab] = useState<string>("single");
+  const { t } = useReceiptsTranslation();
   const isMobile = useIsMobile();
-
-  // Consume upload state & modal control from the background context.
-  // The context persists state across modal open/close cycles.
+  const navigate = useNavigate();
   const backgroundUpload = useBackgroundUpload();
-  const { isModalOpen, closeModal } = backgroundUpload;
+  const { isModalOpen, closeModal, hasActiveUpload } = backgroundUpload;
+  const [confirmClose, setConfirmClose] = useState(false);
 
-  // Create a custom upload complete handler that doesn't close the modal
   const handleUploadComplete = useCallback(() => {
-    // Call the original onUploadComplete callback to refresh data
-    // but don't close the modal
-    if (onUploadComplete) {
-      onUploadComplete();
-    }
-
-    // We're intentionally NOT closing the modal here
-    // This allows users to see the results and take further actions
-    console.log("Upload complete, keeping modal open for review");
+    // Refresh the workspace data but keep the sheet open for review.
+    onUploadComplete?.();
   }, [onUploadComplete]);
 
+  const requestClose = useCallback(() => {
+    if (hasActiveUpload) {
+      setConfirmClose(true);
+      return;
+    }
+    closeModal();
+  }, [closeModal, hasActiveUpload]);
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) requestClose();
+    },
+    [requestClose]
+  );
+
+  const handleOpenReceipt = useCallback(
+    (receiptId: string) => {
+      closeModal();
+      navigate(`/receipt/${receiptId}`);
+    },
+    [closeModal, navigate]
+  );
+
   return (
-    <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
-      <DialogContent className={`
-        ${isMobile
-          ? "w-full h-full max-w-none max-h-none p-4"
-          : "sm:max-w-[900px] w-[95vw] max-w-[95vw] h-[85vh] max-h-[95vh] min-h-[600px] p-6"
-        }
-        flex flex-col overflow-hidden
-      `}>
-        <DialogHeader className={`flex-shrink-0 ${isMobile ? "pb-2" : "pb-4"}`}>
-          <DialogTitle className={isMobile ? "text-lg" : "text-xl"}>Upload Receipts</DialogTitle>
-          <DialogDescription className="text-sm">
-            Upload and process your receipts. You can upload a single receipt or process multiple receipts at once.
-          </DialogDescription>
+    <Dialog open={isModalOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        hideClose
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden border-ledger-line-strong bg-ledger-surface p-0",
+          isMobile
+            ? "h-full w-full max-h-none max-w-none rounded-none"
+            : "h-[85vh] min-h-[520px] max-h-[860px] w-[95vw] max-w-[1000px] sm:max-w-[1000px]"
+        )}
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>{t("batch.title")}</DialogTitle>
+          <DialogDescription>{t("batch.description")}</DialogDescription>
         </DialogHeader>
 
-        <Tabs
-          defaultValue="single"
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-grow flex flex-col min-h-0 overflow-hidden"
-        >
-          <TabsList className={`${isMobile ? "mb-2" : "mb-4"} self-center flex-shrink-0 ${isMobile ? "w-full" : "w-auto"}`}>
-            <TabsTrigger
-              value="single"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm`}
-            >
-              <Upload size={isMobile ? 14 : 16} />
-              {isMobile ? "Single" : "Single Upload"}
-            </TabsTrigger>
-            <TabsTrigger
-              value="batch"
-              className={`flex items-center gap-1 sm:gap-2 ${isMobile ? "flex-1" : "flex-initial"} text-xs sm:text-sm`}
-            >
-              <Files size={isMobile ? 14 : 16} />
-              {isMobile ? "Batch" : "Batch Upload"}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value="single"
-            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-y-auto overflow-x-hidden"
-          >
-            <div className="flex-grow min-h-0 h-full overflow-x-hidden overflow-y-auto">
-              <UploadZone
-                onUploadComplete={handleUploadComplete}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent
-            value="batch"
-            className="flex-grow data-[state=active]:flex flex-col min-h-0 mt-0 overflow-hidden"
-          >
-            <div className={`flex-grow min-h-0 overflow-x-hidden ${isMobile ? "h-full overflow-y-auto" : "overflow-hidden"}`}>
-              <BatchUploadZone
-                onUploadComplete={handleUploadComplete}
-                backgroundUpload={backgroundUpload}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+        <BatchUploadZone
+          onUploadComplete={handleUploadComplete}
+          backgroundUpload={backgroundUpload}
+          onRequestClose={requestClose}
+          onOpenReceipt={handleOpenReceipt}
+        />
       </DialogContent>
+
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent className="z-[70] border-ledger-line bg-ledger-surface sm:max-w-[440px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-2xl font-normal text-ledger-ink">
+              {t("batch.modal.closeTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed text-ledger-muted">
+              {t("batch.modal.closeDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("batch.modal.keepUploading")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-ledger-accent text-white hover:bg-ledger-accent-hover dark:text-ledger-panel"
+              onClick={() => {
+                setConfirmClose(false);
+                closeModal();
+              }}
+            >
+              {t("batch.modal.closeAndContinue")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

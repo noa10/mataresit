@@ -5,6 +5,9 @@
   },
   "mainMenu": {
     "dashboard": "Dashboard",
+    "overview": "Overview",
+    "receipts": "Receipts",
+    "review": "Needs review",
     "leaderboard": "Leaderboard",
     "missions": "Mission & Rewards",
     "search": "Search",
@@ -21,7 +24,8 @@
     "features": "Features",
     "blog": "Blog",
     "status": "Status",
-    "resources": "Resources"
+    "resources": "Resources",
+    "aiSearch": "AI search"
   },
   "userMenu": {
     "profile": "Profile",
@@ -35,9 +39,23 @@
   },
   "sidebar": {
     "navigation": "Navigation",
+    "groups": {
+      "workspace": "Workspace",
+      "tools": "Tools",
+      "rewards": "Rewards",
+      "account": "Account"
+    },
+    "backToSite": "Back to site",
+    "personalWorkspace": "Personal workspace",
     "collapse": "Collapse",
     "expand": "Expand",
     "close": "Close"
+  },
+  "selector": {
+    "switchWorkspace": "Switch workspace",
+    "personalWorkspace": "Personal workspace",
+    "teams": "Teams",
+    "currentRole": "Signed in as {{role}}"
   },
   "breadcrumbs": {
     "home": "Home",
@@ -102,7 +120,19 @@
         "active": "Active missions",
         "completed": "Completed",
         "rewards": "Available XP"
-      }
+      },
+      "eyebrow": "Rewards — This week",
+      "leaderboard": "Leaderboard",
+      "scanStreak": "Scan streak",
+      "scanStreakValue": "{{count}} days",
+      "availableXp": "Available XP",
+      "reset": "Resets {{date}}",
+      "noMissions": "No missions in this window",
+      "noMissionsLede": "New missions appear as the rewards calendar rotates.",
+      "claimed": "claimed",
+      "title": "Mission & Rewards",
+      "scanStreakValue_one": "{{count}} day",
+      "scanStreakValue_other": "{{count}} days"
     },
     "leaderboard": {
       "privacyBadge": "Privacy-aware rankings",
@@ -146,7 +176,14 @@
           "label": "Deductible total",
           "description": "Current deductible amount tracked in your rewards profile."
         }
-      }
+      },
+      "eyebrow": "Rewards — Leaderboard",
+      "weekOf": "Week of {{date}}",
+      "optedIn": "Opted in",
+      "podiumNote": "Top three this week",
+      "anonymousNote": "Anonymous mode hides personal names. Manage rewards privacy in Settings.",
+      "retry": "Try again",
+      "tableNote": "Only opted-in members appear"
     }
   }
 }

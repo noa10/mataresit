@@ -18,6 +18,7 @@ import { UnifiedSearchInputProps, UnifiedSearchParams } from '@/types/unified-se
 import { SearchTargetSelector, SearchTargetQuickSelect } from './SearchTargetSelector';
 import { AdvancedFilterPanel } from './AdvancedFilterPanel';
 import { defaultSearchFilters } from '@/config/search-targets';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 export function UnifiedSearchInput({
   onSearch,
@@ -25,11 +26,12 @@ export function UnifiedSearchInput({
   filters,
   onFiltersChange,
   isLoading = false,
-  placeholder = 'Search across all your data...',
+  placeholder,
   showAdvancedFilters = true,
   suggestions = [],
   className
 }: UnifiedSearchInputProps) {
+  const { t } = useCommonTranslation();
   const [query, setQuery] = useState('');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(['receipts', 'business_directory']);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -67,12 +69,12 @@ export function UnifiedSearchInput({
     e.preventDefault();
     
     if (!query.trim()) {
-      toast.error('Please enter a search query');
+      toast.error(t('unifiedSearch.input.enterQuery'));
       return;
     }
 
     if (selectedTargets.length === 0) {
-      toast.error('Please select at least one search target');
+      toast.error(t('unifiedSearch.input.selectTarget'));
       return;
     }
 
@@ -96,7 +98,7 @@ export function UnifiedSearchInput({
       setSuggestionsOpen(false);
     } catch (error) {
       console.error('Search error:', error);
-      toast.error('Search failed. Please try again.');
+      toast.error(t('unifiedSearch.input.searchFailed'));
     }
   };
 
@@ -129,7 +131,7 @@ export function UnifiedSearchInput({
           <Input
             ref={inputRef}
             type="text"
-            placeholder={placeholder}
+            placeholder={placeholder || t('unifiedSearch.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setSuggestionsOpen(true)}
@@ -173,7 +175,7 @@ export function UnifiedSearchInput({
               <CommandList>
                 {/* Recent Searches */}
                 {recentSearches.length > 0 && (
-                  <CommandGroup heading="Recent Searches">
+                  <CommandGroup heading={t('unifiedSearch.input.recentSearches')}>
                     {recentSearches.map((search, index) => (
                       <CommandItem
                         key={index}
@@ -189,14 +191,14 @@ export function UnifiedSearchInput({
                       className="cursor-pointer text-muted-foreground"
                     >
                       <X className="mr-2 h-4 w-4" />
-                      Clear recent searches
+                      {t('unifiedSearch.input.clearRecent')}
                     </CommandItem>
                   </CommandGroup>
                 )}
 
                 {/* Suggestions */}
                 {suggestions.length > 0 && (
-                  <CommandGroup heading="Suggestions">
+                  <CommandGroup heading={t('unifiedSearch.input.suggestions')}>
                     {suggestions.map((suggestion) => (
                       <CommandItem
                         key={suggestion.id}
@@ -207,7 +209,9 @@ export function UnifiedSearchInput({
                         {suggestion.text}
                         {suggestion.metadata?.resultCount && (
                           <Badge variant="secondary" className="ml-auto text-xs">
-                            {suggestion.metadata.resultCount} results
+                            {t('unifiedSearch.input.resultsCount', {
+                              count: suggestion.metadata.resultCount,
+                            })}
                           </Badge>
                         )}
                       </CommandItem>
@@ -222,13 +226,13 @@ export function UnifiedSearchInput({
                       className="cursor-pointer"
                     >
                       <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-                      Search for "{query}"
+                      {t('unifiedSearch.input.searchFor', { query })}
                     </CommandItem>
                   </CommandGroup>
                 )}
 
                 {!query && recentSearches.length === 0 && suggestions.length === 0 && (
-                  <CommandEmpty>No suggestions available</CommandEmpty>
+                  <CommandEmpty>{t('unifiedSearch.input.noSuggestions')}</CommandEmpty>
                 )}
               </CommandList>
             </Command>
@@ -239,7 +243,7 @@ export function UnifiedSearchInput({
       {/* Search Targets */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">Search In:</label>
+          <label className="text-sm font-medium">{t('unifiedSearch.input.searchIn')}</label>
           <SearchTargetQuickSelect
             targets={searchTargets}
             selectedTargets={selectedTargets}
@@ -263,10 +267,12 @@ export function UnifiedSearchInput({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters</span>
+              <span className="text-sm font-medium">{t('unifiedSearch.input.filters')}</span>
               {getActiveFilterCount() > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  {getActiveFilterCount()} active
+                  {t('unifiedSearch.input.activeFilters', {
+                    count: getActiveFilterCount(),
+                  })}
                 </Badge>
               )}
             </div>
@@ -287,8 +293,13 @@ export function UnifiedSearchInput({
       {/* Search Summary */}
       {selectedTargets.length > 0 && (
         <div className="text-xs text-muted-foreground">
-          Searching in {selectedTargets.length} source{selectedTargets.length !== 1 ? 's' : ''}
-          {getActiveFilterCount() > 0 && ` with ${getActiveFilterCount()} filter${getActiveFilterCount() !== 1 ? 's' : ''}`}
+          {t('unifiedSearch.input.searchingIn', {
+            count: selectedTargets.length,
+          })}
+          {getActiveFilterCount() > 0 &&
+            t('unifiedSearch.input.withFilters', {
+              count: getActiveFilterCount(),
+            })}
         </div>
       )}
     </div>

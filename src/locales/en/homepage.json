@@ -1,114 +1,181 @@
 {
   "meta": {
-    "title": "More Business, Less Paperwork - Mataresit"
+    "title": "Mataresit — Receipts, read and ready",
+    "description": "Mataresit turns photographed, emailed and bulk-uploaded receipts into clean, categorized line items your team can approve in minutes."
   },
-  "hero": {
-    "title": "More Business, <span class=\"text-primary\">Less Paperwork</span>",
-    "subtitle": "Transform your receipts into organized data instantly. Save hours every week and never miss a tax deduction again.",
-    "benefits": {
-      "saveTime": "Save 5+ Hours/Week",
-      "accuracy": "99% Accuracy",
-      "security": "Bank-Level Security"
-    },
-    "cta": {
-      "getStarted": "Get Started Free",
-      "viewPricing": "View Pricing",
-      "goToDashboard": "Go to Dashboard",
-      "trySmartSearch": "Try Smart Search"
-    },
-    "imageOverlay": {
-      "title": "Transform Your Business",
-      "subtitle": "Save time, increase accuracy",
-      "startNow": "Start Now"
-    }
-  },
-  "howItWorks": {
-    "title": "How It Works",
-    "subtitle": "From receipt to organized data in three simple steps. No training required.",
-    "steps": {
-      "upload": {
-        "title": "Upload",
-        "description": "Snap a photo or upload files. Drag and drop multiple receipts for batch processing."
+  "skipToContent": "Skip to content",
+  "nav": {
+    "main": "Main",
+    "pages": "Pages",
+    "home": "Home",
+    "features": "Features",
+    "pricing": "Pricing",
+    "signIn": "Sign in",
+    "openWorkspace": "Open workspace",
+    "language": "Language",
+    "toggleTheme": "Toggle theme",
+    "resources": {
+      "label": "Resources",
+      "items": {
+        "documentation": {
+          "title": "Documentation",
+          "description": "Guides, setup walkthroughs and workflow recipes."
+        },
+        "apiReference": {
+          "title": "API reference",
+          "description": "Endpoints and webhooks for pulling receipts into your stack."
+        },
+        "help": {
+          "title": "Help centre",
+          "description": "Answers from the support team, usually within a day."
+        },
+        "status": {
+          "title": "System status",
+          "description": "Uptime history and live incident tracking."
+        },
+        "blog": {
+          "title": "Blog",
+          "description": "Product notes, Malaysian tax tips and release news."
+        }
       },
-      "aiProcessing": {
-        "title": "AI Processing",
-        "description": "Our AI extracts all data with confidence scores. Review and approve in seconds."
-      },
-      "exportAnalyze": {
-        "title": "Export & Analyze",
-        "description": "Export to Excel, QuickBooks, or your favorite accounting software. Generate reports instantly."
+      "card": {
+        "eyebrow": "From the ledger",
+        "titleLead": "SST codes, read",
+        "titleAccent": "straight off the receipt.",
+        "description": "Every line item now carries its tax code into the exports your accountant already uses.",
+        "link": "Read the changelog"
       }
     }
   },
-  "stats": {
-    "title": "Join thousands of businesses saving time and money",
+  "hero": {
+    "eyebrow": "AI receipt processing for small teams",
+    "titleLead": "Every receipt, filed",
+    "titleAccent": "before",
+    "titleTail": "you think about it.",
+    "lede": "Photograph it, email it, or drop a whole month of scans at once. Mataresit reads the line items, tax and merchant, then routes only the uncertain fields to your team.",
+    "ctaWorkspace": "Open the workspace",
+    "ctaHow": "See how it works",
+    "benefits": {
+      "accuracy": "Line-item accuracy",
+      "bulk": "Bulk upload",
+      "trail": "Team approval trail"
+    }
+  },
+  "scan": {
+    "fieldsLabel": "Extracted fields",
+    "label": "Scan 04 · October",
+    "extracting": "Extracting",
+    "merchant": "Nasi Kandar Pelita",
+    "address": "Jalan Ampang, Kuala Lumpur",
+    "date": "October 18, 2026 · 09:42",
     "items": {
-      "businesses": "Businesses Trust Us",
-      "accuracy": "Accuracy Rate",
-      "timeSaved": "Saved Per Week"
+      "nasiLemak": "Nasi lemak ayam",
+      "tehTarik": "Teh tarik × 2",
+      "rotiCanai": "Roti canai"
+    },
+    "subtotal": "Subtotal",
+    "tax": "SST 6%",
+    "total": "Total",
+    "payment": "VISA •• 4821 · APPROVED",
+    "fields": {
+      "merchant": "Merchant",
+      "total": "Total",
+      "category": "Category"
+    },
+    "merchantValue": "Nasi Kandar Pelita",
+    "totalValue": "RM 27.56 · 3 line items",
+    "categoryValue": "Meals · 96% match"
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "Three steps, no spreadsheet.",
+    "lede": "The work you used to do after hours — typing totals, guessing categories, hunting for a missing receipt — happens while the coffee is still warm.",
+    "steps": {
+      "capture": {
+        "title": "Capture",
+        "description": "Forward an email, photograph the paper copy, or upload a month of scans in one drop."
+      },
+      "extract": {
+        "title": "Extract",
+        "description": "Merchant, date, line items and sales tax are read and matched against your categories."
+      },
+      "review": {
+        "title": "Review",
+        "description": "Only the uncertain fields ask for a human. Approve once and the month's totals move."
+      }
     }
   },
   "features": {
-    "title": "Everything you need to <span class=\"text-primary\">transform your business</span>",
-    "subtitle": "Stop wasting time on manual data entry. Our intelligent platform handles everything from receipt capture to financial reporting.",
-    "list": {
-      "saveTime": {
-        "title": "Save Hours Every Week",
-        "description": "Eliminate manual data entry forever. Our AI processes receipts in seconds, not hours, giving you time to focus on growing your business."
-      },
+    "eyebrow": "Capabilities",
+    "title": "Built around the receipt, not the form.",
+    "lede": "Everything below is part of the same workspace: read a receipt, correct a field, approve it, and watch the books follow.",
+    "items": {
       "accuracy": {
-        "title": "99% Accuracy Guaranteed",
-        "description": "Advanced AI with confidence scoring ensures your financial data is always accurate. Catch errors before they become problems."
+        "title": "Field-level accuracy",
+        "description": "Every extracted value carries a confidence score, so a shaky total is routed to review instead of quietly guessed."
+      },
+      "typing": {
+        "title": "Save the typing",
+        "description": "Upload a batch and let the queue do the work. No totals to copy, no dates to reformat."
       },
       "search": {
-        "title": "Find Any Receipt Instantly",
-        "description": "Smart search that understands natural language. Find receipts by asking 'coffee expenses last month' or 'client dinner receipts'."
+        "title": "Smart search",
+        "description": "Find any receipt by merchant, category, payment method or amount in a single field."
       },
-      "taxDeductions": {
-        "title": "Maximize Tax Deductions",
-        "description": "Never miss a deductible expense again. Automatically categorize and organize receipts for tax season and financial reporting."
+      "tax": {
+        "title": "Sales tax captured",
+        "description": "Tax is recorded per receipt and rolled into a running total, so the deduction never lives in a footnote."
       },
-      "teamCollaboration": {
-        "title": "Team Collaboration Made Easy",
-        "description": "Share receipts and reports with your team or accountant. Real-time collaboration with role-based permissions and audit trails."
+      "team": {
+        "title": "Team collaboration",
+        "description": "A shared inbox with a visible approval trail — who checked it, when, and what changed."
       },
       "security": {
-        "title": "Bank-Level Security",
-        "description": "Your financial data is protected with enterprise-grade security. SOC 2 compliant with end-to-end encryption."
+        "title": "Workspace security",
+        "description": "Receipts stay scoped to your workspace, with role-based access for the people who file and approve."
       }
     }
   },
-  "cta": {
-    "title": "Ready to transform your business?",
-    "subtitle": "Join thousands of businesses already saving hours every week. Start your free trial today.",
-    "startFreeTrial": "Start Free Trial",
-    "viewPricing": "View Pricing",
-    "goToDashboard": "Go to Dashboard"
+  "inside": {
+    "eyebrow": "Inside the workspace",
+    "title": "A workspace that reads like a ledger.",
+    "lede": "The workspace is live, not a screenshot. Upload a receipt, watch the fields land, correct a category, and see the month's totals respond.",
+    "cta": "Open the live workspace",
+    "items": {
+      "overview": {
+        "title": "Overview",
+        "description": "Spend, captured tax and review load, all derived from the same receipts you see below."
+      },
+      "inbox": {
+        "title": "Receipts inbox",
+        "description": "Search, filter and open any receipt down to its line items and payment method."
+      },
+      "review": {
+        "title": "Review queue",
+        "description": "Low-confidence fields wait here with their match score, not buried in a spreadsheet tab."
+      },
+      "approval": {
+        "title": "One-click approval",
+        "description": "Approve a receipt and its status, totals and category chart update in place."
+      }
+    }
   },
   "footer": {
-    "description": "Transform your receipts into organized data. Save time, increase accuracy, and never miss a deduction.",
-    "sections": {
-      "product": {
-        "title": "Product",
-        "features": "Features",
-        "dashboard": "Dashboard",
-        "apiReference": "API Reference",
-        "pricing": "Pricing"
-      },
-      "resources": {
-        "title": "Resources",
-        "documentation": "Documentation",
-        "helpCenter": "Help Center",
-        "systemStatus": "System Status",
-        "blog": "Blog"
-      },
-      "legal": {
-        "title": "Legal",
-        "privacyPolicy": "Privacy Policy",
-        "termsOfService": "Terms of Service",
-        "contactUs": "Contact Us"
-      }
+    "blurb": "Receipts in, books clean. Built for teams that would rather close the month than chase the paperwork.",
+    "product": {
+      "title": "Product",
+      "features": "Features",
+      "pricing": "Pricing",
+      "howItWorks": "How it works",
+      "workspaceOverview": "Workspace overview"
     },
-    "copyright": "© {{year}} Mataresit. All rights reserved."
+    "workspace": {
+      "title": "Workspace",
+      "inbox": "Receipts inbox",
+      "review": "Review queue",
+      "upload": "Upload receipts"
+    },
+    "copyright": "© {{year}} Mataresit",
+    "tagline": "Receipt processing, minus the paperwork"
   }
 }

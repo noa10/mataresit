@@ -29,6 +29,7 @@ import { Receipt } from '@/types/receipt';
 import { formatCurrencySafe } from '@/utils/currency';
 import { getFormattedImageUrlSync } from '@/utils/imageUtils';
 import { useNavigate } from 'react-router-dom';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 
 interface ReceiptPreviewProps {
   receipts: Receipt[];
@@ -46,6 +47,8 @@ export function ReceiptPreview({
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const navigate = useNavigate();
+  const { t, language } = useClaimsTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 
   if (receipts.length === 0) {
     return null;
@@ -64,7 +67,7 @@ export function ReceiptPreview({
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-sm text-muted-foreground">
-          Attached Receipts ({receipts.length})
+          {t('receiptPreview.attachedCount', { count: receipts.length })}
         </h4>
       </div>
 
@@ -76,6 +79,7 @@ export function ReceiptPreview({
             onRemove={showRemoveButton ? onRemoveReceipt : undefined}
             onViewReceipt={() => openReceiptViewer(receipt)}
             onViewImage={() => openImageViewer(receipt)}
+            dateLocale={dateLocale}
           />
         ))}
       </div>
@@ -85,6 +89,7 @@ export function ReceiptPreview({
         receipt={selectedReceipt}
         open={imageViewerOpen}
         onOpenChange={setImageViewerOpen}
+        dateLocale={dateLocale}
       />
     </div>
   );
@@ -95,14 +100,17 @@ interface ReceiptPreviewCardProps {
   onRemove?: (receiptId: string) => void;
   onViewReceipt: () => void;
   onViewImage: () => void;
+  dateLocale: string;
 }
 
 function ReceiptPreviewCard({ 
   receipt, 
   onRemove, 
   onViewReceipt, 
-  onViewImage 
+  onViewImage,
+  dateLocale,
 }: ReceiptPreviewCardProps) {
+  const { t } = useClaimsTranslation();
   const [imageUrl, setImageUrl] = useState<string>('/placeholder.svg');
 
   useEffect(() => {
@@ -127,7 +135,7 @@ function ReceiptPreviewCard({
           <div className="relative h-32 bg-muted">
             <img
               src={imageUrl}
-              alt={`Receipt from ${receipt.merchant}`}
+              alt={t('receiptPreview.receiptFrom', { merchant: receipt.merchant })}
               className="w-full h-full object-cover"
               onError={() => setImageUrl('/placeholder.svg')}
             />
@@ -150,7 +158,7 @@ function ReceiptPreviewCard({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>View full image</p>
+                    <p>{t('receiptPreview.viewFullImage')}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -172,7 +180,7 @@ function ReceiptPreviewCard({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Remove receipt</p>
+                      <p>{t('receiptPreview.removeReceipt')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -182,7 +190,7 @@ function ReceiptPreviewCard({
             {/* Status badge */}
             <div className="absolute bottom-2 left-2">
               <Badge variant="secondary" className="text-xs bg-background/80 backdrop-blur-sm">
-                {receipt.status}
+                {t(`receiptStatus.${receipt.status}`)}
               </Badge>
             </div>
           </div>
@@ -197,7 +205,7 @@ function ReceiptPreviewCard({
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                <span>{new Date(receipt.date).toLocaleDateString()}</span>
+                <span>{new Date(receipt.date).toLocaleDateString(dateLocale)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <DollarSign className="h-3 w-3" />
@@ -215,7 +223,7 @@ function ReceiptPreviewCard({
               onClick={onViewReceipt}
             >
               <FileText className="h-3 w-3 mr-1" />
-              View Details
+              {t('receiptPreview.viewDetails')}
               <ExternalLink className="h-3 w-3 ml-1" />
             </Button>
           </div>
@@ -229,9 +237,11 @@ interface ReceiptImageViewerProps {
   receipt: Receipt | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  dateLocale: string;
 }
 
-function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerProps) {
+function ReceiptImageViewer({ receipt, open, onOpenChange, dateLocale }: ReceiptImageViewerProps) {
+  const { t } = useClaimsTranslation();
   const [imageUrl, setImageUrl] = useState<string>('/placeholder.svg');
 
   useEffect(() => {
@@ -251,7 +261,7 @@ function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerP
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Receipt from {receipt.merchant}
+            {t('receiptPreview.receiptFrom', { merchant: receipt.merchant })}
           </DialogTitle>
         </DialogHeader>
         
@@ -262,7 +272,7 @@ function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerP
               <div className="relative bg-muted rounded-lg overflow-hidden">
                 <img
                   src={imageUrl}
-                  alt={`Receipt from ${receipt.merchant}`}
+                  alt={t('receiptPreview.receiptFrom', { merchant: receipt.merchant })}
                   className="w-full h-auto max-h-[60vh] object-contain"
                   onError={() => setImageUrl('/placeholder.svg')}
                 />
@@ -273,17 +283,17 @@ function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerP
             <div className="lg:w-80 space-y-4">
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Merchant</label>
+                  <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.merchant')}</label>
                   <p className="text-sm">{receipt.merchant}</p>
                 </div>
                 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Date</label>
-                  <p className="text-sm">{new Date(receipt.date).toLocaleDateString()}</p>
+                  <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.date')}</label>
+                  <p className="text-sm">{new Date(receipt.date).toLocaleDateString(dateLocale)}</p>
                 </div>
                 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Total</label>
+                  <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.total')}</label>
                   <p className="text-sm font-medium">
                     {formatCurrencySafe(receipt.total, receipt.currency)}
                   </p>
@@ -291,7 +301,7 @@ function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerP
                 
                 {receipt.tax && receipt.tax > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Tax</label>
+                    <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.tax')}</label>
                     <p className="text-sm">
                       {formatCurrencySafe(receipt.tax, receipt.currency)}
                     </p>
@@ -299,15 +309,15 @@ function ReceiptImageViewer({ receipt, open, onOpenChange }: ReceiptImageViewerP
                 )}
                 
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.status')}</label>
                   <div className="mt-1">
-                    <Badge variant="outline">{receipt.status}</Badge>
+                    <Badge variant="outline">{t(`receiptStatus.${receipt.status}`)}</Badge>
                   </div>
                 </div>
                 
                 {receipt.payment_method && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Payment Method</label>
+                    <label className="text-sm font-medium text-muted-foreground">{t('receiptPreview.paymentMethod')}</label>
                     <p className="text-sm">{receipt.payment_method}</p>
                   </div>
                 )}

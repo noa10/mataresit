@@ -19,7 +19,9 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ms as msLocale } from 'date-fns/locale';
 import { ResultCardProps } from '@/types/unified-search';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 // Icon mapping
 const iconMap = {
@@ -43,6 +45,8 @@ const colorMap = {
 
 export function ResultCard({ result, onAction, compact = false, className }: ResultCardProps) {
   const navigate = useNavigate();
+  const { t, language } = useCommonTranslation();
+  const dateLocale = language === 'ms' ? msLocale : undefined;
   
   const IconComponent = iconMap[result.sourceType as keyof typeof iconMap] || FileText;
   const borderColor = colorMap[result.sourceType as keyof typeof colorMap] || 'border-l-gray-500';
@@ -74,7 +78,11 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
 
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
+      return format(
+        new Date(dateString),
+        language === 'ms' ? 'dd MMM yyyy' : 'MMM dd, yyyy',
+        { locale: dateLocale }
+      );
     } catch {
       return dateString;
     }
@@ -104,7 +112,15 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
       case 'claim':
         return (
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Status: {result.metadata.status || 'Pending'}</span>
+            <span>
+              {t('unifiedSearch.card.status', {
+                status: result.metadata.status
+                  ? t(`unifiedSearch.card.claimStatuses.${result.metadata.status}`, {
+                      defaultValue: result.metadata.status,
+                    })
+                  : t('unifiedSearch.card.pending'),
+              })}
+            </span>
             {result.metadata.amount && (
               <span className="font-medium">
                 {formatCurrency(result.metadata.amount, result.metadata.currency)}
@@ -116,7 +132,13 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
       case 'team_member':
         return (
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{result.metadata.role || 'Team Member'}</span>
+            <span>
+              {result.metadata.role
+                ? t(`unifiedSearch.card.teamRoles.${result.metadata.role}`, {
+                    defaultValue: result.metadata.role,
+                  })
+                : t('unifiedSearch.card.teamMember')}
+            </span>
             <span>{result.metadata.email}</span>
           </div>
         );
@@ -124,7 +146,7 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
       case 'business_directory':
         return (
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{result.metadata.business_type || 'Business'}</span>
+            <span>{result.metadata.business_type || t('unifiedSearch.card.business')}</span>
             <span>{result.metadata.state || result.metadata.location}</span>
           </div>
         );
@@ -132,7 +154,7 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
       case 'custom_category':
         return (
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Category</span>
+            <span>{t('unifiedSearch.card.category')}</span>
             {result.metadata.color && (
               <div 
                 className="w-3 h-3 rounded-full border"
@@ -146,7 +168,11 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
         return (
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatDate(result.createdAt)}</span>
-            <span>{result.metadata.messageCount || 0} messages</span>
+            <span>
+              {t('unifiedSearch.card.messages', {
+                count: result.metadata.messageCount || 0,
+              })}
+            </span>
           </div>
         );
 
@@ -157,24 +183,36 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
 
   const getQuickActions = () => {
     const actions = [
-      { label: 'View', action: 'view', icon: Eye },
-      { label: 'Find Similar', action: 'search_similar', icon: Search }
+      { label: t('unifiedSearch.card.view'), action: 'view', icon: Eye },
+      { label: t('unifiedSearch.card.findSimilar'), action: 'search_similar', icon: Search }
     ];
 
     // Add source-specific actions
     switch (result.sourceType) {
       case 'receipt':
-        actions.push({ label: 'View Receipt', action: 'view_receipt', icon: ExternalLink });
+        actions.push({
+          label: t('unifiedSearch.card.viewReceipt'),
+          action: 'view_receipt',
+          icon: ExternalLink,
+        });
         break;
       case 'claim':
-        actions.push({ label: 'View Claim', action: 'view_claim', icon: ExternalLink });
+        actions.push({
+          label: t('unifiedSearch.card.viewClaim'),
+          action: 'view_claim',
+          icon: ExternalLink,
+        });
         break;
       case 'business_directory':
-        actions.push({ label: 'Get Directions', action: 'get_directions', icon: ExternalLink });
+        actions.push({
+          label: t('unifiedSearch.card.getDirections'),
+          action: 'get_directions',
+          icon: ExternalLink,
+        });
         break;
     }
 
-    actions.push({ label: 'Share', action: 'share', icon: Share });
+    actions.push({ label: t('unifiedSearch.card.share'), action: 'share', icon: Share });
     return actions;
   };
 
@@ -192,14 +230,18 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
               <IconComponent className="h-4 w-4 text-muted-foreground" />
             </div>
             <Badge variant="outline" className="text-xs flex-shrink-0">
-              {result.sourceType.replace('_', ' ')}
+              {t(`unifiedSearch.card.sourceTypes.${result.sourceType}`, {
+                defaultValue: result.sourceType.replace('_', ' '),
+              })}
             </Badge>
           </div>
           
           <div className="flex items-center gap-1 flex-shrink-0">
             {result.similarity > 0 && (
               <Badge variant="secondary" className="text-xs">
-                {Math.round(result.similarity * 100)}% match
+                {t('unifiedSearch.card.match', {
+                  percent: Math.round(result.similarity * 100),
+                })}
               </Badge>
             )}
             
@@ -263,7 +305,7 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
             onClick={handlePrimaryAction} 
             className="flex-1"
           >
-            View
+            {t('unifiedSearch.card.view')}
           </Button>
           <Button 
             size="sm" 
@@ -282,7 +324,9 @@ export function ResultCard({ result, onAction, compact = false, className }: Res
               variant={result.accessLevel === 'team' ? 'default' : 'secondary'} 
               className="text-xs"
             >
-              {result.accessLevel === 'team' ? 'Team' : 'Public'}
+              {result.accessLevel === 'team'
+                ? t('unifiedSearch.card.team')
+                : t('unifiedSearch.card.public')}
             </Badge>
           </div>
         )}

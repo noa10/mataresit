@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
+import { ms as msLocale } from 'date-fns/locale';
 
 interface FeedbackAnalytics {
   total_feedback: number;
@@ -38,6 +40,8 @@ interface FeedbackAnalytics {
 
 export function FeedbackAnalytics() {
   const { user } = useAuth();
+  const { t, language } = useAdminTranslation();
+  const dateLocale = language === 'ms' ? msLocale : undefined;
   const [analytics, setAnalytics] = useState<FeedbackAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState(30); // Days
@@ -83,7 +87,7 @@ export function FeedbackAnalytics() {
       }
     } catch (error) {
       console.error('Error loading feedback analytics:', error);
-      toast.error('Failed to load feedback analytics');
+      toast.error(t('diagnostics.feedbackAnalytics.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +100,13 @@ export function FeedbackAnalytics() {
     if (!analytics) return;
 
     const csvData = [
-      ['Date', 'Total Feedback', 'Positive Feedback', 'Negative Feedback', 'Positive %'],
+      [
+        t('diagnostics.feedbackAnalytics.csv.date'),
+        t('diagnostics.feedbackAnalytics.csv.totalFeedback'),
+        t('diagnostics.feedbackAnalytics.csv.positiveFeedback'),
+        t('diagnostics.feedbackAnalytics.csv.negativeFeedback'),
+        t('diagnostics.feedbackAnalytics.csv.positivePercent'),
+      ],
       ...analytics.feedback_by_day.map(day => [
         day.date,
         day.total.toString(),
@@ -115,19 +125,19 @@ export function FeedbackAnalytics() {
     a.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success('Analytics exported successfully');
+    toast.success(t('diagnostics.feedbackAnalytics.exportSuccess'));
   };
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Feedback Analytics</CardTitle>
+          <CardTitle>{t('diagnostics.feedbackAnalytics.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-            Loading analytics...
+            {t('diagnostics.feedbackAnalytics.loading')}
           </div>
         </CardContent>
       </Card>
@@ -138,11 +148,11 @@ export function FeedbackAnalytics() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Feedback Analytics</CardTitle>
+          <CardTitle>{t('diagnostics.feedbackAnalytics.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            No feedback data available
+            {t('diagnostics.feedbackAnalytics.noData')}
           </div>
         </CardContent>
       </Card>
@@ -156,9 +166,9 @@ export function FeedbackAnalytics() {
       {/* Header with Controls */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Feedback Analytics</h2>
+          <h2 className="text-2xl font-bold">{t('diagnostics.feedbackAnalytics.title')}</h2>
           <p className="text-muted-foreground">
-            User satisfaction metrics for the last {dateRange} days
+            {t('diagnostics.feedbackAnalytics.subtitle', { days: dateRange })}
           </p>
         </div>
         
@@ -172,7 +182,7 @@ export function FeedbackAnalytics() {
                 size="sm"
                 onClick={() => setDateRange(days)}
               >
-                {days}d
+                {t('diagnostics.feedbackAnalytics.dayShort', { count: days })}
               </Button>
             ))}
           </div>
@@ -184,7 +194,7 @@ export function FeedbackAnalytics() {
             disabled={isLoading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('diagnostics.feedbackAnalytics.refresh')}
           </Button>
           
           <Button
@@ -194,7 +204,7 @@ export function FeedbackAnalytics() {
             disabled={analytics.total_feedback === 0}
           >
             <Download className="h-4 w-4 mr-2" />
-            Export
+            {t('diagnostics.feedbackAnalytics.export')}
           </Button>
         </div>
       </div>
@@ -206,7 +216,7 @@ export function FeedbackAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Feedback</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('diagnostics.feedbackAnalytics.totalFeedback')}</p>
                 <p className="text-2xl font-bold">{analytics.total_feedback}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-muted-foreground" />
@@ -219,7 +229,7 @@ export function FeedbackAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Positive</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('diagnostics.feedbackAnalytics.positive')}</p>
                 <p className="text-2xl font-bold text-green-600">{analytics.positive_feedback}</p>
                 <p className="text-xs text-muted-foreground">
                   {analytics.positive_percentage.toFixed(1)}%
@@ -235,7 +245,7 @@ export function FeedbackAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Negative</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('diagnostics.feedbackAnalytics.negative')}</p>
                 <p className="text-2xl font-bold text-red-600">{analytics.negative_feedback}</p>
                 <p className="text-xs text-muted-foreground">
                   {negativePercentage.toFixed(1)}%
@@ -251,7 +261,7 @@ export function FeedbackAnalytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Satisfaction</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('diagnostics.feedbackAnalytics.satisfaction')}</p>
                 <p className="text-2xl font-bold">
                   {analytics.positive_percentage.toFixed(1)}%
                 </p>
@@ -260,8 +270,11 @@ export function FeedbackAnalytics() {
                           analytics.positive_percentage >= 60 ? 'secondary' : 'destructive'}
                   className="text-xs"
                 >
-                  {analytics.positive_percentage >= 80 ? 'Excellent' :
-                   analytics.positive_percentage >= 60 ? 'Good' : 'Needs Improvement'}
+                  {analytics.positive_percentage >= 80
+                    ? t('diagnostics.feedbackAnalytics.excellent')
+                    : analytics.positive_percentage >= 60
+                      ? t('diagnostics.feedbackAnalytics.good')
+                      : t('diagnostics.feedbackAnalytics.needsImprovement')}
                 </Badge>
               </div>
               {analytics.positive_percentage >= 80 ? (
@@ -278,7 +291,7 @@ export function FeedbackAnalytics() {
       {analytics.feedback_by_day.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Daily Feedback Trends</CardTitle>
+            <CardTitle>{t('diagnostics.feedbackAnalytics.dailyTrends')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -290,14 +303,22 @@ export function FeedbackAnalytics() {
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">
-                        {format(new Date(day.date), 'MMM dd')}
+                        {format(
+                          new Date(day.date),
+                          language === 'ms' ? 'dd MMM' : 'MMM dd',
+                          { locale: dateLocale }
+                        )}
                       </span>
                       <div className="flex items-center gap-4">
                         <span className="text-green-600">
-                          {day.positive} positive
+                          {t('diagnostics.feedbackAnalytics.positiveCount', {
+                            count: day.positive,
+                          })}
                         </span>
                         <span className="text-red-600">
-                          {negativeCount} negative
+                          {t('diagnostics.feedbackAnalytics.negativeCount', {
+                            count: negativeCount,
+                          })}
                         </span>
                         <span className="font-medium">
                           {positiveRate.toFixed(0)}%
@@ -322,7 +343,12 @@ export function FeedbackAnalytics() {
       {/* Last Updated */}
       {lastUpdated && (
         <div className="text-center text-sm text-muted-foreground">
-          Last updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+          {t('diagnostics.feedbackAnalytics.lastUpdated', {
+            time: formatDistanceToNow(lastUpdated, {
+              addSuffix: true,
+              locale: dateLocale,
+            }),
+          })}
         </div>
       )}
     </div>

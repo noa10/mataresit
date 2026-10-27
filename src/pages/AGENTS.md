@@ -1,18 +1,18 @@
 # src/pages AGENTS.md
 
 ## OVERVIEW
-Route pages — 39 files. React Router v7 with lazy loading. Auth guards via `ProtectedRoute` and `AdminRoute`.
+Route pages — 37 files. React Router v7 with lazy loading. Auth guards via `ProtectedRoute` and `AdminRoute`.
 
 ## STRUCTURE
 ```
 src/pages/
 ├── Index.tsx                   # Landing page (public)
-├── Dashboard.tsx               # 1542 lines — main dashboard with analytics
+├── OverviewPage.tsx            # Dashboard overview
 ├── ApiReferencePage.tsx        # 2660 lines — API documentation viewer
 ├── Auth.tsx                    # Login / signup / OAuth
 ├── SettingsPage.tsx            # User settings
 ├── PricingPage.tsx             # Subscription plans
-├── SemanticSearch.tsx          # AI semantic search, TODO feedback storage
+├── AISearchPage.tsx            # AI receipt search chat
 ├── UnifiedSearchPage.tsx       # Hybrid search interface
 ├── ReceiptViewer.tsx           # 2304 lines — receipt detail + editor
 ├── AdminDashboard.tsx          # Admin analytics
@@ -31,7 +31,7 @@ src/pages/
 
 ## CONVENTIONS
 
-- **Lazy load heavy pages** — `React.lazy(() => import('./Dashboard'))` + `Suspense` with `Skeleton` fallback.
+- **Lazy load heavy pages** — `React.lazy(() => import('./OverviewPage'))` + `Suspense` with `Skeleton` fallback.
 - **Page components are default exports** — Router imports use default export.
 - **Auth guards in `App.tsx`** — `ProtectedRoute` wraps authenticated pages. `AdminRoute` wraps admin pages, checks `user.role === 'admin'`.
 - **Page-level data fetching** — Use `useQuery` hooks from `src/hooks/`. Do NOT fetch directly in pages.
@@ -42,9 +42,9 @@ src/pages/
 | Route | Page | Notes |
 |-------|------|-------|
 | `/` | `Index.tsx` | Landing, marketing content |
-| `/dashboard` | `Dashboard.tsx` | 1542 lines — receipts list, charts, stats |
+| `/dashboard` | `OverviewPage.tsx` | Main dashboard — receipts list, charts, stats |
 | `/receipt/:id` | `ReceiptViewer.tsx` | 2304 lines — image + data side-by-side editor |
-| `/search` | `SemanticSearch.tsx` | AI search, feedback storage TODO at line 927 |
+| `/search` | `AISearchPage.tsx` | AI search chat, recent chats |
 | `/unified-search` | `UnifiedSearchPage.tsx` | Hybrid search, subscription context TODO at line 52 |
 | `/settings` | `SettingsPage.tsx` | Profile, preferences, billing |
 | `/pricing` | `PricingPage.tsx` | Stripe checkout integration |
@@ -60,6 +60,5 @@ src/pages/
 
 ## ANTI-PATTERNS
 
-- `SemanticSearch.tsx` line 927 — Feedback storage/analytics is a TODO stub.
 - `UnifiedSearchPage.tsx` line 52 — Subscription tier fetched from hardcoded context instead of user subscription.
 - `ApiReferencePage.tsx` is 2660 lines — consider splitting if adding features.

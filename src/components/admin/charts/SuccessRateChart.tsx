@@ -15,6 +15,7 @@ import { EmbeddingHourlyStats } from '@/types/embedding-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Target, AlertTriangle } from 'lucide-react';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface SuccessRateChartProps {
   hourlyStats: EmbeddingHourlyStats[];
@@ -31,10 +32,20 @@ export function SuccessRateChart({
   onRefresh,
   className = ''
 }: SuccessRateChartProps) {
+  const { t, language } = useAdminTranslation();
+  const numberLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
+
   // Transform data and generate chart config
   const { chartConfig, metrics } = useMemo(() => {
-    const series = transformHourlyStatsToSuccessRate(hourlyStats);
-    const config = generateChartConfig('success-rate', series);
+    const series = transformHourlyStatsToSuccessRate(hourlyStats).map((item) => ({
+      ...item,
+      name: t('embeddingMetrics.charts.common.seriesSuccessRate')
+    }));
+    const config = {
+      ...generateChartConfig('success-rate', series),
+      title: t('embeddingMetrics.charts.common.titleSuccessRate'),
+      subtitle: t('embeddingMetrics.charts.common.subtitleSuccessRate')
+    };
     
     // Calculate summary metrics
     const totalAttempts = hourlyStats.reduce((sum, stat) => sum + stat.total_attempts, 0);
@@ -80,7 +91,7 @@ export function SuccessRateChart({
         totalSuccessful
       }
     };
-  }, [hourlyStats]);
+  }, [hourlyStats, t]);
 
   const getSuccessRateStatus = (rate: number) => {
     if (rate >= 95) return { status: 'excellent', color: 'bg-green-100 text-green-800', icon: Target };
@@ -90,7 +101,7 @@ export function SuccessRateChart({
   };
 
   const getTrendStatus = (change: number) => {
-    if (Math.abs(change) < 1) return { icon: TrendingUp, color: 'text-gray-500', text: 'Stable' };
+    if (Math.abs(change) < 1) return { icon: TrendingUp, color: 'text-gray-500', text: t('embeddingMetrics.charts.common.trendStable') };
     if (change > 0) return { icon: TrendingUp, color: 'text-green-500', text: `+${change.toFixed(1)}%` };
     return { icon: TrendingDown, color: 'text-red-500', text: `${change.toFixed(1)}%` };
   };
@@ -132,13 +143,13 @@ export function SuccessRateChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Overall Success Rate</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.successRate.overallSuccessRate')}</p>
                 <p className="text-2xl font-bold">{metrics.overallSuccessRate}%</p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusIcon className="h-6 w-6 text-gray-400" />
                 <Badge className={successRateStatus.color}>
-                  {successRateStatus.status}
+                  {t(`embeddingMetrics.charts.status.${successRateStatus.status}`)}
                 </Badge>
               </div>
             </div>
@@ -149,7 +160,7 @@ export function SuccessRateChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Recent Trend</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.successRate.recentTrend')}</p>
                 <p className="text-2xl font-bold">{metrics.recentSuccessRate}%</p>
               </div>
               <div className="flex items-center gap-1">
@@ -166,13 +177,13 @@ export function SuccessRateChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Range</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.successRate.range')}</p>
                 <p className="text-lg font-bold">
                   {metrics.lowestRate}% - {metrics.highestRate}%
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Min - Max</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.charts.successRate.minMax')}</p>
               </div>
             </div>
           </CardContent>
@@ -182,12 +193,12 @@ export function SuccessRateChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Attempts</p>
-                <p className="text-2xl font-bold">{metrics.totalAttempts.toLocaleString()}</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.successRate.totalAttempts')}</p>
+                <p className="text-2xl font-bold">{metrics.totalAttempts.toLocaleString(numberLocale)}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-green-600 font-medium">
-                  {metrics.totalSuccessful.toLocaleString()} successful
+                  {t('embeddingMetrics.charts.successRate.successful', { count: metrics.totalSuccessful.toLocaleString(numberLocale) })}
                 </p>
               </div>
             </div>
@@ -208,7 +219,7 @@ export function SuccessRateChart({
       {/* Insights */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Success Rate Insights</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.successRate.insightsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -216,9 +227,9 @@ export function SuccessRateChart({
               <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
                 <Target className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-800">Excellent Performance</p>
+                  <p className="font-medium text-green-800">{t('embeddingMetrics.charts.successRate.excellentTitle')}</p>
                   <p className="text-sm text-green-700">
-                    Your embedding generation is performing exceptionally well with a {metrics.overallSuccessRate}% success rate.
+                    {t('embeddingMetrics.charts.successRate.excellentDesc', { rate: metrics.overallSuccessRate })}
                   </p>
                 </div>
               </div>
@@ -228,9 +239,9 @@ export function SuccessRateChart({
               <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">Room for Improvement</p>
+                  <p className="font-medium text-yellow-800">{t('embeddingMetrics.charts.successRate.improvementTitle')}</p>
                   <p className="text-sm text-yellow-700">
-                    Success rate of {metrics.overallSuccessRate}% indicates potential issues. Consider reviewing error patterns and API limits.
+                    {t('embeddingMetrics.charts.successRate.improvementDesc', { rate: metrics.overallSuccessRate })}
                   </p>
                 </div>
               </div>
@@ -240,10 +251,15 @@ export function SuccessRateChart({
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
                 <TrendIcon className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-800">Significant Trend Change</p>
+                  <p className="font-medium text-blue-800">{t('embeddingMetrics.charts.successRate.significantTitle')}</p>
                   <p className="text-sm text-blue-700">
-                    Success rate has {metrics.trendChange > 0 ? 'improved' : 'declined'} by {Math.abs(metrics.trendChange).toFixed(1)}% recently.
-                    {metrics.trendChange < 0 && ' Monitor for potential issues.'}
+                    {t('embeddingMetrics.charts.successRate.significantDesc', {
+                      direction: metrics.trendChange > 0
+                        ? t('embeddingMetrics.charts.successRate.improved')
+                        : t('embeddingMetrics.charts.successRate.declined'),
+                      change: Math.abs(metrics.trendChange).toFixed(1)
+                    })}
+                    {metrics.trendChange < 0 && ` ${t('embeddingMetrics.charts.successRate.monitor')}`}
                   </p>
                 </div>
               </div>
@@ -253,9 +269,9 @@ export function SuccessRateChart({
               <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-gray-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-gray-800">No Data Available</p>
+                  <p className="font-medium text-gray-800">{t('embeddingMetrics.charts.successRate.noDataTitle')}</p>
                   <p className="text-sm text-gray-700">
-                    No embedding metrics data is available yet. Data will appear once embedding generation begins.
+                    {t('embeddingMetrics.charts.successRate.noDataDesc')}
                   </p>
                 </div>
               </div>

@@ -26,20 +26,22 @@ import { EmailNotificationService } from '@/services/emailNotificationService';
 import { notificationService } from '@/services/notificationService';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessingStatus } from '@/types/receipt';
+import { useSettingsTranslation } from '@/contexts/LanguageContext';
 
 export function NotificationTestPanel() {
+  const { t, language } = useSettingsTranslation();
   const { user } = useAuth();
   const { currentTeam } = useTeam();
   const pushContext = usePushNotificationContext();
   const [isLoading, setIsLoading] = useState(false);
   const [testReceiptId, setTestReceiptId] = useState(() => crypto.randomUUID());
-  const [testMerchant, setTestMerchant] = useState('Test Store');
+  const [testMerchant, setTestMerchant] = useState(() => t('notifications.testPanel.merchantPlaceholder'));
   const [testTotal, setTestTotal] = useState('25.50');
   const [testStatus, setTestStatus] = useState<ProcessingStatus>('complete');
 
   const handleTestReceiptNotification = async () => {
     if (!user) {
-      toast.error('Please log in to test notifications');
+      toast.error(t('notifications.testPanel.toasts.loginRequired'));
       return;
     }
 
@@ -64,17 +66,26 @@ export function NotificationTestPanel() {
         case 'failed':
           await ReceiptNotificationService.notifyReceiptProcessingFailed({
             ...testData,
-            errorMessage: 'Test error message'
+            errorMessage: t('notifications.testPanel.testErrorMessage')
           });
           break;
         default:
           throw new Error(`Unsupported test status: ${testStatus}`);
       }
 
-      toast.success(`Test ${testStatus} notification sent!`);
+      toast.success(
+        t('notifications.testPanel.toasts.testSent', { status: testStatus })
+      );
     } catch (error) {
       console.error('Failed to send test notification:', error);
-      toast.error(`Failed to send test notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('notifications.testPanel.toasts.testFailed', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('notifications.testPanel.toasts.unknownError'),
+        })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +93,7 @@ export function NotificationTestPanel() {
 
   const handleTestBatchNotification = async () => {
     if (!user) {
-      toast.error('Please log in to test notifications');
+      toast.error(t('notifications.testPanel.toasts.loginRequired'));
       return;
     }
 
@@ -97,10 +108,10 @@ export function NotificationTestPanel() {
         }
       );
       
-      toast.success('Test batch notification sent!');
+      toast.success(t('notifications.testPanel.toasts.batchSent'));
     } catch (error) {
       console.error('Failed to send test batch notification:', error);
-      toast.error('Failed to send test batch notification');
+      toast.error(t('notifications.testPanel.toasts.batchFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +119,7 @@ export function NotificationTestPanel() {
 
   const handleTestPushNotification = async () => {
     if (!pushContext.isSubscribed) {
-      toast.error('Push notifications not enabled. Please enable push notifications first.');
+      toast.error(t('notifications.testPanel.toasts.pushDisabled'));
       return;
     }
 
@@ -124,10 +135,17 @@ export function NotificationTestPanel() {
         }
       );
 
-      toast.success('Test push notification sent!');
+      toast.success(t('notifications.testPanel.toasts.pushSent'));
     } catch (error) {
       console.error('Failed to send test push notification:', error);
-      toast.error(`Failed to send test push notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('notifications.testPanel.toasts.pushFailed', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('notifications.testPanel.toasts.unknownError'),
+        })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +153,7 @@ export function NotificationTestPanel() {
 
   const handleTestInAppNotification = async () => {
     if (!user) {
-      toast.error('Please log in to test notifications');
+      toast.error(t('notifications.testPanel.toasts.loginRequired'));
       return;
     }
 
@@ -144,8 +162,8 @@ export function NotificationTestPanel() {
       await notificationService.createNotification(
         user.id,
         'receipt_processing_completed',
-        'Test Receipt Processed',
-        `Test receipt from ${testMerchant} has been processed successfully`,
+        t('notifications.testPanel.testReceiptTitle'),
+        t('notifications.testPanel.testReceiptBody', { merchant: testMerchant }),
         {
           priority: 'medium',
           actionUrl: `/receipts/${testReceiptId}`,
@@ -159,10 +177,17 @@ export function NotificationTestPanel() {
         }
       );
 
-      toast.success('Test in-app notification created!');
+      toast.success(t('notifications.testPanel.toasts.inAppSent'));
     } catch (error) {
       console.error('Failed to create test in-app notification:', error);
-      toast.error(`Failed to create test in-app notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('notifications.testPanel.toasts.inAppFailed', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('notifications.testPanel.toasts.unknownError'),
+        })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -170,12 +195,12 @@ export function NotificationTestPanel() {
 
   const handleTestTeamCollaboration = async () => {
     if (!user) {
-      toast.error('Please log in to test notifications');
+      toast.error(t('notifications.testPanel.toasts.loginRequired'));
       return;
     }
 
     if (!currentTeam) {
-      toast.error('Please select a team to test team collaboration notifications');
+      toast.error(t('notifications.testPanel.toasts.teamSelect'));
       return;
     }
 
@@ -192,7 +217,7 @@ export function NotificationTestPanel() {
 
       if (membersError) {
         console.error('Error checking team members:', membersError);
-        toast.error('Failed to check team members');
+        toast.error(t('notifications.testPanel.toasts.teamCheckFailed'));
         return;
       }
 
@@ -208,7 +233,7 @@ export function NotificationTestPanel() {
             merchant: testMerchant,
           }
         );
-        toast.success('Test team collaboration notification created (simulated team member)!');
+        toast.success(t('notifications.testPanel.toasts.teamSimulated'));
       } else {
         // Send to actual team members
         await TeamCollaborationNotificationService.notifyReceiptShared({
@@ -220,11 +245,22 @@ export function NotificationTestPanel() {
           total: parseFloat(testTotal),
           currency: 'MYR'
         });
-        toast.success(`Test team collaboration notification sent to ${teamMembers.length} team members!`);
+        toast.success(
+          t('notifications.testPanel.toasts.teamSent', {
+            count: teamMembers.length,
+          })
+        );
       }
     } catch (error) {
       console.error('Failed to send test team collaboration notification:', error);
-      toast.error(`Failed to send test team collaboration notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('notifications.testPanel.toasts.teamFailed', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('notifications.testPanel.toasts.unknownError'),
+        })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +268,7 @@ export function NotificationTestPanel() {
 
   const handleTestEmailNotification = async () => {
     if (!user) {
-      toast.error('Please log in to test notifications');
+      toast.error(t('notifications.testPanel.toasts.loginRequired'));
       return;
     }
 
@@ -245,18 +281,18 @@ export function NotificationTestPanel() {
 
       if (prefError) {
         console.error('Error checking notification preferences:', prefError);
-        toast.warning('Could not check email preferences, proceeding with test...');
+        toast.warning(t('notifications.testPanel.toasts.emailPrefsCheckFailed'));
       } else if (preferences && preferences.length > 0 && !preferences[0].email_enabled) {
-        toast.warning('Email notifications are disabled in your preferences. Enable them in settings to receive emails.');
+        toast.warning(t('notifications.testPanel.toasts.emailDisabled'));
       }
 
       // Check if send-email Edge Function exists by testing it
       const { data: edgeFunctionTest, error: edgeError } = await supabase.functions.invoke('send-email', {
         body: {
           to: user.email || 'test@example.com',
-          subject: 'Test Email Notification',
-          html: '<p>This is a test email notification from Mataresit.</p>',
-          text: 'This is a test email notification from Mataresit.',
+          subject: t('notifications.testPanel.emailSubject'),
+          html: t('notifications.testPanel.emailHtml'),
+          text: t('notifications.testPanel.emailText'),
           template_name: 'receipt_processing',
           template_data: {
             recipientName: user.user_metadata?.full_name || user.email || 'Test User',
@@ -266,7 +302,7 @@ export function NotificationTestPanel() {
             currency: 'MYR',
             status: testStatus === 'complete' ? 'completed' : testStatus === 'failed' ? 'failed' : 'started',
             actionUrl: `${window.location.origin}/receipts/${testReceiptId}`,
-            language: 'en',
+            language,
           },
           related_entity_type: 'receipt',
           related_entity_id: testReceiptId,
@@ -281,14 +317,25 @@ export function NotificationTestPanel() {
 
       if (edgeError) {
         console.error('Edge Function error:', edgeError);
-        toast.error(`Email service error: ${edgeError.message}. Check if Resend API key is configured in Supabase.`);
+        toast.error(
+          t('notifications.testPanel.toasts.emailServiceError', {
+            message: edgeError.message,
+          })
+        );
       } else {
         console.log('Email sent successfully:', edgeFunctionTest);
-        toast.success('Test email notification sent! Check your email inbox.');
+        toast.success(t('notifications.testPanel.toasts.emailSent'));
       }
     } catch (error) {
       console.error('Failed to send test email notification:', error);
-      toast.error(`Failed to send test email notification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('notifications.testPanel.toasts.emailFailed', {
+          error:
+            error instanceof Error
+              ? error.message
+              : t('notifications.testPanel.toasts.unknownError'),
+        })
+      );
     } finally {
       setIsLoading(false);
     }
@@ -303,9 +350,11 @@ export function NotificationTestPanel() {
               <AlertTriangle className="h-5 w-5 text-orange-600" />
             </div>
             <div>
-              <CardTitle className="text-orange-900">Authentication Required</CardTitle>
+              <CardTitle className="text-orange-900">
+                {t('notifications.testPanel.authRequired')}
+              </CardTitle>
               <CardDescription className="text-orange-700">
-                Please log in to test notifications
+                {t('notifications.testPanel.authDescription')}
               </CardDescription>
             </div>
           </div>
@@ -322,9 +371,9 @@ export function NotificationTestPanel() {
             <TestTube className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <CardTitle>Notification Testing Panel</CardTitle>
+            <CardTitle>{t('notifications.testPanel.title')}</CardTitle>
             <CardDescription>
-              Test different types of notifications to verify the system is working
+              {t('notifications.testPanel.description')}
             </CardDescription>
           </div>
         </div>
@@ -332,10 +381,10 @@ export function NotificationTestPanel() {
       <CardContent className="space-y-6">
         {/* Test Data Configuration */}
         <div className="space-y-4">
-          <h4 className="text-sm font-medium">Test Data</h4>
+          <h4 className="text-sm font-medium">{t('notifications.testPanel.testData')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label className="text-sm">Receipt ID</Label>
+              <Label className="text-sm">{t('notifications.testPanel.receiptId')}</Label>
               <Input
                 value={testReceiptId}
                 onChange={(e) => setTestReceiptId(e.target.value)}
@@ -349,20 +398,20 @@ export function NotificationTestPanel() {
                   onClick={() => setTestReceiptId(crypto.randomUUID())}
                   className="text-xs"
                 >
-                  Generate New UUID
+                  {t('notifications.testPanel.generateUuid')}
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Merchant</Label>
+              <Label className="text-sm">{t('notifications.testPanel.merchant')}</Label>
               <Input
                 value={testMerchant}
                 onChange={(e) => setTestMerchant(e.target.value)}
-                placeholder="Test Store"
+                placeholder={t('notifications.testPanel.merchantPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Total (MYR)</Label>
+              <Label className="text-sm">{t('notifications.testPanel.totalMyr')}</Label>
               <Input
                 value={testTotal}
                 onChange={(e) => setTestTotal(e.target.value)}
@@ -373,15 +422,21 @@ export function NotificationTestPanel() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-sm">Processing Status</Label>
+            <Label className="text-sm">{t('notifications.testPanel.processingStatus')}</Label>
             <Select value={testStatus} onValueChange={(value) => setTestStatus(value as ProcessingStatus)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="processing">
+                  {t('notifications.testPanel.statusProcessing')}
+                </SelectItem>
+                <SelectItem value="complete">
+                  {t('notifications.testPanel.statusComplete')}
+                </SelectItem>
+                <SelectItem value="failed">
+                  {t('notifications.testPanel.statusFailed')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -393,7 +448,7 @@ export function NotificationTestPanel() {
         <div className="space-y-4">
           <h4 className="text-sm font-medium flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Notification Tests
+            {t('notifications.testPanel.notificationTests')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -401,7 +456,9 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Receipt className="h-4 w-4" />
-                <span className="text-sm font-medium">Receipt Notifications</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.receiptNotifications')}
+                </span>
               </div>
               <Button
                 onClick={handleTestReceiptNotification}
@@ -414,7 +471,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <Receipt className="h-4 w-4 mr-2" />
                 )}
-                Test Receipt {testStatus} Notification
+                {t('notifications.testPanel.testReceipt', { status: testStatus })}
               </Button>
             </div>
 
@@ -422,7 +479,9 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                <span className="text-sm font-medium">Batch Notifications</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.batchNotifications')}
+                </span>
               </div>
               <Button
                 onClick={handleTestBatchNotification}
@@ -435,7 +494,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <Users className="h-4 w-4 mr-2" />
                 )}
-                Test Batch Complete
+                {t('notifications.testPanel.testBatch')}
               </Button>
             </div>
 
@@ -443,11 +502,17 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                <span className="text-sm font-medium">Push Notifications</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.pushNotifications')}
+                </span>
                 {pushContext.isSubscribed ? (
-                  <Badge variant="default" className="text-xs">Enabled</Badge>
+                  <Badge variant="default" className="text-xs">
+                    {t('notifications.testPanel.enabled')}
+                  </Badge>
                 ) : (
-                  <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {t('notifications.testPanel.disabled')}
+                  </Badge>
                 )}
               </div>
               <Button
@@ -461,7 +526,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <Bell className="h-4 w-4 mr-2" />
                 )}
-                Test Push Notification
+                {t('notifications.testPanel.testPush')}
               </Button>
             </div>
 
@@ -469,7 +534,9 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">In-App Notifications</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.inAppNotifications')}
+                </span>
               </div>
               <Button
                 onClick={handleTestInAppNotification}
@@ -482,7 +549,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
-                Test In-App Notification
+                {t('notifications.testPanel.testInApp')}
               </Button>
             </div>
 
@@ -490,11 +557,15 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                <span className="text-sm font-medium">Team Collaboration</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.teamCollaboration')}
+                </span>
                 {currentTeam ? (
                   <Badge variant="default" className="text-xs">{currentTeam.name}</Badge>
                 ) : (
-                  <Badge variant="secondary" className="text-xs">No Team</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {t('notifications.testPanel.noTeam')}
+                  </Badge>
                 )}
               </div>
               <Button
@@ -508,7 +579,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <Users className="h-4 w-4 mr-2" />
                 )}
-                Test Team Notification
+                {t('notifications.testPanel.testTeam')}
               </Button>
             </div>
 
@@ -516,7 +587,9 @@ export function NotificationTestPanel() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                <span className="text-sm font-medium">Email Notifications</span>
+                <span className="text-sm font-medium">
+                  {t('notifications.testPanel.emailNotifications')}
+                </span>
               </div>
               <Button
                 onClick={handleTestEmailNotification}
@@ -529,7 +602,7 @@ export function NotificationTestPanel() {
                 ) : (
                   <Mail className="h-4 w-4 mr-2" />
                 )}
-                Test Email Notification
+                {t('notifications.testPanel.testEmail')}
               </Button>
             </div>
           </div>

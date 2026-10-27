@@ -165,9 +165,9 @@ export function useTranslationWithNamespace(namespace?: string) {
   const { t: originalT, i18n, ready } = useTranslation(namespace);
   const { language, isLoading, error } = useLanguage();
 
-  const t = (key: string, options?: any) => {
+  const t = (key: string, options?: any): string => {
     try {
-      return originalT(key, options);
+      return originalT(key, options) as string;
     } catch (err) {
       console.warn(`Translation error for key "${key}":`, err);
       return key; // Return the key as fallback
@@ -277,4 +277,9 @@ export function useChatTranslation() {
 // Helper hook for documentation translations
 export function useDocumentationTranslation() {
   return useTranslationWithNamespace('documentation');
+}
+
+// Helper hook for marketing resource pages translations
+export function useResourcesTranslation() {
+  return useTranslationWithNamespace('resources');
 }

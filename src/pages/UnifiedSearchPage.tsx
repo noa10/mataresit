@@ -30,8 +30,10 @@ import {
 } from '@/types/unified-search';
 import { searchTargets, getAvailableTargets, defaultSearchFilters } from '@/config/search-targets';
 import { unifiedSearch } from '@/lib/ai-search';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 
 export default function UnifiedSearchPage() {
+  const { t } = useCommonTranslation();
   // Search state
   const [searchResults, setSearchResults] = useState<UnifiedSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,13 +71,15 @@ export default function UnifiedSearchPage() {
         setCurrentQuery(params.query);
         setSearchMetadata(response.searchMetadata);
         
-        toast.success(`Found ${response.totalResults} results`);
+        toast.success(t('unifiedSearch.found', { count: response.totalResults }));
       } else {
-        throw new Error(response.error || 'Search failed');
+        throw new Error(response.error || t('unifiedSearch.input.searchFailed'));
       }
     } catch (error) {
       console.error('Search error:', error);
-      toast.error(error instanceof Error ? error.message : 'Search failed');
+      toast.error(
+        error instanceof Error ? error.message : t('unifiedSearch.input.searchFailed')
+      );
       setSearchResults([]);
       setTotalResults(0);
       setHasMore(false);
@@ -110,7 +114,7 @@ export default function UnifiedSearchPage() {
       }
     } catch (error) {
       console.error('Load more error:', error);
-      toast.error('Failed to load more results');
+      toast.error(t('unifiedSearch.loadMoreFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +148,7 @@ export default function UnifiedSearchPage() {
         break;
       case 'share':
         // Handle share action
-        toast.info('Share functionality coming soon');
+        toast.info(t('unifiedSearch.shareComingSoon'));
         break;
       default:
         console.log('Unhandled action:', action);
@@ -161,9 +165,9 @@ export default function UnifiedSearchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-ledger-paper">
       <Helmet>
-        <title>Unified Search - Mataresit</title>
+        <title>{t('unifiedSearch.metaTitle')}</title>
       </Helmet>
 
       <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -171,16 +175,16 @@ export default function UnifiedSearchPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Unified Search</h1>
-              <p className="text-muted-foreground mt-2">
-                Search across all your data sources in one place
+              <h1 className="text-3xl font-bold tracking-tight">{t('unifiedSearch.title')}</h1>
+              <p className="text-ledger-muted mt-2">
+                {t('unifiedSearch.subtitle')}
               </p>
             </div>
             
             {searchResults.length > 0 && (
               <Button onClick={handleNewSearch} variant="outline">
                 <Search className="mr-2 h-4 w-4" />
-                New Search
+                {t('unifiedSearch.newSearch')}
               </Button>
             )}
           </div>
@@ -190,11 +194,11 @@ export default function UnifiedSearchPage() {
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="search" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
-              Search
+              {t('unifiedSearch.searchTab')}
             </TabsTrigger>
             <TabsTrigger value="results" className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
-              Results
+              {t('unifiedSearch.resultsTab')}
               {totalResults > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {totalResults}
@@ -209,7 +213,7 @@ export default function UnifiedSearchPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
-                  Search Configuration
+                  {t('unifiedSearch.searchConfig')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -219,7 +223,7 @@ export default function UnifiedSearchPage() {
                   filters={searchFilters}
                   onFiltersChange={setSearchFilters}
                   isLoading={isLoading}
-                  placeholder="Search across all your data..."
+                  placeholder={t('unifiedSearch.searchPlaceholder')}
                   showAdvancedFilters={true}
                 />
               </CardContent>
@@ -228,20 +232,22 @@ export default function UnifiedSearchPage() {
             {/* Quick Search Examples */}
             <Card>
               <CardHeader>
-                <CardTitle>Quick Search Examples</CardTitle>
+                <CardTitle>{t('unifiedSearch.quickExamples')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                   {[
-                    'Show me recent receipts',
-                    'Find grocery expenses',
-                    'Search Malaysian restaurants',
-                    'Team expense claims',
-                    'Office supplies receipts',
-                    'Business contacts in KL'
-                  ].map((example) => (
+                    'recentReceipts',
+                    'groceryExpenses',
+                    'malaysianRestaurants',
+                    'teamClaims',
+                    'officeSupplies',
+                    'businessContacts'
+                  ].map((exampleKey) => {
+                    const example = t(`unifiedSearch.examples.${exampleKey}`);
+                    return (
                     <Button
-                      key={example}
+                      key={exampleKey}
                       variant="outline"
                       size="sm"
                       onClick={() => handleSearch({
@@ -258,7 +264,8 @@ export default function UnifiedSearchPage() {
                     >
                       {example}
                     </Button>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -269,15 +276,27 @@ export default function UnifiedSearchPage() {
             {searchMetadata && (
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between text-sm text-ledger-muted">
                     <div className="flex items-center gap-4">
-                      <span>Search completed in {searchMetadata.searchDuration}ms</span>
+                      <span>
+                        {t('unifiedSearch.searchDuration', {
+                          duration: searchMetadata.searchDuration,
+                        })}
+                      </span>
                       <Separator orientation="vertical" className="h-4" />
-                      <span>Sources: {searchMetadata.sourcesSearched.join(', ')}</span>
+                      <span>
+                        {t('unifiedSearch.sourcesSearched', {
+                          sources: searchMetadata.sourcesSearched.join(', '),
+                        })}
+                      </span>
                       {searchMetadata.fallbacksUsed.length > 0 && (
                         <>
                           <Separator orientation="vertical" className="h-4" />
-                          <span>Fallbacks used: {searchMetadata.fallbacksUsed.join(', ')}</span>
+                          <span>
+                            {t('unifiedSearch.fallbacksUsed', {
+                              fallbacks: searchMetadata.fallbacksUsed.join(', '),
+                            })}
+                          </span>
                         </>
                       )}
                     </div>

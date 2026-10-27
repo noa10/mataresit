@@ -12,6 +12,7 @@ import {
 import { CreateClaimDialog } from './CreateClaimDialog';
 import { Receipt } from '@/types/receipt';
 import { formatCurrencySafe } from '@/utils/currency';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 
 interface ClaimFromReceiptButtonProps {
   receipt: Receipt;
@@ -30,6 +31,8 @@ export function ClaimFromReceiptButton({
 }: ClaimFromReceiptButtonProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { t, language } = useClaimsTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 
   const handleCreateClaim = () => {
     setShowPreview(false);
@@ -50,7 +53,7 @@ export function ClaimFromReceiptButton({
         onClick={() => setShowPreview(true)}
       >
         <FileText className="h-4 w-4 mr-2" />
-        Create Claim
+        {t('claimFromReceipt.button')}
       </Button>
 
       {/* Preview dialog */}
@@ -59,35 +62,35 @@ export function ClaimFromReceiptButton({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Create Claim from Receipt
+              {t('claimFromReceipt.title')}
             </DialogTitle>
             <DialogDescription>
-              Review the receipt details that will be used to create your claim.
+              {t('claimFromReceipt.subtitle')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Receipt preview */}
             <div className="border rounded-lg p-4 bg-muted/30">
-              <h4 className="font-medium mb-3">Receipt Details</h4>
+              <h4 className="font-medium mb-3">{t('claimFromReceipt.receiptDetails')}</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Merchant:</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.merchant')}</span>
                   <span className="font-medium">{receipt.merchant}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Date:</span>
-                  <span>{new Date(receipt.date).toLocaleDateString()}</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.date')}</span>
+                  <span>{new Date(receipt.date).toLocaleDateString(dateLocale)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.amount')}</span>
                   <span className="font-medium">
                     {formatCurrencySafe(receipt.total, receipt.currency)}
                   </span>
                 </div>
                 {receipt.payment_method && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment:</span>
+                    <span className="text-muted-foreground">{t('claimFromReceipt.payment')}</span>
                     <span>{receipt.payment_method}</span>
                   </div>
                 )}
@@ -96,25 +99,27 @@ export function ClaimFromReceiptButton({
 
             {/* Claim preview */}
             <div className="border rounded-lg p-4 bg-primary/5">
-              <h4 className="font-medium mb-3">Claim to be Created</h4>
+              <h4 className="font-medium mb-3">{t('claimFromReceipt.claimPreview')}</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Title:</span>
-                  <span className="font-medium">Expense - {receipt.merchant}</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.titleLabel')}</span>
+                  <span className="font-medium">
+                    {t('claimFromReceipt.untitled', { merchant: receipt.merchant })}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.amount')}</span>
                   <span className="font-medium">
                     {formatCurrencySafe(receipt.total, receipt.currency)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Category:</span>
-                  <span>{receipt.predicted_category || 'General'}</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.categoryLabel')}</span>
+                  <span>{receipt.predicted_category || t('claimFromReceipt.generalCategory')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Attachments:</span>
-                  <span>1 receipt</span>
+                  <span className="text-muted-foreground">{t('claimFromReceipt.attachmentsLabel')}</span>
+                  <span>{t('claimFromReceipt.oneReceipt')}</span>
                 </div>
               </div>
             </div>
@@ -126,14 +131,14 @@ export function ClaimFromReceiptButton({
                 className="flex-1"
                 onClick={() => setShowPreview(false)}
               >
-                Cancel
+                {t('claimFromReceipt.cancel')}
               </Button>
               <Button
                 className="flex-1"
                 onClick={handleCreateClaim}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Create Claim
+                {t('claimFromReceipt.button')}
               </Button>
             </div>
           </div>
@@ -146,8 +151,11 @@ export function ClaimFromReceiptButton({
         onOpenChange={setShowCreateDialog}
         onSuccess={handleClaimSuccess}
         prefilledData={{
-          title: `Expense - ${receipt.merchant}`,
-          description: `Expense claim for ${receipt.merchant} on ${new Date(receipt.date).toLocaleDateString()}`,
+          title: t('claimFromReceipt.untitled', { merchant: receipt.merchant }),
+          description: t('claimFromReceipt.description', {
+            merchant: receipt.merchant,
+            date: new Date(receipt.date).toLocaleDateString(dateLocale),
+          }),
           amount: receipt.total,
           currency: receipt.currency,
           category: receipt.predicted_category || undefined,

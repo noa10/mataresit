@@ -215,9 +215,9 @@ export const CategoryManager: React.FC = () => {
 
       <Tabs defaultValue="categories" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="rules">Rules</TabsTrigger>
-          <TabsTrigger value="aliases">Aliases</TabsTrigger>
+          <TabsTrigger value="categories">{t("tabs.categories")}</TabsTrigger>
+          <TabsTrigger value="rules">{t("tabs.rules")}</TabsTrigger>
+          <TabsTrigger value="aliases">{t("tabs.aliases")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories">
@@ -303,35 +303,35 @@ export const CategoryManager: React.FC = () => {
         <TabsContent value="rules" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">New Rule</CardTitle>
+              <CardTitle className="text-lg">{t("rules.newTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="space-y-1 md:col-span-2">
-                  <Label>Pattern</Label>
+                  <Label>{t("rules.pattern")}</Label>
                   <Input
                     value={newRulePattern}
                     onChange={(event) => setNewRulePattern(event.target.value)}
-                    placeholder="e.g. shell, family mart"
+                    placeholder={t("rules.patternPlaceholder")}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Match Type</Label>
+                  <Label>{t("rules.matchType")}</Label>
                   <Select value={newRuleMatchType} onValueChange={(value) => setNewRuleMatchType(value as CategoryRuleMatchType)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="merchant_exact">Merchant exact</SelectItem>
-                      <SelectItem value="merchant_contains">Merchant contains</SelectItem>
+                      <SelectItem value="merchant_exact">{t("rules.merchantExact")}</SelectItem>
+                      <SelectItem value="merchant_contains">{t("rules.merchantContains")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Category</Label>
+                  <Label>{t("rules.category")}</Label>
                   <Select value={newRuleCategoryId} onValueChange={setNewRuleCategoryId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={t("rules.selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
@@ -347,26 +347,26 @@ export const CategoryManager: React.FC = () => {
                 className="gap-2"
               >
                 <PlusCircle size={16} />
-                Save Rule
+                {t("rules.save")}
               </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Existing Rules</CardTitle>
+              <CardTitle className="text-lg">{t("rules.existingTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {isRulesLoading && <p className="text-sm text-muted-foreground">Loading rules...</p>}
+              {isRulesLoading && <p className="text-sm text-muted-foreground">{t("rules.loading")}</p>}
               {!isRulesLoading && categoryRules.length === 0 && (
-                <p className="text-sm text-muted-foreground">No rules created yet.</p>
+                <p className="text-sm text-muted-foreground">{t("rules.empty")}</p>
               )}
               {categoryRules.filter((rule) => !rule.archived).map((rule: CategoryRule) => (
                 <div key={rule.id} className="flex items-center justify-between border rounded p-3">
                   <div className="space-y-1">
                     <p className="font-medium">{rule.pattern}</p>
                     <p className="text-xs text-muted-foreground">
-                      {rule.match_type} • {rule.category_name || "Unknown category"}
+                      {rule.match_type} • {rule.category_name || t("rules.unknownCategory")}
                     </p>
                   </div>
                   <Button
@@ -375,7 +375,7 @@ export const CategoryManager: React.FC = () => {
                     onClick={() => archiveRuleMutation.mutate(rule.id)}
                     disabled={archiveRuleMutation.isPending}
                   >
-                    Archive
+                    {t("rules.archive")}
                   </Button>
                 </div>
               ))}
@@ -386,23 +386,23 @@ export const CategoryManager: React.FC = () => {
         <TabsContent value="aliases" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">New Alias</CardTitle>
+              <CardTitle className="text-lg">{t("aliases.newTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1 md:col-span-2">
-                  <Label>AI label</Label>
+                  <Label>{t("aliases.label")}</Label>
                   <Input
                     value={newAliasText}
                     onChange={(event) => setNewAliasText(event.target.value)}
-                    placeholder="e.g. groceries, dining"
+                    placeholder={t("aliases.placeholder")}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Category</Label>
+                  <Label>{t("aliases.category")}</Label>
                   <Select value={newAliasCategoryId} onValueChange={setNewAliasCategoryId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={t("aliases.selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
@@ -418,25 +418,25 @@ export const CategoryManager: React.FC = () => {
                 className="gap-2"
               >
                 <PlusCircle size={16} />
-                Save Alias
+                {t("aliases.save")}
               </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Existing Aliases</CardTitle>
+              <CardTitle className="text-lg">{t("aliases.existingTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {isAliasesLoading && <p className="text-sm text-muted-foreground">Loading aliases...</p>}
+              {isAliasesLoading && <p className="text-sm text-muted-foreground">{t("aliases.loading")}</p>}
               {!isAliasesLoading && categoryAliases.length === 0 && (
-                <p className="text-sm text-muted-foreground">No aliases created yet.</p>
+                <p className="text-sm text-muted-foreground">{t("aliases.empty")}</p>
               )}
               {categoryAliases.map((alias: CategoryAlias) => (
                 <div key={alias.id} className="flex items-center justify-between border rounded p-3">
                   <div className="space-y-1">
                     <p className="font-medium">{alias.alias}</p>
-                    <p className="text-xs text-muted-foreground">{alias.category_name || "Unknown category"}</p>
+                    <p className="text-xs text-muted-foreground">{alias.category_name || t("aliases.unknownCategory")}</p>
                   </div>
                   <Button
                     variant="outline"
@@ -444,7 +444,7 @@ export const CategoryManager: React.FC = () => {
                     onClick={() => deleteAliasMutation.mutate(alias.id)}
                     disabled={deleteAliasMutation.isPending}
                   >
-                    Delete
+                    {t("aliases.delete")}
                   </Button>
                 </div>
               ))}

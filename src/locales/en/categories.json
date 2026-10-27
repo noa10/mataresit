@@ -15,7 +15,11 @@
   },
   "error": {
     "loadFailed": "Failed to load categories",
-    "tryRefresh": "Please try refreshing the page."
+    "tryRefresh": "Please try refreshing the page.",
+    "createFailed": "Failed to create category",
+    "updateFailed": "Failed to update category",
+    "deleteFailed": "Failed to delete category",
+    "assignFailed": "Failed to assign category"
   },
   "form": {
     "name": "Category Name",
@@ -25,7 +29,20 @@
     "nameRequired": "Category name is required",
     "nameMinLength": "Category name must be at least 2 characters",
     "nameMaxLength": "Category name must be less than 50 characters",
-    "colorRequired": "Please select a color"
+    "colorRequired": "Please select a color",
+    "createTitle": "Create New Category",
+    "editTitle": "Edit Category",
+    "characters": "{{count}}/50 characters",
+    "customColor": "Or choose custom color",
+    "icon": "Icon",
+    "preview": "Preview",
+    "previewFallback": "Category Name",
+    "saving": "Saving...",
+    "update": "Update",
+    "create": "Create",
+    "payerConflict": "Category name cannot match an existing payer name",
+    "nameTooLong": "Category name cannot exceed 50 characters",
+    "colorInvalid": "Color must be a valid hex color (e.g., #3B82F6)"
   },
   "delete": {
     "title": "Delete Category",
@@ -35,13 +52,66 @@
     "reassignOption": "Select a category",
     "noReassign": "Don't reassign (receipts will become uncategorized)",
     "confirmDelete": "Yes, delete category",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "cannotUndo": "This action cannot be undone",
+    "assignedTo": "This category is assigned to {{count}} receipt(s). Choose what to do with them below.",
+    "permanentlyDelete": "This category will be permanently deleted.",
+    "whatHappens": "What should happen to receipts in this category?",
+    "removeOption": "Remove category (receipts become uncategorized)",
+    "moveOption": "Move to another category",
+    "selectCategory": "Select category:",
+    "chooseCategory": "Choose a category"
   },
   "receipts": "receipts",
   "receiptCount": "{{count}} receipts",
   "success": {
     "created": "Category created successfully",
     "updated": "Category updated successfully",
-    "deleted": "Category deleted successfully"
+    "deleted": "Category deleted successfully",
+    "assigned": "{{count}} receipt(s) assigned to category",
+    "removed": "{{count}} receipt(s) removed from category"
+  },
+  "tabs": {
+    "categories": "Categories",
+    "rules": "Rules",
+    "aliases": "Aliases"
+  },
+  "rules": {
+    "newTitle": "New Rule",
+    "pattern": "Pattern",
+    "patternPlaceholder": "e.g. shell, family mart",
+    "matchType": "Match Type",
+    "merchantExact": "Merchant exact",
+    "merchantContains": "Merchant contains",
+    "category": "Category",
+    "selectCategory": "Select category",
+    "save": "Save Rule",
+    "existingTitle": "Existing Rules",
+    "loading": "Loading rules...",
+    "empty": "No rules created yet.",
+    "unknownCategory": "Unknown category",
+    "archive": "Archive"
+  },
+  "aliases": {
+    "newTitle": "New Alias",
+    "label": "AI label",
+    "placeholder": "e.g. groceries, dining",
+    "category": "Category",
+    "selectCategory": "Select category",
+    "save": "Save Alias",
+    "existingTitle": "Existing Aliases",
+    "loading": "Loading aliases...",
+    "empty": "No aliases created yet.",
+    "unknownCategory": "Unknown category",
+    "delete": "Delete"
+  },
+  "selector": {
+    "selectPlaceholder": "Select category...",
+    "searchPlaceholder": "Search categories...",
+    "empty": "No categories found.",
+    "remove": "Remove category",
+    "groupHeading": "Categories",
+    "createNew": "Create new category",
+    "uncategorized": "Uncategorized"
   }
 }

@@ -22,6 +22,7 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingRealTimeStatusProps {
   isConnected: boolean;
@@ -40,6 +41,7 @@ export function EmbeddingRealTimeStatus({
   onToggleRealTime,
   className
 }: EmbeddingRealTimeStatusProps) {
+  const { t, language } = useAdminTranslation();
   const getStatusConfig = () => {
     switch (status) {
       case 'connected':
@@ -48,8 +50,8 @@ export function EmbeddingRealTimeStatus({
           color: 'text-green-500',
           bgColor: 'bg-green-100',
           badgeVariant: 'default' as const,
-          label: 'Connected',
-          description: 'Real-time updates are active'
+          label: t('embeddingMetrics.common.connected'),
+          description: t('embeddingMetrics.realTime.connectedDescription')
         };
       case 'connecting':
         return {
@@ -57,8 +59,8 @@ export function EmbeddingRealTimeStatus({
           color: 'text-blue-500',
           bgColor: 'bg-blue-100',
           badgeVariant: 'secondary' as const,
-          label: 'Connecting',
-          description: 'Establishing real-time connection'
+          label: t('embeddingMetrics.common.connecting'),
+          description: t('embeddingMetrics.realTime.connectingDescription')
         };
       case 'error':
         return {
@@ -66,8 +68,8 @@ export function EmbeddingRealTimeStatus({
           color: 'text-red-500',
           bgColor: 'bg-red-100',
           badgeVariant: 'destructive' as const,
-          label: 'Error',
-          description: 'Real-time connection failed'
+          label: t('embeddingMetrics.common.error'),
+          description: t('embeddingMetrics.realTime.errorDescription')
         };
       default:
         return {
@@ -75,8 +77,8 @@ export function EmbeddingRealTimeStatus({
           color: 'text-gray-500',
           bgColor: 'bg-gray-100',
           badgeVariant: 'outline' as const,
-          label: 'Disconnected',
-          description: 'Real-time updates are disabled'
+          label: t('embeddingMetrics.common.disconnected'),
+          description: t('embeddingMetrics.realTime.disconnectedDescription')
         };
     }
   };
@@ -85,21 +87,21 @@ export function EmbeddingRealTimeStatus({
   const Icon = config.icon;
 
   const formatLastUpdate = (date: Date | null) => {
-    if (!date) return 'Never';
+    if (!date) return t('embeddingMetrics.common.never');
     
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     
     if (diff < 60000) { // Less than 1 minute
-      return 'Just now';
+      return t('embeddingMetrics.common.justNow');
     } else if (diff < 3600000) { // Less than 1 hour
       const minutes = Math.floor(diff / 60000);
-      return `${minutes}m ago`;
+      return t('embeddingMetrics.common.minutesAgo', { count: minutes });
     } else if (diff < 86400000) { // Less than 1 day
       const hours = Math.floor(diff / 3600000);
-      return `${hours}h ago`;
+      return t('embeddingMetrics.common.hoursAgo', { count: hours });
     } else {
-      return date.toLocaleDateString();
+      return date.toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-MY');
     }
   };
 
@@ -122,11 +124,15 @@ export function EmbeddingRealTimeStatus({
                 'h-4 w-4 mr-2',
                 enableRealTime && status === 'connected' && 'animate-pulse'
               )} />
-              Real-time
+              {t('embeddingMetrics.realTime.realTime')}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{enableRealTime ? 'Disable' : 'Enable'} real-time updates</p>
+            <p>
+              {enableRealTime
+                ? t('embeddingMetrics.realTime.disableTooltip')
+                : t('embeddingMetrics.realTime.enableTooltip')}
+            </p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -173,10 +179,12 @@ export function EmbeddingRealTimeStatus({
             </TooltipTrigger>
             <TooltipContent>
               <div className="text-center">
-                <p className="font-medium">Last Update</p>
+                <p className="font-medium">{t('embeddingMetrics.realTime.lastUpdate')}</p>
                 {lastUpdateTime && (
                   <p className="text-xs text-muted-foreground">
-                    {lastUpdateTime.toLocaleString()}
+                    {lastUpdateTime.toLocaleString(
+                      language === 'ms' ? 'ms-MY' : 'en-MY'
+                    )}
                   </p>
                 )}
               </div>
