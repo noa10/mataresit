@@ -109,10 +109,10 @@ export function WorkspaceSidebar() {
       <div>
         <LogoLockup
           to="/dashboard"
-          markSize="sm"
+          markSize="md"
           tone="on-panel"
           className="px-1.5 py-1 text-ledger-on-panel"
-          wordmarkClassName="font-display text-[1.1rem] text-ledger-on-panel"
+          wordmarkClassName="font-sans text-[1.1rem] font-semibold tracking-[-0.01em] text-ledger-on-panel"
         />
       </div>
 

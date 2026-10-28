@@ -7,10 +7,10 @@ type MarkSize = "sm" | "md" | "lg";
 type LockupTone = "accent" | "on-panel" | "inherit";
 
 const MARK_SIZE_CLASSES: Record<MarkSize, string> = {
-  // 26 / 28 / 32 px. The brand sheet's floor is 16 px; the lockup never goes lower.
-  sm: "h-[26px] w-[26px]",
-  md: "h-7 w-7",
-  lg: "h-8 w-8",
+  // 28 / 32 / 36 px. The brand sheet's floor is 16 px; the lockup never goes lower.
+  sm: "h-7 w-7",
+  md: "h-8 w-8",
+  lg: "h-9 w-9",
 };
 
 const TONE_CLASSES: Record<LockupTone, string> = {
