@@ -1,9 +1,9 @@
 // Push Notification Service Worker for Mataresit
 // This service worker handles push notifications and background sync
 
-const CACHE_NAME = 'mataresit-push-v1';
-const NOTIFICATION_ICON = '/mataresit-icon.png';
-const NOTIFICATION_BADGE = '/mataresit-icon.png';
+const CACHE_NAME = 'mataresit-push-v2';
+const NOTIFICATION_ICON = '/mataresit-192.png';
+const NOTIFICATION_BADGE = '/mataresit-badge.png';
 
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {

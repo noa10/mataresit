@@ -499,8 +499,8 @@ export class AlertNotificationDeliveryService {
             userId: memberId,
             title: subject,
             body: message,
-            icon: '/mataresit-icon.png',
-            badge: '/mataresit-icon.png',
+            icon: '/mataresit-192.png',
+            badge: '/mataresit-badge.png',
             tag: `alert-${alert.id}`,
             data: {
               alertId: alert.id,

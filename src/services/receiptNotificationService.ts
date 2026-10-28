@@ -415,7 +415,7 @@ export class ReceiptNotificationService {
     errorMessage?: string
   ): any {
     const basePayload = {
-      icon: '/mataresit-icon.png',
+      icon: '/mataresit-192.png',
       tag: `receipt-${receiptData.receiptId}`,
       data: {
         receiptId: receiptData.receiptId,

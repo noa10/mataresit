@@ -104,7 +104,7 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
       const payload = {
         title: notification.title,
         body: notification.message,
-        icon: '/mataresit-icon.png',
+        icon: '/mataresit-192.png',
         tag: `notification-${notification.id}`,
         data: {
           notificationId: notification.id,

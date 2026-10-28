@@ -243,8 +243,8 @@ export class PushNotificationService {
       // Default notification options
       const options: any = {
         body: payload.body,
-        icon: payload.icon || '/mataresit-icon.png',
-        badge: payload.badge || '/mataresit-icon.png',
+        icon: payload.icon || '/mataresit-192.png',
+        badge: payload.badge || '/mataresit-badge.png',
         tag: payload.tag || `notification-${Date.now()}`,
         data: payload.data || {},
         requireInteraction: payload.requireInteraction || false,
@@ -313,7 +313,7 @@ export class PushNotificationService {
         body: receiptData.merchant
           ? `Processing receipt from ${receiptData.merchant}...`
           : 'Your receipt is being processed...',
-        icon: '/mataresit-icon.png',
+        icon: '/mataresit-192.png',
         tag: `receipt-processing-${receiptData.id}`,
         data: {
           type: 'receipt_processing_started' as NotificationType,
@@ -326,7 +326,7 @@ export class PushNotificationService {
         body: receiptData.merchant && receiptData.total
           ? `Receipt from ${receiptData.merchant} (${receiptData.currency || 'MYR'} ${receiptData.total}) processed successfully`
           : 'Your receipt has been processed successfully',
-        icon: '/mataresit-icon.png',
+        icon: '/mataresit-192.png',
         tag: `receipt-processing-${receiptData.id}`,
         data: {
           type: 'receipt_processing_completed' as NotificationType,
@@ -343,7 +343,7 @@ export class PushNotificationService {
       failed: {
         title: 'Receipt Processing Failed',
         body: receiptData.errorMessage || 'Receipt processing failed. Please try again.',
-        icon: '/mataresit-icon.png',
+        icon: '/mataresit-192.png',
         tag: `receipt-processing-${receiptData.id}`,
         data: {
           type: 'receipt_processing_failed' as NotificationType,
@@ -391,7 +391,7 @@ export class PushNotificationService {
     await this.showLocalNotification({
       title: isSuccess ? 'Batch Processing Completed' : 'Batch Processing Failed',
       body,
-      icon: '/mataresit-icon.png',
+      icon: '/mataresit-192.png',
       tag: `batch-processing-${Date.now()}`,
       data: {
         type: isSuccess ? 'receipt_batch_completed' : 'receipt_batch_failed',

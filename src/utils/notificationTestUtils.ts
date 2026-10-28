@@ -116,7 +116,7 @@ export async function testBasicNotification(): Promise<NotificationTestResult> {
 
     const notification = new Notification('Test Notification', {
       body: 'This is a test notification from Mataresit',
-      icon: '/mataresit-icon.png',
+      icon: '/mataresit-192.png',
       tag: 'test-notification'
     });
 
