@@ -7,6 +7,13 @@ const MARK_PATH =
   "M5.2 16H13.6V17.5H5.2Z " +
   "M5.2 18.8H18.4V20.3H5.2Z";
 
+/**
+ * Vertical centre of the mark's ink inside the 24 x 24 canvas: the art spans
+ * y 5.15 (tear peaks) to y 21 (flat cut base). Centring the box alone leaves the
+ * ink 1.32 units low, which is what makes a flex-aligned wordmark look sunk.
+ */
+const MARK_INK_CENTRE = (5.15 + 21) / 2;
+
 interface MataresitMarkProps {
   /** Accessible name. Omitted leaves the mark decorative (`aria-hidden`). */
   title?: string;
@@ -46,12 +53,18 @@ export function MataresitMark({ title, className, scan = false }: MataresitMarkP
           </clipPath>
         </defs>
       ) : null}
-      <path fillRule="evenodd" d={MARK_PATH} />
-      {scan ? (
-        <g clipPath={`url(#${clipId})`} aria-hidden="true">
-          <rect className="mataresit-mark__scan" x="2.4" y="0" width="19.2" height="2.6" />
-        </g>
-      ) : null}
+      {/* The mark letterboxes inside its square box: 2.4–21.6 wide, 5.15–21 tall,
+          so its ink sits 1.32 units low. Shift it up so the visual centre of the
+          ink lands on the box centre and a flex-centred wordmark lines up with
+          it. The shift is one constant in the 24-unit space. */}
+      <g transform={`translate(0 ${-(MARK_INK_CENTRE - 12)})`}>
+        <path fillRule="evenodd" d={MARK_PATH} />
+        {scan ? (
+          <g clipPath={`url(#${clipId})`} aria-hidden="true">
+            <rect className="mataresit-mark__scan" x="2.4" y="0" width="19.2" height="2.6" />
+          </g>
+        ) : null}
+      </g>
     </svg>
   );
 }

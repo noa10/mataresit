@@ -78,6 +78,8 @@ Where this design lives in the app.
 | App assets | `public/mataresit-mark.svg` (seed colour, for `<img>`/favicon), `public/mataresit-icon.svg` (tile), `mataresit-{32,64,180,192,512}.png`, `mataresit-tile-{192,512}.png`, `mataresit-badge.png` (monochrome notification badge), `favicon.ico` (16/24/32/48). |
 | Asset generators | `tools/generate-brand-assets.cjs`, `tools/generate-favicon.cjs`, `tools/pack-favicon.cjs`. One-off; not part of the build. |
 
+Optical centring: the art spans y 5.15 to 21 in the 24-unit box, so its ink sits 1.32 units below the box centre. `MataresitMark` wraps the path in a group translated up by `MARK_INK_CENTRE - 12` (1.075 units) so the visual centre of the ink lands on the box centre. That is what lets a flex-centred wordmark sit level with the mark instead of 1-2 px low. Keep that shift if the path is ever redrawn; it depends only on the ink bounds.
+
 Colour in code comes from the existing ledger tokens: `--ledger-accent` (`#0B6B4D` light, `#3FBF8E` dark) for the mark, with the dark-panel mint (`#3FBF8E`) applied directly on always-dark chrome such as the sidebar and auth panel, which never receive the `.dark` class.
 
 Two deliberate differences from this sheet:
