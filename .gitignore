@@ -113,6 +113,7 @@ opencode.json
 # root and silently misses nested dirs such as supabase/functions/.omc/.
 .omc/
 .omo/
+.workbuddy-ai/
 
 # Local agent/merge planning notes
 MERGE_PLAN.md

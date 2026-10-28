@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { t } = useAdminTranslation();
+  const { t, language } = useAdminTranslation();
 
   useEffect(() => {
     fetchSystemStats();
@@ -53,10 +53,8 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-        <p className="text-muted-foreground">
-          A overview of the platform&apos;s key metrics and recent activity.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
+        <p className="text-muted-foreground">{t("dashboard.description")}</p>
       </div>
 
       {loading ? (
@@ -78,7 +76,7 @@ export default function AdminDashboard() {
                 className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
+                {t("dashboard.refresh")}
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -93,7 +91,9 @@ export default function AdminDashboard() {
                   <div className="text-2xl font-bold">{systemStats?.userCount || 0}</div>
                   <p className="text-sm text-muted-foreground">
                     {systemStats?.activeUsersCount !== undefined
-                      ? `${systemStats.activeUsersCount} active in last 30 days`
+                      ? t("dashboard.activeInLast30Days", {
+                          count: systemStats.activeUsersCount,
+                        })
                       : t("dashboard.descriptions.totalUsers")
                     }
                   </p>
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <BookOpen className="h-5 w-5" />
-              Blog Analytics
+              {t("dashboard.sections.blogAnalytics")}
             </h2>
             <BlogAnalytics />
           </div>
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Embedding System Diagnostics
+              {t("dashboard.sections.embeddingDiagnostics")}
             </h2>
             <EmbeddingSystemDiagnostics />
           </div>
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Database className="h-5 w-5" />
-              User Feedback Analytics
+              {t("dashboard.sections.feedbackAnalytics")}
             </h2>
             <FeedbackAnalytics />
           </div>
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Cache Performance Monitor
+              {t("dashboard.sections.cacheMonitor")}
             </h2>
             <CacheMonitor />
           </div>
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Embedding Repair System (Advanced)
+              {t("dashboard.sections.embeddingRepair")}
             </h2>
             <EmbeddingRepairTest />
           </div>
@@ -192,17 +192,17 @@ export default function AdminDashboard() {
           {/* Recent Activity */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Receipt Activity</CardTitle>
+              <CardTitle>{t("dashboard.sections.recentReceiptActivity")}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Receipt ID</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Merchant</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>{t("dashboard.table.receiptId")}</TableHead>
+                    <TableHead>{t("dashboard.table.user")}</TableHead>
+                    <TableHead>{t("dashboard.table.merchant")}</TableHead>
+                    <TableHead>{t("dashboard.table.total")}</TableHead>
+                    <TableHead>{t("dashboard.table.date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -212,7 +212,11 @@ export default function AdminDashboard() {
                       <TableCell>{activity.profile?.first_name} {activity.profile?.last_name}</TableCell>
                       <TableCell>{activity.merchant}</TableCell>
                       <TableCell>{activity.total}</TableCell>
-                      <TableCell>{new Date(activity.date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {new Date(activity.date).toLocaleDateString(
+                          language === "ms" ? "ms-MY" : "en-MY"
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

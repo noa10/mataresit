@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { EmbeddingAggregationResult } from '@/types/embedding-metrics';
 import { toast } from 'sonner';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingAggregationControlsProps {
   onTrigger: (type: 'hourly' | 'daily' | 'cleanup' | 'all') => Promise<EmbeddingAggregationResult>;
@@ -36,34 +37,35 @@ export function EmbeddingAggregationControls({
   disabled = false,
   size = 'md'
 }: EmbeddingAggregationControlsProps) {
+  const { t } = useAdminTranslation();
   const [isRunning, setIsRunning] = useState<string | null>(null);
 
   const aggregationTypes = [
     {
       key: 'hourly' as const,
-      label: 'Hourly Stats',
-      description: 'Aggregate metrics for the previous hour',
+      label: t('embeddingMetrics.aggregation.hourlyStats'),
+      description: t('embeddingMetrics.aggregation.hourlyStatsDescription'),
       icon: Clock,
       color: 'text-blue-500'
     },
     {
       key: 'daily' as const,
-      label: 'Daily Stats',
-      description: 'Aggregate metrics for the previous day',
+      label: t('embeddingMetrics.aggregation.dailyStats'),
+      description: t('embeddingMetrics.aggregation.dailyStatsDescription'),
       icon: Calendar,
       color: 'text-green-500'
     },
     {
       key: 'cleanup' as const,
-      label: 'Cleanup',
-      description: 'Remove old metrics data',
+      label: t('embeddingMetrics.aggregation.cleanup'),
+      description: t('embeddingMetrics.aggregation.cleanupDescription'),
       icon: Trash2,
       color: 'text-orange-500'
     },
     {
       key: 'all' as const,
-      label: 'All Operations',
-      description: 'Run all aggregation operations',
+      label: t('embeddingMetrics.aggregation.allOperations'),
+      description: t('embeddingMetrics.aggregation.allOperationsDescription'),
       icon: Zap,
       color: 'text-purple-500'
     }
@@ -77,18 +79,34 @@ export function EmbeddingAggregationControls({
     try {
       const result = await onTrigger(type);
       
+      const typeName = t(`embeddingMetrics.aggregation.typeNames.${type}`, {
+        defaultValue: type,
+      });
+
       if (result.success) {
         toast.success(
-          `${type} aggregation completed successfully`,
+          t('embeddingMetrics.aggregation.completedSuccess', { type: typeName }),
           {
-            description: `${result.summary.successful}/${result.summary.totalOperations} operations completed in ${result.summary.totalExecutionTime}ms`
+            description: t('embeddingMetrics.aggregation.completedDescription', {
+              successful: result.summary.successful,
+              total: result.summary.totalOperations,
+              duration: result.summary.totalExecutionTime,
+            }),
           }
         );
       } else {
-        toast.error(`${type} aggregation failed`);
+        toast.error(
+          t('embeddingMetrics.aggregation.failed', { type: typeName })
+        );
       }
     } catch (error) {
-      toast.error(`Failed to trigger ${type} aggregation`);
+      toast.error(
+        t('embeddingMetrics.aggregation.triggerFailed', {
+          type: t(`embeddingMetrics.aggregation.typeNames.${type}`, {
+            defaultValue: type,
+          }),
+        })
+      );
     } finally {
       setIsRunning(null);
     }
@@ -116,7 +134,9 @@ export function EmbeddingAggregationControls({
         ) : (
           <Play className="h-4 w-4 mr-2" />
         )}
-        {isRunning === 'all' ? 'Running...' : 'Run All'}
+        {isRunning === 'all'
+          ? t('embeddingMetrics.aggregation.runningAction')
+          : t('embeddingMetrics.aggregation.runAll')}
       </Button>
 
       {/* Dropdown for Individual Operations */}
@@ -154,7 +174,7 @@ export function EmbeddingAggregationControls({
                     <span className="font-medium">{type.label}</span>
                     {isCurrentlyRunning && (
                       <Badge variant="secondary" className="text-xs">
-                        Running
+                        {t('embeddingMetrics.aggregation.runningBadge')}
                       </Badge>
                     )}
                   </div>
@@ -169,7 +189,7 @@ export function EmbeddingAggregationControls({
           <DropdownMenuSeparator />
           
           <div className="p-3 text-xs text-muted-foreground">
-            <p>Aggregations process raw metrics into hourly and daily summaries for better performance.</p>
+            <p>{t('embeddingMetrics.aggregation.info')}</p>
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -178,7 +198,9 @@ export function EmbeddingAggregationControls({
       {isRunning && (
         <Badge variant="secondary" className="animate-pulse">
           <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-          {isRunning}
+          {t(`embeddingMetrics.aggregation.typeNames.${isRunning}`, {
+            defaultValue: isRunning ?? '',
+          })}
         </Badge>
       )}
     </div>

@@ -13,10 +13,12 @@ import { SUPPORTED_LANGUAGES, getLanguageDisplayName, type SupportedLanguage } f
 import { cn } from '@/lib/utils';
 
 interface LanguageSelectorProps {
-  variant?: 'default' | 'compact' | 'icon-only';
+  variant?: 'default' | 'compact' | 'globe-code' | 'icon-only';
   className?: string;
   showFlag?: boolean;
   disabled?: boolean;
+  ariaLabel?: string;
+  menuClassName?: string;
 }
 
 // Language flag emojis
@@ -35,7 +37,9 @@ export function LanguageSelector({
   variant = 'default', 
   className,
   showFlag = true,
-  disabled = false
+  disabled = false,
+  ariaLabel,
+  menuClassName
 }: LanguageSelectorProps) {
   const { language, changeLanguage, isLoading, error } = useLanguage();
 
@@ -62,11 +66,35 @@ export function LanguageSelector({
             size="sm"
             className={cn("h-8 w-8 p-0", className)}
             disabled={disabled || isLoading}
+            aria-label={ariaLabel}
+            title={ariaLabel}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Globe className="h-4 w-4" />
+            )}
+          </Button>
+        );
+
+      case 'globe-code':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn("h-8 px-2 gap-1.5", className)}
+            disabled={disabled || isLoading}
+            aria-label={ariaLabel}
+            title={ariaLabel}
+          >
+            {isLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <>
+                <Globe className="h-4 w-4" />
+                <span className="text-xs font-medium">{code}</span>
+                <ChevronDown className="h-3 w-3" />
+              </>
             )}
           </Button>
         );
@@ -78,6 +106,8 @@ export function LanguageSelector({
             size="sm"
             className={cn("h-8 px-2 gap-1", className)}
             disabled={disabled || isLoading}
+            aria-label={ariaLabel}
+            title={ariaLabel}
           >
             {isLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -98,6 +128,8 @@ export function LanguageSelector({
             size="sm"
             className={cn("h-9 px-3 gap-2", className)}
             disabled={disabled || isLoading}
+            aria-label={ariaLabel}
+            title={ariaLabel}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -119,7 +151,7 @@ export function LanguageSelector({
       <DropdownMenuTrigger asChild>
         {renderTriggerContent()}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className={cn("w-48", menuClassName)}>
         {Object.entries(SUPPORTED_LANGUAGES).map(([langCode, langName]) => {
           const lang = langCode as SupportedLanguage;
           const isSelected = lang === language;

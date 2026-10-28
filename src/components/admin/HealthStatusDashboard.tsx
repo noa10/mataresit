@@ -33,12 +33,14 @@ import {
   getMutedTextClasses,
   getEmphasisTextClasses
 } from '@/lib/darkModeUtils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface HealthStatusDashboardProps {
   className?: string;
 }
 
 export function HealthStatusDashboard({ className }: HealthStatusDashboardProps) {
+  const { t } = useAdminTranslation();
   const [healthStatus, setHealthStatus] = useState<SystemHealthStatus | null>(null);
   const [aggregationStatus, setAggregationStatus] = useState<AggregationStatus | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
@@ -116,13 +118,13 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
   };
 
   const formatDuration = (ms: number | null) => {
-    if (!ms) return 'N/A';
+    if (!ms) return t('embeddingMetrics.common.notAvailable');
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
   const formatTimeAgo = (timestamp: string | null) => {
-    if (!timestamp) return 'Never';
+    if (!timestamp) return t('embeddingMetrics.common.never');
     
     const now = new Date();
     const time = new Date(timestamp);
@@ -131,10 +133,12 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffMins < 1) return t('embeddingMetrics.common.justNow');
+    if (diffMins < 60)
+      return t('embeddingMetrics.common.minutesAgo', { count: diffMins });
+    if (diffHours < 24)
+      return t('embeddingMetrics.common.hoursAgo', { count: diffHours });
+    return t('embeddingMetrics.common.daysAgo', { count: diffDays });
   };
 
   if (isLoading) {
@@ -142,7 +146,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
       <div className={cn('space-y-6', className)}>
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="h-8 w-8 animate-spin text-gray-400 dark:text-gray-500" />
-          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading health status...</span>
+          <span className="ml-2 text-gray-500 dark:text-gray-400">{t('embeddingMetrics.healthDashboard.loading')}</span>
         </div>
       </div>
     );
@@ -156,11 +160,13 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               {healthStatus && getStatusIcon(healthStatus.overallStatus)}
-              System Health Status
+              {t('embeddingMetrics.healthDashboard.title')}
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge className={healthStatus ? getStatusBadgeClasses(healthStatus.overallStatus as 'healthy' | 'warning' | 'degraded' | 'critical' | 'unknown') : getStatusBadgeClasses('unknown')}>
-                {healthStatus?.overallStatus.toUpperCase() || 'UNKNOWN'}
+                {t(`embeddingMetrics.common.${healthStatus?.overallStatus || 'unknown'}`, {
+                  defaultValue: healthStatus?.overallStatus || 'unknown',
+                }).toUpperCase()}
               </Badge>
               <Button
                 variant="outline"
@@ -169,7 +175,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
                 disabled={isRefreshing}
               >
                 <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
-                Refresh
+                {t('embeddingMetrics.common.refresh')}
               </Button>
             </div>
           </div>
@@ -179,38 +185,42 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
             {/* Health Score */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Health Score</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.healthDashboard.healthScore')}</span>
                 <span className="text-2xl font-bold">{healthStatus?.healthScore || 0}/100</span>
               </div>
               <Progress value={healthStatus?.healthScore || 0} className="h-3" />
               <p className="text-xs text-muted-foreground">
-                Overall system health rating
+                {t('embeddingMetrics.healthDashboard.overallSystemHealth')}
               </p>
             </div>
 
             {/* Uptime */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Uptime</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.healthDashboard.uptime')}</span>
                 <span className="text-2xl font-bold">{healthStatus?.uptime.percentage.toFixed(1) || 0}%</span>
               </div>
               <Progress value={healthStatus?.uptime.percentage || 0} className="h-3" />
               <p className="text-xs text-muted-foreground">
-                {healthStatus?.uptime.duration || 'No data'}
+                {healthStatus?.uptime.duration || t('embeddingMetrics.healthDashboard.noData')}
               </p>
             </div>
 
             {/* Last Check */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Last Check</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.healthDashboard.lastCheck')}</span>
                 <span className="text-lg font-bold">
-                  {lastRefresh ? formatTimeAgo(lastRefresh.toISOString()) : 'Never'}
+                  {lastRefresh
+                    ? formatTimeAgo(lastRefresh.toISOString())
+                    : t('embeddingMetrics.common.never')}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                Auto-refresh every {refreshInterval / 1000}s
+                {t('embeddingMetrics.healthDashboard.autoRefreshEvery', {
+                  seconds: refreshInterval / 1000,
+                })}
               </div>
             </div>
           </div>
@@ -222,7 +232,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
                 <div className="space-y-2">
                   <h4 className="font-medium text-red-800 dark:text-red-200 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    Issues Detected
+                    {t('embeddingMetrics.healthDashboard.issuesDetected')}
                   </h4>
                   <ul className="space-y-1">
                     {healthStatus.issues.map((issue, index) => (
@@ -238,7 +248,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
                 <div className="space-y-2">
                   <h4 className="font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
-                    Recommendations
+                    {t('embeddingMetrics.healthDashboard.recommendations')}
                   </h4>
                   <ul className="space-y-1">
                     {healthStatus.recommendations.map((rec, index) => (
@@ -257,9 +267,9 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
       {/* Detailed Status Tabs */}
       <Tabs defaultValue="components" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="components">System Components</TabsTrigger>
-          <TabsTrigger value="aggregation">Aggregation Status</TabsTrigger>
-          <TabsTrigger value="performance">Performance Metrics</TabsTrigger>
+          <TabsTrigger value="components">{t('embeddingMetrics.healthDashboard.tabs.components')}</TabsTrigger>
+          <TabsTrigger value="aggregation">{t('embeddingMetrics.healthDashboard.tabs.aggregation')}</TabsTrigger>
+          <TabsTrigger value="performance">{t('embeddingMetrics.healthDashboard.tabs.performance')}</TabsTrigger>
         </TabsList>
 
         {/* System Components */}
@@ -271,14 +281,18 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       {getComponentIcon(component.component)}
-                      <span className="font-medium capitalize">
-                        {component.component.replace('_', ' ')}
+                      <span className="font-medium">
+                        {t(`embeddingMetrics.healthDashboard.components.${component.component}`, {
+                          defaultValue: component.component.replace('_', ' '),
+                        })}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(component.status)}
                       <Badge className={getStatusBadgeClasses(component.status as 'healthy' | 'warning' | 'degraded' | 'critical' | 'unknown')}>
-                        {component.status.toUpperCase()}
+                        {t(`embeddingMetrics.common.${component.status}`, {
+                          defaultValue: component.status,
+                        }).toUpperCase()}
                       </Badge>
                     </div>
                   </div>
@@ -286,13 +300,17 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{component.message}</p>
 
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Response: {formatDuration(component.responseTime)}</span>
+                    <span>
+                      {t('embeddingMetrics.healthDashboard.response', {
+                        duration: formatDuration(component.responseTime),
+                      })}
+                    </span>
                     <span>{formatTimeAgo(component.timestamp)}</span>
                   </div>
 
                   {component.details && Object.keys(component.details).length > 0 && (
                     <details className="mt-2">
-                      <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">View Details</summary>
+                      <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors">{t('embeddingMetrics.common.viewDetails')}</summary>
                       <pre className="text-xs bg-gray-50 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 p-2 rounded mt-1 overflow-auto border border-gray-200 dark:border-gray-700">
                         {JSON.stringify(component.details, null, 2)}
                       </pre>
@@ -312,38 +330,42 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Hourly Aggregation
+                  {t('embeddingMetrics.healthDashboard.hourlyAggregation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Status</span>
+                  <span className="text-sm font-medium">{t('embeddingMetrics.common.status')}</span>
                   <div className="flex items-center gap-2">
                     {aggregationStatus && getAggregationStatusIcon(aggregationStatus.hourlyAggregation.status)}
                     <Badge className={aggregationStatus ? getStatusBadgeClasses(
                       aggregationStatus.hourlyAggregation.status === 'completed' ? 'healthy' :
                       aggregationStatus.hourlyAggregation.status === 'running' ? 'warning' : 'critical'
                     ) : getStatusBadgeClasses('unknown')}>
-                      {aggregationStatus?.hourlyAggregation.status.toUpperCase() || 'UNKNOWN'}
+                      {aggregationStatus
+                        ? t(`embeddingMetrics.common.${aggregationStatus.hourlyAggregation.status}`, {
+                            defaultValue: aggregationStatus.hourlyAggregation.status,
+                          }).toUpperCase()
+                        : t('embeddingMetrics.common.unknown').toUpperCase()}
                     </Badge>
                   </div>
                 </div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.lastRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.hourlyAggregation.lastRun || null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duration</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.duration')}</span>
                     <span>{formatDuration(aggregationStatus?.hourlyAggregation.duration || null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Records</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.records')}</span>
                     <span>{aggregationStatus?.hourlyAggregation.recordsProcessed?.toLocaleString() || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Next Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.nextRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.hourlyAggregation.nextScheduled || null)}</span>
                   </div>
                 </div>
@@ -355,38 +377,42 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Activity className="h-5 w-5" />
-                  Daily Aggregation
+                  {t('embeddingMetrics.healthDashboard.dailyAggregation')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Status</span>
+                  <span className="text-sm font-medium">{t('embeddingMetrics.common.status')}</span>
                   <div className="flex items-center gap-2">
                     {aggregationStatus && getAggregationStatusIcon(aggregationStatus.dailyAggregation.status)}
                     <Badge className={aggregationStatus ? getStatusBadgeClasses(
                       aggregationStatus.dailyAggregation.status === 'completed' ? 'healthy' :
                       aggregationStatus.dailyAggregation.status === 'running' ? 'warning' : 'critical'
                     ) : getStatusBadgeClasses('unknown')}>
-                      {aggregationStatus?.dailyAggregation.status.toUpperCase() || 'UNKNOWN'}
+                      {aggregationStatus
+                        ? t(`embeddingMetrics.common.${aggregationStatus.dailyAggregation.status}`, {
+                            defaultValue: aggregationStatus.dailyAggregation.status,
+                          }).toUpperCase()
+                        : t('embeddingMetrics.common.unknown').toUpperCase()}
                     </Badge>
                   </div>
                 </div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.lastRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.dailyAggregation.lastRun || null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duration</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.duration')}</span>
                     <span>{formatDuration(aggregationStatus?.dailyAggregation.duration || null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Records</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.records')}</span>
                     <span>{aggregationStatus?.dailyAggregation.recordsProcessed?.toLocaleString() || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Next Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.nextRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.dailyAggregation.nextScheduled || null)}</span>
                   </div>
                 </div>
@@ -398,34 +424,38 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <HardDrive className="h-5 w-5" />
-                  Data Cleanup
+                  {t('embeddingMetrics.healthDashboard.dataCleanup')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Status</span>
+                  <span className="text-sm font-medium">{t('embeddingMetrics.common.status')}</span>
                   <div className="flex items-center gap-2">
                     {aggregationStatus && getAggregationStatusIcon(aggregationStatus.cleanup.status)}
                     <Badge className={aggregationStatus ? getStatusBadgeClasses(
                       aggregationStatus.cleanup.status === 'completed' ? 'healthy' :
                       aggregationStatus.cleanup.status === 'running' ? 'warning' : 'critical'
                     ) : getStatusBadgeClasses('unknown')}>
-                      {aggregationStatus?.cleanup.status.toUpperCase() || 'UNKNOWN'}
+                      {aggregationStatus
+                        ? t(`embeddingMetrics.common.${aggregationStatus.cleanup.status}`, {
+                            defaultValue: aggregationStatus.cleanup.status,
+                          }).toUpperCase()
+                        : t('embeddingMetrics.common.unknown').toUpperCase()}
                     </Badge>
                   </div>
                 </div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.lastRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.cleanup.lastRun || null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Records Removed</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.recordsRemoved')}</span>
                     <span>{aggregationStatus?.cleanup.recordsRemoved?.toLocaleString() || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Next Run</span>
+                    <span className="text-muted-foreground">{t('embeddingMetrics.healthDashboard.nextRun')}</span>
                     <span>{formatTimeAgo(aggregationStatus?.cleanup.nextScheduled || null)}</span>
                   </div>
                 </div>
@@ -441,13 +471,13 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">API Response Time</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.healthDashboard.apiResponseTime')}</p>
                     <p className="text-2xl font-bold">
                       {performanceMetrics?.apiResponseTime !== undefined 
                         ? performanceMetrics.apiResponseTime >= 0 
                           ? `${performanceMetrics.apiResponseTime}ms`
-                          : 'Error'
-                        : 'N/A'
+                          : t('embeddingMetrics.common.error')
+                        : t('embeddingMetrics.common.notAvailable')
                       }
                     </p>
                   </div>
@@ -460,7 +490,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Cache Hit Rate</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.healthDashboard.cacheHitRate')}</p>
                     <p className="text-2xl font-bold">{performanceMetrics?.cacheHitRate.toFixed(1) || 0}%</p>
                   </div>
                   <Server className="h-8 w-8 text-green-500" />
@@ -472,7 +502,7 @@ export function HealthStatusDashboard({ className }: HealthStatusDashboardProps)
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Error Rate</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.healthDashboard.errorRate')}</p>
                     <p className="text-2xl font-bold">{performanceMetrics?.errorRate.toFixed(1) || 0}%</p>
                   </div>
                   <Shield className="h-8 w-8 text-red-500" />

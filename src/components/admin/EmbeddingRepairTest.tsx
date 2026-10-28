@@ -26,6 +26,7 @@ import {
   processMissingEmbeddingsBatch
 } from '@/lib/edge-function-utils';
 import { EmbeddingRepairService, type EmbeddingAuditResult, type EmbeddingRepairProgress } from '@/lib/embedding-repair-service';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface TestResult {
   success: boolean;
@@ -36,6 +37,7 @@ interface TestResult {
 }
 
 export function EmbeddingRepairTest() {
+  const { t } = useAdminTranslation();
   const [isRunning, setIsRunning] = useState(false);
   const [currentTest, setCurrentTest] = useState<string>('');
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
@@ -50,17 +52,17 @@ export function EmbeddingRepairTest() {
     }));
   };
 
-  const runTest = async (testName: string, testFunction: () => Promise<any>) => {
-    setCurrentTest(testName);
+  const runTest = async (testKey: string, testFunction: () => Promise<any>) => {
+    setCurrentTest(testKey);
     const startTime = Date.now();
     
     try {
       const result = await testFunction();
       const duration = Date.now() - startTime;
       
-      updateTestResult(testName, {
+      updateTestResult(testKey, {
         success: true,
-        message: 'Test completed successfully',
+        message: t('diagnostics.embeddingRepair.success'),
         data: result,
         duration
       });
@@ -70,9 +72,9 @@ export function EmbeddingRepairTest() {
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      updateTestResult(testName, {
+      updateTestResult(testKey, {
         success: false,
-        message: 'Test failed',
+        message: t('diagnostics.embeddingRepair.failed'),
         error: errorMessage,
         duration
       });
@@ -81,25 +83,34 @@ export function EmbeddingRepairTest() {
     }
   };
 
+  const testLabel = (testKey: string) =>
+    t(`diagnostics.embeddingRepair.tests.${testKey}.name`, { defaultValue: testKey });
+
   const runAuditTest = async () => {
     setIsRunning(true);
-    toast.info('Starting embedding audit...');
+    toast.info(t('diagnostics.embeddingRepair.toasts.startingAudit'));
 
     try {
       const result = await runTest('audit', async () => {
         const response = await auditEmbeddings();
         if (!response.success) {
-          throw new Error(response.error || 'Audit failed');
+          throw new Error(
+            response.error || t('diagnostics.embeddingRepair.errors.auditFailed')
+          );
         }
         return response;
       });
 
       setAuditData(result.audit);
-      toast.success('Embedding audit completed successfully');
+      toast.success(t('diagnostics.embeddingRepair.toasts.auditCompleted'));
       
     } catch (error) {
       console.error('Audit test failed:', error);
-      toast.error(`Audit failed: ${error.message}`);
+      toast.error(
+        t('diagnostics.embeddingRepair.toasts.auditFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       setIsRunning(false);
       setCurrentTest('');
@@ -108,22 +119,28 @@ export function EmbeddingRepairTest() {
 
   const runMigrationTest = async () => {
     setIsRunning(true);
-    toast.info('Testing embedding migration...');
+    toast.info(t('diagnostics.embeddingRepair.toasts.testingMigration'));
 
     try {
       await runTest('migration', async () => {
         const response = await migrateEmbeddings();
         if (!response.success) {
-          throw new Error(response.error || 'Migration failed');
+          throw new Error(
+            response.error || t('diagnostics.embeddingRepair.errors.migrationFailed')
+          );
         }
         return response;
       });
 
-      toast.success('Migration test completed');
+      toast.success(t('diagnostics.embeddingRepair.toasts.migrationCompleted'));
       
     } catch (error) {
       console.error('Migration test failed:', error);
-      toast.error(`Migration failed: ${error.message}`);
+      toast.error(
+        t('diagnostics.embeddingRepair.toasts.migrationFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       setIsRunning(false);
       setCurrentTest('');
@@ -132,22 +149,28 @@ export function EmbeddingRepairTest() {
 
   const runContentFixTest = async () => {
     setIsRunning(true);
-    toast.info('Testing content fix...');
+    toast.info(t('diagnostics.embeddingRepair.toasts.testingContentFix'));
 
     try {
       await runTest('content_fix', async () => {
         const response = await fixEmbeddingContent();
         if (!response.success) {
-          throw new Error(response.error || 'Content fix failed');
+          throw new Error(
+            response.error || t('diagnostics.embeddingRepair.errors.contentFixFailed')
+          );
         }
         return response;
       });
 
-      toast.success('Content fix test completed');
+      toast.success(t('diagnostics.embeddingRepair.toasts.contentFixCompleted'));
       
     } catch (error) {
       console.error('Content fix test failed:', error);
-      toast.error(`Content fix failed: ${error.message}`);
+      toast.error(
+        t('diagnostics.embeddingRepair.toasts.contentFixFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       setIsRunning(false);
       setCurrentTest('');
@@ -156,22 +179,28 @@ export function EmbeddingRepairTest() {
 
   const runBatchGenerationTest = async () => {
     setIsRunning(true);
-    toast.info('Testing batch embedding generation...');
+    toast.info(t('diagnostics.embeddingRepair.toasts.testingBatch'));
 
     try {
       await runTest('batch_generation', async () => {
         const response = await processMissingEmbeddingsBatch(5); // Small batch for testing
         if (!response.success) {
-          throw new Error(response.error || 'Batch generation failed');
+          throw new Error(
+            response.error || t('diagnostics.embeddingRepair.errors.batchFailed')
+          );
         }
         return response;
       });
 
-      toast.success('Batch generation test completed');
+      toast.success(t('diagnostics.embeddingRepair.toasts.batchCompleted'));
       
     } catch (error) {
       console.error('Batch generation test failed:', error);
-      toast.error(`Batch generation failed: ${error.message}`);
+      toast.error(
+        t('diagnostics.embeddingRepair.toasts.batchFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       setIsRunning(false);
       setCurrentTest('');
@@ -180,7 +209,7 @@ export function EmbeddingRepairTest() {
 
   const runFullRepairTest = async () => {
     setIsRunning(true);
-    toast.info('Running full embedding repair process...');
+    toast.info(t('diagnostics.embeddingRepair.toasts.runningFull'));
 
     try {
       const repairService = new EmbeddingRepairService((progress) => {
@@ -191,11 +220,19 @@ export function EmbeddingRepairTest() {
         return await repairService.repairEmbeddings();
       });
 
-      toast.success(`Full repair completed: ${result.summary}`);
+      toast.success(
+        t('diagnostics.embeddingRepair.toasts.fullCompleted', {
+          summary: result.summary,
+        })
+      );
       
     } catch (error) {
       console.error('Full repair test failed:', error);
-      toast.error(`Full repair failed: ${error.message}`);
+      toast.error(
+        t('diagnostics.embeddingRepair.toasts.fullFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     } finally {
       setIsRunning(false);
       setCurrentTest('');
@@ -219,9 +256,9 @@ export function EmbeddingRepairTest() {
       
       await runBatchGenerationTest();
       
-      toast.success('All embedding repair tests completed!');
+      toast.success(t('diagnostics.embeddingRepair.toasts.allCompleted'));
     } catch (error) {
-      toast.error('Test suite failed - check individual test results');
+      toast.error(t('diagnostics.embeddingRepair.toasts.suiteFailed'));
     } finally {
       setIsRunning(false);
     }
@@ -234,9 +271,14 @@ export function EmbeddingRepairTest() {
   };
 
   const getStatusBadge = (result?: TestResult) => {
-    if (!result) return <Badge variant="secondary">Not Run</Badge>;
-    if (result.success) return <Badge variant="default" className="bg-green-500">Success</Badge>;
-    return <Badge variant="destructive">Failed</Badge>;
+    if (!result) return <Badge variant="secondary">{t('diagnostics.embeddingRepair.notRun')}</Badge>;
+    if (result.success)
+      return (
+        <Badge variant="default" className="bg-green-500">
+          {t('diagnostics.embeddingRepair.success')}
+        </Badge>
+      );
+    return <Badge variant="destructive">{t('diagnostics.embeddingRepair.failed')}</Badge>;
   };
 
   return (
@@ -245,10 +287,10 @@ export function EmbeddingRepairTest() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Embedding Repair System Test
+            {t('diagnostics.embeddingRepair.title')}
           </CardTitle>
           <CardDescription>
-            Test the comprehensive embedding audit, migration, and repair functionality
+            {t('diagnostics.embeddingRepair.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -259,42 +301,42 @@ export function EmbeddingRepairTest() {
               className="flex items-center gap-2"
             >
               {isRunning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
-              Run All Tests
+              {t('diagnostics.embeddingRepair.runAll')}
             </Button>
             <Button 
               onClick={runAuditTest} 
               disabled={isRunning}
               variant="outline"
             >
-              Test Audit
+              {t('diagnostics.embeddingRepair.testAudit')}
             </Button>
             <Button 
               onClick={runMigrationTest} 
               disabled={isRunning}
               variant="outline"
             >
-              Test Migration
+              {t('diagnostics.embeddingRepair.testMigration')}
             </Button>
             <Button 
               onClick={runContentFixTest} 
               disabled={isRunning}
               variant="outline"
             >
-              Test Content Fix
+              {t('diagnostics.embeddingRepair.testContentFix')}
             </Button>
             <Button 
               onClick={runBatchGenerationTest} 
               disabled={isRunning}
               variant="outline"
             >
-              Test Batch Generation
+              {t('diagnostics.embeddingRepair.testBatchGeneration')}
             </Button>
             <Button 
               onClick={runFullRepairTest} 
               disabled={isRunning}
               variant="outline"
             >
-              Test Full Repair
+              {t('diagnostics.embeddingRepair.testFullRepair')}
             </Button>
           </div>
 
@@ -302,7 +344,9 @@ export function EmbeddingRepairTest() {
             <Alert className="mb-4">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <AlertDescription>
-                Running test: {currentTest}
+                {t('diagnostics.embeddingRepair.runningTest', {
+                  test: testLabel(currentTest),
+                })}
                 {repairProgress && (
                   <div className="mt-2">
                     <div className="text-sm font-medium">{repairProgress.message}</div>
@@ -317,9 +361,9 @@ export function EmbeddingRepairTest() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="audit">Audit Results</TabsTrigger>
-          <TabsTrigger value="tests">Test Results</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="audit">{t('diagnostics.embeddingRepair.auditResults')}</TabsTrigger>
+          <TabsTrigger value="tests">{t('diagnostics.embeddingRepair.testResults')}</TabsTrigger>
+          <TabsTrigger value="details">{t('diagnostics.embeddingRepair.details')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="audit" className="space-y-4">
@@ -327,7 +371,7 @@ export function EmbeddingRepairTest() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Total Receipts</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('diagnostics.embeddingRepair.totalReceipts')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{auditData.totalReceipts}</div>
@@ -336,7 +380,7 @@ export function EmbeddingRepairTest() {
               
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">With Unified Embeddings</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('diagnostics.embeddingRepair.withUnified')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">{auditData.receiptsWithUnifiedEmbeddings}</div>
@@ -345,7 +389,7 @@ export function EmbeddingRepairTest() {
               
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Missing Embeddings</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('diagnostics.embeddingRepair.missingEmbeddings')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">{auditData.receiptsMissingEmbeddings}</div>
@@ -354,14 +398,14 @@ export function EmbeddingRepairTest() {
               
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Migration Needed</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('diagnostics.embeddingRepair.migrationNeeded')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
                     {auditData.migrationNeeded ? (
-                      <Badge variant="destructive">Yes</Badge>
+                      <Badge variant="destructive">{t('diagnostics.embeddingRepair.yes')}</Badge>
                     ) : (
-                      <Badge variant="default" className="bg-green-500">No</Badge>
+                      <Badge variant="default" className="bg-green-500">{t('diagnostics.embeddingRepair.no')}</Badge>
                     )}
                   </div>
                 </CardContent>
@@ -371,7 +415,7 @@ export function EmbeddingRepairTest() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Run the audit test to see embedding statistics
+                {t('diagnostics.embeddingRepair.auditHint')}
               </AlertDescription>
             </Alert>
           )}
@@ -380,11 +424,11 @@ export function EmbeddingRepairTest() {
         <TabsContent value="tests" className="space-y-4">
           <div className="grid gap-4">
             {[
-              { key: 'audit', name: 'Embedding Audit', description: 'Analyze current embedding state' },
-              { key: 'migration', name: 'Embedding Migration', description: 'Migrate old embeddings to unified format' },
-              { key: 'content_fix', name: 'Content Fix', description: 'Repair embeddings with missing content' },
-              { key: 'batch_generation', name: 'Batch Generation', description: 'Generate missing embeddings in batches' },
-              { key: 'full_repair', name: 'Full Repair', description: 'Complete repair process' }
+              { key: 'audit' },
+              { key: 'migration' },
+              { key: 'content_fix' },
+              { key: 'batch_generation' },
+              { key: 'full_repair' }
             ].map(test => {
               const result = testResults[test.key];
               return (
@@ -393,21 +437,35 @@ export function EmbeddingRepairTest() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         {getStatusIcon(result)}
-                        {test.name}
+                        {t(`diagnostics.embeddingRepair.tests.${test.key}.name`)}
                       </CardTitle>
                       {getStatusBadge(result)}
                     </div>
-                    <CardDescription>{test.description}</CardDescription>
+                    <CardDescription>
+                      {t(`diagnostics.embeddingRepair.tests.${test.key}.description`)}
+                    </CardDescription>
                   </CardHeader>
                   {result && (
                     <CardContent>
                       <div className="text-sm">
-                        <div className="font-medium">{result.message}</div>
+                        <div className="font-medium">
+                          {t(
+                            result.success
+                              ? 'diagnostics.embeddingRepair.success'
+                              : 'diagnostics.embeddingRepair.failed'
+                          )}
+                        </div>
                         {result.duration && (
-                          <div className="text-gray-500">Duration: {result.duration}ms</div>
+                          <div className="text-gray-500">
+                            {t('diagnostics.embeddingRepair.duration', {
+                              duration: result.duration,
+                            })}
+                          </div>
                         )}
                         {result.error && (
-                          <div className="text-red-500 mt-1">Error: {result.error}</div>
+                          <div className="text-red-500 mt-1">
+                            {t('diagnostics.embeddingRepair.error')}: {result.error}
+                          </div>
                         )}
                       </div>
                     </CardContent>
@@ -424,7 +482,7 @@ export function EmbeddingRepairTest() {
               <CardHeader>
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   {getStatusIcon(result)}
-                  {testName.replace('_', ' ').toUpperCase()}
+                  {testLabel(testName)}
                 </CardTitle>
               </CardHeader>
               <CardContent>

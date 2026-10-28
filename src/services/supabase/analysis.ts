@@ -2,6 +2,19 @@ import { supabase } from '@/integrations/supabase/client';
 // No need for Receipt type here if we select specific columns
 // import { Receipt } from '@/types/receipt';
 
+/**
+ * Personal mode must not inherit team rows. The receipts RLS policy also
+ * returns team receipts for members, so scope to the signed-in user's own,
+ * team-less receipts explicitly.
+ */
+const getPersonalUserId = async (): Promise<string> => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  const userId = data.user?.id;
+  if (!userId) throw new Error('Not authenticated');
+  return userId;
+};
+
 // Update DailyExpenseData to include receipt IDs
 export interface DailyExpenseData {
   date: string;
@@ -10,7 +23,7 @@ export interface DailyExpenseData {
 }
 
 // Fetch daily expense data with optional date filtering, aggregating IDs
-export const fetchDailyExpenses = async (startDateISO?: string | null, endDateISO?: string | null): Promise<DailyExpenseData[]> => {
+export const fetchDailyExpenses = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<DailyExpenseData[]> => {
   let query = supabase
     .from('receipts')
     // Select id, date, and total
@@ -24,6 +37,11 @@ export const fetchDailyExpenses = async (startDateISO?: string | null, endDateIS
       // Use 'lte' for less than or equal to the end date
       // Adjust if end date should be exclusive
       query = query.lte('date', endDateISO);
+  }
+  if (teamId) {
+    query = query.eq('team_id', teamId);
+  } else {
+    query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
   }
 
 
@@ -71,7 +89,7 @@ export interface CategoryExpenseData {
 
 // Fetch expenses grouped by category with optional date filtering
 // This function now prioritizes custom categories over predicted categories
-export const fetchExpensesByCategory = async (startDateISO?: string | null, endDateISO?: string | null): Promise<CategoryExpenseData[]> => {
+export const fetchExpensesByCategory = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<CategoryExpenseData[]> => {
     // Query receipts with custom category information
     let query = supabase
       .from('receipts')
@@ -89,6 +107,11 @@ export const fetchExpensesByCategory = async (startDateISO?: string | null, endD
     // Add end date filtering
     if (endDateISO) {
         query = query.lte('date', endDateISO);
+    }
+    if (teamId) {
+      query = query.eq('team_id', teamId);
+    } else {
+      query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
     }
 
     const { data, error } = await query;
@@ -132,23 +155,29 @@ export interface ReceiptSummary {
   id: string;
   date: string;
   total: number | null;
+  tax?: number | null;
   merchant: string | null;
   payment_method: string | null;
   paid_by_id: string | null;
 }
 
 // Fetch detailed receipt summaries for a date range
-export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, endDateISO?: string | null): Promise<ReceiptSummary[]> => {
+export const fetchReceiptDetailsForRange = async (startDateISO?: string | null, endDateISO?: string | null, teamId?: string | null): Promise<ReceiptSummary[]> => {
   let query = supabase
     .from('receipts')
     // Select necessary fields
-    .select('id, date, total, merchant, payment_method, paid_by_id');
+    .select('id, date, total, tax, merchant, payment_method, paid_by_id');
 
   if (startDateISO) {
     query = query.gte('date', startDateISO);
   }
   if (endDateISO) {
     query = query.lte('date', endDateISO);
+  }
+  if (teamId) {
+    query = query.eq('team_id', teamId);
+  } else {
+    query = query.eq('user_id', await getPersonalUserId()).is('team_id', null);
   }
 
   // Order by date for easier processing in the select function

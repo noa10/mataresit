@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { useNotifications } from '@/contexts/NotificationContext';
 import {
   Notification,
@@ -30,6 +31,7 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ teamId, className }: NotificationCenterProps) {
+  const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -65,15 +67,15 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
   // Handle connection error display
   useEffect(() => {
     if (error) {
-      toast.error('Connection Error', {
-        description: error,
+      toast.error(t('notifications.connectionError'), {
+        description: t('notifications.connectionFailed'),
         action: {
-          label: 'Reconnect',
+          label: t('notifications.reconnect'),
           onClick: reconnect,
         },
       });
     }
-  }, [error, reconnect]);
+  }, [error, reconnect, t]);
 
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
@@ -97,8 +99,8 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
   // Handle reconnect action
   const handleReconnect = () => {
     reconnect();
-    toast.info('Reconnecting...', {
-      description: 'Attempting to restore real-time connection',
+    toast.info(t('notifications.reconnecting'), {
+      description: t('notifications.reconnectDescription'),
     });
   };
 
@@ -130,12 +132,12 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold">Notifications</h3>
+            <h3 className="font-semibold">{t('notifications.title')}</h3>
             {/* Connection status indicator */}
             {isConnected ? (
-              <Wifi className="h-3 w-3 text-green-500" title="Connected" />
+              <Wifi className="h-3 w-3 text-ledger-accent" title={t('notifications.connected')} />
             ) : (
-              <WifiOff className="h-3 w-3 text-red-500" title="Disconnected" />
+              <WifiOff className="h-3 w-3 text-ledger-danger" title={t('notifications.disconnected')} />
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -146,7 +148,7 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
               onClick={handleRefresh}
               disabled={isLoading}
               className="h-6 w-6 p-0"
-              title="Refresh notifications"
+              title={t('notifications.refresh')}
             >
               <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
             </Button>
@@ -157,9 +159,9 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
                 size="sm"
                 onClick={handleReconnect}
                 className="text-xs"
-                title="Reconnect to real-time updates"
+                title={t('notifications.reconnectTitle')}
               >
-                Reconnect
+                {t('notifications.reconnect')}
               </Button>
             )}
             {/* Mark all read button */}
@@ -170,7 +172,7 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
                 onClick={markAllAsRead}
                 className="text-xs"
               >
-                Mark all read
+                {t('notifications.markAllRead')}
               </Button>
             )}
           </div>
@@ -180,27 +182,27 @@ export function NotificationCenter({ teamId, className }: NotificationCenterProp
         
         <ScrollArea className="h-96">
           {isLoading ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
+            <div className="p-4 text-center text-sm text-ledger-muted">
               <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
-              Loading notifications...
+              {t('notifications.loading')}
             </div>
           ) : error ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <WifiOff className="h-4 w-4 mx-auto mb-2 text-red-500" />
-              <p>Connection error</p>
+            <div className="p-4 text-center text-sm text-ledger-muted">
+              <WifiOff className="h-4 w-4 mx-auto mb-2 text-ledger-danger" />
+              <p>{t('notifications.connectionError')}</p>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleReconnect}
                 className="mt-2 text-xs"
               >
-                Try reconnecting
+                {t('notifications.tryReconnect')}
               </Button>
             </div>
           ) : visibleNotifications.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
+            <div className="p-4 text-center text-sm text-ledger-muted">
               <Bell className="h-4 w-4 mx-auto mb-2" />
-              No notifications
+              {t('notifications.empty')}
             </div>
           ) : (
             <div className="space-y-1">
@@ -237,6 +239,7 @@ function NotificationItem({
   onArchive,
   onDelete,
 }: NotificationItemProps) {
+  const { t } = useTranslation('common');
   const isUnread = !notification.read_at;
   const typeColor = NOTIFICATION_TYPE_COLORS[notification.type];
   const priorityColor = NOTIFICATION_PRIORITY_COLORS[notification.priority];
@@ -245,8 +248,8 @@ function NotificationItem({
   return (
     <div
       className={cn(
-        "group relative p-3 hover:bg-muted/50 cursor-pointer border-l-2 transition-colors",
-        isUnread ? "bg-blue-900/10 border-l-blue-400" : "border-l-transparent"
+        "group relative p-3 hover:bg-ledger-surface-2 cursor-pointer border-l-2 transition-colors",
+        isUnread ? "bg-ledger-accent-soft/50 border-l-ledger-accent" : "border-l-transparent"
       )}
       onClick={onClick}
     >
@@ -267,21 +270,23 @@ function NotificationItem({
               {notification.title}
             </h4>
             <span className={cn("text-xs", priorityColor)}>
-              {notification.priority}
+              {t(`notifications.priority.${notification.priority}`, {
+                defaultValue: notification.priority,
+              })}
             </span>
           </div>
           
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+          <p className="text-xs text-ledger-muted mt-1 line-clamp-2">
             {notification.message}
           </p>
           
           <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-ledger-muted">
               {formatNotificationTime(notification.created_at)}
             </span>
             
             {notification.team_name && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-ledger-muted">
                 {notification.team_name}
               </span>
             )}

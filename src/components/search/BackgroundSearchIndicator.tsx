@@ -60,17 +60,17 @@ export function BackgroundSearchIndicator({
 
     switch (status) {
       case 'preprocessing':
-        return <Zap className={`${iconSize} animate-pulse text-blue-500`} />;
+        return <Zap className={`${iconSize} animate-pulse text-ledger-amber`} />;
       case 'searching':
-        return <Loader2 className={`${iconSize} animate-spin text-purple-500`} />;
+        return <Loader2 className={`${iconSize} animate-spin text-ledger-accent`} />;
       case 'complete':
-        return <CheckCircle className={`${iconSize} text-green-500`} />;
+        return <CheckCircle className={`${iconSize} text-ledger-accent`} />;
       case 'cached':
-        return <Database className={`${iconSize} text-emerald-500`} />;
+        return <Database className={`${iconSize} text-ledger-muted`} />;
       case 'error':
-        return <AlertCircle className={`${iconSize} text-red-500`} />;
+        return <AlertCircle className={`${iconSize} text-ledger-danger`} />;
       default:
-        return <Search className={`${iconSize} text-muted-foreground`} />;
+        return <Search className={`${iconSize} text-ledger-muted`} />;
     }
   };
 
@@ -128,17 +128,17 @@ export function BackgroundSearchIndicator({
   const getStatusColors = () => {
     switch (status) {
       case 'preprocessing':
-        return 'border-blue-200 bg-blue-50 text-blue-700';
+        return 'border-ledger-amber/30 bg-ledger-amber-soft text-ledger-amber';
       case 'searching':
-        return 'border-purple-200 bg-purple-50 text-purple-700';
+        return 'border-ledger-accent/30 bg-ledger-accent-soft text-ledger-accent';
       case 'complete':
-        return 'border-green-200 bg-green-50 text-green-700';
+        return 'border-ledger-accent/30 bg-ledger-accent-soft text-ledger-accent';
       case 'cached':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        return 'border-ledger-line bg-ledger-surface-2 text-ledger-muted';
       case 'error':
-        return 'border-red-200 bg-red-50 text-red-700';
+        return 'border-ledger-danger/30 bg-ledger-danger-soft text-ledger-danger';
       default:
-        return 'border-gray-200 bg-gray-50 text-gray-700';
+        return 'border-ledger-line bg-ledger-surface-2 text-ledger-muted';
     }
   };
 
@@ -284,17 +284,17 @@ export function SearchProgressIndicator({
   return (
     <div className={cn("w-full space-y-2", className)}>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Search Progress</span>
+        <span className="text-ledger-muted">Search Progress</span>
         <span className="font-medium">{getProgressValue()}%</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+      <div className="w-full bg-ledger-line rounded-full h-2 overflow-hidden">
         <div
           className={cn(
             "h-full transition-all duration-500 ease-out rounded-full",
-            status === 'preprocessing' && "bg-blue-500",
-            status === 'searching' && "bg-purple-500",
-            (status === 'complete' || status === 'cached') && "bg-green-500",
-            status === 'error' && "bg-red-500"
+            status === 'preprocessing' && "bg-ledger-amber",
+            status === 'searching' && "bg-ledger-accent",
+            (status === 'complete' || status === 'cached') && "bg-ledger-accent",
+            status === 'error' && "bg-ledger-danger"
           )}
           style={{ width: `${getProgressValue()}%` }}
         />

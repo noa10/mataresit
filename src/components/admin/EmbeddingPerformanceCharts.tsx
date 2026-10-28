@@ -14,6 +14,7 @@ import { PerformanceDurationChart } from './charts/PerformanceDurationChart';
 import { ApiUsageChart } from './charts/ApiUsageChart';
 import { ErrorPatternsChart } from './charts/ErrorPatternsChart';
 import { generateMockHourlyStats, generateMockDailyStats, generateMockSummary } from '@/utils/chartUtils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingPerformanceChartsProps {
   hourlyStats: EmbeddingHourlyStats[];
@@ -30,6 +31,7 @@ export function EmbeddingPerformanceCharts({
   isLoading = false,
   onRefresh
 }: EmbeddingPerformanceChartsProps) {
+  const { t } = useAdminTranslation();
   const [activeTab, setActiveTab] = useState('success-rate');
 
   if (isLoading) {
@@ -75,10 +77,10 @@ export function EmbeddingPerformanceCharts({
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-600" />
-              <p className="text-blue-800 font-medium">Demo Mode</p>
+              <p className="text-blue-800 font-medium">{t('embeddingMetrics.performance.demoMode')}</p>
             </div>
             <p className="text-blue-700 text-sm mt-1">
-              Displaying sample data for demonstration. Real metrics will appear once embedding generation begins.
+              {t('embeddingMetrics.performance.demoDescription')}
             </p>
           </CardContent>
         </Card>
@@ -89,13 +91,13 @@ export function EmbeddingPerformanceCharts({
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Hourly Records</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.performance.hourlyRecords')}</p>
                 <p className="text-2xl font-bold">{displayHourlyStats.length}</p>
               </div>
               <Clock className="h-8 w-8 text-blue-500" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {totalHourlyAttempts} total attempts
+              {t('embeddingMetrics.performance.totalAttempts', { count: totalHourlyAttempts })}
             </p>
           </CardContent>
         </Card>
@@ -104,13 +106,13 @@ export function EmbeddingPerformanceCharts({
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Daily Records</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.performance.dailyRecords')}</p>
                 <p className="text-2xl font-bold">{displayDailyStats.length}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-green-500" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {totalDailyAttempts} total attempts
+              {t('embeddingMetrics.performance.totalAttempts', { count: totalDailyAttempts })}
             </p>
           </CardContent>
         </Card>
@@ -119,13 +121,13 @@ export function EmbeddingPerformanceCharts({
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Success Rate</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.performance.avgSuccessRate')}</p>
                 <p className="text-2xl font-bold">{avgSuccessRate.toFixed(1)}%</p>
               </div>
               <TrendingUp className="h-8 w-8 text-purple-500" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Across all days
+              {t('embeddingMetrics.performance.acrossAllDays')}
             </p>
           </CardContent>
         </Card>
@@ -134,13 +136,13 @@ export function EmbeddingPerformanceCharts({
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Duration</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.performance.avgDuration')}</p>
                 <p className="text-2xl font-bold">{avgDuration.toFixed(0)}ms</p>
               </div>
               <Zap className="h-8 w-8 text-orange-500" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Processing time
+              {t('embeddingMetrics.performance.processingTime')}
             </p>
           </CardContent>
         </Card>
@@ -151,19 +153,19 @@ export function EmbeddingPerformanceCharts({
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="success-rate" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Success Rate
+            {t('embeddingMetrics.performance.tabs.successRate')}
           </TabsTrigger>
           <TabsTrigger value="performance" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Performance
+            {t('embeddingMetrics.performance.tabs.performance')}
           </TabsTrigger>
           <TabsTrigger value="api-usage" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
-            API Usage
+            {t('embeddingMetrics.performance.tabs.apiUsage')}
           </TabsTrigger>
           <TabsTrigger value="errors" className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
-            Errors
+            {t('embeddingMetrics.performance.tabs.errors')}
           </TabsTrigger>
         </TabsList>
 

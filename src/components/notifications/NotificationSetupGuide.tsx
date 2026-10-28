@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { usePushNotificationContext, usePushNotificationStatus } from '@/contexts/PushNotificationContext';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useSettingsTranslation } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 
 interface NotificationSetupGuideProps {
@@ -22,6 +23,7 @@ interface NotificationSetupGuideProps {
 }
 
 export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSetupGuideProps) {
+  const { t } = useSettingsTranslation();
   const pushContext = usePushNotificationContext();
   const pushStatus = usePushNotificationStatus();
   const { preferences } = useNotifications();
@@ -31,8 +33,8 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
   const steps = [
     {
       id: 1,
-      title: 'Enable Browser Notifications',
-      description: 'Allow Mataresit to send you push notifications',
+      title: t('notificationSetup.steps.enableTitle'),
+      description: t('notificationSetup.steps.enableDescription'),
       icon: <Smartphone className="h-5 w-5" />,
       completed: pushStatus.isEnabled,
       action: async () => {
@@ -41,13 +43,13 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
           const permission = await pushContext.requestPermission();
           if (permission === 'granted') {
             await pushContext.subscribe();
-            toast.success('Push notifications enabled!');
+            toast.success(t('notificationSetup.toasts.enabled'));
             setCurrentStep(2);
           } else {
-            toast.error('Permission denied. You can enable notifications in your browser settings.');
+            toast.error(t('notificationSetup.toasts.permissionDenied'));
           }
         } catch (error) {
-          toast.error('Failed to enable notifications');
+          toast.error(t('notificationSetup.toasts.enableFailed'));
         } finally {
           setIsLoading(false);
         }
@@ -55,18 +57,18 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
     },
     {
       id: 2,
-      title: 'Test Notifications',
-      description: 'Send a test notification to make sure everything works',
+      title: t('notificationSetup.steps.testTitle'),
+      description: t('notificationSetup.steps.testDescription'),
       icon: <Bell className="h-5 w-5" />,
       completed: false,
       action: async () => {
         setIsLoading(true);
         try {
           await pushContext.showTestNotification();
-          toast.success('Test notification sent! Check if you received it.');
+          toast.success(t('notificationSetup.toasts.testSent'));
           setCurrentStep(3);
         } catch (error) {
-          toast.error('Failed to send test notification');
+          toast.error(t('notificationSetup.toasts.testFailed'));
         } finally {
           setIsLoading(false);
         }
@@ -74,8 +76,8 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
     },
     {
       id: 3,
-      title: 'Configure Preferences',
-      description: 'Choose which notifications you want to receive',
+      title: t('notificationSetup.steps.preferencesTitle'),
+      description: t('notificationSetup.steps.preferencesDescription'),
       icon: <Mail className="h-5 w-5" />,
       completed: preferences?.email_enabled || preferences?.push_enabled,
       action: () => {
@@ -90,7 +92,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
   const isSetupComplete = completedSteps === steps.length || currentStep > steps.length;
 
   const handleComplete = () => {
-    toast.success('Notification setup complete!');
+    toast.success(t('notificationSetup.toasts.complete'));
     onComplete?.();
   };
 
@@ -100,17 +102,17 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
 
   if (!pushStatus.isAvailable) {
     return (
-      <Card className="border-orange-200 bg-orange-50">
+      <Card className="border-ledger-amber/30 bg-ledger-amber-soft/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <div className="p-2 bg-ledger-amber-soft rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-ledger-amber" />
               </div>
               <div>
-                <CardTitle className="text-orange-900">Notifications Not Available</CardTitle>
-                <CardDescription className="text-orange-700">
-                  Your browser doesn't support push notifications
+                <CardTitle className="text-ledger-ink">{t('notificationSetup.unavailableTitle')}</CardTitle>
+                <CardDescription className="text-ledger-ink-2">
+                  {t('notificationSetup.unavailableDescription')}
                 </CardDescription>
               </div>
             </div>
@@ -125,7 +127,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              You can still receive email notifications. Configure your email preferences below.
+              {t('notificationSetup.emailFallback')}
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -135,17 +137,17 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
 
   if (isSetupComplete) {
     return (
-      <Card className="border-green-200 bg-green-50">
+      <Card className="border-ledger-accent/30 bg-ledger-accent-soft/40">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
+                <CheckCircle className="h-5 w-5 text-ledger-accent" />
               </div>
               <div>
-                <CardTitle className="text-green-900">Setup Complete!</CardTitle>
-                <CardDescription className="text-green-700">
-                  Your notifications are configured and ready to go
+                <CardTitle className="text-ledger-ink">{t('notificationSetup.completeTitle')}</CardTitle>
+                <CardDescription className="text-ledger-ink-2">
+                  {t('notificationSetup.completeDescription')}
                 </CardDescription>
               </div>
             </div>
@@ -159,15 +161,15 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                {completedSteps}/{steps.length} steps completed
+              <Badge variant="default" className="bg-ledger-accent-soft text-ledger-accent">
+                {t('notificationSetup.stepsCompleted', { completed: completedSteps, total: steps.length })}
               </Badge>
-              <span className="text-sm text-green-700">
-                You'll now receive notifications for receipt processing and team activities
+              <span className="text-sm text-ledger-ink-2">
+                {t('notificationSetup.completeFooter')}
               </span>
             </div>
             <Button onClick={handleComplete} size="sm">
-              Done
+              {t('notificationSetup.done')}
             </Button>
           </div>
         </CardContent>
@@ -176,17 +178,17 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
   }
 
   return (
-    <Card className="border-blue-200 bg-blue-50">
+    <Card className="border-ledger-accent/30 bg-ledger-accent-soft/50">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Bell className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-ledger-accent-soft rounded-lg">
+              <Bell className="h-5 w-5 text-ledger-accent" />
             </div>
             <div>
-              <CardTitle className="text-blue-900">Set Up Notifications</CardTitle>
-              <CardDescription className="text-blue-700">
-                Get notified about receipt processing and team activities
+              <CardTitle className="text-ledger-ink">{t('notificationSetup.title')}</CardTitle>
+              <CardDescription className="text-ledger-ink-2">
+                {t('notificationSetup.description')}
               </CardDescription>
             </div>
           </div>
@@ -201,11 +203,11 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
         {/* Progress indicator */}
         <div className="flex items-center gap-2">
           <Badge variant="outline">
-            Step {currentStep} of {steps.length}
+            {t('notificationSetup.stepProgress', { current: currentStep, total: steps.length })}
           </Badge>
-          <div className="flex-1 bg-blue-100 rounded-full h-2">
+          <div className="flex-1 bg-ledger-surface-2 rounded-full h-2">
             <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className="bg-ledger-accent h-2 rounded-full transition-all duration-300"
               style={{ width: `${(currentStep / steps.length) * 100}%` }}
             />
           </div>
@@ -215,12 +217,12 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
         {currentStepData && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
                 {currentStepData.icon}
               </div>
               <div>
-                <h4 className="font-medium text-blue-900">{currentStepData.title}</h4>
-                <p className="text-sm text-blue-700">{currentStepData.description}</p>
+                <h4 className="font-medium text-ledger-ink">{currentStepData.title}</h4>
+                <p className="text-sm text-ledger-ink-2">{currentStepData.description}</p>
               </div>
             </div>
 
@@ -229,7 +231,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
               <Alert>
                 <Bell className="h-4 w-4" />
                 <AlertDescription>
-                  Click "Enable Notifications" and allow permissions when prompted by your browser.
+                  {t('notificationSetup.info.enable')}
                 </AlertDescription>
               </Alert>
             )}
@@ -238,7 +240,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
               <Alert>
                 <Smartphone className="h-4 w-4" />
                 <AlertDescription>
-                  We'll send a test notification to make sure everything is working correctly.
+                  {t('notificationSetup.info.test')}
                 </AlertDescription>
               </Alert>
             )}
@@ -247,7 +249,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
               <Alert>
                 <Mail className="h-4 w-4" />
                 <AlertDescription>
-                  You can customize which notifications you receive in the preferences below.
+                  {t('notificationSetup.info.preferences')}
                 </AlertDescription>
               </Alert>
             )}
@@ -259,11 +261,11 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
                 className="flex items-center gap-2"
               >
                 {isLoading ? (
-                  'Processing...'
+                  t('notificationSetup.processing')
                 ) : currentStepData.completed ? (
                   <>
                     <CheckCircle className="h-4 w-4" />
-                    Completed
+                    {t('notificationSetup.completed')}
                   </>
                 ) : (
                   <>
@@ -279,7 +281,7 @@ export function NotificationSetupGuide({ onComplete, onDismiss }: NotificationSe
                   onClick={() => setCurrentStep(currentStep - 1)}
                   disabled={isLoading}
                 >
-                  Back
+                  {t('notificationSetup.back')}
                 </Button>
               )}
             </div>

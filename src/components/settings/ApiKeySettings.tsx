@@ -61,8 +61,8 @@ export function ApiKeySettings() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Key className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-ledger-accent-soft rounded-lg">
+                <Key className="h-5 w-5 text-ledger-accent" />
               </div>
               <div>
                 <CardTitle className="text-base">{t('apiKeys.openrouter.title')}</CardTitle>
@@ -118,9 +118,9 @@ export function ApiKeySettings() {
             </div>
           </div>
 
-          <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-md">
-            <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-700">
+          <div className="flex items-start gap-2 p-3 bg-ledger-accent-soft/50 rounded-md">
+            <AlertCircle className="h-4 w-4 text-ledger-accent mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-ledger-ink-2">
               <p className="font-medium">About OpenRouter</p>
               <p>
                 OpenRouter provides access to multiple AI providers (OpenAI, Anthropic, Google, Meta, etc.) 

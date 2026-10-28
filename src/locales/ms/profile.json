@@ -50,7 +50,7 @@
       "notProvided": "Tidak disediakan"
     },
     "actions": {
-      "edit": "Edit",
+      "edit": "Sunting",
       "saveChanges": "Simpan Perubahan",
       "saving": "Menyimpan...",
       "cancel": "Batal"
@@ -74,7 +74,33 @@
     "managePlan": "Urus Pelan",
     "unableToLoad": "Tidak dapat memuatkan maklumat langganan.",
     "currentPlan": "Pelan Semasa",
-    "planName": "Pelan {{tier}}"
+    "planName": "Pelan {{tier}}",
+    "receiptsThisMonth": "Resit bulan ini",
+    "resetsOn": "Ditetapkan semula pada {{date}}",
+    "planFeatures": "Ciri Pelan",
+    "monthlyReceipts": "Resit Bulanan",
+    "storage": "Storan",
+    "dataRetention": "Penyimpanan Data",
+    "batchUpload": "Muat Naik Kelompok",
+    "unlimited": "Tanpa had",
+    "na": "T/A",
+    "forever": "Selamanya",
+    "days": "{{count}} hari",
+    "files": "{{count}} fail",
+    "started": "Bermula",
+    "renews": "Diperbaharui",
+    "trialEnds": "Percubaan Tamat",
+    "status": "Status:",
+    "statuses": {
+      "active": "Aktif",
+      "trialing": "Dalam percubaan",
+      "past_due": "Tertunggak",
+      "canceled": "Dibatalkan",
+      "incomplete": "Tidak lengkap",
+      "incomplete_expired": "Tamat tempoh",
+      "unpaid": "Belum dibayar",
+      "free": "Percuma"
+    }
   },
   "settings": {
     "security": {
@@ -125,16 +151,73 @@
       "unlocked": "Dibuka",
       "locked": "Terkunci",
       "catalog": {
-        "first_scan": { "name": "Imbasan pertama", "description": "Lengkapkan imbasan berjaya pertama anda." },
-        "night_owl": { "name": "Burung malam", "description": "Buat imbasan layak pada waktu malam." },
-        "early_bird": { "name": "Burung awal", "description": "Mulakan hari anda dengan imbasan berjaya pada awal pagi." },
-        "seven_day_streak": { "name": "Rentetan 7 hari", "description": "Kekalkan rentetan log masuk atau imbasan selama tujuh hari." },
-        "thirty_day_streak": { "name": "Rentetan 30 hari", "description": "Kekal konsisten sehingga mencapai rentetan sebulan penuh." },
-        "referral_starter": { "name": "Permulaan rujukan", "description": "Jemput rakan pertama anda yang berjaya mendaftar." },
-        "referral_champion": { "name": "Juara rujukan", "description": "Kumpul beberapa rujukan yang berjaya." },
-        "power_scanner": { "name": "Pengimbas tegar", "description": "Capai pencapaian besar dalam jumlah imbasan resit." },
-        "receipt_historian": { "name": "Sejarawan resit", "description": "Bina arkib resit yang kaya dan tersusun." },
-        "community_helper": { "name": "Pembantu komuniti", "description": "Sumbang kepada pencapaian rujukan dan penglibatan komuniti." }
+        "first_scan": {
+          "name": "Imbasan pertama",
+          "description": "Lengkapkan imbasan berjaya pertama anda."
+        },
+        "night_owl": {
+          "name": "Burung malam",
+          "description": "Buat imbasan layak pada waktu malam."
+        },
+        "early_bird": {
+          "name": "Burung awal",
+          "description": "Mulakan hari anda dengan imbasan berjaya pada awal pagi."
+        },
+        "seven_day_streak": {
+          "name": "Rentetan 7 hari",
+          "description": "Kekalkan rentetan log masuk atau imbasan selama tujuh hari."
+        },
+        "thirty_day_streak": {
+          "name": "Rentetan 30 hari",
+          "description": "Kekal konsisten sehingga mencapai rentetan sebulan penuh."
+        },
+        "referral_starter": {
+          "name": "Permulaan rujukan",
+          "description": "Jemput rakan pertama anda yang berjaya mendaftar."
+        },
+        "referral_champion": {
+          "name": "Juara rujukan",
+          "description": "Kumpul beberapa rujukan yang berjaya."
+        },
+        "power_scanner": {
+          "name": "Pengimbas tegar",
+          "description": "Capai pencapaian besar dalam jumlah imbasan resit."
+        },
+        "receipt_historian": {
+          "name": "Sejarawan resit",
+          "description": "Bina arkib resit yang kaya dan tersusun."
+        },
+        "community_helper": {
+          "name": "Pembantu komuniti",
+          "description": "Sumbang kepada pencapaian rujukan dan penglibatan komuniti."
+        },
+        "scanner_pro_100": {
+          "name": "Pro Pengimbas"
+        },
+        "receipt_marathon_30": {
+          "name": "Maraton Resit"
+        },
+        "level_5": {
+          "name": "Tahap 5"
+        },
+        "level_10": {
+          "name": "Tahap 10"
+        },
+        "tax_saver_10": {
+          "name": "Penjimat Cukai"
+        },
+        "tax_warrior_7": {
+          "name": "Pejuang Cukai"
+        },
+        "malaysia_tax_hero_5000": {
+          "name": "Wira Cukai Malaysia"
+        },
+        "mission_master": {
+          "name": "Master Misi"
+        },
+        "recruiter": {
+          "name": "Perekrut"
+        }
       }
     },
     "themes": {
@@ -144,10 +227,22 @@
       "unlocked": "Dibuka",
       "locked": "Terkunci",
       "options": {
-        "default": { "title": "Klasik", "description": "Rupa pengimbas biasa yang tersedia dari hari pertama." },
-        "ocean": { "title": "Lautan", "description": "Tema biru yang tenang untuk sesi imbasan yang fokus." },
-        "forest": { "title": "Hutan", "description": "Tema hijau yang diperoleh melalui rentetan yang berterusan." },
-        "sunset": { "title": "Senja", "description": "Rupa hangat premium untuk kemajuan yang lebih tinggi." }
+        "default": {
+          "title": "Klasik",
+          "description": "Rupa pengimbas biasa yang tersedia dari hari pertama."
+        },
+        "ocean": {
+          "title": "Lautan",
+          "description": "Tema biru yang tenang untuk sesi imbasan yang fokus."
+        },
+        "forest": {
+          "title": "Hutan",
+          "description": "Tema hijau yang diperoleh melalui rentetan yang berterusan."
+        },
+        "sunset": {
+          "title": "Senja",
+          "description": "Rupa hangat premium untuk kemajuan yang lebih tinggi."
+        }
       }
     },
     "privacy": {
@@ -210,5 +305,34 @@
   "signOutSuccess": {
     "title": "Berjaya log keluar",
     "description": "Anda telah log keluar dari akaun anda."
+  },
+  "account": {
+    "googleAccount": "Akaun Google",
+    "googleAccountDescription": "Anda log masuk dengan Google. Urus kata laluan anda dalam akaun Google.",
+    "googleSecurity": "Keselamatan Google",
+    "activeSessions": "Sesi Aktif",
+    "activeSessionsDescription": "Log keluar dari semua peranti dan sesi",
+    "signOutEverywhere": "Log Keluar Di Semua Tempat",
+    "dangerZone": "Zon Bahaya",
+    "deleteAccount": "Padam Akaun",
+    "deleteAccountDescription": "Padam akaun anda dan semua data berkaitan secara kekal. Tindakan ini tidak boleh dibatalkan.",
+    "processing": "Memproses...",
+    "deletionRequested": "Permintaan pemadaman akaun dihantar",
+    "deletionRequestedDescription": "Permintaan pemadaman akaun anda telah dihantar. Anda akan menerima e-mel dengan arahan selanjutnya.",
+    "deletionFailed": "Permintaan pemadaman gagal",
+    "deletionFailedDescription": "Gagal memproses permintaan pemadaman akaun. Sila cuba lagi.",
+    "deletionUnexpected": "Ralat tidak dijangka berlaku. Sila cuba lagi.",
+    "confirmTitle": "Adakah anda benar-benar pasti?",
+    "confirmDescription": "Tindakan ini tidak boleh dibatalkan. Ini akan memadam akaun anda secara kekal dan membuang semua data anda dari pelayan kami.",
+    "confirmIncludes": "Ini termasuk:",
+    "includeReceipts": "Semua resit dan dokumen yang dimuat naik",
+    "includeHistory": "Sejarah pemprosesan dan analisis AI",
+    "includeTeams": "Keahlian pasukan dan tuntutan",
+    "includeSettings": "Tetapan dan keutamaan akaun",
+    "includeBilling": "Maklumat langganan dan pengebilan",
+    "cancel": "Batal",
+    "confirmDelete": "Padam Akaun",
+    "deleting": "Memadam...",
+    "confirmDeleteAction": "Ya, padam akaun saya"
   }
 }

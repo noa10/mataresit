@@ -10,6 +10,14 @@ export interface UnifiedSearchParams {
   similarityThreshold?: number; // Vector similarity threshold
   includeMetadata?: boolean; // Include rich metadata in results
   aggregationMode?: 'relevance' | 'diversity' | 'recency'; // Result ranking strategy
+
+  // Conversational search options (used by the AI search chat)
+  useEnhancedPrompting?: boolean; // Ask the Edge Function for an AI-written narrative + UI components
+  conversationHistory?: string[]; // Recent turns, used as LLM context
+  responseLanguage?: 'en' | 'ms'; // Language for the AI-written response
+  bypassCache?: boolean; // Skip the client-side search cache entirely
+  /** Client-side cancellation; never serialized to the Edge Function. */
+  signal?: AbortSignal;
 }
 
 export interface SearchFilters {
@@ -49,6 +57,12 @@ export interface UnifiedSearchResponse {
     fallbacksUsed: string[];
     modelUsed?: string;
     embeddingDimensions?: number;
+    responseGeneration?: {
+      modelUsed?: string;
+      templateUsed?: string;
+      processingTime?: number;
+      tokensUsed?: number;
+    };
   };
   pagination: {
     hasMore: boolean;

@@ -1,518 +1,413 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import Navbar from "@/components/Navbar";
-import {
-  Upload,
-  FileText,
-  Sparkles,
-  BarChart4,
-  History,
-  Settings2,
-  ArrowRight,
-  CheckCircle,
-  ExternalLink,
-  Users,
-  LineChart,
-  Layers,
-  TrendingUp,
-  Brain,
-  Search,
-  Zap,
-  Shield,
-  Clock,
-  DollarSign,
-  Target
-} from "lucide-react";
-import { useAuth } from '@/contexts/AuthContext';
-import { useHomepageTranslation } from '@/contexts/LanguageContext';
-import { Separator } from "@/components/ui/separator";
-
-
+import { useAuth } from "@/contexts/AuthContext";
+import { useHomepageTranslation } from "@/contexts/LanguageContext";
+import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { ArrowRight, CheckMark } from "@/components/marketing/MarketingIcons";
 
 export default function Index() {
   const { user } = useAuth();
   const { t } = useHomepageTranslation();
 
   useEffect(() => {
-    document.title = t('meta.title');
+    document.title = String(t("meta.title"));
   }, [t]);
 
-  // Business-focused features array with translations
-  const featuresList = [
-    {
-      icon: <Clock className="h-8 w-8 text-primary" />,
-      title: t('features.list.saveTime.title'),
-      description: t('features.list.saveTime.description')
-    },
-    {
-      icon: <Target className="h-8 w-8 text-primary" />,
-      title: t('features.list.accuracy.title'),
-      description: t('features.list.accuracy.description')
-    },
-    {
-      icon: <Search className="h-8 w-8 text-primary" />,
-      title: t('features.list.search.title'),
-      description: t('features.list.search.description')
-    },
-    {
-      icon: <DollarSign className="h-8 w-8 text-primary" />,
-      title: t('features.list.taxDeductions.title'),
-      description: t('features.list.taxDeductions.description')
-    },
-    {
-      icon: <Users className="h-8 w-8 text-primary" />,
-      title: t('features.list.teamCollaboration.title'),
-      description: t('features.list.teamCollaboration.description')
-    },
-    {
-      icon: <Shield className="h-8 w-8 text-primary" />,
-      title: t('features.list.security.title'),
-      description: t('features.list.security.description')
-    }
+  const copy = (key: string) => String(t(key));
+  const workspaceTarget = user ? "/dashboard" : "/auth";
+
+  const receiptItems = [
+    { name: copy("scan.items.nasiLemak"), amount: "RM 14.50" },
+    { name: copy("scan.items.tehTarik"), amount: "RM 7.00" },
+    { name: copy("scan.items.rotiCanai"), amount: "RM 4.50" },
   ];
 
-  // How it works steps with translations
-  const howItWorksSteps = [
-    {
-      step: "1",
-      icon: <Upload className="h-8 w-8 text-primary" />,
-      title: t('howItWorks.steps.upload.title'),
-      description: t('howItWorks.steps.upload.description')
-    },
-    {
-      step: "2",
-      icon: <Sparkles className="h-8 w-8 text-primary" />,
-      title: t('howItWorks.steps.aiProcessing.title'),
-      description: t('howItWorks.steps.aiProcessing.description')
-    },
-    {
-      step: "3",
-      icon: <CheckCircle className="h-8 w-8 text-primary" />,
-      title: t('howItWorks.steps.exportAnalyze.title'),
-      description: t('howItWorks.steps.exportAnalyze.description')
-    }
+  const heroBenefits = [
+    copy("hero.benefits.accuracy"),
+    copy("hero.benefits.bulk"),
+    copy("hero.benefits.trail"),
   ];
 
-  // Business-focused stats with translations
-  const stats = [
-    { value: "10,000+", label: t('stats.items.businesses'), icon: <Users className="h-6 w-6 text-primary mb-2" /> },
-    { value: "99%", label: t('stats.items.accuracy'), icon: <Target className="h-6 w-6 text-primary mb-2" /> },
-    { value: "5 Hours", label: t('stats.items.timeSaved'), icon: <Clock className="h-6 w-6 text-primary mb-2" /> },
+  const howSteps = [
+    {
+      num: "01",
+      title: copy("how.steps.capture.title"),
+      body: copy("how.steps.capture.description"),
+    },
+    {
+      num: "02",
+      title: copy("how.steps.extract.title"),
+      body: copy("how.steps.extract.description"),
+    },
+    {
+      num: "03",
+      title: copy("how.steps.review.title"),
+      body: copy("how.steps.review.description"),
+    },
+  ];
+
+  const features = [
+    {
+      num: "01",
+      title: copy("features.items.accuracy.title"),
+      body: copy("features.items.accuracy.description"),
+    },
+    {
+      num: "02",
+      title: copy("features.items.typing.title"),
+      body: copy("features.items.typing.description"),
+    },
+    {
+      num: "03",
+      title: copy("features.items.search.title"),
+      body: copy("features.items.search.description"),
+    },
+    {
+      num: "04",
+      title: copy("features.items.tax.title"),
+      body: copy("features.items.tax.description"),
+    },
+    {
+      num: "05",
+      title: copy("features.items.team.title"),
+      body: copy("features.items.team.description"),
+    },
+    {
+      num: "06",
+      title: copy("features.items.security.title"),
+      body: copy("features.items.security.description"),
+    },
+  ];
+
+  const insideItems = [
+    {
+      num: "01",
+      title: copy("inside.items.overview.title"),
+      body: copy("inside.items.overview.description"),
+    },
+    {
+      num: "02",
+      title: copy("inside.items.inbox.title"),
+      body: copy("inside.items.inbox.description"),
+    },
+    {
+      num: "03",
+      title: copy("inside.items.review.title"),
+      body: copy("inside.items.review.description"),
+    },
+    {
+      num: "04",
+      title: copy("inside.items.approval.title"),
+      body: copy("inside.items.approval.description"),
+    },
+  ];
+
+  const extractedFields = [
+    { key: copy("scan.fields.merchant"), value: copy("scan.merchantValue") },
+    { key: copy("scan.fields.total"), value: copy("scan.totalValue") },
+    { key: copy("scan.fields.category"), value: copy("scan.categoryValue") },
   ];
 
   return (
-    <>
-      <div className="relative overflow-hidden">
-        {/* Enhanced background pattern */}
-        <div className="absolute inset-0 overflow-hidden z-0">
-          <div className="w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background"></div>
-        </div>
+    <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
+      <a
+        href="#main"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper focus:top-3"
+      >
+        {copy("skipToContent")}
+      </a>
 
-        <main className="relative z-10 container mx-auto py-16 space-y-32 px-4 sm:px-6 lg:px-8">
-          {/* Enhanced Hero Section with business focus */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center pt-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight" dangerouslySetInnerHTML={{ __html: t('hero.title') }}>
-              </h1>
-              <p className="mt-4 text-xl text-muted-foreground lg:text-2xl">
-                {t('hero.subtitle')}
+      <MarketingHeader />
+
+      <main id="main">
+        {/* Hero */}
+        <section
+          id="top"
+          className="scroll-mt-[164px] overflow-hidden border-b border-ledger-line min-[881px]:scroll-mt-[84px]"
+        >
+          <div className="mx-auto grid w-full max-w-[1240px] grid-cols-1 items-center gap-10 px-5 pb-14 pt-11 min-[981px]:grid-cols-[1.02fr_0.98fr] min-[981px]:gap-10 min-[1081px]:gap-16 min-[1081px]:pb-[84px] min-[1081px]:pt-[72px] sm:px-6 sm:pb-16 sm:pt-14">
+            <div className="max-w-[640px] min-[981px]:max-w-[620px]">
+              <p className="font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted">
+                {copy("hero.eyebrow")}
               </p>
-              {/* Business benefits highlight */}
-              <div className="mt-6 flex flex-wrap gap-3">
-                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span>{t('hero.benefits.saveTime')}</span>
-                </div>
-                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <Target className="h-4 w-4 text-primary" />
-                  <span>{t('hero.benefits.accuracy')}</span>
-                </div>
-                <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1 text-sm">
-                  <Shield className="h-4 w-4 text-primary" />
-                  <span>{t('hero.benefits.security')}</span>
-                </div>
-              </div>
-              
-              <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-4">
-                {!user ? (
-                  <>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                        <Link to="/auth" className="flex items-center justify-center sm:justify-start">
-                          {t('hero.cta.getStarted')}
-                          <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                        </Link>
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-                        <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
-                          {t('hero.cta.viewPricing')}
-                        </Link>
-                      </Button>
-                    </motion.div>
-                  </>
-                ) : (
-                  <>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button asChild size="lg" className="group bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                        <Link to="/dashboard" className="flex items-center justify-center sm:justify-start">
-                          {t('hero.cta.goToDashboard')}
-                          <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                        </Link>
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-                        <Link to="/search" className="flex items-center justify-center sm:justify-start">
-                          {t('hero.cta.trySmartSearch')}
-                        </Link>
-                      </Button>
-                    </motion.div>
-                  </>
-                )}
-              </div>
-            </motion.div>
+              <h1 className="mb-[22px] mt-[18px] font-display text-[clamp(2.75rem,5.6vw,4.75rem)] font-normal leading-[1.02] tracking-[-0.028em] text-ledger-ink max-[640px]:text-[clamp(2.5rem,11vw,3.4rem)]">
+                {copy("hero.titleLead")}{" "}
+                <em className="italic text-ledger-accent">{copy("hero.titleAccent")}</em>{" "}
+                {copy("hero.titleTail")}
+              </h1>
+              <p className="max-w-[46ch] text-[1.125rem] leading-[1.6] text-ledger-muted">
+                {copy("hero.lede")}
+              </p>
 
-            {/* Keep existing hero image */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="hidden lg:flex justify-center items-center"
-            >
-              <div className="relative max-w-lg rounded-xl overflow-hidden border border-border shadow-2xl">
-                <img
-                  src="/receipt-scanner.png"
-                  alt="AI Receipt Processing"
-                  width="500"
-                  height="600"
-                  className="block w-full h-auto object-cover"
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button
+                  asChild
+                  variant="accent"
+                  className="h-[46px] gap-[9px] rounded-lg px-5 text-[0.9375rem] font-semibold max-[640px]:w-full"
+                >
+                  <Link to={workspaceTarget}>
+                    {copy("hero.ctaWorkspace")}
+                    <ArrowRight className="h-[18px] w-[18px]" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="accent-outline"
+                  className="h-[46px] rounded-lg border-ledger-line-strong bg-transparent px-5 text-[0.9375rem] font-semibold text-ledger-ink hover:border-ledger-ink hover:bg-ledger-surface max-[640px]:w-full"
+                >
+                  <a href="#how">{copy("hero.ctaHow")}</a>
+                </Button>
+              </div>
+
+              <ul className="mt-[30px] flex flex-wrap gap-x-[22px] gap-y-2.5 border-t border-ledger-line pt-[22px]">
+                {heroBenefits.map((benefit) => (
+                  <li
+                    key={benefit}
+                    className="inline-flex items-center gap-[7px] font-data text-xs leading-[1.6] text-ledger-ink-2"
+                  >
+                    <CheckMark className="h-3.5 w-3.5 text-ledger-accent" />
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mx-auto w-full max-w-[520px] min-[981px]:max-w-none">
+              <div className="relative overflow-hidden rounded-[18px] bg-ledger-panel p-[18px] pb-5 text-ledger-on-panel shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)]">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 opacity-50"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(rgba(241, 242, 238, .13) 1px, transparent 1px)",
+                    backgroundSize: "18px 18px",
+                  }}
                 />
 
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
-                  <div className="flex items-center">
-                    <div>
-                      <p className="text-white font-medium">{t('hero.imageOverlay.title')}</p>
-                      <p className="text-white/80 text-sm">{t('hero.imageOverlay.subtitle')}</p>
+                <div className="relative flex items-center justify-between px-0.5 pb-3.5 pt-0.5 font-data text-[0.6875rem] uppercase tracking-[0.14em] text-ledger-on-panel-muted">
+                  <span>{copy("scan.label")}</span>
+                  <span className="inline-flex items-center gap-[7px]">
+                    <span
+                      aria-hidden="true"
+                      className="ledger-pulse-dot h-1.5 w-1.5 rounded-full bg-[#79D3A4]"
+                    />
+                    {copy("scan.extracting")}
+                  </span>
+                </div>
+
+                <div className="relative overflow-hidden rounded-[5px] bg-[#FBFBF7] p-5 pb-[18px] font-data text-xs leading-[1.55] text-[#1A211E]">
+                  <p className="text-center text-[0.8125rem] font-medium uppercase tracking-[0.16em]">
+                    {copy("scan.merchant")}
+                  </p>
+                  <p className="mt-1 text-center text-[0.6875rem] text-[#5F675F]">
+                    {copy("scan.address")}
+                    <br />
+                    {copy("scan.date")}
+                  </p>
+
+                  <div className="my-3 border-t border-dashed border-[#C9CEC4]" />
+
+                  <ul className="grid gap-0.5">
+                    {receiptItems.map((item) => (
+                      <li
+                        key={item.name}
+                        className="flex items-baseline justify-between gap-3 py-[3px]"
+                      >
+                        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {item.name}
+                        </span>
+                        <span className="shrink-0">{item.amount}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-2.5 grid gap-[3px]">
+                    <div className="flex justify-between gap-3">
+                      <span>{copy("scan.subtotal")}</span>
+                      <span>RM 26.00</span>
                     </div>
-                    <Button size="sm" variant="secondary" className="ml-auto" asChild>
-                      <Link to="/dashboard">
-                        <ArrowRight className="h-4 w-4 mr-2" />
-                        {t('hero.imageOverlay.startNow')}
-                      </Link>
-                    </Button>
+                    <div className="flex justify-between gap-3">
+                      <span>{copy("scan.tax")}</span>
+                      <span>RM 1.56</span>
+                    </div>
+                    <div className="mt-[5px] flex justify-between gap-3 border-t border-[#1A211E] pt-1.5 text-[0.8125rem] font-medium">
+                      <span>{copy("scan.total")}</span>
+                      <span>RM 27.56</span>
+                    </div>
                   </div>
+
+                  <p className="mt-3 text-[0.6875rem] tracking-[0.04em] text-[#5F675F]">
+                    {copy("scan.payment")}
+                  </p>
+
+                  <div aria-hidden="true" className="ledger-scanline" />
+                </div>
+
+                <div
+                  aria-label={copy("scan.fieldsLabel")}
+                  className="relative mt-3.5 grid gap-0.5 border-t border-[rgba(241,242,238,0.16)] pt-3"
+                >
+                  {extractedFields.map((field) => (
+                    <div
+                      key={field.key}
+                      className="grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-3 py-1.5 text-xs leading-[1.6]"
+                    >
+                      <span className="font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-on-panel-muted">
+                        {field.key}
+                      </span>
+                      <span className="truncate font-medium text-ledger-on-panel">
+                        {field.value}
+                      </span>
+                      <CheckMark
+                        strokeWidth={2.2}
+                        className="h-3.5 w-3.5 text-[#79D3A4]"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
-            </motion.div>
-          </section>
+            </div>
+          </div>
+        </section>
 
-          {/* How It Works Section */}
-          <motion.section
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="py-20"
-          >
-            <div className="text-center mb-16">
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-                className="text-3xl md:text-4xl font-bold mb-4"
-              >
-                {t('howItWorks.title')}
-              </motion.h2>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="text-lg text-muted-foreground max-w-2xl mx-auto"
-              >
-                {t('howItWorks.subtitle')}
-              </motion.p>
+        {/* How it works */}
+        <section
+          id="how"
+          className="scroll-mt-[164px] border-b border-ledger-line min-[881px]:scroll-mt-[84px]"
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 py-16 min-[881px]:px-6 min-[881px]:py-[88px]">
+            <div className="mb-10 grid grid-cols-1 items-start gap-4 min-[981px]:mb-14 min-[981px]:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] min-[981px]:items-end min-[981px]:gap-12">
+              <div>
+                <p className="font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted">
+                  {copy("how.eyebrow")}
+                </p>
+                <h2 className="mt-3.5 font-display text-[clamp(2rem,3.6vw,3rem)] font-normal leading-[1.06] tracking-[-0.02em] text-ledger-ink">
+                  {copy("how.title")}
+                </h2>
+              </div>
+              <p className="max-w-[54ch] pb-1 text-[1.0625rem] leading-[1.65] text-ledger-muted">
+                {copy("how.lede")}
+              </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              {howItWorksSteps.map((step, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.2 }}
-                  className="text-center relative"
+            <div className="grid grid-cols-1 gap-6 min-[881px]:grid-cols-3 min-[881px]:gap-8">
+              {howSteps.map((step) => (
+                <div
+                  key={step.num}
+                  className="border-t border-ledger-ink pt-[18px]"
                 >
-                  {/* Step connector line */}
-                  {index < howItWorksSteps.length - 1 && (
-                    <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-primary/30 to-transparent z-0" />
-                  )}
+                  <p className="font-data text-base leading-[1.65] tracking-[0.1em] text-ledger-accent">
+                    {step.num}
+                  </p>
+                  <h3 className="mb-2 mt-3.5 text-[1.25rem] font-semibold tracking-[-0.01em] text-ledger-ink">
+                    {step.title}
+                  </h3>
+                  <p className="max-w-[34ch] text-base leading-[1.65] text-ledger-muted">
+                    {step.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-                  <div className="relative z-10">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-                      {step.icon}
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
-                        {step.step}
-                      </div>
-                    </div>
-                    <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">{step.description}</p>
+        {/* Capabilities */}
+        <section
+          id="features"
+          className="scroll-mt-[164px] border-b border-ledger-line bg-ledger-surface min-[881px]:scroll-mt-[84px]"
+        >
+          <div className="mx-auto w-full max-w-[1240px] px-5 py-16 min-[881px]:px-6 min-[881px]:py-[88px]">
+            <div className="mb-10 grid grid-cols-1 items-start gap-4 min-[981px]:mb-14 min-[981px]:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] min-[981px]:items-end min-[981px]:gap-12">
+              <div>
+                <p className="font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted">
+                  {copy("features.eyebrow")}
+                </p>
+                <h2 className="mt-3.5 font-display text-[clamp(2rem,3.6vw,3rem)] font-normal leading-[1.06] tracking-[-0.02em] text-ledger-ink">
+                  {copy("features.title")}
+                </h2>
+              </div>
+              <p className="max-w-[54ch] pb-1 text-[1.0625rem] leading-[1.65] text-ledger-muted">
+                {copy("features.lede")}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 min-[881px]:grid-cols-2 min-[881px]:gap-x-10 min-[1081px]:gap-x-16">
+              {features.map((feature) => (
+                <article
+                  key={feature.num}
+                  className="grid grid-cols-[40px_minmax(0,1fr)] gap-[18px] border-t border-ledger-line pb-[30px] pt-[26px]"
+                >
+                  <span className="pt-[5px] font-data text-[0.6875rem] text-ledger-muted">
+                    {feature.num}
+                  </span>
+                  <div>
+                    <h3 className="mb-1.5 text-[1.0625rem] font-semibold tracking-[-0.005em] text-ledger-ink">
+                      {feature.title}
+                    </h3>
+                    <p className="max-w-[46ch] text-base leading-[1.62] text-ledger-muted">
+                      {feature.body}
+                    </p>
                   </div>
-                </motion.div>
+                </article>
               ))}
             </div>
-          </motion.section>
+          </div>
+        </section>
 
-
-
-          {/* Enhanced Stats Section */}
-          <motion.section
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="py-20 text-center"
-          >
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-3xl md:text-4xl font-bold mb-16"
-            >
-              {t('stats.title')}
-            </motion.h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  className="text-center flex flex-col items-center p-6 rounded-lg hover:bg-primary/5 transition-all duration-300"
-                >
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    whileInView={{ scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: index * 0.1 + 0.2 }}
-                  >
-                    {stat.icon}
-                  </motion.div>
-                  <motion.h3
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: index * 0.1 + 0.3 }}
-                    className="text-5xl font-bold text-primary"
-                  >
-                    {stat.value}
-                  </motion.h3>
-                  <p className="text-muted-foreground mt-2 font-medium">{stat.label}</p>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-
-          {/* Enhanced Features Section */}
-          <motion.section
-            id="features"
-            className="scroll-mt-16 py-20"
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-16"
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4" dangerouslySetInnerHTML={{ __html: t('features.title') }}>
+        {/* Inside the workspace */}
+        <section
+          id="workspace"
+          className="scroll-mt-[164px] bg-ledger-panel text-ledger-on-panel min-[881px]:scroll-mt-[84px]"
+        >
+          <div className="mx-auto grid w-full max-w-[1240px] grid-cols-1 items-start gap-10 px-5 py-16 min-[881px]:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] min-[881px]:px-6 min-[881px]:py-[84px] min-[1081px]:gap-16">
+            <div>
+              <p className="font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-on-panel-muted">
+                {copy("inside.eyebrow")}
+              </p>
+              <h2 className="mb-[18px] mt-4 font-display text-[clamp(2rem,3.6vw,3rem)] font-normal leading-[1.06] tracking-[-0.02em] text-ledger-on-panel">
+                {copy("inside.title")}
               </h2>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                {t('features.subtitle')}
+              <p className="max-w-[54ch] text-[1.0625rem] leading-[1.65] text-ledger-on-panel-muted">
+                {copy("inside.lede")}
               </p>
-            </motion.div>
+              <Button
+                asChild
+                className="mt-7 h-[46px] gap-[9px] rounded-lg bg-ledger-on-panel px-5 text-[0.9375rem] font-semibold text-ledger-panel hover:bg-white max-[640px]:w-full"
+              >
+                <Link to={workspaceTarget}>
+                  {copy("inside.cta")}
+                  <ArrowRight className="h-[18px] w-[18px]" />
+                </Link>
+              </Button>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuresList.map((feature, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.03, y: -5 }}
-                  className="h-full"
+            <ul className="border-t border-[rgba(241,242,238,0.18)]">
+              {insideItems.map((item) => (
+                <li
+                  key={item.num}
+                  className="grid grid-cols-[36px_minmax(0,1fr)] gap-[14px] border-b border-[rgba(241,242,238,0.14)] py-[18px]"
                 >
-                  <Card className="h-full hover:bg-primary/5 transition-all duration-300 border-border/60 bg-card hover:shadow-lg">
-                    <CardContent className="pt-8">
-                      <motion.div
-                        className="mb-6 rounded-full w-16 h-16 flex items-center justify-center bg-primary/10"
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {feature.icon}
-                      </motion.div>
-                      <h4 className="text-xl font-semibold mb-3">{feature.title}</h4>
-                      <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                  <span className="pt-[3px] font-data text-[0.6875rem] text-ledger-on-panel-muted">
+                    {item.num}
+                  </span>
+                  <div>
+                    <h3 className="text-base font-semibold leading-[1.6] text-ledger-on-panel">
+                      {item.title}
+                    </h3>
+                    <p className="mt-[3px] text-[0.875rem] leading-[1.6] text-ledger-on-panel-muted">
+                      {item.body}
+                    </p>
+                  </div>
+                </li>
               ))}
-            </div>
-          </motion.section>
-
-          {/* Enhanced CTA Section */}
-          <motion.section
-            className="text-center py-20 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl relative overflow-hidden"
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="absolute inset-0 z-0 opacity-5">
-              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="scale(2) rotate(45)"><rect x="0" y="0" width="100%" height="100%" fill="hsla(0,0%,100%,0)"/><path d="M10-5C10 5 10 5 0 5A10 10 0 0 1 10-5M10 15c0 10 0 10-10 10a10 10 0 0 1 10-10" strokeWidth="0.5" stroke="hsla(215, 28%, 17%, 0.2)" fill="none"/></pattern></defs><rect width="800%" height="800%" transform="translate(0,0)" fill="url(#a)"/></svg>
-            </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="max-w-2xl mx-auto relative z-10"
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('cta.title')}</h2>
-              <p className="text-lg md:text-xl text-muted-foreground mb-8">
-                {t('cta.subtitle')}
-              </p>
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button asChild size="lg" className="group w-full sm:w-auto">
-                    <Link to={user ? '/dashboard' : '/auth'} className="flex items-center justify-center sm:justify-start">
-                      {user ? t('cta.goToDashboard') : t('cta.startFreeTrial')}
-                      <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                    </Link>
-                  </Button>
-                </motion.div>
-                {!user && (
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button variant="outline" size="lg" asChild className="w-full sm:w-auto">
-                      <Link to="/pricing" className="flex items-center justify-center sm:justify-start">
-                        {t('cta.viewPricing')}
-                      </Link>
-                    </Button>
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
-          </motion.section>
-        </main>
-      </div>
-
-      {/* Keep existing footer */}
-      <footer className="border-t py-12 bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <img src="/mataresit-icon.png" alt="Mataresit Logo" className="h-8" />
-                <h4 className="font-semibold text-lg">Mataresit</h4>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Transform your receipts into organized data. Save time, increase accuracy, and never miss a deduction.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-medium text-lg">Product</h4>
-              <ul className="space-y-2">
-                {/* Added hover:text-primary */}
-                <li><Link to="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">Features</Link></li>
-                <li><Link to="/dashboard" className="text-sm text-muted-foreground hover:text-primary transition-colors">Dashboard</Link></li>
-                {/* Placeholder links - update as needed */}
-                <li><Link to="/api" className="text-sm text-muted-foreground hover:text-primary transition-colors">API Reference</Link></li>
-                <li><Link to="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">Pricing</Link></li>
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-medium text-lg">Resources</h4>
-              <ul className="space-y-2">
-                {/* Added hover:text-primary */}
-                <li><Link to="/docs" className="text-sm text-muted-foreground hover:text-primary transition-colors">Documentation</Link></li>
-                <li><Link to="/api-reference" className="text-sm text-muted-foreground hover:text-primary transition-colors">API Reference</Link></li>
-                <li><Link to="/help" className="text-sm text-muted-foreground hover:text-primary transition-colors">Help Center</Link></li>
-                <li><Link to="/status" className="text-sm text-muted-foreground hover:text-primary transition-colors">System Status</Link></li>
-                <li><Link to="/blog" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</Link></li>
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-medium text-lg">Legal</h4>
-              <ul className="space-y-2">
-                 {/* Added hover:text-primary */}
-                <li><Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms-conditions" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
-                <li><Link to="/contact" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact Us</Link></li>
-              </ul>
-            </div>
+            </ul>
           </div>
+        </section>
+      </main>
 
-          {/* Newsletter/Contact Placeholder - Adding this requires backend/form handling */}
-          {/*
-          <div className="mb-12 pt-8 border-t">
-             <h4 className="font-medium text-lg mb-4 text-center md:text-left">Stay Updated</h4>
-             <form className="flex flex-col md:flex-row gap-2 max-w-md mx-auto md:mx-0">
-                <Input type="email" placeholder="Enter your email" className="flex-grow" />
-                <Button type="submit">Subscribe</Button>
-             </form>
-          </div>
-          */}
-
-          <div className="flex flex-col md:flex-row justify-between items-center pt-6 border-t">
-            <p className="text-sm text-muted-foreground order-2 md:order-1 mt-4 md:mt-0">
-              © {new Date().getFullYear()} Mataresit. All rights reserved.
-            </p>
-            {/* Increased icon size and added hover effect */}
-            <div className="flex space-x-6 order-1 md:order-2">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors" aria-label="Twitter">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"> {/* Size 24x24 */}
-                  <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
-                </svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors" aria-label="GitHub">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"> {/* Size 24x24 */}
-                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-                </svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors" aria-label="LinkedIn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"> {/* Size 24x24 */}
-                  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                  <rect x="2" y="9" width="4" height="12"></rect>
-                  <circle cx="4" cy="4" r="2"></circle>
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </>
+      <MarketingFooter />
+    </div>
   );
 }

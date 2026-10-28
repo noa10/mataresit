@@ -7,6 +7,7 @@ import { HelpCircle, Zap, Brain, DollarSign, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AVAILABLE_MODELS, getModelsByProvider, getModelsByCapability, ModelProvider } from "@/config/modelProviders";
 import { useSettings } from "@/hooks/useSettings";
+import { useSettingsTranslation } from "@/contexts/LanguageContext";
 
 // Provider information
 const PROVIDER_INFO = {
@@ -57,6 +58,7 @@ export function ReceiptProcessingOptions({
   defaultBatchModel,
   showBatchModelSelection = false
 }: ReceiptProcessingOptionsProps) {
+  const { t } = useSettingsTranslation();
   const { settings, updateSettings } = useSettings();
   const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
   const [selectedBatchModel, setSelectedBatchModel] = useState<string>(
@@ -85,7 +87,7 @@ export function ReceiptProcessingOptions({
   // Get pricing badge
   const getPricingBadge = (pricing?: { inputTokens: number; outputTokens: number }) => {
     if (!pricing || (pricing.inputTokens === 0 && pricing.outputTokens === 0)) {
-      return <Badge variant="outline" className="text-xs bg-green-100 text-green-700">FREE</Badge>;
+      return <Badge variant="outline" className="text-xs bg-green-100 text-green-700">{t('processingOptions.free')}</Badge>;
     }
     const avgCost = (pricing.inputTokens + pricing.outputTokens) / 2;
     if (avgCost < 1) return <Badge variant="outline" className="text-xs bg-green-100 text-green-700">$</Badge>;
@@ -117,7 +119,7 @@ export function ReceiptProcessingOptions({
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <Label htmlFor="ai-model">AI Vision Processing</Label>
+            <Label htmlFor="ai-model">{t('processingOptions.visionTitle')}</Label>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -125,13 +127,13 @@ export function ReceiptProcessingOptions({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    <strong>AI Vision:</strong> Your receipts are processed directly by advanced AI models with vision capabilities. This method provides superior accuracy and supports larger images (up to 5MB).
+                    {t('processingOptions.visionTooltip')}
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
-          <p className="text-sm text-muted-foreground">Select which AI model to use for processing your receipts</p>
+          <p className="text-sm text-muted-foreground">{t('processingOptions.visionDescription')}</p>
         </div>
       </div>
 
@@ -145,7 +147,7 @@ export function ReceiptProcessingOptions({
         }}
       >
         <SelectTrigger id="ai-model">
-          <SelectValue placeholder="Select an AI model">
+          <SelectValue placeholder={t('processingOptions.selectModel')}>
             {selectedModel && AVAILABLE_MODELS[selectedModel] && (
               <div className="flex items-center gap-2">
                 <span>{AVAILABLE_MODELS[selectedModel].name}</span>
@@ -212,16 +214,30 @@ export function ReceiptProcessingOptions({
                         <p className="font-medium">{model.name}</p>
                         <p className="text-sm">{model.description}</p>
                         <div className="flex items-center gap-2 text-xs">
-                          <Badge variant="outline">Speed: {model.performance.speed}</Badge>
-                          <Badge variant="outline">Accuracy: {model.performance.accuracy}</Badge>
+                          <Badge variant="outline">
+                            {t('processingOptions.speed', { speed: model.performance.speed })}
+                          </Badge>
+                          <Badge variant="outline">
+                            {t('processingOptions.accuracy', { accuracy: model.performance.accuracy })}
+                          </Badge>
                         </div>
                         {model.pricing && (
                           <p className="text-xs text-muted-foreground">
-                            Cost: ${model.pricing.inputTokens}/1M input tokens, ${model.pricing.outputTokens}/1M output tokens
+                            {t('processingOptions.cost', {
+                              input: model.pricing.inputTokens,
+                              output: model.pricing.outputTokens,
+                            })}
                           </p>
                         )}
                         <div className="text-xs text-muted-foreground">
-                          Supports: {model.supportsText ? 'Text' : ''}{model.supportsText && model.supportsVision ? ' + ' : ''}{model.supportsVision ? 'Vision' : ''}
+                          {t('processingOptions.supports', {
+                            types: [
+                              model.supportsText ? t('processingOptions.text') : '',
+                              model.supportsVision ? t('processingOptions.vision') : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' + '),
+                          })}
                         </div>
                       </div>
                     </TooltipContent>
@@ -239,7 +255,7 @@ export function ReceiptProcessingOptions({
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
-                <Label htmlFor="batch-ai-model">Batch Processing Model</Label>
+                <Label htmlFor="batch-ai-model">{t('processingOptions.batchModelTitle')}</Label>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -247,15 +263,14 @@ export function ReceiptProcessingOptions({
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="max-w-xs">
-                        Choose a different AI model specifically for batch processing.
-                        Faster models can improve batch processing speed.
+                        {t('processingOptions.batchModelTooltip')}
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
               <p className="text-sm text-muted-foreground">
-                Optionally use a different model for batch uploads
+                {t('processingOptions.batchModelDescription')}
               </p>
             </div>
           </div>
@@ -265,7 +280,7 @@ export function ReceiptProcessingOptions({
             onValueChange={handleBatchModelChange}
           >
             <SelectTrigger id="batch-ai-model">
-              <SelectValue placeholder="Select batch processing model">
+              <SelectValue placeholder={t('processingOptions.selectBatchModel')}>
                 {selectedBatchModel && AVAILABLE_MODELS[selectedBatchModel] && (
                   <div className="flex items-center gap-2">
                     <span>{AVAILABLE_MODELS[selectedBatchModel].name}</span>
@@ -335,9 +350,9 @@ export function ReceiptProcessingOptions({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <label className="text-sm font-medium">Preserve Original Image Quality</label>
+            <label className="text-sm font-medium">{t('processingOptions.preserveQuality')}</label>
             <p className="text-xs text-muted-foreground">
-              Skip image compression during upload for maximum quality in reports
+              {t('processingOptions.preserveQualityDescription')}
             </p>
           </div>
           <Switch

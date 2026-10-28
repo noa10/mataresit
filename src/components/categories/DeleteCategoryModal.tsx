@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { CustomCategory } from "@/types/receipt";
+import { useCategoriesTranslation } from "@/contexts/LanguageContext";
 
 interface DeleteCategoryModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
   onConfirm,
   isDeleting,
 }) => {
+  const { t } = useCategoriesTranslation();
   const [reassignmentOption, setReassignmentOption] = useState<"none" | "category">("none");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
@@ -67,7 +69,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Delete Category
+            {t("delete.title")}
           </DialogTitle>
         </DialogHeader>
 
@@ -83,26 +85,26 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
               {category.name}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              ({category.receipt_count || 0} receipts)
+              ({t("receiptCount", { count: category.receipt_count || 0 })})
             </span>
           </div>
 
           {/* Warning */}
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
             <p className="text-sm text-destructive font-medium mb-1">
-              This action cannot be undone
+              {t("delete.cannotUndo")}
             </p>
             <p className="text-sm text-muted-foreground">
               {hasReceipts
-                ? `This category is assigned to ${category.receipt_count} receipt(s). Choose what to do with them below.`
-                : "This category will be permanently deleted."}
+                ? t("delete.assignedTo", { count: category.receipt_count })
+                : t("delete.permanentlyDelete")}
             </p>
           </div>
 
           {/* Reassignment Options */}
           {hasReceipts && (
             <div className="space-y-3">
-              <Label>What should happen to receipts in this category?</Label>
+              <Label>{t("delete.whatHappens")}</Label>
               <RadioGroup
                 value={reassignmentOption}
                 onValueChange={(value) => setReassignmentOption(value as "none" | "category")}
@@ -110,7 +112,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="none" id="none" />
                   <Label htmlFor="none" className="text-sm">
-                    Remove category (receipts become uncategorized)
+                    {t("delete.removeOption")}
                   </Label>
                 </div>
                 
@@ -118,7 +120,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="category" id="category" />
                     <Label htmlFor="category" className="text-sm">
-                      Move to another category
+                      {t("delete.moveOption")}
                     </Label>
                   </div>
                 )}
@@ -127,13 +129,13 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
               {/* Category Selection */}
               {reassignmentOption === "category" && hasOtherCategories && (
                 <div className="ml-6 space-y-2">
-                  <Label htmlFor="reassign-category">Select category:</Label>
+                  <Label htmlFor="reassign-category">{t("delete.selectCategory")}</Label>
                   <Select
                     value={selectedCategoryId}
                     onValueChange={setSelectedCategoryId}
                   >
                     <SelectTrigger id="reassign-category">
-                      <SelectValue placeholder="Choose a category" />
+                      <SelectValue placeholder={t("delete.chooseCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -157,7 +159,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isDeleting}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -167,7 +169,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
               (reassignmentOption === "category" && !selectedCategoryId)
             }
           >
-            {isDeleting ? "Deleting..." : "Delete Category"}
+            {isDeleting ? t("delete.deleting") : t("delete.title")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -32,6 +32,7 @@ import {
   ResponsiveContainer,
   Tooltip
 } from 'recharts';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface ApiUsageChartProps {
   hourlyStats: EmbeddingHourlyStats[];
@@ -48,11 +49,28 @@ export function ApiUsageChart({
   onRefresh,
   className = ''
 }: ApiUsageChartProps) {
+  const { t, language } = useAdminTranslation();
+  const numberLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
+
   // Transform data and calculate metrics
   const { chartConfig, metrics, uploadContextData } = useMemo(() => {
-    const series = transformHourlyStatsToApiUsage(hourlyStats);
-    const config = generateChartConfig('api-usage', series);
-    const contextData = createUploadContextData(hourlyStats);
+    const series = transformHourlyStatsToApiUsage(hourlyStats).map((item, index) => ({
+      ...item,
+      name: index === 0
+        ? t('embeddingMetrics.charts.common.seriesApiCalls')
+        : t('embeddingMetrics.charts.common.seriesTokensUsed')
+    }));
+    const config = {
+      ...generateChartConfig('api-usage', series),
+      title: t('embeddingMetrics.charts.common.titleApiUsage'),
+      subtitle: t('embeddingMetrics.charts.common.subtitleApiUsage')
+    };
+    const contextData = createUploadContextData(hourlyStats).map((item, index) => ({
+      ...item,
+      name: index === 0
+        ? t('embeddingMetrics.charts.common.seriesSingleUpload')
+        : t('embeddingMetrics.charts.common.seriesBatchUpload')
+    }));
     
     // Calculate API usage metrics
     const totalApiCalls = hourlyStats.reduce((sum, stat) => sum + stat.total_api_calls, 0);
@@ -112,7 +130,7 @@ export function ApiUsageChart({
         efficiencyScore: Math.max(0, 100 - rateLimitedPercentage * 2) // Penalize rate limiting
       }
     };
-  }, [hourlyStats]);
+  }, [hourlyStats, t]);
 
   const getEfficiencyStatus = (score: number) => {
     if (score >= 95) return { status: 'excellent', color: 'bg-green-100 text-green-800', icon: Zap };
@@ -122,7 +140,7 @@ export function ApiUsageChart({
   };
 
   const getTrendStatus = (change: number, metric: string) => {
-    if (Math.abs(change) < 5) return { icon: Activity, color: 'text-gray-500', text: 'Stable' };
+    if (Math.abs(change) < 5) return { icon: Activity, color: 'text-gray-500', text: t('embeddingMetrics.charts.common.trendStable') };
     if (change > 0) return { icon: TrendingUp, color: 'text-blue-500', text: `+${change.toFixed(1)}%` };
     return { icon: TrendingDown, color: 'text-green-500', text: `${change.toFixed(1)}%` };
   };
@@ -167,8 +185,8 @@ export function ApiUsageChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total API Calls</p>
-                <p className="text-2xl font-bold">{metrics.totalApiCalls.toLocaleString()}</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.apiUsage.totalCalls')}</p>
+                <p className="text-2xl font-bold">{metrics.totalApiCalls.toLocaleString(numberLocale)}</p>
               </div>
               <div className="flex items-center gap-1">
                 <ApiTrendIcon className={`h-5 w-5 ${apiTrendStatus.color}`} />
@@ -178,7 +196,7 @@ export function ApiUsageChart({
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.avgApiCallsPerHour}/hour average
+              {t('embeddingMetrics.charts.apiUsage.perHourAverage', { count: metrics.avgApiCallsPerHour.toLocaleString(numberLocale) })}
             </p>
           </CardContent>
         </Card>
@@ -187,8 +205,8 @@ export function ApiUsageChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Tokens</p>
-                <p className="text-2xl font-bold">{metrics.totalTokens.toLocaleString()}</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.apiUsage.totalTokens')}</p>
+                <p className="text-2xl font-bold">{metrics.totalTokens.toLocaleString(numberLocale)}</p>
               </div>
               <div className="flex items-center gap-1">
                 <TokenTrendIcon className={`h-5 w-5 ${tokenTrendStatus.color}`} />
@@ -198,7 +216,7 @@ export function ApiUsageChart({
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.avgTokensPerCall} tokens/call average
+              {t('embeddingMetrics.charts.apiUsage.tokensPerCallAverage', { count: metrics.avgTokensPerCall.toLocaleString(numberLocale) })}
             </p>
           </CardContent>
         </Card>
@@ -207,18 +225,20 @@ export function ApiUsageChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Rate Limited</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.apiUsage.rateLimited')}</p>
                 <p className="text-2xl font-bold">{metrics.rateLimitedPercentage}%</p>
               </div>
               <div className="flex items-center gap-2">
                 <Shield className="h-6 w-6 text-gray-400" />
                 <Badge className={metrics.rateLimitedPercentage > 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
-                  {metrics.rateLimitedPercentage > 5 ? 'High' : 'Low'}
+                  {metrics.rateLimitedPercentage > 5
+                    ? t('embeddingMetrics.charts.apiUsage.high')
+                    : t('embeddingMetrics.charts.apiUsage.low')}
                 </Badge>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.totalRateLimited} total occurrences
+              {t('embeddingMetrics.charts.apiUsage.totalOccurrences', { count: metrics.totalRateLimited.toLocaleString(numberLocale) })}
             </p>
           </CardContent>
         </Card>
@@ -227,13 +247,13 @@ export function ApiUsageChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Efficiency Score</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.apiUsage.efficiencyScore')}</p>
                 <p className="text-2xl font-bold">{metrics.efficiencyScore.toFixed(0)}/100</p>
               </div>
               <div className="flex items-center gap-2">
                 <EfficiencyIcon className="h-6 w-6 text-gray-400" />
                 <Badge className={efficiencyStatus.color}>
-                  {efficiencyStatus.status}
+                  {t(`embeddingMetrics.charts.status.${efficiencyStatus.status}`)}
                 </Badge>
               </div>
             </div>
@@ -260,7 +280,7 @@ export function ApiUsageChart({
         {/* Upload Context Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Upload Context Distribution</CardTitle>
+            <CardTitle className="text-lg">{t('embeddingMetrics.charts.apiUsage.uploadContextDistribution')}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -304,20 +324,20 @@ export function ApiUsageChart({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">API Efficiency</CardTitle>
+            <CardTitle className="text-lg">{t('embeddingMetrics.charts.apiUsage.efficiencyTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">API Calls per Attempt</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.callsPerAttempt')}</span>
                 <span className="text-lg font-bold">{metrics.apiCallsPerAttempt}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Tokens per Attempt</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.tokensPerAttempt')}</span>
                 <span className="text-lg font-bold">{metrics.tokensPerAttempt}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Tokens per API Call</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.tokensPerCall')}</span>
                 <span className="text-lg font-bold">{metrics.avgTokensPerCall}</span>
               </div>
             </div>
@@ -326,20 +346,20 @@ export function ApiUsageChart({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Rate Limiting Analysis</CardTitle>
+            <CardTitle className="text-lg">{t('embeddingMetrics.charts.apiUsage.rateLimitingTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Peak Rate Limited (1 hour)</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.peakRateLimited')}</span>
                 <span className="text-lg font-bold">{metrics.peakRateLimitedHour}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Recent Trend (3 hours)</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.recentTrend3h')}</span>
                 <span className="text-lg font-bold">{metrics.rateLimitingTrend}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Overall Rate</span>
+                <span className="text-sm font-medium">{t('embeddingMetrics.charts.apiUsage.overallRate')}</span>
                 <span className={`text-lg font-bold ${metrics.rateLimitedPercentage > 5 ? 'text-red-600' : 'text-green-600'}`}>
                   {metrics.rateLimitedPercentage}%
                 </span>
@@ -352,7 +372,7 @@ export function ApiUsageChart({
       {/* API Usage Insights */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">API Usage Insights</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.apiUsage.insightsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -360,9 +380,9 @@ export function ApiUsageChart({
               <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-800">High Rate Limiting Detected</p>
+                  <p className="font-medium text-red-800">{t('embeddingMetrics.charts.apiUsage.highRateTitle')}</p>
                   <p className="text-sm text-red-700">
-                    {metrics.rateLimitedPercentage}% of requests are being rate limited. Consider implementing request throttling or upgrading API limits.
+                    {t('embeddingMetrics.charts.apiUsage.highRateDesc', { rate: metrics.rateLimitedPercentage })}
                   </p>
                 </div>
               </div>
@@ -372,9 +392,9 @@ export function ApiUsageChart({
               <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">API Efficiency Concern</p>
+                  <p className="font-medium text-yellow-800">{t('embeddingMetrics.charts.apiUsage.efficiencyConcernTitle')}</p>
                   <p className="text-sm text-yellow-700">
-                    Average of {metrics.apiCallsPerAttempt} API calls per embedding attempt suggests potential retry issues or inefficient processing.
+                    {t('embeddingMetrics.charts.apiUsage.efficiencyConcernDesc', { count: metrics.apiCallsPerAttempt })}
                   </p>
                 </div>
               </div>
@@ -384,9 +404,9 @@ export function ApiUsageChart({
               <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
                 <Zap className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-800">Excellent API Efficiency</p>
+                  <p className="font-medium text-green-800">{t('embeddingMetrics.charts.apiUsage.excellentEfficiencyTitle')}</p>
                   <p className="text-sm text-green-700">
-                    Your API usage is highly efficient with minimal rate limiting and optimal token usage.
+                    {t('embeddingMetrics.charts.apiUsage.excellentEfficiencyDesc')}
                   </p>
                 </div>
               </div>
@@ -396,9 +416,9 @@ export function ApiUsageChart({
               <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <Activity className="h-5 w-5 text-gray-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-gray-800">No API Usage Data</p>
+                  <p className="font-medium text-gray-800">{t('embeddingMetrics.charts.apiUsage.noDataTitle')}</p>
                   <p className="text-sm text-gray-700">
-                    No API usage metrics are available yet. Data will appear once embedding generation begins.
+                    {t('embeddingMetrics.charts.apiUsage.noDataDesc')}
                   </p>
                 </div>
               </div>

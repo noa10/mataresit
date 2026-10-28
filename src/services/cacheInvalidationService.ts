@@ -64,6 +64,16 @@ export class CacheInvalidationService {
       queryKey: ['receiptsForDay']
     });
 
+    // Workspace overview aggregates and navigation counts are derived from
+    // receipts, so they must refresh whenever the receipt list changes.
+    await queryClient.invalidateQueries({
+      queryKey: ['dashboard-summary']
+    });
+
+    await queryClient.invalidateQueries({
+      queryKey: ['receipt-counts']
+    });
+
     // Force refetch instead of just invalidating
     await queryClient.refetchQueries({
       queryKey: ['receipts']

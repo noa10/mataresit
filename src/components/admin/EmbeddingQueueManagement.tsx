@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface QueueStats {
   total_pending: number;
@@ -49,6 +50,7 @@ interface QueueConfig {
 }
 
 export function EmbeddingQueueManagement() {
+  const { t, language } = useAdminTranslation();
   const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [config, setConfig] = useState<QueueConfig>({});
@@ -75,8 +77,8 @@ export function EmbeddingQueueManagement() {
     } catch (error) {
       console.error('Error loading queue data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load queue data",
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.loadFailed'),
         variant: "destructive"
       });
     } finally {
@@ -147,8 +149,8 @@ export function EmbeddingQueueManagement() {
       
       if (data.success) {
         toast({
-          title: "Success",
-          description: `Worker ${data.workerId} started successfully`
+          title: t('embeddingMetrics.queue.successTitle'),
+          description: t('embeddingMetrics.queue.workerStarted', { id: data.workerId })
         });
         await loadWorkerStatus();
       } else {
@@ -156,8 +158,8 @@ export function EmbeddingQueueManagement() {
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to start worker: ${error.message}`,
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.startFailed', { error: error.message }),
         variant: "destructive"
       });
     }
@@ -178,8 +180,8 @@ export function EmbeddingQueueManagement() {
       
       if (data.success) {
         toast({
-          title: "Success",
-          description: "Worker stopped successfully"
+          title: t('embeddingMetrics.queue.successTitle'),
+          description: t('embeddingMetrics.queue.workerStopped')
         });
         await loadWorkerStatus();
       } else {
@@ -187,8 +189,8 @@ export function EmbeddingQueueManagement() {
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to stop worker: ${error.message}`,
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.stopFailed', { error: error.message }),
         variant: "destructive"
       });
     }
@@ -205,15 +207,15 @@ export function EmbeddingQueueManagement() {
       if (error) throw error;
       
       toast({
-        title: "Success",
-        description: `Configuration updated: ${key}`
+        title: t('embeddingMetrics.queue.successTitle'),
+        description: t('embeddingMetrics.queue.configUpdated', { key })
       });
       
       await loadConfig();
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to update configuration: ${error.message}`,
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.configUpdateFailed', { error: error.message }),
         variant: "destructive"
       });
     }
@@ -225,15 +227,15 @@ export function EmbeddingQueueManagement() {
       if (error) throw error;
       
       toast({
-        title: "Success",
-        description: `Requeued ${data} failed items`
+        title: t('embeddingMetrics.queue.successTitle'),
+        description: t('embeddingMetrics.queue.requeued', { count: data })
       });
       
       await loadQueueStats();
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to requeue items: ${error.message}`,
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.requeueFailed', { error: error.message }),
         variant: "destructive"
       });
     }
@@ -245,15 +247,15 @@ export function EmbeddingQueueManagement() {
       if (error) throw error;
       
       toast({
-        title: "Success",
-        description: `Cleaned up ${data} old items`
+        title: t('embeddingMetrics.queue.successTitle'),
+        description: t('embeddingMetrics.queue.cleanedUp', { count: data })
       });
       
       await loadQueueStats();
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to cleanup items: ${error.message}`,
+        title: t('embeddingMetrics.queue.errorTitle'),
+        description: t('embeddingMetrics.queue.cleanupFailed', { error: error.message }),
         variant: "destructive"
       });
     }
@@ -292,9 +294,9 @@ export function EmbeddingQueueManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Queue Management</h2>
+          <h2 className="text-2xl font-bold">{t('embeddingMetrics.queue.title')}</h2>
           <p className="text-muted-foreground">
-            Monitor and control the embedding queue processing system
+            {t('embeddingMetrics.queue.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -304,7 +306,7 @@ export function EmbeddingQueueManagement() {
             disabled={isRefreshing}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('embeddingMetrics.common.refresh')}
           </Button>
         </div>
       </div>
@@ -313,14 +315,16 @@ export function EmbeddingQueueManagement() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Items</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('embeddingMetrics.queue.pendingItems')}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{queueStats?.total_pending || 0}</div>
             {queueStats?.oldest_pending_age_hours && queueStats.oldest_pending_age_hours > 0 && (
               <p className="text-xs text-muted-foreground">
-                Oldest: {queueStats.oldest_pending_age_hours.toFixed(1)}h ago
+                {t('embeddingMetrics.queue.oldest', {
+                  hours: queueStats.oldest_pending_age_hours.toFixed(1),
+                })}
               </p>
             )}
           </CardContent>
@@ -328,27 +332,31 @@ export function EmbeddingQueueManagement() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Processing</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('embeddingMetrics.queue.processing')}</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{queueStats?.total_processing || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {queueStats?.active_workers || 0} active workers
+              {t('embeddingMetrics.queue.activeWorkers', {
+                count: queueStats?.active_workers || 0,
+              })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('embeddingMetrics.queue.completed')}</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{queueStats?.total_completed || 0}</div>
             {queueStats?.avg_processing_time_ms && (
               <p className="text-xs text-muted-foreground">
-                Avg: {(queueStats.avg_processing_time_ms / 1000).toFixed(1)}s
+                {t('embeddingMetrics.queue.avg', {
+                  seconds: (queueStats.avg_processing_time_ms / 1000).toFixed(1),
+                })}
               </p>
             )}
           </CardContent>
@@ -356,13 +364,15 @@ export function EmbeddingQueueManagement() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('embeddingMetrics.queue.failed')}</CardTitle>
             <XCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{queueStats?.total_failed || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {queueStats?.total_rate_limited || 0} rate limited
+              {t('embeddingMetrics.queue.rateLimited', {
+                count: queueStats?.total_rate_limited || 0,
+              })}
             </p>
           </CardContent>
         </Card>
@@ -371,9 +381,9 @@ export function EmbeddingQueueManagement() {
       {/* Detailed Management Tabs */}
       <Tabs defaultValue="workers" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="workers">Workers</TabsTrigger>
-          <TabsTrigger value="config">Configuration</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+          <TabsTrigger value="workers">{t('embeddingMetrics.queue.tabs.workers')}</TabsTrigger>
+          <TabsTrigger value="config">{t('embeddingMetrics.queue.tabs.configuration')}</TabsTrigger>
+          <TabsTrigger value="maintenance">{t('embeddingMetrics.queue.tabs.maintenance')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workers" className="space-y-4">
@@ -382,7 +392,7 @@ export function EmbeddingQueueManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Worker Control
+                {t('embeddingMetrics.queue.workerControl')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -390,15 +400,17 @@ export function EmbeddingQueueManagement() {
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${workerStatus?.isRunning ? 'bg-green-500' : 'bg-gray-500'}`} />
                   <span className="text-sm font-medium">
-                    {workerStatus?.isRunning ? 'Running' : 'Stopped'}
+                    {workerStatus?.isRunning
+                      ? t('embeddingMetrics.queue.running')
+                      : t('embeddingMetrics.queue.stopped')}
                   </span>
                 </div>
 
                 {workerStatus?.worker && (
                   <div className="text-sm text-muted-foreground">
-                    ID: {workerStatus.worker.workerId} |
-                    Processed: {workerStatus.worker.processedCount} |
-                    Errors: {workerStatus.worker.errorCount}
+                    {t('embeddingMetrics.queue.idLabel')} {workerStatus.worker.workerId} |{' '}
+                    {t('embeddingMetrics.queue.processedLabel')} {workerStatus.worker.processedCount} |{' '}
+                    {t('embeddingMetrics.queue.errorsLabel')} {workerStatus.worker.errorCount}
                   </div>
                 )}
 
@@ -409,7 +421,7 @@ export function EmbeddingQueueManagement() {
                     size="sm"
                   >
                     <Play className="h-4 w-4 mr-2" />
-                    Start Worker
+                    {t('embeddingMetrics.queue.startWorker')}
                   </Button>
                   <Button
                     onClick={stopWorker}
@@ -418,7 +430,7 @@ export function EmbeddingQueueManagement() {
                     size="sm"
                   >
                     <Square className="h-4 w-4 mr-2" />
-                    Stop Worker
+                    {t('embeddingMetrics.queue.stopWorker')}
                   </Button>
                 </div>
               </div>
@@ -428,11 +440,11 @@ export function EmbeddingQueueManagement() {
           {/* Workers List */}
           <Card>
             <CardHeader>
-              <CardTitle>Active Workers</CardTitle>
+              <CardTitle>{t('embeddingMetrics.queue.activeWorkersTitle')}</CardTitle>
             </CardHeader>
             <CardContent>
               {workers.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No workers found</p>
+                <p className="text-muted-foreground text-center py-4">{t('embeddingMetrics.queue.noWorkers')}</p>
               ) : (
                 <div className="space-y-3">
                   {workers.map((worker) => (
@@ -442,17 +454,31 @@ export function EmbeddingQueueManagement() {
                         <div>
                           <div className="font-medium">{worker.worker_id}</div>
                           <div className="text-sm text-muted-foreground">
-                            Last seen: {new Date(worker.last_heartbeat).toLocaleString()}
+                            {t('embeddingMetrics.queue.lastSeen', {
+                              time: new Date(worker.last_heartbeat).toLocaleString(
+                                language === 'ms' ? 'ms-MY' : 'en-MY'
+                              ),
+                            })}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <Badge variant={getStatusBadgeVariant(worker.status)}>
-                          {worker.status}
+                          {t(`embeddingMetrics.common.${worker.status}`, {
+                            defaultValue: worker.status,
+                          })}
                         </Badge>
                         <div className="text-sm text-right">
-                          <div>Tasks: {worker.tasks_processed}</div>
-                          <div>Errors: {worker.error_count}</div>
+                          <div>
+                            {t('embeddingMetrics.queue.tasks', {
+                              count: worker.tasks_processed,
+                            })}
+                          </div>
+                          <div>
+                            {t('embeddingMetrics.queue.errors', {
+                              count: worker.error_count,
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -468,13 +494,13 @@ export function EmbeddingQueueManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Queue Configuration
+                {t('embeddingMetrics.queue.queueConfiguration')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="queue_enabled">Queue Processing Enabled</Label>
+                  <Label htmlFor="queue_enabled">{t('embeddingMetrics.queue.queueProcessingEnabled')}</Label>
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="queue_enabled"
@@ -482,13 +508,15 @@ export function EmbeddingQueueManagement() {
                       onCheckedChange={(checked) => updateConfig('queue_enabled', checked)}
                     />
                     <span className="text-sm text-muted-foreground">
-                      {config.queue_enabled === true || config.queue_enabled === 'true' ? 'Enabled' : 'Disabled'}
+                      {config.queue_enabled === true || config.queue_enabled === 'true'
+                        ? t('embeddingMetrics.queue.enabled')
+                        : t('embeddingMetrics.queue.disabled')}
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="batch_size">Batch Size</Label>
+                  <Label htmlFor="batch_size">{t('embeddingMetrics.queue.batchSize')}</Label>
                   <Input
                     id="batch_size"
                     type="number"
@@ -500,7 +528,7 @@ export function EmbeddingQueueManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="max_concurrent_workers">Max Concurrent Workers</Label>
+                  <Label htmlFor="max_concurrent_workers">{t('embeddingMetrics.queue.maxConcurrentWorkers')}</Label>
                   <Input
                     id="max_concurrent_workers"
                     type="number"
@@ -512,7 +540,7 @@ export function EmbeddingQueueManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="rate_limit_delay_ms">Rate Limit Delay (ms)</Label>
+                  <Label htmlFor="rate_limit_delay_ms">{t('embeddingMetrics.queue.rateLimitDelay')}</Label>
                   <Input
                     id="rate_limit_delay_ms"
                     type="number"
@@ -524,7 +552,7 @@ export function EmbeddingQueueManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="max_retries">Max Retries</Label>
+                  <Label htmlFor="max_retries">{t('embeddingMetrics.queue.maxRetries')}</Label>
                   <Input
                     id="max_retries"
                     type="number"
@@ -536,7 +564,7 @@ export function EmbeddingQueueManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="worker_heartbeat_interval_ms">Heartbeat Interval (ms)</Label>
+                  <Label htmlFor="worker_heartbeat_interval_ms">{t('embeddingMetrics.queue.heartbeatInterval')}</Label>
                   <Input
                     id="worker_heartbeat_interval_ms"
                     type="number"
@@ -556,26 +584,26 @@ export function EmbeddingQueueManagement() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                Queue Maintenance
+                {t('embeddingMetrics.queue.queueMaintenance')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button onClick={requeFailedItems} variant="outline">
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Requeue Failed Items
+                  {t('embeddingMetrics.queue.requeueFailedItems')}
                 </Button>
 
                 <Button onClick={cleanupOldItems} variant="outline">
                   <Database className="h-4 w-4 mr-2" />
-                  Cleanup Old Items
+                  {t('embeddingMetrics.queue.cleanupOldItems')}
                 </Button>
               </div>
 
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Maintenance operations may affect queue performance. Use during low-traffic periods.
+                  {t('embeddingMetrics.queue.maintenanceWarning')}
                 </AlertDescription>
               </Alert>
             </CardContent>

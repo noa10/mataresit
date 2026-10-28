@@ -1,7 +1,8 @@
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { clearSearchChatHistory } from "@/lib/search-chat/history";
 import { useToast } from "@/hooks/use-toast";
 import { AppRole, UserWithRole, AuthState } from "@/types/auth";
 import { invitationFlowService } from "@/services/invitationFlowService";
@@ -31,6 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+  const userIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user]);
 
   // Process pending invitations after authentication
   const processPendingInvitation = async (userId: string) => {
@@ -222,6 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
           }
+        } else if (event === 'SIGNED_OUT') {
+          // Financial chat history must not outlive the session on a shared browser.
+          clearSearchChatHistory(userIdRef.current ?? undefined);
         }
 
         // Use setTimeout to avoid auth deadlock issues
@@ -395,6 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      clearSearchChatHistory(user?.id);
       toast({
         title: "Signed out",
         description: "You have been signed out successfully",

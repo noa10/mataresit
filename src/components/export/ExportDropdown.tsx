@@ -13,6 +13,7 @@ import { Receipt } from '@/types/receipt';
 import { exportToCSV, exportToExcel, exportToPDF, ExportFilters } from '@/lib/export';
 import { buildPayerNameMap } from '@/lib/export/payerNameResolver';
 import { useTeam } from '@/contexts/TeamContext';
+import { useCommonTranslation } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 
 interface ExportDropdownProps {
@@ -33,11 +34,12 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<string | null>(null);
   const { currentTeam } = useTeam();
+  const { t } = useCommonTranslation();
   const availableReceipts = totalCount ?? receipts.length;
 
   const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (availableReceipts === 0) {
-      toast.error('No receipts to export');
+      toast.error(t('exportMenu.noReceipts'));
       return;
     }
 
@@ -50,7 +52,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
         : receipts;
 
       if (receiptsToExport.length === 0) {
-        toast.error('No receipts to export');
+        toast.error(t('exportMenu.noReceipts'));
         return;
       }
 
@@ -59,22 +61,45 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
       switch (format) {
         case 'csv':
           exportToCSV(receiptsToExport, filters, payerNameMap);
-          toast.success(`CSV file exported successfully (${receiptsToExport.length} receipts)`);
+          toast.success(
+            t('exportMenu.success', {
+              format: format.toUpperCase(),
+              count: receiptsToExport.length,
+            })
+          );
           break;
         case 'excel':
           exportToExcel(receiptsToExport, filters, payerNameMap);
-          toast.success(`Excel file exported successfully (${receiptsToExport.length} receipts)`);
+          toast.success(
+            t('exportMenu.success', {
+              format: format.toUpperCase(),
+              count: receiptsToExport.length,
+            })
+          );
           break;
         case 'pdf':
           exportToPDF(receiptsToExport, filters, payerNameMap);
-          toast.success(`PDF file exported successfully (${receiptsToExport.length} receipts)`);
+          toast.success(
+            t('exportMenu.success', {
+              format: format.toUpperCase(),
+              count: receiptsToExport.length,
+            })
+          );
           break;
         default:
-          throw new Error('Unsupported export format');
+          throw new Error(t('exportMenu.unsupportedFormat'));
       }
     } catch (error) {
       console.error('Export error:', error);
-      toast.error(`Failed to export ${format.toUpperCase()}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(
+        t('exportMenu.failed', {
+          format: format.toUpperCase(),
+          error:
+            error instanceof Error
+              ? error.message
+              : t('exportMenu.unknownError'),
+        })
+      );
     } finally {
       setIsExporting(false);
       setExportingFormat(null);
@@ -83,9 +108,11 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
 
   const getButtonText = () => {
     if (isExporting && exportingFormat) {
-      return `Exporting ${exportingFormat.toUpperCase()}...`;
+      return t('exportMenu.exporting', {
+        format: exportingFormat.toUpperCase(),
+      });
     }
-    return 'Export';
+    return t('buttons.export');
   };
 
   const getButtonIcon = () => {
@@ -109,7 +136,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('exportMenu.label')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         
         <DropdownMenuItem
@@ -121,7 +148,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
           <div className="flex flex-col">
             <span>CSV</span>
             <span className="text-xs text-muted-foreground">
-              Comma-separated values
+              {t('exportMenu.csv')}
             </span>
           </div>
         </DropdownMenuItem>
@@ -135,7 +162,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
           <div className="flex flex-col">
             <span>Excel</span>
             <span className="text-xs text-muted-foreground">
-              Formatted spreadsheet
+              {t('exportMenu.excel')}
             </span>
           </div>
         </DropdownMenuItem>
@@ -149,7 +176,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
           <div className="flex flex-col">
             <span>PDF</span>
             <span className="text-xs text-muted-foreground">
-              Formatted report
+              {t('exportMenu.pdf')}
             </span>
           </div>
         </DropdownMenuItem>
@@ -158,7 +185,7 @@ export const ExportDropdown: React.FC<ExportDropdownProps> = ({
           <>
             <DropdownMenuSeparator />
             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-              {availableReceipts} receipt{availableReceipts !== 1 ? 's' : ''} to export
+              {t('exportMenu.itemsToExport', { count: availableReceipts })}
             </div>
           </>
         )}

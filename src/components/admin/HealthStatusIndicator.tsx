@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useHealthMonitoring } from '@/hooks/useHealthMonitoring';
 import { cn } from '@/lib/utils';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface HealthStatusIndicatorProps {
   className?: string;
@@ -33,6 +34,7 @@ export function HealthStatusIndicator({
   className,
   showDetails = true 
 }: HealthStatusIndicatorProps) {
+  const { t } = useAdminTranslation();
   const {
     healthStatus,
     isLoading,
@@ -85,22 +87,24 @@ export function HealthStatusIndicator({
   };
 
   const getStatusText = () => {
-    if (isLoading) return 'Checking...';
-    if (!healthStatus) return 'Unknown';
-    
-    return healthStatus.overallStatus.charAt(0).toUpperCase() + 
-           healthStatus.overallStatus.slice(1);
+    if (isLoading) return t('embeddingMetrics.healthStatus.checking');
+    if (!healthStatus) return t('embeddingMetrics.common.unknown');
+
+    return t(`embeddingMetrics.common.${healthStatus.overallStatus}`, {
+      defaultValue: healthStatus.overallStatus,
+    });
   };
 
   const formatTimeAgo = (timestamp: Date | null) => {
-    if (!timestamp) return 'Never';
+    if (!timestamp) return t('embeddingMetrics.common.never');
     
     const now = new Date();
     const diffMs = now.getTime() - timestamp.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1) return t('embeddingMetrics.common.justNow');
+    if (diffMins < 60)
+      return t('embeddingMetrics.common.minutesAgo', { count: diffMins });
     return timestamp.toLocaleTimeString();
   };
 
@@ -143,7 +147,7 @@ export function HealthStatusIndicator({
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h4 className="font-medium">System Health</h4>
+            <h4 className="font-medium">{t('embeddingMetrics.healthStatus.systemHealth')}</h4>
             <Button
               variant="ghost"
               size="sm"
@@ -157,7 +161,7 @@ export function HealthStatusIndicator({
           {/* Overall Status */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Overall Status</span>
+              <span className="text-sm font-medium">{t('embeddingMetrics.healthStatus.overallStatus')}</span>
               <div className="flex items-center gap-2">
                 {getStatusIcon()}
                 <Badge className={getStatusColor()}>
@@ -168,7 +172,7 @@ export function HealthStatusIndicator({
             
             {healthStatus && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Health Score</span>
+                <span className="text-muted-foreground">{t('embeddingMetrics.healthStatus.healthScore')}</span>
                 <span className="font-medium">{healthStatus.healthScore}/100</span>
               </div>
             )}
@@ -179,18 +183,18 @@ export function HealthStatusIndicator({
             <div className="space-y-2">
               <h5 className="text-sm font-medium flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                Active Alerts
+                {t('embeddingMetrics.healthStatus.activeAlerts')}
               </h5>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {criticalAlerts > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-red-600">Critical</span>
+                    <span className="text-red-600">{t('embeddingMetrics.healthStatus.critical')}</span>
                     <Badge variant="destructive">{criticalAlerts}</Badge>
                   </div>
                 )}
                 {unacknowledgedAlerts > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-yellow-600">Unacknowledged</span>
+                    <span className="text-yellow-600">{t('embeddingMetrics.healthStatus.unacknowledged')}</span>
                     <Badge variant="secondary">{unacknowledgedAlerts}</Badge>
                   </div>
                 )}
@@ -201,12 +205,14 @@ export function HealthStatusIndicator({
           {/* Component Status */}
           {healthStatus?.components && (
             <div className="space-y-2">
-              <h5 className="text-sm font-medium">Components</h5>
+              <h5 className="text-sm font-medium">{t('embeddingMetrics.healthStatus.components')}</h5>
               <div className="space-y-1">
                 {healthStatus.components.slice(0, 4).map((component, index) => (
                   <div key={index} className="flex items-center justify-between text-sm">
-                    <span className="capitalize text-muted-foreground">
-                      {component.component.replace('_', ' ')}
+                    <span className="text-muted-foreground">
+                      {t(`embeddingMetrics.healthDashboard.components.${component.component}`, {
+                        defaultValue: component.component.replace('_', ' '),
+                      })}
                     </span>
                     <div className="flex items-center gap-1">
                       {component.status === 'healthy' ? (
@@ -216,13 +222,19 @@ export function HealthStatusIndicator({
                       ) : (
                         <XCircle className="h-3 w-3 text-red-500" />
                       )}
-                      <span className="text-xs capitalize">{component.status}</span>
+                      <span className="text-xs">
+                        {t(`embeddingMetrics.common.${component.status}`, {
+                          defaultValue: component.status,
+                        })}
+                      </span>
                     </div>
                   </div>
                 ))}
                 {healthStatus.components.length > 4 && (
                   <div className="text-xs text-muted-foreground text-center pt-1">
-                    +{healthStatus.components.length - 4} more components
+                    {t('embeddingMetrics.healthStatus.moreComponents', {
+                      count: healthStatus.components.length - 4,
+                    })}
                   </div>
                 )}
               </div>
@@ -232,7 +244,7 @@ export function HealthStatusIndicator({
           {/* Issues */}
           {healthStatus?.issues && healthStatus.issues.length > 0 && (
             <div className="space-y-2">
-              <h5 className="text-sm font-medium text-red-800 dark:text-red-200">Issues</h5>
+              <h5 className="text-sm font-medium text-red-800 dark:text-red-200">{t('embeddingMetrics.healthStatus.issues')}</h5>
               <div className="space-y-1">
                 {healthStatus.issues.slice(0, 2).map((issue, index) => (
                   <div key={index} className="text-xs text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-800/50">
@@ -241,7 +253,9 @@ export function HealthStatusIndicator({
                 ))}
                 {healthStatus.issues.length > 2 && (
                   <div className="text-xs text-muted-foreground text-center">
-                    +{healthStatus.issues.length - 2} more issues
+                    {t('embeddingMetrics.healthStatus.moreIssues', {
+                      count: healthStatus.issues.length - 2,
+                    })}
                   </div>
                 )}
               </div>
@@ -252,7 +266,7 @@ export function HealthStatusIndicator({
           <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-2">
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              Last check
+              {t('embeddingMetrics.healthStatus.lastCheck')}
             </div>
             <span>{formatTimeAgo(lastRefresh)}</span>
           </div>
@@ -264,8 +278,8 @@ export function HealthStatusIndicator({
            criticalAlerts === 0 && (
             <div className="text-center py-2">
               <CheckCircle className="h-8 w-8 mx-auto text-green-500 mb-2" />
-              <p className="text-sm text-green-700 font-medium">All Systems Operational</p>
-              <p className="text-xs text-green-600">No issues detected</p>
+              <p className="text-sm text-green-700 font-medium">{t('embeddingMetrics.healthStatus.allOperational')}</p>
+              <p className="text-xs text-green-600">{t('embeddingMetrics.healthStatus.noIssues')}</p>
             </div>
           )}
         </div>

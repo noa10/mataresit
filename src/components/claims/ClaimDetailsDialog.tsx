@@ -19,16 +19,16 @@ import {
   ClaimAuditTrail,
   CLAIM_STATUS_COLORS,
   CLAIM_PRIORITY_COLORS,
-  getClaimStatusDisplayName,
-  getClaimPriorityDisplayName,
 } from '@/types/claims';
 import { cn } from '@/lib/utils';
+import { formatCurrencySafe } from '@/utils/currency';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 import { Receipt } from '@/types/receipt';
 import { fetchReceipts } from '@/services/receiptService';
 import { ReceiptPreview } from './ReceiptPreview';
 import {
   Calendar,
-  DollarSign,
+  Banknote,
   User,
   FileText,
   Clock,
@@ -67,6 +67,25 @@ export function ClaimDetailsDialog({
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const { hasPermission } = useTeam();
   const { toast } = useToast();
+  const { t, language } = useClaimsTranslation();
+  const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
+
+  const statusLabel = (status: Claim['status']) => t(`list.status.${status}`);
+  const priorityLabel = (priority: Claim['priority']) => t(`create.priority.${priority}`);
+  const actionLabel = (action: string) => {
+    const key = `details.history.actions.${action}`;
+    const translated = t(key);
+    return translated === key ? action : translated;
+  };
+  const commentLabel = (comment: string) => {
+    const known: Record<string, string> = {
+      'Claim created': t('details.history.comments.created'),
+      'Claim submitted for review': t('details.history.comments.submitted'),
+      'Claim approved': t('details.history.comments.approved'),
+      'Claim rejected': t('details.history.comments.rejected'),
+    };
+    return known[comment] ?? comment;
+  };
 
   // Load audit trail and receipts when claim changes
   useEffect(() => {
@@ -87,8 +106,8 @@ export function ClaimDetailsDialog({
       console.error('Error loading audit trail:', error);
       setAuditTrail([]); // Set empty array to prevent showing loading state
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to load claim history',
+        title: t('errors.title'),
+        description: error instanceof Error ? error.message : t('errors.loadHistoryFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -133,8 +152,8 @@ export function ClaimDetailsDialog({
     } catch (error) {
       console.error('Error loading attached receipts:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load attached receipts',
+        title: t('errors.title'),
+        description: t('errors.loadReceiptsFailed'),
         variant: 'destructive',
       });
       setAttachedReceipts([]);
@@ -143,15 +162,11 @@ export function ClaimDetailsDialog({
     }
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency: string) =>
+    formatCurrencySafe(amount, currency);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(dateLocale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -176,7 +191,7 @@ export function ClaimDetailsDialog({
             {claim.title}
           </DialogTitle>
           <DialogDescription>
-            Claim details and workflow information
+            {t('details.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -185,23 +200,23 @@ export function ClaimDetailsDialog({
           {/* Status and Priority */}
           <div className="flex items-center gap-4">
             <Badge variant="outline" className={cn(CLAIM_STATUS_COLORS[claim.status])}>
-              {getClaimStatusDisplayName(claim.status)}
+              {statusLabel(claim.status)}
             </Badge>
             <Badge variant="outline" className={cn(CLAIM_PRIORITY_COLORS[claim.priority])}>
-              {getClaimPriorityDisplayName(claim.priority)}
+              {priorityLabel(claim.priority)}
             </Badge>
           </div>
 
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Claim Information</CardTitle>
+              <CardTitle className="text-lg">{t('details.sections.information')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Amount:</span>
+                  <Banknote className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{t('details.information.amount')}:</span>
                   <span className="text-lg font-semibold">
                     {formatCurrency(claim.amount, claim.currency)}
                   </span>
@@ -209,21 +224,21 @@ export function ClaimDetailsDialog({
                 
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Claimant:</span>
-                  <span>{claim.claimant_name || 'Unknown'}</span>
+                  <span className="font-medium">{t('details.information.claimant')}:</span>
+                  <span>{claim.claimant_name || t('approval.details.unknown')}</span>
                 </div>
               </div>
 
               {claim.category && (
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Category:</span>
+                  <span className="font-medium">{t('details.information.category')}:</span>
                   <span>{claim.category}</span>
                 </div>
               )}
 
               {claim.description && (
                 <div>
-                  <span className="font-medium">Description:</span>
+                  <span className="font-medium">{t('details.information.description')}:</span>
                   <p className="mt-1 text-sm text-muted-foreground">{claim.description}</p>
                 </div>
               )}
@@ -231,13 +246,13 @@ export function ClaimDetailsDialog({
               <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span>Created: {formatDate(claim.created_at)}</span>
+                  <span>{t('details.information.created')}: {formatDate(claim.created_at)}</span>
                 </div>
                 
                 {claim.submitted_at && (
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <span>Submitted: {formatDate(claim.submitted_at)}</span>
+                    <span>{t('details.information.submitted')}: {formatDate(claim.submitted_at)}</span>
                   </div>
                 )}
               </div>
@@ -248,16 +263,16 @@ export function ClaimDetailsDialog({
           {(claim.reviewed_by || claim.approved_by || claim.rejection_reason) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Workflow Status</CardTitle>
+                <CardTitle className="text-lg">{t('details.workflow.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {claim.reviewed_by && (
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-blue-500" />
-                    <span>Reviewed by: {claim.reviewer_name || 'Unknown'}</span>
+                    <span>{t('details.workflow.reviewedBy')} {claim.reviewer_name || t('approval.details.unknown')}</span>
                     {claim.reviewed_at && (
                       <span className="text-sm text-muted-foreground">
-                        on {formatDate(claim.reviewed_at)}
+                        {t('details.workflow.on', { date: formatDate(claim.reviewed_at) })}
                       </span>
                     )}
                   </div>
@@ -266,10 +281,10 @@ export function ClaimDetailsDialog({
                 {claim.approved_by && (
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Approved by: {claim.approver_name || 'Unknown'}</span>
+                    <span>{t('details.workflow.approvedBy')} {claim.approver_name || t('approval.details.unknown')}</span>
                     {claim.approved_at && (
                       <span className="text-sm text-muted-foreground">
-                        on {formatDate(claim.approved_at)}
+                        {t('details.workflow.on', { date: formatDate(claim.approved_at) })}
                       </span>
                     )}
                   </div>
@@ -279,7 +294,7 @@ export function ClaimDetailsDialog({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <XCircle className="h-4 w-4 text-red-500" />
-                      <span className="font-medium">Rejection Reason:</span>
+                      <span className="font-medium">{t('details.workflow.rejectionReason')}</span>
                     </div>
                     <p className="text-sm bg-red-50 p-3 rounded-md border border-red-200">
                       {claim.rejection_reason}
@@ -296,14 +311,14 @@ export function ClaimDetailsDialog({
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <ReceiptIcon className="h-5 w-5" />
-                  Attachments
+                  {t('details.attachments.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {receiptsLoading ? (
                   <div className="flex items-center justify-center p-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    <span className="ml-2 text-sm text-muted-foreground">Loading receipts...</span>
+                    <span className="ml-2 text-sm text-muted-foreground">{t('create.loading.receipts')}</span>
                   </div>
                 ) : attachedReceipts.length > 0 ? (
                   <ReceiptPreview
@@ -322,10 +337,12 @@ export function ClaimDetailsDialog({
                               <ReceiptIcon className="h-4 w-4 text-muted-foreground" />
                               <div className="flex-1">
                                 <div className="font-medium text-sm">
-                                  Receipt from {parsed.metadata?.merchant || 'Unknown Merchant'}
+                                  {t('details.attachments.receiptFrom', {
+                                    merchant: parsed.metadata?.merchant || t('details.attachments.unknownMerchant'),
+                                  })}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {parsed.metadata?.date && new Date(parsed.metadata.date).toLocaleDateString()} •
+                                  {parsed.metadata?.date && new Date(parsed.metadata.date).toLocaleDateString(dateLocale)} •
                                   {parsed.metadata?.total && parsed.metadata?.currency &&
                                     ` ${formatCurrency(parsed.metadata.total, parsed.metadata.currency)}`
                                   }
@@ -353,13 +370,13 @@ export function ClaimDetailsDialog({
           {/* Audit Trail */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Activity History</CardTitle>
+              <CardTitle className="text-lg">{t('details.history.title')}</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center p-4">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  <span className="ml-2 text-sm text-muted-foreground">Loading activity history...</span>
+                  <span className="ml-2 text-sm text-muted-foreground">{t('details.history.loading')}</span>
                 </div>
               ) : auditTrail.length > 0 ? (
                 <div className="space-y-3">
@@ -367,17 +384,19 @@ export function ClaimDetailsDialog({
                     <div key={entry.id} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{entry.user_name || 'Unknown'}</span>
-                          <span className="text-sm text-muted-foreground">{entry.action}</span>
+                          <span className="font-medium">{entry.user_name || t('approval.details.unknown')}</span>
+                          <span className="text-sm text-muted-foreground">{actionLabel(entry.action)}</span>
                           {entry.old_status && entry.new_status && (
                             <span className="text-sm">
-                              from <Badge variant="outline" className="text-xs">{entry.old_status}</Badge>
-                              {' '}to <Badge variant="outline" className="text-xs">{entry.new_status}</Badge>
+                              {t('details.history.statusChanged', {
+                                from: statusLabel(entry.old_status),
+                                to: statusLabel(entry.new_status),
+                              })}
                             </span>
                           )}
                         </div>
                         {entry.comment && (
-                          <p className="text-sm text-muted-foreground mt-1">{entry.comment}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{commentLabel(entry.comment)}</p>
                         )}
                         <span className="text-xs text-muted-foreground">
                           {formatDate(entry.created_at)}
@@ -389,7 +408,7 @@ export function ClaimDetailsDialog({
               ) : (
                 <div className="text-center py-4 text-muted-foreground">
                   <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No activity history available</p>
+                  <p>{t('details.history.emptyDialog')}</p>
                 </div>
               )}
             </CardContent>
@@ -399,34 +418,34 @@ export function ClaimDetailsDialog({
 
         <DialogFooter className="px-6 py-4 border-t border-border shrink-0 flex items-center gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t('details.actions.close')}
           </Button>
           
           {canEdit && (
             <Button variant="outline" onClick={() => onEdit?.(claim)}>
               <Edit className="h-4 w-4 mr-2" />
-              Edit
+              {t('details.actions.edit')}
             </Button>
           )}
           
           {canSubmit && (
             <Button onClick={() => onSubmit?.(claim)}>
               <Send className="h-4 w-4 mr-2" />
-              Submit for Review
+              {t('details.actions.submit')}
             </Button>
           )}
           
           {canReject && (
             <Button variant="destructive" onClick={() => onReject?.(claim)}>
               <XCircle className="h-4 w-4 mr-2" />
-              Reject
+              {t('details.actions.reject')}
             </Button>
           )}
           
           {canApprove && (
             <Button onClick={() => onApprove?.(claim)}>
               <CheckCircle className="h-4 w-4 mr-2" />
-              Approve
+              {t('details.actions.approve')}
             </Button>
           )}
         </DialogFooter>

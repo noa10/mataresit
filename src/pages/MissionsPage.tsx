@@ -1,21 +1,23 @@
 import { useMemo, useState } from "react";
-
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, Clock3, Sparkles, Target, Users } from "lucide-react";
+import {
+  Clock3,
+  Receipt,
+  ScanLine,
+  Sparkles,
+  Target,
+  Users,
+} from "lucide-react";
 import { Link } from "react-router-dom";
-
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ledger/EmptyState";
+import { StatusChip } from "@/components/ledger/StatusChip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { useGamification } from "@/contexts/GamificationContext";
-import { GamificationProgressCard } from "@/components/gamification/GamificationProgressCard";
-import { cn } from "@/lib/utils";
+import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { gamificationQueryKeys } from "@/services/gamificationService";
-import type { MissionProgress, MissionType } from "@/types/gamification";
+import type { MissionObjectiveType, MissionProgress, MissionType } from "@/types/gamification";
+import { cn } from "@/lib/utils";
 
 const MISSION_TYPE_ORDER: MissionType[] = ["one_time", "weekly", "community"];
 const LOCALE_BY_LANGUAGE = {
@@ -23,21 +25,25 @@ const LOCALE_BY_LANGUAGE = {
   ms: "ms-MY",
 } as const;
 
-const getLocale = (language: string) => LOCALE_BY_LANGUAGE[language as keyof typeof LOCALE_BY_LANGUAGE] ?? "en-MY";
+const getLocale = (language: string) =>
+  LOCALE_BY_LANGUAGE[language as keyof typeof LOCALE_BY_LANGUAGE] ?? "en-MY";
 
-const formatCount = (value: number, locale: string) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
-const formatCurrency = (value: number, locale: string) => new Intl.NumberFormat(locale, {
-  style: "currency",
-  currency: "MYR",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-}).format(value);
+const formatCount = (value: number, locale: string) =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
+
+const formatCurrency = (value: number, locale: string) =>
+  new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "MYR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
 
 const formatObjectiveValue = (
   mission: MissionProgress["mission"],
   value: number,
   locale: string,
-  t: (key: string, options?: Record<string, unknown>) => string,
+  t: (key: string, options?: Record<string, unknown>) => string
 ) => {
   const formattedValue = formatCount(value, locale);
 
@@ -51,7 +57,11 @@ const formatObjectiveValue = (
   return formattedValue;
 };
 
-const formatMissionWindow = (mission: MissionProgress["mission"], fallback: string, locale: string) => {
+const formatMissionWindow = (
+  mission: MissionProgress["mission"],
+  fallback: string,
+  locale: string
+) => {
   if (!mission?.startsAt && !mission?.endsAt) return fallback;
 
   const formatter = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
@@ -62,7 +72,19 @@ const formatMissionWindow = (mission: MissionProgress["mission"], fallback: stri
   return start ?? end ?? fallback;
 };
 
-function MissionCard({ missionProgress, language, t }: {
+const OBJECTIVE_ICONS: Partial<Record<MissionObjectiveType, typeof Target>> = {
+  receipts_scanned: ScanLine,
+  deductible_receipts: Receipt,
+  deductible_total_amount: Receipt,
+  scan_streak_days: Clock3,
+  xp_earned: Sparkles,
+};
+
+function MissionCard({
+  missionProgress,
+  language,
+  t,
+}: {
   missionProgress: MissionProgress;
   language: string;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -70,68 +92,100 @@ function MissionCard({ missionProgress, language, t }: {
   const mission = missionProgress.mission;
   const isCommunity = mission?.missionType === "community";
   const locale = getLocale(language);
-  const displayCurrent = isCommunity ? missionProgress.communityCurrentValue ?? missionProgress.currentValue : missionProgress.currentValue;
-  const displayTarget = isCommunity ? missionProgress.communityTargetValue ?? missionProgress.targetValue : missionProgress.targetValue;
-  const progressValue = displayTarget > 0 ? Math.min(100, Math.round((displayCurrent / displayTarget) * 100)) : 0;
-  const isComplete = Boolean(missionProgress.claimedAt ?? missionProgress.completedAt ?? (isCommunity && missionProgress.communityCompletedAt));
+  const displayCurrent = isCommunity
+    ? missionProgress.communityCurrentValue ?? missionProgress.currentValue
+    : missionProgress.currentValue;
+  const displayTarget = isCommunity
+    ? missionProgress.communityTargetValue ?? missionProgress.targetValue
+    : missionProgress.targetValue;
+  const progressValue =
+    displayTarget > 0 ? Math.min(100, Math.round((displayCurrent / displayTarget) * 100)) : 0;
+  const isComplete = Boolean(
+    missionProgress.claimedAt ??
+      missionProgress.completedAt ??
+      (isCommunity && missionProgress.communityCompletedAt)
+  );
   const statusKey = isComplete ? "complete" : isCommunity ? "community" : "inProgress";
+  const Icon =
+    OBJECTIVE_ICONS[mission?.objectiveType as MissionObjectiveType] ?? Target;
 
   return (
-    <Card className={cn("h-full", isComplete && "border-primary/40 bg-primary/5")}>
-      <CardHeader className="gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{t(`gamification.missions.tabs.${mission?.missionType ?? "one_time"}`)}</Badge>
-              <Badge variant={isComplete ? "default" : "secondary"}>{t(`gamification.missions.status.${statusKey}`)}</Badge>
-            </div>
-            <CardTitle className="text-xl">{mission?.title ?? t("gamification.missions.emptyTitle")}</CardTitle>
-            <CardDescription>{mission?.description ?? t("gamification.missions.emptyDescription")}</CardDescription>
+    <article className="grid gap-3 rounded-[10px] border border-ledger-line bg-ledger-surface p-[18px]">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-ledger-accent-soft text-ledger-accent"
+        >
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h3 className="text-[0.9375rem] font-semibold leading-snug text-ledger-ink">
+              {mission?.title ?? t("gamification.missions.emptyTitle")}
+            </h3>
+            <StatusChip
+              tone={isComplete ? "reviewed" : isCommunity ? "neutral" : "processing"}
+              label={t(`gamification.missions.status.${statusKey}`)}
+            />
           </div>
-          <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />+{mission?.rewardXp ?? 0} XP</Badge>
+          <p className="mt-1 text-sm leading-relaxed text-ledger-muted">
+            {mission?.description ?? t("gamification.missions.emptyDescription")}
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{t(isCommunity ? "gamification.missions.communityProgress" : "gamification.missions.personalProgress")}</span>
-            <span className="font-medium text-foreground">
-              {formatObjectiveValue(mission, displayCurrent, locale, t)} / {formatObjectiveValue(mission, displayTarget, locale, t)}
-            </span>
-          </div>
-          <Progress value={progressValue} aria-label={mission?.title ?? "Mission progress"} />
-        </div>
+      </div>
 
-        <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-          <div className="rounded-lg border bg-background/80 p-3">
-            <p className="font-medium text-foreground">{t("gamification.missions.windowLabel")}</p>
-            <p className="mt-1">{formatMissionWindow(mission, t("gamification.missions.windowLifetime"), locale)}</p>
-          </div>
-          <div className="rounded-lg border bg-background/80 p-3">
-            <p className="font-medium text-foreground">{t("gamification.missions.rewardLabel")}</p>
-            <p className="mt-1">+{mission?.rewardXp ?? 0} XP</p>
-          </div>
+      <div>
+        <div className="h-[7px] overflow-hidden rounded-full bg-ledger-surface-2">
+          <span
+            className={cn("block h-full rounded-full bg-ledger-accent")}
+            style={{ width: `${progressValue}%`, minWidth: progressValue > 0 ? undefined : 2 }}
+          />
         </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="font-data text-[0.625rem] text-ledger-muted">
+            {formatObjectiveValue(mission, displayCurrent, locale, t)} /{" "}
+            {formatObjectiveValue(mission, displayTarget, locale, t)}
+          </p>
+          <span className="rounded-full bg-ledger-accent-soft px-2.5 py-1 font-data text-[0.6875rem] text-ledger-accent">
+            +{mission?.rewardXp ?? 0} XP
+          </span>
+        </div>
+      </div>
 
-        {isCommunity ? (
-          <div className="rounded-lg border border-dashed bg-background/80 p-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 font-medium text-foreground"><Users className="h-4 w-4 text-primary" />{t("gamification.missions.communityContributionTitle")}</div>
-            <p className="mt-2">
-              {t("gamification.missions.communityContributionBody")}: {formatObjectiveValue(mission, missionProgress.currentValue, locale, t)}
-            </p>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      <div className="border-t border-dashed border-ledger-line pt-3">
+        <p className="font-data text-[0.5625rem] uppercase tracking-[0.14em] text-ledger-muted">
+          {t("gamification.missions.windowLabel")}
+        </p>
+        <p className="mt-1 font-data text-[0.625rem] text-ledger-ink-2">
+          {formatMissionWindow(mission, t("gamification.missions.windowLifetime"), locale)}
+        </p>
+      </div>
+
+      {isCommunity ? (
+        <div className="rounded-[8px] border border-dashed border-ledger-line bg-ledger-surface-2/60 px-3 py-2.5">
+          <p className="flex items-center gap-2 text-sm font-medium text-ledger-ink">
+            <Users className="h-4 w-4 text-ledger-accent" aria-hidden="true" />
+            {t("gamification.missions.communityContributionTitle")}
+          </p>
+          <p className="mt-1 text-sm text-ledger-muted">
+            {t("gamification.missions.communityContributionBody")}:{" "}
+            {formatObjectiveValue(mission, missionProgress.currentValue, locale, t)}
+          </p>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
-function MissionsLoadingState() {
+function MissionsSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Skeleton className="h-64 rounded-xl" />
-      <Skeleton className="h-64 rounded-xl" />
-      <Skeleton className="h-64 rounded-xl" />
+    <div className="grid gap-3 lg:grid-cols-2" aria-hidden="true">
+      {[0, 1, 2, 3].map((index) => (
+        <div
+          key={index}
+          className="h-[190px] animate-pulse rounded-[10px] border border-ledger-line bg-ledger-surface-2"
+        />
+      ))}
     </div>
   );
 }
@@ -150,94 +204,131 @@ export default function MissionsPage() {
 
   const missions = useMemo(
     () => missionsQuery.data ?? snapshot?.activeMissions ?? [],
-    [missionsQuery.data, snapshot?.activeMissions],
+    [missionsQuery.data, snapshot?.activeMissions]
   );
+
   const summary = useMemo(() => {
-    const completed = missions.filter((mission) => Boolean(mission.claimedAt ?? mission.completedAt ?? mission.communityCompletedAt)).length;
-    const rewardXp = missions.reduce((total, mission) => total + (mission.mission?.rewardXp ?? 0), 0);
-    return { total: missions.length, completed, rewardXp };
+    const completed = missions.filter((mission) =>
+      Boolean(mission.claimedAt ?? mission.completedAt ?? mission.communityCompletedAt)
+    ).length;
+    const availableXp = missions
+      .filter((mission) => !mission.claimedAt)
+      .reduce((total, mission) => total + (mission.mission?.rewardXp ?? 0), 0);
+    return { total: missions.length, completed, availableXp };
   }, [missions]);
+
   const groupedMissions = useMemo(
-    () => Object.fromEntries(MISSION_TYPE_ORDER.map((type) => [type, missions.filter((mission) => mission.mission?.missionType === type)])) as Record<MissionType, MissionProgress[]>,
-    [missions],
+    () =>
+      Object.fromEntries(
+        MISSION_TYPE_ORDER.map((type) => [
+          type,
+          missions.filter((mission) => mission.mission?.missionType === type),
+        ])
+      ) as Record<MissionType, MissionProgress[]>,
+    [missions]
   );
+
+  const scanStreak = snapshot?.profile.scanStreakDays ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
-      <main className="container max-w-6xl px-4 py-8">
-        <Button asChild variant="ghost" className="mb-6 gap-2">
-          <Link to="/dashboard"><ChevronLeft className="h-4 w-4" />{t("gamification.backToDashboard")}</Link>
-        </Button>
-        <div className="space-y-6">
-          <GamificationProgressCard />
-
-          <Card>
-            <CardHeader className="gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <CardTitle className="flex items-center gap-2 text-2xl"><Target className="h-5 w-5 text-primary" />{t("mainMenu.missions")}</CardTitle>
-                  <Badge variant="secondary" className="gap-1"><Clock3 className="h-3.5 w-3.5" />{t("gamification.missions.liveBadge")}</Badge>
-                </div>
-                <CardDescription className="max-w-3xl text-sm md:text-base">{t("gamification.missionsDescription")}</CardDescription>
-              </div>
-            </CardHeader>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardDescription>{t("gamification.missions.summary.active")}</CardDescription>
-                <CardTitle className="text-3xl">{summary.total}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>{t("gamification.missions.summary.completed")}</CardDescription>
-                <CardTitle className="text-3xl">{summary.completed}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>{t("gamification.missions.summary.rewards")}</CardDescription>
-                <CardTitle className="text-3xl">+{summary.rewardXp} XP</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
-
-          {isSnapshotLoading || missionsQuery.isLoading ? (
-            <MissionsLoadingState />
-          ) : (
-            <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as MissionType)}>
-              <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                {MISSION_TYPE_ORDER.map((type) => (
-                  <TabsTrigger key={type} value={type} className="rounded-full border px-4 py-2 data-[state=active]:border-primary data-[state=active]:text-primary">
-                    {t(`gamification.missions.tabs.${type}`)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-
-              {MISSION_TYPE_ORDER.map((type) => (
-                <TabsContent key={type} value={type} className="space-y-4">
-                  {groupedMissions[type].length === 0 ? (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>{t("gamification.missions.emptyTitle")}</CardTitle>
-                        <CardDescription>{t("gamification.missions.emptyDescription")}</CardDescription>
-                      </CardHeader>
-                    </Card>
-                  ) : (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      {groupedMissions[type].map((missionProgress) => (
-                        <MissionCard key={missionProgress.id} missionProgress={missionProgress} language={language} t={t} />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              ))}
-            </Tabs>
-          )}
+    <div className="mx-auto w-full max-w-[1180px] px-5 pb-14 pt-8 md:px-7">
+      <header className="flex flex-wrap items-end justify-between gap-[18px]">
+        <div className="min-w-0">
+          <p className="font-data text-[0.625rem] uppercase tracking-[0.16em] text-ledger-muted">
+            {t("gamification.missions.eyebrow")}
+          </p>
+          <h1 className="mt-1.5 font-display text-[clamp(2rem,3.2vw,2.75rem)] leading-[1.05] tracking-[-0.02em] text-ledger-ink">
+            {t("gamification.missions.title")}
+          </h1>
+          <p className="mt-2 max-w-[58ch] text-[0.9375rem] leading-relaxed text-ledger-muted">
+            {t("gamification.missionsDescription")}
+          </p>
         </div>
-      </main>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="accent-outline" size="app" asChild>
+            <Link to="/leaderboard">{t("gamification.missions.leaderboard")}</Link>
+          </Button>
+        </div>
+      </header>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="rounded-[10px] border border-ledger-line bg-ledger-surface px-4 py-3.5">
+          <p className="font-data text-[1.1rem] font-medium text-ledger-ink">{summary.total}</p>
+          <p className="mt-0.5 font-data text-[0.5625rem] uppercase tracking-[0.14em] text-ledger-muted">
+            {t("gamification.missions.summary.active")}
+          </p>
+        </div>
+        <div className="rounded-[10px] border border-ledger-line bg-ledger-surface px-4 py-3.5">
+          <p className="font-data text-[1.1rem] font-medium text-ledger-ink">{summary.completed}</p>
+          <p className="mt-0.5 font-data text-[0.5625rem] uppercase tracking-[0.14em] text-ledger-muted">
+            {t("gamification.missions.summary.completed")}
+          </p>
+        </div>
+        <div className="rounded-[10px] border border-ledger-accent bg-ledger-accent-soft px-4 py-3.5">
+          <p className="font-data text-[1.1rem] font-medium text-ledger-accent">
+            +{summary.availableXp} XP
+          </p>
+          <p className="mt-0.5 font-data text-[0.5625rem] uppercase tracking-[0.14em] text-ledger-accent">
+            {t("gamification.missions.summary.rewards")}
+          </p>
+        </div>
+        <div className="rounded-[10px] border border-ledger-line bg-ledger-surface px-4 py-3.5">
+          <p className="font-data text-[1.1rem] font-medium text-ledger-ink">
+            {t("gamification.missions.scanStreakValue", { count: formatCount(scanStreak, getLocale(language)) })}
+          </p>
+          <p className="mt-0.5 font-data text-[0.5625rem] uppercase tracking-[0.14em] text-ledger-muted">
+            {t("gamification.missions.scanStreak")}
+          </p>
+        </div>
+      </div>
+
+      {isSnapshotLoading || missionsQuery.isLoading ? (
+        <div className="mt-6">
+          <MissionsSkeleton />
+        </div>
+      ) : (
+        <Tabs
+          value={selectedType}
+          onValueChange={(value) => setSelectedType(value as MissionType)}
+          className="mt-6"
+        >
+          <TabsList className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            {MISSION_TYPE_ORDER.map((type) => (
+              <TabsTrigger
+                key={type}
+                value={type}
+                className="rounded-full border border-ledger-line-strong bg-transparent px-3.5 py-2 font-data text-[0.6875rem] tracking-[0.06em] text-ledger-ink-2 shadow-none data-[state=active]:border-ledger-ink data-[state=active]:bg-ledger-ink data-[state=active]:text-ledger-paper"
+              >
+                {t(`gamification.missions.tabs.${type}`)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {MISSION_TYPE_ORDER.map((type) => (
+            <TabsContent key={type} value={type} className="mt-4">
+              {groupedMissions[type].length === 0 ? (
+                <EmptyState
+                  icon={<Target className="h-7 w-7" />}
+                  title={t("gamification.missions.emptyTitle")}
+                  description={t("gamification.missions.emptyDescription")}
+                />
+              ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {groupedMissions[type].map((missionProgress) => (
+                    <MissionCard
+                      key={missionProgress.id}
+                      missionProgress={missionProgress}
+                      language={language}
+                      t={t}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </div>
   );
 }

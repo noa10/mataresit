@@ -135,5 +135,371 @@
     "subtitle": "Join thousands of businesses already using Mataresit",
     "button": "Start Free Trial",
     "contact": "Contact Sales"
+  },
+  "page": {
+    "meta": {
+      "title": "Pricing — Mataresit",
+      "description": "Mataresit pricing: start free with 50 receipts a month, Pro at RM 10 a month for teams, Max at RM 20 a month for volume, claims and API access."
+    },
+    "hero": {
+      "eyebrow": "Pricing",
+      "titleLead": "Three plans.",
+      "titleAccent": "One clean ledger.",
+      "lede": "Start free with 50 receipts a month. Move to Pro when the team joins in. Go Max when you need the volume, the claims and the API.",
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "save": "Save 10%",
+      "noteMonthly": "Billed monthly. Prices in Malaysian ringgit.",
+      "noteAnnual": "Billed once for twelve months. Prices in Malaysian ringgit."
+    },
+    "plans": {
+      "free": {
+        "name": "Free",
+        "description": "For one person testing the habit on their own receipts.",
+        "cta": "Start free",
+        "priceNote": "50 receipts every month",
+        "features": [
+          {
+            "text": "50 receipts per month",
+            "off": false
+          },
+          {
+            "text": "Up to 5 files per batch",
+            "off": false
+          },
+          {
+            "text": "Line-item extraction with confidence scoring",
+            "off": false
+          },
+          {
+            "text": "Multi-currency detection",
+            "off": false
+          },
+          {
+            "text": "Standard categories",
+            "off": false
+          },
+          {
+            "text": "CSV export",
+            "off": false
+          },
+          {
+            "text": "Single user",
+            "off": false
+          },
+          {
+            "text": "No team features",
+            "off": true
+          }
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "For a small team closing the month together.",
+        "cta": "Choose Pro",
+        "priceNote": "Billed monthly",
+        "features": [
+          {
+            "text": "500 receipts per month",
+            "off": false
+          },
+          {
+            "text": "Up to 50 files per batch",
+            "off": false
+          },
+          {
+            "text": "Smart search across receipts and line items",
+            "off": false
+          },
+          {
+            "text": "Team invitations and shared receipts",
+            "off": false
+          },
+          {
+            "text": "Merchant analysis and monthly / quarterly trends",
+            "off": false
+          },
+          {
+            "text": "Custom branding",
+            "off": false
+          },
+          {
+            "text": "Priority support",
+            "off": false
+          }
+        ],
+        "badge": "Most popular"
+      },
+      "max": {
+        "name": "Max",
+        "description": "For finance teams with the volume, the claims and the audit trail.",
+        "cta": "Choose Max",
+        "priceNote": "Billed monthly",
+        "features": [
+          {
+            "text": "Unlimited receipts",
+            "off": false
+          },
+          {
+            "text": "Up to 100 files per batch",
+            "off": false
+          },
+          {
+            "text": "API access and integrations",
+            "off": false
+          },
+          {
+            "text": "Claims management",
+            "off": false
+          },
+          {
+            "text": "Role-based permissions",
+            "off": false
+          },
+          {
+            "text": "Year-over-year comparisons and tax deduction identification",
+            "off": false
+          },
+          {
+            "text": "Dedicated support",
+            "off": false
+          }
+        ]
+      }
+    },
+    "forever": "forever",
+    "perMonth": "/ month",
+    "perYear": "/ year",
+    "billedMonthly": "Billed monthly",
+    "annualMonthly": "{{amount}} / month · save 10%",
+    "current": "Current plan",
+    "choose": "Choose {{plan}}",
+    "note": "Every plan reads line items, SST and payment details. Volume and team tools are what change.",
+    "compare": {
+      "eyebrow": "Compare",
+      "title": "What changes between plans.",
+      "lede": "Volume and team controls scale. The reading itself does not.",
+      "tableLabel": "Plan comparison table",
+      "caption": "Feature comparison of the Free, Pro and Max plans",
+      "columns": {
+        "feature": "Feature",
+        "free": "Free",
+        "pro": "Pro",
+        "max": "Max"
+      },
+      "groups": [
+        {
+          "label": "Receipts & capture",
+          "rows": [
+            {
+              "label": "Receipts per month",
+              "free": "50",
+              "pro": "500",
+              "max": "Unlimited"
+            },
+            {
+              "label": "Batch upload",
+              "free": "Up to 5 files",
+              "pro": "Up to 50 files",
+              "max": "Up to 100 files"
+            },
+            {
+              "label": "Line-item extraction",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Confidence scoring",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Multi-currency detection",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "SST captured separately",
+              "free": true,
+              "pro": true,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Find & report",
+          "rows": [
+            {
+              "label": "Smart search",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Categories",
+              "free": "Standard",
+              "pro": "Custom",
+              "max": "Custom"
+            },
+            {
+              "label": "CSV export",
+              "free": true,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Merchant analysis",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Monthly & quarterly trends",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Year-over-year comparisons",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Tax deduction identification",
+              "free": false,
+              "pro": false,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Team & control",
+          "rows": [
+            {
+              "label": "Users",
+              "free": "Single user",
+              "pro": "Team",
+              "max": "Team + roles"
+            },
+            {
+              "label": "Team invitations",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Shared receipt access",
+              "free": false,
+              "pro": true,
+              "max": true
+            },
+            {
+              "label": "Claims management",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Role-based permissions",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Custom branding",
+              "free": false,
+              "pro": true,
+              "max": true
+            }
+          ]
+        },
+        {
+          "label": "Platform & support",
+          "rows": [
+            {
+              "label": "API access",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Integrations",
+              "free": false,
+              "pro": false,
+              "max": true
+            },
+            {
+              "label": "Support",
+              "free": "Email",
+              "pro": "Priority",
+              "max": "Dedicated"
+            }
+          ]
+        }
+      ],
+      "included": "Included",
+      "notIncluded": "Not included"
+    },
+    "faq": {
+      "eyebrow": "Questions",
+      "title": "Before you pick one.",
+      "lede": "The short answers. If something is still unclear, the help centre covers the setup in more detail.",
+      "items": [
+        {
+          "question": "Is the free plan really free?",
+          "answer": "Yes. It covers 50 receipts a month for a single user, with 5-file batches and CSV export. Paid plans add volume, team tools and deeper reporting — not a different reading model."
+        },
+        {
+          "question": "How does annual billing work?",
+          "answer": "Annual billing charges once for twelve months. Pro is RM 108 a year instead of RM 120, and Max is RM 216 instead of RM 240 — 10% off either way."
+        },
+        {
+          "question": "What counts as a receipt?",
+          "answer": "One uploaded scan or emailed receipt counts once, however many line items it contains. Max removes the monthly cap."
+        },
+        {
+          "question": "Can I change plans later?",
+          "answer": "Yes. Plan and billing-period changes live in subscription settings, so you can move from monthly to annual without starting over."
+        },
+        {
+          "question": "What is on every plan?",
+          "answer": "Line-item extraction, confidence scoring, multi-currency detection, SST capture and CSV export. The reading is the same; the limits and team controls are not."
+        }
+      ]
+    },
+    "cta": {
+      "eyebrow": "Start small",
+      "title": "Start with 50 receipts.",
+      "lede": "The free plan is a real workspace, not a countdown. Add the team when the pile grows.",
+      "workspace": "Open the workspace",
+      "features": "Compare features"
+    },
+    "downgrade": {
+      "title": "Change your plan?",
+      "description": "You are moving to {{plan}}.",
+      "freeWarningTitle": "What happens if you move to Free",
+      "freeWarning": [
+        "Your subscription will be canceled",
+        "You will lose access to premium features",
+        "Data retention will be limited to 7 days",
+        "Monthly receipt limit will be reduced to 50"
+      ],
+      "paidWarning": [
+        "You will lose access to higher-tier features",
+        "Your monthly limits will be reduced",
+        "You will receive a prorated credit for unused time"
+      ],
+      "billingNote": "You are billed monthly or annually based on your chosen plan. You can upgrade, downgrade, or cancel anytime.",
+      "cancel": "Keep current plan",
+      "confirm": "Confirm change",
+      "paidWarningTitle": "What changes with {{plan}}"
+    },
+    "alreadyOnPlan": "You are already on the {{plan}} plan.",
+    "checkoutError": "We could not start checkout. Please try again.",
+    "plansLabel": "Plans"
   }
 }

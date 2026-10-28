@@ -31,19 +31,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { claimService } from '@/services/claimService';
-import { Claim, ClaimPriority } from '@/types/claims';
+import { Claim } from '@/types/claims';
 import { Edit } from 'lucide-react';
+import { useClaimsTranslation } from '@/contexts/LanguageContext';
 
-const editClaimSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(255, 'Title must be less than 255 characters'),
-  description: z.string().optional(),
-  amount: z.number().min(0.01, 'Amount must be greater than 0'),
-  currency: z.string().min(3, 'Currency is required'),
-  category: z.string().optional(),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']),
-});
-
-type EditClaimFormData = z.infer<typeof editClaimSchema>;
+type EditClaimFormData = {
+  title: string;
+  description?: string;
+  amount: number;
+  currency: string;
+  category?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+};
 
 interface EditClaimDialogProps {
   claim: Claim | null;
@@ -55,6 +54,19 @@ interface EditClaimDialogProps {
 export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditClaimDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { t } = useClaimsTranslation();
+
+  const editClaimSchema = z.object({
+    title: z
+      .string()
+      .min(3, t('edit.validation.titleMin'))
+      .max(255, t('edit.validation.titleMax')),
+    description: z.string().optional(),
+    amount: z.number().min(0.01, t('edit.validation.amountMin')),
+    currency: z.string().min(3, t('edit.validation.currency')),
+    category: z.string().optional(),
+    priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  });
 
   const form = useForm<EditClaimFormData>({
     resolver: zodResolver(editClaimSchema),
@@ -62,7 +74,7 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
       title: '',
       description: '',
       amount: 0,
-      currency: 'USD',
+      currency: 'MYR',
       category: '',
       priority: 'medium',
     },
@@ -98,8 +110,8 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
       });
 
       toast({
-        title: 'Success',
-        description: 'Claim updated successfully',
+        title: t('notifications.success'),
+        description: t('edit.notifications.updated'),
       });
 
       onOpenChange(false);
@@ -107,8 +119,8 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
     } catch (error) {
       console.error('Error updating claim:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update claim',
+        title: t('errors.title'),
+        description: t('edit.errors.updateFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -138,10 +150,10 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit className="h-5 w-5" />
-            Edit Claim
+            {t('edit.title')}
           </DialogTitle>
           <DialogDescription>
-            Update the details of your expense claim. Only draft claims can be edited.
+            {t('edit.subtitle')}
           </DialogDescription>
         </DialogHeader>
 
@@ -153,9 +165,9 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
                 name="title"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Title *</FormLabel>
+                    <FormLabel>{t('edit.form.title')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter claim title" {...field} />
+                      <Input placeholder={t('edit.placeholders.title')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,7 +179,7 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount *</FormLabel>
+                    <FormLabel>{t('edit.form.amount')}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -188,21 +200,21 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency *</FormLabel>
+                    <FormLabel>{t('edit.form.currency')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select currency" />
+                          <SelectValue placeholder={t('edit.placeholders.currency')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="MYR">MYR</SelectItem>
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="EUR">EUR</SelectItem>
                         <SelectItem value="GBP">GBP</SelectItem>
                         <SelectItem value="CAD">CAD</SelectItem>
                         <SelectItem value="AUD">AUD</SelectItem>
                         <SelectItem value="JPY">JPY</SelectItem>
-                        <SelectItem value="MYR">MYR</SelectItem>
                         <SelectItem value="SGD">SGD</SelectItem>
                       </SelectContent>
                     </Select>
@@ -216,12 +228,12 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel>{t('edit.form.category')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Travel, Meals, Office Supplies" {...field} />
+                      <Input placeholder={t('edit.placeholders.category')} {...field} />
                     </FormControl>
                     <FormDescription>
-                      Optional expense category for better organization
+                      {t('edit.descriptions.category')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -233,18 +245,18 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
                 name="priority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Priority</FormLabel>
+                    <FormLabel>{t('edit.form.priority')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select priority" />
+                          <SelectValue placeholder={t('edit.placeholders.priority')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="low">{t('create.priority.low')}</SelectItem>
+                        <SelectItem value="medium">{t('create.priority.medium')}</SelectItem>
+                        <SelectItem value="high">{t('create.priority.high')}</SelectItem>
+                        <SelectItem value="urgent">{t('create.priority.urgent')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -258,16 +270,16 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('edit.form.description')}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Provide details about this expense claim..."
+                      placeholder={t('edit.placeholders.description')}
                       className="min-h-[100px]"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Optional description to provide more context about the expense
+                    {t('edit.descriptions.description')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -278,18 +290,18 @@ export function EditClaimDialog({ claim, open, onOpenChange, onSuccess }: EditCl
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={loading}>
-            Cancel
+            {t('edit.actions.cancel')}
           </Button>
           <Button onClick={form.handleSubmit(onSubmit)} disabled={loading}>
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Updating...
+                {t('edit.actions.updating')}
               </>
             ) : (
               <>
                 <Edit className="h-4 w-4 mr-2" />
-                Update Claim
+                {t('edit.actions.update')}
               </>
             )}
           </Button>

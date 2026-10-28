@@ -87,41 +87,67 @@ Object.defineProperty(global, 'crypto', {
 // Mock fetch for API calls
 global.fetch = vi.fn();
 
-// Mock WebSocket for real-time features
-global.WebSocket = vi.fn(() => ({
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  send: vi.fn(),
-  close: vi.fn(),
-  readyState: 1,
-  CONNECTING: 0,
-  OPEN: 1,
-  CLOSING: 2,
-  CLOSED: 3
-})) as any;
+// Mock WebSocket for real-time features. Supabase's RealtimeClient calls
+// `new WebSocket(url)`, so this must be constructible.
+class WebSocketMock {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
 
-// Mock localStorage
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  send = vi.fn();
+  close = vi.fn();
+  readyState = 1;
+  binaryType = 'blob';
+}
+global.WebSocket = WebSocketMock as any;
+
+// Functional in-memory storage so tests that persist state (search chat
+// history, drafts) behave like the browser under the full vitest config too.
+const createMemoryStorage = (): Storage => {
+  let store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: () => {
+      store.clear();
+    },
+    getItem: (key: string) => store.get(key) ?? null,
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+  };
+};
+
+const localStorageMock = createMemoryStorage();
+const sessionStorageMock = createMemoryStorage();
+
 Object.defineProperty(window, 'localStorage', {
-  value: {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-    length: 0,
-    key: vi.fn()
-  }
+  value: localStorageMock,
+  configurable: true,
 });
 
-// Mock sessionStorage
 Object.defineProperty(window, 'sessionStorage', {
-  value: {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-    length: 0,
-    key: vi.fn()
-  }
+  value: sessionStorageMock,
+  configurable: true,
+});
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
+});
+
+Object.defineProperty(globalThis, 'sessionStorage', {
+  value: sessionStorageMock,
+  configurable: true,
 });
 
 // Mock URL.createObjectURL
@@ -140,19 +166,16 @@ global.IntersectionObserver = vi.fn(() => ({
   disconnect: vi.fn()
 })) as any;
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn()
-})) as any;
+// Mock ResizeObserver. Must be constructible: @floating-ui/dom's autoUpdate
+// does `new ResizeObserver(...)` inside Radix popper.
+class ResizeObserverMock {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+global.ResizeObserver = ResizeObserverMock as any;
 
-// Mock MutationObserver
-global.MutationObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn(),
-  takeRecords: vi.fn(() => [])
-})) as any;
+// Keep the real MutationObserver: Testing Library's waitFor depends on it.
 
 // Mock requestAnimationFrame
 global.requestAnimationFrame = vi.fn((callback) => {

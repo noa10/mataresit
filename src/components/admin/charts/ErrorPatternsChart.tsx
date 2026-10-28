@@ -37,6 +37,17 @@ import {
   YAxis,
   CartesianGrid
 } from 'recharts';
+import { useAdminTranslation } from '@/contexts/LanguageContext';
+
+const ERROR_TYPE_KEYS: Record<string, string> = {
+  api_limit: 'apiLimit',
+  network: 'network',
+  validation: 'validation',
+  timeout: 'timeout',
+  unknown: 'unknown'
+};
+
+const ERROR_TYPE_ORDER = ['api_limit', 'network', 'validation', 'timeout', 'unknown'];
 
 interface ErrorPatternsChartProps {
   hourlyStats: EmbeddingHourlyStats[];
@@ -55,11 +66,34 @@ export function ErrorPatternsChart({
   onRefresh,
   className = ''
 }: ErrorPatternsChartProps) {
+  const { t } = useAdminTranslation();
+
+  const getErrorTypeLabel = (type: string) => {
+    const key = ERROR_TYPE_KEYS[type.replace(/_errors$/, '')] ?? 'unknown';
+    return t(`embeddingMetrics.charts.errorTypes.${key}`);
+  };
+
   // Transform data and calculate metrics
   const { chartConfig, metrics, errorDistribution, errorTrends } = useMemo(() => {
-    const series = transformHourlyStatsToErrorPatterns(hourlyStats);
-    const config = generateChartConfig('errors', series);
-    const distribution = summary ? createErrorDistributionData(summary) : [];
+    const labelForType = (type: string) => {
+      const key = ERROR_TYPE_KEYS[type.replace(/_errors$/, '')] ?? 'unknown';
+      return t(`embeddingMetrics.charts.errorTypes.${key}`);
+    };
+    const series = transformHourlyStatsToErrorPatterns(hourlyStats).map((item, index) => ({
+      ...item,
+      name: labelForType(ERROR_TYPE_ORDER[index] ?? 'unknown')
+    }));
+    const config = {
+      ...generateChartConfig('errors', series),
+      title: t('embeddingMetrics.charts.common.titleErrors'),
+      subtitle: t('embeddingMetrics.charts.common.subtitleErrors')
+    };
+    const distribution = summary
+      ? createErrorDistributionData(summary).map((entry, index) => ({
+          ...entry,
+          name: labelForType(summary.topErrors[index]?.type ?? 'unknown')
+        }))
+      : [];
     
     // Calculate error metrics
     const totalErrors = hourlyStats.reduce((sum, stat) => 
@@ -130,7 +164,7 @@ export function ErrorPatternsChart({
         avgErrorsPerHour: hourlyStats.length > 0 ? Math.round(totalErrors / hourlyStats.length) : 0
       }
     };
-  }, [hourlyStats, summary]);
+  }, [hourlyStats, summary, t]);
 
   const getErrorSeverity = (errorRate: number) => {
     if (errorRate <= 1) return { status: 'excellent', color: 'bg-green-100 text-green-800', icon: CheckCircle };
@@ -197,18 +231,18 @@ export function ErrorPatternsChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Error Rate</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.errorPatterns.errorRate')}</p>
                 <p className="text-2xl font-bold">{metrics.errorRate}%</p>
               </div>
               <div className="flex items-center gap-2">
                 <ErrorSeverityIcon className="h-6 w-6 text-gray-400" />
                 <Badge className={errorSeverity.color}>
-                  {errorSeverity.status}
+                  {t(`embeddingMetrics.charts.status.${errorSeverity.status}`)}
                 </Badge>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.totalErrors} total errors
+              {t('embeddingMetrics.charts.errorPatterns.totalErrors', { count: metrics.totalErrors })}
             </p>
           </CardContent>
         </Card>
@@ -217,7 +251,7 @@ export function ErrorPatternsChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Error Trend</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.errorPatterns.errorTrend')}</p>
                 <p className="text-2xl font-bold">
                   {metrics.errorTrend > 0 ? '+' : ''}{metrics.errorTrend.toFixed(1)}%
                 </p>
@@ -233,7 +267,7 @@ export function ErrorPatternsChart({
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Recent vs previous period
+              {t('embeddingMetrics.charts.errorPatterns.recentVsPrevious')}
             </p>
           </CardContent>
         </Card>
@@ -242,16 +276,18 @@ export function ErrorPatternsChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Error Type</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.errorPatterns.topErrorType')}</p>
                 <p className="text-lg font-bold capitalize">
-                  {metrics.mostProblematicError?.type.replace('_', ' ') || 'None'}
+                  {metrics.mostProblematicError
+                    ? getErrorTypeLabel(metrics.mostProblematicError.type)
+                    : t('embeddingMetrics.charts.errorPatterns.none')}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium">
                   {metrics.mostProblematicError?.count || 0}
                 </p>
-                <p className="text-xs text-muted-foreground">occurrences</p>
+                <p className="text-xs text-muted-foreground">{t('embeddingMetrics.charts.errorPatterns.occurrences')}</p>
               </div>
             </div>
           </CardContent>
@@ -261,12 +297,12 @@ export function ErrorPatternsChart({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Errors/Hour</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('embeddingMetrics.charts.errorPatterns.avgErrorsPerHour')}</p>
                 <p className="text-2xl font-bold">{metrics.avgErrorsPerHour}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">
-                  Based on {hourlyStats.length} hours
+                  {t('embeddingMetrics.charts.errorPatterns.basedOnHours', { count: hourlyStats.length })}
                 </p>
               </div>
             </div>
@@ -288,7 +324,7 @@ export function ErrorPatternsChart({
         {/* Error Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Error Type Distribution</CardTitle>
+            <CardTitle className="text-lg">{t('embeddingMetrics.charts.errorPatterns.distributionTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             {errorDistribution.length > 0 ? (
@@ -315,8 +351,8 @@ export function ErrorPatternsChart({
               <div className="h-64 flex items-center justify-center">
                 <div className="text-center">
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-                  <p className="text-gray-500 font-medium">No Errors Detected</p>
-                  <p className="text-gray-400 text-sm">All embedding generations are successful</p>
+                  <p className="text-gray-500 font-medium">{t('embeddingMetrics.charts.errorPatterns.noErrorsTitle')}</p>
+                  <p className="text-gray-400 text-sm">{t('embeddingMetrics.charts.errorPatterns.noErrorsDesc')}</p>
                 </div>
               </div>
             )}
@@ -327,7 +363,7 @@ export function ErrorPatternsChart({
       {/* Error Type Analysis */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Error Type Analysis</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.errorPatterns.analysisTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -340,9 +376,12 @@ export function ErrorPatternsChart({
                   <div className="flex items-center gap-3">
                     <ErrorIcon className="h-5 w-5" style={{ color: errorColor }} />
                     <div>
-                      <p className="font-medium capitalize">{errorTrend.type.replace('_', ' ')} Errors</p>
+                      <p className="font-medium capitalize">{t('embeddingMetrics.charts.errorPatterns.typeErrors', { type: getErrorTypeLabel(errorTrend.type) })}</p>
                       <p className="text-sm text-muted-foreground">
-                        {errorTrend.total} total, {errorTrend.recent} recent
+                        {t('embeddingMetrics.charts.errorPatterns.trendSummary', {
+                          total: errorTrend.total,
+                          recent: errorTrend.recent
+                        })}
                       </p>
                     </div>
                   </div>
@@ -371,7 +410,7 @@ export function ErrorPatternsChart({
       {/* Error Insights */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Error Analysis & Recommendations</CardTitle>
+          <CardTitle className="text-lg">{t('embeddingMetrics.charts.errorPatterns.recommendationsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -379,9 +418,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-800">Excellent Error Rate</p>
+                  <p className="font-medium text-green-800">{t('embeddingMetrics.charts.errorPatterns.excellentRateTitle')}</p>
                   <p className="text-sm text-green-700">
-                    Your error rate of {metrics.errorRate}% is excellent. The system is performing very reliably.
+                    {t('embeddingMetrics.charts.errorPatterns.excellentRateDesc', { rate: metrics.errorRate })}
                   </p>
                 </div>
               </div>
@@ -391,9 +430,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
                 <Shield className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-800">High API Limit Errors</p>
+                  <p className="font-medium text-red-800">{t('embeddingMetrics.charts.errorPatterns.highApiLimitTitle')}</p>
                   <p className="text-sm text-red-700">
-                    API limit errors account for a significant portion of failures. Consider implementing rate limiting or upgrading your API plan.
+                    {t('embeddingMetrics.charts.errorPatterns.highApiLimitDesc')}
                   </p>
                 </div>
               </div>
@@ -403,9 +442,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
                 <Wifi className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">Network Connectivity Issues</p>
+                  <p className="font-medium text-yellow-800">{t('embeddingMetrics.charts.errorPatterns.networkIssuesTitle')}</p>
                   <p className="text-sm text-yellow-700">
-                    High network error rate suggests connectivity issues. Consider implementing retry logic with exponential backoff.
+                    {t('embeddingMetrics.charts.errorPatterns.networkIssuesDesc')}
                   </p>
                 </div>
               </div>
@@ -415,9 +454,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
                 <Clock className="h-5 w-5 text-orange-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-orange-800">Timeout Issues</p>
+                  <p className="font-medium text-orange-800">{t('embeddingMetrics.charts.errorPatterns.timeoutTitle')}</p>
                   <p className="text-sm text-orange-700">
-                    Frequent timeouts may indicate slow API responses or insufficient timeout values. Consider optimizing request size or increasing timeout limits.
+                    {t('embeddingMetrics.charts.errorPatterns.timeoutDesc')}
                   </p>
                 </div>
               </div>
@@ -427,9 +466,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-800">Perfect Performance</p>
+                  <p className="font-medium text-green-800">{t('embeddingMetrics.charts.errorPatterns.perfectTitle')}</p>
                   <p className="text-sm text-green-700">
-                    No errors detected in the current time period. Your embedding generation is running flawlessly!
+                    {t('embeddingMetrics.charts.errorPatterns.perfectDesc')}
                   </p>
                 </div>
               </div>
@@ -439,9 +478,9 @@ export function ErrorPatternsChart({
               <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-gray-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-gray-800">No Error Data Available</p>
+                  <p className="font-medium text-gray-800">{t('embeddingMetrics.charts.errorPatterns.noDataTitle')}</p>
                   <p className="text-sm text-gray-700">
-                    No error pattern data is available yet. Error analysis will appear once embedding generation begins.
+                    {t('embeddingMetrics.charts.errorPatterns.noDataDesc')}
                   </p>
                 </div>
               </div>

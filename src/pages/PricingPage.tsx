@@ -1,890 +1,795 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { Fragment, useState } from "react";
+import type { ReactNode } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAuth } from "@/contexts/AuthContext";
-import { useStripe } from "@/contexts/StripeContext";
-import { usePricingTranslation } from "@/contexts/LanguageContext";
-import { useMalaysianCulture } from "@/hooks/useMalaysianCulture";
-import { PRICE_IDS } from "@/config/stripe";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
-  Check,
-  X,
-  Zap,
-  Crown,
-  Star,
-  Upload,
-  Brain,
-  BarChart3,
-  Shield,
-  Clock,
-  Sparkles,
-  Loader2,
-  CheckCircle,
-  ChevronDown,
-  Users
-} from "lucide-react";
-import { SubscriptionStatusRefresh } from "@/components/SubscriptionStatusRefresh";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  useHomepageTranslation,
+  usePricingTranslation,
+} from "@/contexts/LanguageContext";
+import { useStripe } from "@/contexts/StripeContext";
+import { PRICE_IDS } from "@/config/stripe";
+import { MarketingCtaBand } from "@/components/marketing/MarketingCtaBand";
+import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { CheckMark } from "@/components/marketing/MarketingIcons";
 
-interface PricingTier {
-  id: string;
-  name: string;
-  price: {
-    monthly: number;
-    annual: number;
-  };
-  description: string;
-  icon: React.ReactNode;
-  popular?: boolean;
-  features: {
-    uploads: string;
-    processing: string;
-    storage: string;
-    models: string[];
-    capabilities: string[];
-    collaboration: string[];
-    analytics: string[];
-    support?: string;
-  };
-  limitations?: string[];
+type PlanId = "free" | "pro" | "max";
+type BillingInterval = "monthly" | "annual";
+type PlanFeature = { text: string; off: boolean };
+type CompareCell = boolean | string;
+type CompareRow = {
+  label: string;
+  free: CompareCell;
+  pro: CompareCell;
+  max: CompareCell;
+};
+type CompareGroup = { label: string; rows: CompareRow[] };
+type FaqItem = { question: string; answer: string };
+
+const PLAN_PRICES: Record<PlanId, { monthly: number; annual: number }> = {
+  free: { monthly: 0, annual: 0 },
+  pro: { monthly: 10, annual: 108 },
+  max: { monthly: 20, annual: 216 },
+};
+
+const TIER_HIERARCHY: Record<PlanId, number> = { free: 0, pro: 1, max: 2 };
+
+const shell = "mx-auto w-full max-w-[1240px] px-5 min-[881px]:px-6";
+const eyebrow =
+  "font-data text-[0.6875rem] uppercase tracking-[0.16em] text-ledger-muted";
+const sectionTitle =
+  "font-display text-[clamp(2rem,3.6vw,3rem)] font-normal leading-[1.06] tracking-[-0.02em] text-ledger-ink";
+const sectionLede = "text-[1.0625rem] leading-[1.65] text-ledger-muted";
+const compareMobileLabel =
+  "mb-1 hidden font-data text-[0.5625rem] uppercase leading-[1.4] tracking-[0.08em] max-[760px]:block";
+const compareCellClass =
+  "border-b border-ledger-line px-[18px] py-3 text-center text-sm leading-[1.6] text-ledger-ink-2 max-[760px]:border-0 max-[760px]:px-3 max-[760px]:py-0 max-[760px]:text-left max-[760px]:leading-[1.4]";
+
+function PlusIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
 }
 
-// Function to generate pricing tiers with translations
-const getPricingTiers = (t: (key: string, options?: any) => string): PricingTier[] => [
-  {
-    id: "free",
-    name: t('plans.free.name'),
-    price: { monthly: 0, annual: 0 },
-    description: t('plans.free.description'),
-    icon: <Upload className="h-6 w-6" />,
-    features: {
-      uploads: t('plans.free.features.receipts'),
-      processing: t('plans.free.features.processing'),
-      storage: t('plans.free.features.storage'),
-      models: [
-        "Google Gemini (default AI processing)",
-        "Consistent AI processing across all plans"
-      ],
-      capabilities: [
-        t('plans.free.features.exports'),
-        t('plans.free.features.categories'),
-        "Multi-currency detection",
-        "Confidence scoring",
-        "Single processing method"
-      ],
-      collaboration: [
-        "Single user access",
-        "No team features"
-      ],
-      analytics: [t('plans.free.features.exports'), "Basic data export (CSV)"]
+function MinusIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function CompareCellValue({
+  value,
+  strong,
+  includedLabel,
+  notIncludedLabel,
+}: {
+  value: CompareCell;
+  strong: boolean;
+  includedLabel: string;
+  notIncludedLabel: string;
+}) {
+  if (typeof value === "boolean") {
+    if (value) {
+      return (
+        <span className="inline-grid h-[22px] w-[22px] place-items-center rounded-full bg-ledger-accent-soft text-ledger-accent">
+          <CheckMark className="h-3.5 w-3.5" strokeWidth={2.4} />
+          <span className="sr-only">{includedLabel}</span>
+        </span>
+      );
     }
-  },
-  {
-    id: "pro",
-    name: t('plans.pro.name'),
-    price: { monthly: 10, annual: 108 },
-    description: t('plans.pro.description'),
-    icon: <Zap className="h-6 w-6" />,
-    popular: true,
-    features: {
-      uploads: t('plans.pro.features.receipts'),
-      processing: t('plans.pro.features.processing'),
-      storage: t('plans.pro.features.storage'),
-      models: [
-        "Google Gemini (default AI processing)",
-        "Consistent AI processing across all plans"
-      ],
-      capabilities: [
-        t('plans.pro.features.batch'),
-        t('plans.pro.features.search'),
-        t('plans.pro.features.categories'),
-        t('plans.pro.features.exports'),
-        "Custom branding options"
-      ],
-      collaboration: [
-        t('plans.pro.features.team'),
-        "Team member invitations",
-        "Shared receipt access"
-      ],
-      analytics: [
-        t('plans.pro.features.search'),
-        t('plans.pro.features.exports'),
-        "Merchant analysis",
-        "Monthly/quarterly trends"
-      ],
-      support: t('plans.pro.features.support')
-    }
-  },
-  {
-    id: "max",
-    name: t('plans.max.name'),
-    price: { monthly: 20, annual: 216 },
-    description: t('plans.max.description'),
-    icon: <Crown className="h-6 w-6" />,
-    features: {
-      uploads: t('plans.max.features.receipts'),
-      processing: t('plans.max.features.processing'),
-      storage: t('plans.max.features.storage'),
-      models: [
-        "Google Gemini (default AI processing)",
-        "Consistent AI processing across all plans"
-      ],
-      capabilities: [
-        t('plans.max.features.batch'),
-        t('plans.max.features.search'),
-        t('plans.max.features.categories'),
-        t('plans.max.features.exports'),
-        t('plans.max.features.api'),
-        t('plans.max.features.integrations')
-      ],
-      collaboration: [
-        t('plans.max.features.team'),
-        "Team member invitations",
-        "Shared receipt access",
-        "Claims management",
-        "Role-based permissions"
-      ],
-      analytics: [
-        t('plans.max.features.search'),
-        t('plans.max.features.exports'),
-        t('plans.max.features.api'),
-        "Year-over-year comparisons",
-        "Tax deduction identification"
-      ],
-      support: t('plans.max.features.support')
-    }
+    return (
+      <>
+        <span aria-hidden="true" className="font-data text-ledger-line-strong">
+          —
+        </span>
+        <span className="sr-only">{notIncludedLabel}</span>
+      </>
+    );
   }
-];
-
-// Feature Comparison Table Component
-const FeatureComparisonTable = ({ tiers, t }: { tiers: PricingTier[], t: (key: string, options?: any) => string }) => {
-  const allFeatures = [
-    { key: "uploads", label: t('features.list.aiProcessing.title') },
-    { key: "processing", label: t('features.list.smartSearch.title') },
-    { key: "storage", label: t('features.list.storage.title') },
-    { key: "models", label: t('features.list.aiProcessing.title') },
-    { key: "capabilities", label: t('features.list.categories.title') },
-    { key: "collaboration", label: t('features.list.collaboration.title') },
-    { key: "analytics", label: t('features.list.exports.title') },
-    { key: "support", label: t('features.list.support.title') }
-  ];
-
-  const getFeatureValue = (tier: PricingTier, featureKey: string) => {
-    const feature = tier.features[featureKey as keyof typeof tier.features];
-    if (Array.isArray(feature)) {
-      return feature.slice(0, 3).join(", ") + (feature.length > 3 ? "..." : "");
-    }
-    return feature || "Not included";
-  };
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[200px]">Feature</TableHead>
-            {tiers.map(tier => (
-              <TableHead key={tier.id} className="text-center min-w-[200px]">
-                <div className="flex flex-col items-center gap-2">
-                  <div className={`p-2 rounded-full ${
-                    tier.id === 'free' ? 'bg-green-100 text-green-600' :
-                    tier.id === 'pro' ? 'bg-blue-100 text-blue-600' :
-                    'bg-purple-100 text-purple-600'
-                  }`}>
-                    {tier.icon}
-                  </div>
-                  <span className="font-semibold">{tier.name}</span>
-                  {tier.popular && (
-                    <Badge className="bg-primary text-primary-foreground">
-                      <Star className="h-3 w-3 mr-1" />
-                      {t('plans.pro.popular')}
-                    </Badge>
-                  )}
-                </div>
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {allFeatures.map(feature => (
-            <TableRow key={feature.key}>
-              <TableCell className="font-medium">{feature.label}</TableCell>
-              {tiers.map(tier => (
-                <TableCell key={tier.id} className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    <span className="text-sm">{getFeatureValue(tier, feature.key)}</span>
-                  </div>
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <span
+      className={
+        strong
+          ? "text-[0.8125rem] font-medium leading-[1.6] text-ledger-ink-2 max-[760px]:leading-[1.4]"
+          : "text-[0.8125rem] leading-[1.6] text-ledger-muted max-[760px]:leading-[1.4]"
+      }
+    >
+      {value}
+    </span>
   );
-};
+}
 
 export default function PricingPage() {
   const { user } = useAuth();
-  const { createCheckoutSession, downgradeSubscription, isLoading, subscriptionData } = useStripe();
-  const { t, language } = usePricingTranslation();
-  const { formatCurrency } = useMalaysianCulture();
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const {
+    createCheckoutSession,
+    downgradeSubscription,
+    isLoading,
+    subscriptionData,
+  } = useStripe();
+  const { t } = usePricingTranslation();
+  const { t: tHome } = useHomepageTranslation();
 
-  // Generate pricing tiers with translations
-  const pricingTiers = getPricingTiers(t);
-  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const copy = (key: string) => String(t(key));
+  const list = <T,>(key: string): T[] =>
+    t(key, { returnObjects: true }) as unknown as T[];
+
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>("monthly");
   const [downgradeDialog, setDowngradeDialog] = useState<{
     isOpen: boolean;
-    targetTier: 'free' | 'pro' | 'max' | null;
+    targetTier: PlanId | null;
     tierName: string;
     isProcessing: boolean;
   }>({
     isOpen: false,
     targetTier: null,
-    tierName: '',
-    isProcessing: false
+    tierName: "",
+    isProcessing: false,
   });
 
-  useEffect(() => {
-    document.title = t('meta.title');
-  }, [t]);
+  const workspaceTarget = user ? "/dashboard" : "/auth";
+  const currentTier = (subscriptionData?.tier || "free") as PlanId;
+  const subscriptionActive = subscriptionData?.status === "active";
 
-  const formatPrice = (price: number) => {
-    return price === 0 ? t('plans.free.price') : formatCurrency(price);
+  const planFeatures = {
+    free: list<PlanFeature>("page.plans.free.features"),
+    pro: list<PlanFeature>("page.plans.pro.features"),
+    max: list<PlanFeature>("page.plans.max.features"),
   };
 
-  const getAnnualSavings = (monthly: number, annual: number) => {
-    if (monthly === 0) return 0;
-    const monthlyCost = monthly * 12;
-    const savings = ((monthlyCost - annual) / monthlyCost) * 100;
-    return Math.round(savings);
+  const compareGroups = list<CompareGroup>("page.compare.groups");
+  const faqItems = list<FaqItem>("page.faq.items");
+
+  const openDowngradeDialog = (tierId: PlanId) => {
+    const tierNames: Record<PlanId, string> = {
+      free: copy("page.plans.free.name"),
+      pro: copy("page.plans.pro.name"),
+      max: copy("page.plans.max.name"),
+    };
+    setDowngradeDialog({
+      isOpen: true,
+      targetTier: tierId,
+      tierName: tierNames[tierId],
+      isProcessing: false,
+    });
   };
 
-  const handleSubscribe = async (tierId: string) => {
+  const handleSubscribe = async (tierId: PlanId) => {
     if (!user) {
-      toast.error(t('cta.contact'));
+      toast.error(copy("page.checkoutError"));
       return;
     }
 
-    const currentTier = subscriptionData?.tier || 'free';
-    const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
+    const tierNames: Record<PlanId, string> = {
+      free: copy("page.plans.free.name"),
+      pro: copy("page.plans.pro.name"),
+      max: copy("page.plans.max.name"),
+    };
 
-    // Check if this is a downgrade
-    if (tierHierarchy[tierId as keyof typeof tierHierarchy] < tierHierarchy[currentTier]) {
-      // This is a downgrade - show confirmation dialog
-      const tierNames = {
-        'free': t('plans.free.name'),
-        'pro': t('plans.pro.name'),
-        'max': t('plans.max.name')
-      };
-      setDowngradeDialog({
-        isOpen: true,
-        targetTier: tierId as 'free' | 'pro' | 'max',
-        tierName: tierNames[tierId as keyof typeof tierNames],
-        isProcessing: false
-      });
+    if (TIER_HIERARCHY[tierId] < TIER_HIERARCHY[currentTier]) {
+      openDowngradeDialog(tierId);
       return;
     }
 
-    // Handle same tier
     if (tierId === currentTier) {
-      const tierName = tierNames[tierId as keyof typeof tierNames];
-      toast.success(t('cta.button', { plan: tierName }));
+      toast.success(
+        String(t("page.alreadyOnPlan", { plan: tierNames[tierId] })),
+      );
       return;
     }
 
-    // Handle free tier for new users
-    if (tierId === 'free' && currentTier === 'free') {
-      toast.success(t('cta.button', { plan: t('plans.free.name') }));
+    if (tierId === "free") {
       return;
     }
 
-    // Handle upgrades
     try {
-      // Get the appropriate price ID based on tier and billing interval
-      const priceId = PRICE_IDS[tierId as 'pro' | 'max'][billingInterval];
+      const priceId = PRICE_IDS[tierId][billingInterval];
       await createCheckoutSession(priceId, billingInterval);
     } catch (error) {
-      console.error('Error subscribing:', error);
-      toast.error(t('faq.items.refund.answer'));
+      console.error("Error subscribing:", error);
+      toast.error(copy("page.checkoutError"));
     }
   };
 
-  const handleDowngradeConfirm = async (immediate: boolean = true) => {
+  const handleDowngradeConfirm = async () => {
     if (!downgradeDialog.targetTier) return;
 
-    setDowngradeDialog(prev => ({ ...prev, isProcessing: true }));
+    setDowngradeDialog((previous) => ({
+      ...previous,
+      isProcessing: true,
+    }));
 
     try {
-      await downgradeSubscription(downgradeDialog.targetTier, immediate);
-      setDowngradeDialog({ isOpen: false, targetTier: null, tierName: '', isProcessing: false });
+      await downgradeSubscription(downgradeDialog.targetTier, true);
+      setDowngradeDialog({
+        isOpen: false,
+        targetTier: null,
+        tierName: "",
+        isProcessing: false,
+      });
     } catch (error) {
-      console.error('Error downgrading:', error);
-      setDowngradeDialog(prev => ({ ...prev, isProcessing: false }));
+      console.error("Error downgrading:", error);
+      setDowngradeDialog((previous) => ({
+        ...previous,
+        isProcessing: false,
+      }));
     }
   };
 
   const handleDowngradeCancel = () => {
-    if (downgradeDialog.isProcessing) return; // Prevent closing during processing
-    setDowngradeDialog({ isOpen: false, targetTier: null, tierName: '', isProcessing: false });
+    if (downgradeDialog.isProcessing) return;
+    setDowngradeDialog({
+      isOpen: false,
+      targetTier: null,
+      tierName: "",
+      isProcessing: false,
+    });
+  };
+
+  const billingNote =
+    billingInterval === "monthly"
+      ? copy("page.hero.noteMonthly")
+      : copy("page.hero.noteAnnual");
+
+  const downgradeWarnings = list<string>(
+    downgradeDialog.targetTier === "free"
+      ? "page.downgrade.freeWarning"
+      : "page.downgrade.paidWarning",
+  );
+
+  const renderPlanCta = (planId: PlanId, isCurrent: boolean) => {
+    const label = isCurrent
+      ? copy("page.current")
+      : copy(`page.plans.${planId}.cta`);
+
+    if (!user) {
+      return (
+        <Button
+          asChild
+          variant={planId === "free" ? "accent-outline" : planId === "pro" ? "ghost" : "accent"}
+          className={
+            planId === "free"
+              ? "mt-5 h-[46px] w-full rounded-lg border-ledger-line-strong bg-transparent text-[0.9375rem] font-semibold text-ledger-ink hover:bg-ledger-surface-2"
+              : planId === "pro"
+                ? "mt-5 h-[46px] w-full rounded-lg bg-ledger-on-panel text-[0.9375rem] font-semibold text-[#0A2E23] hover:bg-white hover:text-[#0A2E23]"
+                : "mt-5 h-[46px] w-full rounded-lg text-[0.9375rem] font-semibold"
+          }
+        >
+          <Link to="/auth">{label}</Link>
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        type="button"
+        variant={planId === "free" ? "accent-outline" : planId === "pro" ? "ghost" : "accent"}
+        onClick={() => handleSubscribe(planId)}
+        disabled={isLoading || isCurrent}
+        className={
+          planId === "free"
+            ? "mt-5 h-[46px] w-full rounded-lg border-ledger-line-strong bg-transparent text-[0.9375rem] font-semibold text-ledger-ink hover:bg-ledger-surface-2"
+            : planId === "pro"
+              ? "mt-5 h-[46px] w-full rounded-lg bg-ledger-on-panel text-[0.9375rem] font-semibold text-[#0A2E23] hover:bg-white hover:text-[#0A2E23] disabled:opacity-60"
+              : "mt-5 h-[46px] w-full rounded-lg text-[0.9375rem] font-semibold"
+        }
+      >
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {label}
+      </Button>
+    );
   };
 
   return (
-    <>
-      <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            {t('hero.title')}
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            {t('hero.subtitle')}
-          </p>
-          {/* Enhanced Trust Signals */}
-          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mt-8">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>{t('faq.items.trial.answer')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>{t('faq.items.billing.answer')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span>{t('hero.subtitle')}</span>
-            </div>
-          </div>
-        </motion.div>
+    <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
+      <Helmet>
+        <title>{copy("page.meta.title")}</title>
+        <meta name="description" content={copy("page.meta.description")} />
+      </Helmet>
 
-        {/* Enhanced Billing Interval Toggle */}
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            duration: 0.6,
-            delay: 0.2,
-            type: "spring",
-            stiffness: 200,
-            damping: 20
-          }}
-          className="flex justify-center mb-12"
-        >
-          <div className="relative bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 p-2 md:p-2.5 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 backdrop-blur-sm">
-            {/* Sliding Background Indicator */}
-            <motion.div
-              className="absolute top-2 md:top-2.5 h-[calc(100%-16px)] md:h-[calc(100%-20px)] bg-gradient-to-r from-white to-slate-50 dark:from-slate-700 dark:to-slate-600 rounded-xl shadow-lg border border-slate-200 dark:border-slate-500"
-              style={{
-                boxShadow: billingInterval === 'annual'
-                  ? '0 4px 24px rgba(34, 197, 94, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12)'
-                  : '0 4px 18px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06)'
-              }}
-              initial={false}
-              animate={{
-                left: billingInterval === 'monthly' ? '8px' : '50%',
-                width: billingInterval === 'monthly' ? 'calc(50% - 8px)' : 'calc(50% - 8px)',
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 320,
-                damping: 28,
-              }}
-            />
+      <a
+        href="#main"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper focus:top-3"
+      >
+        {String(tHome("skipToContent"))}
+      </a>
 
-            {/* Toggle Buttons */}
-            <div className="relative flex">
-              {/* Monthly Button */}
-              <motion.button
-                onClick={() => setBillingInterval('monthly')}
-                className={`relative z-10 flex items-center justify-center px-6 md:px-8 py-3.5 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[150px] md:min-w-[170px] h-[60px] ${
-                  billingInterval === 'monthly'
-                    ? 'text-slate-900 dark:text-slate-100 shadow-sm ring-1 ring-slate-300/30'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-                whileHover={{
-                  scale: 1.02,
-                  transition: { duration: 0.2 }
-                }}
-                whileTap={{ scale: 0.98 }}
-                initial={false}
-                animate={{
-                  fontWeight: billingInterval === 'monthly' ? 600 : 500,
-                }}
+      <MarketingHeader active="pricing" />
+
+      <main id="main">
+        <section className="border-b border-ledger-line">
+          <div
+            className={`${shell} pb-[44px] pt-[52px] text-center min-[881px]:pb-[52px] min-[881px]:pt-[72px]`}
+          >
+            <p className={eyebrow}>{copy("page.hero.eyebrow")}</p>
+            <h1 className="mx-auto mb-[18px] mt-4 max-w-[18ch] font-display text-[clamp(2.5rem,11vw,3.4rem)] font-normal leading-[1.02] tracking-[-0.028em] min-[641px]:text-[clamp(2.75rem,5.4vw,4.5rem)]">
+              {copy("page.hero.titleLead")}{" "}
+              <em className="italic text-ledger-accent">
+                {copy("page.hero.titleAccent")}
+              </em>
+            </h1>
+            <p className="mx-auto max-w-[56ch] text-[1.125rem] leading-[1.6] text-ledger-muted">
+              {copy("page.hero.lede")}
+            </p>
+
+            <div className="mt-[30px] inline-flex flex-col items-center gap-2.5 max-[640px]:mt-6 max-[640px]:flex max-[640px]:w-full">
+              <div
+                role="group"
+                aria-label={copy("page.hero.eyebrow")}
+                className="inline-flex gap-1 rounded-[9px] border border-ledger-line-strong bg-ledger-surface p-1 max-[640px]:w-full"
               >
-                <motion.span
-                  initial={false}
-                  animate={{
-                    textShadow: billingInterval === 'monthly'
-                      ? '0 1px 2px rgba(0, 0, 0, 0.1)'
-                      : '0 0 0px rgba(0, 0, 0, 0)'
-                  }}
-                  className="text-center"
+                <button
+                  type="button"
+                  aria-pressed={billingInterval === "monthly"}
+                  onClick={() => setBillingInterval("monthly")}
+                  className={
+                    billingInterval === "monthly"
+                      ? "inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-ledger-ink px-4 text-sm font-semibold text-ledger-paper transition-colors max-[640px]:flex-1 max-[640px]:px-2.5"
+                      : "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold text-ledger-muted transition-colors hover:text-ledger-ink max-[640px]:flex-1 max-[640px]:px-2.5"
+                  }
                 >
-                  {t('hero.monthlyBilling')}
-                </motion.span>
-              </motion.button>
-
-              {/* Yearly Button */}
-              <motion.button
-                onClick={() => setBillingInterval('annual')}
-                className={`relative z-10 flex items-center justify-center px-6 md:px-8 py-2.5 md:py-3.5 pb-7 md:pb-6 text-sm font-semibold rounded-xl transition-all duration-300 min-w-[150px] md:min-w-[170px] h-[60px] ${
-                  billingInterval === 'annual'
-                    ? 'text-slate-900 dark:text-slate-100 shadow-sm ring-1 ring-emerald-300/30'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-                whileHover={{
-                  scale: 1.02,
-                  transition: { duration: 0.2 }
-                }}
-                whileTap={{ scale: 0.98 }}
-                initial={false}
-                animate={{
-                  fontWeight: billingInterval === 'annual' ? 600 : 500,
-                }}
-              >
-                {/* Label centered; badge absolutely anchored to bottom to avoid layout shifts */}
-                <motion.span
-                  initial={false}
-                  animate={{
-                    textShadow: billingInterval === 'annual'
-                      ? '0 1px 2px rgba(0, 0, 0, 0.1)'
-                      : '0 0 0px rgba(0, 0, 0, 0)'
-                  }}
-                  className="text-center leading-none"
+                  {copy("page.hero.monthly")}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={billingInterval === "annual"}
+                  onClick={() => setBillingInterval("annual")}
+                  className={
+                    billingInterval === "annual"
+                      ? "inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-ledger-ink px-4 text-sm font-semibold text-ledger-paper transition-colors max-[640px]:flex-1 max-[640px]:px-2.5"
+                      : "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold text-ledger-muted transition-colors hover:text-ledger-ink max-[640px]:flex-1 max-[640px]:px-2.5"
+                  }
                 >
-                  {t('hero.annualBilling')}
-                </motion.span>
-
-                {/* Discount badge: absolute, centered, non-wrapping for consistent alignment */}
-                <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.25, type: 'spring', stiffness: 220, damping: 20 }}
-                  whileHover={{ scale: 1.05 }}
-                  className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-2"
-                >
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
+                  {copy("page.hero.annual")}
+                  <span
+                    className={
+                      billingInterval === "annual"
+                        ? "rounded bg-white/15 px-1.5 py-0.5 font-data text-[0.625rem] font-medium tracking-[0.03em] text-[#CFF1DF] dark:bg-ledger-accent-soft dark:text-ledger-accent"
+                        : "rounded bg-ledger-accent-soft px-1.5 py-0.5 font-data text-[0.625rem] font-medium tracking-[0.03em] text-ledger-accent"
+                    }
                   >
-                    <Badge
-                      variant="outline"
-                      className="whitespace-nowrap text-[9px] xs:text-[10px] bg-gradient-to-r from-emerald-500 to-green-500 text-white border-emerald-400 shadow-[0_4px_12px_rgba(16,185,129,0.25)] font-semibold px-2 py-0.5 xs:px-2.5 leading-none rounded-full"
-                    >
-                      {language === 'ms' ? 'Jimat 20%' : 'Save 20%'}
-                    </Badge>
-                  </motion.div>
-                </motion.div>
-              </motion.button>
+                    {copy("page.hero.save")}
+                  </span>
+                </button>
+              </div>
+              <p className="font-data text-[0.6875rem] tracking-[0.03em] text-ledger-muted">
+                {billingNote}
+              </p>
             </div>
           </div>
-        </motion.div>
+        </section>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          {pricingTiers.map((tier, index) => (
-            <motion.div
-              key={tier.id}
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ y: -10, transition: { duration: 0.2 } }}
-              className={`relative ${tier.popular ? 'md:scale-105' : ''}`}
-            >
-              {tier.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                  <Badge className="bg-primary text-primary-foreground shadow-lg">
-                    <Star className="h-3 w-3 mr-1" />
-                    {t('plans.pro.popular')}
-                  </Badge>
-                </div>
-              )}
+        <section aria-label={copy("page.plansLabel")} className="pb-2 pt-[52px] max-[640px]:pt-9">
+          <div className={shell}>
+            <div className="mx-auto grid max-w-[520px] grid-cols-1 gap-3.5 min-[881px]:max-w-none min-[881px]:grid-cols-3 min-[1025px]:gap-5">
+              {(["free", "pro", "max"] as PlanId[]).map((planId) => {
+                const isPro = planId === "pro";
+                const isCurrent =
+                  Boolean(user) &&
+                  planId === currentTier &&
+                  (planId === "free" || subscriptionActive);
 
-              <Card className={`h-full ${tier.popular ? 'border-primary shadow-lg pt-4' : ''}`}>
-                <CardHeader className="text-center pb-8">
-                  <div className="flex items-center justify-center mb-4">
-                    <div className={`p-3 rounded-full ${
-                      tier.id === 'free' ? 'bg-green-100 text-green-600' :
-                      tier.id === 'pro' ? 'bg-blue-100 text-blue-600' :
-                      'bg-purple-100 text-purple-600'
-                    }`}>
-                      {tier.icon}
-                    </div>
-                  </div>
-                  <h2 className="text-2xl font-semibold leading-none tracking-tight font-bold">{tier.name}</h2>
-                  <CardDescription className="text-sm">{tier.description}</CardDescription>
-
-                  <div className="mt-6">
-                    <div className="text-4xl font-bold">
-                      {billingInterval === 'monthly'
-                        ? formatPrice(tier.price.monthly)
-                        : formatPrice(tier.price.annual)
-                      }
-                      {(billingInterval === 'monthly' ? tier.price.monthly : tier.price.annual) > 0 && (
-                        <span className="text-lg font-normal text-muted-foreground">
-                          /{billingInterval === 'monthly' ? t('plans.free.period') : t('plans.pro.period')}
+                return (
+                  <article
+                    key={planId}
+                    className={
+                      isPro
+                        ? "flex flex-col rounded-[14px] border border-[#0A3B2C] bg-[#0A3B2C] px-6 pb-6 pt-6 text-ledger-on-panel shadow-[0_1px_2px_rgba(18,23,21,0.05),0_18px_40px_-24px_rgba(18,23,21,0.28)] min-[881px]:px-[18px] min-[881px]:pb-[22px] min-[881px]:pt-[22px] min-[1025px]:px-6 min-[1025px]:pb-6 min-[1025px]:pt-[26px]"
+                        : "flex flex-col rounded-[14px] border border-ledger-line bg-ledger-surface px-6 pb-6 pt-6 min-[881px]:px-[18px] min-[881px]:pb-[22px] min-[881px]:pt-[22px] min-[1025px]:px-6 min-[1025px]:pb-6 min-[1025px]:pt-[26px]"
+                    }
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h2
+                        className={
+                          isPro
+                            ? "font-display text-[1.75rem] font-normal leading-none tracking-[-0.01em] text-ledger-on-panel"
+                            : "font-display text-[1.75rem] font-normal leading-none tracking-[-0.01em] text-ledger-ink"
+                        }
+                      >
+                        {copy(`page.plans.${planId}.name`)}
+                      </h2>
+                      {isPro && (
+                        <span className="whitespace-nowrap rounded bg-ledger-accent-soft px-2 py-1 font-data text-[0.625rem] uppercase tracking-[0.06em] text-ledger-accent">
+                          {copy("page.plans.pro.badge")}
                         </span>
                       )}
                     </div>
-                    {billingInterval === 'annual' && tier.price.annual > 0 && (
-                      <div className="text-sm text-muted-foreground mt-2">
-                        <Badge variant="outline" className="text-green-600 border-green-200">
-                          Save {getAnnualSavings(tier.price.monthly, tier.price.annual)}% vs monthly
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
 
-                <CardContent className="space-y-6">
-                  {/* Core Features */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      {t('features.title')}
-                    </h3>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>{tier.features.uploads}</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>{tier.features.processing}</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>{tier.features.storage}</span>
-                      </li>
-                    </ul>
-                  </div>
+                    <p
+                      className={
+                        isPro
+                          ? "mt-2.5 text-[0.9375rem] leading-[1.5] text-[#B9CCC2]"
+                          : "mt-2.5 text-[0.9375rem] leading-[1.5] text-ledger-muted"
+                      }
+                    >
+                      {copy(`page.plans.${planId}.description`)}
+                    </p>
 
-                  {/* AI Models */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Brain className="h-4 w-4" />
-                      {t('features.list.aiProcessing.title')}
-                    </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tier.features.models.map((model, idx) => (
-                        <li key={idx} className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <span>{model}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                    <p className="mt-5 flex items-baseline gap-2">
+                      <span className="whitespace-nowrap font-data text-[2.5rem] font-medium leading-none tracking-[-0.04em] min-[881px]:text-[2rem] min-[1025px]:text-[2.375rem]">
+                        RM{" "}
+                        {billingInterval === "monthly"
+                          ? PLAN_PRICES[planId].monthly
+                          : PLAN_PRICES[planId].annual}
+                      </span>
+                      <span
+                        className={
+                          isPro
+                            ? "whitespace-nowrap text-sm leading-[1.6] text-[#A8CBB9]"
+                            : "whitespace-nowrap text-sm leading-[1.6] text-ledger-muted"
+                        }
+                      >
+                        {planId === "free"
+                          ? `/ ${copy("page.forever")}`
+                          : billingInterval === "monthly"
+                            ? copy("page.perMonth")
+                            : copy("page.perYear")}
+                      </span>
+                    </p>
 
-                  {/* Processing Capabilities */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      {t('features.list.smartSearch.title')}
-                    </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tier.features.capabilities.map((capability, idx) => (
-                        <li key={idx} className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <span>{capability}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                    <p
+                      className={
+                        isPro
+                          ? "mt-2 text-xs leading-[1.6] text-[#9FB9AC]"
+                          : "mt-2 text-xs leading-[1.6] text-ledger-muted"
+                      }
+                    >
+                      {planId === "free"
+                        ? copy("page.plans.free.priceNote")
+                        : billingInterval === "monthly"
+                          ? copy("page.billedMonthly")
+                          : String(
+                              t("page.annualMonthly", {
+                                amount: `RM ${(PLAN_PRICES[planId].annual / 12).toFixed(2)}`,
+                              }),
+                            )}
+                    </p>
 
-                  {/* Collaboration */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      {t('features.list.collaboration.title')}
-                    </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tier.features.collaboration.map((collab, idx) => (
-                        <li key={idx} className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <span>{collab}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                    {renderPlanCta(planId, isCurrent)}
 
-                  {/* Analytics */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      {t('features.list.exports.title')}
-                    </h3>
-                    <ul className="space-y-1 text-sm">
-                      {tier.features.analytics.map((analytic, idx) => (
-                        <li key={idx} className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <span>{analytic}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Limitations */}
-                  {tier.limitations && (
-                    <div>
-                      <h3 className="font-semibold mb-3 text-muted-foreground">Limitations</h3>
-                      <ul className="space-y-1 text-sm">
-                        {tier.limitations.map((limitation, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-muted-foreground">
-                            <X className="h-4 w-4 text-red-500 flex-shrink-0" />
-                            <span>{limitation}</span>
+                    <ul
+                      className={
+                        isPro
+                          ? "mt-[22px] grid gap-2.5 border-t border-[rgba(241,242,238,0.18)] pt-[18px]"
+                          : "mt-[22px] grid gap-2.5 border-t border-ledger-line pt-[18px]"
+                      }
+                    >
+                      {planFeatures[planId].map((feature) =>
+                        feature.off ? (
+                          <li
+                            key={feature.text}
+                            className={
+                              isPro
+                                ? "flex items-start gap-[9px] text-sm leading-[1.45] text-[#87A497]"
+                                : "flex items-start gap-[9px] text-sm leading-[1.45] text-ledger-muted"
+                            }
+                          >
+                            <MinusIcon
+                              className={
+                                isPro
+                                  ? "mt-[3px] h-4 w-4 shrink-0 text-[#87A497]"
+                                  : "mt-[3px] h-4 w-4 shrink-0 text-ledger-line-strong"
+                              }
+                            />
+                            <span>{feature.text}</span>
                           </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Support */}
-                  {tier.features.support && (
-                    <div className="pt-4 border-t">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Shield className="h-4 w-4 text-blue-500" />
-                        <span className="font-medium">{tier.features.support}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CTA Button */}
-                  <div className="pt-6">
-                    {user ? (
-                      <Button
-                        onClick={() => handleSubscribe(tier.id)}
-                        disabled={isLoading || (subscriptionData?.status === 'active' && tier.id === subscriptionData?.tier)}
-                        className={`w-full ${tier.popular ? 'bg-primary hover:bg-primary/90' : ''}`}
-                        variant={tier.popular ? 'default' : 'outline'}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (() => {
-                          const currentTier = subscriptionData?.tier || 'free';
-                          const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
-                          const isCurrentPlan = subscriptionData?.status === 'active' && tier.id === currentTier;
-                          const isDowngrade = tierHierarchy[tier.id as keyof typeof tierHierarchy] < tierHierarchy[currentTier];
-                          const isUpgrade = tierHierarchy[tier.id as keyof typeof tierHierarchy] > tierHierarchy[currentTier];
-
-                          if (isCurrentPlan) {
-                            return t('cta.button');
-                          } else if (isDowngrade) {
-                            return t('cta.contact', { plan: tier.name });
-                          } else if (isUpgrade) {
-                            return t('cta.button', { plan: tier.name });
-                          } else {
-                            return tier.id === 'free' ? t('plans.free.cta') : t('cta.button');
-                          }
-                        })()}
-                      </Button>
-                    ) : (
-                      <Button
-                        asChild
-                        className={`w-full ${tier.popular ? 'bg-primary hover:bg-primary/90' : ''}`}
-                        variant={tier.popular ? 'default' : 'outline'}
-                      >
-                        <Link to="/auth">
-                          {tier.id === 'free' ? t('plans.free.cta') : t('cta.button')}
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Feature Comparison Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-16 text-center"
-        >
-          <Collapsible open={isComparisonOpen} onOpenChange={setIsComparisonOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="text-lg">
-                {t('features.subtitle')}
-                <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isComparisonOpen ? 'rotate-180' : ''}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-8">
-              <Card className="p-6">
-                <FeatureComparisonTable tiers={pricingTiers} t={t} />
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
-        </motion.div>
-
-        {/* FAQ Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-24 text-center"
-        >
-          <h2 className="text-3xl font-bold mb-8">{t('faq.title')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <Card className="glass-card text-left">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('faq.items.billing.question')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t('faq.items.billing.answer')}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card text-left">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('faq.items.limits.question')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t('faq.items.limits.answer')}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card text-left">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('faq.items.refund.question')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t('faq.items.refund.answer')}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card text-left">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('faq.items.support.question')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  {t('faq.items.support.answer')}
-                </p>
-              </CardContent>
-            </Card>
+                        ) : (
+                          <li
+                            key={feature.text}
+                            className={
+                              isPro
+                                ? "flex items-start gap-[9px] text-sm leading-[1.45] text-[#D7E3DC]"
+                                : "flex items-start gap-[9px] text-sm leading-[1.45] text-ledger-ink-2"
+                            }
+                          >
+                            <CheckMark
+                              className={
+                                isPro
+                                  ? "mt-[3px] h-4 w-4 shrink-0 text-[#8FE0B7]"
+                                  : "mt-[3px] h-4 w-4 shrink-0 text-ledger-accent"
+                              }
+                            />
+                            <span>{feature.text}</span>
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  </article>
+                );
+              })}
+            </div>
+            <p className="mt-6 text-center text-[0.8125rem] text-ledger-muted">
+              {copy("page.note")}
+            </p>
           </div>
-        </motion.div>
+        </section>
 
-
-
-        {/* Contact Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="mt-16 text-center"
+        <section
+          id="compare"
+          className="scroll-mt-[164px] border-t border-ledger-line py-14 min-[881px]:scroll-mt-[84px] min-[881px]:py-[72px]"
         >
-          <p className="text-muted-foreground mb-4">
-            {t('cta.subtitle')}
-          </p>
-          <Button variant="outline" asChild>
-            <Link to="/contact">{t('cta.contact')}</Link>
-          </Button>
-        </motion.div>
-      </div>
-
-      {/* Downgrade Confirmation Dialog */}
-      <Dialog open={downgradeDialog.isOpen} onOpenChange={(open) => !open && !downgradeDialog.isProcessing && handleDowngradeCancel()}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{t('cta.title')}</DialogTitle>
-            <DialogDescription>
-              {t('cta.subtitle', { plan: downgradeDialog.tierName })}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <div className="space-y-4">
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">{t('faq.items.limits.question')}</h4>
-                <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-                  {downgradeDialog.targetTier === 'free' ? (
-                    <>
-                      <li>• Your subscription will be canceled</li>
-                      <li>• You'll lose access to premium features</li>
-                      <li>• Data retention will be limited to 7 days</li>
-                      <li>• Monthly receipt limit will be reduced to 50</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>• You'll lose access to higher-tier features</li>
-                      <li>• Your monthly limits will be reduced</li>
-                      <li>• You'll receive a prorated credit for unused time</li>
-                    </>
-                  )}
-                </ul>
+          <div className={shell}>
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-8">
+              <div>
+                <p className={eyebrow}>{copy("page.compare.eyebrow")}</p>
+                <h2 className={`${sectionTitle} mt-3.5`}>
+                  {copy("page.compare.title")}
+                </h2>
               </div>
+              <p className={`${sectionLede} max-w-[44ch]`}>
+                {copy("page.compare.lede")}
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {t('faq.items.billing.answer')}
-                </p>
+            <div className="overflow-hidden rounded-xl border border-ledger-line bg-ledger-surface max-[760px]:rounded-[10px]">
+              <div
+                className="overflow-x-auto outline-offset-[-2px]"
+                tabIndex={0}
+                role="region"
+                aria-label={copy("page.compare.tableLabel")}
+              >
+                <table className="w-full border-separate border-spacing-0 max-[760px]:block max-[760px]:min-w-0">
+                  <caption className="sr-only">
+                    {copy("page.compare.caption")}
+                  </caption>
+                  <thead className="max-[760px]:sr-only">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="w-[280px] border-b border-ledger-line bg-ledger-surface-2 px-[18px] py-3.5 text-left font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-muted"
+                      >
+                        {copy("page.compare.columns.feature")}
+                      </th>
+                      <th
+                        scope="col"
+                        className="border-b border-ledger-line bg-ledger-surface-2 px-[18px] py-3.5 text-center font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-muted"
+                      >
+                        {copy("page.compare.columns.free")}
+                      </th>
+                      <th
+                        scope="col"
+                        className="border-b border-ledger-line bg-ledger-surface-2 px-[18px] py-3.5 text-center font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-muted"
+                      >
+                        {copy("page.compare.columns.pro")}
+                      </th>
+                      <th
+                        scope="col"
+                        className="border-b border-ledger-line bg-ledger-surface-2 px-[18px] py-3.5 text-center font-data text-[0.625rem] uppercase tracking-[0.12em] text-ledger-muted"
+                      >
+                        {copy("page.compare.columns.max")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="max-[760px]:block">
+                    {compareGroups.map((group) => (
+                      <Fragment key={group.label}>
+                        <tr className="max-[760px]:block">
+                          <th
+                            colSpan={4}
+                            scope="colgroup"
+                            className="bg-ledger-surface-2 px-[18px] py-2.5 text-center font-data text-[0.625rem] font-medium uppercase tracking-[0.12em] text-ledger-muted max-[760px]:block max-[760px]:border-b max-[760px]:border-ledger-line max-[760px]:px-4 max-[760px]:text-[0.5625rem] max-[760px]:tracking-[0.09em]"
+                          >
+                            {group.label}
+                          </th>
+                        </tr>
+                        {group.rows.map((row, rowIndex) => (
+                          <tr
+                            key={row.label}
+                            className="max-[760px]:grid max-[760px]:grid-cols-3 max-[760px]:border-b max-[760px]:border-ledger-line max-[760px]:pb-3 max-[760px]:pt-3.5 max-[760px]:last:border-b-0 [&:last-child>th]:border-b-0 [&:last-child>td]:border-b-0"
+                          >
+                            <th
+                              scope="row"
+                              className="sticky left-0 z-[1] min-w-[240px] border-b border-r border-ledger-line bg-ledger-surface px-[18px] py-3 text-left text-sm font-medium leading-[1.6] text-ledger-ink-2 max-[760px]:static max-[760px]:col-span-3 max-[760px]:min-w-0 max-[760px]:border-0 max-[760px]:bg-transparent max-[760px]:px-4 max-[760px]:pb-2.5 max-[760px]:pt-0 max-[760px]:text-[0.9375rem] max-[760px]:font-semibold max-[760px]:text-ledger-ink"
+                            >
+                              {row.label}
+                            </th>
+                            <td className={`${compareCellClass} max-[760px]:pl-4`}>
+                              <span
+                                aria-hidden="true"
+                                className={`${compareMobileLabel} text-ledger-muted`}
+                              >
+                                {copy("page.compare.columns.free")}
+                              </span>
+                              <CompareCellValue
+                                value={row.free}
+                                strong={rowIndex === 0}
+                                includedLabel={copy("page.compare.included")}
+                                notIncludedLabel={copy("page.compare.notIncluded")}
+                              />
+                            </td>
+                            <td className={compareCellClass}>
+                              <span
+                                aria-hidden="true"
+                                className={`${compareMobileLabel} max-[760px]:font-medium max-[760px]:text-ledger-accent`}
+                              >
+                                {copy("page.compare.columns.pro")}
+                              </span>
+                              <CompareCellValue
+                                value={row.pro}
+                                strong={rowIndex === 0}
+                                includedLabel={copy("page.compare.included")}
+                                notIncludedLabel={copy("page.compare.notIncluded")}
+                              />
+                            </td>
+                            <td className={`${compareCellClass} max-[760px]:pr-4`}>
+                              <span
+                                aria-hidden="true"
+                                className={`${compareMobileLabel} text-ledger-muted`}
+                              >
+                                {copy("page.compare.columns.max")}
+                              </span>
+                              <CompareCellValue
+                                value={row.max}
+                                strong={rowIndex === 0}
+                                includedLabel={copy("page.compare.included")}
+                                notIncludedLabel={copy("page.compare.notIncluded")}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        </section>
 
-          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <section className="border-t border-ledger-line py-[72px]">
+          <div
+            className={`${shell} grid grid-cols-1 items-start gap-7 min-[881px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] min-[881px]:gap-14`}
+          >
+            <div>
+              <p className={eyebrow}>{copy("page.faq.eyebrow")}</p>
+              <h2 className={`${sectionTitle} mb-4 mt-3.5`}>
+                {copy("page.faq.title")}
+              </h2>
+              <p className={`${sectionLede} max-w-[46ch]`}>
+                {copy("page.faq.lede")}
+              </p>
+            </div>
+
+            <div className="border-t border-ledger-line-strong">
+              {faqItems.map((item) => (
+                <details
+                  key={item.question}
+                  className="group border-b border-ledger-line"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-[18px] text-base font-semibold leading-[1.6] text-ledger-ink [&::-webkit-details-marker]:hidden">
+                    {item.question}
+                    <PlusIcon className="h-[18px] w-[18px] shrink-0 text-ledger-muted transition-transform group-open:rotate-45" />
+                  </summary>
+                  <div className="max-w-[62ch] pb-5 text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                    <p>{item.answer}</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <MarketingCtaBand
+          eyebrow={copy("page.cta.eyebrow")}
+          title={copy("page.cta.title")}
+          lede={copy("page.cta.lede")}
+          primary={{ label: copy("page.cta.workspace"), to: workspaceTarget }}
+          secondary={{ label: copy("page.cta.features"), to: "/features" }}
+        />
+      </main>
+
+      <MarketingFooter />
+
+      <Dialog
+        open={downgradeDialog.isOpen}
+        onOpenChange={(open) =>
+          !open && !downgradeDialog.isProcessing && handleDowngradeCancel()
+        }
+      >
+        <DialogContent className="border-ledger-line bg-ledger-surface text-ledger-ink sm:max-w-[470px]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-[2rem] font-normal leading-[1.05] tracking-[-0.02em]">
+              {copy("page.downgrade.title")}
+            </DialogTitle>
+            <DialogDescription className="mt-1.5 text-sm text-ledger-muted">
+              {String(
+                t("page.downgrade.description", {
+                  plan: downgradeDialog.tierName,
+                }),
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-1 rounded-lg border border-ledger-line bg-ledger-surface-2 p-4">
+            <h4 className="mb-3 text-sm font-semibold text-ledger-ink">
+              {downgradeDialog.targetTier === "free"
+                ? copy("page.downgrade.freeWarningTitle")
+                : String(
+                    t("page.downgrade.paidWarningTitle", {
+                      plan: downgradeDialog.tierName,
+                    }),
+                  )}
+            </h4>
+            <ul className="grid gap-2">
+              {downgradeWarnings.map((warning) => (
+                <li
+                  key={warning}
+                  className="flex items-start gap-2 text-[0.8125rem] leading-[1.5] text-ledger-ink-2"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-ledger-accent"
+                  />
+                  <span>{warning}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="text-xs leading-[1.55] text-ledger-muted">
+            {copy("page.downgrade.billingNote")}
+          </p>
+
+          <DialogFooter className="mt-1 gap-2 sm:gap-2">
             <Button
-              variant="outline"
+              type="button"
+              variant="accent-outline"
               onClick={handleDowngradeCancel}
               disabled={downgradeDialog.isProcessing}
-              className="w-full sm:w-auto order-3 sm:order-1"
+              className="h-[46px] rounded-lg border-ledger-line-strong px-5 text-[0.9375rem] font-semibold"
             >
-              {t('faq.items.billing.answer')}
+              {copy("page.downgrade.cancel")}
             </Button>
             <Button
-              variant="secondary"
-              onClick={() => handleDowngradeConfirm(false)}
+              type="button"
+              variant="accent"
+              onClick={handleDowngradeConfirm}
               disabled={downgradeDialog.isProcessing}
-              className="w-full sm:w-auto order-2 sm:order-2"
+              className="h-[46px] rounded-lg px-5 text-[0.9375rem] font-semibold"
             >
               {downgradeDialog.isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('cta.button')}
-                </>
-              ) : (
-                t('cta.contact')
-              )}
-            </Button>
-            <Button
-              onClick={() => handleDowngradeConfirm(true)}
-              disabled={downgradeDialog.isProcessing}
-              className="w-full sm:w-auto order-1 sm:order-3"
-            >
-              {downgradeDialog.isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('cta.button')}
-                </>
-              ) : (
-                t('cta.button')
-              )}
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {copy("page.downgrade.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

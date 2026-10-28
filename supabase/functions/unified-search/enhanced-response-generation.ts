@@ -25,6 +25,7 @@ export interface EnhancedResponseContext {
   searchResults: UnifiedSearchResult[];
   userProfile?: any;
   conversationHistory?: string[];
+  responseLanguage?: 'en' | 'ms';
   metadata?: Record<string, any>;
   supabase?: any;
   user?: any;
@@ -675,9 +676,19 @@ function buildEnhancedPrompt(
 
   // Add conversation context
   if (context.conversationHistory && context.conversationHistory.length > 0) {
-    const recentHistory = context.conversationHistory.slice(-3).join('\n');
+    const recentHistory = context.conversationHistory
+      .slice(-3)
+      .map((entry) => String(entry).slice(0, 2000))
+      .join('\n');
     prompt += `\n\nRecent conversation:\n${recentHistory}`;
   }
+
+  // Match the language of the app UI
+  const responseLanguage =
+    context.responseLanguage === 'ms' ? 'Bahasa Malaysia (Malay)' : 'English';
+  prompt += `\n\nLANGUAGE REQUIREMENT:
+- Write the entire response in ${responseLanguage}.
+- Keep merchant names, item names and numbers unchanged.`;
 
   // Build user prompt with context substitution
   let userPrompt = strategy.userPromptTemplate;

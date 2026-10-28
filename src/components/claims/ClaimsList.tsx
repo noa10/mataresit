@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Eye, Check, X, Clock, DollarSign, ExternalLink } from 'lucide-react';
+import { Plus, Eye, Check, X, Clock, Banknote, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,7 @@ import {
   getClaimPriorityDisplayName,
 } from '@/types/claims';
 import { cn } from '@/lib/utils';
+import { formatCurrencySafe } from '@/utils/currency';
 
 interface ClaimsListProps {
   onCreateClaim?: () => void;
@@ -90,12 +91,8 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
   };
 
   // Format currency
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency: string) =>
+    formatCurrencySafe(amount, currency);
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -222,7 +219,7 @@ export function ClaimsList({ onCreateClaim, onViewClaim, onApproveClaim, onRejec
                     
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <Banknote className="h-4 w-4 text-muted-foreground" />
                         {formatCurrency(claim.amount, claim.currency)}
                       </div>
                     </TableCell>
