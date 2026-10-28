@@ -62,6 +62,33 @@ describe("documentationService localization", () => {
     expect(guide?.title).toBe("5-Minute Quick Start");
     expect(guide?.content).toBe("# Quick start");
     expect(guide?.contentFallback).toBe(false);
+    expect(guide?.sourcePath).toBe("/docs/user-guides/en/onboarding/quick-start-5min.md");
+  });
+
+  it("does not claim an English fallback or expose a source when neither language has markdown", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(response(false));
+
+    const guide = await documentationService.getGuide("quick-start-5min", "ms");
+
+    expect(guide?.content).toContain("placeholder");
+    expect(guide?.contentFallback).toBe(false);
+    expect(guide?.sourcePath).toBeUndefined();
+
+    consoleError.mockRestore();
+  });
+
+  it("does not expose a source when the requested English markdown is missing", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(response(false));
+
+    const guide = await documentationService.getGuide("quick-start-5min", "en");
+
+    expect(guide?.content).toContain("placeholder");
+    expect(guide?.contentFallback).toBe(false);
+    expect(guide?.sourcePath).toBeUndefined();
+
+    consoleError.mockRestore();
   });
 
   it("treats the SPA index.html as a miss instead of rendering it as guide content", async () => {

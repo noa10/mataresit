@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -36,6 +36,7 @@ vi.mock("react-helmet-async", () => ({
 }));
 
 const translations: Record<string, string> = {
+  "meta.description": "Your complete guide to using Mataresit.",
   "guide.backToDocs": "Back to Docs",
   "guide.notFoundTitle": "Guide not found",
   "guide.notFoundDescription": "The requested guide could not be found or loaded.",
@@ -156,6 +157,59 @@ describe("GuideDetailPage quick actions", () => {
     expect(toastSuccess).toHaveBeenCalledWith("Guide bookmarked");
 
     openSpy.mockRestore();
+  });
+
+  it("does not offer a source action for generated content", async () => {
+    getGuide.mockResolvedValue({ ...guide, sourcePath: undefined });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    renderPage();
+    await screen.findByRole("heading", { name: guide.title });
+
+    expect(screen.queryByRole("button", { name: "View Source" })).not.toBeInTheDocument();
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it("keeps the accessible shell and updates metadata from loading to a missing guide", async () => {
+    let resolveGuide: (value: null) => void = () => {};
+    const promise = new Promise<null>((resolve) => {
+      resolveGuide = resolve;
+    });
+    getGuide.mockImplementation(() => promise);
+    const { container } = renderPage();
+
+    const expectShell = () => {
+      expect(screen.getByTestId("marketing-header")).toBeInTheDocument();
+      expect(screen.getByTestId("marketing-footer")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute("href", "#main");
+      expect(screen.getByRole("main")).toHaveAttribute("id", "main");
+    };
+    expectShell();
+    expect(screen.getByRole("status", { name: "Loading guide…" })).toBeInTheDocument();
+    expect(container.querySelector("title")).toHaveTextContent("Loading guide… - Mataresit");
+    expect(container.querySelector('meta[name="description"]')).toHaveAttribute("content", translations["meta.description"]);
+
+    await act(async () => {
+      resolveGuide(null);
+      await promise;
+    });
+
+    expectShell();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Guide not found" })).toBeInTheDocument()
+    );
+    expect(container.querySelector("title")).toHaveTextContent("Guide not found - Mataresit");
+    expect(container.querySelector('meta[name="description"]')).toHaveAttribute("content", translations["guide.notFoundDescription"]);
+  });
+
+  it("uses guide metadata after loading", async () => {
+    const { container } = renderPage();
+    await screen.findByRole("heading", { name: guide.title });
+    expect(screen.getByTestId("marketing-footer")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute("href", "#main");
+    expect(container.querySelector("title")).toHaveTextContent(`${guide.title} - Mataresit`);
+    expect(container.querySelector('meta[name="description"]')).toHaveAttribute("content", guide.description);
   });
 
   it("shows the English fallback notice for an untranslated Malay guide", async () => {

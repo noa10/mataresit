@@ -155,9 +155,8 @@ export default function GuideDetailPage() {
   };
 
   const handleViewSource = () => {
-    if (!guide) return;
-    const sourcePath = guide.sourcePath ?? guide.path;
-    window.open(sourcePath, '_blank', 'noopener,noreferrer');
+    if (!guide?.sourcePath) return;
+    window.open(guide.sourcePath, '_blank', 'noopener,noreferrer');
   };
 
   const toggleBookmark = () => {
@@ -205,56 +204,22 @@ export default function GuideDetailPage() {
     </Link>
   );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
-        <MarketingHeader />
-        <main id="main" className={`${shell} py-14`}>
-          {backLink}
-          <div
-            role="status"
-            aria-label={String(t('guide.loading'))}
-            className="flex min-h-[320px] items-center justify-center"
-          >
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-line border-b-ledger-accent" />
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (error || !guide) {
-    return (
-      <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
-        <MarketingHeader />
-        <main id="main" className={`${shell} py-14`}>
-          {backLink}
-          <div className="mt-10 rounded-2xl border border-ledger-line bg-ledger-surface px-6 py-12 text-center">
-            <h1 className="font-display text-[clamp(1.7rem,2.6vw,2.2rem)] font-normal leading-[1.1] tracking-[-0.018em] text-ledger-ink">
-              {String(t('guide.notFoundTitle'))}
-            </h1>
-            <p className="mx-auto mt-3 max-w-[52ch] text-[0.9375rem] leading-[1.65] text-ledger-muted">
-              {String(t('guide.notFoundDescription'))}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/docs')}
-              className="mt-6 inline-flex items-center gap-2 rounded-[7px] bg-ledger-accent px-4 py-2.5 text-sm font-semibold text-ledger-paper transition-colors hover:bg-ledger-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              {String(t('guide.backToDocs'))}
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const pageTitle = loading
+    ? String(t('guide.loading'))
+    : error || !guide
+      ? String(t('guide.notFoundTitle'))
+      : guide.title;
+  const pageDescription = loading
+    ? String(t('meta.description'))
+    : error || !guide
+      ? String(t('guide.notFoundDescription'))
+      : guide.description;
 
   return (
     <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
       <Helmet>
-        <title>{guide.title}</title>
-        <meta name="description" content={guide.description} />
+        <title>{`${pageTitle} - Mataresit`}</title>
+        <meta name="description" content={pageDescription} />
       </Helmet>
 
       <a
@@ -267,6 +232,39 @@ export default function GuideDetailPage() {
       <MarketingHeader />
 
       <main id="main">
+        {loading ? (
+          <div className={`${shell} py-14`}>
+            {backLink}
+            <div
+              role="status"
+              aria-label={String(t('guide.loading'))}
+              className="flex min-h-[320px] items-center justify-center"
+            >
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-line border-b-ledger-accent" />
+            </div>
+          </div>
+        ) : error || !guide ? (
+          <div className={`${shell} py-14`}>
+            {backLink}
+            <div className="mt-10 rounded-2xl border border-ledger-line bg-ledger-surface px-6 py-12 text-center">
+              <h1 className="font-display text-[clamp(1.7rem,2.6vw,2.2rem)] font-normal leading-[1.1] tracking-[-0.018em] text-ledger-ink">
+                {String(t('guide.notFoundTitle'))}
+              </h1>
+              <p className="mx-auto mt-3 max-w-[52ch] text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                {String(t('guide.notFoundDescription'))}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/docs')}
+                className="mt-6 inline-flex items-center gap-2 rounded-[7px] bg-ledger-accent px-4 py-2.5 text-sm font-semibold text-ledger-paper transition-colors hover:bg-ledger-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {String(t('guide.backToDocs'))}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Guide header */}
         <section className="border-b border-ledger-line">
           <div className={`${shell} pb-10 pt-10 min-[881px]:pb-12 min-[881px]:pt-12`}>
@@ -303,7 +301,7 @@ export default function GuideDetailPage() {
               </div>
             </div>
 
-            <div className="mt-7 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[0.6875rem] uppercase tracking-[0.1em] text-ledger-muted">
+            <div className="mt-7 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[0.6875rem] tracking-[0.1em] text-ledger-muted">
               <span>{categoryLabel}</span>
               {subcategoryLabel ? (
                 <>
@@ -323,7 +321,7 @@ export default function GuideDetailPage() {
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <span
-                className={`rounded-full px-2.5 py-1 font-data text-[0.625rem] font-medium uppercase tracking-[0.08em] ${
+                className={`rounded-full px-2.5 py-1 font-data text-[0.625rem] font-medium tracking-[0.08em] ${
                   difficultyTone[guide.difficulty] ?? 'bg-ledger-surface-2 text-ledger-ink-2'
                 }`}
               >
@@ -337,7 +335,7 @@ export default function GuideDetailPage() {
 
               <span className="flex items-center gap-1.5 text-sm text-ledger-muted">
                 {getUserTypeIcon(guide.userType)}
-                <span className="capitalize">{userTypeLabel}</span>
+                <span>{userTypeLabel}</span>
               </span>
 
               <span className="text-sm text-ledger-muted">
@@ -404,10 +402,12 @@ export default function GuideDetailPage() {
                     {String(t('guide.quickActions'))}
                   </h2>
                   <div className="grid gap-1.5">
-                    <button type="button" className={actionButtonClass} onClick={handleViewSource}>
-                      <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      {String(t('guide.actions.viewSource'))}
-                    </button>
+                    {guide.sourcePath ? (
+                      <button type="button" className={actionButtonClass} onClick={handleViewSource}>
+                        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {String(t('guide.actions.viewSource'))}
+                      </button>
+                    ) : null}
                     <button type="button" className={actionButtonClass} onClick={handleShare}>
                       <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
                       {String(t('guide.actions.share'))}
@@ -443,7 +443,7 @@ export default function GuideDetailPage() {
                     ].map(([label, value]) => (
                       <div key={label} className="grid gap-0.5">
                         <dt className="text-xs text-ledger-muted">{label}</dt>
-                        <dd className="capitalize text-[0.875rem] text-ledger-ink">{value}</dd>
+                        <dd className="text-[0.875rem] text-ledger-ink">{value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -452,6 +452,8 @@ export default function GuideDetailPage() {
             </aside>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       <MarketingFooter />

@@ -9,9 +9,9 @@ export interface DocumentationGuide {
   subcategory?: string;
   path: string;
   content?: string;
-  /** Language actually used for the markdown body (may fall back to English). */
+  /** True only when an English markdown file was successfully substituted for the requested language. */
   contentFallback?: boolean;
-  /** Path of the markdown that was actually loaded. */
+  /** Path of the fetched markdown file; undefined when only generated placeholder content exists. */
   sourcePath?: string;
   lastUpdated: string;
   readingTime: number;
@@ -68,21 +68,22 @@ class DocumentationService {
         if (!guide.content) {
           const localized = await markdownLoader.loadMarkdown(guide.path);
           let content = localized.content;
-          let sourcePath = guide.path;
-          const needsEnglishFallback = localized.fallback === true && language !== 'en';
+          let sourcePath: string | undefined = localized.fallback === true ? undefined : guide.path;
+          let contentFallback = false;
 
-          if (needsEnglishFallback) {
+          if (localized.fallback === true && language !== 'en') {
             const englishPath = guide.path.replace(`/${language}/`, '/en/');
             const english = await markdownLoader.loadMarkdown(englishPath);
             if (english.fallback !== true) {
               content = english.content;
               sourcePath = englishPath;
+              contentFallback = true;
             }
           }
 
           guide.content = content;
           guide.sourcePath = sourcePath;
-          guide.contentFallback = needsEnglishFallback;
+          guide.contentFallback = contentFallback;
         }
         return guide;
       }

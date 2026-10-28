@@ -175,6 +175,21 @@ const interpolationSettings = {
   escapeValue: false, // React already escapes values
 };
 
+const getInitialLanguage = (): SupportedLanguage => {
+  try {
+    const saved = localStorage.getItem('mataresit_language');
+    return saved === 'en' || saved === 'ms' ? saved : 'en';
+  } catch {
+    return 'en';
+  }
+};
+
+const initialLanguage = getInitialLanguage();
+
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = initialLanguage;
+}
+
 // Initialize i18next with advanced features
 i18n
   .use(HttpBackend)
@@ -182,7 +197,7 @@ i18n
   .use(initReactI18next)
   .init({
     // Language settings
-    lng: 'en', // Default language
+    lng: initialLanguage, // Honour the saved preference, default to English
     fallbackLng: 'en', // Fallback language
     supportedLngs: Object.keys(SUPPORTED_LANGUAGES), // Updated from whitelist
 
