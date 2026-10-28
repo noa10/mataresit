@@ -96,4 +96,33 @@ describe("documentationService localization", () => {
 
     consoleError.mockRestore();
   });
+
+  it("serves a real Malay body for every guide that has source markdown", async () => {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
+    fetchMock.mockImplementation(async (path: string) => {
+      try {
+        return response(true, readFileSync(join(process.cwd(), "public", path), "utf8"));
+      } catch {
+        return response(false);
+      }
+    });
+
+    const structure = await documentationService.getDocumentationStructure("ms");
+    const guides = structure.categories.flatMap((category) => category.guides);
+    const withSource = guides.filter((guide) =>
+      existsSync(join(process.cwd(), "public", guide.path.replace("/ms/", "/en/")))
+    );
+
+    expect(withSource.length).toBeGreaterThan(0);
+
+    for (const guide of withSource) {
+      const loaded = await documentationService.getGuide(guide.id, "ms");
+
+      expect(loaded?.contentFallback, `${guide.id} has no Malay translation`).toBe(false);
+      expect(loaded?.sourcePath).toBe(guide.path);
+      expect(loaded?.content?.trim().startsWith("#")).toBe(true);
+    }
+  });
 });
