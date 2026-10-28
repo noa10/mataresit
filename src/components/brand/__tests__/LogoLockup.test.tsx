@@ -44,21 +44,21 @@ describe("LogoLockup", () => {
     const { container, rerender } = renderLockup(<LogoLockup />);
     const markWrapper = () => container.querySelector('svg[data-mark="mataresit"]')!.parentElement!;
 
-    expect(markWrapper().className).toContain("h-8");
+    expect(markWrapper().className).toContain("h-9");
 
     rerender(
       <MemoryRouter>
         <LogoLockup markSize="sm" />
       </MemoryRouter>,
     );
-    expect(markWrapper().className).toContain("h-7");
+    expect(markWrapper().className).toContain("h-8");
 
     rerender(
       <MemoryRouter>
         <LogoLockup markSize="lg" />
       </MemoryRouter>,
     );
-    expect(markWrapper().className).toContain("h-9");
+    expect(markWrapper().className).toContain("h-10");
   });
 
   it("renders an in-page anchor when href is supplied", () => {
