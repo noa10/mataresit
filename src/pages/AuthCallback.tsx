@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthTranslation } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 
 /**
  * This component is a special handler for auth callbacks, particularly for password reset flows.
@@ -62,19 +63,11 @@ export default function AuthCallback() {
 
   return (
     <div className="flex min-h-svh flex-col bg-ledger-paper px-5 py-4 text-ledger-ink min-[980px]:px-8">
-      <Link
-        to="/"
-        aria-label="Mataresit home"
-        className="inline-flex w-fit items-center gap-2.5 rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-ink"
-      >
-        <span
-          aria-hidden="true"
-          className="grid h-8 w-8 place-items-center rounded-[7px] bg-ledger-ink pt-0.5 font-display text-[1.35rem] leading-none text-ledger-paper"
-        >
-          M
-        </span>
-        <span>Mataresit</span>
-      </Link>
+      <LogoLockup
+        label="Mataresit home"
+        className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
+        wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-ink"
+      />
 
       <main className="flex flex-1 items-center justify-center pb-16">
         {isLoading ? (

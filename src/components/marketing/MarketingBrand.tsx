@@ -1,31 +1,25 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 
 const brandClassName =
-  "inline-flex min-h-11 items-center gap-2.5 text-[1.0625rem] [font-weight:650] tracking-[-0.01em] text-ledger-ink";
+  "min-h-11 text-[1.0625rem] [font-weight:650] tracking-[-0.01em] text-ledger-ink";
 
-const markClassName =
-  "grid h-8 w-8 place-items-center rounded-[7px] bg-ledger-ink pt-0.5 font-display text-[1.35rem] leading-none text-ledger-paper";
+const wordmarkClassName = "text-[1.0625rem] [font-weight:650] tracking-[-0.01em]";
 
+/**
+ * Marketing-site brand link. On the landing page it scrolls back to the top
+ * instead of pushing a new history entry; elsewhere it navigates home.
+ */
 export function MarketingBrand({ label = "Mataresit home" }: { label?: string }) {
   const { pathname } = useLocation();
 
-  if (pathname === "/") {
-    return (
-      <a href="#top" aria-label={label} className={brandClassName}>
-        <span aria-hidden="true" className={markClassName}>
-          M
-        </span>
-        <span>Mataresit</span>
-      </a>
-    );
-  }
-
   return (
-    <Link to="/" aria-label={label} className={brandClassName}>
-      <span aria-hidden="true" className={markClassName}>
-        M
-      </span>
-      <span>Mataresit</span>
-    </Link>
+    <LogoLockup
+      href={pathname === "/" ? "#top" : undefined}
+      to="/"
+      label={label}
+      className={brandClassName}
+      wordmarkClassName={wordmarkClassName}
+    />
   );
 }
