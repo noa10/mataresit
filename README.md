@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./public/mataresit-icon.png" alt="Mataresit logo" width="96" />
+  <img src="./public/mataresit-mark.svg" alt="Mataresit logo" width="96" />
   <h1>Mataresit</h1>
   <p><strong>AI-assisted receipt processing and expense management</strong></p>
   <p>Turn receipt images into structured, searchable expense records.</p>
