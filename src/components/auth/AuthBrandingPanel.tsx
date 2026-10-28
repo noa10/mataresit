@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
@@ -9,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuthTranslation } from "@/contexts/LanguageContext";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 
 interface FeatureItemProps {
   icon: LucideIcon;
@@ -68,19 +68,12 @@ export function AuthBrandingPanel() {
       aria-label="About Mataresit"
       className="flex flex-col gap-2 border-b border-white/10 bg-ledger-panel px-5 pb-5 pt-4 text-ledger-on-panel dark:bg-ledger-surface min-[980px]:min-h-svh min-[980px]:gap-7 min-[980px]:border-b-0 min-[980px]:border-r min-[980px]:border-white/10 min-[980px]:px-8 min-[980px]:pb-8 min-[980px]:pt-7 min-[1180px]:px-12 min-[1180px]:pb-9 min-[1180px]:pt-[30px]"
     >
-      <Link
-        to="/"
-        aria-label="Mataresit home"
-        className="inline-flex w-fit items-center gap-2.5 rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-on-panel focus-visible:outline-ledger-on-panel"
-      >
-        <span
-          aria-hidden="true"
-          className="grid h-8 w-8 place-items-center rounded-[7px] bg-ledger-on-panel pt-0.5 font-display text-[1.35rem] leading-none text-ledger-panel"
-        >
-          M
-        </span>
-        <span>Mataresit</span>
-      </Link>
+      <LogoLockup
+        label="Mataresit home"
+        tone="on-panel"
+        className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
+        wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-on-panel"
+      />
 
       <div className="grid gap-1 min-[980px]:my-0 min-[980px]:flex-1 min-[980px]:place-content-center min-[980px]:justify-items-center min-[980px]:gap-[clamp(28px,5vh,52px)] min-[980px]:py-4">
         <p className="mt-2 max-w-[34ch] font-display text-[1.15rem] font-normal leading-[1.16] tracking-[-0.015em] text-ledger-on-panel min-[980px]:mt-0 min-[980px]:max-w-[24ch] min-[980px]:text-center min-[980px]:text-[clamp(1.6rem,2.1vw,2.05rem)]">

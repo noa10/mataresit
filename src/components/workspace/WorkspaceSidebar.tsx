@@ -23,6 +23,7 @@ import { useWorkspaceReceiptCounts } from "@/hooks/useDashboardSummary";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import { claimService } from "@/services/claimService";
 import { cn } from "@/lib/utils";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -106,15 +107,13 @@ export function WorkspaceSidebar() {
       className="sticky top-0 hidden h-screen w-[252px] flex-col gap-6 overflow-hidden border-r border-black/20 bg-ledger-panel px-3.5 pb-4 pt-[18px] text-ledger-on-panel min-[980px]:flex"
     >
       <div>
-        <Link
+        <LogoLockup
           to="/dashboard"
-          className="inline-flex items-center gap-2.5 rounded-md px-1.5 py-1 text-ledger-on-panel"
-        >
-          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[6px] bg-white/[0.12] font-display text-[1.05rem] leading-none">
-            M
-          </span>
-          <span className="font-display text-[1.1rem] leading-none">Mataresit</span>
-        </Link>
+          markSize="sm"
+          tone="on-panel"
+          className="px-1.5 py-1 text-ledger-on-panel"
+          wordmarkClassName="font-display text-[1.1rem] text-ledger-on-panel"
+        />
       </div>
 
       <nav aria-label={t("sidebar.navigation")} className="min-h-0 flex-1 overflow-y-auto pb-2">

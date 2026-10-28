@@ -12,6 +12,7 @@ import { Badge } from "./ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 import { TeamSelector } from "@/components/team/TeamSelector";
 import { CompactChatHistory } from "@/components/chat/CompactChatHistory";
 import { cn } from "@/lib/utils";
@@ -84,10 +85,10 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
             </div>
           )}
 
-          <NavLink to="/" className="flex items-center gap-2 text-xl font-bold text-foreground hover:text-primary transition-colors">
-            <img src="/mataresit-icon.png" alt="Mataresit Logo" className="h-7 w-7" />
-            <span>Mataresit</span>
-          </NavLink>
+          <LogoLockup
+            className="text-xl font-bold text-foreground hover:text-primary transition-colors"
+            wordmarkClassName="font-bold"
+          />
 
           {getTierBadge()}
 

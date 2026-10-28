@@ -365,11 +365,35 @@
   animation: marketing-resources-in 160ms ease-out;
 }
 
+/* ---------- Brand mark: the one interaction ----------
+   A single scan pass down the receipt on hover / keyboard focus, clipped to the
+   mark so it reads as the document being read. 620ms, one pass, then gone. */
+@keyframes mataresit-mark-scan {
+  0%   { transform: translateY(-3px); opacity: 0; }
+  12%  { opacity: .9; }
+  88%  { opacity: .9; }
+  100% { transform: translateY(24px); opacity: 0; }
+}
+
+.mataresit-mark__scan {
+  /* The bar is painted in the surface colour, so it wipes the mark as it
+     passes — that is what reads as the document being read. */
+  fill: var(--mark-scan-color, var(--ledger-surface));
+  opacity: 0;
+}
+
+.group:hover .mataresit-mark__scan,
+.group:focus-visible .mataresit-mark__scan {
+  animation: mataresit-mark-scan 620ms cubic-bezier(.45, .05, .35, 1) 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ledger-scanline { display: none; }
   .ledger-pulse-dot { animation: none; }
   .ledger-caret { animation: none; }
   .marketing-resources-panel { animation: none; }
+  .group:hover .mataresit-mark__scan,
+  .group:focus-visible .mataresit-mark__scan { animation: none; }
 }
 
 @layer base {
