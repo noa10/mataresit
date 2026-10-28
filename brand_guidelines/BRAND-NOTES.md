@@ -65,3 +65,22 @@ One interaction: a single **scan pass** down the receipt on hover or keyboard fo
 ## Known risk
 
 At 16 px the four rows compress to roughly one pixel each and the mark reads as a striped block rather than a receipt. That is a graceful failure — the silhouette still holds — but the metaphor only fully appears at 24 px and above. If favicon presence matters more than the detail, reducing to three rows would buy back clarity at small sizes.
+
+## Implementation
+
+Where this design lives in the app.
+
+| Piece | Location |
+| --- | --- |
+| Lockup (mark + wordmark) | `src/components/brand/LogoLockup.tsx` — the only definition. Navbar, marketing header/footer, auth panel, auth callback, workspace sidebar all render it. |
+| Mark geometry | `src/components/brand/MataresitMark.tsx` — single even-odd path, `currentColor`. Do not re-draw it anywhere else. |
+| Scan pass | `.mataresit-mark__scan` + `@keyframes mataresit-mark-scan` in `src/index.css`. The bar is painted in the surface colour so it wipes the mark as it passes. |
+| App assets | `public/mataresit-mark.svg` (seed colour, for `<img>`/favicon), `public/mataresit-icon.svg` (tile), `mataresit-{32,64,180,192,512}.png`, `mataresit-tile-{192,512}.png`, `mataresit-badge.png` (monochrome notification badge), `favicon.ico` (16/24/32/48). |
+| Asset generators | `tools/generate-brand-assets.cjs`, `tools/generate-favicon.cjs`, `tools/pack-favicon.cjs`. One-off; not part of the build. |
+
+Colour in code comes from the existing ledger tokens: `--ledger-accent` (`#0B6B4D` light, `#3FBF8E` dark) for the mark, with the dark-panel mint (`#3FBF8E`) applied directly on always-dark chrome such as the sidebar and auth panel, which never receive the `.dark` class.
+
+Two deliberate differences from this sheet:
+
+- **Wordmark font.** The sheet sets it in Instrument Sans SemiBold. In the app the wordmark stays in the product's display serif (Instrument Serif) for continuity with headings; only the mark was migrated.
+- **Sizes.** The lockup renders the mark at 26, 28, or 32 px. Nothing goes below the 16 px floor, and the 16 px favicon uses the mark alone.
