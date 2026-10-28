@@ -162,6 +162,11 @@ const App = () => (
                                           <NewDocumentationPage />
                                         </Suspense>
                                       } />
+                                      <Route path="/docs/guide/:guideId" element={
+                                        <Suspense fallback={<PageLoading />}>
+                                          <GuideDetailPage />
+                                        </Suspense>
+                                      } />
                                       <Route path="/api-reference" element={
                                         <Suspense fallback={<PageLoading />}>
                                           <ApiReferencePage />
@@ -185,11 +190,6 @@ const App = () => (
 
                                       {/* Public Routes with Layout */}
                                       <Route element={<PublicLayout />}>
-                                        <Route path="/docs/guide/:guideId" element={
-                                          <Suspense fallback={<PageLoading />}>
-                                            <GuideDetailPage />
-                                          </Suspense>
-                                        } />
                                         <Route path="/docs/legacy" element={
                                           <Suspense fallback={<PageLoading />}>
                                             <DocumentationPage />

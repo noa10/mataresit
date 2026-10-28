@@ -23,6 +23,18 @@ vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: toastError },
 }));
 
+vi.mock("@/components/marketing/MarketingHeader", () => ({
+  MarketingHeader: () => <header data-testid="marketing-header" />,
+}));
+
+vi.mock("@/components/marketing/MarketingFooter", () => ({
+  MarketingFooter: () => <footer data-testid="marketing-footer" />,
+}));
+
+vi.mock("react-helmet-async", () => ({
+  Helmet: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+}));
+
 const translations: Record<string, string> = {
   "guide.backToDocs": "Back to Docs",
   "guide.notFoundTitle": "Guide not found",
@@ -57,6 +69,9 @@ const translations: Record<string, string> = {
 
 vi.mock("@/contexts/LanguageContext", () => ({
   useLanguage: () => ({ language: "en" }),
+  useHomepageTranslation: () => ({
+    t: (key: string) => (key === "skipToContent" ? "Skip to content" : key),
+  }),
   useDocumentationTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
       let value = translations[key] ?? (options?.defaultValue as string | undefined) ?? key;
