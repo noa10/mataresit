@@ -7,8 +7,10 @@
 
 export interface MarkdownContent {
   content: string;
-  frontmatter?: Record<string, any>;
+  frontmatter?: Record<string, unknown>;
   lastModified?: Date;
+  /** True when the requested file could not be fetched and placeholder copy is returned. */
+  fallback?: boolean;
 }
 
 class MarkdownLoader {
@@ -28,12 +30,21 @@ class MarkdownLoader {
       // In development, we can try to load from the public directory
       // In production, this would need to be pre-built or served from an API
       const response = await fetch(path);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load markdown: ${response.status} ${response.statusText}`);
       }
 
+      const contentType = response.headers.get('content-type') ?? '';
       const content = await response.text();
+
+      // A missing markdown file is served by the SPA catch-all rewrite as
+      // index.html, which would otherwise render the app's own <link> tags as
+      // guide content. Treat HTML as a miss so the caller can fall back.
+      if (contentType.includes('text/html') || this.looksLikeHtmlDocument(content)) {
+        throw new Error(`Expected markdown but received HTML from ${path}`);
+      }
+
       const markdownContent: MarkdownContent = {
         content,
         lastModified: new Date()
@@ -49,11 +60,21 @@ class MarkdownLoader {
       // Return fallback content that references our comprehensive guides
       const fallbackContent: MarkdownContent = {
         content: this.generateFallbackContent(path),
-        lastModified: new Date()
+        lastModified: new Date(),
+        fallback: true
       };
       
       return fallbackContent;
     }
+  }
+
+  /**
+   * Detect an HTML document returned in place of markdown (e.g. the SPA
+   * index.html served by a catch-all rewrite for a missing guide).
+   */
+  private looksLikeHtmlDocument(content: string): boolean {
+    const head = content.trimStart().slice(0, 200).toLowerCase();
+    return head.startsWith('<!doctype html') || head.startsWith('<html');
   }
 
   /**
