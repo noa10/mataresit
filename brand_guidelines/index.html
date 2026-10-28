@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mataresit — Logo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Ledger palette, taken from the product itself */
+    --paper: #F1F2EE;
+    --surface: #FFFFFF;
+    --surface-2: #F6F7F3;
+    --ink: #121715;
+    --ink-2: #2B342F;
+    --muted: #59625B;
+    --line: #DCE0D8;
+    --line-strong: #C2C8BE;
+    --brand: #0B6B4D;
+    --brand-soft: #DFEFE6;
+    --panel: #101614;
+    --on-panel: #F1F2EE;
+    --on-panel-muted: #AEB9B2;
+
+    --font-sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-data: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+    --s9: 96px;
+    --radius: 10px;
+    --dur: 180ms;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: var(--s7) var(--s6) var(--s9);
+  }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s4) var(--s6);
+    padding-bottom: var(--s5);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    margin: 0 0 var(--s2);
+    font-family: var(--font-data);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 4.4vw, 40px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+  }
+
+  .masthead p {
+    max-width: 46ch;
+    margin: var(--s2) 0 0;
+    color: var(--muted);
+  }
+
+  .stamp {
+    font-family: var(--font-data);
+    font-size: 12px;
+    letter-spacing: .04em;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* ---------- Section rhythm ---------- */
+  section { margin-top: var(--s8); scroll-margin-top: var(--s5); }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s3);
+    margin-bottom: var(--s4);
+  }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-family: var(--font-data);
+  }
+
+  .section-head .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .section-head .note {
+    font-size: 14px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ---------- Hero lockup ---------- */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .hero-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    padding: var(--s7) var(--s5);
+  }
+
+  .hero-panel.light { background: var(--surface); }
+  .hero-panel.dark  { background: var(--panel); }
+
+  @media (min-width: 760px) {
+    .hero { grid-template-columns: 1fr 1fr; }
+  }
+
+  .lockup {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--ink);
+    border-radius: 6px;
+    text-decoration: none;
+  }
+
+  .lockup .glyph {
+    width: 64px;
+    height: 64px;
+    flex: none;
+    color: var(--brand);
+    display: block;
+  }
+
+  .lockup .word {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 46px;
+    line-height: 1;
+    letter-spacing: -.03em;
+    color: var(--ink);
+  }
+
+  .hero-panel.dark .lockup { color: var(--on-panel); }
+  .hero-panel.dark .lockup .glyph { color: #3FBF8E; }
+  .hero-panel.dark .lockup .word { color: var(--on-panel); }
+
+  /* The one interaction: a single pass of the scanner down the receipt.
+     The bar is clipped to the mark, so it reads as the document being read
+     rather than a decorative sweep. 620ms, ease-in-out, one pass per hover. */
+  @keyframes mark-scan {
+    0%   { transform: translateY(-3px); opacity: 0; }
+    12%  { opacity: .9; }
+    88%  { opacity: .9; }
+    100% { transform: translateY(24px); opacity: 0; }
+  }
+
+  .lockup .glyph .scan { transform: translateY(-3px); }
+
+  .lockup:hover .glyph .scan,
+  .lockup:focus-visible .glyph .scan {
+    animation: mark-scan 620ms cubic-bezier(.45, .05, .35, 1) 1;
+  }
+
+  .lockup:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 8px;
+  }
+
+  .hero-panel.dark .lockup:focus-visible { outline-color: #8FDDBE; }
+
+  /* ---------- Scale ladder ---------- */
+  .ladder {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--s3);
+  }
+
+  .rung {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--s4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .rung.dark { background: var(--panel); border-color: #26302B; }
+
+  .rung .stage {
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand);
+  }
+
+  .rung.dark .stage { color: #3FBF8E; }
+
+  .rung .stage svg { display: block; }
+
+  .rung .meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--font-data);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: var(--s2);
+  }
+
+  .rung.dark .meta { color: var(--on-panel-muted); border-top-color: #26302B; }
+
+  .rung .meta strong {
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+
+  .rung.dark .meta strong { color: var(--on-panel); }
+
+  /* ---------- One ink ---------- */
+  .inktest {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  @media (min-width: 760px) {
+    .inktest { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .inktest-cell {
+    padding: var(--s5) var(--s4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s4);
+    min-height: 148px;
+  }
+
+  .inktest-cell svg { width: 56px; height: 56px; display: block; }
+
+  .inktest-cell.on-white { background: #FFFFFF; }
+  .inktest-cell.on-paper { background: var(--paper); }
+  .inktest-cell.on-panel { background: var(--panel); }
+  .inktest-cell.on-dark  { background: #2B342F; }
+
+  .inktest-label {
+    font-family: var(--font-data);
+    font-size: 11px;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+
+  .inktest-cell.on-panel .inktest-label { color: var(--on-panel-muted); }
+  .inktest-cell.on-dark .inktest-label  { color: #C2C8BE; }
+
+  .readtest-note {
+    margin: var(--s3) 0 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 70ch;
+  }
+
+  /* ---------- Anatomy ---------- */
+  .anatomy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s4);
+    align-items: start;
+  }
+
+  @media (min-width: 760px) {
+    .anatomy { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--s5);
+  }
+
+  .anatomy-figure {
+    position: relative;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px) 0 0 / 12.5% 100%,
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px) 0 0 / 100% 12.5%,
+      var(--surface-2);
+    --grid: #E4E8E0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: var(--s5);
+  }
+
+  .anatomy-figure svg {
+    width: 100%;
+    height: 100%;
+    max-width: 300px;
+    max-height: 300px;
+    color: var(--brand);
+  }
+
+  .anatomy-figure .guide {
+    fill: none;
+    stroke: #9B2C2C;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+    opacity: .55;
+  }
+
+  .anatomy-figure .tol {
+    fill: none;
+    stroke: #7A4200;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    opacity: .5;
+  }
+
+  .legend {
+    margin: 0 0 var(--s4);
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--s3);
+  }
+
+  .legend li {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: var(--s3);
+    align-items: start;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .legend li b { font-weight: 600; }
+
+  .swatch-key {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    margin-top: 2px;
+  }
+
+  .swatch-key.k-accent { background: var(--brand); border-color: var(--brand); }
+  .swatch-key.k-guide  { background: transparent; border: 1px dashed #9B2C2C; }
+  .swatch-key.k-tol    { background: transparent; border: 1px dashed #7A4200; }
+
+  /* ---------- Clear space ---------- */
+  .clearspace {
+    display: grid;
+    place-items: center;
+    padding: var(--s7) var(--s5);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .clearspace-box {
+    position: relative;
+    padding: 24px;
+    outline: 1px dashed var(--line-strong);
+    outline-offset: 0;
+  }
+
+  .clearspace-box::after {
+    content: "x = ¼ cap height";
+    position: absolute;
+    right: 0;
+    top: -22px;
+    font-family: var(--font-data);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .clearspace-box svg {
+    width: 160px;
+    height: 160px;
+    display: block;
+    color: var(--brand);
+  }
+
+  /* ---------- Colour ---------- */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--s3);
+  }
+
+  .chip {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .chip .fill {
+    height: 96px;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--s3);
+    font-family: var(--font-data);
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+
+  .chip .body {
+    padding: var(--s3) var(--s3) var(--s4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .chip .name { font-weight: 600; font-size: 14px; }
+  .chip .use { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+  /* ---------- App bar preview ---------- */
+  .appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s4);
+    padding: var(--s3) var(--s4);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .appbar .lockup { gap: 10px; }
+  .appbar .lockup .glyph { width: 28px; height: 28px; }
+  .appbar .lockup .word { font-size: 19px; letter-spacing: -.025em; }
+
+  .nav { display: flex; gap: var(--s4); font-size: 14px; color: var(--muted); }
+  .nav span[aria-current] { color: var(--ink); font-weight: 500; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    margin-top: var(--s9);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s5);
+    justify-content: space-between;
+    font-family: var(--font-data);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lockup:hover .glyph .scan,
+    .lockup:focus-visible .glyph .scan { animation: none; }
+  }
+
+  @media (max-width: 560px) {
+    .page { padding: var(--s6) var(--s4) var(--s8); }
+    .lockup .glyph { width: 48px; height: 48px; }
+    .lockup .word { font-size: 34px; }
+    .nav { display: none; }
+    .section-head .note { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Brand mark · v4</p>
+      <h1>Mataresit</h1>
+      <p>A receipt read back as data. The top is the torn edge you hold in your hand; below it the sheet breaks into three rows that step in from the right — the fields the system extracted, aligned to a ragged margin.</p>
+    </div>
+    <div class="stamp">AI-assisted receipts<br />for Malaysian teams</div>
+  </header>
+
+  <!-- HERO -->
+  <section aria-labelledby="hero-head">
+    <div class="section-head" id="hero-head">
+      <h2>Primary lockup</h2>
+      <div class="rule"></div>
+      <span class="note">hover or tab to it</span>
+    </div>
+
+    <div class="hero">
+      <div class="hero-panel light">
+        <a class="lockup" href="#" aria-label="Mataresit home">
+          <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <defs>
+              <clipPath id="markclip-light">
+                <path fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+              </clipPath>
+            </defs>
+            <path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+            <g clip-path="url(#markclip-light)">
+              <rect class="scan" x="2.4" y="0" width="19.2" height="2.6" fill="var(--surface)" opacity="0"/>
+            </g>
+          </svg>
+          <span class="word">Mataresit</span>
+        </a>
+      </div>
+      <div class="hero-panel dark">
+        <a class="lockup" href="#" aria-label="Mataresit home">
+          <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <defs>
+              <clipPath id="markclip-dark">
+                <path fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+              </clipPath>
+            </defs>
+            <path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+            <g clip-path="url(#markclip-dark)">
+              <rect class="scan" x="2.4" y="0" width="19.2" height="2.6" fill="var(--panel)" opacity="0"/>
+            </g>
+          </svg>
+          <span class="word">Mataresit</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCALE -->
+  <section aria-labelledby="scale-head">
+    <div class="section-head" id="scale-head">
+      <h2>Mark at size</h2>
+      <div class="rule"></div>
+      <span class="note">one shape, no detail loss</span>
+    </div>
+
+    <div class="ladder">
+      <div class="rung">
+        <div class="stage">
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        </div>
+        <div class="meta"><strong>16 px</strong><span>favicon floor</span></div>
+      </div>
+      <div class="rung">
+        <div class="stage">
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        </div>
+        <div class="meta"><strong>24 px</strong><span>UI icon</span></div>
+      </div>
+      <div class="rung">
+        <div class="stage">
+          <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        </div>
+        <div class="meta"><strong>32 px</strong><span>app tile</span></div>
+      </div>
+      <div class="rung">
+        <div class="stage">
+          <svg width="64" height="64" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        </div>
+        <div class="meta"><strong>64 px</strong><span>avatar / card</span></div>
+      </div>
+      <div class="rung dark">
+        <div class="stage">
+          <svg width="64" height="64" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        </div>
+        <div class="meta"><strong>Dark</strong><span>paper panel</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- READ TEST -->
+  <section aria-labelledby="read-head">
+    <div class="section-head" id="read-head">
+      <h2>One ink</h2>
+      <div class="rule"></div>
+      <span class="note">four grounds, no second colour</span>
+    </div>
+
+    <div class="inktest">
+      <div class="inktest-cell on-white">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#121715" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        <span class="inktest-label">Ink on white</span>
+      </div>
+      <div class="inktest-cell on-paper">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#0B6B4D" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        <span class="inktest-label">Brand on paper</span>
+      </div>
+      <div class="inktest-cell on-panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3FBF8E" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        <span class="inktest-label">Mint on panel</span>
+      </div>
+      <div class="inktest-cell on-dark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#F1F2EE" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        <span class="inktest-label">Knockout on photo</span>
+      </div>
+    </div>
+    <p class="readtest-note">Four grounds, one shape, no second colour. Because the lines are true holes rather than white strokes, the mark never carries a background of its own — it sits on the paper, the panel, or a photograph equally. That is what makes it safe as a stamp, an emboss, or a favicon.</p>
+  </section>
+
+  <!-- ANATOMY -->
+  <section aria-labelledby="anatomy-head">
+    <div class="section-head" id="anatomy-head">
+      <h2>Anatomy</h2>
+      <div class="rule"></div>
+      <span class="note">24 × 24 grid, six tear teeth</span>
+    </div>
+
+    <div class="anatomy">
+      <div class="card">
+        <div class="anatomy-figure">
+          <svg viewBox="-1 -1 26 26" role="img" aria-label="Construction grid of the Mataresit mark">
+            <g stroke="none">
+              <g opacity=".14">
+                <path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+              </g>
+            </g>
+            <!-- tear peaks + valleys -->
+            <line class="guide" x1="0" y1="5.15" x2="24" y2="5.15" />
+            <line class="tol" x1="0" y1="7.05" x2="24" y2="7.05" />
+            <!-- body sides + base -->
+            <line class="guide" x1="2.4" y1="0" x2="2.4" y2="24" />
+            <line class="guide" x1="21.6" y1="0" x2="21.6" y2="24" />
+            <line class="tol" x1="0" y1="21" x2="24" y2="21" />
+            <!-- row grid -->
+            <line class="guide" x1="5.2" y1="0" x2="5.2" y2="24" />
+            <line class="guide" x1="0" y1="9.4" x2="24" y2="9.4" />
+            <line class="guide" x1="0" y1="18.8" x2="24" y2="18.8" />
+            <!-- outline only -->
+            <path fill="none" stroke="currentColor" stroke-width=".35" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+            <!-- the two ragged right margins -->
+            <circle cx="20.2" cy="13.45" r=".55" fill="currentColor" />
+            <circle cx="13.6" cy="16.75" r=".55" fill="currentColor" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="card">
+        <ul class="legend">
+          <li>
+            <span class="swatch-key k-accent" aria-hidden="true"></span>
+            <span><b>Six teeth, one rip.</b> The top edge alternates between 5.15 and 7.05 across the full width. Six peaks is the most that stays legible at 16px — more and the tear turns into noise.</span>
+          </li>
+          <li>
+            <span class="swatch-key k-guide" aria-hidden="true"></span>
+            <span><b>Flat where it was cut.</b> The bottom is dead level at 21, because that is the edge the till cut. The contrast between a torn top and a cut bottom is what makes it read as paper rather than a shape.</span>
+          </li>
+          <li>
+            <span class="swatch-key k-tol" aria-hidden="true"></span>
+            <span><b>Four lines, four margins.</b> Each extracted row ends somewhere different — 16.8, 20.2, 13.6, 18.4. Even margins would read as a paragraph; ragged ones read as fields the system found.</span>
+          </li>
+          <li>
+            <span aria-hidden="true" style="display:grid;place-items:center;font-family:var(--font-data);font-size:11px;color:var(--muted);">1.5</span>
+            <span><b>Rows are holes, not strokes.</b> Each line is 1.5 units tall — a full pixel at 16px — and cut clean through the sheet, so it holds on any background without a white plate behind it.</span>
+          </li>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLEAR SPACE + APPBAR -->
+  <section aria-labelledby="space-head">
+    <div class="section-head" id="space-head">
+      <h2>Clear space</h2>
+      <div class="rule"></div>
+      <span class="note">and how it sits in the product chrome</span>
+    </div>
+
+    <div class="card" style="margin-bottom: var(--s4);">
+      <div class="clearspace">
+        <div class="clearspace-box">
+          <svg viewBox="0 0 24 24" aria-label="Mataresit mark with clear space" role="img">
+            <rect x="0.25" y="0.25" width="23.5" height="23.5" fill="none" stroke="var(--line-strong)" stroke-width=".25" />
+            <path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="appbar">
+      <div class="lockup">
+        <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/></svg>
+        <span class="word">Mataresit</span>
+      </div>
+      <nav class="nav" aria-label="Preview navigation">
+        <span aria-current="page">Dashboard</span>
+        <span>Receipts</span>
+        <span>Claims</span>
+        <span>Teams</span>
+      </nav>
+    </div>
+  </section>
+
+  <!-- COLOUR -->
+  <section aria-labelledby="colour-head">
+    <div class="section-head" id="colour-head">
+      <h2>Colour</h2>
+      <div class="rule"></div>
+      <span class="note">inherited from the ledger palette</span>
+    </div>
+
+    <div class="palette">
+      <div class="chip">
+        <div class="fill" style="background:#0B6B4D;color:#F1F2EE;">#0B6B4D</div>
+        <div class="body"><span class="name">Ember green</span><span class="use">The mark on paper. Light-mode primary, taken from the product's own accent.</span></div>
+      </div>
+      <div class="chip">
+        <div class="fill" style="background:#3FBF8E;color:#101614;">#3FBF8E</div>
+        <div class="body"><span class="name">Ledger mint</span><span class="use">The mark on the dark panel — the product's existing dark-mode accent.</span></div>
+      </div>
+      <div class="chip">
+        <div class="fill" style="background:#F1F2EE;color:#59625B;border-bottom:1px solid #DCE0D8;">#F1F2EE</div>
+        <div class="body"><span class="name">Ledger paper</span><span class="use">Knockout mark on photography or any dark ground that isn't the panel.</span></div>
+      </div>
+      <div class="chip">
+        <div class="fill" style="background:#101614;color:#AEB9B2;">#101614</div>
+        <div class="body"><span class="name">Panel ink</span><span class="use">Single-colour printing, embossing, or default social avatars.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>assets/mataresit-mark.svg — one path, even-odd, currentColor</span>
+    <span>Instrument Sans wordmark · 24 px grid</span>
+  </footer>
+</main>
+</body>
+</html>
