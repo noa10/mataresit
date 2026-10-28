@@ -257,14 +257,14 @@ export class SEOMetaManager {
         url: baseURL,
         logo: {
           '@type': 'ImageObject',
-          url: `${baseURL}/mataresit-icon.png`
+          url: `${baseURL}/mataresit-512.png`
         }
       };
     }
 
     if (pageData.type === 'Organization') {
       structuredData.url = baseURL;
-      structuredData.logo = `${baseURL}/mataresit-icon.png`;
+      structuredData.logo = `${baseURL}/mataresit-512.png`;
       structuredData.contactPoint = {
         '@type': 'ContactPoint',
         contactType: 'customer service',
