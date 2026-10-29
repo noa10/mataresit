@@ -11,7 +11,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         accent:
-          "bg-ledger-accent text-white hover:bg-ledger-accent-hover dark:text-ledger-panel",
+          "bg-ledger-accent text-ledger-accent-foreground hover:bg-ledger-accent-hover",
         "accent-outline":
           "border border-ledger-line bg-ledger-surface text-ledger-ink hover:bg-ledger-surface-2",
         destructive:
