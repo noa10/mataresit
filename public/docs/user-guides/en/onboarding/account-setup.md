@@ -43,6 +43,8 @@ This guide walks you through creating and configuring your Mataresit account wit
 - Free tier access granted automatically
 - No credit card required for basic features
 
+Your account plan appears in the workspace header once subscription information has loaded. Select it to open Plan & usage in Settings. The plan belongs to your account, even when you switch workspaces.
+
 ---
 
 ## Step 2: Profile Configuration

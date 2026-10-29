@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/workspace/AppHeader";
 const mocks = vi.hoisted(() => ({
   createTeam: vi.fn(),
   switchTeam: vi.fn(),
+  subscriptionData: null as { tier: "free" | "pro" | "max" } | null,
 }));
 
 vi.mock("@/components/notifications/NotificationCenter", () => ({
@@ -30,8 +31,13 @@ vi.mock("@/contexts/BackgroundUploadContext", () => ({
   useBackgroundUpload: () => ({ openModal: vi.fn() }),
 }));
 
+vi.mock("@/contexts/StripeContext", () => ({
+  useStripe: () => ({ subscriptionData: mocks.subscriptionData }),
+}));
+
 vi.mock("@/contexts/LanguageContext", () => {
   const translations: Record<string, string> = {
+    "accountPlan": "Account plan: {{tier}}",
     "selector.switchWorkspace": "Switch workspace",
     "selector.personalWorkspace": "Personal workspace",
     "selector.teams": "Teams",
@@ -57,8 +63,8 @@ vi.mock("@/contexts/LanguageContext", () => {
   };
 
   const makeTranslation = () => ({
-    t: (key: string, options?: { defaultValue?: string }) =>
-      translations[key] ?? options?.defaultValue ?? key,
+    t: (key: string, options?: { defaultValue?: string; tier?: string }) =>
+      (translations[key] ?? options?.defaultValue ?? key).replace("{{tier}}", options?.tier ?? ""),
   });
 
   return {
@@ -93,6 +99,7 @@ describe("AppHeader create team", () => {
   beforeEach(() => {
     mocks.createTeam.mockReset();
     mocks.switchTeam.mockReset();
+    mocks.subscriptionData = null;
     mocks.createTeam.mockResolvedValue("team-1");
     mocks.switchTeam.mockResolvedValue(undefined);
   });
@@ -137,5 +144,22 @@ describe("AppHeader create team", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("AppHeader account plan", () => {
+  it("shows the loaded account plan and updates when it changes", () => {
+    mocks.subscriptionData = null;
+    const { rerender } = render(<MemoryRouter><AppHeader /></MemoryRouter>);
+    expect(screen.queryByRole("link", { name: /account plan/i })).not.toBeInTheDocument();
+
+    for (const tier of ["free", "pro", "max"] as const) {
+      mocks.subscriptionData = { tier };
+      rerender(<MemoryRouter><AppHeader /></MemoryRouter>);
+      const label = `Account plan: ${tier[0].toUpperCase()}${tier.slice(1)}`;
+      const indicator = screen.getByRole("link", { name: label });
+      expect(indicator).toHaveAttribute("href", "/settings?tab=plan");
+      expect(indicator).toHaveTextContent(tier[0].toUpperCase() + tier.slice(1));
+    }
   });
 });
