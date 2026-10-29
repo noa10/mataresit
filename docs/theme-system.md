@@ -12,6 +12,11 @@ The theme system provides:
 - CSS custom properties for consistent styling
 - TypeScript support with full type safety
 
+Ledger accent buttons use `--ledger-accent` for their background and
+`--ledger-accent-foreground` for their text and icons. Both tokens follow the
+application's `.dark` theme class, including when it differs from the device's
+color preference.
+
 ## Architecture
 
 ### Core Components
