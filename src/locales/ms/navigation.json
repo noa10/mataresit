@@ -37,6 +37,7 @@
     "login": "Log Masuk",
     "signup": "Daftar"
   },
+  "accountPlan": "Pelan akaun: {{tier}}",
   "sidebar": {
     "navigation": "Navigasi",
     "groups": {

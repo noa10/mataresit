@@ -44,6 +44,7 @@ Mataresit — AI-powered receipt processing & expense management. React 18 + Typ
 | Fix test failure | `src/**/__tests__/` or `tests/{domain}/` | See test commands below |
 | Debug build | `vite.config.ts` | Manual chunk splitting defined here |
 | Update theme tokens | `src/index.css` | Tailwind v4 `@theme` block |
+| Change the logo / brand mark | `src/components/brand/` | `LogoLockup` is the only lockup; source art in `brand_guidelines/` |
 
 ## CONVENTIONS (Deviations from Standard)
 

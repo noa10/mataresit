@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-labelledby="mr-title">
+  <title id="mr-title">Mataresit mark</title>
+  <!-- A receipt read back as data.
+       Top: the rip — six teeth, torn off the roll above.
+       Body: the sheet itself, cut flat at the bottom where it met the till.
+       Inside: four extracted lines, each ending on a different right margin,
+       so the rows read as fields found rather than a block of text.
+       One path, even-odd, so the lines are true holes and inherit currentColor. -->
+  <path id="mataresit-mark" fill="currentColor" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z
+       M5.2 9.4H16.8V10.9H5.2Z
+       M5.2 12.7H20.2V14.2H5.2Z
+       M5.2 16H13.6V17.5H5.2Z
+       M5.2 18.8H18.4V20.3H5.2Z"/>
+</svg>

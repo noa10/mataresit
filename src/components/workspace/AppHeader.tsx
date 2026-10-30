@@ -6,15 +6,18 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Crown,
   LogOut,
   Moon,
   Plus,
   Settings,
+  Shield,
   ShieldCheck,
   Sun,
   Upload,
   User,
   Users,
+  Zap,
 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
@@ -38,6 +41,7 @@ import {
   useTeamTranslation,
 } from "@/contexts/LanguageContext";
 import { useTeam } from "@/contexts/TeamContext";
+import { useStripe } from "@/contexts/StripeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import { getTeamRoleDisplayName } from "@/types/team";
@@ -62,6 +66,7 @@ const monthLabel = (language: string) => {
  */
 export function AppHeader() {
   const { user, signOut, isAdmin } = useAuth();
+  const { subscriptionData } = useStripe();
   const { currentTeam, currentTeamRole, userTeams, switchTeam } = useTeam();
   const { isDarkMode, toggleMode } = useTheme();
   const { language, changeLanguage } = useLanguage();
@@ -172,6 +177,25 @@ export function AppHeader() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {user && subscriptionData?.tier && (
+          <Link
+            to="/settings?tab=plan"
+            aria-label={tNav("accountPlan", {
+              tier: subscriptionData.tier.charAt(0).toUpperCase() + subscriptionData.tier.slice(1),
+            })}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-ledger-line-strong bg-ledger-surface px-3 py-1.5 font-data text-xs font-semibold text-ledger-ink transition-colors hover:bg-ledger-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent"
+          >
+            {subscriptionData.tier === "free" ? (
+              <Shield className="h-4 w-4" aria-hidden="true" />
+            ) : subscriptionData.tier === "pro" ? (
+              <Zap className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Crown className="h-4 w-4" aria-hidden="true" />
+            )}
+            {subscriptionData.tier.charAt(0).toUpperCase() + subscriptionData.tier.slice(1)}
+          </Link>
+        )}
 
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
           <NotificationCenter

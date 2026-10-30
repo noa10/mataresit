@@ -37,6 +37,7 @@
     "login": "Sign In",
     "signup": "Sign Up"
   },
+  "accountPlan": "Account plan: {{tier}}",
   "sidebar": {
     "navigation": "Navigation",
     "groups": {

@@ -196,7 +196,7 @@ export function usePushNotifications(): PushNotificationState & PushNotification
       await pushService.showLocalNotification({
         title: 'Test Notification',
         body: 'This is a test notification from Mataresit',
-        icon: '/mataresit-icon.png',
+        icon: '/mataresit-192.png',
         tag: 'test-notification',
         data: {
           type: 'receipt_processing_completed',

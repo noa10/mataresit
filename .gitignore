@@ -116,4 +116,4 @@ opencode.json
 .workbuddy-ai/
 
 # Local agent/merge planning notes
-MERGE_PLAN.md
+MERGE_PLAN.md.vitest/

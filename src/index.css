@@ -135,6 +135,7 @@
   --color-ledger-line: var(--ledger-line);
   --color-ledger-line-strong: var(--ledger-line-strong);
   --color-ledger-accent: var(--ledger-accent);
+  --color-ledger-accent-foreground: var(--ledger-accent-foreground);
   --color-ledger-accent-hover: var(--ledger-accent-hover);
   --color-ledger-accent-soft: var(--ledger-accent-soft);
   --color-ledger-amber: var(--ledger-amber);
@@ -163,6 +164,7 @@
     --ledger-line: #DCE0D8;
     --ledger-line-strong: #C2C8BE;
     --ledger-accent: #0B6B4D;
+    --ledger-accent-foreground: #FFFFFF;
     --ledger-accent-hover: #085741;
     --ledger-accent-soft: #DFEFE6;
     --ledger-amber: #7A4200;
@@ -190,6 +192,7 @@
     --ledger-line: #26302B;
     --ledger-line-strong: #3A4640;
     --ledger-accent: #3FBF8E;
+    --ledger-accent-foreground: #080C0A;
     --ledger-accent-hover: #55D2A2;
     --ledger-accent-soft: #16352A;
     --ledger-amber: #E1A85C;
@@ -365,11 +368,35 @@
   animation: marketing-resources-in 160ms ease-out;
 }
 
+/* ---------- Brand mark: the one interaction ----------
+   A single scan pass down the receipt on hover / keyboard focus, clipped to the
+   mark so it reads as the document being read. 620ms, one pass, then gone. */
+@keyframes mataresit-mark-scan {
+  0%   { transform: translateY(-3px); opacity: 0; }
+  12%  { opacity: .9; }
+  88%  { opacity: .9; }
+  100% { transform: translateY(24px); opacity: 0; }
+}
+
+.mataresit-mark__scan {
+  /* The bar is painted in the surface colour, so it wipes the mark as it
+     passes — that is what reads as the document being read. */
+  fill: var(--mark-scan-color, var(--ledger-surface));
+  opacity: 0;
+}
+
+.group:hover .mataresit-mark__scan,
+.group:focus-visible .mataresit-mark__scan {
+  animation: mataresit-mark-scan 620ms cubic-bezier(.45, .05, .35, 1) 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ledger-scanline { display: none; }
   .ledger-pulse-dot { animation: none; }
   .ledger-caret { animation: none; }
   .marketing-resources-panel { animation: none; }
+  .group:hover .mataresit-mark__scan,
+  .group:focus-visible .mataresit-mark__scan { animation: none; }
 }
 
 @layer base {

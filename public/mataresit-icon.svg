@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="mt-title">
+  <title id="mt-title">Mataresit</title>
+  <!-- Solid tile for surfaces that cannot hold a transparent mark
+       (iOS touch icon, notification icon, social card).
+       Panel ink plate, paper knockout, mark scaled 28 -> 72 of 1024. -->
+  <rect width="1024" height="1024" fill="#101614"/>
+  <g transform="translate(0 0) scale(42.667)">
+    <path fill="#F1F2EE" fill-rule="evenodd" d="M2.4 7.05L4 5.15L5.6 7.05L7.2 5.15L8.8 7.05L10.4 5.15L12 7.05L13.6 5.15L15.2 7.05L16.8 5.15L18.4 7.05L20 5.15L21.6 7.05V21H2.4Z M5.2 9.4H16.8V10.9H5.2Z M5.2 12.7H20.2V14.2H5.2Z M5.2 16H13.6V17.5H5.2Z M5.2 18.8H18.4V20.3H5.2Z"/>
+  </g>
+</svg>

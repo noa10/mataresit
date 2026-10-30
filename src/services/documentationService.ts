@@ -1,4 +1,4 @@
-import { SupportedLanguage } from '@/lib/i18n';
+import i18n, { SupportedLanguage } from '@/lib/i18n';
 import { markdownLoader } from './markdownLoader';
 
 export interface DocumentationGuide {
@@ -9,6 +9,10 @@ export interface DocumentationGuide {
   subcategory?: string;
   path: string;
   content?: string;
+  /** Language actually used for the markdown body (may fall back to English). */
+  contentFallback?: boolean;
+  /** Path of the markdown that was actually loaded. */
+  sourcePath?: string;
   lastUpdated: string;
   readingTime: number;
   tags: string[];
@@ -34,7 +38,6 @@ export interface DocumentationStructure {
 
 class DocumentationService {
   private cache = new Map<string, DocumentationStructure>();
-  private contentCache = new Map<string, string>();
 
   /**
    * Get the complete documentation structure for a language
@@ -63,7 +66,23 @@ class DocumentationService {
       if (guide) {
         // Load content if not already loaded
         if (!guide.content) {
-          guide.content = await this.loadGuideContent(guide.path);
+          const localized = await markdownLoader.loadMarkdown(guide.path);
+          let content = localized.content;
+          let sourcePath = guide.path;
+          const needsEnglishFallback = localized.fallback === true && language !== 'en';
+
+          if (needsEnglishFallback) {
+            const englishPath = guide.path.replace(`/${language}/`, '/en/');
+            const english = await markdownLoader.loadMarkdown(englishPath);
+            if (english.fallback !== true) {
+              content = english.content;
+              sourcePath = englishPath;
+            }
+          }
+
+          guide.content = content;
+          guide.sourcePath = sourcePath;
+          guide.contentFallback = needsEnglishFallback;
         }
         return guide;
       }
@@ -369,45 +388,46 @@ class DocumentationService {
       }
     ];
 
+    // Localize the navigation metadata while keeping the guide ids/paths stable.
+    const translate = i18n.getFixedT(language, 'documentation');
+    const localize = (key: string, fallback: string) =>
+      String(translate(key, { defaultValue: fallback }));
+
+    const localizedCategories: DocumentationCategory[] = categories.map((category) => ({
+      ...category,
+      title: localize(`guide.categories.${category.id}.title`, category.title),
+      description: localize(
+        `guide.categories.${category.id}.description`,
+        category.description
+      ),
+      guides: category.guides.map((guide) => ({
+        ...guide,
+        title: localize(`guide.list.${guide.id}.title`, guide.title),
+        description: localize(`guide.list.${guide.id}.description`, guide.description),
+      })),
+    }));
+
     // Define quick start guides
     const quickStart = [
-      categories[0].guides[0], // 5-minute quick start
-      categories[1].guides[0], // AI Vision Processing
-      categories[3].guides[0], // Team Setup
-      categories[2].guides[0]  // Advanced Analytics
+      localizedCategories[0].guides[0], // 5-minute quick start
+      localizedCategories[1].guides[0], // AI Vision Processing
+      localizedCategories[3].guides[0], // Team Setup
+      localizedCategories[2].guides[0]  // Advanced Analytics
     ];
 
     // Define featured guides
     const featured = [
-      categories[0].guides[1], // New User Guide
-      categories[1].guides[1], // Batch Processing
-      categories[2].guides[1], // Malaysian Business Intelligence
-      categories[3].guides[2]  // Claims Management
+      localizedCategories[0].guides[1], // New User Guide
+      localizedCategories[1].guides[1], // Batch Processing
+      localizedCategories[2].guides[1], // Malaysian Business Intelligence
+      localizedCategories[3].guides[2]  // Claims Management
     ];
 
     return {
-      categories,
+      categories: localizedCategories,
       quickStart,
       featured
     };
-  }
-
-  /**
-   * Load guide content from markdown file
-   */
-  private async loadGuideContent(path: string): Promise<string> {
-    if (this.contentCache.has(path)) {
-      return this.contentCache.get(path)!;
-    }
-
-    try {
-      const markdownContent = await markdownLoader.loadMarkdown(path);
-      this.contentCache.set(path, markdownContent.content);
-      return markdownContent.content;
-    } catch (error) {
-      console.error(`Failed to load guide content from ${path}:`, error);
-      return `# Guide Not Found\n\nThe requested guide could not be loaded. Please check the path: ${path}`;
-    }
   }
 
   /**
@@ -415,7 +435,6 @@ class DocumentationService {
    */
   clearCache(): void {
     this.cache.clear();
-    this.contentCache.clear();
   }
 }
 
