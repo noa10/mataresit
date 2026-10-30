@@ -66,7 +66,7 @@ export function AuthBrandingPanel() {
   return (
     <aside
       aria-label="About Mataresit"
-      className="flex flex-col gap-2 border-b border-white/10 bg-ledger-panel px-5 pb-5 pt-4 text-ledger-on-panel dark:bg-ledger-surface min-[980px]:min-h-svh min-[980px]:gap-7 min-[980px]:border-b-0 min-[980px]:border-r min-[980px]:border-white/10 min-[980px]:px-8 min-[980px]:pb-8 min-[980px]:pt-7 min-[1180px]:px-12 min-[1180px]:pb-9 min-[1180px]:pt-[30px]"
+      className="flex flex-col gap-2 border-b border-white/10 bg-ledger-panel px-5 pb-5 pt-4 text-ledger-on-panel min-[980px]:min-h-svh min-[980px]:gap-7 min-[980px]:border-b-0 min-[980px]:border-r min-[980px]:border-white/10 min-[980px]:px-8 min-[980px]:pb-8 min-[980px]:pt-7 min-[1180px]:px-12 min-[1180px]:pb-9 min-[1180px]:pt-[30px]"
     >
       <LogoLockup
         label="Mataresit home"
