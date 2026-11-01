@@ -73,7 +73,7 @@ function hasRecoveryHash() {
 
 const authLabelClass = "text-[0.8125rem] font-semibold text-ledger-ink-2";
 const authInputClass =
-  "h-[46px] rounded-lg border-ledger-line-strong bg-ledger-surface px-3.5 text-base text-ledger-ink placeholder:text-ledger-muted/80 focus-visible:border-ledger-accent focus-visible:ring-2 focus-visible:ring-ledger-accent/25 focus-visible:ring-offset-0 aria-[invalid=true]:border-ledger-danger aria-[invalid=true]:bg-ledger-danger-soft/25 aria-[invalid=true]:focus-visible:border-ledger-danger aria-[invalid=true]:focus-visible:ring-ledger-danger/25 md:text-base";
+  "h-[46px] rounded-lg border-ledger-line-strong bg-ledger-surface px-3.5 text-base text-ledger-ink placeholder:text-ledger-muted focus-visible:border-ledger-accent focus-visible:ring-2 focus-visible:ring-ledger-accent/25 focus-visible:ring-offset-0 aria-[invalid=true]:border-ledger-danger aria-[invalid=true]:bg-ledger-danger-soft/25 aria-[invalid=true]:focus-visible:border-ledger-danger aria-[invalid=true]:focus-visible:ring-ledger-danger/25 md:text-base";
 const authMessageClass = "text-[0.8125rem] font-normal leading-[1.45] text-ledger-danger";
 const authLinkClass =
   "inline-flex min-h-11 items-center text-sm font-semibold text-ledger-accent underline decoration-1 underline-offset-[3px] transition-colors hover:text-ledger-accent-hover";
@@ -719,7 +719,7 @@ export default function Auth() {
                                 size="sm"
                                 checked={rememberMe}
                                 onCheckedChange={(checked) => setRememberMe(checked === true)}
-                                className="rounded-[3px] border-ledger-line-strong data-[state=checked]:border-ledger-accent data-[state=checked]:bg-ledger-accent data-[state=checked]:text-white dark:data-[state=checked]:text-ledger-panel"
+                                className="rounded-[3px] border-ledger-line-strong data-[state=checked]:border-ledger-accent data-[state=checked]:bg-ledger-accent data-[state=checked]:text-ledger-accent-foreground"
                               />
                               {t("signIn.rememberMe")}
                             </label>

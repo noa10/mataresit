@@ -214,8 +214,8 @@ export function NotificationSystemTester() {
             payload: {
               title: 'Test Push Notification',
               body: `Receipt from ${testMerchant} processed successfully`,
-              icon: '/icon-192x192.png',
-              badge: '/badge-72x72.png',
+              icon: '/mataresit-192.png',
+              badge: '/mataresit-badge.png',
               data: {
                 receiptId: testReceiptId,
                 url: `/receipts/${testReceiptId}`

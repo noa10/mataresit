@@ -1,7 +1,9 @@
 {
   "brand": {
     "name": "Mataresit",
-    "tagline": "Pengurusan Resit Pintar"
+    "tagline": "Pengurusan Resit Pintar",
+    "home": "Laman utama Mataresit",
+    "workspace": "Ruang kerja Mataresit"
   },
   "mainMenu": {
     "dashboard": "Papan Pemuka",
@@ -37,6 +39,7 @@
     "login": "Log Masuk",
     "signup": "Daftar"
   },
+  "accountPlan": "Pelan akaun: {{tier}}",
   "sidebar": {
     "navigation": "Navigasi",
     "groups": {

@@ -43,6 +43,8 @@ Panduan ini membawa anda melalui proses mencipta dan mengkonfigurasi akaun Matar
 - Akses peringkat percuma diberikan secara automatik
 - Tiada kad kredit diperlukan untuk ciri asas
 
+Pelan akaun anda dipaparkan pada pengepala ruang kerja selepas maklumat langganan dimuatkan. Pilihnya untuk membuka Pelan & penggunaan dalam Tetapan. Pelan ini milik akaun anda walaupun anda bertukar ruang kerja.
+
 ---
 
 ## Langkah 2: Konfigurasi Profil
