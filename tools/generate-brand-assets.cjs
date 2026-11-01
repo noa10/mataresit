@@ -88,8 +88,11 @@ const iconFile = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024
     written.push(`${file} (${buf.length} bytes)`);
   };
 
-  // Tab icon: the mark on its own. Runs to the full canvas edge so a 16px tab
-  // icon keeps the tear and rows readable.
+  // Tab icon and notification icon: the mark on its own. Runs to the full
+  // canvas edge so a 16px tab icon keeps the tear and rows readable. It stays
+  // transparent: Android recolours a notification icon to a white silhouette
+  // from its alpha channel, and an opaque plate would come back as a solid
+  // white square.
   for (const size of [32, 64, 192, 512]) {
     const buf = await sharp(Buffer.from(markSvg(size, BRAND, INSET))).png().toBuffer();
     await emit(`mataresit-${size}.png`, buf);

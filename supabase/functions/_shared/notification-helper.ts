@@ -151,6 +151,10 @@ export class EdgeNotificationHelper {
 
   /**
    * Send push notification via Edge Function
+   *
+   * `icon` and `badge` are absolute URLs: the payload ends up at a push
+   * service, which resolves the asset against its own origin. A root-relative
+   * path does not resolve there.
    */
   private async sendPushNotification(
     userId: string,
@@ -347,8 +351,8 @@ export class EdgeNotificationHelper {
           {
             title: 'Receipt Processing Started',
             body: `Processing started for receipt from ${receiptData.merchant || 'Unknown Merchant'}`,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: `${getFrontendUrl()}/mataresit-192.png`,
+            badge: `${getFrontendUrl()}/mataresit-badge.png`,
             data: {
               receiptId,
               url: `/receipt/${receiptId}`
@@ -415,8 +419,8 @@ export class EdgeNotificationHelper {
           {
             title: 'Receipt Completed',
             body: `Receipt from ${receiptData.merchant || 'Unknown Merchant'}${totalText} is ready for review`,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: `${getFrontendUrl()}/mataresit-192.png`,
+            badge: `${getFrontendUrl()}/mataresit-badge.png`,
             data: {
               receiptId,
               url: `/receipt/${receiptId}`
@@ -500,8 +504,8 @@ export class EdgeNotificationHelper {
           {
             title: 'Receipt Processing Failed',
             body: `Failed to process receipt from ${receiptData.merchant || 'Unknown Merchant'}`,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: `${getFrontendUrl()}/mataresit-192.png`,
+            badge: `${getFrontendUrl()}/mataresit-badge.png`,
             data: {
               receiptId,
               url: `/receipt/${receiptId}`,
@@ -584,8 +588,8 @@ export class EdgeNotificationHelper {
           {
             title: 'Batch Processing Completed',
             body: `Batch upload completed: ${statusText}`,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: `${getFrontendUrl()}/mataresit-192.png`,
+            badge: `${getFrontendUrl()}/mataresit-badge.png`,
             data: {
               batchId: batchData.batchId,
               url: '/dashboard',
@@ -671,8 +675,8 @@ export class EdgeNotificationHelper {
           {
             title: 'Review Needed',
             body: `Receipt from ${receiptData.merchant || 'Unknown Merchant'}${totalText} needs your review`,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: `${getFrontendUrl()}/mataresit-192.png`,
+            badge: `${getFrontendUrl()}/mataresit-badge.png`,
             data: {
               receiptId,
               url: `/receipt/${receiptId}`
