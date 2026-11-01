@@ -10,6 +10,138 @@
   "navigation": {
     "onThisPage": "On this page"
   },
+  "guide": {
+    "backToDocs": "Back to Docs",
+    "notFoundTitle": "Guide not found",
+    "notFoundDescription": "The requested guide could not be found or loaded.",
+    "loading": "Loading guide…",
+    "contentLoadingTitle": "Content loading",
+    "contentLoadingDescription": "The guide content is being loaded...",
+    "contentFallback": "This guide has not been translated into Bahasa Melayu yet. Showing the English version.",
+    "readingTime": "{{count}} min read",
+    "updated": "Updated {{date}}",
+    "quickActions": "Quick Actions",
+    "actions": {
+      "viewSource": "View Source",
+      "share": "Share Guide",
+      "bookmark": "Bookmark",
+      "bookmarked": "Bookmarked",
+      "linkCopied": "Link copied to clipboard",
+      "copyFailed": "Could not copy the link",
+      "bookmarkAdded": "Guide bookmarked",
+      "bookmarkRemoved": "Bookmark removed",
+      "bookmarkFailed": "Could not update bookmarks"
+    },
+    "info": {
+      "title": "Guide Information",
+      "category": "Category:",
+      "difficulty": "Difficulty:",
+      "targetUser": "Target User:",
+      "readingTime": "Reading Time:",
+      "lastUpdated": "Last Updated:",
+      "minutes": "{{count}} minutes"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "userType": {
+      "newUser": "New user",
+      "regularUser": "Regular user",
+      "teamAdmin": "Team admin",
+      "powerUser": "Power user",
+      "all": "All users"
+    },
+    "categories": {
+      "getting-started": {
+        "title": "Getting Started",
+        "description": "Essential guides for new users to set up and start using Mataresit effectively."
+      },
+      "core-features": {
+        "title": "Core Features",
+        "description": "Master the essential receipt management and processing capabilities."
+      },
+      "ai-intelligence": {
+        "title": "AI & Intelligence",
+        "description": "Leverage advanced AI features and Malaysian business intelligence."
+      },
+      "team-collaboration": {
+        "title": "Team Collaboration",
+        "description": "Set up and manage multi-user environments and collaborative workflows."
+      }
+    },
+    "list": {
+      "quick-start-5min": {
+        "title": "5-Minute Quick Start",
+        "description": "Get started with Mataresit in just 5 minutes"
+      },
+      "new-user-guide": {
+        "title": "New User Onboarding",
+        "description": "Complete setup walkthrough for first-time users"
+      },
+      "account-setup": {
+        "title": "Account Setup & Verification",
+        "description": "Account creation, verification, and configuration"
+      },
+      "dashboard-navigation": {
+        "title": "Dashboard Navigation",
+        "description": "Learn to navigate the Mataresit interface"
+      },
+      "ai-vision-processing": {
+        "title": "AI Vision Processing",
+        "description": "Smart receipt processing with advanced AI technology"
+      },
+      "batch-processing": {
+        "title": "Batch Processing",
+        "description": "Upload and process multiple receipts efficiently"
+      },
+      "semantic-search": {
+        "title": "Semantic Search",
+        "description": "Advanced search capabilities with natural language"
+      },
+      "export-reporting": {
+        "title": "Export & Reporting",
+        "description": "Generate reports and export data in multiple formats"
+      },
+      "platform-features": {
+        "title": "Platform Features",
+        "description": "Cross-platform capabilities and advanced features"
+      },
+      "advanced-analytics": {
+        "title": "Advanced Analytics",
+        "description": "Business intelligence and comprehensive analytics"
+      },
+      "malaysian-business-intelligence": {
+        "title": "Malaysian Business Intelligence",
+        "description": "Local business intelligence and cultural adaptations"
+      },
+      "personalization-features": {
+        "title": "Personalization Features",
+        "description": "Customize your Mataresit experience"
+      },
+      "real-time-notifications": {
+        "title": "Real-time Notifications",
+        "description": "Smart alerts and notification system"
+      },
+      "team-setup": {
+        "title": "Team Setup",
+        "description": "Create and configure team workspaces"
+      },
+      "role-permissions": {
+        "title": "Role & Permissions",
+        "description": "Manage access control and user permissions"
+      },
+      "claims-management": {
+        "title": "Claims Management",
+        "description": "Expense workflow and approval management"
+      },
+      "team-analytics": {
+        "title": "Team Analytics",
+        "description": "Team performance insights and metrics"
+      }
+    }
+  },
   "sections": {
     "overview": {
       "id": "1-overview",

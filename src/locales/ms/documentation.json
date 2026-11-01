@@ -10,6 +10,138 @@
   "navigation": {
     "onThisPage": "Di halaman ini"
   },
+  "guide": {
+    "backToDocs": "Kembali ke Dokumen",
+    "notFoundTitle": "Panduan tidak ditemui",
+    "notFoundDescription": "Panduan yang diminta tidak dapat ditemui atau dimuatkan.",
+    "loading": "Memuatkan panduan…",
+    "contentLoadingTitle": "Kandungan sedang dimuatkan",
+    "contentLoadingDescription": "Kandungan panduan sedang dimuatkan...",
+    "contentFallback": "Panduan ini belum diterjemah ke Bahasa Melayu. Versi Inggeris dipaparkan.",
+    "readingTime": "{{count}} min baca",
+    "updated": "Dikemas kini {{date}}",
+    "quickActions": "Tindakan Pantas",
+    "actions": {
+      "viewSource": "Lihat Sumber",
+      "share": "Kongsi Panduan",
+      "bookmark": "Tanda Buku",
+      "bookmarked": "Ditanda Buku",
+      "linkCopied": "Pautan disalin ke papan klip",
+      "copyFailed": "Pautan tidak dapat disalin",
+      "bookmarkAdded": "Panduan ditanda buku",
+      "bookmarkRemoved": "Tanda buku dibuang",
+      "bookmarkFailed": "Tanda buku tidak dapat dikemas kini"
+    },
+    "info": {
+      "title": "Maklumat Panduan",
+      "category": "Kategori:",
+      "difficulty": "Kesukaran:",
+      "targetUser": "Pengguna Sasaran:",
+      "readingTime": "Masa Bacaan:",
+      "lastUpdated": "Kemas Kini Terakhir:",
+      "minutes": "{{count}} minit"
+    },
+    "difficulty": {
+      "beginner": "Pemula",
+      "intermediate": "Pertengahan",
+      "advanced": "Lanjutan"
+    },
+    "userType": {
+      "newUser": "Pengguna baharu",
+      "regularUser": "Pengguna biasa",
+      "teamAdmin": "Pentadbir pasukan",
+      "powerUser": "Pengguna mahir",
+      "all": "Semua pengguna"
+    },
+    "categories": {
+      "getting-started": {
+        "title": "Bermula",
+        "description": "Panduan penting untuk pengguna baharu menyediakan dan mula menggunakan Mataresit dengan berkesan."
+      },
+      "core-features": {
+        "title": "Ciri Teras",
+        "description": "Kuasai keupayaan pengurusan dan pemprosesan resit yang penting."
+      },
+      "ai-intelligence": {
+        "title": "AI & Kecerdasan",
+        "description": "Manfaatkan ciri AI termaju dan kecerdasan perniagaan Malaysia."
+      },
+      "team-collaboration": {
+        "title": "Kerjasama Pasukan",
+        "description": "Sediakan dan urus persekitaran berbilang pengguna serta aliran kerja kolaboratif."
+      }
+    },
+    "list": {
+      "quick-start-5min": {
+        "title": "Mula Pantas 5 Minit",
+        "description": "Mulakan Mataresit dalam masa 5 minit sahaja"
+      },
+      "new-user-guide": {
+        "title": "Panduan Pengguna Baharu",
+        "description": "Panduan persediaan lengkap untuk pengguna kali pertama"
+      },
+      "account-setup": {
+        "title": "Persediaan & Pengesahan Akaun",
+        "description": "Penciptaan akaun, pengesahan dan konfigurasi"
+      },
+      "dashboard-navigation": {
+        "title": "Navigasi Papan Pemuka",
+        "description": "Pelajari cara menavigasi antara muka Mataresit"
+      },
+      "ai-vision-processing": {
+        "title": "Pemprosesan AI Vision",
+        "description": "Pemprosesan resit pintar dengan teknologi AI termaju"
+      },
+      "batch-processing": {
+        "title": "Pemprosesan Kelompok",
+        "description": "Muat naik dan proses berbilang resit dengan cekap"
+      },
+      "semantic-search": {
+        "title": "Carian Semantik",
+        "description": "Keupayaan carian termaju dengan bahasa semula jadi"
+      },
+      "export-reporting": {
+        "title": "Eksport & Pelaporan",
+        "description": "Jana laporan dan eksport data dalam pelbagai format"
+      },
+      "platform-features": {
+        "title": "Ciri Platform",
+        "description": "Keupayaan merentas platform dan ciri termaju"
+      },
+      "advanced-analytics": {
+        "title": "Analitik Termaju",
+        "description": "Kecerdasan perniagaan dan analitik menyeluruh"
+      },
+      "malaysian-business-intelligence": {
+        "title": "Kecerdasan Perniagaan Malaysia",
+        "description": "Kecerdasan perniagaan tempatan dan penyesuaian budaya"
+      },
+      "personalization-features": {
+        "title": "Ciri Pemperibadian",
+        "description": "Sesuaikan pengalaman Mataresit anda"
+      },
+      "real-time-notifications": {
+        "title": "Pemberitahuan Masa Nyata",
+        "description": "Isyarat pintar dan sistem pemberitahuan"
+      },
+      "team-setup": {
+        "title": "Persediaan Pasukan",
+        "description": "Cipta dan konfigurasi ruang kerja pasukan"
+      },
+      "role-permissions": {
+        "title": "Peranan & Kebenaran",
+        "description": "Urus kawalan akses dan kebenaran pengguna"
+      },
+      "claims-management": {
+        "title": "Pengurusan Tuntutan",
+        "description": "Aliran kerja perbelanjaan dan pengurusan kelulusan"
+      },
+      "team-analytics": {
+        "title": "Analitik Pasukan",
+        "description": "Cerapan prestasi pasukan dan metrik"
+      }
+    }
+  },
   "sections": {
     "overview": {
       "id": "1-gambaran-keseluruhan",

@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useDocumentationTranslation, useLanguage, useHomepageTranslation } from '@/contexts/LanguageContext';
+import { MarketingFooter } from '@/components/marketing/MarketingFooter';
+import { MarketingHeader } from '@/components/marketing/MarketingHeader';
+import { documentationService, DocumentationGuide } from '@/services/documentationService';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import {
   ArrowLeft,
   Clock,
@@ -15,280 +16,447 @@ import {
   Share2,
   Bookmark
 } from 'lucide-react';
-import { documentationService, DocumentationGuide } from '@/services/documentationService';
-import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+
+const shell = 'mx-auto w-full max-w-[1240px] px-5 min-[881px]:px-6';
+
+const BOOKMARK_STORAGE_KEY = 'mataresit_guide_bookmarks';
+
+const USER_TYPE_KEYS: Record<DocumentationGuide['userType'], string> = {
+  'new-user': 'newUser',
+  'regular-user': 'regularUser',
+  'team-admin': 'teamAdmin',
+  'power-user': 'powerUser',
+  all: 'all',
+};
+
+const readBookmarks = (): string[] => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BOOKMARK_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const formatGuideDate = (value: string, language: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  try {
+    return new Intl.DateTimeFormat(language === 'ms' ? 'ms-MY' : 'en-MY', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return date.toLocaleDateString();
+  }
+};
+
+const difficultyTone: Record<string, string> = {
+  beginner: 'bg-ledger-accent-soft text-ledger-accent',
+  intermediate: 'bg-ledger-amber-soft text-ledger-amber',
+  advanced: 'bg-ledger-danger-soft text-ledger-danger',
+};
+
+const actionButtonClass =
+  'flex w-full items-center gap-2 rounded-[7px] border border-ledger-line bg-ledger-surface px-3 py-2 text-left text-[0.8125rem] font-medium text-ledger-ink-2 no-underline transition-colors hover:border-ledger-line-strong hover:text-ledger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40';
+
+const utilityButtonClass =
+  'grid h-9 w-9 place-items-center rounded-lg text-ledger-ink-2 transition-colors hover:bg-ledger-surface-2 hover:text-ledger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40';
 
 export default function GuideDetailPage() {
   const { guideId } = useParams<{ guideId: string }>();
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { t } = useDocumentationTranslation();
+  const { t: tHome } = useHomepageTranslation();
   const [guide, setGuide] = useState<DocumentationGuide | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
 
   useEffect(() => {
-    if (guideId) {
-      loadGuide();
-    }
-  }, [guideId, language]);
-
-  const loadGuide = async () => {
     if (!guideId) return;
 
-    try {
-      setLoading(true);
-      setError(null);
-      const guideData = await documentationService.getGuide(guideId, language);
-      
-      if (!guideData) {
-        setError('Guide not found');
-        return;
-      }
+    let cancelled = false;
+    // Route param/language changes reset the guide before the new fetch lands.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGuide(null);
+    setLoading(true);
+    setError(false);
 
-      setGuide(guideData);
-    } catch (err) {
-      console.error('Failed to load guide:', err);
-      setError('Failed to load guide');
-    } finally {
-      setLoading(false);
-    }
-  };
+    documentationService
+      .getGuide(guideId, language)
+      .then((guideData) => {
+        if (cancelled) return;
+        if (!guideData) {
+          setError(true);
+          return;
+        }
+        setGuide(guideData);
+      })
+      .catch((err) => {
+        console.error('Failed to load guide:', err);
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner': return 'bg-green-100 text-green-800 border-green-200';
-      case 'intermediate': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'advanced': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [guideId, language]);
+
+  useEffect(() => {
+    // Bookmarks live in localStorage, outside React's state tree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBookmarked(guideId ? readBookmarks().includes(guideId) : false);
+  }, [guideId]);
 
   const getUserTypeIcon = (userType: string) => {
     switch (userType) {
-      case 'new-user': return <User className="h-4 w-4" />;
-      case 'team-admin': return <User className="h-4 w-4" />;
-      case 'power-user': return <User className="h-4 w-4" />;
-      default: return <BookOpen className="h-4 w-4" />;
+      case 'new-user': return <User className="h-3.5 w-3.5" aria-hidden="true" />;
+      case 'team-admin': return <User className="h-3.5 w-3.5" aria-hidden="true" />;
+      case 'power-user': return <User className="h-3.5 w-3.5" aria-hidden="true" />;
+      default: return <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />;
     }
   };
 
   const handleShare = async () => {
-    if (navigator.share && guide) {
+    if (!guide) return;
+
+    if (navigator.share) {
       try {
         await navigator.share({
           title: guide.title,
           text: guide.description,
           url: window.location.href,
         });
+        return;
       } catch (err) {
-        // Fallback to clipboard
-        navigator.clipboard.writeText(window.location.href);
+        if (err instanceof DOMException && err.name === 'AbortError') return;
       }
-    } else {
-      // Fallback to clipboard
-      navigator.clipboard.writeText(window.location.href);
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard is unavailable');
+      }
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success(t('guide.actions.linkCopied'));
+    } catch (err) {
+      console.error('Failed to copy guide link:', err);
+      toast.error(t('guide.actions.copyFailed'));
     }
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
+  const handleViewSource = () => {
+    if (!guide?.sourcePath) return;
+    window.open(guide.sourcePath, '_blank', 'noopener,noreferrer');
+  };
 
-  if (error || !guide) {
-    return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">
-            {error || 'Guide Not Found'}
-          </h1>
-          <p className="text-muted-foreground mt-2 mb-6">
-            The requested guide could not be found or loaded.
-          </p>
-          <Button onClick={() => navigate('/docs')} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Documentation
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const toggleBookmark = () => {
+    if (!guide) return;
+
+    const next = new Set(readBookmarks());
+    if (next.has(guide.id)) {
+      next.delete(guide.id);
+    } else {
+      next.add(guide.id);
+    }
+
+    try {
+      localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify([...next]));
+      setBookmarked(next.has(guide.id));
+      toast.success(
+        t(next.has(guide.id) ? 'guide.actions.bookmarkAdded' : 'guide.actions.bookmarkRemoved')
+      );
+    } catch (err) {
+      console.error('Failed to update guide bookmarks:', err);
+      toast.error(t('guide.actions.bookmarkFailed'));
+    }
+  };
+
+  const categoryLabel = guide
+    ? String(
+        t(`guide.categories.${guide.category}.title`, {
+          defaultValue: guide.category.replace(/-/g, ' '),
+        })
+      )
+    : '';
+  const subcategoryLabel = guide?.subcategory?.replace(/-/g, ' ') ?? '';
+  const difficultyLabel = guide ? String(t(`guide.difficulty.${guide.difficulty}`)) : '';
+  const userTypeLabel = guide
+    ? String(t(`guide.userType.${USER_TYPE_KEYS[guide.userType]}`))
+    : '';
+
+  const backLink = (
+    <Link
+      to="/docs"
+      className="inline-flex items-center gap-1.5 rounded-md font-data text-[0.6875rem] uppercase tracking-[0.12em] text-ledger-muted no-underline transition-colors hover:text-ledger-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+    >
+      <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+      {String(t('guide.backToDocs'))}
+    </Link>
+  );
+
+  const pageTitle = loading
+    ? String(t('guide.loading'))
+    : error || !guide
+      ? String(t('guide.notFoundTitle'))
+      : guide.title;
+  const pageDescription = loading
+    ? String(t('meta.description'))
+    : error || !guide
+      ? String(t('guide.notFoundDescription'))
+      : guide.description;
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="mb-8"
+    <div className="min-h-screen bg-ledger-paper leading-[1.6] text-ledger-ink">
+      <Helmet>
+        <title>{`${pageTitle} - Mataresit`}</title>
+        <meta name="description" content={pageDescription} />
+      </Helmet>
+
+      <a
+        href="#main"
+        className="absolute left-4 top-[-64px] z-[100] rounded-md bg-ledger-ink px-4 py-2.5 text-sm text-ledger-paper focus:top-3"
       >
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/docs')}
-            className="flex items-center gap-2"
+        {String(tHome('skipToContent'))}
+      </a>
+
+      <MarketingHeader />
+
+      <main id="main">
+        {loading ? (
+          <div className={`${shell} py-14`}>
+            {backLink}
+            <div
+              role="status"
+              aria-label={String(t('guide.loading'))}
+              className="flex min-h-[320px] items-center justify-center"
+            >
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-line border-b-ledger-accent" />
+            </div>
+          </div>
+        ) : error || !guide ? (
+          <div className={`${shell} py-14`}>
+            {backLink}
+            <div className="mt-10 rounded-2xl border border-ledger-line bg-ledger-surface px-6 py-12 text-center">
+              <h1 className="font-display text-[clamp(1.7rem,2.6vw,2.2rem)] font-normal leading-[1.1] tracking-[-0.018em] text-ledger-ink">
+                {String(t('guide.notFoundTitle'))}
+              </h1>
+              <p className="mx-auto mt-3 max-w-[52ch] text-[0.9375rem] leading-[1.65] text-ledger-muted">
+                {String(t('guide.notFoundDescription'))}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/docs')}
+                className="mt-6 inline-flex items-center gap-2 rounded-[7px] bg-ledger-accent px-4 py-2.5 text-sm font-semibold text-ledger-paper transition-colors hover:bg-ledger-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/40"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {String(t('guide.backToDocs'))}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+        {/* Guide header */}
+        <section className="border-b border-ledger-line">
+          <div className={`${shell} pb-10 pt-10 min-[881px]:pb-12 min-[881px]:pt-12`}>
+            <div className="flex items-center justify-between gap-4">
+              {backLink}
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  aria-label={String(t('guide.actions.share'))}
+                  title={String(t('guide.actions.share'))}
+                  className={utilityButtonClass}
+                >
+                  <Share2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleBookmark}
+                  aria-label={String(
+                    t(bookmarked ? 'guide.actions.bookmarked' : 'guide.actions.bookmark')
+                  )}
+                  aria-pressed={bookmarked}
+                  title={String(
+                    t(bookmarked ? 'guide.actions.bookmarked' : 'guide.actions.bookmark')
+                  )}
+                  className={utilityButtonClass}
+                >
+                  <Bookmark
+                    className={`h-4 w-4 ${bookmarked ? 'fill-current' : ''}`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[0.6875rem] tracking-[0.1em] text-ledger-muted">
+              <span>{categoryLabel}</span>
+              {subcategoryLabel ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{subcategoryLabel}</span>
+                </>
+              ) : null}
+            </div>
+
+            <h1 className="mt-3 font-display text-[clamp(2.1rem,4vw,3.25rem)] font-normal leading-[1.05] tracking-[-0.024em] text-ledger-ink">
+              {guide.title}
+            </h1>
+
+            <p className="mt-[18px] max-w-[68ch] text-[1.0625rem] leading-[1.6] text-ledger-muted">
+              {guide.description}
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <span
+                className={`rounded-full px-2.5 py-1 font-data text-[0.625rem] font-medium tracking-[0.08em] ${
+                  difficultyTone[guide.difficulty] ?? 'bg-ledger-surface-2 text-ledger-ink-2'
+                }`}
+              >
+                {difficultyLabel}
+              </span>
+
+              <span className="flex items-center gap-1.5 text-sm text-ledger-muted">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {String(t('guide.readingTime', { count: guide.readingTime }))}
+              </span>
+
+              <span className="flex items-center gap-1.5 text-sm text-ledger-muted">
+                {getUserTypeIcon(guide.userType)}
+                <span>{userTypeLabel}</span>
+              </span>
+
+              <span className="text-sm text-ledger-muted">
+                {String(
+                  t('guide.updated', {
+                    date: formatGuideDate(guide.lastUpdated, language),
+                  })
+                )}
+              </span>
+            </div>
+
+            {guide.tags.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {guide.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-ledger-line bg-ledger-surface px-2.5 py-1 font-data text-[0.6875rem] text-ledger-ink-2"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {/* Guide body */}
+        <section className="border-b border-ledger-line">
+          <div
+            className={`${shell} grid grid-cols-1 gap-8 pb-[88px] pt-10 min-[881px]:grid-cols-[minmax(0,1fr)_220px] min-[881px]:gap-14 min-[881px]:pt-14`}
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Docs
-          </Button>
-          
-          <div className="flex items-center gap-2 ml-auto">
-            <Button variant="ghost" size="sm" onClick={handleShare}>
-              <Share2 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Bookmark className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="capitalize">{guide.category.replace('-', ' ')}</span>
-            {guide.subcategory && (
-              <>
-                <span>•</span>
-                <span className="capitalize">{guide.subcategory.replace('-', ' ')}</span>
-              </>
-            )}
-          </div>
-
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            {guide.title}
-          </h1>
-
-          <p className="text-lg text-muted-foreground max-w-3xl">
-            {guide.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <Badge variant="outline" className={getDifficultyColor(guide.difficulty)}>
-              {guide.difficulty}
-            </Badge>
-            
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              {guide.readingTime} min read
-            </div>
-
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              {getUserTypeIcon(guide.userType)}
-              <span className="capitalize">{guide.userType.replace('-', ' ')}</span>
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              Updated {new Date(guide.lastUpdated).toLocaleDateString()}
-            </div>
-          </div>
-
-          {guide.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {guide.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      <Separator className="mb-8" />
-
-      {/* Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="grid grid-cols-1 lg:grid-cols-4 gap-8"
-      >
-        {/* Main Content */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardContent className="p-8">
-              {guide.content ? (
-                <MarkdownRenderer content={guide.content} />
-              ) : (
-                <div className="text-center py-12">
-                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Content Loading</h3>
-                  <p className="text-muted-foreground">
-                    The guide content is being loaded...
-                  </p>
+            <div className="min-w-0">
+              {guide.contentFallback ? (
+                <div
+                  role="status"
+                  className="mb-5 rounded-[10px] border border-ledger-line bg-ledger-amber-soft px-4 py-3 text-sm leading-[1.55] text-ledger-amber"
+                >
+                  {String(t('guide.contentFallback'))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              ) : null}
 
-        {/* Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-8 space-y-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold mb-3">Quick Actions</h3>
-                <div className="space-y-2">
-                  <Button variant="outline" size="sm" className="w-full justify-start">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Source
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share Guide
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start">
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Bookmark
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <article className="rounded-2xl border border-ledger-line bg-ledger-surface px-5 py-6 min-[881px]:px-9 min-[881px]:py-9">
+                {guide.content ? (
+                  <MarkdownRenderer content={guide.content} />
+                ) : (
+                  <div className="py-12 text-center">
+                    <BookOpen className="mx-auto mb-4 h-12 w-12 text-ledger-muted" aria-hidden="true" />
+                    <h3 className="mb-2 font-display text-xl text-ledger-ink">
+                      {String(t('guide.contentLoadingTitle'))}
+                    </h3>
+                    <p className="text-ledger-muted">
+                      {String(t('guide.contentLoadingDescription'))}
+                    </p>
+                  </div>
+                )}
+              </article>
+            </div>
 
-            {/* Guide Info */}
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold mb-3">Guide Information</h3>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Category:</span>
-                    <div className="font-medium capitalize">
-                      {guide.category.replace('-', ' ')}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Difficulty:</span>
-                    <div className="font-medium capitalize">{guide.difficulty}</div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Target User:</span>
-                    <div className="font-medium capitalize">
-                      {guide.userType.replace('-', ' ')}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Reading Time:</span>
-                    <div className="font-medium">{guide.readingTime} minutes</div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Last Updated:</span>
-                    <div className="font-medium">
-                      {new Date(guide.lastUpdated).toLocaleDateString()}
-                    </div>
+            {/* Guide sidebar */}
+            <aside className="min-[881px]:sticky min-[881px]:top-[104px] min-[881px]:self-start">
+              <div className="grid gap-4">
+                <div className="rounded-xl border border-ledger-line bg-ledger-surface p-4">
+                  <h2 className="mb-3 font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+                    {String(t('guide.quickActions'))}
+                  </h2>
+                  <div className="grid gap-1.5">
+                    {guide.sourcePath ? (
+                      <button type="button" className={actionButtonClass} onClick={handleViewSource}>
+                        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {String(t('guide.actions.viewSource'))}
+                      </button>
+                    ) : null}
+                    <button type="button" className={actionButtonClass} onClick={handleShare}>
+                      <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      {String(t('guide.actions.share'))}
+                    </button>
+                    <button
+                      type="button"
+                      className={actionButtonClass}
+                      onClick={toggleBookmark}
+                      aria-pressed={bookmarked}
+                    >
+                      <Bookmark
+                        className={`h-4 w-4 shrink-0 ${bookmarked ? 'fill-current' : ''}`}
+                        aria-hidden="true"
+                      />
+                      {String(
+                        t(bookmarked ? 'guide.actions.bookmarked' : 'guide.actions.bookmark')
+                      )}
+                    </button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+
+                <div className="rounded-xl border border-ledger-line bg-ledger-surface p-4">
+                  <h2 className="mb-3 font-data text-[0.625rem] uppercase tracking-[0.14em] text-ledger-muted">
+                    {String(t('guide.info.title'))}
+                  </h2>
+                  <dl className="grid gap-2.5 text-sm">
+                    {[
+                      [String(t('guide.info.category')), categoryLabel],
+                      [String(t('guide.info.difficulty')), difficultyLabel],
+                      [String(t('guide.info.targetUser')), userTypeLabel],
+                      [String(t('guide.info.readingTime')), String(t('guide.info.minutes', { count: guide.readingTime }))],
+                      [String(t('guide.info.lastUpdated')), formatGuideDate(guide.lastUpdated, language)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid gap-0.5">
+                        <dt className="text-xs text-ledger-muted">{label}</dt>
+                        <dd className="text-[0.875rem] text-ledger-ink">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            </aside>
           </div>
-        </div>
-      </motion.div>
+        </section>
+          </>
+        )}
+      </main>
+
+      <MarketingFooter />
     </div>
   );
 }

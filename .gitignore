@@ -86,6 +86,9 @@ reports/
 integration_test/
 config/
 docs/
+
+# Public documentation is shipped with the app and must stay versioned
+!public/docs/
 scripts/
 
 # Additional build artifacts and caches
