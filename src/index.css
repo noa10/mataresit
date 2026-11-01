@@ -136,6 +136,7 @@
   --color-ledger-line-strong: var(--ledger-line-strong);
   --color-ledger-accent: var(--ledger-accent);
   --color-ledger-accent-foreground: var(--ledger-accent-foreground);
+  --color-ledger-accent-on-panel: var(--ledger-accent-on-panel);
   --color-ledger-accent-hover: var(--ledger-accent-hover);
   --color-ledger-accent-soft: var(--ledger-accent-soft);
   --color-ledger-amber: var(--ledger-amber);
@@ -165,6 +166,11 @@
     --ledger-line-strong: #C2C8BE;
     --ledger-accent: #0B6B4D;
     --ledger-accent-foreground: #FFFFFF;
+    /* The brand sheet's dark-mode mint. Chrome that is always dark (workspace
+       sidebar, auth panel) stays dark whatever the app theme is, so it takes
+       this instead of the theme's accent. Theme-independent: not redeclared
+       under `.dark`. */
+    --ledger-accent-on-panel: #3FBF8E;
     --ledger-accent-hover: #085741;
     --ledger-accent-soft: #DFEFE6;
     --ledger-amber: #7A4200;
@@ -379,9 +385,11 @@
 }
 
 .mataresit-mark__scan {
-  /* The bar is painted in the surface colour, so it wipes the mark as it
-     passes — that is what reads as the document being read. */
-  fill: var(--mark-scan-color, var(--ledger-surface));
+  /* The bar is painted in the colour of the surface behind the mark, so it
+     wipes the mark as it passes — that is what reads as the document being
+     read. The default is paper, which is what every light-surface lockup
+     sits on; the panel tone overrides it with `--ledger-panel`. */
+  fill: var(--mark-scan-color, var(--ledger-paper));
   opacity: 0;
 }
 

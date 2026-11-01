@@ -12,6 +12,7 @@ console.log('🎨 Brand mark verification');
 console.log('='.repeat(50));
 
 const RASTER_SIZES = [32, 64, 180, 192, 512];
+const RASTER_TILES = [192, 512];
 const SVG_ASSETS = ['/mataresit-mark.svg', '/mataresit-icon.svg'];
 
 // Test 1: vector assets are served
@@ -34,6 +35,24 @@ RASTER_SIZES.forEach((size) => {
     })
     .catch((error) => console.log(`   ❌ ${path}:`, error));
 });
+
+// Test 2b: the opaque tiles and the notification badge are served
+console.log('\n📝 Test 2b: Tiles and badge...');
+RASTER_TILES.forEach((size) => {
+  const path = `/mataresit-tile-${size}.png`;
+  fetch(path, { method: 'HEAD' })
+    .then((response) => {
+      console.log(response.ok ? `   ✅ ${path}` : `   ❌ ${path} not accessible`);
+    })
+    .catch((error) => console.log(`   ❌ ${path}:`, error));
+});
+fetch('/mataresit-badge.png', { method: 'HEAD' })
+  .then((response) => {
+    console.log(
+      response.ok ? '   ✅ /mataresit-badge.png' : '   ❌ /mataresit-badge.png not accessible',
+    );
+  })
+  .catch((error) => console.log('   ❌ /mataresit-badge.png:', error));
 
 // Test 3: the lockup renders the mark, not a bitmap
 console.log('\n📝 Test 3: Lockup in page chrome...');
@@ -83,8 +102,10 @@ setTimeout(() => {
   report('SVG favicon', svgIcon, 'href', 'mataresit-mark.svg');
   report('PNG favicon', pngIcon, 'href', 'mataresit-32.png');
   report('Apple touch icon', touchIcon, 'href', 'mataresit-180.png');
-  report('Open Graph image', ogImage, 'content', 'mataresit-512.png');
-  report('Twitter image', twitterImage, 'content', 'mataresit-512.png');
+  // Social cards use the opaque tile: a transparent PNG is flattened onto an
+  // unpredictable background by most scrapers.
+  report('Open Graph image', ogImage, 'content', 'mataresit-tile-512.png');
+  report('Twitter image', twitterImage, 'content', 'mataresit-tile-512.png');
   report('Theme colour', themeColour, 'content', '#0B6B4D');
 }, 500);
 

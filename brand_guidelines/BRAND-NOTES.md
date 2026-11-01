@@ -73,16 +73,17 @@ Where this design lives in the app.
 | Piece | Location |
 | --- | --- |
 | Lockup (mark + wordmark) | `src/components/brand/LogoLockup.tsx` — the only definition. Navbar, marketing header/footer, auth panel, auth callback, workspace sidebar all render it. |
-| Mark geometry | `src/components/brand/MataresitMark.tsx` — single even-odd path, `currentColor`. Do not re-draw it anywhere else. |
-| Scan pass | `.mataresit-mark__scan` + `@keyframes mataresit-mark-scan` in `src/index.css`. The bar is painted in the surface colour so it wipes the mark as it passes. |
-| App assets | `public/mataresit-mark.svg` (seed colour, for `<img>`/favicon), `public/mataresit-icon.svg` (tile), `mataresit-{32,64,180,192,512}.png`, `mataresit-tile-{192,512}.png`, `mataresit-badge.png` (monochrome notification badge), `favicon.ico` (16/24/32/48). |
-| Asset generators | `tools/generate-brand-assets.cjs`, `tools/generate-favicon.cjs`, `tools/pack-favicon.cjs`. One-off; not part of the build. |
+| Mark geometry | `src/components/brand/MataresitMark.tsx` — single even-odd path, `currentColor`. The path itself is authored in `brand_guidelines/assets/mataresit-mark.svg`; the component and the asset generators both read it from there. Do not re-draw it anywhere else. |
+| Scan pass | `.mataresit-mark__scan` + `@keyframes mataresit-mark-scan` in `src/index.css`. The bar is painted in the colour of the surface behind the mark, so it wipes the mark as it passes. |
+| App assets | `public/mataresit-mark.svg` (seed colour, for `<img>`/favicon), `public/mataresit-icon.svg` (tile), `mataresit-{32,64,180,192,512}.png`, `mataresit-tile-{192,512}.png` (opaque tiles — social cards), `mataresit-badge.png` (monochrome notification badge), `favicon.ico` (16/24/32/48). |
+| Asset generators | `tools/brand-mark.cjs` (the shared geometry), `tools/generate-brand-assets.cjs`, `tools/generate-favicon.cjs`, `tools/pack-favicon.cjs`. One-off; not part of the build. |
 
-Optical centring: the art spans y 5.15 to 21 in the 24-unit box, so its ink sits 1.32 units below the box centre. `MataresitMark` wraps the path in a group translated up by `MARK_INK_CENTRE - 12` (1.075 units) so the visual centre of the ink lands on the box centre. That is what lets a flex-centred wordmark sit level with the mark instead of 1-2 px low. Keep that shift if the path is ever redrawn; it depends only on the ink bounds.
+Optical centring: the art spans y 5.15 to 21 in the 24-unit box, so its ink sits 1.075 units below the box centre. `MataresitMark` wraps the path in a group translated up by `MARK_INK_SHIFT` (1.075 units) so the visual centre of the ink lands on the box centre. That is what lets a flex-centred wordmark sit level with the mark instead of 1-2 px low. The asset generators apply the same shift, so the favicon and the in-app mark sit in the same place; `tools/brand-mark.cjs` holds the constant for both and fails the build if the component and the source SVG disagree. Keep that shift if the path is ever redrawn; it depends only on the ink bounds.
 
-Colour in code comes from the existing ledger tokens: `--ledger-accent` (`#0B6B4D` light, `#3FBF8E` dark) for the mark, with the dark-panel mint (`#3FBF8E`) applied directly on always-dark chrome such as the sidebar and auth panel, which never receive the `.dark` class.
+Colour in code comes from the existing ledger tokens: `--ledger-accent` (`#0B6B4D` light, `#3FBF8E` dark) for the mark, and `--ledger-accent-on-panel` (`#3FBF8E`) on always-dark chrome such as the sidebar and auth panel. That chrome is dark whatever the app theme is, so it takes the sheet's dark-mode mint directly rather than the theme's accent, which would be ember green on a near-black plate.
 
-Two deliberate differences from this sheet:
+Wordmark: live text in the app's UI font (Instrument Sans) — the family the sheet asks for. It is not outlined, so the font has to stay available. Each surface sets its own size and weight through `wordmarkClassName`; the family is the same everywhere.
 
-- **Wordmark font.** The sheet sets it in Instrument Sans SemiBold. In the app the wordmark stays in the product's display serif (Instrument Serif) for continuity with headings; only the mark was migrated.
-- **Sizes.** The lockup renders the mark at 26, 28, or 32 px. Nothing goes below the 16 px floor, and the 16 px favicon uses the mark alone.
+One deliberate difference from this sheet:
+
+- **Sizes.** The lockup renders the mark in a 32 / 36 / 40 px box. Nothing goes below the 16 px floor, and the 16 px favicon uses the mark alone.

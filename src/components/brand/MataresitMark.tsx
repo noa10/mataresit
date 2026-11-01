@@ -10,9 +10,12 @@ const MARK_PATH =
 /**
  * Vertical centre of the mark's ink inside the 24 x 24 canvas: the art spans
  * y 5.15 (tear peaks) to y 21 (flat cut base). Centring the box alone leaves the
- * ink 1.32 units low, which is what makes a flex-aligned wordmark look sunk.
+ * ink 1.075 units low, which is what makes a flex-aligned wordmark look sunk.
  */
 const MARK_INK_CENTRE = (5.15 + 21) / 2;
+
+/** How far the art moves up so the ink centre lands on the canvas centre. */
+const MARK_INK_SHIFT = Number((MARK_INK_CENTRE - 12).toFixed(3));
 
 interface MataresitMarkProps {
   /** Accessible name. Omitted leaves the mark decorative (`aria-hidden`). */
@@ -49,15 +52,21 @@ export function MataresitMark({ title, className, scan = false }: MataresitMarkP
       {scan ? (
         <defs>
           <clipPath id={clipId}>
-            <path fillRule="evenodd" d={MARK_PATH} />
+            {/* `clipRule` decides how the clip is filled. Without it the clip
+                defaults to `nonzero`, and because the four rows wind the same
+                way as the receipt body they would count as solid — the scan
+                band would paint over the row holes and the mark would read as
+                a filled block instead of a receipt being swept. */}
+            <path clipRule="evenodd" fillRule="evenodd" d={MARK_PATH} />
           </clipPath>
         </defs>
       ) : null}
       {/* The mark letterboxes inside its square box: 2.4–21.6 wide, 5.15–21 tall,
-          so its ink sits 1.32 units low. Shift it up so the visual centre of the
+          so its ink sits 1.075 units low. Shift it up so the visual centre of the
           ink lands on the box centre and a flex-centred wordmark lines up with
-          it. The shift is one constant in the 24-unit space. */}
-      <g transform={`translate(0 ${-(MARK_INK_CENTRE - 12)})`}>
+          it. The shift is one constant in the 24-unit space, and the asset
+          generators apply the same one — see tools/brand-mark.cjs. */}
+      <g transform={`translate(0 ${-MARK_INK_SHIFT})`}>
         <path fillRule="evenodd" d={MARK_PATH} />
         {scan ? (
           <g clipPath={`url(#${clipId})`} aria-hidden="true">

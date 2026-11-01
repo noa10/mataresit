@@ -28,7 +28,7 @@ describe("LogoLockup", () => {
     const { container, rerender } = renderLockup(<LogoLockup />);
     const markWrapper = () => container.querySelector('svg[data-mark="mataresit"]')!.parentElement!;
 
-    expect(markWrapper().className).toContain("text-ledger-accent");
+    expect(markWrapper().className.split(" ")).toContain("text-ledger-accent");
 
     rerender(
       <MemoryRouter>
@@ -36,8 +36,26 @@ describe("LogoLockup", () => {
       </MemoryRouter>,
     );
 
-    expect(markWrapper().className).toContain("text-[#3FBF8E]");
-    expect(markWrapper().className).not.toContain("text-ledger-accent");
+    expect(markWrapper().className.split(" ")).toContain("text-ledger-accent-on-panel");
+    expect(markWrapper().className.split(" ")).not.toContain("text-ledger-accent");
+  });
+
+  it("keeps the focus ring readable on the always-dark panel tone", () => {
+    const { rerender } = renderLockup(<LogoLockup />);
+    const link = () => screen.getByRole("link", { name: "Mataresit home" });
+
+    // A half-strength accent ring on the near-black panel is about 1.4:1 and
+    // disappears, so the panel tone rings in the on-panel colour instead.
+    expect(link().className.split(" ")).toContain("focus-visible:ring-ledger-accent");
+
+    rerender(
+      <MemoryRouter>
+        <LogoLockup tone="on-panel" />
+      </MemoryRouter>,
+    );
+
+    expect(link().className.split(" ")).toContain("focus-visible:ring-ledger-on-panel");
+    expect(link().className.split(" ")).not.toContain("focus-visible:ring-ledger-accent");
   });
 
   it("honours the size ladder without dropping below the 16px floor", () => {
@@ -98,5 +116,23 @@ describe("MataresitMark", () => {
     expect(path).toHaveAttribute("fill-rule", "evenodd");
     // Five subpaths: the receipt body plus four cut rows.
     expect(path.getAttribute("d")!.match(/M/g)).toHaveLength(5);
+  });
+
+  it("clips the scan pass to the mark, keeping the row holes open", () => {
+    const { container } = render(<MataresitMark scan />);
+    const clipPath = container.querySelector("clipPath path")!;
+
+    // The clip defaults to `nonzero`, where the rows wind the same way as the
+    // body and count as solid — the scan band would then paint over the holes.
+    expect(clipPath).toHaveAttribute("clip-rule", "evenodd");
+    expect(clipPath.getAttribute("d")!.match(/M/g)).toHaveLength(5);
+  });
+
+  it("centres the ink, not the box", () => {
+    const { container } = render(<MataresitMark />);
+    const group = container.querySelector("g")!;
+
+    // The art spans y 5.15 to 21, so it is shifted up by 1.075 units.
+    expect(group.getAttribute("transform")).toBe("translate(0 -1.075)");
   });
 });

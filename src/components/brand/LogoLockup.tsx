@@ -16,10 +16,22 @@ const MARK_SIZE_CLASSES: Record<MarkSize, string> = {
 const TONE_CLASSES: Record<LockupTone, string> = {
   // Light surfaces: ember green, the product's light-mode primary.
   accent: "text-ledger-accent",
-  // Always-dark panels (sidebar, auth panel) never receive the `.dark` class,
-  // so the sheet's dark-mode mint is applied directly.
-  "on-panel": "text-[#3FBF8E] [--mark-scan-color:var(--ledger-panel)]",
+  // Always-dark panels (sidebar, auth panel) are dark whatever the app theme
+  // is, so they take the sheet's dark-mode mint directly rather than the
+  // theme's accent, which would be ember green on a near-black plate.
+  "on-panel": "text-ledger-accent-on-panel [--mark-scan-color:var(--ledger-panel)]",
   inherit: "",
+};
+
+/**
+ * Focus ring per tone. The ring is drawn at full strength: the panel tone sits
+ * on a near-black plate, where a half-strength accent ring drops to about
+ * 1.4:1 and disappears.
+ */
+const TONE_FOCUS_CLASSES: Record<LockupTone, string> = {
+  accent: "focus-visible:ring-ledger-accent",
+  "on-panel": "focus-visible:ring-ledger-on-panel",
+  inherit: "focus-visible:ring-ledger-accent",
 };
 
 interface LogoLockupProps {
@@ -41,9 +53,9 @@ interface LogoLockupProps {
  * The one definition of the Mataresit lockup: brand mark + wordmark.
  *
  * Every surface that shows the company logo renders this, so the mark geometry
- * and colour rules stay identical. The wordmark stays in the product's display
- * serif (see BRAND-NOTES.md — a deliberate difference from the brand sheet,
- * which sets it in Instrument Sans SemiBold).
+ * and colour rules stay identical. The wordmark is live text in the app's UI
+ * font (Instrument Sans), which is what the brand sheet asks for; it is not
+ * outlined, so the font has to stay available.
  */
 export function LogoLockup({
   to = "/",
@@ -69,7 +81,8 @@ export function LogoLockup({
   );
 
   const sharedClassName = cn(
-    "group inline-flex items-center gap-2.5 rounded-[6px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent/50",
+    "group inline-flex items-center gap-2.5 rounded-[6px] focus-visible:outline-none focus-visible:ring-2",
+    TONE_FOCUS_CLASSES[tone],
     className,
   );
 
