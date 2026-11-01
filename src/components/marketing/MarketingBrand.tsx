@@ -5,11 +5,12 @@ import { useNavigationTranslation } from "@/contexts/LanguageContext";
 const brandClassName =
   "min-h-11 text-[1.0625rem] [font-weight:650] tracking-[-0.01em] text-ledger-ink";
 
-const wordmarkClassName = "text-[1.0625rem] [font-weight:650] tracking-[-0.01em]";
-
 /**
  * Marketing-site brand link. On the landing page it scrolls back to the top
  * instead of pushing a new history entry; elsewhere it navigates home.
+ *
+ * The lockup root carries the typography and the wordmark inherits it, so the
+ * wordmark only has to say what is different about it.
  */
 export function MarketingBrand({ label }: { label?: string }) {
   const { pathname } = useLocation();
@@ -21,7 +22,6 @@ export function MarketingBrand({ label }: { label?: string }) {
       to="/"
       label={label ?? t("brand.home")}
       className={brandClassName}
-      wordmarkClassName={wordmarkClassName}
     />
   );
 }

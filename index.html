@@ -12,11 +12,17 @@
     <meta property="og:description" content="Mataresit - Streamlining your digital experience." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://mataresit.vercel.app/" />
-    <meta property="og:image" content="/mataresit-tile-512.png" />
+    <!-- The social card is 1200x630 (1.91:1), the shape link previews are
+         rendered at. Absolute, because a scraper resolves og:image against
+         its own origin. -->
+    <meta property="og:image" content="https://mataresit.vercel.app/mataresit-social-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@mataresit" />
-    <meta name="twitter:image" content="/mataresit-tile-512.png" />
+    <meta name="twitter:image" content="https://mataresit.vercel.app/mataresit-social-1200x630.png" />
 
     <!-- Brand mark ("a receipt read back as data"): SVG first, PNG fallbacks,
          solid tile for platforms that crop or composite transparency. -->

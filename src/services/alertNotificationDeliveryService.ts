@@ -4,6 +4,7 @@
  * Task 3: Create Multiple Notification Channel System
  */
 
+import { BRAND_NOTIFICATION_BADGE, BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 import { supabase } from '@/lib/supabase';
 import { notificationService } from './notificationService';
 import { 
@@ -499,8 +500,8 @@ export class AlertNotificationDeliveryService {
             userId: memberId,
             title: subject,
             body: message,
-            icon: '/mataresit-192.png',
-            badge: '/mataresit-badge.png',
+            icon: BRAND_NOTIFICATION_ICON,
+            badge: BRAND_NOTIFICATION_BADGE,
             tag: `alert-${alert.id}`,
             data: {
               alertId: alert.id,

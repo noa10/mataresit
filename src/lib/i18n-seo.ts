@@ -4,6 +4,7 @@
  */
 
 import { SupportedLanguage } from './i18n';
+import { BRAND_LOGO } from './brand-assets';
 
 // Language-specific SEO configuration
 export interface LanguageSEOConfig {
@@ -257,14 +258,14 @@ export class SEOMetaManager {
         url: baseURL,
         logo: {
           '@type': 'ImageObject',
-          url: `${baseURL}/mataresit-tile-512.png`
+          url: `${baseURL}${BRAND_LOGO}`
         }
       };
     }
 
     if (pageData.type === 'Organization') {
       structuredData.url = baseURL;
-      structuredData.logo = `${baseURL}/mataresit-tile-512.png`;
+      structuredData.logo = `${baseURL}${BRAND_LOGO}`;
       structuredData.contactPoint = {
         '@type': 'ContactPoint',
         contactType: 'customer service',

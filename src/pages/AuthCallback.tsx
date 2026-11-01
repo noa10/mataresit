@@ -67,7 +67,7 @@ export default function AuthCallback() {
       <LogoLockup
         label={tNav("brand.home")}
         className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
-        wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-ink"
+        wordmarkClassName="text-ledger-ink"
       />
 
       <main className="flex flex-1 items-center justify-center pb-16">

@@ -18,6 +18,7 @@ import {
   User,
   Users,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
@@ -43,9 +44,16 @@ import {
 import { useTeam } from "@/contexts/TeamContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { SUBSCRIPTION_TIERS } from "@/config/stripe";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
+import { SUBSCRIPTION_TIERS, type SubscriptionTier } from "@/config/stripe";
 import { getTeamRoleDisplayName } from "@/types/team";
+
+/** The plan chip's icon per tier. */
+const TIER_ICONS: Record<SubscriptionTier, LucideIcon> = {
+  free: Shield,
+  pro: Zap,
+  max: Crown,
+};
 
 const monthLabel = (language: string) => {
   const locale = language === "ms" ? "ms-MY" : "en-MY";
@@ -87,6 +95,11 @@ export function AppHeader() {
   const workspaceName = currentTeam?.name || tNav("sidebar.personalWorkspace");
   const period = useMemo(() => monthLabel(language), [language]);
   const workspaceMark = (currentTeam?.name || displayName || "M").trim().charAt(0).toUpperCase();
+  // The plan chip reads the tier's name from the shared subscription config,
+  // so it cannot drift from the pricing copy.
+  const tier = subscriptionData?.tier;
+  const TierIcon = tier ? TIER_ICONS[tier] : null;
+  const tierName = tier ? SUBSCRIPTION_TIERS[tier]?.name ?? tier : "";
 
   return (
     <header className="border-b border-ledger-line bg-ledger-paper/95 backdrop-blur supports-[backdrop-filter]:bg-ledger-paper/85">
@@ -182,19 +195,11 @@ export function AppHeader() {
         {user && subscriptionData?.tier && (
           <Link
             to="/settings?tab=plan"
-            aria-label={tNav("accountPlan", {
-              tier: SUBSCRIPTION_TIERS[subscriptionData.tier]?.name ?? subscriptionData.tier,
-            })}
+            aria-label={tNav("accountPlan", { tier: tierName })}
             className="hidden min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-ledger-line-strong bg-ledger-surface px-3 py-1.5 font-data text-xs font-semibold text-ledger-ink transition-colors hover:bg-ledger-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent sm:inline-flex"
           >
-            {subscriptionData.tier === "free" ? (
-              <Shield className="h-4 w-4" aria-hidden="true" />
-            ) : subscriptionData.tier === "pro" ? (
-              <Zap className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <Crown className="h-4 w-4" aria-hidden="true" />
-            )}
-            {SUBSCRIPTION_TIERS[subscriptionData.tier]?.name ?? subscriptionData.tier}
+            {TierIcon && <TierIcon className="h-4 w-4" aria-hidden="true" />}
+            {tierName}
           </Link>
         )}
 

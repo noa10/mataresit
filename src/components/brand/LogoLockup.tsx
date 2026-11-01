@@ -47,7 +47,10 @@ interface LogoLockupProps {
   label?: string;
   markSize?: MarkSize;
   tone?: LockupTone;
-  /** Wordmark styling differs per surface; pass the existing classes here. */
+  /**
+   * Wordmark styling that differs from the lockup root. Typography set on
+   * the root is inherited by the wordmark, so pass only what has to differ.
+   */
   wordmarkClassName?: string;
   className?: string;
   /** Extra props forwarded to the rendered link (aria-current, data-testid, …). */

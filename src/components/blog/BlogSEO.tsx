@@ -3,6 +3,11 @@ import { useEffect } from 'react';
 import { BlogSEOProps } from '@/types/blog';
 import { useLanguage, useResourcesTranslation } from '@/contexts/LanguageContext';
 import { seoUtils, LANGUAGE_SEO_CONFIGS } from '@/lib/i18n-seo';
+import {
+  BRAND_SOCIAL_CARD,
+  BRAND_SOCIAL_CARD_HEIGHT,
+  BRAND_SOCIAL_CARD_WIDTH,
+} from '@/lib/brand-assets';
 
 export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOProps) {
   const { language } = useLanguage();
@@ -17,8 +22,11 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
   const defaultTitle = title || String(tResources('meta.blog.title'));
   const defaultDescription =
     description || String(tResources('meta.blog.description'));
-  const defaultImage = '/mataresit-tile-512.png';
   const siteUrl = window.location.origin;
+  // The social card is 1200x630 (1.91:1), the shape link previews are
+  // rendered at. Absolute, because a scraper resolves og:image against its
+  // own origin rather than the page's.
+  const defaultImage = `${siteUrl}${BRAND_SOCIAL_CARD}`;
 
   // Generate SEO values based on whether it's index or individual post
   const getSEOData = () => {
@@ -28,6 +36,8 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
         description: defaultDescription,
         url: `${siteUrl}/blog`,
         image: defaultImage,
+        imageWidth: BRAND_SOCIAL_CARD_WIDTH,
+        imageHeight: BRAND_SOCIAL_CARD_HEIGHT,
         type: 'website',
       };
     }
@@ -38,6 +48,8 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
         description: description || defaultDescription,
         url: `${siteUrl}/blog`,
         image: defaultImage,
+        imageWidth: BRAND_SOCIAL_CARD_WIDTH,
+        imageHeight: BRAND_SOCIAL_CARD_HEIGHT,
         type: 'article',
       };
     }
@@ -56,6 +68,10 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
       description: postDescription,
       url,
       image,
+      // A post's own image has its own dimensions; only the brand card's are
+      // known here.
+      imageWidth: post.image_url ? null : BRAND_SOCIAL_CARD_WIDTH,
+      imageHeight: post.image_url ? null : BRAND_SOCIAL_CARD_HEIGHT,
       type: 'article',
       publishedTime: post.published_at,
       modifiedTime: post.updated_at,
@@ -88,6 +104,12 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
       <meta property="og:description" content={seoData.description} />
       <meta property="og:url" content={seoData.url} />
       <meta property="og:image" content={seoData.image} />
+      {seoData.imageWidth ? (
+        <>
+          <meta property="og:image:width" content={String(seoData.imageWidth)} />
+          <meta property="og:image:height" content={String(seoData.imageHeight)} />
+        </>
+      ) : null}
       <meta property="og:type" content={seoData.type} />
       <meta property="og:site_name" content="Mataresit" />
       <meta property="og:locale" content={languageConfig.locale} />
