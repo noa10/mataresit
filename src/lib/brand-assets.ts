@@ -11,6 +11,7 @@
  * schema.org) have to make it absolute first — those resolve the URL against
  * their own origin, not the page's.
  */
+import { getSiteUrl } from './site-url';
 
 /**
  * The social card for link previews: 1200x630, the 1.91:1 shape Facebook,
@@ -40,3 +41,10 @@ export const BRAND_LOGO = '/mataresit-512.png';
  */
 export const BRAND_NOTIFICATION_ICON = '/mataresit-192.png';
 export const BRAND_NOTIFICATION_BADGE = '/mataresit-badge.png';
+
+/**
+ * A brand asset as an absolute URL, for the payloads that reach a push
+ * service. Those resolve the asset against their own origin, so a
+ * root-relative path does not resolve there.
+ */
+export const brandAssetUrl = (assetPath: string): string => `${getSiteUrl()}${assetPath}`;

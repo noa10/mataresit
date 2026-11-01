@@ -1,4 +1,4 @@
-import { BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
+import { BRAND_NOTIFICATION_ICON, brandAssetUrl } from '@/lib/brand-assets';
 import { notificationService } from './notificationService';
 import { EmailNotificationService } from './emailNotificationService';
 import { supabase } from '@/integrations/supabase/client';
@@ -416,7 +416,7 @@ export class ReceiptNotificationService {
     errorMessage?: string
   ): any {
     const basePayload = {
-      icon: BRAND_NOTIFICATION_ICON,
+      icon: brandAssetUrl(BRAND_NOTIFICATION_ICON),
       tag: `receipt-${receiptData.receiptId}`,
       data: {
         receiptId: receiptData.receiptId,
