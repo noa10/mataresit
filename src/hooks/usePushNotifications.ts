@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 import { PushNotificationService } from '@/services/pushNotificationService';
 import { notificationService } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -196,7 +197,7 @@ export function usePushNotifications(): PushNotificationState & PushNotification
       await pushService.showLocalNotification({
         title: 'Test Notification',
         body: 'This is a test notification from Mataresit',
-        icon: '/mataresit-192.png',
+        icon: BRAND_NOTIFICATION_ICON,
         tag: 'test-notification',
         data: {
           type: 'receipt_processing_completed',

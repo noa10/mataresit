@@ -73,7 +73,7 @@ export function AuthBrandingPanel() {
         label={tNav("brand.home")}
         tone="on-panel"
         className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
-        wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-on-panel"
+        wordmarkClassName="text-ledger-on-panel"
       />
 
       <div className="grid gap-1 min-[980px]:my-0 min-[980px]:flex-1 min-[980px]:place-content-center min-[980px]:justify-items-center min-[980px]:gap-[clamp(28px,5vh,52px)] min-[980px]:py-4">

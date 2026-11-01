@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useCallback, ReactNode } from 'react';
+import { BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 import { usePushNotifications, PushNotificationState, PushNotificationActions } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -104,7 +105,7 @@ export function PushNotificationProvider({ children }: PushNotificationProviderP
       const payload = {
         title: notification.title,
         body: notification.message,
-        icon: '/mataresit-192.png',
+        icon: BRAND_NOTIFICATION_ICON,
         tag: `notification-${notification.id}`,
         data: {
           notificationId: notification.id,

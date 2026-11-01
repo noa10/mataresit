@@ -12,7 +12,16 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
-const { CANVAS, INK_SHIFT, readMarkPath, assertComponentInSync } = require('./brand-mark.cjs');
+const {
+  CANVAS,
+  INK_BOTTOM,
+  INK_CENTRE,
+  INK_CENTRE_X,
+  INK_TOP,
+  INK_SHIFT,
+  readMarkPath,
+  assertComponentInSync,
+} = require('./brand-mark.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'public');
@@ -30,6 +39,15 @@ const INSET = 1;
 // platforms cut into touch icons and social cards.
 const TILE_SCALE = 0.66;
 const TILE_INSET = 0.17;
+
+// The social card. Link previews are rendered at 1.91:1, so a square tile is
+// cropped to about half its height: the tear comes off the top of the mark
+// and the flat base comes off the bottom, leaving the four rows floating.
+const SOCIAL_CARD = { width: 1200, height: 630 };
+
+// How much of the card height the mark's ink takes. It reads at feed size and
+// still leaves the card its margin.
+const SOCIAL_CARD_INK_RATIO = 0.46;
 
 const D = readMarkPath();
 assertComponentInSync(D);
@@ -57,6 +75,22 @@ const tileSvg = (size, plate, ink) =>
     ${inkCentred(`<path fill="${ink}" fill-rule="evenodd" d="${D}"/>`)}
   </g>
 </svg>`;
+
+// Social card: the wide plate link previews are rendered at. The mark's ink is
+// centred on it at the size given, so the card holds the whole mark.
+const socialCardSvg = (ground, ink) => {
+  const scale =
+    (SOCIAL_CARD.height * SOCIAL_CARD_INK_RATIO) / (INK_BOTTOM - INK_TOP);
+  // The ink centre lands on the card centre once the art is shifted up.
+  const tx = SOCIAL_CARD.width / 2 - INK_CENTRE_X * scale;
+  const ty = SOCIAL_CARD.height / 2 - (CANVAS / 2) * scale;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SOCIAL_CARD.width}" height="${SOCIAL_CARD.height}" viewBox="0 0 ${SOCIAL_CARD.width} ${SOCIAL_CARD.height}">
+  <rect width="${SOCIAL_CARD.width}" height="${SOCIAL_CARD.height}" fill="${ground}"/>
+  <g transform="translate(${tx} ${ty}) scale(${scale})">
+    ${inkCentred(`<path fill="${ink}" fill-rule="evenodd" d="${D}"/>`)}
+  </g>
+</svg>`;
+};
 
 // The standalone mark, as an SVG file. Seed colour so it reads on any page,
 // and currentColor-free because a standalone SVG has no inherited colour.
@@ -113,6 +147,12 @@ const iconFile = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024
   // The vector pair: the mark alone, and the tile.
   await emit('mataresit-mark.svg', Buffer.from(markFile));
   await emit('mataresit-icon.svg', Buffer.from(iconFile));
+
+  // The social card: the wide plate for link previews.
+  const socialCard = await sharp(
+    Buffer.from(socialCardSvg(PANEL, PAPER)),
+  ).png().toBuffer();
+  await emit('mataresit-social-1200x630.png', socialCard);
 
   console.log(written.join('\n'));
 })().catch((error) => {

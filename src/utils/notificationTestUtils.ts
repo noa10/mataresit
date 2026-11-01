@@ -6,6 +6,7 @@
  */
 
 import { toast } from 'sonner';
+import { BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 
 export interface NotificationTestResult {
   testName: string;
@@ -116,7 +117,7 @@ export async function testBasicNotification(): Promise<NotificationTestResult> {
 
     const notification = new Notification('Test Notification', {
       body: 'This is a test notification from Mataresit',
-      icon: '/mataresit-192.png',
+      icon: BRAND_NOTIFICATION_ICON,
       tag: 'test-notification'
     });
 

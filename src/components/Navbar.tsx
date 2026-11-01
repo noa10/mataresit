@@ -87,7 +87,6 @@ export default function Navbar({ navControls }: NavbarProps = {}) {
 
           <LogoLockup
             className="text-xl font-bold text-foreground hover:text-primary transition-colors"
-            wordmarkClassName="font-bold"
             label={tNav("brand.home")}
             linkProps={{ "aria-current": location.pathname === "/" ? "page" : undefined }}
           />

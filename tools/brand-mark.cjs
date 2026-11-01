@@ -25,6 +25,15 @@ const INK_TOP = 5.15;
 const INK_BOTTOM = 21;
 const INK_CENTRE = (INK_TOP + INK_BOTTOM) / 2;
 
+/**
+ * Ink bounds across: the sheet runs from x 2.4 to x 21.6, which is symmetric
+ * about the canvas centre. The rows inside it stop short of the right edge,
+ * so they do not widen the mark.
+ */
+const INK_LEFT = 2.4;
+const INK_RIGHT = 21.6;
+const INK_CENTRE_X = (INK_LEFT + INK_RIGHT) / 2;
+
 /** How far the art moves up for its ink centre to land on the canvas centre. */
 const INK_SHIFT = Number((INK_CENTRE - CANVAS / 2).toFixed(3));
 
@@ -78,6 +87,9 @@ module.exports = {
   INK_TOP,
   INK_BOTTOM,
   INK_CENTRE,
+  INK_LEFT,
+  INK_RIGHT,
+  INK_CENTRE_X,
   INK_SHIFT,
   readMarkPath,
   sameGeometry,

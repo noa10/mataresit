@@ -26,6 +26,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BRAND_NOTIFICATION_BADGE, BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -214,8 +215,8 @@ export function NotificationSystemTester() {
             payload: {
               title: 'Test Push Notification',
               body: `Receipt from ${testMerchant} processed successfully`,
-              icon: '/mataresit-192.png',
-              badge: '/mataresit-badge.png',
+              icon: BRAND_NOTIFICATION_ICON,
+              badge: BRAND_NOTIFICATION_BADGE,
               data: {
                 receiptId: testReceiptId,
                 url: `/receipts/${testReceiptId}`
