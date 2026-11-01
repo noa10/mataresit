@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { MataresitMark } from "@/components/brand/MataresitMark";
@@ -39,13 +39,19 @@ interface LogoLockupProps {
   to?: string;
   /** Plain anchor target, for in-page links such as `#top`. */
   href?: string;
-  /** Accessible name for the link. */
+  /**
+   * Accessible name for the link. Left unset, the name is the wordmark
+   * ("Mataresit"). Pass a localized name when the link goes somewhere other
+   * than the home page.
+   */
   label?: string;
   markSize?: MarkSize;
   tone?: LockupTone;
   /** Wordmark styling differs per surface; pass the existing classes here. */
   wordmarkClassName?: string;
   className?: string;
+  /** Extra props forwarded to the rendered link (aria-current, data-testid, …). */
+  linkProps?: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "children">;
   children?: ReactNode;
 }
 
@@ -60,11 +66,12 @@ interface LogoLockupProps {
 export function LogoLockup({
   to = "/",
   href,
-  label = "Mataresit home",
+  label,
   markSize = "md",
   tone = "accent",
   wordmarkClassName,
   className,
+  linkProps,
   children,
 }: LogoLockupProps) {
   const content = (
@@ -88,14 +95,14 @@ export function LogoLockup({
 
   if (href) {
     return (
-      <a href={href} aria-label={label} className={sharedClassName}>
+      <a href={href} aria-label={label} className={sharedClassName} {...linkProps}>
         {content}
       </a>
     );
   }
 
   return (
-    <Link to={to} aria-label={label} className={sharedClassName}>
+    <Link to={to} aria-label={label} className={sharedClassName} {...linkProps}>
       {content}
     </Link>
   );

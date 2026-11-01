@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuthTranslation } from "@/contexts/LanguageContext";
+import { useAuthTranslation, useNavigationTranslation } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { LogoLockup } from "@/components/brand/LogoLockup";
@@ -16,6 +16,7 @@ export default function AuthCallback() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { t } = useAuthTranslation();
+  const { t: tNav } = useNavigationTranslation();
   const { toast } = useToast();
   const tRef = useRef(t);
   const toastRef = useRef(toast);
@@ -64,7 +65,7 @@ export default function AuthCallback() {
   return (
     <div className="flex min-h-svh flex-col bg-ledger-paper px-5 py-4 text-ledger-ink min-[980px]:px-8">
       <LogoLockup
-        label="Mataresit home"
+        label={tNav("brand.home")}
         className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
         wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-ink"
       />

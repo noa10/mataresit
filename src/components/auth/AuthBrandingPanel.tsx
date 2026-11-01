@@ -7,7 +7,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { useAuthTranslation } from "@/contexts/LanguageContext";
+import { useAuthTranslation, useNavigationTranslation } from "@/contexts/LanguageContext";
 import { LogoLockup } from "@/components/brand/LogoLockup";
 
 interface FeatureItemProps {
@@ -41,6 +41,7 @@ function FeatureItem({ icon: Icon, title, description }: FeatureItemProps) {
 
 export function AuthBrandingPanel() {
   const { t } = useAuthTranslation();
+  const { t: tNav } = useNavigationTranslation();
   const [activeFeature, setActiveFeature] = useState(2);
 
   const features = FEATURE_ICONS.map((icon, i) => ({
@@ -69,7 +70,7 @@ export function AuthBrandingPanel() {
       className="flex flex-col gap-2 border-b border-white/10 bg-ledger-panel px-5 pb-5 pt-4 text-ledger-on-panel min-[980px]:min-h-svh min-[980px]:gap-7 min-[980px]:border-b-0 min-[980px]:border-r min-[980px]:border-white/10 min-[980px]:px-8 min-[980px]:pb-8 min-[980px]:pt-7 min-[1180px]:px-12 min-[1180px]:pb-9 min-[1180px]:pt-[30px]"
     >
       <LogoLockup
-        label="Mataresit home"
+        label={tNav("brand.home")}
         tone="on-panel"
         className="w-fit rounded-[7px] text-[1.0625rem] font-semibold tracking-[-0.01em]"
         wordmarkClassName="text-[1.0625rem] font-semibold tracking-[-0.01em] text-ledger-on-panel"

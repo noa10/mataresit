@@ -1,7 +1,9 @@
 {
   "brand": {
     "name": "Mataresit",
-    "tagline": "Smart Receipt Management"
+    "tagline": "Smart Receipt Management",
+    "home": "Mataresit home",
+    "workspace": "Mataresit workspace"
   },
   "mainMenu": {
     "dashboard": "Dashboard",

@@ -14,7 +14,8 @@ describe("LogoLockup", () => {
   it("renders one brand mark and the wordmark behind a single accessible name", () => {
     const { container } = renderLockup(<LogoLockup />);
 
-    const link = screen.getByRole("link", { name: "Mataresit home" });
+    // No label passed: the wordmark itself names the link.
+    const link = screen.getByRole("link", { name: "Mataresit" });
     expect(link).toHaveAttribute("href", "/");
     expect(link).toHaveTextContent("Mataresit");
 
@@ -42,7 +43,7 @@ describe("LogoLockup", () => {
 
   it("keeps the focus ring readable on the always-dark panel tone", () => {
     const { rerender } = renderLockup(<LogoLockup />);
-    const link = () => screen.getByRole("link", { name: "Mataresit home" });
+    const link = () => screen.getByRole("link", { name: "Mataresit" });
 
     // A half-strength accent ring on the near-black panel is about 1.4:1 and
     // disappears, so the panel tone rings in the on-panel colour instead.
@@ -82,7 +83,7 @@ describe("LogoLockup", () => {
   it("renders an in-page anchor when href is supplied", () => {
     renderLockup(<LogoLockup href="#top" />);
 
-    expect(screen.getByRole("link", { name: "Mataresit home" })).toHaveAttribute("href", "#top");
+    expect(screen.getByRole("link", { name: "Mataresit" })).toHaveAttribute("href", "#top");
   });
 
   it("lets a caller override the accessible name", () => {
@@ -90,6 +91,12 @@ describe("LogoLockup", () => {
 
     const link = screen.getByRole("link", { name: "Back to workspace" });
     expect(link).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("forwards extra link props so a caller can mark the current page", () => {
+    renderLockup(<LogoLockup linkProps={{ "aria-current": "page" }} />);
+
+    expect(screen.getByRole("link", { name: "Mataresit" })).toHaveAttribute("aria-current", "page");
   });
 });
 

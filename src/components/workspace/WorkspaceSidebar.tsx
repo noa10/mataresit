@@ -113,6 +113,7 @@ export function WorkspaceSidebar() {
           tone="on-panel"
           className="px-1.5 py-1 text-ledger-on-panel"
           wordmarkClassName="font-sans text-[1.1rem] font-semibold tracking-[-0.01em] text-ledger-on-panel"
+          label={t("brand.workspace")}
         />
       </div>
 

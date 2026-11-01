@@ -43,6 +43,7 @@ import {
 import { useTeam } from "@/contexts/TeamContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { SUBSCRIPTION_TIERS } from "@/config/stripe";
 import { getAvatarUrl, getUserInitials } from "@/services/avatarService";
 import { getTeamRoleDisplayName } from "@/types/team";
 
@@ -182,9 +183,9 @@ export function AppHeader() {
           <Link
             to="/settings?tab=plan"
             aria-label={tNav("accountPlan", {
-              tier: subscriptionData.tier.charAt(0).toUpperCase() + subscriptionData.tier.slice(1),
+              tier: SUBSCRIPTION_TIERS[subscriptionData.tier]?.name ?? subscriptionData.tier,
             })}
-            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-ledger-line-strong bg-ledger-surface px-3 py-1.5 font-data text-xs font-semibold text-ledger-ink transition-colors hover:bg-ledger-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent"
+            className="hidden min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-ledger-line-strong bg-ledger-surface px-3 py-1.5 font-data text-xs font-semibold text-ledger-ink transition-colors hover:bg-ledger-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ledger-accent sm:inline-flex"
           >
             {subscriptionData.tier === "free" ? (
               <Shield className="h-4 w-4" aria-hidden="true" />
@@ -193,7 +194,7 @@ export function AppHeader() {
             ) : (
               <Crown className="h-4 w-4" aria-hidden="true" />
             )}
-            {subscriptionData.tier.charAt(0).toUpperCase() + subscriptionData.tier.slice(1)}
+            {SUBSCRIPTION_TIERS[subscriptionData.tier]?.name ?? subscriptionData.tier}
           </Link>
         )}
 
