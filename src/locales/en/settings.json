@@ -464,8 +464,7 @@
     "cancelSubscription": "Cancel Subscription",
     "paymentMethod": "Payment Method",
     "billingHistory": "Billing History",
-    "invoices": "Invoices",
-    "simulatedNotice": "You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal."
+    "invoices": "Invoices"
   },
   "team": {
     "title": "Team Management",
@@ -537,8 +536,6 @@
   "billingPreferences": {
     "title": "Billing Preferences",
     "description": "Manage your subscription, payment methods, and billing notifications.",
-    "demoTitle": "Demo Mode - Simulated Subscription",
-    "demoDescription": "You're viewing a simulated subscription for testing purposes. To access the full Stripe billing portal and manage real payments, please upgrade to a paid plan.",
     "tabs": {
       "autoRenewal": "Auto-Renewal",
       "notifications": "Notifications",

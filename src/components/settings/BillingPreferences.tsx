@@ -84,9 +84,6 @@ export function BillingPreferences() {
   const { user } = useAuth();
   const { subscriptionData, createPortalSession, isLoading: stripeLoading } = useStripe();
 
-  // Check if this is a simulated subscription
-  const isSimulatedSubscription = subscriptionData?.simulated === true;
-  
   const [preferences, setPreferences] = useState<BillingPreferencesData>({
     auto_renewal_enabled: true,
     auto_renewal_frequency: 'monthly',
@@ -300,21 +297,6 @@ export function BillingPreferences() {
           {t('billingPreferences.description')}
         </p>
       </div>
-
-      {/* Simulated Subscription Alert */}
-      {isSimulatedSubscription && (
-        <Alert className="mb-6 border-ledger-accent/30 bg-ledger-accent-soft">
-          <Info className="h-4 w-4 text-ledger-accent" />
-          <AlertDescription className="text-ledger-ink-2">
-            <div className="space-y-2">
-              <p className="font-medium">{t('billingPreferences.demoTitle')}</p>
-              <p className="text-sm">
-                {t('billingPreferences.demoDescription')}
-              </p>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">

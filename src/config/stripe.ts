@@ -2,12 +2,12 @@ export const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || '';
 
 export const PRICE_IDS = {
   pro: {
-    monthly: import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID || 'price_pro_monthly',
-    annual: import.meta.env.VITE_STRIPE_PRO_ANNUAL_PRICE_ID || 'price_pro_annual',
+    monthly: import.meta.env.VITE_STRIPE_PRO_MONTHLY_PRICE_ID || '',
+    annual: import.meta.env.VITE_STRIPE_PRO_ANNUAL_PRICE_ID || '',
   },
   max: {
-    monthly: import.meta.env.VITE_STRIPE_MAX_MONTHLY_PRICE_ID || 'price_max_monthly',
-    annual: import.meta.env.VITE_STRIPE_MAX_ANNUAL_PRICE_ID || 'price_max_annual',
+    monthly: import.meta.env.VITE_STRIPE_MAX_MONTHLY_PRICE_ID || '',
+    annual: import.meta.env.VITE_STRIPE_MAX_ANNUAL_PRICE_ID || '',
   }
 };
 
@@ -77,7 +77,14 @@ export interface SubscriptionData {
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
   trialEndDate?: string;
+  billingInterval?: 'monthly' | 'annual';
+  /**
+   * False when the interval came from a profile that has not been reconciled
+   * from Stripe yet. The UI must not present an unreconciled interval as a
+   * verified plan attribute.
+   */
+  billingIntervalReconciled?: boolean;
+  cancelAtPeriodEnd?: boolean;
   receiptsUsedThisMonth: number;
   monthlyResetDate?: string;
-  simulated?: boolean;
 }
