@@ -119,12 +119,13 @@ than acknowledging unprocessed work. Stripe's own retry window still applies.
 
 Completion is fenced by a per-claim token, so a slow worker cannot mark a newer
 claim processed. Webhook subscription-state updates additionally call
-`apply_fenced_stripe_subscription_event`: that RPC locks the claim row and
-checks its token, processing status, and unexpired lease **in the same
-transaction** as the profile update. The row lock prevents another delivery
-from reclaiming that event during the transaction; it does not impose a hard
-wall-clock deadline on a transaction that continues past its lease expiry. The
-RPC also records an event timestamp per
+`apply_fenced_stripe_subscription_event`: that RPC locks the claim row, checks
+its token and processing status, and renews the lease by five minutes **in the
+same transaction** as the profile update. The row lock prevents another
+delivery from reclaiming that event during the transaction, and the renewal
+keeps a handler that is still working from being reclaimed for the next five
+minutes. An expired lease is rejected, not renewed; an owner that lost its
+lease cannot resurrect it. The RPC also records an event timestamp per
 subscription, but that does not reliably order events from different
 subscriptions, invoice handlers, or administrative updates. Stripe event IDs
 are not a chronological tie-breaker for events created in the same second;

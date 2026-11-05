@@ -16,9 +16,11 @@
 --   4. This migration deliberately does NOT create a trigger. No CREATE TRIGGER
 --      referencing handle_new_batch_item exists anywhere in this repository, so
 --      the attachment - if any - is unversioned drift established outside
---      migrations. The function body is replaced in place and existing timing is
---      preserved. Confirm attachment and timing on a nonproduction database
---      before applying: RETURN NULL cancels an insert in a BEFORE trigger.
+--      migrations. The function body is replaced in place. It returns NEW, so
+--      a BEFORE trigger no longer cancels the row (RETURN NULL would) and an
+--      AFTER trigger ignores the return value. Confirm attachment and timing on
+--      a nonproduction database before applying, because timing still decides
+--      whether dispatch is enqueued before or after commit.
 --
 -- No credential values appear in this file.
 
@@ -100,7 +102,10 @@ BEGIN
     timeout_milliseconds := 5000
   );
 
-  RETURN NULL;
+  -- Return NEW, not NULL: a row-level BEFORE trigger treats NULL as "cancel
+  -- this row", while an AFTER trigger ignores the return value. Returning NEW
+  -- keeps inserts working under either timing.
+  RETURN NEW;
 END;
 $$;
 

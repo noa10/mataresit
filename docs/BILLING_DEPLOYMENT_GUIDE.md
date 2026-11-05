@@ -47,8 +47,9 @@ the migration; the Edge Functions call RPCs and columns it creates.
       the Vault-backed trigger migration is applied.
 - [ ] Plan a batch-processing maintenance window. Confirm the existing
       `handle_new_batch_item` trigger attachment and timing in nonproduction:
-      the migration replaces the function but does not create a trigger, and
-      its `RETURN NULL` cancels a row in a BEFORE trigger.
+      the migration replaces the function but does not create a trigger. The
+      function returns `NEW`, so a BEFORE attachment no longer cancels the row;
+      timing still decides whether dispatch is enqueued before or after commit.
 - [ ] Apply both hardening migrations, in order:
       `20261104000000_stripe_production_hardening.sql` (billing columns,
       billing-field guard, service-only billing RPCs, fenced subscription-event

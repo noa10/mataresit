@@ -359,4 +359,69 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------------------------------------------------------------------------
+-- 8. The fenced claim check renews a live lease and rejects an expired one.
+-- A handler whose lease expires while it is still working cannot renew the
+-- claim; a live claim is extended so a newer delivery cannot reclaim it
+-- mid-flight.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_event TEXT := 'evt_test_' || gen_random_uuid()::text;
+  v_old_token UUID;
+  v_new_token UUID;
+  v_outcome TEXT;
+  v_lease_before TIMESTAMP WITH TIME ZONE;
+  v_lease_after TIMESTAMP WITH TIME ZONE;
+BEGIN
+  SELECT token INTO v_old_token
+  FROM public.claim_stripe_webhook_event(v_event, 'customer.subscription.updated');
+
+  SELECT lease_expires_at INTO v_lease_before
+  FROM public.stripe_webhook_events WHERE event_id = v_event;
+
+  -- A live claim passes the fence, which renews the lease five minutes ahead.
+  PERFORM public.assert_active_stripe_claim(v_event, v_old_token);
+
+  SELECT lease_expires_at INTO v_lease_after
+  FROM public.stripe_webhook_events WHERE event_id = v_event;
+  IF v_lease_after IS NULL OR v_lease_after <= v_lease_before THEN
+    RAISE EXCEPTION 'live claim: the fenced check must renew the lease (% -> %)',
+      v_lease_before, v_lease_after;
+  END IF;
+
+  -- The same handler finishes after its lease expired. It must not renew the
+  -- claim, and the stored lease must stay expired.
+  UPDATE public.stripe_webhook_events
+  SET lease_expires_at = clock_timestamp() - INTERVAL '1 second'
+  WHERE event_id = v_event;
+
+  IF NOT pg_temp.test_raises(format(
+    'SELECT public.assert_active_stripe_claim(%L, %L)', v_event, v_old_token)) THEN
+    RAISE EXCEPTION 'expired lease: the fenced check must reject the expired owner';
+  END IF;
+
+  SELECT lease_expires_at INTO v_lease_after
+  FROM public.stripe_webhook_events WHERE event_id = v_event;
+  IF v_lease_after IS NULL OR v_lease_after > clock_timestamp() THEN
+    RAISE EXCEPTION 'expired lease: a rejected check must not renew the lease';
+  END IF;
+
+  -- A newer delivery can then reclaim it, and the old token stays fenced out.
+  SELECT outcome, token INTO v_outcome, v_new_token
+  FROM public.claim_stripe_webhook_event(v_event, 'customer.subscription.updated');
+  IF v_outcome <> 'claimed' OR v_new_token IS NULL OR v_new_token = v_old_token THEN
+    RAISE EXCEPTION 'reclaim after expiry: expected a new claim with a new token, got %',
+      v_outcome;
+  END IF;
+
+  IF NOT pg_temp.test_raises(format(
+    'SELECT public.assert_active_stripe_claim(%L, %L)', v_event, v_old_token)) THEN
+    RAISE EXCEPTION 'reclaim after expiry: the old token must stay fenced out';
+  END IF;
+
+  -- The new owner can renew its claim.
+  PERFORM public.assert_active_stripe_claim(v_event, v_new_token);
+END $$;
+
 ROLLBACK;

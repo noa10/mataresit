@@ -50,7 +50,9 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    // `getUser` returns a null user for an invalid or expired token; the outer
+    // catch turns transport failures into a 500.
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
 
     if (!user) {
       return jsonResponse({ error: 'Unauthorized' }, 401);

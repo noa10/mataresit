@@ -5024,7 +5024,7 @@ BEGIN
     timeout_milliseconds := 5000
   );
 
-  RETURN NULL;
+  RETURN NEW;
 END;
 $$;
 

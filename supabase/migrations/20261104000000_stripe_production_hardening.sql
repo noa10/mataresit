@@ -167,9 +167,10 @@ GRANT EXECUTE ON FUNCTION public.reset_monthly_usage() TO service_role;
 --
 -- Plain administrative writes use sync_subscription_from_stripe. Stripe webhook
 -- subscription-state writes use apply_fenced_stripe_subscription_event, which
--- checks claim ownership, lease validity and event ordering in the same
--- transaction as the profile update. A separate preflight request is not
--- equivalent: the lease can expire before the following write request arrives.
+-- checks claim ownership, renews the lease, and checks event ordering in the
+-- same transaction as the profile update. A separate preflight request is not
+-- equivalent: the lease can expire before the following write request arrives,
+-- and only the fenced transaction can reject an expired owner atomically.
 -- This fences the profile state, not external side effects such as email.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.sync_subscription_from_stripe(
@@ -240,16 +241,18 @@ BEGIN
     RAISE EXCEPTION 'A claim token and Stripe event id are required';
   END IF;
 
-  -- Lock the claim until this transaction ends. A lease that expires after the
-  -- check does not interrupt an in-flight transaction, but a reclaim cannot
-  -- supersede this claim while the row is locked.
-  PERFORM 1
-  FROM public.stripe_webhook_events
+  -- Lock the claim until this transaction ends and renew its lease so a
+  -- handler that is still working cannot be reclaimed mid-flight by a newer
+  -- delivery. The lease is renewed only while it is live: an owner whose lease
+  -- already expired must not be able to resurrect it. Five minutes matches
+  -- LEASE_SECONDS in supabase/functions/_shared/webhook-idempotency.ts.
+  UPDATE public.stripe_webhook_events
+  SET lease_expires_at = clock_timestamp() + INTERVAL '5 minutes',
+      updated_at = clock_timestamp()
   WHERE event_id = _event_id
     AND claim_token = _claim_token
     AND status = 'processing'
-    AND lease_expires_at > clock_timestamp()
-  FOR UPDATE;
+    AND lease_expires_at > clock_timestamp();
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Stripe webhook claim % is stale or superseded', _event_id
@@ -262,6 +265,25 @@ REVOKE ALL ON FUNCTION public.assert_active_stripe_claim(TEXT, UUID)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.assert_active_stripe_claim(TEXT, UUID)
   TO service_role;
+
+-- Event IDs are opaque, and distinct events with equal timestamps are ambiguous.
+-- Such events fail closed until reconciliation; replaying the same event is safe.
+-- Created before its callers so the migration reads top-down even though
+-- PL/pgSQL string bodies resolve relation names at first execution.
+CREATE TABLE IF NOT EXISTS public.stripe_subscription_event_order (
+  stripe_subscription_id TEXT NOT NULL,
+  event_family TEXT NOT NULL DEFAULT 'subscription'
+    CHECK (event_family IN ('subscription', 'payment')),
+  stripe_event_id TEXT NOT NULL,
+  stripe_event_created TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (stripe_subscription_id, event_family)
+);
+
+ALTER TABLE public.stripe_subscription_event_order ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.stripe_subscription_event_order
+  FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.stripe_subscription_event_order TO service_role;
 
 CREATE OR REPLACE FUNCTION public.assert_stripe_event_order(
   _stripe_subscription_id TEXT,
@@ -311,23 +333,6 @@ REVOKE ALL ON FUNCTION public.assert_stripe_event_order(TEXT, TEXT, TEXT, TIMEST
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.assert_stripe_event_order(TEXT, TEXT, TEXT, TIMESTAMP WITH TIME ZONE)
   TO service_role;
-
--- Event IDs are opaque, and distinct events with equal timestamps are ambiguous.
--- Such events fail closed until reconciliation; replaying the same event is safe.
-CREATE TABLE IF NOT EXISTS public.stripe_subscription_event_order (
-  stripe_subscription_id TEXT NOT NULL,
-  event_family TEXT NOT NULL DEFAULT 'subscription'
-    CHECK (event_family IN ('subscription', 'payment')),
-  stripe_event_id TEXT NOT NULL,
-  stripe_event_created TIMESTAMP WITH TIME ZONE NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (stripe_subscription_id, event_family)
-);
-
-ALTER TABLE public.stripe_subscription_event_order ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.stripe_subscription_event_order
-  FROM PUBLIC, anon, authenticated;
-GRANT ALL ON TABLE public.stripe_subscription_event_order TO service_role;
 
 CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(
   _event_id TEXT,

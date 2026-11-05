@@ -10,7 +10,11 @@ import {
 } from '../_shared/stripe-sync.ts';
 import { getFrontendUrl } from '../_shared/site-url.ts';
 import { getServiceRoleKey } from '../_shared/service-role.ts';
-import { createWebhookIdempotencyClient, handleWebhookEventSafely as runWebhookHandler } from '../_shared/webhook-idempotency.ts';
+import {
+  createWebhookIdempotencyClient,
+  handleWebhookEventSafely as runWebhookHandler,
+  type WebhookClaim,
+} from '../_shared/webhook-idempotency.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -86,7 +90,18 @@ serve(async (req) => {
     return new Response('Invalid signature', { status: 400 });
   }
 
-  const claim = await webhookIdempotency.claim(event.id, event.type);
+  // Claim acquisition is fail-closed: if the idempotency store is down or
+  // returns an unexpected shape, acknowledge nothing and tell Stripe to retry.
+  // This runs in its own try/catch so a claim failure cannot fall through to
+  // the handler's unstructured error path.
+  let claim: WebhookClaim;
+  try {
+    claim = await webhookIdempotency.claim(event.id, event.type);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Webhook claim failed for event ${event.id}:`, message);
+    return jsonResponse({ error: 'Webhook claim failed' }, 500);
+  }
 
   if (claim.outcome === 'duplicate') {
     return jsonResponse({ received: true, duplicate: true });
@@ -263,8 +278,18 @@ serve(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Webhook event ${event.id} failed:`, message);
-    // Do not report success when completion itself fails.
-    await webhookIdempotency.complete(event.id, claim.token, 'failed', message);
+    // Mark the claim failed so a retry can reclaim it immediately. If the
+    // completion store is also down, keep the original 500: the lease will
+    // expire and the event becomes reclaimable instead of being reported as
+    // processed.
+    try {
+      await webhookIdempotency.complete(event.id, claim.token, 'failed', message);
+    } catch (completionError) {
+      console.error(
+        `Webhook failure completion failed for event ${event.id}:`,
+        completionError instanceof Error ? completionError.message : String(completionError),
+      );
+    }
 
     // 5xx tells Stripe to retry. Signature errors were handled before this
     // block and never reach the handler.
