@@ -134,14 +134,88 @@ Older events are also rejected rather than acknowledged as stale, so they can
 retry until Stripe's retry window expires. An expired or superseded claim or a
 returned RPC error causes the handler to fail and Stripe to retry.
 
-This is **single-active-claim, not exactly-once** for external effects. Emails,
-audit rows, payment-history inserts, reminder scheduling, and renewal-tracking
-RPCs happen outside the fenced profile transaction; they remain at-least-once
-and must each stay independently idempotent. A worker that has already
-committed those effects can lose its lease before completing, so nonproduction
-concurrency testing is required before cutover. Required database writes now
-throw on returned `{ error }` values; optional notification and audit failures
-are logged rather than retried.
+This is **single-active-claim, not exactly-once** for external effects. Emails
+and audit rows happen outside the fenced profile transaction; they remain
+at-least-once and must each stay independently idempotent. Payment-history
+inserts, the grace-period reset, retry-tracking close, payment event ordering,
+and renewal tracking (`next_billing_date` / `subscription_renewal_tracking`
+via `apply_fenced_renewal_tracking`) are now fenced:
+`apply_fenced_stripe_payment_event` (successful payments),
+`apply_fenced_renewal_failure` (grace start on failure),
+`apply_fenced_profile_status` (`incomplete` / `past_due` status changes), and
+`apply_fenced_renewal_tracking` (billing-period bookkeeping) each verify the
+claim before writing, and status writes are scoped to the invoice's own
+subscription so a late event cannot change a superseded subscription's state.
+The payment RPC records the payment row before the order check and skips —
+rather than fails — the state advance for one-off, superseded, or out-of-order
+payments ('recorded'), so collected money is always recorded and Stripe is not
+sent into a permanent retry for a completed fact. Payment history remains
+idempotent through the payment intent unique index. A worker that has already
+committed external effects can lose its lease before completing, so
+nonproduction concurrency testing is required before cutover. Required
+database writes throw on returned `{ error }` values; optional notification
+and audit failures are logged rather than retried. Residual unfenced webhook
+writes: `invoice.finalized` (next billing date), `payment_method.attached` /
+`detached` and `setup_intent.succeeded` (card display fields), and reminder
+scheduling stay outside the fence and remain at-least-once; the
+`billing-auto-renewal` cron path is administrative and intentionally unfenced.
+
+### 3c. Checkout ownership
+
+`stripe_checkout_locks` holds at most one row per user, and
+`create-checkout-session` must own that row before it creates a customer or a
+Checkout Session:
+
+1. `try_acquire_checkout_lock` is atomic (`INSERT ... ON CONFLICT`). An expired
+   row is deleted and the insert retried; a live row reports its bound session
+   id instead. Each acquisition returns a `lock_token` identifying the owner.
+2. If a session is already bound and still `open` at Stripe **for the same
+   plan** (tier + billing interval from its metadata), the endpoint returns
+   that same session (`reused: true`) instead of creating a second one. An
+   open session for a different plan is expired at Stripe and replaced. The
+   `SUBSCRIPTION_EXISTS` guard runs before reuse too, so a session can never
+   be handed out next to an existing subscription. A session that completed
+   but whose webhook has not released the lock yet returns
+   `409 CHECKOUT_IN_PROGRESS`; an expired session lets the caller steal the
+   lock and start a new checkout. An inspection failure (including a
+   `resource_missing` error, which points at a key or mode mismatch) fails
+   closed as `409 CHECKOUT_IN_PROGRESS` rather than freeing the lock.
+3. Customer creation runs under the lock with a per-user Stripe idempotency
+   key, so concurrent requests cannot create duplicate Stripe customers and
+   an ambiguous network failure replays the same customer instead of a second
+   one.
+4. `bind_checkout_session` ties the lock's expiry to the Checkout Session's
+   own `expires_at` (30 minutes), and the acquisition TTL is set higher than
+   the session TTL, so a crash between creating the session and binding it
+   can never leave a stealable lock while the orphan session is still
+   completable. Binding requires a live, unbound lock **and the owner's
+   token**.
+5. Failure paths release by token; `checkout.session.completed` releases by
+   session id before syncing. Both match only the exact row, so a stale
+   request or a delayed redelivery cannot free a newer checkout's lock.
+
+This guarantees at most one completable Checkout Session per user for the
+normal flow. The residual case is a request that dies between Stripe creating
+the session and the bind: the session is completable for its 30-minute
+lifetime, but the URL was never returned to any client and the lock outlives
+it, so a second session cannot be created until the session is dead. A user
+holding the orphaned session URL in another tab could still complete it,
+which is why nonproduction checkout-concurrency testing remains a cutover
+requirement.
+
+### 3d. Receipt usage counter
+
+`receipts_used_this_month` previously never incremented: the Deno incrementer
+called a non-existent client method. The increment is now a service-only RPC
+(`increment_receipts_used`) plus an `AFTER INSERT` trigger on `public.receipts`
+(`track_receipt_usage`), making the trigger the authoritative counter for
+every insert path (web, external API, batch). The increment doubles as the
+lazy monthly reset (mirroring `reset_monthly_usage`'s month-start semantics);
+`reset_monthly_usage` itself is still not scheduled anywhere, so scheduling it
+via pg_cron remains a deployment step (see the billing deployment guide).
+Receipts for a user without a profile row are skipped by the trigger instead
+of aborting the insert; the explicit RPC keeps strict behavior for its own
+callers.
 
 ### 4. Stripe Configuration
 
@@ -240,9 +314,11 @@ The backend rules are:
 
 - New subscriptions use `create-checkout-session`. Checkout is rejected with
   `409 SUBSCRIPTION_EXISTS` when the customer already has a non-canceled
-  subscription among the first 10. Simultaneous requests can still create
-  duplicate customers and open Checkout Sessions, both of which can complete,
-  so duplicate subscriptions remain a blocker.
+  subscription among the first 10, both before creating a new session and
+  before reusing an open one (which is expired at Stripe when blocked).
+  Concurrent requests for one user are serialized by the per-user checkout
+  lock: a second request reuses the open session for the same plan, or gets
+  `409 CHECKOUT_IN_PROGRESS` while another request is preparing one.
 - Existing subscribers use `manage-subscription` action `change_plan`.
   Upgrades and interval changes apply immediately with proration. Downgrades
   default to a Stripe subscription schedule at the current period end. A

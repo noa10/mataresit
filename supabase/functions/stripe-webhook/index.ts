@@ -3,11 +3,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { resolveStripeStatusForDatabase } from '../_shared/stripe-config.ts';
 import {
+  applyFencedProfileStatus,
+  applyFencedRenewalFailure,
+  applyFencedRenewalTracking,
+  applyFencedStripePaymentEvent,
   applyFencedStripeSubscriptionEvent,
   getSubscriptionBillingInterval,
   getSubscriptionTier,
   type WebhookClaimContext,
 } from '../_shared/stripe-sync.ts';
+import { releaseCheckoutLock } from '../_shared/checkout-locks.ts';
 import { getFrontendUrl } from '../_shared/site-url.ts';
 import { getServiceRoleKey } from '../_shared/service-role.ts';
 import {
@@ -170,7 +175,7 @@ serve(async (req) => {
         await handleWebhookEventSafely(
           event.type,
           event.id,
-          () => handlePaymentSucceeded(event.data.object as Stripe.Invoice),
+          () => handlePaymentSucceeded(event.data.object as Stripe.Invoice, activeClaim),
           customerId
         );
         break;
@@ -179,7 +184,7 @@ serve(async (req) => {
         await handleWebhookEventSafely(
           event.type,
           event.id,
-          () => handlePaymentFailed(event.data.object as Stripe.Invoice),
+          () => handlePaymentFailed(event.data.object as Stripe.Invoice, activeClaim),
           customerId
         );
         break;
@@ -188,7 +193,7 @@ serve(async (req) => {
         await handleWebhookEventSafely(
           event.type,
           event.id,
-          () => handlePaymentActionRequired(event.data.object as Stripe.Invoice),
+          () => handlePaymentActionRequired(event.data.object as Stripe.Invoice, activeClaim),
           customerId
         );
         break;
@@ -310,6 +315,16 @@ async function handleCheckoutSessionCompleted(
     paymentStatus: session.payment_status,
     mode: session.mode
   });
+
+  // The checkout is complete, so its ownership lock has done its job. Release
+  // it before syncing: if the sync has to retry, the user can still start a new
+  // checkout, and the release matches only the row bound to exactly this
+  // session, so a delayed redelivery cannot free a newer checkout's lock. The
+  // release is idempotent on every retry. client_reference_id carries the user
+  // id set by create-checkout-session.
+  if (session.client_reference_id) {
+    await releaseCheckoutLock(supabaseClient, session.client_reference_id, { sessionId: session.id });
+  }
 
   if (subscriptionId) {
     try {
@@ -459,9 +474,9 @@ async function handleSubscriptionDeleted(
   console.log(`Subscription deleted for customer ${customerId}, reverted to free tier`);
 }
 
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handlePaymentSucceeded(invoice: Stripe.Invoice, claim: WebhookClaimContext) {
   const customerId = invoice.customer as string;
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (invoice.subscription as string | null) ?? null;
   const paymentIntentId = (invoice.payment_intent as string | null) ?? invoice.id;
 
   const { data: profile, error: profileError } = await supabaseClient
@@ -490,85 +505,59 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     ? getSubscriptionBillingInterval(subscription)
     : 'monthly';
 
-  // A duplicate Stripe event must not add a second payment row.
-  const { data: existingPayment, error: existingPaymentError } = await supabaseClient
-    .from('payment_history')
-    .select('id')
-    .eq('stripe_payment_intent_id', paymentIntentId)
-    .maybeSingle();
+  // Required billing writes — payment row (idempotent per payment intent),
+  // grace-period reset, retry-state close, and payment event order — commit in
+  // one fenced transaction. A stale or superseded claim raises here before any
+  // of them apply. The outcome distinguishes a state advance ('applied') from
+  // a recorded-but-skipped payment (one-off, superseded, or out-of-order
+  // event): both are success for the delivery.
+  const paymentOutcome = await applyFencedStripePaymentEvent(
+    supabaseClient,
+    {
+      customerId,
+      subscriptionId,
+      paymentIntentId,
+      amountPaid: invoice.amount_paid,
+      currency: invoice.currency,
+      tier: subscriptionTier,
+      billingPeriodStart: Number.isFinite(invoice.period_start)
+        ? new Date(invoice.period_start * 1000).toISOString()
+        : null,
+      billingPeriodEnd: Number.isFinite(invoice.period_end)
+        ? new Date(invoice.period_end * 1000).toISOString()
+        : null,
+    },
+    claim,
+  );
 
-  if (existingPaymentError) {
-    throw new Error(
-      `Failed to check payment ${paymentIntentId} for customer ${customerId}: ${existingPaymentError.message}`,
-    );
-  }
-
-  if (!existingPayment) {
-    const { error: paymentError } = await supabaseClient
-      .from('payment_history')
-      .insert({
-        user_id: profile.id,
-        stripe_payment_intent_id: paymentIntentId,
-        stripe_subscription_id: subscriptionId || null,
-        amount: invoice.amount_paid,
-        currency: invoice.currency,
-        status: 'succeeded',
-        tier: subscriptionTier,
-        billing_period_start: new Date(invoice.period_start * 1000).toISOString(),
-        billing_period_end: new Date(invoice.period_end * 1000).toISOString(),
-      });
-
-    if (paymentError) {
-      throw new Error(`Failed to record payment for customer ${customerId}: ${paymentError.message}`);
-    }
+  if (paymentOutcome === 'recorded') {
+    console.log(`Payment ${paymentIntentId} recorded without applying state (one-off, superseded, or out-of-order payment)`);
   }
 
   if (subscription) {
-    await requireSuccess(
-      supabaseClient.rpc('update_subscription_renewal_tracking', {
-        p_user_id: profile.id,
-        p_stripe_subscription_id: subscription.id,
-        p_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        p_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        p_current_tier: subscriptionTier,
-        p_current_price_id: subscription.items.data[0]?.price.id || '',
-        p_status: 'active',
-      }),
-      `Failed to update renewal tracking for subscription ${subscription.id}`,
+    // Renewal tracking and next_billing_date are required billing writes, so
+    // they go through the same claim fence as the payment row: an expired
+    // worker must not overwrite a newer billing period.
+    await applyFencedRenewalTracking(
+      supabaseClient,
+      {
+        userId: profile.id,
+        subscriptionId: subscription.id,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+        currentTier: subscriptionTier,
+        currentPriceId: subscription.items.data[0]?.price.id || '',
+        status: 'active',
+      },
+      claim,
     );
   }
 
-  // Clear any grace period and reset retry attempts.
-  await requireSuccess(
-    supabaseClient
-      .from('profiles')
-      .update({
-        subscription_status: 'active',
-        grace_period_end_date: null,
-        payment_retry_attempts: 0,
-        last_payment_attempt: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', profile.id),
-    `Failed to clear grace period for user ${profile.id}`,
-  );
-
-  if (subscriptionId) {
-    await requireSuccess(
-      supabaseClient
-        .from('payment_retry_tracking')
-        .update({
-          status: 'succeeded',
-          succeeded_at: new Date().toISOString(),
-        })
-        .eq('stripe_subscription_id', subscriptionId)
-        .eq('status', 'pending'),
-      `Failed to close payment retry tracking for subscription ${subscriptionId}`,
-    );
-  }
-
+  // Email is a best-effort external effect: it is not entitlement state, so a
+  // delivery failure must not block marking the billing event processed.
   if (profile.email) {
-    await supabaseClient.functions.invoke('send-email', {
+    try {
+      const { error: emailError } = await supabaseClient.functions.invoke('send-email', {
       body: {
         to: profile.email,
         template_name: 'payment_confirmation',
@@ -589,7 +578,13 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
           language: profile.preferred_language === 'ms' ? 'ms' : 'en',
         },
       },
-    });
+      });
+      if (emailError) {
+        console.error(`Payment confirmation invoke reported an error for user ${profile.id}:`, emailError);
+      }
+    } catch (error) {
+      console.error(`Failed to send payment confirmation for user ${profile.id}:`, error);
+    }
   }
 
   await logOptionalBillingEvent(
@@ -613,7 +608,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   console.log(`Payment succeeded for customer ${customerId}`);
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: Stripe.Invoice, claim: WebhookClaimContext) {
   const customerId = invoice.customer as string;
 
   console.log(`Processing payment failure for customer ${customerId}, invoice ${invoice.id}`);
@@ -633,14 +628,18 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   if (invoice.subscription) {
     const failureReason = invoice.last_finalization_error?.message || 'Payment failed';
 
-    await requireSuccess(
-      supabaseClient.rpc('handle_renewal_failure', {
-        p_user_id: profile.id,
-        p_stripe_subscription_id: invoice.subscription as string,
-        p_failure_reason: failureReason,
-        p_stripe_invoice_id: invoice.id
-      }),
-      `Failed to handle renewal failure for user ${profile.id}`,
+    // Grace period, retry tracking, and audit rows are written by the fenced
+    // RPC so an expired worker cannot start a grace period after a newer
+    // delivery already resolved this event.
+    await applyFencedRenewalFailure(
+      supabaseClient,
+      {
+        userId: profile.id,
+        subscriptionId: invoice.subscription as string,
+        failureReason: failureReason,
+        invoiceId: invoice.id,
+      },
+      claim,
     );
 
     // Get billing preferences to check if payment failure notifications are enabled
@@ -657,48 +656,60 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     if (billingPrefs?.[0]?.payment_failure_notifications && billingPrefs[0].billing_email_enabled) {
       const prefs = billingPrefs[0];
 
-      // Schedule payment failed email with user preferences
-      await supabaseClient.functions.invoke('send-email', {
-        body: {
-          to: profile.email,
-          template_name: 'payment_failed',
-          template_data: {
-            recipientName: getProfileName(profile),
-            recipientEmail: profile.email,
-            subscriptionTier: profile.subscription_tier,
-            amount: invoice.amount_due / 100,
-            currency: invoice.currency,
-            failureReason: failureReason,
-            retryAttempt: invoice.attempt_count || 1,
-            maxRetryAttempts: prefs.max_payment_retry_attempts,
-            nextRetryDate: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString() : null,
-            gracePeriodDays: prefs.grace_period_days,
-            updatePaymentMethodUrl: `${getFrontendUrl()}/settings?tab=billing`,
-            manageSubscriptionUrl: `${getFrontendUrl()}/settings?tab=billing`,
-            language: prefs.preferred_language
+      // Schedule payment failed email with user preferences. A delivery
+      // failure must not retry the event: the grace period is already
+      // committed, so email failures are logged, not thrown.
+      try {
+        const { error: emailError } = await supabaseClient.functions.invoke('send-email', {
+          body: {
+            to: profile.email,
+            template_name: 'payment_failed',
+            template_data: {
+              recipientName: getProfileName(profile),
+              recipientEmail: profile.email,
+              subscriptionTier: profile.subscription_tier,
+              amount: invoice.amount_due / 100,
+              currency: invoice.currency,
+              failureReason: failureReason,
+              retryAttempt: invoice.attempt_count || 1,
+              maxRetryAttempts: prefs.max_payment_retry_attempts,
+              nextRetryDate: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString() : null,
+              gracePeriodDays: prefs.grace_period_days,
+              updatePaymentMethodUrl: `${getFrontendUrl()}/settings?tab=billing`,
+              manageSubscriptionUrl: `${getFrontendUrl()}/settings?tab=billing`,
+              language: prefs.preferred_language
+            }
           }
+        });
+        if (emailError) {
+          console.error(`Payment-failure email invoke reported an error for user ${profile.id}:`, emailError);
         }
-      });
+      } catch (error) {
+        console.error(`Failed to send payment-failure email for user ${profile.id}:`, error);
+      }
     } else {
       console.log(`Payment failure notifications disabled for user ${profile.id}, skipping email`);
     }
 
     console.log(`Payment failure handled for customer ${customerId}, grace period initiated`);
   } else {
-    // Fallback for non-subscription payments
-    await requireSuccess(
-      supabaseClient
-        .from('profiles')
-        .update({ subscription_status: 'past_due' })
-        .eq('stripe_customer_id', customerId),
-      `Failed to mark customer ${customerId} past due`,
+    // Fallback for non-subscription payments. The status change is fenced
+    // against the claim like every other billing write.
+    const statusRows = await applyFencedProfileStatus(
+      supabaseClient,
+      { customerId, subscriptionId: null, status: 'past_due' },
+      claim,
     );
 
-    console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+    if (statusRows === 0) {
+      console.warn(`No profile status change applied for customer ${customerId}; a newer subscription owns the record`);
+    } else {
+      console.log(`Payment failed for customer ${customerId}, marked as past_due`);
+    }
   }
 }
 
-async function handlePaymentActionRequired(invoice: Stripe.Invoice) {
+async function handlePaymentActionRequired(invoice: Stripe.Invoice, claim: WebhookClaimContext) {
   const customerId = invoice.customer as string;
 
   console.log(`Payment action required for customer ${customerId}, invoice ${invoice.id}`);
@@ -714,17 +725,21 @@ async function handlePaymentActionRequired(invoice: Stripe.Invoice) {
     throw new Error(`Profile not found for customer ${customerId}: ${profileError?.message ?? 'no profile'}`);
   }
 
-  // Update subscription status to indicate action required
-  await requireSuccess(
-    supabaseClient
-      .from('profiles')
-      .update({
-        subscription_status: 'incomplete',
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_customer_id', customerId),
-    `Failed to mark customer ${customerId} incomplete`,
+  // Update subscription status to indicate action required, fenced against the
+  // claim and scoped to the invoice's own subscription.
+  const statusRows = await applyFencedProfileStatus(
+    supabaseClient,
+    {
+      customerId,
+      subscriptionId: (invoice.subscription as string | null) ?? null,
+      status: 'incomplete',
+    },
+    claim,
   );
+
+  if (statusRows === 0) {
+    console.warn(`No profile status change applied for customer ${customerId}; a newer subscription owns the record`);
+  }
 
   // Log the event
   await logOptionalBillingEvent(
@@ -948,22 +963,31 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
 
   const prefs = billingPrefs[0];
 
-  // Send trial ending email
-  await supabaseClient.functions.invoke('send-email', {
-    body: {
-      to: profile.email,
-      template_name: 'trial_ending',
-      template_data: {
-        recipientName: getProfileName(profile),
-        recipientEmail: profile.email,
-        subscriptionTier: profile.subscription_tier,
-        trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-        manageSubscriptionUrl: `${getFrontendUrl()}/settings?tab=billing`,
-        pricingUrl: `${getFrontendUrl()}/pricing`,
-        language: prefs.preferred_language
+  // Send trial ending email. A delivery failure must not retry the event: the
+  // notification is best-effort and the event is otherwise fully processed,
+  // so email failures are logged, not thrown.
+  try {
+    const { error: emailError } = await supabaseClient.functions.invoke('send-email', {
+      body: {
+        to: profile.email,
+        template_name: 'trial_ending',
+        template_data: {
+          recipientName: getProfileName(profile),
+          recipientEmail: profile.email,
+          subscriptionTier: profile.subscription_tier,
+          trialEndDate: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+          manageSubscriptionUrl: `${getFrontendUrl()}/settings?tab=billing`,
+          pricingUrl: `${getFrontendUrl()}/pricing`,
+          language: prefs.preferred_language
+        }
       }
+    });
+    if (emailError) {
+      console.error(`Trial-ending email invoke reported an error for user ${profile.id}:`, emailError);
     }
-  });
+  } catch (error) {
+    console.error(`Failed to send trial-ending email for user ${profile.id}:`, error);
+  }
 
   // Log the trial ending event
   await logOptionalBillingEvent(

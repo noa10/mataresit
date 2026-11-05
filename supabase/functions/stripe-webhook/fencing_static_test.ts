@@ -1,4 +1,6 @@
 const migrationUrl = new URL('../../migrations/20261104000000_stripe_production_hardening.sql', import.meta.url);
+const checkoutMigrationUrl = new URL('../../migrations/20261106000000_stripe_checkout_locks_and_payment_fencing.sql', import.meta.url);
+const checkoutFunctionUrl = new URL('../create-checkout-session/index.ts', import.meta.url);
 const webhookUrl = new URL('./index.ts', import.meta.url);
 
 Deno.test('subscription preferences are created inside the fenced transaction', async () => {
@@ -27,5 +29,108 @@ Deno.test('equal-timestamp events fail closed without ordering opaque IDs', asyn
     !body.includes("USING ERRCODE = 'serialization_failure'") ||
     /_event_id\s*[<>]\s*v_last_event_id/.test(body)) {
     throw new Error('Ambiguous Stripe event ordering must fail closed');
+  }
+});
+
+Deno.test('payment handlers write billing state only through fenced RPCs', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+  const start = webhook.indexOf('async function handlePaymentSucceeded(');
+  const end = webhook.indexOf('async function handleUpcomingInvoice(');
+  const handlers = webhook.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    !handlers.includes('applyFencedStripePaymentEvent(') ||
+    !handlers.includes('applyFencedRenewalFailure(') ||
+    !handlers.includes('applyFencedProfileStatus(') ||
+    !handlers.includes('applyFencedRenewalTracking(')) {
+    throw new Error('Payment handlers must use the fenced payment RPCs');
+  }
+
+  // Profiles, payment history, and retry tracking are written by the RPCs; a
+  // direct .update()/.insert() in these handlers would bypass the claim fence,
+  // and so would an unfenced RPC that writes billing state.
+  if (/\.from\('profiles'\)[\s\S]{0,80}\.update\(/.test(handlers) ||
+    /\.from\('payment_history'\)/.test(handlers) ||
+    /\.from\('payment_retry_tracking'\)/.test(handlers) ||
+    handlers.includes("rpc('update_subscription_renewal_tracking'")) {
+    throw new Error('Payment handlers must not write billing state outside the fence');
+  }
+});
+
+Deno.test('checkout completion releases the per-user checkout lock', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+
+  if (!webhook.includes('releaseCheckoutLock(supabaseClient, session.client_reference_id, { sessionId: session.id })')) {
+    throw new Error('checkout.session.completed must release the checkout ownership lock by session id');
+  }
+});
+
+Deno.test('checkout sessions are created only while holding the checkout lock', async () => {
+  const checkout = await Deno.readTextFile(checkoutFunctionUrl);
+  const webhook = await Deno.readTextFile(webhookUrl);
+
+  if (!checkout.includes('acquireCheckoutOwnership(') ||
+    !checkout.includes('bindCheckoutSession(') ||
+    !checkout.includes('releaseCheckoutLock(supabaseAdmin, user.id, { lockToken })') ||
+    checkout.includes('releaseCheckoutLock(supabaseAdmin, user.id, null)')) {
+    throw new Error('create-checkout-session must acquire, bind, and release the checkout lock by token');
+  }
+
+  // The Stripe session must be bound before the response reports success.
+  const createIndex = checkout.indexOf('checkout.sessions.create(');
+  const bindIndex = checkout.indexOf('bindCheckoutSession(');
+  if (createIndex < 0 || bindIndex < 0 || bindIndex < createIndex) {
+    throw new Error('The checkout lock must be bound after the session is created');
+  }
+
+  if (!webhook.includes('releaseCheckoutLock(')) {
+    throw new Error('The webhook must release the lock when checkout completes');
+  }
+});
+
+Deno.test('the checkout lock cannot outlive the session it protects', async () => {
+  const migration = await Deno.readTextFile(checkoutMigrationUrl);
+  const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.bind_checkout_session(');
+  const end = migration.indexOf('\n$$;', start);
+  const body = migration.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    !body.includes('expires_at = _expires_at') ||
+    !body.includes('session_id IS NULL') ||
+    !body.includes('expires_at > clock_timestamp()')) {
+    throw new Error('Binding the checkout lock must require a live pre-bind lock and adopt the session expiry');
+  }
+});
+
+Deno.test('payment fencing RPCs check the claim before every write', async () => {
+  const subscriptionMigration = await Deno.readTextFile(migrationUrl);
+  const checkoutMigration = await Deno.readTextFile(checkoutMigrationUrl);
+
+  for (const [migrationText, fn] of [
+    [subscriptionMigration, 'apply_fenced_stripe_subscription_event'],
+    [checkoutMigration, 'apply_fenced_stripe_payment_event'],
+    [checkoutMigration, 'apply_fenced_renewal_failure'],
+    [checkoutMigration, 'apply_fenced_profile_status'],
+    [checkoutMigration, 'apply_fenced_renewal_tracking'],
+  ] as const) {
+    const start = migrationText.indexOf(`CREATE OR REPLACE FUNCTION public.${fn}(`);
+    const end = migrationText.indexOf('\n$$;', start);
+    const body = migrationText.slice(start, end);
+    const claimCheck = body.indexOf('PERFORM public.assert_active_stripe_claim(');
+    // The first write of any kind: INSERT, UPDATE, or DELETE on a real table.
+    const writeMatches = [
+      body.indexOf('INSERT INTO public.'),
+      body.indexOf('UPDATE public.'),
+      body.indexOf('DELETE FROM public.'),
+    ].filter((index) => index >= 0);
+    const firstWrite = Math.min(...(writeMatches.length ? writeMatches : [body.length]));
+
+    if (start < 0 || end < 0 || claimCheck < 0) {
+      throw new Error(`${fn} must verify the webhook claim`);
+    }
+
+    if (firstWrite < 0 || claimCheck > firstWrite) {
+      throw new Error(`${fn} must check the claim before writing`);
+    }
   }
 });

@@ -25,11 +25,11 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 ## Stripe Production Cutover
 
 **Blocked:** The current changes have not been validated end to end in an
-isolated nonproduction environment. Webhook claim fencing does not yet cover
-all billing writes, and events and subscription-management actions can race
-when updating the same profile. Concurrent checkout sessions can also create
-multiple subscriptions, and upgrades may grant a higher tier before the
-proration is paid. Resolve and test these issues before cutover.
+isolated nonproduction environment. The new SQL migrations and fenced RPCs have
+not been executed against a database, and the Stripe subscription lifecycle
+(including checkout concurrency) has not been exercised. Upgrades may still
+grant a higher tier before the proration is paid. Resolve and test the
+remaining items before cutover.
 
 Complete these steps in order before switching to live Stripe keys. Do not skip
 the migration; the Edge Functions call RPCs and columns it creates.
@@ -50,13 +50,26 @@ the migration; the Edge Functions call RPCs and columns it creates.
       the migration replaces the function but does not create a trigger. The
       function returns `NEW`, so a BEFORE attachment no longer cancels the row;
       timing still decides whether dispatch is enqueued before or after commit.
-- [ ] Apply both hardening migrations, in order:
+- [ ] Apply the hardening migrations, in order:
       `20261104000000_stripe_production_hardening.sql` (billing columns,
       billing-field guard, service-only billing RPCs, fenced subscription-event
-      RPC, webhook idempotency RPCs, payment-history uniqueness) and
-      `20261104000001_batch_item_vault_trigger.sql` (Vault-backed batch trigger).
-      The first aborts if duplicate payment intent IDs exist; the second aborts
-      if exactly one Vault secret is not present.
+      RPC, webhook idempotency RPCs, payment-history uniqueness),
+      `20261104000001_batch_item_vault_trigger.sql` (Vault-backed batch trigger),
+      and `20261106000000_stripe_checkout_locks_and_payment_fencing.sql`
+      (per-user checkout ownership, fenced payment/invoice-failure/status and
+      renewal-tracking RPCs, receipt usage counter RPC + trigger, lazy monthly
+      usage reset). The first aborts if duplicate payment intent IDs exist; the
+      second aborts if exactly one Vault secret is not present.
+- [ ] Schedule the monthly usage reset: `reset_monthly_usage()` is not
+      scheduled anywhere in the application. The lazy reset inside
+      `increment_receipts_used` keeps the counter correct for anyone who
+      uploads after the month boundary; scheduling the function with pg_cron
+      is what refreshes the displayed counter for users who upload nothing in
+      a given month.
+- [ ] Reconciliation is user-initiated only: admin syncs through
+      `manage-subscription` remain unfenced by design. Do not run Stripe
+      dashboard mutations in parallel with a user's own plan change — on those
+      unfenced paths the last write wins.
 - [ ] Immediately after the second migration, have a trusted database
       administrator configure the current environment's HTTPS endpoint. Verify
       the hostname belongs to that environment before executing the following
@@ -98,12 +111,15 @@ the migration; the Edge Functions call RPCs and columns it creates.
       `docs/api/stripe-integration.md`.
 - [ ] Verify in Stripe test mode using a test clock: new monthly and annual
       checkout, upgrade, period-end downgrade, cancel, resume, interval switch,
-      failed payment, duplicate webhook delivery, out-of-order subscription
-      events, a worker paused past its webhook lease, and a required billing
-      RPC returning an error. Confirm the DB tier and `cancel_at_period_end`
-      after each step and verify that rejected stale writes leave profile state
-      unchanged. Separately perform controlled live-mode verification after
-      cutover.
+      failed payment, duplicate webhook delivery, out-of-order subscription and
+      payment events, a worker paused past its webhook lease, and a required
+      billing RPC returning an error. Confirm the DB tier and
+      `cancel_at_period_end` after each step and verify that rejected stale
+      writes leave profile state unchanged. For checkout ownership: double
+      clicking "Upgrade" returns the same Checkout Session, two concurrent
+      checkout requests create one Stripe customer and one session, and a
+      completed session releases the lock before the next checkout starts.
+      Separately perform controlled live-mode verification after cutover.
 - [ ] Do not use the Stripe Customer Portal as the only cancellation path; the
       app now has in-app cancel and resume.
 
