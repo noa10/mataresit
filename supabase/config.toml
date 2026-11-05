@@ -28,15 +28,11 @@ port = 54334
 # External URL of the API server that frontend connects to.
 api_url = "http://127.0.0.1:54331"
 
-# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
-# are monitored, and you can view the emails that would have been sent from the web interface.
-[inbucket]
+# Local email testing uses Mailpit. Emails are not delivered externally.
+[local_smtp]
 enabled = true
-# Port to use for the email testing server web interface.
+# Web interface: http://127.0.0.1:54335
 port = 54335
-# Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 2500
-# pop3_port = 1100
 
 [storage]
 enabled = true
@@ -97,4 +93,9 @@ enable_confirmations = false
 verify_jwt = false
 
 [functions.send-gamification-streak-reminders]
+verify_jwt = false
+
+# Stripe signs its webhook requests with Stripe-Signature; it never sends a
+# Supabase JWT. The handler verifies the Stripe signature itself.
+[functions.stripe-webhook]
 verify_jwt = false

@@ -22,6 +22,90 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 - [ ] Email service API keys validated
 - [ ] Frontend build configuration updated
 
+## Stripe Production Cutover
+
+**Blocked:** The current changes have not been validated end to end in an
+isolated nonproduction environment. Webhook claim fencing does not yet cover
+all billing writes, and events and subscription-management actions can race
+when updating the same profile. Concurrent checkout sessions can also create
+multiple subscriptions, and upgrades may grant a higher tier before the
+proration is paid. Resolve and test these issues before cutover.
+
+Complete these steps in order before switching to live Stripe keys. Do not skip
+the migration; the Edge Functions call RPCs and columns it creates.
+
+- [ ] Create the Vault secret named `service_role_key` (Dashboard → Database →
+      Vault). Never commit or log its value. Check that exactly one entry exists.
+      Treat any previously exposed credential as compromised; redacting the
+      repository does not rotate or revoke it. The legacy service-role JWT in
+      `20250503181349_remote_schema.sql` was redacted as well. Verify its
+      revocation using Supabase's supported process without exposing the value.
+      Legacy service-role JWTs are tied to the legacy JWT signing secret; plan
+      any rotation or revocation with the [Supabase signing-key guide](https://supabase.com/docs/guides/auth/signing-keys),
+      since it also affects other legacy keys and tokens. Replaying that
+      historical migration installs a trigger with an invalid placeholder until
+      the Vault-backed trigger migration is applied.
+- [ ] Plan a batch-processing maintenance window. Confirm the existing
+      `handle_new_batch_item` trigger attachment and timing in nonproduction:
+      the migration replaces the function but does not create a trigger, and
+      its `RETURN NULL` cancels a row in a BEFORE trigger.
+- [ ] Apply both hardening migrations, in order:
+      `20261104000000_stripe_production_hardening.sql` (billing columns,
+      billing-field guard, service-only billing RPCs, fenced subscription-event
+      RPC, webhook idempotency RPCs, payment-history uniqueness) and
+      `20261104000001_batch_item_vault_trigger.sql` (Vault-backed batch trigger).
+      The first aborts if duplicate payment intent IDs exist; the second aborts
+      if exactly one Vault secret is not present.
+- [ ] Immediately after the second migration, have a trusted database
+      administrator configure the current environment's HTTPS endpoint. Verify
+      the hostname belongs to that environment before executing the following
+      example; never use the production hostname in a nonproduction environment:
+
+      ```sql
+      INSERT INTO public.batch_item_dispatch_config (singleton, endpoint_url)
+      VALUES (true, 'https://YOUR_PROJECT.supabase.co/functions/v1/process-batch-item')
+      ON CONFLICT (singleton) DO UPDATE SET endpoint_url = EXCLUDED.endpoint_url;
+      ```
+
+      The table is owned by `postgres`, has row-level security enabled, and is
+      inaccessible to `PUBLIC`, `anon`, `authenticated`, and `service_role`.
+      Only trusted database administrators should own it or receive privileges
+      on it. Batch inserts invoking the trigger fail until it is configured.
+      Test batch dispatch in nonproduction before resuming processing. An
+      asynchronous enqueue does not prove delivery.
+- [ ] Export `payment_history` before the first migration; reconcile duplicates
+      against Stripe rather than deleting them.
+- [ ] Reconcile existing subscriptions from Stripe. `billing_interval` is NULL
+      until reconciled, so annual and scheduled-cancellation state must be
+      backfilled before the UI can be trusted to report it.
+- [ ] After applying the migrations, regenerate and commit frontend types:
+      `supabase gen types typescript --remote > src/integrations/supabase/types.ts`.
+      Until the migrations are applied the generated types lack the new columns,
+      so do not commit a regenerated file before then.
+- [ ] Set Supabase Edge Function secrets: `STRIPE_SECRET_KEY`,
+      `STRIPE_WEBHOOK_SECRET`, and all four live price IDs
+      (`STRIPE_PRO_MONTHLY_PRICE_ID`, `STRIPE_PRO_ANNUAL_PRICE_ID`,
+      `STRIPE_MAX_MONTHLY_PRICE_ID`, `STRIPE_MAX_ANNUAL_PRICE_ID`).
+- [ ] Set Vercel environment variables: `VITE_STRIPE_PUBLIC_KEY` and the four
+      `VITE_STRIPE_*_PRICE_ID` values. These must be the same live prices as the
+      Edge Function secrets.
+- [ ] Confirm `supabase/config.toml` contains
+      `[functions.stripe-webhook] verify_jwt = false`.
+- [ ] Deploy `stripe-webhook` with `--no-verify-jwt`, and deploy
+      `create-checkout-session` and `manage-subscription`.
+- [ ] In Stripe, register the live webhook endpoint and the events listed in
+      `docs/api/stripe-integration.md`.
+- [ ] Verify in Stripe test mode using a test clock: new monthly and annual
+      checkout, upgrade, period-end downgrade, cancel, resume, interval switch,
+      failed payment, duplicate webhook delivery, out-of-order subscription
+      events, a worker paused past its webhook lease, and a required billing
+      RPC returning an error. Confirm the DB tier and `cancel_at_period_end`
+      after each step and verify that rejected stale writes leave profile state
+      unchanged. Separately perform controlled live-mode verification after
+      cutover.
+- [ ] Do not use the Stripe Customer Portal as the only cancellation path; the
+      app now has in-app cancel and resume.
+
 ## Deployment Steps
 
 ### 1. Database Migration
@@ -263,16 +347,16 @@ supabase functions logs stripe-webhook
 
 #### End-to-End Workflow Testing
 
-1. **Create Test User:**
-   ```sql
-   INSERT INTO auth.users (id, email) 
-   VALUES ('test-user-e2e', 'test-e2e@example.com');
-   ```
+1. **Create a test user** through Supabase Auth in the isolated test project.
+   Record the user's UUID for the following checks.
 
-2. **Initialize Billing Preferences:**
+2. **Verify default billing preferences:**
    ```sql
-   SELECT initialize_billing_preferences('test-user-e2e', 'pro');
+   SELECT * FROM public.billing_preferences
+   WHERE user_id = '00000000-0000-0000-0000-000000000000'::uuid;
    ```
+   Replace the example UUID with the test user's UUID. The Auth user creation
+   trigger creates the preferences row; preserve any settings already present.
 
 3. **Schedule Billing Reminders:**
    ```bash
@@ -450,14 +534,10 @@ If critical issues are discovered:
    # ... deploy other functions
    ```
 
-3. **Database Rollback:**
-   ```bash
-   # Revert database changes
-   supabase db reset
-   # Apply previous migration
-   git checkout previous-migration
-   supabase db push
-   ```
+3. **Database recovery:** Do not reset the production database or replay old
+   migrations as a rollback. Assess the impact, preserve the affected data, and
+   prepare a reviewed forward migration or a tested backup-recovery procedure.
+   Apply it only after confirming the target environment and obtaining approval.
 
 ### Partial Rollback
 
