@@ -24,12 +24,66 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 
 ## Stripe Production Cutover
 
-**Blocked:** The current changes have not been validated end to end in an
-isolated nonproduction environment. The new SQL migrations and fenced RPCs have
-not been executed against a database, and the Stripe subscription lifecycle
-(including checkout concurrency) has not been exercised. Upgrades may still
-grant a higher tier before the proration is paid. Resolve and test the
-remaining items before cutover.
+**Blocked:** The database half is now locally verified; the Stripe lifecycle is
+not. On 2026-11-06 the five billing SQL suites
+(`stripe_webhook_claim_fencing`, `payment_state_fencing`,
+`stripe_checkout_locks`, `profile_billing_column_protection`,
+`batch_item_dispatch_config`) passed against a disposable PostgreSQL 15
+database built from a curated baseline (initial schema plus the subscription
+and billing-schema migrations) and the three hardening migrations (see
+`Verification status` below). CI is wired through the `sql-regression` job but
+has not been observed on this branch.
+
+Still blocking cutover:
+
+- Live/test-mode Stripe lifecycle behavior — Checkout, upgrade/proration
+  collection, cancel/resume, interval switch, payment failure/dunning, 3DS,
+  replayed and out-of-order webhook delivery, and a worker paused past its
+  lease — has not been exercised.
+- Two-session checkout-lock and webhook-claim races are not covered by the
+  single-session SQL suites.
+- Paid upgrades still sync the target tier before the proration invoice is
+  collected (see the proration limitation in `docs/api/stripe-integration.md`).
+- Legacy service-role JWT revocation/rotation and production Vault creation
+  require dashboard or management access and are not verified here.
+- The app-wide TypeScript baseline remains non-zero; CI's root `tsc` command
+  check is not evidence. Only the billing-specific diagnostics were fixed.
+
+### Verification status
+
+Local SQL execution (2026-11-06):
+
+```bash
+bash .github/sql-regression/run-sql-regression.sh
+```
+
+The tracked runner creates a loopback-only `postgres:15-alpine` container,
+applies a curated production-shaped baseline plus
+`20261104000000_stripe_production_hardening.sql`,
+`20261104000001_batch_item_vault_trigger.sql`, and
+`20261106000000_stripe_checkout_locks_and_payment_fencing.sql`, then runs the
+five suites. All five exited 0. The full historical migration chain is **not**
+replayed: it contains remote placeholders and out-of-band schema drift, so it
+is not a valid bootstrap.
+
+The baseline is `20231126000000_initial_schema.sql`, then
+`20250115000000_add_subscription_schema.sql`,
+`20250120000000_fix_profiles_insert_policy.sql`, and
+`20250722000000_enhance_billing_system_schema.sql`, plus a two-line
+`email`-column shim. `.github/sql-regression/bootstrap.sql` substitutes the
+Supabase platform pieces those migrations assume: it creates the `anon`,
+`authenticated`, and `service_role` roles, `auth.uid()` / `auth.role()` shims
+(only when absent), a minimal `auth.users` table, a `vault.decrypted_secrets`
+placeholder, and a `pg_net` stub that raises instead of delivering HTTP. Read
+"production-shaped" as "matches the billing table and function contract", not
+"identical to production".
+
+The `invitation-auth-regression` CI job continues to own
+`supabase/tests/invitation_acceptance_auth.sql` separately.
+
+CI status: `sql-regression` is wired in `.github/workflows/supabase-validate.yml`
+and runs the same runner. Executing it requires a push; the local run above is
+the execution evidence for this branch.
 
 Complete these steps in order before switching to live Stripe keys. Do not skip
 the migration; the Edge Functions call RPCs and columns it creates.
@@ -37,9 +91,23 @@ the migration; the Edge Functions call RPCs and columns it creates.
 - [ ] Create the Vault secret named `service_role_key` (Dashboard → Database →
       Vault). Never commit or log its value. Check that exactly one entry exists.
       Treat any previously exposed credential as compromised; redacting the
-      repository does not rotate or revoke it. The legacy service-role JWT in
-      `20250503181349_remote_schema.sql` was redacted as well. Verify its
-      revocation using Supabase's supported process without exposing the value.
+      repository does not rotate or revoke it. Verify revocation using
+      Supabase's supported process without exposing the value. The credential
+      inventory as of this branch (all redacted in the working tree, all still
+      present in Git history):
+
+      | Location | Kind |
+      |---|---|
+      | `20250503181349_remote_schema.sql` | legacy service-role JWT literal |
+      | `docs/troubleshooting/WEBHOOK_DEBUGGING_GUIDE.md` | legacy service-role JWT literal |
+      | `scripts/apply-missing-migrations.ts` | embedded fallback service-role key |
+      | `scripts/apply-quality-metrics-migration.ts` | embedded fallback service-role key |
+      | `scripts/setup-test-environment.js` | embedded service-role key constant |
+      | `tools/debug/check-receipts.js` | embedded service-role key constant |
+
+      Several scripts and test fixtures also contain `anon` JWTs. Those are
+      public by design and are not part of the revocation gate, but they should
+      be replaced with environment reads as they are touched.
       Legacy service-role JWTs are tied to the legacy JWT signing secret; plan
       any rotation or revocation with the [Supabase signing-key guide](https://supabase.com/docs/guides/auth/signing-keys),
       since it also affects other legacy keys and tokens. Replaying that
@@ -92,10 +160,17 @@ the migration; the Edge Functions call RPCs and columns it creates.
 - [ ] Reconcile existing subscriptions from Stripe. `billing_interval` is NULL
       until reconciled, so annual and scheduled-cancellation state must be
       backfilled before the UI can be trusted to report it.
-- [ ] After applying the migrations, regenerate and commit frontend types:
-      `supabase gen types typescript --remote > src/integrations/supabase/types.ts`.
-      Until the migrations are applied the generated types lack the new columns,
-      so do not commit a regenerated file before then.
+- [ ] After applying the migrations, regenerate and commit frontend types into
+      the file the browser client actually imports:
+      `supabase gen types typescript --remote > src/types/supabase.ts`
+      (`src/integrations/supabase/client.ts` imports `Database` from
+      `src/types/supabase`; `src/integrations/supabase/types.ts` is stale and
+      unused). This command targets the linked project; run it only in the
+      authorized environment. Until the migrations are applied the generated
+      types lack the new columns, so do not commit a regenerated file before
+      then. The billing settings screen currently uses local row interfaces for
+      the two missing objects, so type generation does not block local
+      verification.
 - [ ] Set Supabase Edge Function secrets: `STRIPE_SECRET_KEY`,
       `STRIPE_WEBHOOK_SECRET`, and all four live price IDs
       (`STRIPE_PRO_MONTHLY_PRICE_ID`, `STRIPE_PRO_ANNUAL_PRICE_ID`,
