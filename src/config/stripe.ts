@@ -87,4 +87,7 @@ export interface SubscriptionData {
   cancelAtPeriodEnd?: boolean;
   receiptsUsedThisMonth: number;
   monthlyResetDate?: string;
+  next_billing_date?: string;
+  payment_method_brand?: string;
+  payment_method_last_four?: string;
 }

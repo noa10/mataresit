@@ -79,7 +79,7 @@ built-in variable is absent.
 
 ### 3. Database Migration
 
-Two migrations must be applied, in order:
+Three migrations must be applied, in order:
 
 - `supabase/migrations/20261104000000_stripe_production_hardening.sql` — adds
   `billing_interval` / `cancel_at_period_end`, guards billing columns on INSERT
@@ -97,11 +97,44 @@ Two migrations must be applied, in order:
   authenticated, or service_role. Batch-item inserts fail until the URL is
   configured; schedule a maintenance window. The migration does not validate the
   endpoint before applying.
+- `supabase/migrations/20261106000000_stripe_checkout_locks_and_payment_fencing.sql`
+  — adds `stripe_checkout_locks` and the checkout ownership RPCs, the
+  service-only receipt-usage counter and trigger, and the fenced
+  payment/renewal/status/profile RPCs used by the webhook.
 
 Before the first migration: export `payment_history` and reconcile duplicate
 payment intent IDs against Stripe. After it: backfill `billing_interval` from
 Stripe, since the column is NULL until reconciled and the UI cannot otherwise
 report annual subscriptions correctly.
+
+#### Verification status
+
+The five billing SQL suites in `supabase/tests/` (`stripe_webhook_claim_fencing`,
+`payment_state_fencing`, `stripe_checkout_locks`,
+`profile_billing_column_protection`, and `batch_item_dispatch_config`) were
+executed successfully on 2026-11-06 against a disposable PostgreSQL 15
+database. The runner builds it from `20231126000000_initial_schema.sql`, three
+intermediate billing migrations, a two-line `email`-column shim, and the three
+migrations above. `bootstrap.sql` substitutes the platform pieces: roles,
+`auth.uid()` / `auth.role()` shims (created only when absent), a minimal
+`auth.users` table, a `vault.decrypted_secrets` placeholder, and a `pg_net`
+stub that raises instead of delivering HTTP. The contract under test is the
+billing tables and functions, not a byte-identical production schema. Run the
+suites with:
+
+```bash
+bash .github/sql-regression/run-sql-regression.sh
+```
+
+The runner creates a loopback-only `postgres:15-alpine` container, applies the
+curated schema, and removes the container on exit. The `sql-regression` CI job
+uses the same runner. CI execution is **wired but not yet observed on this
+branch** (it requires a push); the local run is the execution evidence.
+
+These suites are single-session. Two-session checkout-lock and webhook-lease
+races, live Stripe lifecycle behavior (Checkout, proration collection,
+cancellation, dunning, 3DS), and webhook forwarding remain user-gated
+nonproduction checks before cutover.
 
 ### 3b. Webhook idempotency
 
@@ -155,10 +188,26 @@ committed external effects can lose its lease before completing, so
 nonproduction concurrency testing is required before cutover. Required
 database writes throw on returned `{ error }` values; optional notification
 and audit failures are logged rather than retried. Residual unfenced webhook
-writes: `invoice.finalized` (next billing date), `payment_method.attached` /
-`detached` and `setup_intent.succeeded` (card display fields), and reminder
-scheduling stay outside the fence and remain at-least-once; the
-`billing-auto-renewal` cron path is administrative and intentionally unfenced.
+writes, all in `supabase/functions/stripe-webhook/index.ts`:
+
+- `invoice.finalized` (`handleInvoiceFinalized`, ~879-927) updates
+  `profiles.next_billing_date` directly.
+- `payment_method.attached` / `detached` (~1013-1117) and
+  `setup_intent.succeeded` (~1123-1179) update card display fields directly.
+- Reminder scheduling and the payment-success/failure/trial-ending emails stay
+  outside the fence and remain at-least-once.
+- `manage-subscription` admin syncs and the `billing-auto-renewal` cron path
+  are administrative and intentionally unfenced.
+
+These are display/bookkeeping writes, not entitlement grants, and are accepted
+as best-effort for this PR. The following known limitations remain open and
+are **not** claimed as fixed: a paid upgrade can sync the target tier before
+Stripe collects the proration invoice (`manage-subscription` `changePlan`);
+`handle_renewal_failure` records a hardcoded USD amount (2999/9999 cents) and
+resets `payment_retry_attempts` to 1; and `apply_fenced_profile_status` can
+still update the display-only status of a profile whose
+`stripe_subscription_id` is NULL when a late event for a deleted subscription
+arrives. Each needs a dedicated follow-up migration or product decision.
 
 ### 3c. Checkout ownership
 
@@ -320,10 +369,18 @@ The backend rules are:
   lock: a second request reuses the open session for the same plan, or gets
   `409 CHECKOUT_IN_PROGRESS` while another request is preparing one.
 - Existing subscribers use `manage-subscription` action `change_plan`.
-  Upgrades and interval changes apply immediately with proration. Downgrades
-  default to a Stripe subscription schedule at the current period end. A
-  subscription already scheduled to cancel must be resumed before scheduling a
-  paid-tier downgrade.
+  Upgrades and interval changes apply immediately with
+  `proration_behavior: 'create_prorations'`. **Known limitation:** the same
+  request syncs `profiles.subscription_tier` to the target tier, so a customer
+  can receive the higher tier before Stripe collects the proration invoice.
+  The safe redesign uses `payment_behavior: 'pending_if_incomplete'` with
+  `proration_behavior: 'always_invoice'`, handles
+  `customer.subscription.pending_update_applied` / `pending_update_expired`,
+  and only grants the tier after Stripe reports the update paid. That redesign
+  is not implemented in this branch and remains a pre-production blocker.
+  Downgrades default to a Stripe subscription schedule at the current period
+  end. A subscription already scheduled to cancel must be resumed before
+  scheduling a paid-tier downgrade.
 - Cancellation sets `cancel_at_period_end`; resume clears it. Both are
   reflected in `profiles.cancel_at_period_end` immediately, with the webhook as
   the reconciliation path.
@@ -371,6 +428,19 @@ The backend rules are:
 
 ## Testing
 
+### Billing SQL suites (local, no hosted project)
+
+```bash
+bash .github/sql-regression/run-sql-regression.sh
+```
+
+This is the execution evidence used by the `sql-regression` CI job. It builds
+a disposable loopback-only PostgreSQL 15 database, applies the curated initial
+schema plus the three billing migrations, and runs the five suites. The
+existing `invitation-auth-regression` job continues to own
+`supabase/tests/invitation_acceptance_auth.sql` on its own bare-Postgres
+database; it is not part of this runner.
+
 ### Test Cards
 Use Stripe test cards for development:
 - Success: `4242424242424242`
@@ -382,6 +452,12 @@ Use Stripe CLI for local webhook testing:
 ```bash
 stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook
 ```
+
+Live Stripe lifecycle checks — Checkout concurrency, upgrade/proration
+collection, cancel/resume, payment failure and dunning, 3DS, and replayed or
+out-of-order webhook delivery — are **not** covered by the SQL suites and
+remain user-gated nonproduction tests. Do not mark this integration production
+ready on the strength of the SQL run alone.
 
 ## Troubleshooting
 

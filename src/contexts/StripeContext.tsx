@@ -42,7 +42,10 @@ const PROFILE_SUBSCRIPTION_COLUMNS = `
   billing_interval,
   cancel_at_period_end,
   receipts_used_this_month,
-  monthly_reset_date
+  monthly_reset_date,
+  next_billing_date,
+  payment_method_brand,
+  payment_method_last_four
 `;
 
 interface ProfileSubscriptionRow {
@@ -57,6 +60,9 @@ interface ProfileSubscriptionRow {
   cancel_at_period_end: boolean | null;
   receipts_used_this_month: number | null;
   monthly_reset_date: string | null;
+  next_billing_date: string | null;
+  payment_method_brand: string | null;
+  payment_method_last_four: string | null;
 }
 
 /**
@@ -85,6 +91,9 @@ function toSubscriptionData(profile: ProfileSubscriptionRow): SubscriptionData {
     cancelAtPeriodEnd: Boolean(profile.cancel_at_period_end),
     receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
     monthlyResetDate: profile.monthly_reset_date ?? undefined,
+    next_billing_date: profile.next_billing_date ?? undefined,
+    payment_method_brand: profile.payment_method_brand ?? undefined,
+    payment_method_last_four: profile.payment_method_last_four ?? undefined,
   };
 }
 

@@ -63,6 +63,37 @@ interface PaymentHistory {
   invoice_url?: string;
 }
 
+// The generated Supabase types imported by the client predate the billing
+// tables and RPCs. Keep the row shapes local rather than regenerating the
+// entire type file (which requires a remote project).
+interface BillingPreferenceRow {
+  auto_renewal_enabled: boolean;
+  auto_renewal_frequency: 'monthly' | 'annual';
+  billing_email_enabled: boolean;
+  reminder_days_before_renewal: number[];
+  payment_failure_notifications: boolean;
+  grace_period_notifications: boolean;
+  max_payment_retry_attempts: number;
+  retry_interval_hours: number;
+  grace_period_days: number;
+  preferred_language: 'en' | 'ms';
+  timezone: string;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+}
+
+interface BillingAuditRow {
+  id: string;
+  created_at: string;
+  event_type: string;
+  event_description?: string | null;
+  new_values?: {
+    amount_paid?: number;
+    currency?: string;
+    invoice_url?: string;
+  } | null;
+}
+
 interface SubscriptionHealth {
   subscription_tier: string;
   subscription_status: string;
@@ -115,7 +146,7 @@ export function BillingPreferences() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase.rpc('get_billing_preferences', {
+      const { data, error } = await (supabase.rpc as any)('get_billing_preferences', {
         p_user_id: user.id
       });
 
@@ -125,8 +156,9 @@ export function BillingPreferences() {
         return;
       }
 
-      if (data && data.length > 0) {
-        const prefs = data[0];
+      const rows = (data ?? []) as BillingPreferenceRow[];
+      if (rows.length > 0) {
+        const prefs = rows[0];
         setPreferences({
           auto_renewal_enabled: prefs.auto_renewal_enabled,
           auto_renewal_frequency: prefs.auto_renewal_frequency,
@@ -139,8 +171,8 @@ export function BillingPreferences() {
           grace_period_days: prefs.grace_period_days,
           preferred_language: prefs.preferred_language,
           timezone: prefs.timezone,
-          quiet_hours_start: prefs.quiet_hours_start,
-          quiet_hours_end: prefs.quiet_hours_end
+          quiet_hours_start: prefs.quiet_hours_start ?? undefined,
+          quiet_hours_end: prefs.quiet_hours_end ?? undefined
         });
       }
     } catch (error) {
@@ -156,8 +188,7 @@ export function BillingPreferences() {
 
     try {
       // Get payment history from billing audit trail
-      const { data, error } = await supabase
-        .from('billing_audit_trail')
+      const { data, error } = await (supabase.from as any)('billing_audit_trail')
         .select('*')
         .eq('user_id', user.id)
         .in('event_type', ['payment_succeeded', 'payment_failed', 'subscription_created'])
@@ -169,7 +200,8 @@ export function BillingPreferences() {
         return;
       }
 
-      const history: PaymentHistory[] = data?.map(record => ({
+      const rows = (data ?? []) as BillingAuditRow[];
+      const history: PaymentHistory[] = rows.map(record => ({
         id: record.id,
         amount: record.new_values?.amount_paid || 0,
         currency: record.new_values?.currency || 'usd',
@@ -177,7 +209,7 @@ export function BillingPreferences() {
         created_at: record.created_at,
         description: record.event_description,
         invoice_url: record.new_values?.invoice_url
-      })) || [];
+      }));
 
       setPaymentHistory(history);
     } catch (error) {
