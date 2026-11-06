@@ -142,6 +142,7 @@
       "settingsCta": "Urus privasi ganjaran",
       "emptyTitle": "Belum ada aktiviti papan pendahulu",
       "emptyDescription": "Ahli yang memilih untuk menyertai akan muncul di sini selepas mula mengumpul kemajuan untuk metrik ini.",
+      "errorDescription": "Kami tidak dapat memuatkan papan pendahulu sekarang. Sila cuba lagi.",
       "privacyGateTitle": "Sertai papan pendahulu apabila anda bersedia",
       "privacyGateDescription": "Hidupkan penyertaan papan pendahulu dalam tetapan ganjaran anda untuk membandingkan XP mingguan, resit bulanan, dan jumlah boleh ditolak.",
       "privacyGateStatus": "Profil ganjaran anda kini disembunyikan daripada papan pendahulu.",

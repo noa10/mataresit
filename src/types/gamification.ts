@@ -135,6 +135,7 @@ export interface MissionProgress {
 
 export interface LeaderboardEntry {
   rank: number;
+  /** Empty when the backend withholds an anonymous member's id. */
   userId: string;
   displayName: string;
   isCurrentUser: boolean;

@@ -142,6 +142,7 @@
       "settingsCta": "Manage rewards privacy",
       "emptyTitle": "No leaderboard activity yet",
       "emptyDescription": "Opted-in members will appear here after they start earning progress for this metric.",
+      "errorDescription": "We couldn't load the leaderboard right now. Please try again.",
       "privacyGateTitle": "Join the leaderboard when you're ready",
       "privacyGateDescription": "Turn on leaderboard participation from your rewards settings to compare weekly XP, monthly receipts, and deductible totals.",
       "privacyGateStatus": "Your rewards profile is currently hidden from the leaderboard.",

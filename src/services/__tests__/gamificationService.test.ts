@@ -218,6 +218,43 @@ describe("gamificationService", () => {
     }]);
   });
 
+  it("maps a masked anonymous member without a stable user id", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [{
+        rank: 3,
+        user_id: null,
+        display_name: "Anonymous #3",
+        is_current_user: false,
+        is_anonymous: true,
+        metric_value: 500,
+        gap_to_top_ten: 50,
+      }],
+      error: null,
+    });
+
+    const leaderboard = await gamificationService.getLeaderboard("weekly_xp");
+
+    expect(leaderboard[0]).toMatchObject({
+      userId: "",
+      displayName: "Anonymous #3",
+      isAnonymous: true,
+    });
+  });
+
+  it("rejects leaderboard failures so the page can render its retry state", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "42702",
+        message: 'column reference "metric_value" is ambiguous',
+      },
+    });
+
+    await expect(gamificationService.getLeaderboard("weekly_xp")).rejects.toThrow(
+      /ambiguous/
+    );
+  });
+
   it("maps mission rpc rows into typed mission progress", async () => {
     rpcMock.mockResolvedValueOnce({
       data: [{
