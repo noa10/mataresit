@@ -67,6 +67,7 @@ DECLARE
   v_acquired BOOLEAN;
   v_session TEXT;
   v_token UUID;
+  v_bound BOOLEAN;
 BEGIN
   SELECT acquired, session_id, lock_token INTO v_acquired, v_session, v_token
   FROM public.try_acquire_checkout_lock(v_user, 900);

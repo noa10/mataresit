@@ -431,6 +431,7 @@ BEGIN
   FROM public.profiles WHERE id = v_user;
   IF v_attempts IS NULL OR v_attempts <> 1 THEN
     RAISE EXCEPTION 'replay: attempts must stay at 1 after the short-circuit, got %', v_attempts;
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------------

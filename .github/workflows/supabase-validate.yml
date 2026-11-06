@@ -5,11 +5,13 @@ on:
     branches: [ main, develop ]
     paths:
       - 'supabase/**'
+      - '.github/sql-regression/**'
       - '.github/workflows/supabase-validate.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'supabase/**'
+      - '.github/sql-regression/**'
       - '.github/workflows/supabase-validate.yml'
   workflow_dispatch:
     inputs:
@@ -350,6 +352,40 @@ jobs:
           psql -h localhost -U postgres -d invitation_test -v ON_ERROR_STOP=1 \
             -f supabase/tests/invitation_acceptance_auth.sql
 
+  # SQL regression suites. The Stripe/billing suites need a Supabase-shaped
+  # schema, not the historical migration chain: that chain contains remote
+  # placeholders and out-of-band schema drift and cannot replay cleanly. The
+  # tracked runner builds a curated production-shaped baseline in a disposable
+  # loopback-only postgres:15 container, applies the three billing hardening
+  # migrations, and runs the suites. It never contacts a hosted project or uses
+  # a repository secret.
+  sql-regression:
+    name: Stripe SQL Regression
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run disposable PostgreSQL suites
+        env:
+          PR234_SQL_LOG_DIR: ${{ runner.temp }}/pr234-sql-regression
+        run: bash .github/sql-regression/run-sql-regression.sh
+
+      - name: Upload SQL regression logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr234-sql-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pr234-sql-regression
+          if-no-files-found: error
+
   # Edge Functions Validation
   validate-edge-functions:
     name: Validate Edge Functions
@@ -479,8 +515,8 @@ jobs:
   validate-deployment:
     name: Validate Supabase Configuration
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, validate-edge-functions]
-    if: always() && needs.validate.result == 'success'
+    needs: [validate, validate-migrations, sql-regression, validate-edge-functions]
+    if: always() && needs.validate.result == 'success' && (needs.sql-regression.result == 'success' || needs.sql-regression.result == 'skipped')
     environment: Production
 
     steps:
@@ -686,28 +722,30 @@ jobs:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, invitation-auth-regression, validate-edge-functions, validate-deployment]
+    needs: [validate, validate-migrations, invitation-auth-regression, sql-regression, validate-edge-functions, validate-deployment]
     if: always()
 
     steps:
       - name: Log deployment success
-        if: ${{ needs.validate-deployment.result == 'success' }}
+        if: ${{ needs.validate-deployment.result == 'success' && (needs.sql-regression.result == 'success' || needs.sql-regression.result == 'skipped') }}
         run: |
           echo "🚀 Supabase deployment successful!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
           echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
+          echo "Stripe SQL regression: ${{ needs.sql-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
       - name: Log deployment failure
-        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.invitation-auth-regression.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
+        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.invitation-auth-regression.result == 'failure' || needs.sql-regression.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
         run: |
           echo "❌ Supabase deployment failed!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
           echo "Validation: ${{ needs.validate.result }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
           echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
+          echo "Stripe SQL regression: ${{ needs.sql-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Check workflow logs for details."
 
@@ -719,6 +757,7 @@ jobs:
           echo "Validation: ${{ needs.validate.result }}"
           echo "Migrations: ${{ needs.validate-migrations.result }}"
           echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
+          echo "Stripe SQL regression: ${{ needs.sql-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
