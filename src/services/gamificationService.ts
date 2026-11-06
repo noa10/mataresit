@@ -357,8 +357,11 @@ export const gamificationService = {
       _limit: options.limit ?? 100,
     });
     if (error) {
-      console.warn("Unable to load gamification leaderboard.", error);
-      return [];
+      // Surface the failure to React Query so LeaderboardPage renders its retry
+      // state. Returning [] here made a broken RPC look like an empty board.
+      console.error("Unable to load gamification leaderboard.", error);
+      const detail = [error.code, error.message].filter(Boolean).join(" ").trim();
+      throw new Error(detail || "Unable to load gamification leaderboard.");
     }
     return Array.isArray(data)
       ? data.map((row, index) => ({
