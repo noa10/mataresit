@@ -224,8 +224,10 @@ serve(async (req) => {
 
     // From here on this request owns the lock. Any failure before a Checkout
     // Session exists releases the pre-bind lock so the user is not locked out
-    // for the full acquisition TTL.
+    // for the full acquisition TTL. Once a session exists, releasing would let
+    // the next request create a second completable session.
     const lockToken = ownership.lockToken;
+    let createdSession: Stripe.Checkout.Session | null = null;
 
     try {
       const { data: profile, error: profileError } = await supabaseAdmin
@@ -332,7 +334,7 @@ serve(async (req) => {
       const successUrl = `${baseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${baseUrl}/pricing`;
 
-      const session = await stripe.checkout.sessions.create({
+      createdSession = await stripe.checkout.sessions.create({
         customer: customerId,
         client_reference_id: user.id,
         payment_method_types: ['card'],
@@ -361,8 +363,22 @@ serve(async (req) => {
         idempotencyKey: `checkout-session-${lockToken}`,
       });
 
+      const session = createdSession;
+
       if (!session.url || !session.expires_at) {
-        await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+        // Stripe may have created a payable object even though the SDK returned
+        // no URL. Expire it before freeing the lock; if it cannot be expired,
+        // keep the lock so a second session cannot be opened alongside it.
+        let expired = false;
+        try {
+          await stripe.checkout.sessions.expire(session.id);
+          expired = true;
+        } catch (expireError) {
+          console.error('Could not expire the incomplete Checkout Session; keeping the lock', expireError);
+        }
+        if (expired) {
+          await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+        }
         console.error('Checkout Session is missing a URL or expiry', { sessionId: session.id });
         return jsonResponse({ error: 'Could not start checkout. Please try again.' }, 500);
       }
@@ -386,7 +402,16 @@ serve(async (req) => {
 
       return jsonResponse({ sessionId: session.id, url: session.url });
     } catch (error) {
-      await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+      if (createdSession) {
+        // The session exists and may still be completable. Releasing here would
+        // let the next request open a second one; the lock self-heals once the
+        // session can no longer be paid.
+        console.error('Checkout Session exists but the request failed before binding; keeping the lock', {
+          sessionId: createdSession.id,
+        });
+      } else {
+        await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+      }
       throw error;
     }
   } catch (error) {

@@ -62,9 +62,14 @@ applies a curated production-shaped baseline plus
 `20261104000000_stripe_production_hardening.sql`,
 `20261104000001_batch_item_vault_trigger.sql`, and
 `20261106000000_stripe_checkout_locks_and_payment_fencing.sql`, then runs the
-five suites. All five exited 0. The full historical migration chain is **not**
-replayed: it contains remote placeholders and out-of-band schema drift, so it
-is not a valid bootstrap.
+five suites. All five exited 0. It then runs
+`.github/sql-regression/two-session-races.sh` against the same target: two real
+connections race lock acquisition and webhook claims, and the harness asserts
+one owner, one claim, owner-scoped bind/release, stale-token rejection, and
+expired-lock stealing. Both the suites and the race harness passed on
+2026-11-06 and run in the `sql-regression` CI job, which passed on `a316a8c`.
+The full historical migration chain is **not** replayed: it contains remote
+placeholders and out-of-band schema drift, so it is not a valid bootstrap.
 
 The baseline is `20231126000000_initial_schema.sql`, then
 `20250115000000_add_subscription_schema.sql`,

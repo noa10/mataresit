@@ -173,6 +173,19 @@ for suite in "${suite_list[@]}"; do
   fi
 done
 
+# The suites are single-session. Prove the primary-key / ON CONFLICT
+# serialisation with two genuinely concurrent connections on the same target.
+echo "=== two_session_races ===" | tee -a "${log_dir}/two_session_races.log"
+if PR234_RACE_CONTAINER="$container" bash "${scripts_dir}/two-session-races.sh" \
+     >> "${log_dir}/two_session_races.log" 2>&1; then
+  printf '%s\t%s\t%s\n' "two_session_races" "0" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$summary"
+else
+  printf '%s\t%s\t%s\n' "two_session_races" "1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$summary"
+  failed=1
+  echo "FAIL two_session_races" >&2
+  tail -20 "${log_dir}/two_session_races.log" >&2
+fi
+
 if [[ "$failed" -ne 0 ]]; then
   echo "one or more SQL regression suites failed; see ${log_dir}" >&2
   exit 1

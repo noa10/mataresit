@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { STRIPE_PUBLIC_KEY } from '@/config/stripe';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,6 +102,34 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+  // One idempotency key per billing intent, reused across retries of the same
+  // request. The key is dropped once the server answers a success or a 4xx
+  // (nothing was mutated); a 5xx or transport failure keeps it, because the
+  // mutation may already have reached Stripe and the retry must replay it
+  // instead of executing it a second time.
+  const pendingMutationKeys = useRef(new Map<string, string>());
+
+  const invokeManageSubscription = async (body: Record<string, unknown>) => {
+    const signature = JSON.stringify(body);
+    const idempotencyKey = pendingMutationKeys.current.get(signature) ?? crypto.randomUUID();
+    pendingMutationKeys.current.set(signature, idempotencyKey);
+
+    const result = await supabase.functions.invoke('manage-subscription', {
+      body,
+      headers: { 'x-idempotency-key': idempotencyKey },
+    });
+
+    const status = (result.error as { context?: { status?: number } } | null)
+      ?.context?.status;
+    const settled = !result.error
+      || (typeof status === 'number' && status >= 400 && status < 500);
+    if (settled) {
+      pendingMutationKeys.current.delete(signature);
+    }
+
+    return result;
+  };
 
   useEffect(() => {
     if (user) {
@@ -236,9 +264,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: { action: 'cancel' },
-      });
+      const { data, error } = await invokeManageSubscription({ action: 'cancel' });
 
       if (error) throw error;
 
@@ -261,9 +287,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: { action: 'resume' },
-      });
+      const { data, error } = await invokeManageSubscription({ action: 'resume' });
 
       if (error) throw error;
 
@@ -309,13 +333,11 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: {
-          action: 'change_plan',
-          targetTier,
-          immediate,
-          billingInterval,
-        },
+      const { data, error } = await invokeManageSubscription({
+        action: 'change_plan',
+        targetTier,
+        immediate,
+        billingInterval,
       });
 
       if (error) throw error;
@@ -354,13 +376,11 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: {
-          action: 'change_plan',
-          targetTier,
-          billingInterval,
-          immediate: true,
-        },
+      const { data, error } = await invokeManageSubscription({
+        action: 'change_plan',
+        targetTier,
+        billingInterval,
+        immediate: true,
       });
 
       if (error) throw error;

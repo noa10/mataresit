@@ -534,7 +534,11 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice, claim: WebhookCla
     console.log(`Payment ${paymentIntentId} recorded without applying state (one-off, superseded, or out-of-order payment)`);
   }
 
-  if (subscription) {
+  // Renewal tracking shares the payment-family watermark. An out-of-order
+  // payment was recorded without advancing state, so asking the tracking RPC to
+  // advance it now would fail the order check and turn a successfully recorded
+  // payment into a 500 retry loop.
+  if (subscription && paymentOutcome === 'applied') {
     // Renewal tracking and next_billing_date are required billing writes, so
     // they go through the same claim fence as the payment row: an expired
     // worker must not overwrite a newer billing period.

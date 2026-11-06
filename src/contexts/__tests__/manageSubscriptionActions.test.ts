@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Load the actual edge handlers with their network boundaries replaced by fakes.
 const source = readFileSync('supabase/functions/manage-subscription/index.ts', 'utf8');
-const javascript = ts.transpileModule(`${source}\nexport { cancelSubscription, resumeSubscription, changePlan };`, {
+const javascript = ts.transpileModule(`${source}\nexport { cancelSubscription, resumeSubscription, changePlan, isValidIdempotencyKey, scopedIdempotencyKey };`, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const moduleExports: Record<string, any> = {};
@@ -124,5 +124,86 @@ describe('manage-subscription action sequencing', () => {
     expect(subscription.cancel_at_period_end).toBe(true);
     expect(update).not.toHaveBeenCalled();
     expect(stripe.subscriptionSchedules.create).not.toHaveBeenCalled();
+  });
+
+  it('replays a retried cancel with the caller-supplied key', async () => {
+    const { stripe, subscription, update, profile } = setup();
+    const requestKey = 'cancel:user_1:immediate:false:retry-key-1';
+
+    const first = await moduleExports.cancelSubscription(stripe, {}, profile, false, requestKey);
+    const second = await moduleExports.cancelSubscription(stripe, {}, profile, false, requestKey);
+
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(update.mock.calls[0][2].idempotencyKey).toBe(`cancel:${requestKey}`);
+    expect(update.mock.calls[1][2].idempotencyKey).toBe(`cancel:${requestKey}`);
+    expect(await first.json()).toEqual(await second.json());
+  });
+
+  it('does not mutate again when a retried resume finds the change applied', async () => {
+    const { stripe, subscription, update, profile } = setup();
+    subscription.cancel_at_period_end = true;
+    const requestKey = 'resume:user_1:none:retry-key-2';
+
+    const first = await moduleExports.resumeSubscription(stripe, {}, profile, requestKey);
+    const second = await moduleExports.resumeSubscription(stripe, {}, profile, requestKey);
+
+    // The first call reached Stripe; the retry's fresh read sees the applied
+    // change and returns success without a second mutation.
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][2].idempotencyKey).toBe(`resume:${requestKey}`);
+    expect((await first.json()).success).toBe(true);
+    expect((await second.json()).success).toBe(true);
+  });
+
+  it('replays a retried scheduled downgrade instead of replacing the schedule', async () => {
+    const { stripe, scheduleUpdate, profile } = setup();
+    const requestKey = 'change_plan:user_1:pro|annual|default:retry-key-3';
+    const body = { targetTier: 'pro' as const, billingInterval: 'annual' as const };
+
+    const first = await moduleExports.changePlan(stripe, {}, profile, body, requestKey);
+    const second = await moduleExports.changePlan(stripe, {}, profile, body, requestKey);
+
+    expect(scheduleUpdate).toHaveBeenCalledTimes(2);
+    expect(scheduleUpdate.mock.calls[0][2].idempotencyKey).toBe(`schedule:${requestKey}`);
+    expect(scheduleUpdate.mock.calls[1][2].idempotencyKey).toBe(`schedule:${requestKey}`);
+    expect(await first.json()).toEqual(await second.json());
+  });
+
+  it('rejects a reused caller key on a different parameter set', async () => {
+    const { stripe, scheduleUpdate, profile } = setup();
+    const requestKey = 'change_plan:user_1:pro|annual|default:retry-key-4';
+
+    await moduleExports.changePlan(
+      stripe,
+      {},
+      profile,
+      { targetTier: 'pro', billingInterval: 'annual' },
+      requestKey,
+    );
+    // A different intent (monthly) arrives with a key scoped to the annual
+    // request; Stripe must see a different key rather than a replay.
+    await moduleExports.changePlan(
+      stripe,
+      {},
+      profile,
+      { targetTier: 'pro', billingInterval: 'monthly' },
+      requestKey.replace('annual', 'monthly'),
+    );
+
+    expect(new Set(scheduleUpdate.mock.calls.map((call) => call[2].idempotencyKey)).size).toBe(2);
+  });
+
+  it('validates and scopes caller-supplied idempotency keys', () => {
+    expect(moduleExports.isValidIdempotencyKey('valid-key_123')).toBe(true);
+    expect(moduleExports.isValidIdempotencyKey('short')).toBe(false);
+    expect(moduleExports.isValidIdempotencyKey('has space')).toBe(false);
+    expect(moduleExports.isValidIdempotencyKey('x'.repeat(129))).toBe(false);
+    expect(moduleExports.isValidIdempotencyKey(undefined)).toBe(false);
+
+    expect(moduleExports.scopedIdempotencyKey('change_plan', 'user_1', 'pro|annual|true', 'abc12345'))
+      .toBe('change_plan:user_1:pro|annual|true:abc12345');
+    // No caller key (legacy client): the function falls back to a random key.
+    expect(moduleExports.scopedIdempotencyKey('cancel', 'user_1', 'immediate:false', null))
+      .toBeUndefined();
   });
 });

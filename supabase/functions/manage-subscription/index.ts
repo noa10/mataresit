@@ -27,6 +27,27 @@ const jsonResponse = (body: unknown, status = 200) =>
 
 const TIER_HIERARCHY: Record<SubscriptionTier, number> = { free: 0, pro: 1, max: 2 };
 
+// A caller-supplied key makes a retried request replay the same Stripe
+// mutation instead of executing a second one. It is scoped to the action, the
+// authenticated user, and the action's parameters before it reaches Stripe, so
+// reusing one key across different intents cannot silently return another
+// intent's result. Clients that do not send the header keep the previous
+// per-request random keys.
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+function isValidIdempotencyKey(value: string | null | undefined): boolean {
+  return typeof value === 'string' && IDEMPOTENCY_KEY_PATTERN.test(value);
+}
+
+function scopedIdempotencyKey(
+  action: string,
+  userId: string,
+  parameters: string,
+  requestKey: string | null,
+): string | undefined {
+  return requestKey ? `${action}:${userId}:${parameters}:${requestKey}` : undefined;
+}
+
 const isSimulatedId = (value: string | null | undefined): boolean =>
   Boolean(
     value?.startsWith('cus_simulated_') ||
@@ -63,6 +84,7 @@ async function schedulePlanChange(
   stripe: Stripe,
   subscription: Stripe.Subscription,
   targetPriceId: string,
+  requestIdempotencyKey?: string,
 ): Promise<Stripe.SubscriptionSchedule> {
   const existingScheduleId = getScheduleId(subscription);
   const schedule = existingScheduleId
@@ -110,7 +132,7 @@ async function schedulePlanChange(
       ],
     },
     {
-      idempotencyKey: `schedule:${crypto.randomUUID()}`,
+      idempotencyKey: `schedule:${requestIdempotencyKey ?? crypto.randomUUID()}`,
     },
   );
 }
@@ -163,6 +185,7 @@ async function cancelSubscription(
   supabaseAdmin: any,
   profile: any,
   immediate: boolean,
+  requestIdempotencyKey?: string,
 ): Promise<Response> {
   const subscription = await getSubscriptionOrNull(stripe, profile.stripe_subscription_id);
 
@@ -170,12 +193,16 @@ async function cancelSubscription(
     return jsonResponse({ error: 'No active subscription found' }, 404);
   }
 
+  const idempotencyKey = `cancel:${requestIdempotencyKey ?? crypto.randomUUID()}`;
+
   await releaseScheduleIfPresent(stripe, subscription);
 
   if (immediate) {
-    const canceled = await stripe.subscriptions.cancel(subscription.id, {
-      prorate: true,
-    });
+    const canceled = await stripe.subscriptions.cancel(
+      subscription.id,
+      { prorate: true },
+      { idempotencyKey },
+    );
 
     await syncSubscriptionToProfile(supabaseAdmin, canceled, {
       tier: 'free',
@@ -195,7 +222,7 @@ async function cancelSubscription(
   const updated = await stripe.subscriptions.update(
     subscription.id,
     { cancel_at_period_end: true },
-    { idempotencyKey: `cancel:${crypto.randomUUID()}` },
+    { idempotencyKey },
   );
 
   await syncSubscriptionToProfile(supabaseAdmin, updated, { cancelAtPeriodEnd: true });
@@ -213,6 +240,7 @@ async function resumeSubscription(
   stripe: Stripe,
   supabaseAdmin: any,
   profile: any,
+  requestIdempotencyKey?: string,
 ): Promise<Response> {
   const subscription = await getSubscriptionOrNull(stripe, profile.stripe_subscription_id);
 
@@ -231,7 +259,7 @@ async function resumeSubscription(
   const updated = await stripe.subscriptions.update(
     subscription.id,
     { cancel_at_period_end: false },
-    { idempotencyKey: `resume:${crypto.randomUUID()}` },
+    { idempotencyKey: `resume:${requestIdempotencyKey ?? crypto.randomUUID()}` },
   );
 
   await syncSubscriptionToProfile(supabaseAdmin, updated, { cancelAtPeriodEnd: false });
@@ -253,6 +281,7 @@ async function changePlan(
     billingInterval?: BillingInterval;
     immediate?: boolean;
   },
+  requestIdempotencyKey?: string,
 ): Promise<Response> {
   const { targetTier, billingInterval, immediate } = body;
 
@@ -267,7 +296,13 @@ async function changePlan(
   }
 
   if (targetTier === 'free') {
-    return await cancelSubscription(stripe, supabaseAdmin, profile, immediate === true);
+    return await cancelSubscription(
+      stripe,
+      supabaseAdmin,
+      profile,
+      immediate === true,
+      requestIdempotencyKey,
+    );
   }
 
   if (subscription.cancel_at_period_end) {
@@ -298,7 +333,12 @@ async function changePlan(
   const shouldApplyImmediately = immediate ?? (isUpgrade || isIntervalChange);
 
   if (isDowngrade && !shouldApplyImmediately) {
-    const schedule = await schedulePlanChange(stripe, subscription, targetPriceId);
+    const schedule = await schedulePlanChange(
+      stripe,
+      subscription,
+      targetPriceId,
+      requestIdempotencyKey,
+    );
 
     return jsonResponse({
       success: true,
@@ -323,7 +363,7 @@ async function changePlan(
       cancel_at_period_end: false,
     },
     {
-      idempotencyKey: `change-plan:${crypto.randomUUID()}`,
+      idempotencyKey: `change-plan:${requestIdempotencyKey ?? crypto.randomUUID()}`,
     },
   );
 
@@ -404,6 +444,17 @@ serve(async (req) => {
       return jsonResponse({ error: 'Action is required' }, 400);
     }
 
+    const rawIdempotencyKey = req.headers.get('x-idempotency-key')?.trim() ?? '';
+    if (rawIdempotencyKey && !isValidIdempotencyKey(rawIdempotencyKey)) {
+      // Ignoring a malformed key would let a retry run a second mutation while
+      // the caller believes it is deduplicated.
+      return jsonResponse(
+        { error: 'x-idempotency-key must be 8-128 characters of A-Z, a-z, 0-9, _ or -' },
+        400,
+      );
+    }
+    const requestIdempotencyKey = rawIdempotencyKey || null;
+
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
       console.error('STRIPE_SECRET_KEY is missing');
@@ -430,10 +481,26 @@ serve(async (req) => {
         return await getSubscriptionStatus(stripe, profile);
 
       case 'cancel':
-        return await cancelSubscription(stripe, supabaseAdmin, profile, body.immediate === true);
+        return await cancelSubscription(
+          stripe,
+          supabaseAdmin,
+          profile,
+          body.immediate === true,
+          scopedIdempotencyKey(
+            action,
+            user.id,
+            `immediate:${body.immediate === true}`,
+            requestIdempotencyKey,
+          ),
+        );
 
       case 'resume':
-        return await resumeSubscription(stripe, supabaseAdmin, profile);
+        return await resumeSubscription(
+          stripe,
+          supabaseAdmin,
+          profile,
+          scopedIdempotencyKey(action, user.id, 'none', requestIdempotencyKey),
+        );
 
       case 'downgrade':
       case 'change_plan': {
@@ -450,7 +517,12 @@ serve(async (req) => {
           targetTier,
           billingInterval,
           immediate: body.immediate,
-        });
+        }, scopedIdempotencyKey(
+          action,
+          user.id,
+          `${targetTier}|${billingInterval ?? 'current'}|${body.immediate ?? 'default'}`,
+          requestIdempotencyKey,
+        ));
       }
 
       case 'create_portal_session':

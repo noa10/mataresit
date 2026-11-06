@@ -127,9 +127,12 @@ bash .github/sql-regression/run-sql-regression.sh
 ```
 
 The runner creates a loopback-only `postgres:15-alpine` container, applies the
-curated schema, and removes the container on exit. The `sql-regression` CI job
-uses the same runner. CI execution is **wired but not yet observed on this
-branch** (it requires a push); the local run is the execution evidence.
+curated schema, and removes the container on exit. It then runs
+`.github/sql-regression/two-session-races.sh` on the same target: two real
+connections race `try_acquire_checkout_lock` and `claim_stripe_webhook_event`,
+and the harness asserts one owner, one claim, owner-scoped bind/release, stale
+token rejection, and expired-lock stealing. The `sql-regression` CI job runs
+both. CI execution is observed on `a316a8c` and later commits.
 
 These suites are single-session. Two-session checkout-lock and webhook-lease
 races, live Stripe lifecycle behavior (Checkout, proration collection,
@@ -252,7 +255,24 @@ holding the orphaned session URL in another tab could still complete it,
 which is why nonproduction checkout-concurrency testing remains a cutover
 requirement.
 
-### 3d. Receipt usage counter
+### 3d. Manage-subscription retries
+
+`manage-subscription` mutations (`cancel`, `resume`, `change_plan` /
+`downgrade`) accept an `x-idempotency-key` request header. The value must be
+8–128 characters of `A–Z`, `a–z`, `0–9`, `_` or `-`; anything else is rejected
+with `400` rather than silently ignored. The endpoint scopes the key to the
+authenticated user, the action, and that action's parameters before passing it
+to Stripe, so one client key reused for a different plan or target cannot
+replay another intent's result. The browser client (`StripeContext`) mints one
+key per request body and keeps it only while the outcome is ambiguous — a
+transport failure or `5xx` retries the same key, while a success or `4xx`
+settles it. Clients that send no header keep the previous per-request random
+keys, which means an older client can still duplicate a mutation on retry.
+Retries of an applied `resume` short-circuit on the fresh Stripe read; retries
+of a scheduled downgrade replay the same `subscriptionSchedules.update`
+instead of replacing the schedule.
+
+### 3e. Receipt usage counter
 
 `receipts_used_this_month` previously never incremented: the Deno incrementer
 called a non-existent client method. The increment is now a service-only RPC
@@ -458,6 +478,43 @@ collection, cancel/resume, payment failure and dunning, 3DS, and replayed or
 out-of-order webhook delivery — are **not** covered by the SQL suites and
 remain user-gated nonproduction tests. Do not mark this integration production
 ready on the strength of the SQL run alone.
+
+#### Running the lifecycle checks
+
+Prerequisites (none of these are committed):
+
+- a Stripe **test-mode** secret key (`sk_test_…`) for the project's account;
+- the webhook signing secret printed by `stripe listen` (`whsec_…`);
+- a local stack whose database already has the three PR migrations.
+
+Create `supabase/functions/.env` with `STRIPE_SECRET_KEY` and
+`STRIPE_WEBHOOK_SECRET`, start the stack and serve the two billing functions:
+
+```bash
+supabase start
+stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook
+stripe trigger customer.subscription.updated
+```
+
+Scenario matrix, all in test mode with a [test clock](https://docs.stripe.com/billing/testing/test-clocks):
+
+| Scenario | Expected |
+|---|---|
+| Two `create-checkout-session` calls for one user | one session; the second reuses it or reports `SUBSCRIPTION_EXISTS` |
+| Checkout completion | lock released by exact session id; profile tier updated once |
+| Upgrade with proration | invoice raised; tier must not exceed the paid tier until collection succeeds |
+| Cancel at period end, then resume | cancellation preserved; no tier change until period end |
+| `invoice.payment_failed` then recovery | grace/retry rows recorded once per invoice; repeat delivery short-circuits |
+| 3DS card `4000002500003155` | session completes after authentication; no duplicate payment row |
+| Replay an old event after a newer one | older event is recorded but does not advance state |
+
+The SQL suites cover the fencing primitives behind these scenarios
+(`stripe_webhook_claim_fencing`, `payment_state_fencing`,
+`stripe_checkout_locks`), and `two-session-races.sh` covers concurrent claims
+and lock acquisition. The matrix above is the remaining live-service evidence.
+
+Refuse to run any of it with an `sk_live_` key or against the production
+project ref.
 
 ## Troubleshooting
 
