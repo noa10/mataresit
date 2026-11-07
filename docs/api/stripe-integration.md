@@ -496,6 +496,17 @@ stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook
 stripe trigger customer.subscription.updated
 ```
 
+`stripe listen` needs an environment that allows its outbound websocket; in a
+restricted environment it prints `Ready` but forwards nothing. Two practical
+adjustments: the local stack's gateway port comes from `supabase status` (not
+always 54321 — the verified run used 54431), and when the listener cannot
+forward, a signed direct delivery works instead — fetch the event with
+`stripe events retrieve <id>` and POST its exact bytes with a
+`Stripe-Signature: t=<unix seconds>,v1=<hex hmac-sha256 of "<ts>.<body>"`
+header computed with the env file's `STRIPE_WEBHOOK_SECRET` to the local
+`/functions/v1/stripe-webhook`. Never deliver directly to the production
+webhook endpoint.
+
 Scenario matrix, all in test mode with a [test clock](https://docs.stripe.com/billing/testing/test-clocks):
 
 | Scenario | Expected |

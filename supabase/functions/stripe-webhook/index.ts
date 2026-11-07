@@ -25,6 +25,11 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
 });
 
+// Deno's WebCrypto is async-only; the sync constructEvent() path fails on the
+// edge runtime with "SubtleCryptoProvider cannot be used in a synchronous
+// context", so verification must use the async API with this provider.
+const cryptoProvider = Stripe.createSubtleCryptoProvider();
+
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   getServiceRoleKey() ?? ''
@@ -87,7 +92,13 @@ serve(async (req) => {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    event = await stripe.webhooks.constructEventAsync(
+      body,
+      signature,
+      webhookSecret,
+      undefined,
+      cryptoProvider,
+    );
   } catch (error) {
     console.error('Invalid Stripe webhook signature:', {
       message: error instanceof Error ? error.message : String(error),

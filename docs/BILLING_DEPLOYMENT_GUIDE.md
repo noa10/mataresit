@@ -118,6 +118,45 @@ the migration; the Edge Functions call RPCs and columns it creates.
       since it also affects other legacy keys and tokens. Replaying that
       historical migration installs a trigger with an invalid placeholder until
       the Vault-backed trigger migration is applied.
+- [ ] After any API-key rotation or revocation (legacy anon JWT or
+      `sb_publishable_...`), update `VITE_SUPABASE_ANON_KEY` in **every** Vercel
+      environment and redeploy. `VITE_*` values are inlined into the JS bundle
+      at build time, and Vercel applies environment-variable changes only to
+      new deployments, so a rotated key keeps shipping as `Unregistered API
+      key` on every auth and REST request until a fresh build replaces it.
+      Update each environment in place — `vercel env update` does not disturb
+      the variable in the other environments:
+
+      ```bash
+      NEW_KEY='sb_publishable_...'   # the key registered in the Supabase dashboard
+      for env in production preview development; do
+        vercel env update VITE_SUPABASE_ANON_KEY "$env" --value "$NEW_KEY" --yes
+      done
+      ```
+
+      Redeploy the current production deployment so the same commit rebuilds
+      with the new value — set `PROJECT` to the Vercel project name and
+      `DEPLOYMENT_URL` to the current production deployment URL from
+      `vercel ls "$PROJECT" --prod`, then run
+      `vercel redeploy "$DEPLOYMENT_URL"`. Then verify the live bundle
+      actually carries the registered key. The key is not in the hashed entry
+      chunk (`index-*.js`); it is inlined into the chunks the page preloads
+      (`feature-admin-*.js` and others), and `curl` does not expand `*` in a
+      URL path, while the SPA rewrite answers 200 for any miss — so fetch the
+      asset list from the HTML first:
+
+      ```bash
+      SITE=https://mataresit.vercel.app   # deployment origin
+      for p in $(curl -fsS "$SITE/" | grep -oE '/assets/[^"]+\.js' | sort -u); do
+        curl -fsS "$SITE$p"
+      done | grep -oE 'sb_publishable_[A-Za-z0-9_-]{20,}' | sort -u
+      ```
+
+      The output must list the registered key and never a revoked one. Also
+      update `.env.local`, which Vercel does not manage. Sessions that still
+      exist recover on the next token refresh; users whose access tokens
+      expired during a prolonged outage are signed out client-side and must
+      sign in again.
 - [ ] Plan a batch-processing maintenance window. Confirm the existing
       `handle_new_batch_item` trigger attachment and timing in nonproduction:
       the migration replaces the function but does not create a trigger. The
