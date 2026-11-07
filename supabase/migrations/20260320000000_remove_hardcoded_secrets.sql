@@ -1,27 +1,18 @@
--- Remove hardcoded legacy JWT service role key from handle_new_batch_item trigger function.
--- Replaced with new sb_secret_* format key.
+-- Historical migration: the original replacement embedded another service-role
+-- credential. Its literal is redacted here, but may remain in Git history and
+-- previously deployed databases; treat it as compromised and rotate or revoke it.
+-- This edit alone does not remediate any existing deployment.
+--
+-- The raising stub prevents a replay from reintroducing the credential.
+-- 20261104000001_batch_item_vault_trigger.sql replaces the function with
+-- Vault-backed dispatch and an administrator-controlled endpoint.
 
 CREATE OR REPLACE FUNCTION public.handle_new_batch_item()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
-DECLARE
-  json_body TEXT;
 BEGIN
-  -- Construct the JSON body payload using the NEW record's ID
-  json_body := '{"batch_item_id":"' || NEW.id::text || '"}';
-
-  -- Call the http_request function using PERFORM because we don't need its return value
-  -- Ensure positional arguments match the function signature
-  PERFORM supabase_functions.http_request(
-    url := 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/process-batch-item',
-    method := 'POST',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer sb_secret_r5jrHqGhCKQYjDphz6SWQg_-WimbsHX"}',
-    body := json_body,
-    timeout_milliseconds := 5000
-  );
-
-  -- For AFTER triggers, RETURN NULL is conventional for side-effect functions
-  RETURN NULL;
+  RAISE EXCEPTION
+    'handle_new_batch_item requires Vault-backed configuration; see 20261104000001_batch_item_vault_trigger.sql';
 END;
 $function$;

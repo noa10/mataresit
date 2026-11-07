@@ -483,7 +483,7 @@
       "description": "Anda sedang beralih ke {{plan}}.",
       "freeWarningTitle": "Apa yang berlaku jika anda beralih ke Percuma",
       "freeWarning": [
-        "Langganan anda akan dibatalkan",
+        "Langganan anda akan dibatalkan pada akhir tempoh pengebilan semasa",
         "Anda akan kehilangan akses kepada ciri premium",
         "Pengekalan data akan terhad kepada 7 hari",
         "Had resit bulanan akan dikurangkan kepada 50"
@@ -491,12 +491,17 @@
       "paidWarning": [
         "Anda akan kehilangan akses kepada ciri peringkat lebih tinggi",
         "Had bulanan anda akan dikurangkan",
-        "Anda akan menerima kredit berkadar untuk masa yang tidak digunakan"
+        "Perubahan akan berkuat kuasa pada akhir tempoh pengebilan semasa anda"
       ],
-      "billingNote": "Anda dibilkan secara bulanan atau tahunan berdasarkan pelan pilihan anda. Anda boleh naik taraf, turun taraf, atau batal bila-bila masa.",
+      "billingNote": "Penurunan taraf akan berkuat kuasa pada akhir tempoh pengebilan semasa. Anda boleh naik taraf atau batal bila-bila masa.",
       "cancel": "Kekalkan pelan semasa",
       "confirm": "Sahkan perubahan",
       "paidWarningTitle": "Apa yang berubah dengan {{plan}}"
+    },
+    "cancellation": {
+      "title": "Langganan ditetapkan untuk dibatalkan",
+      "message": "Pelan anda akan tamat pada {{date}}. Anda boleh menyambung semula di bawah.",
+      "resume": "Sambung semula langganan"
     },
     "alreadyOnPlan": "Anda sudah menggunakan pelan {{plan}}.",
     "checkoutError": "Kami tidak dapat memulakan pembayaran. Sila cuba lagi.",

@@ -283,19 +283,28 @@ export async function recordUsage(
   try {
     // Update usage counters based on action
     switch (action) {
-      case 'receipt_upload':
-        await context.supabase
-          .from('profiles')
-          .update({
-            receipts_used_this_month: context.supabase.raw(`receipts_used_this_month + ${quantity}`)
-          })
-          .eq('id', context.userId);
+      case 'receipt_upload': {
+        // Row-based counting is owned by the track_receipt_usage AFTER INSERT
+        // trigger (20261106000000), which counts every insert path exactly
+        // once. This branch remains for non-row-based metering and callers
+        // outside the receipt-insert path; it must not double-count what the
+        // trigger already counted. (The previous `supabase.raw(...)` call did
+        // not exist on the Supabase client, so usage never wrote at all.)
+        const { error } = await context.supabase.rpc('increment_receipts_used', {
+          _user_id: context.userId,
+          _quantity: quantity,
+        });
+
+        if (error) {
+          throw new Error(`Failed to record receipt usage: ${error.message}`);
+        }
         break;
-      
+      }
+
       case 'api_request':
         // API request usage is tracked in rate limiting
         break;
-      
+
       default:
         console.log(`Usage tracking not implemented for action: ${action}`);
     }

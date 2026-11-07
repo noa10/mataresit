@@ -3,8 +3,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Environment variables
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://mpmkbtsufihzdelrlszs.supabase.co';
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzAxMjM4OSwiZXhwIjoyMDU4NTg4Mzg5fQ.o6Xn7TTIYF4U9zAOhGWVf5MoAcl_BGPtQ_BRcR2xV0o';
+function requireEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value) {
+    throw new Error(`${name} must be set; no embedded credentials are shipped.`);
+  }
+  return value;
+}
+
+const SUPABASE_URL = requireEnv('SUPABASE_URL');
+const SUPABASE_SERVICE_KEY = requireEnv('SUPABASE_SERVICE_KEY');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

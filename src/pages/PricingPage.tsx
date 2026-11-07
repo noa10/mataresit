@@ -138,6 +138,8 @@ export default function PricingPage() {
   const {
     createCheckoutSession,
     downgradeSubscription,
+    upgradeSubscription,
+    resumeSubscription,
     isLoading,
     subscriptionData,
   } = useStripe();
@@ -164,7 +166,11 @@ export default function PricingPage() {
 
   const workspaceTarget = user ? "/dashboard" : "/auth";
   const currentTier = (subscriptionData?.tier || "free") as PlanId;
-  const subscriptionActive = subscriptionData?.status === "active";
+  const currentInterval: BillingInterval =
+    subscriptionData?.billingInterval === "annual" ? "annual" : "monthly";
+  const subscriptionActive =
+    subscriptionData?.status === "active" || subscriptionData?.status === "trialing";
+  const cancelAtPeriodEnd = Boolean(subscriptionData?.cancelAtPeriodEnd);
 
   const planFeatures = {
     free: list<PlanFeature>("page.plans.free.features"),
@@ -201,25 +207,40 @@ export default function PricingPage() {
       max: copy("page.plans.max.name"),
     };
 
+    if (tierId === "free") {
+      if (currentTier !== "free") {
+        openDowngradeDialog("free");
+      }
+      return;
+    }
+
+    if (tierId === currentTier) {
+      if (currentInterval === billingInterval) {
+        toast.success(
+          String(t("page.alreadyOnPlan", { plan: tierNames[tierId] })),
+        );
+        return;
+      }
+
+      // Same plan, different billing interval.
+      await upgradeSubscription(tierId, billingInterval);
+      return;
+    }
+
     if (TIER_HIERARCHY[tierId] < TIER_HIERARCHY[currentTier]) {
       openDowngradeDialog(tierId);
       return;
     }
 
-    if (tierId === currentTier) {
-      toast.success(
-        String(t("page.alreadyOnPlan", { plan: tierNames[tierId] })),
-      );
-      return;
-    }
-
-    if (tierId === "free") {
-      return;
-    }
-
     try {
-      const priceId = PRICE_IDS[tierId][billingInterval];
-      await createCheckoutSession(priceId, billingInterval);
+      if (currentTier === "free") {
+        const priceId = PRICE_IDS[tierId][billingInterval];
+        await createCheckoutSession(priceId, billingInterval);
+      } else {
+        // Existing subscribers must update their current subscription, not
+        // create a second Checkout Session.
+        await upgradeSubscription(tierId, billingInterval);
+      }
     } catch (error) {
       console.error("Error subscribing:", error);
       toast.error(copy("page.checkoutError"));
@@ -235,7 +256,8 @@ export default function PricingPage() {
     }));
 
     try {
-      await downgradeSubscription(downgradeDialog.targetTier, true);
+      // Downgrades take effect at the end of the current billing period.
+      await downgradeSubscription(downgradeDialog.targetTier, false, billingInterval);
       setDowngradeDialog({
         isOpen: false,
         targetTier: null,
@@ -399,10 +421,14 @@ export default function PricingPage() {
             <div className="mx-auto grid max-w-[520px] grid-cols-1 gap-3.5 min-[881px]:max-w-none min-[881px]:grid-cols-3 min-[1025px]:gap-5">
               {(["free", "pro", "max"] as PlanId[]).map((planId) => {
                 const isPro = planId === "pro";
+                // Until the interval has been reconciled from Stripe, do not
+                // claim a paid plan matches the selected interval.
+                const intervalKnown = subscriptionData?.billingIntervalReconciled !== false;
                 const isCurrent =
                   Boolean(user) &&
                   planId === currentTier &&
-                  (planId === "free" || subscriptionActive);
+                  (planId === "free" ||
+                    (subscriptionActive && intervalKnown && currentInterval === billingInterval));
 
                 return (
                   <article
@@ -533,6 +559,34 @@ export default function PricingPage() {
                 );
               })}
             </div>
+            {cancelAtPeriodEnd && (
+              <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-ledger-accent/30 bg-ledger-accent-soft px-5 py-4 min-[641px]:flex-row">
+                <div>
+                  <p className="text-sm font-semibold text-ledger-ink">
+                    {copy("page.cancellation.title")}
+                  </p>
+                  <p className="text-sm text-ledger-ink-2">
+                    {String(
+                      t("page.cancellation.message", {
+                        date: subscriptionData?.subscriptionEndDate
+                          ? new Date(subscriptionData.subscriptionEndDate).toLocaleDateString("en-GB")
+                          : "",
+                      }),
+                    )}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="accent"
+                  onClick={resumeSubscription}
+                  disabled={isLoading}
+                  className="h-[42px] shrink-0 rounded-lg px-5 text-[0.9375rem] font-semibold"
+                >
+                  {copy("page.cancellation.resume")}
+                </Button>
+              </div>
+            )}
+
             <p className="mt-6 text-center text-[0.8125rem] text-ledger-muted">
               {copy("page.note")}
             </p>

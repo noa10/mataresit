@@ -1,0 +1,4 @@
+comment = 'pg_net test stub; no network delivery'
+default_version = '1.0'
+relocatable = false
+schema = extensions

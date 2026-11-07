@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { STRIPE_PUBLIC_KEY } from '@/config/stripe';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,15 +6,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { SubscriptionData, SubscriptionTier, SubscriptionStatus } from '@/config/stripe';
 
+type PaidTier = Exclude<SubscriptionTier, 'free'>;
+type BillingInterval = 'monthly' | 'annual';
+
 // Only load Stripe if we have a valid public key
 const stripePromise = STRIPE_PUBLIC_KEY && STRIPE_PUBLIC_KEY.trim() !== ''
   ? loadStripe(STRIPE_PUBLIC_KEY)
   : Promise.resolve(null);
 
 interface StripeContextType {
-  createCheckoutSession: (priceId: string, billingInterval?: 'monthly' | 'annual') => Promise<void>;
+  createCheckoutSession: (priceId: string, billingInterval?: BillingInterval) => Promise<void>;
   cancelSubscription: () => Promise<void>;
-  downgradeSubscription: (targetTier: 'free' | 'pro' | 'max', immediate?: boolean) => Promise<void>;
+  resumeSubscription: () => Promise<void>;
+  downgradeSubscription: (targetTier: SubscriptionTier, immediate?: boolean, billingInterval?: BillingInterval) => Promise<void>;
+  upgradeSubscription: (targetTier: PaidTier, billingInterval: BillingInterval) => Promise<void>;
   createPortalSession: () => Promise<void>;
   getSubscriptionStatus: () => Promise<SubscriptionData | null>;
   isLoading: boolean;
@@ -26,11 +31,105 @@ interface StripeContextType {
 
 const StripeContext = createContext<StripeContextType | undefined>(undefined);
 
+const PROFILE_SUBSCRIPTION_COLUMNS = `
+  subscription_tier,
+  subscription_status,
+  stripe_customer_id,
+  stripe_subscription_id,
+  subscription_start_date,
+  subscription_end_date,
+  trial_end_date,
+  billing_interval,
+  cancel_at_period_end,
+  receipts_used_this_month,
+  monthly_reset_date,
+  next_billing_date,
+  payment_method_brand,
+  payment_method_last_four
+`;
+
+interface ProfileSubscriptionRow {
+  subscription_tier: string | null;
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_start_date: string | null;
+  subscription_end_date: string | null;
+  trial_end_date: string | null;
+  billing_interval: string | null;
+  cancel_at_period_end: boolean | null;
+  receipts_used_this_month: number | null;
+  monthly_reset_date: string | null;
+  next_billing_date: string | null;
+  payment_method_brand: string | null;
+  payment_method_last_four: string | null;
+}
+
+/**
+ * `billing_interval` is NULL until a profile has been reconciled from Stripe,
+ * so a paid subscriber is never silently reported as monthly. A paid tier with
+ * an unknown interval reports the conservative default and can be reconciled by
+ * the webhook without the UI having lied first.
+ */
+function resolveBillingInterval(
+  profile: ProfileSubscriptionRow,
+): 'monthly' | 'annual' {
+  return profile.billing_interval === 'annual' ? 'annual' : 'monthly';
+}
+
+function toSubscriptionData(profile: ProfileSubscriptionRow): SubscriptionData {
+  return {
+    tier: (profile.subscription_tier as SubscriptionTier) || 'free',
+    status: (profile.subscription_status as SubscriptionStatus) || 'active',
+    stripeCustomerId: profile.stripe_customer_id ?? undefined,
+    stripeSubscriptionId: profile.stripe_subscription_id ?? undefined,
+    subscriptionStartDate: profile.subscription_start_date ?? undefined,
+    subscriptionEndDate: profile.subscription_end_date ?? undefined,
+    trialEndDate: profile.trial_end_date ?? undefined,
+    billingInterval: resolveBillingInterval(profile),
+    billingIntervalReconciled: profile.billing_interval !== null,
+    cancelAtPeriodEnd: Boolean(profile.cancel_at_period_end),
+    receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
+    monthlyResetDate: profile.monthly_reset_date ?? undefined,
+    next_billing_date: profile.next_billing_date ?? undefined,
+    payment_method_brand: profile.payment_method_brand ?? undefined,
+    payment_method_last_four: profile.payment_method_last_four ?? undefined,
+  };
+}
+
 export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+  // One idempotency key per billing intent, reused across retries of the same
+  // request. The key is dropped once the server answers a success or a 4xx
+  // (nothing was mutated); a 5xx or transport failure keeps it, because the
+  // mutation may already have reached Stripe and the retry must replay it
+  // instead of executing it a second time.
+  const pendingMutationKeys = useRef(new Map<string, string>());
+
+  const invokeManageSubscription = async (body: Record<string, unknown>) => {
+    const signature = JSON.stringify(body);
+    const idempotencyKey = pendingMutationKeys.current.get(signature) ?? crypto.randomUUID();
+    pendingMutationKeys.current.set(signature, idempotencyKey);
+
+    const result = await supabase.functions.invoke('manage-subscription', {
+      body,
+      headers: { 'x-idempotency-key': idempotencyKey },
+    });
+
+    const status = (result.error as { context?: { status?: number } } | null)
+      ?.context?.status;
+    const settled = !result.error
+      || (typeof status === 'number' && status >= 400 && status < 500);
+    if (settled) {
+      pendingMutationKeys.current.delete(signature);
+    }
+
+    return result;
+  };
 
   useEffect(() => {
     if (user) {
@@ -44,178 +143,64 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!user) return null;
 
     try {
-      console.log('StripeContext: Refreshing subscription data for user:', user.id);
-
-      // Get subscription data from Supabase profiles table
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select(`
-          subscription_tier,
-          subscription_status,
-          stripe_customer_id,
-          stripe_subscription_id,
-          subscription_start_date,
-          subscription_end_date,
-          trial_end_date,
-          receipts_used_this_month,
-          monthly_reset_date
-        `)
+        .select(PROFILE_SUBSCRIPTION_COLUMNS)
         .eq('id', user.id)
-        .single();
+        .single()
+        .overrideTypes<ProfileSubscriptionRow, { merge: false }>();
 
       if (error) {
-        console.error('StripeContext: Error fetching subscription data:', error);
-
-        // If profile doesn't exist, create one with default values
         if (error.code === 'PGRST116') {
-          console.log('StripeContext: Profile not found, this might be a new user');
-          return {
+          const fallback: SubscriptionData = {
             tier: 'free',
             status: 'active',
             receiptsUsedThisMonth: 0,
           };
+          setSubscriptionData(fallback);
+          return fallback;
         }
+        console.error('StripeContext: Error fetching subscription data:', error);
         return null;
       }
 
-      if (profile) {
-        // Check if user needs subscription initialization
-        const needsInitialization = !profile.stripe_customer_id || !profile.stripe_subscription_id;
+      if (!profile) return null;
 
-        if (needsInitialization) {
-          console.log('StripeContext: User needs subscription initialization, setting up...');
-          try {
-            const { data: initData, error: initError } = await supabase.functions.invoke('initialize-user-subscription');
-
-            if (initError) {
-              console.error('StripeContext: Failed to initialize subscription:', initError);
-            } else {
-              console.log('StripeContext: Subscription initialized successfully:', initData);
-              // Refresh the profile data after initialization
-              const { data: updatedProfile, error: refreshError } = await supabase
-                .from('profiles')
-                .select(`
-                  subscription_tier,
-                  subscription_status,
-                  stripe_customer_id,
-                  stripe_subscription_id,
-                  subscription_start_date,
-                  subscription_end_date,
-                  trial_end_date,
-                  receipts_used_this_month,
-                  monthly_reset_date
-                `)
-                .eq('id', user.id)
-                .single();
-
-              if (!refreshError && updatedProfile) {
-                profile.stripe_customer_id = updatedProfile.stripe_customer_id;
-                profile.stripe_subscription_id = updatedProfile.stripe_subscription_id;
-                profile.subscription_start_date = updatedProfile.subscription_start_date;
-                profile.subscription_end_date = updatedProfile.subscription_end_date;
-              }
-            }
-          } catch (error) {
-            console.error('StripeContext: Error during subscription initialization:', error);
-          }
-        }
-
-        // Check if this is a simulated subscription
-        const isSimulated = profile.stripe_subscription_id?.startsWith('sub_simulated_') ||
-                           profile.stripe_subscription_id?.startsWith('test_sub_') ||
-                           profile.stripe_customer_id?.startsWith('cus_simulated_');
-
-        const newSubscriptionData = {
-          tier: (profile.subscription_tier as SubscriptionTier) || 'free',
-          status: (profile.subscription_status as SubscriptionStatus) || 'active',
-          stripeCustomerId: profile.stripe_customer_id,
-          stripeSubscriptionId: profile.stripe_subscription_id,
-          subscriptionStartDate: profile.subscription_start_date,
-          subscriptionEndDate: profile.subscription_end_date,
-          trialEndDate: profile.trial_end_date,
-          receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
-          monthlyResetDate: profile.monthly_reset_date,
-          simulated: isSimulated,
-        };
-
-        console.log('StripeContext: Updated subscription data:', {
-          tier: newSubscriptionData.tier,
-          status: newSubscriptionData.status,
-          stripeSubscriptionId: newSubscriptionData.stripeSubscriptionId
-        });
-
-        setSubscriptionData(newSubscriptionData);
-        setLastRefreshTime(new Date());
-        return newSubscriptionData;
-      }
+      const newSubscriptionData = toSubscriptionData(profile);
+      setSubscriptionData(newSubscriptionData);
+      setLastRefreshTime(new Date());
+      return newSubscriptionData;
     } catch (error) {
       console.error('StripeContext: Error refreshing subscription:', error);
+      return null;
     }
-
-    return null;
   };
 
   // Force refresh with cache bypass for webhook failure scenarios
   const forceRefreshSubscription = async (): Promise<SubscriptionData | null> => {
     if (!user) return null;
 
-    console.log('StripeContext: Force refreshing subscription data (bypassing cache)');
-
     try {
-      // Add cache-busting timestamp to ensure fresh data
-      const timestamp = Date.now();
-
-      // Get subscription data from Supabase profiles table with cache bypass
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select(`
-          subscription_tier,
-          subscription_status,
-          stripe_customer_id,
-          stripe_subscription_id,
-          subscription_start_date,
-          subscription_end_date,
-          trial_end_date,
-          receipts_used_this_month,
-          monthly_reset_date
-        `)
+        .select(PROFILE_SUBSCRIPTION_COLUMNS)
         .eq('id', user.id)
-        .single();
+        .single()
+        .overrideTypes<ProfileSubscriptionRow, { merge: false }>();
 
-      if (error) {
+      if (error || !profile) {
         console.error('StripeContext: Error force refreshing subscription data:', error);
         return null;
       }
 
-      if (profile) {
-        // Check if this is a simulated subscription
-        const isSimulated = profile.stripe_subscription_id?.startsWith('sub_simulated_') ||
-                           profile.stripe_subscription_id?.startsWith('test_sub_') ||
-                           profile.stripe_customer_id?.startsWith('cus_simulated_');
-
-        const newSubscriptionData: SubscriptionData = {
-          tier: profile.subscription_tier || 'free',
-          status: profile.subscription_status || 'active',
-          stripeCustomerId: profile.stripe_customer_id,
-          stripeSubscriptionId: profile.stripe_subscription_id,
-          subscriptionStartDate: profile.subscription_start_date,
-          subscriptionEndDate: profile.subscription_end_date,
-          trialEndDate: profile.trial_end_date,
-          receiptsUsedThisMonth: profile.receipts_used_this_month || 0,
-          monthlyResetDate: profile.monthly_reset_date,
-          simulated: isSimulated,
-        };
-
-        console.log('StripeContext: Force refresh successful:', newSubscriptionData);
-        setSubscriptionData(newSubscriptionData);
-        setLastRefreshTime(new Date());
-        return newSubscriptionData;
-      }
+      const newSubscriptionData = toSubscriptionData(profile);
+      setSubscriptionData(newSubscriptionData);
+      setLastRefreshTime(new Date());
+      return newSubscriptionData;
     } catch (error) {
       console.error('StripeContext: Error force refreshing subscription:', error);
+      return null;
     }
-
-    return null;
   };
 
   const getSubscriptionStatus = async (): Promise<SubscriptionData | null> => {
@@ -227,23 +212,29 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (error) throw error;
-      return data;
+      return data as SubscriptionData;
     } catch (error) {
       console.error('Error getting subscription status:', error);
       return null;
     }
   };
 
-  const createCheckoutSession = async (priceId: string, billingInterval: 'monthly' | 'annual' = 'monthly') => {
+  const createCheckoutSession = async (
+    priceId: string,
+    billingInterval: BillingInterval = 'monthly',
+  ) => {
     if (!user) {
       toast.error('Please sign in to subscribe');
       return;
     }
 
-    // Check if Stripe is properly configured
     if (!STRIPE_PUBLIC_KEY || STRIPE_PUBLIC_KEY.trim() === '') {
-      console.error('Stripe public key is not configured');
       toast.error('Payment system is not configured. Please contact support.');
+      return;
+    }
+
+    if (!priceId) {
+      toast.error('This plan is not configured yet. Please contact support.');
       return;
     }
 
@@ -255,7 +246,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (error) throw error;
 
-      if (data.url) {
+      if (data?.url) {
         window.location.href = data.url;
       } else {
         throw new Error('No checkout URL returned');
@@ -273,13 +264,15 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: { action: 'cancel' },
-      });
+      const { data, error } = await invokeManageSubscription({ action: 'cancel' });
 
       if (error) throw error;
 
-      toast.success('Subscription will be canceled at the end of the current billing period');
+      toast.success(
+        data?.effectiveDate
+          ? `Subscription will be canceled on ${new Date(data.effectiveDate).toLocaleDateString()}.`
+          : 'Subscription will be canceled at the end of the current billing period',
+      );
       await refreshSubscription();
     } catch (error) {
       console.error('Error canceling subscription:', error);
@@ -289,85 +282,114 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const downgradeSubscription = async (targetTier: 'free' | 'pro' | 'max', immediate: boolean = true) => {
+  const resumeSubscription = async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await invokeManageSubscription({ action: 'resume' });
+
+      if (error) throw error;
+
+      toast.success(data?.message || 'Subscription resumed');
+      await refreshSubscription();
+    } catch (error) {
+      console.error('Error resuming subscription:', error);
+      toast.error('Failed to resume subscription. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const downgradeSubscription = async (
+    targetTier: SubscriptionTier,
+    immediate: boolean = false,
+    billingInterval?: BillingInterval,
+  ) => {
+    if (!user) {
+      const message = 'Please sign in to manage your subscription';
+      toast.error(message);
+      throw new Error(message);
+    }
+
+    if (!subscriptionData) {
+      const message = 'No active subscription found';
+      toast.error(message);
+      throw new Error(message);
+    }
+
+    const tierHierarchy = { free: 0, pro: 1, max: 2 };
+    if (tierHierarchy[targetTier] >= tierHierarchy[subscriptionData.tier]) {
+      const message = 'You can only downgrade to a lower tier';
+      toast.error(message);
+      throw new Error(message);
+    }
+
+    if (targetTier !== 'free' && !immediate && subscriptionData.cancelAtPeriodEnd) {
+      const message = 'Resume your subscription before scheduling a plan change';
+      toast.error(message);
+      throw new Error(message);
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await invokeManageSubscription({
+        action: 'change_plan',
+        targetTier,
+        immediate,
+        billingInterval,
+      });
+
+      if (error) throw error;
+
+      if (data?.scheduledChange) {
+        toast.success(
+          `Your plan will change to ${targetTier} on ${new Date(data.effectiveDate).toLocaleDateString()}`,
+        );
+      } else if (data?.cancelAtPeriodEnd) {
+        toast.success(
+          `Your subscription will be canceled on ${new Date(data.effectiveDate).toLocaleDateString()}`,
+        );
+      } else {
+        toast.success(data?.message || `Successfully changed to ${targetTier}`);
+      }
+
+      await refreshSubscription();
+    } catch (error) {
+      console.error('Error downgrading subscription:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to downgrade subscription';
+      toast.error(errorMessage);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const upgradeSubscription = async (
+    targetTier: PaidTier,
+    billingInterval: BillingInterval,
+  ) => {
     if (!user) {
       toast.error('Please sign in to manage your subscription');
       return;
     }
 
-    if (!subscriptionData) {
-      toast.error('No active subscription found');
-      return;
-    }
-
-    // Validate downgrade direction
-    const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
-    const currentTierLevel = tierHierarchy[subscriptionData.tier];
-    const targetTierLevel = tierHierarchy[targetTier];
-
-    if (targetTierLevel >= currentTierLevel) {
-      toast.error('You can only downgrade to a lower tier');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      console.log(`Downgrading from ${subscriptionData.tier} to ${targetTier}, immediate: ${immediate}`);
-
-      // Debug: Check current session
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session ? 'exists' : 'null');
-      console.log('User ID:', user.id);
-      console.log('Access token exists:', !!session?.access_token);
-
-      if (!session?.access_token) {
-        console.error('No valid session found, attempting to refresh...');
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshedSession) {
-          toast.error('Authentication session expired. Please sign in again.');
-          return;
-        }
-        console.log('Session refreshed successfully');
-      }
-
-      // Test authentication first with get_status action
-      console.log('Testing authentication with get_status...');
-      const { data: statusData, error: statusError } = await supabase.functions.invoke('manage-subscription', {
-        body: { action: 'get_status' },
-      });
-
-      if (statusError) {
-        console.error('Authentication test failed:', statusError);
-        toast.error('Authentication failed. Please try signing out and back in.');
-        return;
-      }
-
-      console.log('Authentication test successful, proceeding with downgrade...');
-
-      const { data, error } = await supabase.functions.invoke('manage-subscription', {
-        body: {
-          action: 'downgrade',
-          targetTier,
-          immediate
-        },
+      const { data, error } = await invokeManageSubscription({
+        action: 'change_plan',
+        targetTier,
+        billingInterval,
+        immediate: true,
       });
 
       if (error) throw error;
 
-      // Show success message based on the response
-      if (data.scheduledChange) {
-        toast.success(`Your subscription will be downgraded to ${targetTier} at the end of your current billing period`);
-      } else if (data.cancelAtPeriodEnd) {
-        toast.success('Your subscription will be canceled at the end of your current billing period');
-      } else {
-        toast.success(data.message || `Successfully downgraded to ${targetTier}`);
-      }
-
-      // Refresh subscription data to reflect changes
+      toast.success(data?.message || `Successfully changed to ${targetTier}`);
       await refreshSubscription();
     } catch (error) {
-      console.error('Error downgrading subscription:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to downgrade subscription';
+      console.error('Error upgrading subscription:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to change subscription';
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -385,7 +407,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (error) throw error;
 
-      if (data.url) {
+      if (data?.url) {
         window.location.href = data.url;
       } else {
         throw new Error('No portal URL returned');
@@ -402,7 +424,9 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <StripeContext.Provider value={{
       createCheckoutSession,
       cancelSubscription,
+      resumeSubscription,
       downgradeSubscription,
+      upgradeSubscription,
       createPortalSession,
       getSubscriptionStatus,
       isLoading,

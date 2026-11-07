@@ -464,8 +464,7 @@
     "cancelSubscription": "Batal Langganan",
     "paymentMethod": "Kaedah Pembayaran",
     "billingHistory": "Sejarah Pengebilan",
-    "invoices": "Invois",
-    "simulatedNotice": "Anda sedang melihat maklumat pengebilan simulasi. Naik taraf ke pelan berbayar untuk mengakses portal pengebilan Stripe penuh."
+    "invoices": "Invois"
   },
   "team": {
     "title": "Pengurusan Pasukan",
@@ -537,8 +536,6 @@
   "billingPreferences": {
     "title": "Keutamaan Pengebilan",
     "description": "Urus langganan, kaedah pembayaran dan pemberitahuan pengebilan anda.",
-    "demoTitle": "Mod Demo - Langganan Simulasi",
-    "demoDescription": "Anda sedang melihat langganan simulasi untuk tujuan ujian. Untuk mengakses portal pengebilan Stripe penuh dan mengurus pembayaran sebenar, sila naik taraf kepada pelan berbayar.",
     "tabs": {
       "autoRenewal": "Pembaharuan Automatik",
       "notifications": "Pemberitahuan",
