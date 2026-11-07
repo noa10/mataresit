@@ -17,6 +17,7 @@ This directory contains comprehensive deployment documentation, operational runb
 - **[Infrastructure Management](./infrastructure-management-runbook.md)** - Kubernetes and infrastructure operations
 
 ### Troubleshooting Guides
+- **[Production Login Follow-ups](./production-login-followups.md)** - Remaining owner actions after the "Unregistered API key" outage
 - **[Common Issues](./troubleshooting-common-issues.md)** - Frequently encountered problems and solutions
 - **[Performance Issues](./troubleshooting-performance.md)** - Performance debugging and optimization
 - **[Security Incidents](./security-incident-response.md)** - Security incident response procedures
