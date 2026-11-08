@@ -171,7 +171,7 @@ BEGIN
   PERFORM supabase_functions.http_request(
     url := 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/process-batch-item',
     method := 'POST',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzAxMjM4OSwiZXhwIjoyMDU4NTg4Mzg5fQ.o6Xn7TTIYF4U9zAOhGWVf5MoAcl_BGPtQ_BRcR2xV0o"}',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer REDACTED_REVOKE_OR_ROTATE"}',
     body := json_body,
     timeout_milliseconds := 5000
   );

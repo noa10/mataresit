@@ -4976,36 +4976,60 @@ $$;
 ALTER FUNCTION "public"."get_users_by_ids"("user_ids" "uuid"[]) OWNER TO "postgres";
 
 
+CREATE TABLE "public"."batch_item_dispatch_config" (
+    "singleton" boolean DEFAULT true NOT NULL PRIMARY KEY CHECK ("singleton"),
+    "endpoint_url" text NOT NULL CHECK ("endpoint_url" ~ '^https://[A-Za-z0-9.-]+(:[0-9]+)?/functions/v1/process-batch-item$')
+);
+
+ALTER TABLE "public"."batch_item_dispatch_config" OWNER TO "postgres";
+ALTER TABLE "public"."batch_item_dispatch_config" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "public"."batch_item_dispatch_config" FROM PUBLIC, "anon", "authenticated", "service_role";
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_new_batch_item"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog'
     AS $$
 DECLARE
-  json_body TEXT;
+  v_service_key TEXT;
+  v_batch_url TEXT;
 BEGIN
-  -- Construct the JSON body payload using the NEW record's ID
-  json_body := '{"batch_item_id":"' || NEW.id::text || '"}';
+  -- The service-role key lives in Supabase Vault as `service_role_key`.
+  SELECT decrypted_secret
+  INTO v_service_key
+  FROM vault.decrypted_secrets
+  WHERE name = 'service_role_key'
+  LIMIT 1;
 
-  -- Call the http_request function using PERFORM because we don't need its return value
-  -- Ensure positional arguments match the function signature
-  PERFORM supabase_functions.http_request(
-    url := 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/process-batch-item',
-    method := 'POST',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer sb_secret_r5jrHqGhCKQYjDphz6SWQg_-WimbsHX"}',
-    body := json_body,
+  IF v_service_key IS NULL THEN
+    RAISE EXCEPTION 'Missing Vault secret service_role_key';
+  END IF;
+
+  SELECT endpoint_url INTO v_batch_url
+  FROM public.batch_item_dispatch_config
+  WHERE singleton;
+
+  IF v_batch_url IS NULL THEN
+    RAISE EXCEPTION 'Missing administrator-configured batch item endpoint';
+  END IF;
+
+  PERFORM net.http_post(
+    url := v_batch_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_service_key
+    ),
+    body := jsonb_build_object('batch_item_id', NEW.id::text),
     timeout_milliseconds := 5000
   );
 
-  -- For AFTER triggers, RETURN NULL is conventional for side-effect functions
-  RETURN NULL;
+  RETURN NEW;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."handle_new_batch_item"() OWNER TO "postgres";
-
-
--- Service role key is set via migration (20260320_remove_hardcoded_secrets.sql)
--- using: ALTER FUNCTION handle_new_batch_item() SET app.settings.service_role_key = 'sb_secret_...';
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -13097,9 +13121,7 @@ GRANT ALL ON FUNCTION "public"."hamming_distance"(bit, bit) TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."handle_new_batch_item"() TO "anon";
-GRANT ALL ON FUNCTION "public"."handle_new_batch_item"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."handle_new_batch_item"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."handle_new_batch_item"() FROM PUBLIC, "anon", "authenticated", "service_role";
 
 
 

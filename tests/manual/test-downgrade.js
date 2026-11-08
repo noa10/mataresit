@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use the service role key to check user data
-const supabase = createClient(
-  'https://mpmkbtsufihzdelrlszs.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzAxMjM4OSwiZXhwIjoyMDU4NTg4Mzg5fQ.o6Xn7TTIYF4U9zAOhGWVf5MoAcl_BGPtQ_BRcR2xV0o'
-);
+const supabaseUrl = process.env.SUPABASE_URL || 'https://mpmkbtsufihzdelrlszs.supabase.co';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!serviceRoleKey) {
+  console.error('Set SUPABASE_SERVICE_ROLE_KEY in your environment before running this manual test.');
+  process.exit(1);
+}
+
+// Use the service role key to check user data. Never hardcode it in this file.
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 async function checkUserData() {
   try {

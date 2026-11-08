@@ -32,9 +32,11 @@ The webhook processing chain is broken at one of these points:
 
 ### Fix 1: Manual User Update (Temporary)
 ```bash
+# Never commit a service-role key. Load it from your secret manager into the
+# environment before running this; this guide must not contain a literal value.
 # Update the current user to Pro tier
 VITE_SUPABASE_URL=https://mpmkbtsufihzdelrlszs.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbWtidHN1ZmloemRlbHJsc3pzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MzAxMjM4OSwiZXhwIjoyMDU4NTg4Mzg5fQ.o6Xn7TTIYF4U9zAOhGWVf5MoAcl_BGPtQ_BRcR2xV0o \
+SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:?set this from your secret manager — never paste a literal key here}" \
 node scripts/test-payment-flow.js simulate samcodersam7@gmail.com
 ```
 
