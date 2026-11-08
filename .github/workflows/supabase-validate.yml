@@ -30,7 +30,7 @@ on:
         type: boolean
 
 env:
-  SUPABASE_CLI_VERSION: '1.127.4'
+  SUPABASE_CLI_VERSION: '3.0.0'
 
 
 
@@ -60,7 +60,7 @@ jobs:
           echo "Deploying to: $ENVIRONMENT"
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
@@ -111,7 +111,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
