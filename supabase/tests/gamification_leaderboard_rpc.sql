@@ -249,6 +249,10 @@ ON CONFLICT (user_id) DO UPDATE SET
 -- ---------------------------------------------------------------------------
 -- Assertions
 -- ---------------------------------------------------------------------------
+-- Row assertions combine NOT FOUND with IS DISTINCT FROM. A `<>` comparison
+-- whose operand is NULL evaluates to NULL, and `IF NULL THEN` does not raise,
+-- so a missing row or a withheld/NULL value would otherwise pass silently.
+-- (SELECT ... INTO leaves every field NULL when no row matches.)
 -- Timezone handling is exercised before switching to the authenticated role:
 -- the trigger update below runs as the table owner.
 DO $$
@@ -262,7 +266,7 @@ BEGIN
     RAISE EXCEPTION 'invalid timezone write must be rejected';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_message = MESSAGE_TEXT;
-    IF v_message NOT LIKE 'Invalid timezone%' THEN
+    IF v_message IS NULL OR v_message NOT LIKE 'Invalid timezone%' THEN
       RAISE EXCEPTION 'invalid timezone write: unexpected error: %', v_message;
     END IF;
   END;
@@ -295,7 +299,7 @@ BEGIN
   SELECT metric_value INTO v_value
   FROM public.get_gamification_leaderboard('monthly_receipts', NULL, 100)
   WHERE rank = 6;
-  IF v_value <> 1 THEN
+  IF NOT FOUND OR v_value IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'bad legacy timezone: expected rank 6 value 1, got %', v_value;
   END IF;
 
@@ -334,14 +338,12 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('weekly_xp', NULL, 5)
   WHERE is_current_user;
-  IF v_row.rank <> 14 THEN
-    RAISE EXCEPTION 'viewer row: expected rank 14, got %', v_row.rank;
-  END IF;
-  IF v_row.metric_value <> 860 THEN
-    RAISE EXCEPTION 'viewer row: expected 860 XP, got %', v_row.metric_value;
-  END IF;
-  IF v_row.gap_to_top_ten <> 40 THEN
-    RAISE EXCEPTION 'viewer row: expected gap 40, got %', v_row.gap_to_top_ten;
+  IF NOT FOUND
+     OR v_row.rank IS DISTINCT FROM 14
+     OR v_row.metric_value IS DISTINCT FROM 860
+     OR v_row.gap_to_top_ten IS DISTINCT FROM 40 THEN
+    RAISE EXCEPTION 'viewer row: expected rank 14 / 860 XP / gap 40, got % / % / %',
+      v_row.rank, v_row.metric_value, v_row.gap_to_top_ten;
   END IF;
 
   -- 3. Anonymity masking: names are hidden and the stable user_id is withheld
@@ -349,7 +351,7 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('weekly_xp', NULL, 100)
   WHERE display_name = 'Anonymous #1';
-  IF NOT FOUND OR NOT v_row.is_anonymous OR v_row.user_id IS NOT NULL THEN
+  IF NOT FOUND OR v_row.is_anonymous IS DISTINCT FROM TRUE OR v_row.user_id IS NOT NULL THEN
     RAISE EXCEPTION 'anonymous user: expected masked name and NULL user_id, got % (anonymous=%, user_id=%)',
       v_row.display_name, v_row.is_anonymous, v_row.user_id;
   END IF;
@@ -357,7 +359,10 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('weekly_xp', NULL, 100)
   WHERE user_id = '00000000-0000-0000-0000-000000000002';
-  IF v_row.is_anonymous OR v_row.display_name <> 'User 2' OR v_row.user_id IS NULL THEN
+  IF NOT FOUND
+     OR v_row.is_anonymous IS DISTINCT FROM FALSE
+     OR v_row.display_name IS DISTINCT FROM 'User 2'
+     OR v_row.user_id IS DISTINCT FROM '00000000-0000-0000-0000-000000000002' THEN
     RAISE EXCEPTION 'named user: expected "User 2" and a visible user_id, got % (anonymous=%, user_id=%)',
       v_row.display_name, v_row.is_anonymous, v_row.user_id;
   END IF;
@@ -370,7 +375,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'member with no name must still appear on the board';
   END IF;
-  IF NOT v_row.is_anonymous OR v_row.user_id IS NOT NULL THEN
+  IF v_row.is_anonymous IS DISTINCT FROM TRUE OR v_row.user_id IS NOT NULL THEN
     RAISE EXCEPTION 'member with no name: expected masked row, got anonymous=% user_id=%',
       v_row.is_anonymous, v_row.user_id;
   END IF;
@@ -386,9 +391,10 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('weekly_xp', NULL, 5)
   WHERE is_current_user;
-  IF v_row.user_id <> '00000000-0000-0000-0000-000000000001'
-     OR NOT v_row.is_anonymous
-     OR v_row.display_name <> 'Anonymous #1' THEN
+  IF NOT FOUND
+     OR v_row.user_id IS DISTINCT FROM '00000000-0000-0000-0000-000000000001'
+     OR v_row.is_anonymous IS DISTINCT FROM TRUE
+     OR v_row.display_name IS DISTINCT FROM 'Anonymous #1' THEN
     RAISE EXCEPTION 'anonymous viewer: expected own user_id and "Anonymous #1", got % (anonymous=%)',
       v_row.user_id, v_row.is_anonymous;
   END IF;
@@ -420,7 +426,9 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('weekly_xp', 'MY', 5)
   WHERE is_current_user;
-  IF v_row.rank <> 12 OR v_row.gap_to_top_ten <> 20 THEN
+  IF NOT FOUND
+     OR v_row.rank IS DISTINCT FROM 12
+     OR v_row.gap_to_top_ten IS DISTINCT FROM 20 THEN
     RAISE EXCEPTION 'MY viewer row: expected rank 12 gap 20, got rank % gap %',
       v_row.rank, v_row.gap_to_top_ten;
   END IF;
@@ -430,7 +438,7 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('monthly_receipts', NULL, 100)
   WHERE user_id = '00000000-0000-0000-0000-000000000002';
-  IF v_row.metric_value <> 2 THEN
+  IF NOT FOUND OR v_row.metric_value IS DISTINCT FROM 2 THEN
     RAISE EXCEPTION 'monthly user 2: expected 2 complete receipts, got %', v_row.metric_value;
   END IF;
 
@@ -440,7 +448,7 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('monthly_receipts', NULL, 100)
   WHERE rank = 6;
-  IF v_row.metric_value <> 1 THEN
+  IF NOT FOUND OR v_row.metric_value IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'monthly user 1: expected 1 current-month receipt (old row excluded), got %', v_row.metric_value;
   END IF;
 
@@ -448,7 +456,10 @@ BEGIN
   SELECT * INTO v_row
   FROM public.get_gamification_leaderboard('deductible_total', NULL, 100)
   WHERE user_id = '00000000-0000-0000-0000-000000000014';
-  IF v_row.metric_value <> 860 OR v_row.rank <> 14 OR v_row.gap_to_top_ten <> 40 THEN
+  IF NOT FOUND
+     OR v_row.metric_value IS DISTINCT FROM 860
+     OR v_row.rank IS DISTINCT FROM 14
+     OR v_row.gap_to_top_ten IS DISTINCT FROM 40 THEN
     RAISE EXCEPTION 'deductible viewer: expected value 860 rank 14 gap 40, got % / % / %',
       v_row.metric_value, v_row.rank, v_row.gap_to_top_ten;
   END IF;
@@ -485,7 +496,7 @@ BEGIN
     RAISE EXCEPTION 'NULL metric must be rejected';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_message = MESSAGE_TEXT;
-    IF v_message NOT LIKE 'Unsupported leaderboard metric%' THEN
+    IF v_message IS NULL OR v_message NOT LIKE 'Unsupported leaderboard metric%' THEN
       RAISE EXCEPTION 'NULL metric: unexpected error: %', v_message;
     END IF;
   END;
@@ -495,7 +506,7 @@ BEGIN
     RAISE EXCEPTION 'unsupported metric must be rejected';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_message = MESSAGE_TEXT;
-    IF v_message NOT LIKE 'Unsupported leaderboard metric%' THEN
+    IF v_message IS NULL OR v_message NOT LIKE 'Unsupported leaderboard metric%' THEN
       RAISE EXCEPTION 'unsupported metric: unexpected error: %', v_message;
     END IF;
   END;
@@ -507,7 +518,7 @@ BEGIN
     RAISE EXCEPTION 'anonymous caller must be rejected';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_message = MESSAGE_TEXT;
-    IF v_message <> 'Authentication required' THEN
+    IF v_message IS DISTINCT FROM 'Authentication required' THEN
       RAISE EXCEPTION 'anonymous caller: unexpected error: %', v_message;
     END IF;
   END;
