@@ -346,6 +346,9 @@
       "failedCount": "{{count}} failed",
       "readyOfTotal": "{{ready}} of {{total}} ready"
     },
+    "browser": {
+      "goToReceipts": "Go to Receipts"
+    },
     "tray": {
       "fullTitle": "This batch is full",
       "optimisingTitle": "Optimising your receipts",

@@ -352,6 +352,75 @@ export const fetchReceiptsPage = async (
   };
 };
 
+// Fetch the receipts immediately before and after `receipt` in upload order
+// (oldest first), scoped to the active workspace. Used by the individual
+// receipt page for Previous/Next navigation.
+export interface ReceiptNeighbor {
+  id: string;
+  merchant: string | null;
+  date: string | null;
+}
+
+export interface ReceiptNeighbors {
+  previous: ReceiptNeighbor | null;
+  next: ReceiptNeighbor | null;
+}
+
+export const fetchReceiptNeighbors = async (
+  receipt: Pick<Receipt, "id" | "created_at">,
+  teamContext?: { currentTeam: { id: string } | null }
+): Promise<ReceiptNeighbors> => {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user || !receipt.created_at) {
+    return { previous: null, next: null };
+  }
+
+  // Compare with the database's raw timestamp. Round-tripping through Date
+  // truncates microseconds to milliseconds, which makes the `gt` filter match
+  // the current receipt itself and leaves the Next button stuck on it.
+  const createdAt = receipt.created_at;
+
+  const buildQuery = () => {
+    let query = supabase
+      .from("receipts")
+      .select("id, merchant, date, created_at");
+
+    if (teamContext?.currentTeam?.id) {
+      query = query.eq("team_id", teamContext.currentTeam.id);
+    } else {
+      query = query.eq("user_id", user.user.id).is("team_id", null);
+    }
+
+    return query;
+  };
+
+  const [previousResult, nextResult] = await Promise.all([
+    // Earlier upload: the receipt before this one in the batch ledger.
+    buildQuery()
+      .lt("created_at", createdAt)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    // Later upload: the receipt after this one in the batch ledger.
+    buildQuery()
+      .gt("created_at", createdAt)
+      .order("created_at", { ascending: true })
+      .limit(1),
+  ]);
+
+  if (previousResult.error || nextResult.error) {
+    console.error(
+      "Error fetching receipt neighbors:",
+      previousResult.error || nextResult.error
+    );
+    return { previous: null, next: null };
+  }
+
+  return {
+    previous: (previousResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+    next: (nextResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+  };
+};
+
 // Fetch available currencies for filter options.
 export const fetchReceiptCurrencies = async (
   teamContext?: { currentTeam: { id: string } | null }

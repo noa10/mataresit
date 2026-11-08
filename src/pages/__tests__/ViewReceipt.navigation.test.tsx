@@ -1,13 +1,15 @@
+import type { HTMLAttributes } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ViewReceipt from "@/pages/ViewReceipt";
 
 const mocks = vi.hoisted(() => ({
   fetchReceiptById: vi.fn(),
+  fetchReceiptNeighbors: vi.fn(),
   deleteReceipt: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock("@/contexts/TeamContext", () => ({
 
 vi.mock("@/services/receiptService", () => ({
   fetchReceiptById: mocks.fetchReceiptById,
+  fetchReceiptNeighbors: mocks.fetchReceiptNeighbors,
   deleteReceipt: mocks.deleteReceipt,
 }));
 
@@ -35,7 +38,7 @@ vi.mock("sonner", () => ({
 
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   },
 }));
 
@@ -56,6 +59,11 @@ function LocationObserver() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
+function NavigationTypeObserver() {
+  const navigationType = useNavigationType();
+  return <div data-testid="navigation-type">{navigationType}</div>;
+}
+
 function renderViewReceipt(initialEntry: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -67,7 +75,12 @@ function renderViewReceipt(initialEntry: string) {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/receipt/:id" element={<ViewReceipt />} />
+          <Route path="/receipt/:id" element={
+            <>
+              <NavigationTypeObserver />
+              <ViewReceipt />
+            </>
+          } />
           <Route path="/receipts" element={<LocationObserver />} />
         </Routes>
       </MemoryRouter>
@@ -77,12 +90,17 @@ function renderViewReceipt(initialEntry: string) {
 
 describe("ViewReceipt dashboard navigation", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mocks.fetchReceiptById.mockResolvedValue({
       id: "receipt-1",
       merchant: "Test Merchant",
       date: "2026-02-01",
       total: 12.5,
       currency: "MYR",
+    });
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: null,
     });
     mocks.deleteReceipt.mockResolvedValue(true);
     mocks.toastSuccess.mockReset();
@@ -114,5 +132,104 @@ describe("ViewReceipt dashboard navigation", () => {
         "/receipts?q=office&currency=USD&page=3&limit=25&view=list",
       );
     });
+  });
+
+  it("moves to the next uploaded receipt", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-2",
+        merchant: "Next Merchant",
+        date: "2026-02-02",
+      },
+    });
+
+    renderViewReceipt("/receipt/receipt-1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Next" })
+    );
+
+    await waitFor(() => {
+      expect(mocks.fetchReceiptById).toHaveBeenCalledWith(
+        "receipt-2",
+        expect.anything()
+      );
+    });
+  });
+
+  it("moves to the previous uploaded receipt", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: {
+        id: "receipt-0",
+        merchant: "Previous Merchant",
+        date: "2026-01-31",
+      },
+      next: null,
+    });
+
+    renderViewReceipt("/receipt/receipt-1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Previous" })
+    );
+
+    await waitFor(() => {
+      expect(mocks.fetchReceiptById).toHaveBeenCalledWith(
+        "receipt-0",
+        expect.anything()
+      );
+    });
+  });
+
+  it("replaces history when moving between receipts so Back does not replay them", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-2",
+        merchant: "Next Merchant",
+        date: "2026-02-02",
+      },
+    });
+
+    renderViewReceipt("/receipt/receipt-1");
+
+    expect(await screen.findByTestId("navigation-type")).toHaveTextContent("POP");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Next" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("navigation-type")).toHaveTextContent("REPLACE");
+    });
+  });
+
+  it("ignores a neighbour that points at the current receipt", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-1",
+        merchant: "Same Merchant",
+        date: "2026-02-01",
+      },
+    });
+
+    renderViewReceipt("/receipt/receipt-1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Next" })
+    );
+
+    expect(mocks.fetchReceiptById).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the neighbour buttons when there are none", async () => {
+    renderViewReceipt("/receipt/receipt-1");
+
+    expect(
+      await screen.findByRole("button", { name: "Previous" })
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 });

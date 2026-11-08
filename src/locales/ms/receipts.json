@@ -346,6 +346,9 @@
       "failedCount": "{{count}} gagal",
       "readyOfTotal": "{{ready}} daripada {{total}} sedia"
     },
+    "browser": {
+      "goToReceipts": "Pergi ke Resit"
+    },
     "tray": {
       "fullTitle": "Kelompok ini penuh",
       "optimisingTitle": "Mengoptimumkan resit anda",

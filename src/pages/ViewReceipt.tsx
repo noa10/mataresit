@@ -3,8 +3,8 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import ReceiptViewer from "@/components/ReceiptViewer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
-import { fetchReceiptById, deleteReceipt } from "@/services/receiptService";
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Loader2 } from "lucide-react";
+import { fetchReceiptById, fetchReceiptNeighbors, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,6 +78,13 @@ export default function ViewReceipt() {
     retry: 1,     // Only retry once to avoid excessive requests if there's a problem
   });
 
+  const { data: neighbors } = useQuery({
+    queryKey: ['receipt-neighbors', id, currentTeam?.id],
+    queryFn: () => fetchReceiptNeighbors(receipt!, { currentTeam }),
+    enabled: !!receipt,
+    staleTime: 30 * 1000,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (receiptId: string) => deleteReceipt(receiptId),
     onSuccess: (success) => {
@@ -101,6 +108,13 @@ export default function ViewReceipt() {
     if (window.confirm("Are you sure you want to delete this receipt?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleNavigateNeighbor = (neighborId: string | null | undefined) => {
+    if (!neighborId || neighborId === id) return;
+    // Replace rather than push so the header Back button returns to the page
+    // the user came from instead of stepping back through each receipt.
+    navigate(`/receipt/${neighborId}${location.search}`, { replace: true });
   };
 
   if (isLoading) {
@@ -161,8 +175,38 @@ export default function ViewReceipt() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="flex gap-2"
+            className="flex flex-wrap items-center gap-2"
           >
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => handleNavigateNeighbor(neighbors?.previous?.id)}
+              disabled={!neighbors?.previous}
+              title={
+                neighbors?.previous
+                  ? `Previous: ${neighbors.previous.merchant || "Untitled receipt"}`
+                  : "No previous receipt"
+              }
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => handleNavigateNeighbor(neighbors?.next?.id)}
+              disabled={!neighbors?.next}
+              title={
+                neighbors?.next
+                  ? `Next: ${neighbors.next.merchant || "Untitled receipt"}`
+                  : "No next receipt"
+              }
+            >
+              Next
+              <ChevronRight size={16} aria-hidden="true" />
+            </Button>
             <Button
               variant="outline"
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"

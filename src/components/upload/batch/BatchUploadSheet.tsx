@@ -233,6 +233,12 @@ export function BatchUploadSheet({
     navigate(`/receipt/${receiptId}`);
   };
 
+  const handleGoToReceipts = () => {
+    setShowReceiptBrowser(false);
+    onRequestClose?.();
+    navigate("/receipts");
+  };
+
   const handleOpenSettings = () => {
     window.open("/admin/settings", "_blank", "noopener,noreferrer");
   };
@@ -453,6 +459,7 @@ export function BatchUploadSheet({
         receiptIds={browserReceiptIds}
         isOpen={showReceiptBrowser}
         onClose={() => setShowReceiptBrowser(false)}
+        onGoToReceipts={handleGoToReceipts}
       />
 
       <AlertDialog
