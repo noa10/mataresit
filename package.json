@@ -69,12 +69,12 @@
     "playwright-mcp:debug-trace": "npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace",
     "playwright-mcp:debug-console": "PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json",
     "playwright-mcp:debug-verbose": "DEBUG=pw:api PWDEBUG=console npx @playwright/mcp --config ./playwright-mcp-debug.config.json --save-trace",
-    "supabase:push": "supabase db push --remote",
+    "supabase:push": "supabase db push --remote --yes",
     "supabase:push:dry": "supabase db push --dry-run --remote",
-    "supabase:diff": "supabase db diff --schema public",
+    "supabase:diff": "supabase db diff --schema public --remote",
     "supabase:migrate:list": "supabase migration list --remote",
     "supabase:migrate:new": "supabase migration new",
-    "supabase:migrate:repair": "supabase migration repair --remote"
+    "supabase:migrate:repair": "supabase migration repair --remote --yes"
   },
   "dependencies": {
     "@hookform/resolvers": "^6.0.2",
@@ -187,7 +187,7 @@
     "mocha": "^12.0.3",
     "msw": "^3.0.3",
     "postcss": "^8.5.32",
-    "supabase": "^3.0.0",
+    "supabase": "3.0.0",
     "supertest": "^7.3.1",
     "tailwindcss": "^4.1.11",
     "terser": "^5.51.2",
