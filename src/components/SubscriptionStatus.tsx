@@ -23,7 +23,7 @@ import SubscriptionStatusRefresh from '@/components/SubscriptionStatusRefresh';
 
 export const SubscriptionStatus: React.FC = () => {
   const { limits, usage, isLoading, getCurrentTier, getUpgradeMessage, isFeatureAvailable, getFeatureLimit } = useSubscription();
-  const { subscriptionData, createPortalSession, isLoading: stripeLoading } = useStripe();
+  const { subscriptionData, createPortalSession, resumeSubscription, isLoading: stripeLoading } = useStripe();
 
   if (isLoading) {
     return (
@@ -221,6 +221,27 @@ export const SubscriptionStatus: React.FC = () => {
                 <p className="text-sm text-orange-800">{upgradeMessage}</p>
                 <Button size="sm" asChild>
                   <Link to="/pricing">Upgrade Plan</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {subscriptionData?.cancelAtPeriodEnd && (
+            <div className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
+              <div className="space-y-2">
+                <p className="text-sm text-orange-800">
+                  Your subscription is set to cancel
+                  {subscriptionData.subscriptionEndDate
+                    ? ` on ${new Date(subscriptionData.subscriptionEndDate).toLocaleDateString()}`
+                    : ' at the end of the current billing period'}.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={resumeSubscription}
+                  disabled={stripeLoading}
+                >
+                  Resume subscription
                 </Button>
               </div>
             </div>

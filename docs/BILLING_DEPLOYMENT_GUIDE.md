@@ -22,6 +22,226 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 - [ ] Email service API keys validated
 - [ ] Frontend build configuration updated
 
+## Stripe Production Cutover
+
+**Blocked:** The database half is now locally verified; the Stripe lifecycle is
+not. On 2026-11-06 the five billing SQL suites
+(`stripe_webhook_claim_fencing`, `payment_state_fencing`,
+`stripe_checkout_locks`, `profile_billing_column_protection`,
+`batch_item_dispatch_config`) passed against a disposable PostgreSQL 15
+database built from a curated baseline (initial schema plus the subscription
+and billing-schema migrations) and the three hardening migrations (see
+`Verification status` below). CI is wired through the `sql-regression` job but
+has not been observed on this branch.
+
+Still blocking cutover:
+
+- Live/test-mode Stripe lifecycle behavior — Checkout, upgrade/proration
+  collection, cancel/resume, interval switch, payment failure/dunning, 3DS,
+  replayed and out-of-order webhook delivery, and a worker paused past its
+  lease — has not been exercised.
+- Two-session checkout-lock and webhook-claim races are not covered by the
+  single-session SQL suites.
+- Paid upgrades still sync the target tier before the proration invoice is
+  collected (see the proration limitation in `docs/api/stripe-integration.md`).
+- Legacy service-role JWT revocation/rotation and production Vault creation
+  require dashboard or management access and are not verified here.
+- The app-wide TypeScript baseline remains non-zero; CI's root `tsc` command
+  check is not evidence. Only the billing-specific diagnostics were fixed.
+
+### Verification status
+
+Local SQL execution (2026-11-06):
+
+```bash
+bash .github/sql-regression/run-sql-regression.sh
+```
+
+The tracked runner creates a loopback-only `postgres:15-alpine` container,
+applies a curated production-shaped baseline plus
+`20261104000000_stripe_production_hardening.sql`,
+`20261104000001_batch_item_vault_trigger.sql`, and
+`20261106000000_stripe_checkout_locks_and_payment_fencing.sql`, then runs the
+five suites. All five exited 0. It then runs
+`.github/sql-regression/two-session-races.sh` against the same target: two real
+connections race lock acquisition and webhook claims, and the harness asserts
+one owner, one claim, owner-scoped bind/release, stale-token rejection, and
+expired-lock stealing. Both the suites and the race harness passed on
+2026-11-06 and run in the `sql-regression` CI job, which passed on `a316a8c`.
+The full historical migration chain is **not** replayed: it contains remote
+placeholders and out-of-band schema drift, so it is not a valid bootstrap.
+
+The baseline is `20231126000000_initial_schema.sql`, then
+`20250115000000_add_subscription_schema.sql`,
+`20250120000000_fix_profiles_insert_policy.sql`, and
+`20250722000000_enhance_billing_system_schema.sql`, plus a two-line
+`email`-column shim. `.github/sql-regression/bootstrap.sql` substitutes the
+Supabase platform pieces those migrations assume: it creates the `anon`,
+`authenticated`, and `service_role` roles, `auth.uid()` / `auth.role()` shims
+(only when absent), a minimal `auth.users` table, a `vault.decrypted_secrets`
+placeholder, and a `pg_net` stub that raises instead of delivering HTTP. Read
+"production-shaped" as "matches the billing table and function contract", not
+"identical to production".
+
+The `invitation-auth-regression` CI job continues to own
+`supabase/tests/invitation_acceptance_auth.sql` separately.
+
+CI status: `sql-regression` is wired in `.github/workflows/supabase-validate.yml`
+and runs the same runner. Executing it requires a push; the local run above is
+the execution evidence for this branch.
+
+Complete these steps in order before switching to live Stripe keys. Do not skip
+the migration; the Edge Functions call RPCs and columns it creates.
+
+- [ ] Create the Vault secret named `service_role_key` (Dashboard → Database →
+      Vault). Never commit or log its value. Check that exactly one entry exists.
+      Treat any previously exposed credential as compromised; redacting the
+      repository does not rotate or revoke it. Verify revocation using
+      Supabase's supported process without exposing the value. The credential
+      inventory as of this branch (all redacted in the working tree, all still
+      present in Git history):
+
+      | Location | Kind |
+      |---|---|
+      | `20250503181349_remote_schema.sql` | legacy service-role JWT literal |
+      | `docs/troubleshooting/WEBHOOK_DEBUGGING_GUIDE.md` | legacy service-role JWT literal |
+      | `scripts/apply-missing-migrations.ts` | embedded fallback service-role key |
+      | `scripts/apply-quality-metrics-migration.ts` | embedded fallback service-role key |
+      | `scripts/setup-test-environment.js` | embedded service-role key constant |
+      | `tools/debug/check-receipts.js` | embedded service-role key constant |
+
+      Several scripts and test fixtures also contain `anon` JWTs. Those are
+      public by design and are not part of the revocation gate, but they should
+      be replaced with environment reads as they are touched.
+      Legacy service-role JWTs are tied to the legacy JWT signing secret; plan
+      any rotation or revocation with the [Supabase signing-key guide](https://supabase.com/docs/guides/auth/signing-keys),
+      since it also affects other legacy keys and tokens. Replaying that
+      historical migration installs a trigger with an invalid placeholder until
+      the Vault-backed trigger migration is applied.
+- [ ] After any API-key rotation or revocation (legacy anon JWT or
+      `sb_publishable_...`), update `VITE_SUPABASE_ANON_KEY` in **every** Vercel
+      environment and redeploy. `VITE_*` values are inlined into the JS bundle
+      at build time, and Vercel applies environment-variable changes only to
+      new deployments, so a rotated key keeps shipping as `Unregistered API
+      key` on every auth and REST request until a fresh build replaces it.
+      Update each environment in place — `vercel env update` does not disturb
+      the variable in the other environments:
+
+      ```bash
+      NEW_KEY='sb_publishable_...'   # the key registered in the Supabase dashboard
+      for env in production preview development; do
+        vercel env update VITE_SUPABASE_ANON_KEY "$env" --value "$NEW_KEY" --yes
+      done
+      ```
+
+      Redeploy the current production deployment so the same commit rebuilds
+      with the new value — set `PROJECT` to the Vercel project name and
+      `DEPLOYMENT_URL` to the current production deployment URL from
+      `vercel ls "$PROJECT" --prod`, then run
+      `vercel redeploy "$DEPLOYMENT_URL"`. Then verify the live bundle
+      actually carries the registered key. The key is not in the hashed entry
+      chunk (`index-*.js`); it is inlined into the chunks the page preloads
+      (`feature-admin-*.js` and others), and `curl` does not expand `*` in a
+      URL path, while the SPA rewrite answers 200 for any miss — so fetch the
+      asset list from the HTML first:
+
+      ```bash
+      SITE=https://mataresit.vercel.app   # deployment origin
+      for p in $(curl -fsS "$SITE/" | grep -oE '/assets/[^"]+\.js' | sort -u); do
+        curl -fsS "$SITE$p"
+      done | grep -oE 'sb_publishable_[A-Za-z0-9_-]{20,}' | sort -u
+      ```
+
+      The output must list the registered key and never a revoked one. Also
+      update `.env.local`, which Vercel does not manage. Sessions that still
+      exist recover on the next token refresh; users whose access tokens
+      expired during a prolonged outage are signed out client-side and must
+      sign in again.
+- [ ] Plan a batch-processing maintenance window. Confirm the existing
+      `handle_new_batch_item` trigger attachment and timing in nonproduction:
+      the migration replaces the function but does not create a trigger. The
+      function returns `NEW`, so a BEFORE attachment no longer cancels the row;
+      timing still decides whether dispatch is enqueued before or after commit.
+- [ ] Apply the hardening migrations, in order:
+      `20261104000000_stripe_production_hardening.sql` (billing columns,
+      billing-field guard, service-only billing RPCs, fenced subscription-event
+      RPC, webhook idempotency RPCs, payment-history uniqueness),
+      `20261104000001_batch_item_vault_trigger.sql` (Vault-backed batch trigger),
+      and `20261106000000_stripe_checkout_locks_and_payment_fencing.sql`
+      (per-user checkout ownership, fenced payment/invoice-failure/status and
+      renewal-tracking RPCs, receipt usage counter RPC + trigger, lazy monthly
+      usage reset). The first aborts if duplicate payment intent IDs exist; the
+      second aborts if exactly one Vault secret is not present.
+- [ ] Schedule the monthly usage reset: `reset_monthly_usage()` is not
+      scheduled anywhere in the application. The lazy reset inside
+      `increment_receipts_used` keeps the counter correct for anyone who
+      uploads after the month boundary; scheduling the function with pg_cron
+      is what refreshes the displayed counter for users who upload nothing in
+      a given month.
+- [ ] Reconciliation is user-initiated only: admin syncs through
+      `manage-subscription` remain unfenced by design. Do not run Stripe
+      dashboard mutations in parallel with a user's own plan change — on those
+      unfenced paths the last write wins.
+- [ ] Immediately after the second migration, have a trusted database
+      administrator configure the current environment's HTTPS endpoint. Verify
+      the hostname belongs to that environment before executing the following
+      example; never use the production hostname in a nonproduction environment:
+
+      ```sql
+      INSERT INTO public.batch_item_dispatch_config (singleton, endpoint_url)
+      VALUES (true, 'https://YOUR_PROJECT.supabase.co/functions/v1/process-batch-item')
+      ON CONFLICT (singleton) DO UPDATE SET endpoint_url = EXCLUDED.endpoint_url;
+      ```
+
+      The table is owned by `postgres`, has row-level security enabled, and is
+      inaccessible to `PUBLIC`, `anon`, `authenticated`, and `service_role`.
+      Only trusted database administrators should own it or receive privileges
+      on it. Batch inserts invoking the trigger fail until it is configured.
+      Test batch dispatch in nonproduction before resuming processing. An
+      asynchronous enqueue does not prove delivery.
+- [ ] Export `payment_history` before the first migration; reconcile duplicates
+      against Stripe rather than deleting them.
+- [ ] Reconcile existing subscriptions from Stripe. `billing_interval` is NULL
+      until reconciled, so annual and scheduled-cancellation state must be
+      backfilled before the UI can be trusted to report it.
+- [ ] After applying the migrations, regenerate and commit frontend types into
+      the file the browser client actually imports:
+      `supabase gen types typescript --remote > src/types/supabase.ts`
+      (`src/integrations/supabase/client.ts` imports `Database` from
+      `src/types/supabase`; `src/integrations/supabase/types.ts` is stale and
+      unused). This command targets the linked project; run it only in the
+      authorized environment. Until the migrations are applied the generated
+      types lack the new columns, so do not commit a regenerated file before
+      then. The billing settings screen currently uses local row interfaces for
+      the two missing objects, so type generation does not block local
+      verification.
+- [ ] Set Supabase Edge Function secrets: `STRIPE_SECRET_KEY`,
+      `STRIPE_WEBHOOK_SECRET`, and all four live price IDs
+      (`STRIPE_PRO_MONTHLY_PRICE_ID`, `STRIPE_PRO_ANNUAL_PRICE_ID`,
+      `STRIPE_MAX_MONTHLY_PRICE_ID`, `STRIPE_MAX_ANNUAL_PRICE_ID`).
+- [ ] Set Vercel environment variables: `VITE_STRIPE_PUBLIC_KEY` and the four
+      `VITE_STRIPE_*_PRICE_ID` values. These must be the same live prices as the
+      Edge Function secrets.
+- [ ] Confirm `supabase/config.toml` contains
+      `[functions.stripe-webhook] verify_jwt = false`.
+- [ ] Deploy `stripe-webhook` with `--no-verify-jwt`, and deploy
+      `create-checkout-session` and `manage-subscription`.
+- [ ] In Stripe, register the live webhook endpoint and the events listed in
+      `docs/api/stripe-integration.md`.
+- [ ] Verify in Stripe test mode using a test clock: new monthly and annual
+      checkout, upgrade, period-end downgrade, cancel, resume, interval switch,
+      failed payment, duplicate webhook delivery, out-of-order subscription and
+      payment events, a worker paused past its webhook lease, and a required
+      billing RPC returning an error. Confirm the DB tier and
+      `cancel_at_period_end` after each step and verify that rejected stale
+      writes leave profile state unchanged. For checkout ownership: double
+      clicking "Upgrade" returns the same Checkout Session, two concurrent
+      checkout requests create one Stripe customer and one session, and a
+      completed session releases the lock before the next checkout starts.
+      Separately perform controlled live-mode verification after cutover.
+- [ ] Do not use the Stripe Customer Portal as the only cancellation path; the
+      app now has in-app cancel and resume.
+
 ## Deployment Steps
 
 ### 1. Database Migration
@@ -263,16 +483,16 @@ supabase functions logs stripe-webhook
 
 #### End-to-End Workflow Testing
 
-1. **Create Test User:**
-   ```sql
-   INSERT INTO auth.users (id, email) 
-   VALUES ('test-user-e2e', 'test-e2e@example.com');
-   ```
+1. **Create a test user** through Supabase Auth in the isolated test project.
+   Record the user's UUID for the following checks.
 
-2. **Initialize Billing Preferences:**
+2. **Verify default billing preferences:**
    ```sql
-   SELECT initialize_billing_preferences('test-user-e2e', 'pro');
+   SELECT * FROM public.billing_preferences
+   WHERE user_id = '00000000-0000-0000-0000-000000000000'::uuid;
    ```
+   Replace the example UUID with the test user's UUID. The Auth user creation
+   trigger creates the preferences row; preserve any settings already present.
 
 3. **Schedule Billing Reminders:**
    ```bash
@@ -450,14 +670,10 @@ If critical issues are discovered:
    # ... deploy other functions
    ```
 
-3. **Database Rollback:**
-   ```bash
-   # Revert database changes
-   supabase db reset
-   # Apply previous migration
-   git checkout previous-migration
-   supabase db push
-   ```
+3. **Database recovery:** Do not reset the production database or replay old
+   migrations as a rollback. Assess the impact, preserve the affected data, and
+   prepare a reviewed forward migration or a tested backup-recovery procedure.
+   Apply it only after confirming the target environment and obtaining approval.
 
 ### Partial Rollback
 

@@ -483,7 +483,7 @@
       "description": "You are moving to {{plan}}.",
       "freeWarningTitle": "What happens if you move to Free",
       "freeWarning": [
-        "Your subscription will be canceled",
+        "Your subscription will be canceled at the end of the current billing period",
         "You will lose access to premium features",
         "Data retention will be limited to 7 days",
         "Monthly receipt limit will be reduced to 50"
@@ -491,12 +491,17 @@
       "paidWarning": [
         "You will lose access to higher-tier features",
         "Your monthly limits will be reduced",
-        "You will receive a prorated credit for unused time"
+        "The change takes effect at the end of your current billing period"
       ],
-      "billingNote": "You are billed monthly or annually based on your chosen plan. You can upgrade, downgrade, or cancel anytime.",
+      "billingNote": "Downgrades take effect at the end of your current billing period. You can upgrade or cancel anytime.",
       "cancel": "Keep current plan",
       "confirm": "Confirm change",
       "paidWarningTitle": "What changes with {{plan}}"
+    },
+    "cancellation": {
+      "title": "Subscription set to cancel",
+      "message": "Your plan will end on {{date}}. You can resume it below.",
+      "resume": "Resume subscription"
     },
     "alreadyOnPlan": "You are already on the {{plan}} plan.",
     "checkoutError": "We could not start checkout. Please try again.",

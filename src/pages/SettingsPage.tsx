@@ -129,13 +129,6 @@ export default function SettingsPage() {
     active?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [section]);
 
-  useEffect(() => {
-    if (searchParams.get("simulated") === "true") {
-      toast.info(ts("billing.simulatedNotice", { defaultValue: "You are viewing simulated billing information. Upgrade to a paid plan to access the full Stripe billing portal." }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleSectionChange = (key: SettingsSection) => {
     setSearchParams(
       (current) => {
