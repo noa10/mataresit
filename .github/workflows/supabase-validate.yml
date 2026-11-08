@@ -628,8 +628,8 @@ jobs:
   validate-deployment:
     name: Validate Supabase Configuration
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, sql-regression, validate-edge-functions]
-    if: always() && needs.validate.result == 'success' && needs.sql-regression.result == 'success'
+    needs: [validate, validate-migrations, sql-regression, validate-edge-functions, gamification-leaderboard-regression]
+    if: always() && needs.validate.result == 'success' && needs.sql-regression.result == 'success' && needs.gamification-leaderboard-regression.result == 'success'
     environment: Production
 
     steps:
