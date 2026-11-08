@@ -66,13 +66,13 @@ The agent verified everything up to the gateway but could not perform interactiv
 
 ## Credential cleanups — owner action
 
-- [ ] Rotate the service-role credentials that remain in Git history. This is the **same owner-gated credential-history purge** listed as a blocker on PR #234 (`docs/runbooks/credential-history-purge.md`) — one decision covers both.
+- [ ] Rotate the service-role credentials that remain in Git history. This is the **same owner-gated credential-history purge** listed as a blocker on PR #234 — one decision covers both. The purge runbook is tracked on PR #234's branch (`docs/runbooks/credential-history-purge.md`) and lands on `main` when that PR merges.
 - [ ] Delete the stale `SERVICE_ROLE_KEY` and `VITE_SUPABASE_ANON_KEY` Edge Function secrets.
 - [ ] Move production secrets out of `.env.local` into the platform secret store.
 
 ## Prevention
 
-After any API-key rotation or revocation, update `VITE_SUPABASE_ANON_KEY` in every Vercel environment and **redeploy**, because `VITE_*` values are baked into the bundle. The step-by-step rotation/redeploy/verify procedure is documented in `docs/BILLING_DEPLOYMENT_GUIDE.md`.
+After any API-key rotation or revocation, update `VITE_SUPABASE_ANON_KEY` in every Vercel environment and **redeploy**, because `VITE_*` values are baked into the bundle. The rebuild/redeploy step is `docs/BILLING_DEPLOYMENT_GUIDE.md` § 5 "Frontend Integration"; a step-by-step rotation/redeploy/verify procedure is being added to that guide in PR #234 and lands with it.
 
 ## References
 
