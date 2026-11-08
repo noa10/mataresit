@@ -1109,6 +1109,16 @@ export const updateReceiptWithLineItems = async (
       }
     }
 
+    // Invalidate caches after successful receipt update. The workspace
+    // navigation "Needs review" count is derived from receipt status, so a
+    // save that marks a receipt reviewed must refresh it (and the overview).
+    try {
+      await CacheInvalidationService.onReceiptUpdated(receipt.user_id);
+    } catch (cacheError) {
+      console.warn('Cache invalidation failed:', cacheError);
+      // Don't fail the update if cache invalidation fails
+    }
+
     return receipt;
   } catch (error) {
     console.error('Error updating receipt with line items:', error);
