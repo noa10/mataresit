@@ -16,7 +16,7 @@ This guide helps you test the complete subscription upgrade flow to ensure both 
    supabase functions deploy stripe-webhook
 
    # Apply the database migration
-   supabase db push
+   npm run supabase:push
    ```
 
 ## Test Plan

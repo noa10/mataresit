@@ -224,7 +224,7 @@ If issues occur after deployment:
    ./deploy-migrations.sh --validate-only
    
    # Review recent changes
-   supabase migration list
+   npm run supabase:migrate:list
    ```
 
 2. **Emergency Rollback**:
@@ -242,7 +242,7 @@ If issues occur after deployment:
 ### Troubleshooting
 
 #### Common Issues
-1. **Migration Already Applied**: Check `supabase migration list`
+1. **Migration Already Applied**: Check `npm run supabase:migrate:list`
 2. **Permission Denied**: Verify database user permissions
 3. **Connection Failed**: Check database connectivity and credentials
 4. **Validation Failed**: Review validation output for specific issues
@@ -256,8 +256,8 @@ export DEBUG=1
 # Check database connection
 psql "postgresql://postgres:$SUPABASE_DB_PASSWORD@db.$SUPABASE_PROJECT_ID.supabase.co:5432/postgres" -c "SELECT version();"
 
-# Verify migration files
-supabase db diff --schema public
+# Verify hosted schema against migrations
+npm run supabase:diff
 ```
 
 ## 📈 Performance Considerations
@@ -325,11 +325,14 @@ npm run supabase:migrate:list
 # Dry run (preview what would be applied)
 npm run supabase:push:dry
 
-# Apply migrations
+# Apply migrations (interactive confirmation)
 npm run supabase:push
 
+# Apply migrations (CI/agent, no prompt)
+npm run supabase:push:ci
+
 # If there are pre-existing migrations with older timestamps, use:
-supabase db push --include-all
+npm run supabase:push:ci -- --include-all
 ```
 
 ### Generating a Diff
@@ -341,14 +344,14 @@ npm run supabase:diff
 
 ### Troubleshooting
 
-If `supabase db push` fails with `tuple concurrently updated`:
+If `npm run supabase:push` fails with `tuple concurrently updated`:
 - Set `SUPABASE_DB_PASSWORD` in `.env.local` — this bypasses the login role creation step
 
 If local and remote migration history drifts:
-- Run `supabase migration list` to identify mismatches
+- Run `npm run supabase:migrate:list` to identify mismatches
 - For remote-only migrations: create placeholder files in `supabase/migrations/`
-- For local-only migrations: run `supabase db push --include-all`
-- As a last resort: `supabase migration repair --status applied <version>`
+- For local-only migrations: run `npm run supabase:push:ci -- --include-all`
+- As a last resort: `npm run supabase:migrate:repair:ci -- --status applied <version>`
 
 ---
 

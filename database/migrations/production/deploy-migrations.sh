@@ -179,7 +179,7 @@ create_backup() {
     fi
     
     # Create schema backup
-    if supabase db dump --schema-only > "$backup_file.schema"; then
+    if supabase db dump --schema-only --remote > "$backup_file.schema"; then
         success "Schema backup created: $backup_file.schema"
     else
         error "Failed to create schema backup"
@@ -197,7 +197,7 @@ create_backup() {
     )
     
     for table in "${critical_tables[@]}"; do
-        if supabase db dump --data-only --table "$table" >> "$backup_file.data" 2>/dev/null; then
+        if supabase db dump --data-only --table "$table" --remote >> "$backup_file.data" 2>/dev/null; then
             log "Backed up table: $table"
         else
             warning "Table $table does not exist or backup failed"
@@ -255,13 +255,13 @@ apply_migration() {
     fi
     
     # Check if migration already applied
-    if supabase migration list | grep -q "$migration_name"; then
+    if supabase migration list --remote | grep -q "$migration_name"; then
         warning "Migration $migration_name already applied, skipping"
         return 0
     fi
     
     # Apply migration
-    if supabase db push --include-all; then
+    if supabase db push --include-all --remote --yes; then
         success "Applied migration: $migration_name"
         
         # Run post-migration validation
@@ -283,7 +283,7 @@ validate_migration_success() {
             # Validate Phase 1 tables exist
             local tables=("embedding_performance_metrics" "embedding_hourly_stats" "embedding_daily_stats")
             for table in "${tables[@]}"; do
-                if ! supabase db diff --schema public | grep -q "$table"; then
+                if ! supabase db diff --schema public --remote | grep -q "$table"; then
                     error "Table $table not found after migration"
                     return 1
                 fi
@@ -291,7 +291,7 @@ validate_migration_success() {
             ;;
         "20250719000001_enhance_embedding_queue_phase2")
             # Validate Phase 2 enhancements
-            if ! supabase db diff --schema public | grep -q "embedding_queue.*batch_id"; then
+            if ! supabase db diff --schema public --remote | grep -q "embedding_queue.*batch_id"; then
                 error "Phase 2 queue enhancements not found"
                 return 1
             fi
@@ -300,7 +300,7 @@ validate_migration_success() {
             # Validate Phase 3 tables
             local tables=("batch_upload_sessions" "batch_upload_files")
             for table in "${tables[@]}"; do
-                if ! supabase db diff --schema public | grep -q "$table"; then
+                if ! supabase db diff --schema public --remote | grep -q "$table"; then
                     error "Table $table not found after migration"
                     return 1
                 fi
@@ -355,12 +355,12 @@ rollback_migrations() {
     case "$target_phase" in
         "1")
             log "Rolling back Phase 3 and Phase 2..."
-            supabase db reset --linked
+            supabase db reset --remote --yes
             apply_migration "$MIGRATIONS_DIR/20250717000001_create_embedding_metrics_tables.sql"
             ;;
         "2")
             log "Rolling back Phase 3..."
-            supabase db reset --linked
+            supabase db reset --remote --yes
             apply_migration "$MIGRATIONS_DIR/20250717000001_create_embedding_metrics_tables.sql"
             apply_migration "$MIGRATIONS_DIR/20250719000001_enhance_embedding_queue_phase2.sql"
             ;;
@@ -388,7 +388,7 @@ generate_report() {
   "status": "$status",
   "migrations": [
 $(for migration in "${PHASE5_MIGRATIONS[@]}"; do
-    echo "    {\"name\": \"$migration\", \"applied\": $(supabase migration list | grep -q "$(basename "$migration" .sql)" && echo "true" || echo "false")}"
+    echo "    {\"name\": \"$migration\", \"applied\": $(supabase migration list --remote | grep -q "$(basename "$migration" .sql)" && echo "true" || echo "false")}"
 done | paste -sd ',' -)
   ],
   "supabase_project_id": "$SUPABASE_PROJECT_ID"

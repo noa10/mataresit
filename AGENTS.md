@@ -112,7 +112,8 @@ npm run test:queue:*     # Queue domain tests
 npm run test:phase4:*    # Phase4 cross-system tests
 
 # Supabase
-npm run supabase:push    # Push migrations to remote
+npm run supabase:push    # Push migrations to remote (interactive)
+npm run supabase:push:ci # Push migrations to remote (non-interactive)
 npm run supabase:diff    # Compare hosted schema against migrations
 npm run supabase:migrate:new -- name
 
@@ -130,7 +131,7 @@ npm run deploy:validate:malaysian   # Pre-deployment Malaysian features check
 
 ## NOTES
 
-- **Supabase CLI v3** — `supabase` (3.0.0) is an exact devDependency; database commands target the **local stack by default**, so the hosted `supabase:*` scripts pass `--remote` (and `--yes` for hosted mutations). Run `npm run supabase:migrate:list` to check the current local/remote migration state; do not assume a fixed count. If drift occurs: `npx supabase migration repair <version> --status applied --remote --yes`.
+- **Supabase CLI v3** — `supabase` (3.0.0) is an exact devDependency; database commands target the **local stack by default**, so hosted `supabase:*` scripts pass `--remote`. `supabase:push` and `supabase:migrate:repair` remain interactive; `supabase:push:ci` and `supabase:migrate:repair:ci` add `--yes` for automation. Run `npm run supabase:migrate:list` to check the current local/remote migration state; do not assume a fixed count. If drift occurs: `npm run supabase:migrate:repair -- --status applied <version>` (or the `:ci` script outside a TTY).
 - **React 19 pinned, ignored by Dependabot** — Requires dedicated migration effort. Do not upgrade React casually.
 - **Lockfiles must be generated with npm 10** — CI and Vercel both install via `npm ci` on Node 22, i.e. npm 10. A lockfile written by a newer local npm, or by Dependabot (which omits the nested `vitest → msw@2.15.0` subtree), fails with `npm error Missing: <pkg> from lock file` and skips every downstream job. Remedy: on the branch run `npx npm@10 install`, confirm `npx npm@10 ci --dry-run` is clean, commit the lockfile.
 - **Vercel SPA rewrites** — All routes `/*` → `/index.html`. Special handling for `/docs/*`.
