@@ -386,6 +386,119 @@ jobs:
           path: ${{ runner.temp }}/pr234-sql-regression
           if-no-files-found: error
 
+  # Regression test for the gamification leaderboard RPC.
+  #
+  # The migration validation job never executes SQL, so this job applies the
+  # gamification migrations to a bare Postgres and calls the RPC for every
+  # metric. It catches the PL/pgSQL output-parameter ambiguity that made every
+  # leaderboard request fail at runtime even though CREATE FUNCTION succeeded.
+  gamification-leaderboard-regression:
+    name: Gamification Leaderboard RPC Regression
+    runs-on: ubuntu-latest
+    needs: validate
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: leaderboard_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ensure psql is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
+      # Supabase provides the roles, auth schema, auth.uid(), and the
+      # updated_at trigger helper; a bare Postgres does not.
+      - name: Create the Supabase roles and schema shims
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN;
+
+          -- Supabase grants EXECUTE on new public functions to anon by
+          -- default; mirror that so the migration's explicit anon revoke is
+          -- actually tested rather than passing vacuously.
+          ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+            GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY, email text);
+          CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+            SELECT COALESCE(
+              NULLIF(current_setting('request.jwt.claim.sub', true), ''),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+            )::uuid
+          $$;
+
+          CREATE FUNCTION public.update_updated_at_column()
+          RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$;
+
+          -- gamification_xp_events has a foreign key to receipts, so the table
+          -- must exist before the foundation migration runs. merchant/date/total
+          -- are NOT NULL on the production table; the suite supplies them.
+          CREATE TABLE public.receipts (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id uuid NOT NULL,
+            merchant text,
+            date date,
+            total numeric(10,2),
+            processing_status text,
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+
+          -- The fix migration installs a timezone-validation trigger on
+          -- profiles; the suite adds the remaining columns it needs.
+          CREATE TABLE public.profiles (
+            id uuid PRIMARY KEY,
+            timezone_preference text
+          );
+          SQL
+
+      # Apply the migrations in filename order, exactly as db push would. The
+      # original leaderboard migration is applied first so this job proves the
+      # fix migration repairs a database that already has the broken function.
+      - name: Apply the gamification migrations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20260310000000_add_gamification_schema_foundation.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20260310110000_add_gamification_leaderboard_rpc.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261106010000_fix_gamification_leaderboard_rpc.sql
+
+      - name: Assert leaderboard RPC behaviour
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/tests/gamification_leaderboard_rpc.sql
+
   # Edge Functions Validation
   validate-edge-functions:
     name: Validate Edge Functions
@@ -515,8 +628,8 @@ jobs:
   validate-deployment:
     name: Validate Supabase Configuration
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, sql-regression, validate-edge-functions]
-    if: always() && needs.validate.result == 'success' && needs.sql-regression.result == 'success'
+    needs: [validate, validate-migrations, sql-regression, validate-edge-functions, gamification-leaderboard-regression]
+    if: always() && needs.validate.result == 'success' && needs.sql-regression.result == 'success' && needs.gamification-leaderboard-regression.result == 'success'
     environment: Production
 
     steps:
@@ -722,7 +835,7 @@ jobs:
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
-    needs: [validate, validate-migrations, invitation-auth-regression, sql-regression, validate-edge-functions, validate-deployment]
+    needs: [validate, validate-migrations, invitation-auth-regression, gamification-leaderboard-regression, sql-regression, validate-edge-functions, validate-deployment]
     if: always()
 
     steps:
@@ -734,11 +847,12 @@ jobs:
           echo "Migrations: ${{ needs.validate-migrations.result }}"
           echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
           echo "Stripe SQL regression: ${{ needs.sql-regression.result }}"
+          echo "Leaderboard regression: ${{ needs.gamification-leaderboard-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 
       - name: Log deployment failure
-        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.invitation-auth-regression.result == 'failure' || needs.sql-regression.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
+        if: ${{ needs.validate.result == 'failure' || needs.validate-migrations.result == 'failure' || needs.invitation-auth-regression.result == 'failure' || needs.sql-regression.result == 'failure' || needs.gamification-leaderboard-regression.result == 'failure' || needs.validate-edge-functions.result == 'failure' }}
         run: |
           echo "❌ Supabase deployment failed!"
           echo "Environment: ${{ needs.validate.outputs.environment }}"
@@ -758,6 +872,7 @@ jobs:
           echo "Migrations: ${{ needs.validate-migrations.result }}"
           echo "Invitation auth regression: ${{ needs.invitation-auth-regression.result }}"
           echo "Stripe SQL regression: ${{ needs.sql-regression.result }}"
+          echo "Leaderboard regression: ${{ needs.gamification-leaderboard-regression.result }}"
           echo "Functions: ${{ needs.validate-edge-functions.result }}"
           echo "Validation: ${{ needs.validate-deployment.result }}"
 

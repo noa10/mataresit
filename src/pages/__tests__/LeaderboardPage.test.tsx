@@ -27,6 +27,8 @@ vi.mock("@/contexts/LanguageContext", () => ({
         "gamification.leaderboard.settingsCta": "Manage rewards privacy",
         "gamification.leaderboard.emptyTitle": "No leaderboard activity yet",
         "gamification.leaderboard.emptyDescription": "Opted-in members will appear here after they start earning progress for this metric.",
+        "gamification.leaderboard.errorDescription": "We couldn't load the leaderboard right now. Please try again.",
+        "gamification.leaderboard.retry": "Retry",
         "gamification.leaderboard.privacyGateTitle": "Join the leaderboard when you're ready",
         "gamification.leaderboard.privacyGateDescription": "Turn on leaderboard participation from your rewards settings to compare weekly XP, monthly receipts, and deductible totals.",
         "gamification.leaderboard.privacyGateStatus": "Your rewards profile is currently hidden from the leaderboard.",
@@ -151,6 +153,22 @@ describe("LeaderboardPage", () => {
     // Asserted directly rather than inside a waitFor: waitFor resolves on the
     // first passing check, so it would not catch a request firing slightly later.
     expect(getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it("shows the retry action when the leaderboard request fails", async () => {
+    const getLeaderboard = vi.fn().mockRejectedValue(new Error("leaderboard unavailable"));
+
+    mocks.useGamification.mockReturnValue({
+      snapshot: { profile: { leaderboardOptIn: true } },
+      isLoading: false,
+      getLeaderboard,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("We couldn't load the leaderboard right now. Please try again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(getLeaderboard).toHaveBeenCalledTimes(1);
   });
 
   it("starts fetching once the member opts in", async () => {
