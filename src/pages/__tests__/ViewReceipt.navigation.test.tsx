@@ -47,7 +47,8 @@ vi.mock("@/contexts/LanguageContext", () => ({
         "navigation.noPrevious": "No previous receipt",
         "navigation.noNext": "No next receipt",
         "navigation.untitledReceipt": "Untitled receipt",
-        "navigation.uploadOrder": "Walks receipts in upload order",
+        "navigation.ledgerOrder":
+          "Browses the full ledger by receipt date; active filters are not applied.",
         "navigation.unsavedChanges": "Discard changes?",
         "navigation.retry": "Retry",
       }[key] ?? key),
@@ -152,14 +153,14 @@ describe("ViewReceipt dashboard navigation", () => {
   });
 
   it("preserves dashboard filters when deleting from the receipt viewer", async () => {
-    const initialEntry = "/receipt/receipt-1?q=groceries&tab=reviewed&currency=MYR&category=cat-team&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table&ignored=1";
+    const initialEntry = "/receipt/receipt-1?q=groceries&tab=reviewed&currency=MYR&category=cat-team&paidBy=payer-1&ps=failed_ai&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table&ignored=1";
     renderViewReceipt(initialEntry);
 
     await userEvent.click(await screen.findByRole("button", { name: "Viewer Delete" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toBe(
-        "/receipts?q=groceries&tab=reviewed&currency=MYR&category=cat-team&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table",
+        "/receipts?q=groceries&tab=reviewed&currency=MYR&category=cat-team&paidBy=payer-1&ps=failed_ai&sort=highest&page=2&limit=10&from=2026-02-01&to=2026-02-14&view=table",
       );
     });
   });
@@ -288,15 +289,52 @@ describe("ViewReceipt dashboard navigation", () => {
 
     renderViewReceipt("/receipt/receipt-1");
 
+    const initialKey = (await screen.findByTestId("location-key")).textContent;
+
     await userEvent.click(
       await screen.findByRole("button", { name: "Next" })
     );
 
+    await waitFor(() => {
+      expect(screen.getByTestId("location-key")).toHaveTextContent(
+        initialKey ?? ""
+      );
+      expect(screen.getByTestId("navigation-type")).toHaveTextContent("POP");
+    });
     expect(mocks.fetchReceiptById).toHaveBeenCalledTimes(1);
     expect(mocks.fetchReceiptById).toHaveBeenCalledWith(
       "receipt-1",
       expect.anything()
     );
+  });
+
+  it("keeps the direct-load Back fallback after replacing the receipt URL", async () => {
+    const historyLength = vi
+      .spyOn(window.history, "length", "get")
+      .mockReturnValue(3);
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-2",
+        merchant: "Next Merchant",
+        date: "2026-02-02",
+      },
+    });
+
+    renderViewReceipt("/receipt/receipt-1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Next" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("viewer-receipt-id")).toHaveTextContent(
+        "receipt-2"
+      );
+    });
+    expect(screen.getByTitle("Back to dashboard")).toBeInTheDocument();
+
+    historyLength.mockRestore();
   });
 
   it("confirms navigation away from unsaved edits", async () => {
@@ -326,5 +364,10 @@ describe("ViewReceipt dashboard navigation", () => {
       await screen.findByRole("button", { name: "Previous" })
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Browses the full ledger by receipt date; active filters are not applied."
+      )
+    ).toBeInTheDocument();
   });
 });

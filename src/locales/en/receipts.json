@@ -221,7 +221,7 @@
     "noPrevious": "No previous receipt",
     "noNext": "No next receipt",
     "untitledReceipt": "Untitled receipt",
-    "uploadOrder": "Walks receipts in upload order",
+    "ledgerOrder": "Browses the full ledger by receipt date; active filters are not applied.",
     "unsavedChanges": "You have unsaved changes. Discard them and continue?",
     "retry": "Retry"
   },

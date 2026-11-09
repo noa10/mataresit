@@ -183,6 +183,29 @@ describe("fetchReceiptNeighbors", () => {
     });
   });
 
+  it("keeps an explicitly personal receipt in the personal workspace", async () => {
+    await fetchReceiptNeighbors(
+      {
+        id: "receipt-1",
+        date: "2026-01-02",
+        created_at: "2026-01-02T00:00:00Z",
+        team_id: null,
+        user_id: "user-1",
+      },
+      { currentTeam: { id: "active-team" } }
+    );
+
+    const builders = hoisted.supabase.from.mock.results.map(
+      (result) => result.value
+    );
+
+    builders.forEach((builder) => {
+      expect(builder.eq).toHaveBeenCalledWith("user_id", "user-1");
+      expect(builder.eq).not.toHaveBeenCalledWith("team_id", "active-team");
+      expect(builder.is).toHaveBeenCalledWith("team_id", null);
+    });
+  });
+
   it("throws PostgREST errors so React Query can retry", async () => {
     const firstBuilder = createBuilder();
     firstBuilder.limit.mockResolvedValueOnce({

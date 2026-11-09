@@ -221,7 +221,7 @@
     "noPrevious": "Tiada resit sebelumnya",
     "noNext": "Tiada resit seterusnya",
     "untitledReceipt": "Resit tanpa tajuk",
-    "uploadOrder": "Menelusuri resit mengikut urutan muat naik",
+    "ledgerOrder": "Menelusuri seluruh lejar mengikut tarikh resit; penapis aktif tidak digunakan.",
     "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Buang dan teruskan?",
     "retry": "Cuba semula"
   },

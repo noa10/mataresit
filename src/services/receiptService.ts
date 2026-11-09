@@ -387,8 +387,11 @@ export const fetchReceiptNeighbors = async (
   // truncates microseconds to milliseconds, which makes the `gt` filter match
   // the current receipt itself and leaves the Next button stuck on it.
   const createdAt = receipt.created_at;
-  const receiptTeamId = receipt.team_id ?? teamContext?.currentTeam?.id ?? null;
-  const currentUserId = (receipt.user_id as string | undefined) ?? null;
+  const receiptTeamId =
+    receipt.team_id !== undefined
+      ? receipt.team_id
+      : teamContext?.currentTeam?.id ?? null;
+  const currentUserId = receipt.user_id ?? null;
   const buildQuery = () => {
     let query = ((supabase as any).from("receipts") as any).select(
       "id, merchant, date, created_at"
@@ -396,10 +399,11 @@ export const fetchReceiptNeighbors = async (
 
     if (receiptTeamId) {
       query = query.eq("team_id", receiptTeamId);
-    } else if (currentUserId) {
-      query = query.eq("user_id", currentUserId).is("team_id", null);
     } else {
       query = query.is("team_id", null);
+      if (currentUserId) {
+        query = query.eq("user_id", currentUserId);
+      }
     }
 
     return query;

@@ -18,6 +18,8 @@ const DASHBOARD_PARAM_KEYS = [
   "tab",
   "currency",
   "category",
+  "paidBy",
+  "ps",
   "sort",
   "page",
   "limit",
@@ -59,10 +61,9 @@ export default function ViewReceipt() {
   // Capture the entry's initial history state once. Replace navigations generate
   // a new location.key and must not turn a direct visit into an in-app Back.
   useEffect(() => {
-    if (initialCanGoBackRef.current === null) {
-      initialCanGoBackRef.current =
-        window.history.length > 1 && location.key !== "default";
-    }
+    if (initialCanGoBackRef.current !== null) return;
+    initialCanGoBackRef.current =
+      window.history.length > 1 && location.key !== "default";
     setCanGoBack(initialCanGoBackRef.current);
   }, [location.key]);
 
@@ -210,6 +211,7 @@ export default function ViewReceipt() {
                   className="gap-1.5"
                   onClick={() => handleNavigateNeighbor(neighbors?.previous?.id)}
                   disabled={!neighbors?.previous}
+                  aria-describedby="receipt-navigation-order"
                   title={
                     neighbors?.previous
                       ? t("navigation.previousTitle", {
@@ -229,6 +231,7 @@ export default function ViewReceipt() {
                   className="gap-1.5"
                   onClick={() => handleNavigateNeighbor(neighbors?.next?.id)}
                   disabled={!neighbors?.next}
+                  aria-describedby="receipt-navigation-order"
                   title={
                     neighbors?.next
                       ? t("navigation.nextTitle", {
@@ -242,9 +245,6 @@ export default function ViewReceipt() {
                   {t("navigation.next")}
                   <ChevronRight size={16} aria-hidden="true" />
                 </Button>
-                <span className="sr-only" title={t("navigation.uploadOrder")}>
-                  {t("navigation.uploadOrder")}
-                </span>
               </>
             )}
             <Button
@@ -260,6 +260,14 @@ export default function ViewReceipt() {
               )}
               Delete Receipt
             </Button>
+            {!neighborsError ? (
+              <p
+                id="receipt-navigation-order"
+                className="basis-full text-right text-xs text-ledger-muted"
+              >
+                {t("navigation.ledgerOrder")}
+              </p>
+            ) : null}
           </motion.div>
         </div>
       </header>
