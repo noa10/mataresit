@@ -70,8 +70,18 @@ serve(async (req) => {
       case 'process_alert_rules':
         return await checkAlertConditions();
 
-      case 'send_alert_notification':
-        return await sendNotification(requestBody);
+      case 'send_alert_notification': {
+        const delivery = await sendNotification(
+          requestBody as AlertNotification,
+        );
+        return new Response(
+          JSON.stringify({ success: true, delivery }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
 
       case 'create_alert':
         return await createAlert(requestBody);
@@ -497,35 +507,65 @@ async function sendAlertNotifications(alert: any) {
 /**
  * Send individual notification
  */
-async function sendNotification(notification: AlertNotification) {
+async function sendNotification(
+  notification: AlertNotification,
+): Promise<{ channel: string; delivered: boolean; detail?: string }> {
   switch (notification.channel) {
-    case 'email':
-      if (notification.recipients.length === 0) {
+    case 'email': {
+      const recipients = Array.isArray(notification.recipients)
+        ? notification.recipients
+        : [];
+      if (recipients.length === 0) {
         console.warn('BILLING_ALERT_EMAILS is not configured; skipping billing alert email');
-        return;
+        return {
+          channel: 'email',
+          delivered: false,
+          detail: 'No recipients configured',
+        };
       }
 
-      await supabaseClient.functions.invoke('send-email', {
+      const { error } = await supabaseClient.functions.invoke('send-email', {
         body: {
-          to: notification.recipients[0], // Simplified for now
+          to: recipients[0], // Simplified for now
           template_name: notification.template,
           template_data: {
             alert: notification.metadata,
-            timestamp: new Date().toISOString()
-          }
-        }
+            timestamp: new Date().toISOString(),
+          },
+        },
       });
-      break;
-    
+
+      if (error) {
+        throw new Error(`Failed to send alert email: ${error.message}`);
+      }
+
+      return { channel: 'email', delivered: true };
+    }
+
     case 'slack':
       // Implement Slack notification
       console.log('Slack notification would be sent:', notification);
-      break;
-    
+      return {
+        channel: 'slack',
+        delivered: false,
+        detail: 'Slack delivery is not implemented',
+      };
+
     case 'webhook':
       // Implement webhook notification
       console.log('Webhook notification would be sent:', notification);
-      break;
+      return {
+        channel: 'webhook',
+        delivered: false,
+        detail: 'Webhook delivery is not implemented',
+      };
+
+    default:
+      return {
+        channel: 'unknown',
+        delivered: false,
+        detail: 'Unsupported notification channel',
+      };
   }
 }
 
