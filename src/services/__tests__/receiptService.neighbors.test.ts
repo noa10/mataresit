@@ -81,8 +81,6 @@ describe("fetchReceiptNeighbors", () => {
   it("maps previous to the earlier date and next to the later date", async () => {
     const date = "2026-01-02";
     const createdAt = "2026-01-02T00:00:00.123456+00:00";
-    const encodedDate = encodeURIComponent(date);
-    const encodedCreatedAt = encodeURIComponent(createdAt);
 
     const neighbors = await fetchReceiptNeighbors({
       id: "receipt-1",
@@ -99,8 +97,9 @@ describe("fetchReceiptNeighbors", () => {
       (result) => result.value
     );
 
+    // Raw values: supabase-js encodes them exactly once when building the URL.
     expect(previousBuilder.or).toHaveBeenCalledWith(
-      `date.lt.${encodedDate},and(date.eq.${encodedDate},created_at.lt.${encodedCreatedAt}),and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.lt.receipt-1)`
+      `date.lt.${date},and(date.eq.${date},created_at.lt.${createdAt}),and(date.eq.${date},created_at.eq.${createdAt},id.lt.receipt-1)`
     );
     expect(previousBuilder.order).toHaveBeenNthCalledWith(1, "date", {
       ascending: false,
@@ -113,7 +112,7 @@ describe("fetchReceiptNeighbors", () => {
     });
 
     expect(nextBuilder.or).toHaveBeenCalledWith(
-      `date.gt.${encodedDate},and(date.eq.${encodedDate},created_at.gt.${encodedCreatedAt}),and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.gt.receipt-1)`
+      `date.gt.${date},and(date.eq.${date},created_at.gt.${createdAt}),and(date.eq.${date},created_at.eq.${createdAt},id.gt.receipt-1)`
     );
     expect(nextBuilder.order).toHaveBeenNthCalledWith(1, "date", {
       ascending: true,
@@ -128,7 +127,6 @@ describe("fetchReceiptNeighbors", () => {
 
   it("falls back to upload order when the receipt has no date", async () => {
     const createdAt = "2026-01-02T00:00:00.123456+00:00";
-    const encodedCreatedAt = encodeURIComponent(createdAt);
 
     await fetchReceiptNeighbors({
       id: "receipt-1",
@@ -143,7 +141,7 @@ describe("fetchReceiptNeighbors", () => {
     );
 
     expect(previousBuilder.or).toHaveBeenCalledWith(
-      `created_at.lt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.lt.receipt-1)`
+      `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.receipt-1)`
     );
     expect(previousBuilder.order).toHaveBeenNthCalledWith(1, "created_at", {
       ascending: false,
@@ -153,7 +151,7 @@ describe("fetchReceiptNeighbors", () => {
     });
 
     expect(nextBuilder.or).toHaveBeenCalledWith(
-      `created_at.gt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.gt.receipt-1)`
+      `created_at.gt.${createdAt},and(created_at.eq.${createdAt},id.gt.receipt-1)`
     );
     expect(nextBuilder.order).toHaveBeenNthCalledWith(1, "created_at", {
       ascending: true,

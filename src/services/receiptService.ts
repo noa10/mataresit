@@ -405,8 +405,9 @@ export const fetchReceiptNeighbors = async (
     return query;
   };
 
-  const encodedCreatedAt = encodeURIComponent(createdAt);
-  const encodedId = encodeURIComponent(receipt.id);
+  // Pass filter values raw: supabase-js URL-encodes them once when building
+  // the request. Pre-encoding here would double-encode the timestamp
+  // (e.g. "+00:00" becomes "%2B00%3A00") and PostgREST rejects the filter.
   type NeighborQuery = ReturnType<typeof buildQuery>;
 
   const fetchPair = async (
@@ -436,21 +437,20 @@ export const fetchReceiptNeighbors = async (
   // Follow the receipt date shown in the list; created_at and id only break
   // ties between receipts that share a date.
   if (receipt.date) {
-    const encodedDate = encodeURIComponent(receipt.date);
-    const previousTieFilter = `and(date.eq.${encodedDate},created_at.lt.${encodedCreatedAt})`;
-    const previousIdTieFilter = `and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.lt.${encodedId})`;
-    const nextTieFilter = `and(date.eq.${encodedDate},created_at.gt.${encodedCreatedAt})`;
-    const nextIdTieFilter = `and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.gt.${encodedId})`;
+    const previousTieFilter = `and(date.eq.${receipt.date},created_at.lt.${createdAt})`;
+    const previousIdTieFilter = `and(date.eq.${receipt.date},created_at.eq.${createdAt},id.lt.${receipt.id})`;
+    const nextTieFilter = `and(date.eq.${receipt.date},created_at.gt.${createdAt})`;
+    const nextIdTieFilter = `and(date.eq.${receipt.date},created_at.eq.${createdAt},id.gt.${receipt.id})`;
 
     return fetchPair(
       buildQuery()
-        .or(`date.lt.${encodedDate},${previousTieFilter},${previousIdTieFilter}`)
+        .or(`date.lt.${receipt.date},${previousTieFilter},${previousIdTieFilter}`)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(1),
       buildQuery()
-        .or(`date.gt.${encodedDate},${nextTieFilter},${nextIdTieFilter}`)
+        .or(`date.gt.${receipt.date},${nextTieFilter},${nextIdTieFilter}`)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true })
@@ -462,14 +462,14 @@ export const fetchReceiptNeighbors = async (
   return fetchPair(
     buildQuery()
       .or(
-        `created_at.lt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.lt.${encodedId})`
+        `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${receipt.id})`
       )
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(1),
     buildQuery()
       .or(
-        `created_at.gt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.gt.${encodedId})`
+        `created_at.gt.${createdAt},and(created_at.eq.${createdAt},id.gt.${receipt.id})`
       )
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
