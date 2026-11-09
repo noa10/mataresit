@@ -73,32 +73,40 @@ migration_version() {
     echo "${base%%_*}"
 }
 
+# Exit code for a failed hosted-database probe (distinct from a negative answer)
+PROBE_ERROR_EXIT=3
+PROBE_RESULT=""
+
+# Run a read-only probe, storing the answer in PROBE_RESULT.
+# A failed query is fatal and is never treated as a negative answer.
+remote_probe() {
+    local query="$1"
+    if ! PROBE_RESULT=$(psql_remote --no-align --tuples-only --command "$query"); then
+        error "Failed to query the hosted database; refusing to continue"
+        exit "$PROBE_ERROR_EXIT"
+    fi
+}
+
 # Check whether a migration version is recorded in the hosted migration history
 migration_is_applied() {
     local version="$1"
-    local result
-    result=$(psql_remote --no-align --tuples-only \
-        --command "SELECT 1 FROM supabase_migrations.schema_migrations WHERE version = '$version' LIMIT 1;")
-    [[ "$result" == "1" ]]
+    remote_probe "SELECT 1 FROM supabase_migrations.schema_migrations WHERE version = '$version' LIMIT 1;"
+    [[ "$PROBE_RESULT" == "1" ]]
 }
 
 # Check whether a relation exists in the hosted public schema
 remote_relation_exists() {
     local relation="$1"
-    local result
-    result=$(psql_remote --no-align --tuples-only \
-        --command "SELECT to_regclass('public.$relation') IS NOT NULL;")
-    [[ "$result" == "t" ]]
+    remote_probe "SELECT to_regclass('public.$relation') IS NOT NULL;"
+    [[ "$PROBE_RESULT" == "t" ]]
 }
 
 # Check whether a column exists on a hosted public table
 remote_column_exists() {
     local table="$1"
     local column="$2"
-    local result
-    result=$(psql_remote --no-align --tuples-only \
-        --command "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' AND column_name = '$column');")
-    [[ "$result" == "t" ]]
+    remote_probe "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' AND column_name = '$column');"
+    [[ "$PROBE_RESULT" == "t" ]]
 }
 
 # Help function
@@ -111,7 +119,7 @@ Usage: $0 [OPTIONS]
 OPTIONS:
     --help, -h              Show this help message
     --environment ENV       Target environment (production/staging/test)
-    --dry-run              Validate migrations without applying
+    --dry-run              Check migration files without database calls
     --rollback PHASE       Rollback to specific phase (0, 1, 2, 3)
     --validate-only        Only run validation checks
     --backup-first         Create backup before migration
@@ -274,8 +282,21 @@ validate_migrations() {
             validation_failed=true
             continue
         fi
-        
-        # Check SQL syntax
+
+        # Dry runs must not touch the hosted database at all
+        if [[ "$DRY_RUN" == "true" ]]; then
+            success "Found migration file: $migration (dry run, database checks skipped)"
+            continue
+        fi
+
+        # Replaying an applied migration fails on its non-idempotent statements
+        # (for example CREATE POLICY), so only validate pending migrations
+        if migration_is_applied "$(migration_version "$migration_file")"; then
+            log "Migration already applied, skipping SQL validation: $migration"
+            continue
+        fi
+
+        # Check SQL syntax in a rolled-back transaction
         if ! psql_remote --quiet \
             --command "BEGIN; $(cat "$migration_file"); ROLLBACK;" \
             &> /dev/null; then
@@ -399,30 +420,54 @@ deploy_migrations() {
     success "All Phase 5 migrations deployed successfully"
 }
 
-# Run a rollback script and mark its migration version as reverted
-run_rollback_script() {
-    local rollback_file="$1"
-    local migration_ver="$2"
+# Roll back the given phases in one transaction, skipping phases that are not applied
+rollback_phases() {
+    local -a psql_args=()
+    local phase version rollback_file
 
-    if [[ ! -f "$rollback_file" ]]; then
-        error "Rollback script not found: $rollback_file"
-        return 1
-    fi
+    for phase in "$@"; do
+        case "$phase" in
+            "3")
+                version="20250720000003"
+                rollback_file="$ROLLBACK_DIR/rollback_phase3.sql"
+                ;;
+            "2")
+                version="20250719000001"
+                rollback_file="$ROLLBACK_DIR/rollback_phase2.sql"
+                ;;
+            "1")
+                version="20250717000001"
+                rollback_file="$ROLLBACK_DIR/rollback_phase1.sql"
+                ;;
+        esac
 
-    log "Running rollback script: $(basename "$rollback_file")"
+        if ! migration_is_applied "$version"; then
+            warning "Phase $phase migration is not applied, skipping rollback"
+            continue
+        fi
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "DRY RUN: Would run $(basename "$rollback_file") and mark version $migration_ver as reverted"
+        if [[ ! -f "$rollback_file" ]]; then
+            error "Rollback script not found: $rollback_file"
+            return 1
+        fi
+
+        log "Queuing rollback script: $(basename "$rollback_file")"
+        psql_args+=(
+            --file "$rollback_file"
+            --command "DELETE FROM supabase_migrations.schema_migrations WHERE version = '$version';"
+        )
+    done
+
+    if [[ ${#psql_args[@]} -eq 0 ]]; then
+        log "No applied phases to roll back"
         return 0
     fi
 
-    # Roll back the schema and remove the migration from remote history atomically
-    if psql_remote --single-transaction \
-        --file "$rollback_file" \
-        --command "DELETE FROM supabase_migrations.schema_migrations WHERE version = '$migration_ver';"; then
-        success "Rollback script completed: $(basename "$rollback_file")"
+    # One transaction across all phases keeps a multi-phase rollback atomic
+    if psql_remote --single-transaction "${psql_args[@]}"; then
+        success "Rollback transaction committed"
     else
-        error "Rollback script failed: $(basename "$rollback_file")"
+        error "Rollback failed; no changes were committed"
         return 1
     fi
 }
@@ -430,27 +475,21 @@ run_rollback_script() {
 # Rollback to specific phase
 rollback_migrations() {
     local target_phase="$1"
-
-    log "Rolling back to Phase $target_phase..."
+    local phases=()
 
     case "$target_phase" in
         "0")
-            log "Rolling back Phase 3, Phase 2 and Phase 1..."
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase3.sql" "20250720000003"
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase2.sql" "20250719000001"
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase1.sql" "20250717000001"
+            phases=(3 2 1)
             ;;
         "1")
-            log "Rolling back Phase 3 and Phase 2..."
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase3.sql" "20250720000003"
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase2.sql" "20250719000001"
+            phases=(3 2)
             ;;
         "2")
-            log "Rolling back Phase 3..."
-            run_rollback_script "$ROLLBACK_DIR/rollback_phase3.sql" "20250720000003"
+            phases=(3)
             ;;
         "3")
             log "No rollback needed, already at Phase 3"
+            return 0
             ;;
         *)
             error "Invalid rollback phase: $target_phase"
@@ -458,10 +497,14 @@ rollback_migrations() {
             ;;
     esac
 
+    log "Rolling back to Phase $target_phase..."
+
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "DRY RUN: Rollback to Phase $target_phase not executed"
+        log "DRY RUN: Would roll back phases: ${phases[*]}"
         return 0
     fi
+
+    rollback_phases "${phases[@]}"
 
     success "Rollback to Phase $target_phase completed"
 }
@@ -470,22 +513,38 @@ rollback_migrations() {
 generate_report() {
     local status="$1"
     local report_file="$BACKUP_DIR/migration_report_$(date +%Y%m%d_%H%M%S).json"
-    
+    local migrations_json=""
+    local migration applied separator=""
+
+    # Dry runs must not query the database
+    if [[ "$DRY_RUN" == "true" ]]; then
+        status="dry_run"
+    fi
+
+    for migration in "${PHASE5_MIGRATIONS[@]}"; do
+        if [[ "$DRY_RUN" == "true" ]]; then
+            applied="null"
+        elif migration_is_applied "$(migration_version "$migration")"; then
+            applied="true"
+        else
+            applied="false"
+        fi
+        migrations_json+="${separator}    {\"name\": \"$migration\", \"applied\": $applied}"
+        separator=$',\n'
+    done
+
     cat > "$report_file" << EOF
 {
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "environment": "$ENVIRONMENT",
   "status": "$status",
   "migrations": [
-$(for migration in "${PHASE5_MIGRATIONS[@]}"; do
-    applied=$(migration_is_applied "$(migration_version "$migration")" && echo "true" || echo "false")
-    echo "    {\"name\": \"$migration\", \"applied\": $applied}"
-done | paste -sd ',' -)
+$migrations_json
   ],
   "supabase_project_id": "$SUPABASE_PROJECT_ID"
 }
 EOF
-    
+
     log "Migration report generated: $report_file"
 }
 

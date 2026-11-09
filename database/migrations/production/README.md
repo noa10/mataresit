@@ -75,7 +75,7 @@ The Phase 5 database migration system implements three sequential phases:
 # Deploy all phases with backup
 ./deploy-migrations.sh --environment production --backup-first
 
-# Dry run to validate before deployment
+# Dry run: check migration files without database calls
 ./deploy-migrations.sh --dry-run --environment production
 ```
 
