@@ -13,7 +13,8 @@ database access.
 - You have the production database password and are logged in to the Supabase
   CLI (`supabase projects list` shows `autoreceipt`).
 - The CLI is v3 (`supabase --version`). v3 targets the local stack by default;
-  every hosted command below passes `--remote`.
+  every hosted *database* command below passes `--remote`. `functions deploy`
+  targets the linked project by default; `--remote` only selects another one.
 
 > **`--include-all` is required.** The remote database already has
 > `20261106010000` (the gamification leaderboard fix from #235), while the three

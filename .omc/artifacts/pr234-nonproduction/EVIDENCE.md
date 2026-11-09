@@ -1,9 +1,12 @@
 # PR #234 nonproduction verification evidence
 
-Date: 2026-11-06
+Date: 2026-11-06 (updated 2026-11-10)
 Branch: `fix/stripe-production-readiness`
-Environment: disposable local Docker only. No hosted project, production
-database, Stripe API, or secret value was accessed.
+Environments: disposable local Docker for the SQL regression (2026-11-06 and
+the 2026-11-10 re-run); a local nonproduction Supabase stack with test-mode
+Stripe API calls and hosted Checkout for the lifecycle matrix (2026-11-07/08).
+No production project, live-mode Stripe key, or production database was
+accessed.
 
 ## SQL regression execution
 
@@ -122,8 +125,11 @@ same target and races the lock/claim RPCs. It runs at the end of
 | Processed event / expired lock | `duplicate`; expired lock stealable exactly once |
 
 Run on 2026-11-06 against both the local stack and a disposable PostgreSQL 15
-container: all six checks passed in each (`summary.tsv` row
-`two_session_races 0`).
+container: all six checks passed in each. The committed `summary.tsv` is the
+2026-11-06 five-suite run; the race step was added to
+`run-sql-regression.sh` afterward. A fresh full run on 2026-11-10 is committed
+as `summary-full-2026-11-10.tsv` (`two_session_races 0`), with the race output
+in `two_session_races-2026-11-10.log`.
 
 ## Five review findings re-verified
 
@@ -243,9 +249,6 @@ last live gap the PR body listed. Stack hook removed after the run.
 
 ## Not verified (user-gated)
 
-- Live/test-mode Stripe lifecycle: **executed 2026-11-07 — see the matrix
-  section above.** Remaining live gap: the concurrency-only checks (worker
-  paused past its lease) stay user-gated nonproduction checks before cutover.
 - Production migration application and Vault secret creation. Blocked by the
   execution policy that forbids this session from querying or writing the
   linked production project; runbook added at

@@ -1,0 +1,8 @@
+=== two_session_races ===
+ok 1: exactly one of two concurrent acquisitions won (token 8fd4a4c9...)
+ok 2: bind and release are owner-scoped and session-exact
+ok 3: a delayed completion cannot release a newer lock
+ok 4: exactly one of two concurrent deliveries claimed the event
+ok 5: the reclaimer wins and the stale token is rejected
+ok 6: processed events are duplicates and expired locks are stealable
+all two-session race checks passed
