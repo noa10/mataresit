@@ -12,12 +12,12 @@ import {
   type Caller,
 } from './function-auth.ts';
 
-const user: Caller = {
+const user = {
   role: 'user',
   userId: 'user-1',
   email: 'User@Example.com',
-  profileEmail: 'billing@example.com',
-};
+  emailVerified: true,
+} as Caller;
 
 Deno.test('extractBearerToken accepts case-insensitive Bearer tokens', () => {
   assertEquals(extractBearerToken('Bearer abc.def'), 'abc.def');
@@ -58,10 +58,16 @@ Deno.test('isSelf compares the authenticated user id', () => {
   assertEquals(isSelf(null, 'user-1'), false);
 });
 
-Deno.test('callerOwnsEmail checks both auth and profile addresses', () => {
+Deno.test('callerOwnsEmail trusts only the verified auth address', () => {
   assertEquals(callerOwnsEmail(user, 'user@example.com'), true);
-  assertEquals(callerOwnsEmail(user, 'billing@example.com'), true);
-  assertEquals(callerOwnsEmail(user, 'other@example.com'), false);
+  assertEquals(callerOwnsEmail(user, 'billing@example.com'), false);
+  assertEquals(
+    callerOwnsEmail(
+      { role: 'user', userId: 'user-1', email: 'user@example.com' } as Caller,
+      'user@example.com',
+    ),
+    false,
+  );
   assertEquals(callerOwnsEmail(null, 'user@example.com'), false);
 });
 
@@ -73,10 +79,10 @@ Deno.test('isPrivileged allows only service role and global admins', () => {
 });
 
 interface FakeAdminOptions {
-  user?: { id: string; email?: string } | null;
+  user?: { id: string; email?: string; email_confirmed_at?: string | null } | null;
   userError?: unknown;
   roles?: string[];
-  profileEmail?: string | null;
+  profilesEmail?: string | null;
   teamRole?: string | null;
   teamError?: unknown;
 }
@@ -92,7 +98,7 @@ function fakeAdmin(options: FakeAdminOptions): SupabaseClient {
     }
     if (table === 'profiles') {
       return {
-        data: options.profileEmail === undefined ? null : { email: options.profileEmail },
+        data: options.profilesEmail === undefined ? null : { email: options.profilesEmail },
         error: null,
       };
     }
@@ -167,9 +173,13 @@ Deno.test('resolveCaller accepts the exact service-role key', async () => {
 Deno.test('resolveCaller classifies a regular user', async () => {
   await withServiceKey(async () => {
     const admin = fakeAdmin({
-      user: { id: 'user-1', email: 'auth@example.com' },
+      user: {
+        id: 'user-1',
+        email: 'auth@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
       roles: [],
-      profileEmail: 'profile@example.com',
+      profilesEmail: 'profile@example.com',
     });
     const caller = await resolveCaller(
       new Request('http://localhost', {
@@ -182,15 +192,57 @@ Deno.test('resolveCaller classifies a regular user', async () => {
       role: 'user',
       userId: 'user-1',
       email: 'auth@example.com',
-      profileEmail: 'profile@example.com',
+      emailVerified: true,
     });
+  });
+});
+
+Deno.test('resolveCaller does not trust a user-writable profile email', async () => {
+  await withServiceKey(async () => {
+    const admin = fakeAdmin({
+      user: {
+        id: 'attacker',
+        email: 'attacker@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
+      profilesEmail: 'victim@example.com',
+    });
+    const caller = await resolveCaller(
+      new Request('http://localhost', {
+        headers: { Authorization: 'Bearer attacker-token' },
+      }),
+      admin,
+    );
+
+    assertEquals(caller?.email, 'attacker@example.com');
+    assertEquals(callerOwnsEmail(caller, 'victim@example.com'), false);
+  });
+});
+
+Deno.test('resolveCaller marks an unconfirmed auth email as unverified', async () => {
+  await withServiceKey(async () => {
+    const admin = fakeAdmin({
+      user: { id: 'user-1', email: 'user@example.com', email_confirmed_at: null },
+    });
+    const caller = await resolveCaller(
+      new Request('http://localhost', {
+        headers: { Authorization: 'Bearer user-token' },
+      }),
+      admin,
+    );
+
+    assertEquals(callerOwnsEmail(caller, 'user@example.com'), false);
   });
 });
 
 Deno.test('resolveCaller classifies a global admin', async () => {
   await withServiceKey(async () => {
     const admin = fakeAdmin({
-      user: { id: 'admin-1', email: 'admin@example.com' },
+      user: {
+        id: 'admin-1',
+        email: 'admin@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
       roles: ['admin'],
     });
     const caller = await resolveCaller(
@@ -204,6 +256,7 @@ Deno.test('resolveCaller classifies a global admin', async () => {
       role: 'admin',
       userId: 'admin-1',
       email: 'admin@example.com',
+      emailVerified: true,
     });
   });
 });

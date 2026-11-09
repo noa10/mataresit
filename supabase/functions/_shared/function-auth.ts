@@ -21,8 +21,10 @@ export type CallerRole = 'service_role' | 'admin' | 'user';
 export interface Caller {
   role: CallerRole;
   userId?: string;
+  /** Address reported by the auth server, never a user-writable profile field. */
   email?: string;
-  profileEmail?: string;
+  /** True only when the auth server reports the address as confirmed. */
+  emailVerified?: boolean;
 }
 
 const EMAIL_PATTERN = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
@@ -88,6 +90,9 @@ export async function resolveCaller(
     if (error || !data?.user) return null;
 
     const user = data.user;
+    const email = user.email ?? undefined;
+    const emailVerified = Boolean(user.email_confirmed_at);
+
     const { data: adminRoles } = await admin
       .from('user_roles')
       .select('role')
@@ -96,21 +101,10 @@ export async function resolveCaller(
       .limit(1);
 
     if (Array.isArray(adminRoles) && adminRoles.length > 0) {
-      return { role: 'admin', userId: user.id, email: user.email ?? undefined };
+      return { role: 'admin', userId: user.id, email, emailVerified };
     }
 
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    return {
-      role: 'user',
-      userId: user.id,
-      email: user.email ?? undefined,
-      profileEmail: typeof profile?.email === 'string' ? profile.email : undefined,
-    };
+    return { role: 'user', userId: user.id, email, emailVerified };
   } catch (error) {
     console.error(
       'Caller resolution failed:',
@@ -144,12 +138,17 @@ export function normalizeEmail(value: unknown): string | null {
   return email;
 }
 
+/**
+ * True only when the recipient is the caller's own address as reported by the
+ * auth server and that address is confirmed. `profiles.email` is writable by
+ * the user (the "Users can update their own profile" policy has no column
+ * restriction), so it must never be used for authorization.
+ */
 export function callerOwnsEmail(caller: Caller | null, email: string): boolean {
-  const own = [caller?.email, caller?.profileEmail]
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim().toLowerCase());
+  if (!caller?.emailVerified || typeof caller.email !== 'string') return false;
 
-  return own.includes(email);
+  const own = caller.email.trim().toLowerCase();
+  return own.length > 0 && own === email.trim().toLowerCase();
 }
 
 /**

@@ -21,24 +21,15 @@ async function testUnifiedSearchMigration() {
     console.log('\n1️⃣ Testing Authentication...');
     
     try {
-      const authResponse = await fetch('/functions/v1/test-auth-validation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`
-        },
-        body: JSON.stringify({ test: true })
-      });
-      
-      const authData = await authResponse.json();
-      console.log('Auth test response:', authData);
-      
-      if (authData.success && authData.userValidation?.success) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(await getAuthToken());
+
+      if (!userError && user) {
         testResults.authenticationFixed = true;
-        console.log('✅ Authentication is working correctly');
+        console.log('✅ Authentication is working correctly:', user.email);
       } else {
-        console.log('❌ Authentication still has issues:', authData.error);
-        testResults.errors.push('Authentication failed: ' + authData.error);
+        const reason = userError?.message ?? 'no user returned';
+        console.log('❌ Authentication still has issues:', reason);
+        testResults.errors.push('Authentication failed: ' + reason);
       }
     } catch (authError) {
       console.log('❌ Authentication test failed:', authError.message);
