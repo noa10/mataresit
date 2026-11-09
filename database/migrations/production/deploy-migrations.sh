@@ -48,6 +48,67 @@ SUPABASE_PROJECT_ID="${SUPABASE_PROJECT_ID:-mpmkbtsufihzdelrlszs}"
 SUPABASE_DB_PASSWORD="${SUPABASE_DB_PASSWORD}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
 
+# Hosted database connection
+REMOTE_DB_HOST="db.$SUPABASE_PROJECT_ID.supabase.co"
+REMOTE_DB_PORT="5432"
+REMOTE_DB_USER="postgres"
+REMOTE_DB_NAME="postgres"
+
+# Run psql against the hosted project database
+psql_remote() {
+    PGPASSWORD="$SUPABASE_DB_PASSWORD" psql \
+        --no-psqlrc \
+        --set ON_ERROR_STOP=1 \
+        --host "$REMOTE_DB_HOST" \
+        --port "$REMOTE_DB_PORT" \
+        --username "$REMOTE_DB_USER" \
+        --dbname "$REMOTE_DB_NAME" \
+        "$@"
+}
+
+# Extract the migration version (timestamp prefix) from a migration file path
+migration_version() {
+    local base
+    base=$(basename "$1" .sql)
+    echo "${base%%_*}"
+}
+
+# Exit code for a failed hosted-database probe (distinct from a negative answer)
+PROBE_ERROR_EXIT=3
+PROBE_RESULT=""
+
+# Run a read-only probe, storing the answer in PROBE_RESULT.
+# A failed query is fatal and is never treated as a negative answer.
+remote_probe() {
+    local query="$1"
+    if ! PROBE_RESULT=$(psql_remote --no-align --tuples-only --command "$query"); then
+        error "Failed to query the hosted database; refusing to continue"
+        exit "$PROBE_ERROR_EXIT"
+    fi
+}
+
+# Check whether a migration version is recorded in the hosted migration history
+migration_is_applied() {
+    local version="$1"
+    remote_probe "SELECT 1 FROM supabase_migrations.schema_migrations WHERE version = '$version' LIMIT 1;"
+    [[ "$PROBE_RESULT" == "1" ]]
+}
+
+# Check whether a relation exists in the hosted public schema
+remote_relation_exists() {
+    local relation="$1"
+    remote_probe "SELECT to_regclass('public.$relation') IS NOT NULL;"
+    [[ "$PROBE_RESULT" == "t" ]]
+}
+
+# Check whether a column exists on a hosted public table
+remote_column_exists() {
+    local table="$1"
+    local column="$2"
+    remote_probe "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '$table' AND column_name = '$column');"
+    [[ "$PROBE_RESULT" == "t" ]]
+}
+
 # Help function
 show_help() {
     cat << EOF
@@ -58,8 +119,8 @@ Usage: $0 [OPTIONS]
 OPTIONS:
     --help, -h              Show this help message
     --environment ENV       Target environment (production/staging/test)
-    --dry-run              Validate migrations without applying
-    --rollback PHASE       Rollback to specific phase (1, 2, 3)
+    --dry-run              Check migration files without database calls
+    --rollback PHASE       Rollback to specific phase (0, 1, 2, 3)
     --validate-only        Only run validation checks
     --backup-first         Create backup before migration
     --force                Force migration even if validation fails
@@ -179,7 +240,7 @@ create_backup() {
     fi
     
     # Create schema backup
-    if supabase db dump --schema-only > "$backup_file.schema"; then
+    if supabase db dump --schema-only --remote > "$backup_file.schema"; then
         success "Schema backup created: $backup_file.schema"
     else
         error "Failed to create schema backup"
@@ -197,7 +258,7 @@ create_backup() {
     )
     
     for table in "${critical_tables[@]}"; do
-        if supabase db dump --data-only --table "$table" >> "$backup_file.data" 2>/dev/null; then
+        if supabase db dump --data-only --table "$table" --remote >> "$backup_file.data" 2>/dev/null; then
             log "Backed up table: $table"
         else
             warning "Table $table does not exist or backup failed"
@@ -221,11 +282,23 @@ validate_migrations() {
             validation_failed=true
             continue
         fi
-        
-        # Check SQL syntax
-        if ! psql --set ON_ERROR_STOP=1 --quiet --no-psqlrc \
-            -c "BEGIN; $(cat "$migration_file"); ROLLBACK;" \
-            "postgresql://postgres:$SUPABASE_DB_PASSWORD@db.$SUPABASE_PROJECT_ID.supabase.co:5432/postgres" \
+
+        # Dry runs must not touch the hosted database at all
+        if [[ "$DRY_RUN" == "true" ]]; then
+            success "Found migration file: $migration (dry run, database checks skipped)"
+            continue
+        fi
+
+        # Replaying an applied migration fails on its non-idempotent statements
+        # (for example CREATE POLICY), so only validate pending migrations
+        if migration_is_applied "$(migration_version "$migration_file")"; then
+            log "Migration already applied, skipping SQL validation: $migration"
+            continue
+        fi
+
+        # Check SQL syntax in a rolled-back transaction
+        if ! psql_remote --quiet \
+            --command "BEGIN; $(cat "$migration_file"); ROLLBACK;" \
             &> /dev/null; then
             error "SQL syntax validation failed for: $migration"
             validation_failed=true
@@ -246,24 +319,27 @@ validate_migrations() {
 apply_migration() {
     local migration_file="$1"
     local migration_name=$(basename "$migration_file" .sql)
-    
+    local migration_ver=$(migration_version "$migration_file")
+
     log "Applying migration: $migration_name"
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         log "DRY RUN: Would apply migration $migration_name"
         return 0
     fi
-    
+
     # Check if migration already applied
-    if supabase migration list | grep -q "$migration_name"; then
+    if migration_is_applied "$migration_ver"; then
         warning "Migration $migration_name already applied, skipping"
         return 0
     fi
-    
-    # Apply migration
-    if supabase db push --include-all; then
+
+    # Apply this migration file only, recording it in remote history atomically
+    if psql_remote --single-transaction \
+        --file "$migration_file" \
+        --command "INSERT INTO supabase_migrations.schema_migrations (version) VALUES ('$migration_ver') ON CONFLICT (version) DO NOTHING;"; then
         success "Applied migration: $migration_name"
-        
+
         # Run post-migration validation
         validate_migration_success "$migration_name"
     else
@@ -283,7 +359,7 @@ validate_migration_success() {
             # Validate Phase 1 tables exist
             local tables=("embedding_performance_metrics" "embedding_hourly_stats" "embedding_daily_stats")
             for table in "${tables[@]}"; do
-                if ! supabase db diff --schema public | grep -q "$table"; then
+                if ! remote_relation_exists "$table"; then
                     error "Table $table not found after migration"
                     return 1
                 fi
@@ -291,16 +367,19 @@ validate_migration_success() {
             ;;
         "20250719000001_enhance_embedding_queue_phase2")
             # Validate Phase 2 enhancements
-            if ! supabase db diff --schema public | grep -q "embedding_queue.*batch_id"; then
-                error "Phase 2 queue enhancements not found"
-                return 1
-            fi
+            local columns=("batch_id" "worker_id" "processing_started_at" "processing_completed_at" "estimated_tokens" "actual_tokens" "rate_limit_delay_ms")
+            for column in "${columns[@]}"; do
+                if ! remote_column_exists "embedding_queue" "$column"; then
+                    error "Column embedding_queue.$column not found after migration"
+                    return 1
+                fi
+            done
             ;;
         "20250720000003_batch_upload_optimization")
             # Validate Phase 3 tables
             local tables=("batch_upload_sessions" "batch_upload_files")
             for table in "${tables[@]}"; do
-                if ! supabase db diff --schema public | grep -q "$table"; then
+                if ! remote_relation_exists "$table"; then
                     error "Table $table not found after migration"
                     return 1
                 fi
@@ -341,38 +420,92 @@ deploy_migrations() {
     success "All Phase 5 migrations deployed successfully"
 }
 
+# Roll back the given phases in one transaction, skipping phases that are not applied
+rollback_phases() {
+    local -a psql_args=()
+    local phase version rollback_file
+
+    for phase in "$@"; do
+        case "$phase" in
+            "3")
+                version="20250720000003"
+                rollback_file="$ROLLBACK_DIR/rollback_phase3.sql"
+                ;;
+            "2")
+                version="20250719000001"
+                rollback_file="$ROLLBACK_DIR/rollback_phase2.sql"
+                ;;
+            "1")
+                version="20250717000001"
+                rollback_file="$ROLLBACK_DIR/rollback_phase1.sql"
+                ;;
+        esac
+
+        if ! migration_is_applied "$version"; then
+            warning "Phase $phase migration is not applied, skipping rollback"
+            continue
+        fi
+
+        if [[ ! -f "$rollback_file" ]]; then
+            error "Rollback script not found: $rollback_file"
+            return 1
+        fi
+
+        log "Queuing rollback script: $(basename "$rollback_file")"
+        psql_args+=(
+            --file "$rollback_file"
+            --command "DELETE FROM supabase_migrations.schema_migrations WHERE version = '$version';"
+        )
+    done
+
+    if [[ ${#psql_args[@]} -eq 0 ]]; then
+        log "No applied phases to roll back"
+        return 0
+    fi
+
+    # One transaction across all phases keeps a multi-phase rollback atomic
+    if psql_remote --single-transaction "${psql_args[@]}"; then
+        success "Rollback transaction committed"
+    else
+        error "Rollback failed; no changes were committed"
+        return 1
+    fi
+}
+
 # Rollback to specific phase
 rollback_migrations() {
     local target_phase="$1"
-    
-    log "Rolling back to Phase $target_phase..."
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "DRY RUN: Would rollback to Phase $target_phase"
-        return 0
-    fi
-    
+    local phases=()
+
     case "$target_phase" in
+        "0")
+            phases=(3 2 1)
+            ;;
         "1")
-            log "Rolling back Phase 3 and Phase 2..."
-            supabase db reset --linked
-            apply_migration "$MIGRATIONS_DIR/20250717000001_create_embedding_metrics_tables.sql"
+            phases=(3 2)
             ;;
         "2")
-            log "Rolling back Phase 3..."
-            supabase db reset --linked
-            apply_migration "$MIGRATIONS_DIR/20250717000001_create_embedding_metrics_tables.sql"
-            apply_migration "$MIGRATIONS_DIR/20250719000001_enhance_embedding_queue_phase2.sql"
+            phases=(3)
             ;;
         "3")
             log "No rollback needed, already at Phase 3"
+            return 0
             ;;
         *)
             error "Invalid rollback phase: $target_phase"
             exit 1
             ;;
     esac
-    
+
+    log "Rolling back to Phase $target_phase..."
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "DRY RUN: Would roll back phases: ${phases[*]}"
+        return 0
+    fi
+
+    rollback_phases "${phases[@]}"
+
     success "Rollback to Phase $target_phase completed"
 }
 
@@ -380,21 +513,38 @@ rollback_migrations() {
 generate_report() {
     local status="$1"
     local report_file="$BACKUP_DIR/migration_report_$(date +%Y%m%d_%H%M%S).json"
-    
+    local migrations_json=""
+    local migration applied separator=""
+
+    # Dry runs must not query the database
+    if [[ "$DRY_RUN" == "true" ]]; then
+        status="dry_run"
+    fi
+
+    for migration in "${PHASE5_MIGRATIONS[@]}"; do
+        if [[ "$DRY_RUN" == "true" ]]; then
+            applied="null"
+        elif migration_is_applied "$(migration_version "$migration")"; then
+            applied="true"
+        else
+            applied="false"
+        fi
+        migrations_json+="${separator}    {\"name\": \"$migration\", \"applied\": $applied}"
+        separator=$',\n'
+    done
+
     cat > "$report_file" << EOF
 {
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "environment": "$ENVIRONMENT",
   "status": "$status",
   "migrations": [
-$(for migration in "${PHASE5_MIGRATIONS[@]}"; do
-    echo "    {\"name\": \"$migration\", \"applied\": $(supabase migration list | grep -q "$(basename "$migration" .sql)" && echo "true" || echo "false")}"
-done | paste -sd ',' -)
+$migrations_json
   ],
   "supabase_project_id": "$SUPABASE_PROJECT_ID"
 }
 EOF
-    
+
     log "Migration report generated: $report_file"
 }
 
