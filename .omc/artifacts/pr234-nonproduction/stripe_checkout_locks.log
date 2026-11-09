@@ -1,0 +1,12 @@
+=== stripe_checkout_locks ===
+BEGIN
+DO
+DO
+CREATE TABLE
+INSERT 0 1
+INSERT 0 1
+CREATE TABLE
+DO
+DO
+DO
+ROLLBACK

@@ -1,0 +1,16 @@
+=== payment_state_fencing ===
+BEGIN
+DO
+DO
+CREATE TABLE
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+INSERT 0 0
+DO
+DO
+DO
+DO
+DO
+DO
+ROLLBACK
