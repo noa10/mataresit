@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { NotificationHelper } from '../_shared/notification-helper.ts';
-import { supabaseClient } from '../_shared/supabase-client.ts';
+import { EdgeNotificationHelper } from '../_shared/notification-helper.ts';
+import { isPrivileged, isSelf, resolveCaller } from '../_shared/function-auth.ts';
 
 serve(async (req: Request) => {
   // Handle CORS
@@ -20,34 +20,33 @@ serve(async (req: Request) => {
       return new Response('Method not allowed', { status: 405 });
     }
 
+    const caller = await resolveCaller(req);
+    if (!caller) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
     const { notificationType, userId } = await req.json();
 
-    if (!notificationType || !userId) {
+    if (!notificationType || typeof userId !== 'string' || !userId) {
       return new Response(
         JSON.stringify({ error: 'Missing notificationType or userId' }),
-        { 
+        {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
         }
       );
     }
 
-    // Get auth header and create supabase client
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    const supabase = supabaseClient(authHeader);
-
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response('Invalid token', { status: 401 });
+    // The preference lookup runs with the caller's session. A caller may only
+    // inspect their own preferences unless they are privileged.
+    if (!isPrivileged(caller) && !isSelf(caller, userId)) {
+      return new Response('Forbidden', { status: 403 });
     }
 
     // Use the NotificationHelper to check filtering
-    const notificationHelper = new NotificationHelper();
+    const notificationHelper = new EdgeNotificationHelper(
+      req.headers.get('Authorization') ?? undefined
+    );
     const result = await notificationHelper.checkNotificationPreferences(userId, notificationType);
 
     return new Response(

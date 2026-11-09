@@ -2,11 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { getFrontendUrl } from "../_shared/site-url.ts";
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, isSelf, resolveCaller } from '../_shared/function-auth.ts';
 
 // Initialize Supabase client
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
 
 // Initialize Stripe
@@ -19,40 +21,69 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { action, userId, subscriptionId } = await req.json();
+    const requestBody = await req.json();
+    const { action, userId, subscriptionId } = requestBody;
 
-    console.log('Billing auto-renewal request:', { action, userId, subscriptionId });
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return jsonError(401, 'Unauthorized');
+    }
+
+    console.log('Billing auto-renewal request:', {
+      action,
+      userId,
+      subscriptionId,
+      callerRole: caller.role,
+    });
 
     switch (action) {
       case 'process_upcoming_renewals':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await processUpcomingRenewals();
-      
+
       case 'handle_payment_retry':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
+        if (typeof subscriptionId !== 'string' || !subscriptionId) {
+          return jsonError(400, 'Missing subscriptionId');
+        }
         return await handlePaymentRetry(subscriptionId);
-      
+
       case 'process_grace_period_expiry':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await processGracePeriodExpiry();
-      
+
       case 'update_auto_renewal_settings':
-        return await updateAutoRenewalSettings(userId, await req.json());
-      
+        if (!isPrivileged(caller) && !isSelf(caller, userId)) {
+          return jsonError(403, 'Forbidden');
+        }
+        if (typeof userId !== 'string' || !userId) {
+          return jsonError(400, 'Missing userId');
+        }
+        return await updateAutoRenewalSettings(userId, requestBody);
+
       case 'check_subscription_health':
+        if (!isPrivileged(caller) && !isSelf(caller, userId)) {
+          return jsonError(403, 'Forbidden');
+        }
+        if (typeof userId !== 'string' || !userId) {
+          return jsonError(400, 'Missing userId');
+        }
         return await checkSubscriptionHealth(userId);
-      
+
       default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown action' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        return jsonError(400, 'Unknown action');
     }
   } catch (error) {
     console.error('Error in billing auto-renewal:', error);
@@ -312,6 +343,19 @@ async function handlePaymentRetry(subscriptionId: string) {
           }
         );
       }
+
+      // Stripe accepted the pay call but the invoice is not settled yet.
+      return new Response(
+        JSON.stringify({
+          success: false,
+          action: 'payment_retry_pending',
+          invoice_status: paidInvoice.status
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
 
     } catch (paymentError) {
       console.error('Payment retry failed:', paymentError);

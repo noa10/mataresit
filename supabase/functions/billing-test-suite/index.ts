@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, resolveCaller } from '../_shared/function-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,8 +9,8 @@ const corsHeaders = {
 };
 
 const supabaseClient = createClient(
-  Deno.env.get('VITE_SUPABASE_URL') ?? '',
-  Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+  Deno.env.get('SUPABASE_URL') ?? '',
+  getServiceRoleKey() ?? ''
 );
 
 interface TestResult {
@@ -35,6 +37,22 @@ serve(async (req) => {
   }
 
   try {
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    // The suite creates and deletes test billing data and can trigger
+    // auto-renewal processing. Global admins and internal service callers only.
+    if (!isPrivileged(caller)) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { action, test_suite, test_config = {} } = await req.json();
 
     console.log('Billing test suite request:', { action, test_suite, test_config });
@@ -42,10 +60,7 @@ serve(async (req) => {
     switch (action) {
       case 'run_all_tests':
         return await runAllTests(test_config);
-      
-      case 'run_test_suite':
-        return await runTestSuite(test_suite, test_config);
-      
+
       case 'test_email_templates':
         return await testEmailTemplates(test_config);
       

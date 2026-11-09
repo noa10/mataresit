@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, resolveCaller } from '../_shared/function-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,8 +10,14 @@ const corsHeaders = {
 
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
+
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 const BILLING_ALERT_EMAILS = (Deno.env.get('BILLING_ALERT_EMAILS') || '')
   .split(',')
@@ -40,43 +48,44 @@ serve(async (req) => {
   }
 
   try {
-    const { action } = await req.json();
+    const requestBody = await req.json();
+    const { action } = requestBody;
 
-    console.log('Billing alerting request:', { action });
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return jsonError(401, 'Unauthorized');
+    }
+    // Alert rules and notifications are operational controls across the billing
+    // system; only global admins and internal service callers may touch them.
+    if (!isPrivileged(caller)) {
+      return jsonError(403, 'Forbidden');
+    }
+
+    console.log('Billing alerting request:', { action, callerRole: caller.role });
 
     switch (action) {
       case 'check_alert_conditions':
         return await checkAlertConditions();
-      
+
       case 'process_alert_rules':
-        return await processAlertRules();
-      
+        return await checkAlertConditions();
+
       case 'send_alert_notification':
-        return await sendAlertNotification(await req.json());
-      
+        return await sendNotification(requestBody);
+
       case 'create_alert':
-        return await createAlert(await req.json());
-      
+        return await createAlert(requestBody);
+
       case 'resolve_alert':
-        return await resolveAlert(await req.json());
-      
+        return await resolveAlert(requestBody);
+
       case 'get_alert_rules':
-        return await getAlertRules();
-      
       case 'update_alert_rule':
-        return await updateAlertRule(await req.json());
-      
       case 'test_alert_rule':
-        return await testAlertRule(await req.json());
-      
+        return jsonError(501, 'Action not implemented');
+
       default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown action' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        return jsonError(400, 'Unknown action');
     }
   } catch (error) {
     console.error('Billing alerting error:', error);

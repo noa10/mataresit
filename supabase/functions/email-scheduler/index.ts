@@ -1,16 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, isSelf, resolveCaller } from '../_shared/function-auth.ts';
 
 // Initialize Supabase client
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,38 +28,50 @@ serve(async (req) => {
   try {
     const { action, ...params } = await req.json();
 
-    console.log('Email scheduler request:', { action, params });
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return jsonError(401, 'Unauthorized');
+    }
+
+    console.log('Email scheduler request:', { action, params, callerRole: caller.role });
 
     switch (action) {
       case 'schedule_billing_reminders':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await scheduleBillingReminders(params);
-      
+
       case 'process_scheduled_emails':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await processScheduledEmails();
-      
+
       case 'reschedule_failed_emails':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await rescheduleFailedEmails(params);
-      
+
       case 'cancel_scheduled_email':
+        if (!isPrivileged(caller)) return jsonError(403, 'Forbidden');
         return await cancelScheduledEmail(params.scheduleId);
-      
+
       case 'get_email_delivery_stats':
+        // Self-service stats carry the caller's own userId; an unscoped
+        // aggregate is admin-only.
+        if (!isPrivileged(caller) && !isSelf(caller, params.userId)) {
+          return jsonError(403, 'Forbidden');
+        }
         return await getEmailDeliveryStats(params);
-      
+
       case 'update_email_preferences':
+        if (!isPrivileged(caller) && !isSelf(caller, params.userId)) {
+          return jsonError(403, 'Forbidden');
+        }
         return await updateEmailPreferences(params);
-      
+
       case 'preview_email_template':
+        // Renders caller-supplied template data and never sends.
         return await previewEmailTemplate(params);
-      
+
       default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown action' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        return jsonError(400, 'Unknown action');
     }
   } catch (error) {
     console.error('Error in email scheduler:', error);

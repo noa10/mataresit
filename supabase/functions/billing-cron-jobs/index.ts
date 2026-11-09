@@ -1,10 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { resolveCaller } from '../_shared/function-auth.ts';
 
 // Initialize Supabase client
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
 
 const corsHeaders = {
@@ -12,12 +14,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return jsonError(401, 'Unauthorized');
+    }
+    // Cron jobs are driven by the scheduler (or another service-role caller).
+    // A user session, even an admin one, must not trigger billing runs here.
+    if (caller.role !== 'service_role') {
+      return jsonError(403, 'Forbidden');
+    }
+
     const { job_type } = await req.json();
 
     console.log('Billing cron job request:', { job_type });
