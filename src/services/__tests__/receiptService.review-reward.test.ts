@@ -34,7 +34,10 @@ vi.mock("@/lib/ai-search", () => ({
 
 vi.mock("@/services/cacheInvalidationService", () => ({
   CacheInvalidationService: {
-    onReceiptUpdated: hoisted.onReceiptUpdated,
+    onReceiptUpdated: (userId: string) => {
+      hoisted.onReceiptUpdated(userId);
+      return Promise.resolve();
+    },
   },
 }));
 
@@ -115,6 +118,22 @@ describe("updateReceiptWithLineItems review reward integration", () => {
 
     expect(hoisted.supabase.rpc).not.toHaveBeenCalled();
     expect(hoisted.onReceiptUpdated).not.toHaveBeenCalled();
+  });
+
+  it("invalidates caches when a later line-item write fails", async () => {
+    hoisted.lineItemsTable.insert.mockResolvedValueOnce({
+      error: { message: "line item RLS failure" },
+    });
+
+    await expect(
+      updateReceiptWithLineItems(
+        "receipt-1",
+        { status: "reviewed" },
+        [{ id: "line-1", receipt_id: "receipt-1", description: "Latte", amount: 12.5 }]
+      )
+    ).rejects.toThrow("Failed to update line items");
+
+    expect(hoisted.onReceiptUpdated).toHaveBeenCalledWith("user-1");
   });
 
   it("skips the review reward for non-reviewed saves", async () => {

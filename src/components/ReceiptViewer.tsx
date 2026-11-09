@@ -88,6 +88,7 @@ export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
   onDelete?: (deletedId: string) => void; // Notify parent of deletion
   onUpdate?: (updatedReceipt: ReceiptWithDetails) => void; // Notify parent of updates
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
@@ -110,6 +111,39 @@ const defaultConfidence: ReceiptConfidence = {
   tax: 0,
   payment_method: 0,
   line_items: 0,
+};
+
+const normalizeReceiptValue = (key: string, value: unknown): unknown => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => ({
+        description: String(item?.description ?? ""),
+        amount: typeof item?.amount === "number" ? item.amount : Number(item?.amount) || 0,
+      }))
+      .sort((left, right) => left.description.localeCompare(right.description));
+  }
+  if (key === "currency") return normalizeCurrencyCode(String(value), "MYR");
+  return String(value);
+};
+
+const hasReceiptChanges = (
+  current: ReceiptWithDetails,
+  original: ReceiptWithDetails
+): boolean => {
+  const keys = new Set([
+    ...Object.keys(current),
+    ...Object.keys(original),
+  ]);
+
+  return Array.from(keys).some((key) => {
+    if (key === "updated_at" || key === "created_at") return false;
+    if (key === "confidence_scores" || key === "processing_status") return false;
+    return JSON.stringify(normalizeReceiptValue(key, (current as any)[key])) !==
+      JSON.stringify(normalizeReceiptValue(key, (original as any)[key]));
+  });
 };
 
 // Helper function to normalize confidence (handles decimal/percentage)
@@ -338,7 +372,7 @@ const toDisplayDate = (value: string): string => {
 
 const MAG_ZOOM = 3;
 
-export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
+export default function ReceiptViewer({ receipt, onDelete, onUpdate, onDirtyChange }: ReceiptViewerProps) {
   // Get user settings for processing method
   const { settings } = useSettings();
   const { t } = useReceiptsTranslation();
@@ -531,6 +565,17 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Use save status context for background save operations
   const { saveReceipt } = useSaveStatus();
   const { isSaving, status: saveStatus } = useReceiptSaveStatus(receipt.id);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    if (!isSaving) {
+      setHasUnsavedChanges(hasReceiptChanges(editedReceipt, receipt));
+    }
+  }, [editedReceipt, receipt, isSaving]);
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
@@ -557,6 +602,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         is_business_expense: Boolean(receipt.is_business_expense)
       });
       setDateDisplayValue(toDisplayDate(receipt.date || ""));
+      setHasUnsavedChanges(false);
     }
   }, [receipt, isSaving]);
 
@@ -669,6 +715,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         paid_by_id: receipt.paid_by_id || null,
         is_business_expense: Boolean(receipt.is_business_expense)
       });
+      setHasUnsavedChanges(false);
     }
 
     // Initialize/Update editedConfidence when receipt changes
@@ -925,11 +972,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             onUpdate(updatedReceipt);
           }
 
-          // Invalidate queries to refresh data
-          queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-          queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
-          queryClient.invalidateQueries({ queryKey: ['receipts'] });
-
           // Fix processing status if needed
           if (receipt.processing_status !== 'complete') {
             fixProcessingStatus(receipt.id);
@@ -1110,6 +1152,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       toast.error("Please enter a total amount");
       return;
     }
+
+    setHasUnsavedChanges(false);
 
     // Perform background save - non-blocking
     const operationId = performBackgroundSave();

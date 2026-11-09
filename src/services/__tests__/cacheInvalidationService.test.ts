@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {},
+}));
+
+vi.mock("@/hooks/useSubscription", () => ({
+  subscriptionQueryKeys: {
+    usage: (userId: string) => ["subscription", "usage", userId],
+  },
+}));
+
 import { CacheInvalidationService } from "@/services/cacheInvalidationService";
 
 describe("CacheInvalidationService receipt updates", () => {
@@ -21,5 +32,6 @@ describe("CacheInvalidationService receipt updates", () => {
 
     expect(invalidatedKeys).toContainEqual(["receipt-counts"]);
     expect(invalidatedKeys).toContainEqual(["dashboard-summary"]);
+    expect(invalidatedKeys).toContainEqual(["receipts", "neighbors"]);
   });
 });

@@ -345,6 +345,7 @@ export type Database = {
           created_at: string
           currency: string | null
           currency_converted: boolean | null
+          custom_category_id: string | null
           date: string
           discrepancies: Json | null
           document_structure: Json | null
@@ -353,9 +354,11 @@ export type Database = {
           has_alternative_data: boolean | null
           id: string
           image_url: string | null
+          is_business_expense: boolean | null
           merchant: string
           model_used: string | null
           normalized_merchant: string | null
+          paid_by_id: string | null
           payment_method: string | null
           predicted_category: string | null
           primary_method: string | null
@@ -363,6 +366,7 @@ export type Database = {
           processing_status: string | null
           processing_time: number | null
           status: string | null
+          team_id: string | null
           tax: number | null
           thumbnail_url: string | null
           total: number
@@ -376,6 +380,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           currency_converted?: boolean | null
+          custom_category_id?: string | null
           date: string
           discrepancies?: Json | null
           document_structure?: Json | null
@@ -384,9 +389,11 @@ export type Database = {
           has_alternative_data?: boolean | null
           id?: string
           image_url?: string | null
+          is_business_expense?: boolean | null
           merchant: string
           model_used?: string | null
           normalized_merchant?: string | null
+          paid_by_id?: string | null
           payment_method?: string | null
           predicted_category?: string | null
           primary_method?: string | null
@@ -394,6 +401,7 @@ export type Database = {
           processing_status?: string | null
           processing_time?: number | null
           status?: string | null
+          team_id?: string | null
           tax?: number | null
           thumbnail_url?: string | null
           total: number
@@ -407,6 +415,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           currency_converted?: boolean | null
+          custom_category_id?: string | null
           date?: string
           discrepancies?: Json | null
           document_structure?: Json | null
@@ -415,9 +424,11 @@ export type Database = {
           has_alternative_data?: boolean | null
           id?: string
           image_url?: string | null
+          is_business_expense?: boolean | null
           merchant?: string
           model_used?: string | null
           normalized_merchant?: string | null
+          paid_by_id?: string | null
           payment_method?: string | null
           predicted_category?: string | null
           primary_method?: string | null
@@ -425,6 +436,7 @@ export type Database = {
           processing_status?: string | null
           processing_time?: number | null
           status?: string | null
+          team_id?: string | null
           tax?: number | null
           thumbnail_url?: string | null
           total?: number

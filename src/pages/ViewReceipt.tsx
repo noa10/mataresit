@@ -7,10 +7,11 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Trash2, Loader2 } from "lucide-re
 import { fetchReceiptById, fetchReceiptNeighbors, deleteReceipt } from "@/services/receiptService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/contexts/TeamContext";
+import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrencySafe } from "@/utils/currency";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 const DASHBOARD_PARAM_KEYS = [
   "q",
@@ -32,10 +33,13 @@ export default function ViewReceipt() {
 
   const { user } = useAuth();
   const { currentTeam } = useTeam();
+  const { t } = useReceiptsTranslation();
   const queryClient = useQueryClient();
 
   // Track if we have history to go back to
   const [canGoBack, setCanGoBack] = useState(false);
+  const [isReceiptDirty, setIsReceiptDirty] = useState(false);
+  const initialCanGoBackRef = useRef<boolean | null>(null);
 
   const getDashboardPathWithFilters = useCallback(() => {
     const currentParams = new URLSearchParams(location.search);
@@ -52,12 +56,15 @@ export default function ViewReceipt() {
     return queryString ? `/receipts?${queryString}` : "/receipts";
   }, [location.search]);
 
-  // Determine if there's a history entry to go back to
+  // Capture the entry's initial history state once. Replace navigations generate
+  // a new location.key and must not turn a direct visit into an in-app Back.
   useEffect(() => {
-    // Check if we have a history state or if this was a direct navigation
-    // window.history.length > 1 means there's a previous page in history
-    setCanGoBack(window.history.length > 1 && location.key !== 'default');
-  }, [location]);
+    if (initialCanGoBackRef.current === null) {
+      initialCanGoBackRef.current =
+        window.history.length > 1 && location.key !== "default";
+    }
+    setCanGoBack(initialCanGoBackRef.current);
+  }, [location.key]);
 
   // Handle back navigation using browser history
   const handleBack = useCallback(() => {
@@ -78,11 +85,16 @@ export default function ViewReceipt() {
     retry: 1,     // Only retry once to avoid excessive requests if there's a problem
   });
 
-  const { data: neighbors } = useQuery({
-    queryKey: ['receipt-neighbors', id, currentTeam?.id],
+  const {
+    data: neighbors,
+    error: neighborsError,
+    refetch: refetchNeighbors,
+  } = useQuery({
+    queryKey: ['receipts', 'neighbors', id, receipt?.team_id, currentTeam?.id],
     queryFn: () => fetchReceiptNeighbors(receipt!, { currentTeam }),
     enabled: !!receipt,
     staleTime: 30 * 1000,
+    retry: 1,
   });
 
   const deleteMutation = useMutation({
@@ -112,10 +124,15 @@ export default function ViewReceipt() {
 
   const handleNavigateNeighbor = (neighborId: string | null | undefined) => {
     if (!neighborId || neighborId === id) return;
+    if (isReceiptDirty && !window.confirm(t("navigation.unsavedChanges"))) return;
     // Replace rather than push so the header Back button returns to the page
     // the user came from instead of stepping back through each receipt.
     navigate(`/receipt/${neighborId}${location.search}`, { replace: true });
   };
+
+  const handleReceiptDirtyChange = useCallback((isDirty: boolean) => {
+    setIsReceiptDirty(isDirty);
+  }, []);
 
   if (isLoading) {
     return (
@@ -177,36 +194,59 @@ export default function ViewReceipt() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex flex-wrap items-center gap-2"
           >
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => handleNavigateNeighbor(neighbors?.previous?.id)}
-              disabled={!neighbors?.previous}
-              title={
-                neighbors?.previous
-                  ? `Previous: ${neighbors.previous.merchant || "Untitled receipt"}`
-                  : "No previous receipt"
-              }
-            >
-              <ChevronLeft size={16} aria-hidden="true" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => handleNavigateNeighbor(neighbors?.next?.id)}
-              disabled={!neighbors?.next}
-              title={
-                neighbors?.next
-                  ? `Next: ${neighbors.next.merchant || "Untitled receipt"}`
-                  : "No next receipt"
-              }
-            >
-              Next
-              <ChevronRight size={16} aria-hidden="true" />
-            </Button>
+            {neighborsError ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refetchNeighbors()}
+              >
+                {t("navigation.retry")}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => handleNavigateNeighbor(neighbors?.previous?.id)}
+                  disabled={!neighbors?.previous}
+                  title={
+                    neighbors?.previous
+                      ? t("navigation.previousTitle", {
+                          merchant:
+                            neighbors.previous.merchant ||
+                            t("navigation.untitledReceipt"),
+                        })
+                      : t("navigation.noPrevious")
+                  }
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                  {t("navigation.previous")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => handleNavigateNeighbor(neighbors?.next?.id)}
+                  disabled={!neighbors?.next}
+                  title={
+                    neighbors?.next
+                      ? t("navigation.nextTitle", {
+                          merchant:
+                            neighbors.next.merchant ||
+                            t("navigation.untitledReceipt"),
+                        })
+                      : t("navigation.noNext")
+                  }
+                >
+                  {t("navigation.next")}
+                  <ChevronRight size={16} aria-hidden="true" />
+                </Button>
+                <span className="sr-only" title={t("navigation.uploadOrder")}>
+                  {t("navigation.uploadOrder")}
+                </span>
+              </>
+            )}
             <Button
               variant="outline"
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -234,6 +274,7 @@ export default function ViewReceipt() {
         >
           <ReceiptViewer
             receipt={receipt}
+            onDirtyChange={handleReceiptDirtyChange}
             onDelete={(_) => {
               toast.success("Receipt deleted successfully");
               // Invalidate the receipts query to refresh the dashboard data

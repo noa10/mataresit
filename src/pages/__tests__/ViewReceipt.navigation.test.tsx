@@ -36,6 +36,24 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/contexts/LanguageContext", () => ({
+  useReceiptsTranslation: () => ({
+    t: (key: string, options?: { merchant?: string }) =>
+      ({
+        "navigation.previous": "Previous",
+        "navigation.next": "Next",
+        "navigation.previousTitle": `Previous: ${options?.merchant ?? ""}`,
+        "navigation.nextTitle": `Next: ${options?.merchant ?? ""}`,
+        "navigation.noPrevious": "No previous receipt",
+        "navigation.noNext": "No next receipt",
+        "navigation.untitledReceipt": "Untitled receipt",
+        "navigation.uploadOrder": "Walks receipts in upload order",
+        "navigation.unsavedChanges": "Discard changes?",
+        "navigation.retry": "Retry",
+      }[key] ?? key),
+  }),
+}));
+
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
@@ -47,16 +65,35 @@ vi.mock("@/utils/currency", () => ({
 }));
 
 vi.mock("@/components/ReceiptViewer", () => ({
-  default: ({ onDelete }: { onDelete?: (id: string) => void }) => (
-    <button type="button" onClick={() => onDelete?.("receipt-1")}>
-      Viewer Delete
-    </button>
+  default: ({
+    onDelete,
+    onDirtyChange,
+    receipt,
+  }: {
+    onDelete?: (id: string) => void;
+    onDirtyChange?: (isDirty: boolean) => void;
+    receipt: { id: string };
+  }) => (
+    <>
+      <div data-testid="viewer-receipt-id">{receipt.id}</div>
+      <button type="button" onClick={() => onDelete?.("receipt-1")}>
+        Viewer Delete
+      </button>
+      <button type="button" onClick={() => onDirtyChange?.(true)}>
+        Mark Dirty
+      </button>
+    </>
   ),
 }));
 
 function LocationObserver() {
   const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+  return (
+    <>
+      <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+      <div data-testid="location-key">{location.key}</div>
+    </>
+  );
 }
 
 function NavigationTypeObserver() {
@@ -77,11 +114,13 @@ function renderViewReceipt(initialEntry: string) {
         <Routes>
           <Route path="/receipt/:id" element={
             <>
+              <LocationObserver />
               <NavigationTypeObserver />
               <ViewReceipt />
             </>
           } />
           <Route path="/receipts" element={<LocationObserver />} />
+          <Route path="*" element={<LocationObserver />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -91,13 +130,16 @@ function renderViewReceipt(initialEntry: string) {
 describe("ViewReceipt dashboard navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.fetchReceiptById.mockResolvedValue({
-      id: "receipt-1",
+    mocks.fetchReceiptById.mockImplementation(async (receiptId: string) => ({
+      id: receiptId,
       merchant: "Test Merchant",
       date: "2026-02-01",
       total: 12.5,
       currency: "MYR",
-    });
+      created_at: "2026-02-01T00:00:00.000Z",
+      team_id: null,
+      user_id: "user-1",
+    }));
     mocks.fetchReceiptNeighbors.mockResolvedValue({
       previous: null,
       next: null,
@@ -105,6 +147,7 @@ describe("ViewReceipt dashboard navigation", () => {
     mocks.deleteReceipt.mockResolvedValue(true);
     mocks.toastSuccess.mockReset();
     mocks.toastError.mockReset();
+    vi.restoreAllMocks();
     vi.spyOn(window, "confirm").mockImplementation(() => true);
   });
 
@@ -155,7 +198,35 @@ describe("ViewReceipt dashboard navigation", () => {
         "receipt-2",
         expect.anything()
       );
+      expect(screen.getByTestId("viewer-receipt-id")).toHaveTextContent(
+        "receipt-2"
+      );
     });
+  });
+
+  it("preserves dashboard filters when moving to a neighbour", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-2",
+        merchant: "Next Merchant",
+        date: "2026-02-02",
+      },
+    });
+
+    renderViewReceipt("/receipt/receipt-1?q=groceries&tab=reviewed&page=2");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Next" }));
+
+    await waitFor(() => {
+      expect(mocks.fetchReceiptById).toHaveBeenCalledWith(
+        "receipt-2",
+        expect.anything()
+      );
+    });
+    expect(screen.getByTestId("location").textContent).toBe(
+      "/receipt/receipt-2?q=groceries&tab=reviewed&page=2"
+    );
   });
 
   it("moves to the previous uploaded receipt", async () => {
@@ -221,6 +292,30 @@ describe("ViewReceipt dashboard navigation", () => {
       await screen.findByRole("button", { name: "Next" })
     );
 
+    expect(mocks.fetchReceiptById).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchReceiptById).toHaveBeenCalledWith(
+      "receipt-1",
+      expect.anything()
+    );
+  });
+
+  it("confirms navigation away from unsaved edits", async () => {
+    mocks.fetchReceiptNeighbors.mockResolvedValue({
+      previous: null,
+      next: {
+        id: "receipt-2",
+        merchant: "Next Merchant",
+        date: "2026-02-02",
+      },
+    });
+    vi.spyOn(window, "confirm").mockImplementation(() => false);
+
+    renderViewReceipt("/receipt/receipt-1");
+    await screen.findByRole("button", { name: "Next" });
+    await userEvent.click(screen.getByRole("button", { name: "Mark Dirty" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(window.confirm).toHaveBeenCalledWith("Discard changes?");
     expect(mocks.fetchReceiptById).toHaveBeenCalledTimes(1);
   });
 

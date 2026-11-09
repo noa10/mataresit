@@ -115,6 +115,13 @@ export const clearReceiptCaches = (queryClient: any, receiptId?: string, teamId?
   queryClient.invalidateQueries({ queryKey: ['categories'] }); // Fallback for safety
 };
 
+const invalidateReceiptCaches = (userId?: string): void => {
+  const invalidation = CacheInvalidationService.onReceiptUpdated(userId ?? "");
+  void (invalidation as Promise<void> | undefined)?.catch?.((cacheError) => {
+    console.warn('Cache invalidation failed:', cacheError);
+  });
+};
+
 // TEAM COLLABORATION FIX: Test function to verify category access
 export const testCategoryAccess = async (receiptId: string = '3a7a81c1-a8ca-4e91-8aba-950f146d8cc6') => {
   console.log("🧪 Testing category access for receipt:", receiptId);
@@ -353,12 +360,13 @@ export const fetchReceiptsPage = async (
 };
 
 // Fetch the receipts immediately before and after `receipt` in upload order
-// (oldest first), scoped to the active workspace. Used by the individual
-// receipt page for Previous/Next navigation.
+// (oldest first), scoped to the receipt's own workspace. Used by the
+// individual receipt page for Previous/Next navigation.
 export interface ReceiptNeighbor {
   id: string;
   merchant: string | null;
   date: string | null;
+  created_at: string;
 }
 
 export interface ReceiptNeighbors {
@@ -367,11 +375,10 @@ export interface ReceiptNeighbors {
 }
 
 export const fetchReceiptNeighbors = async (
-  receipt: Pick<Receipt, "id" | "created_at">,
+  receipt: Pick<Receipt, "id" | "created_at" | "team_id" | "user_id">,
   teamContext?: { currentTeam: { id: string } | null }
 ): Promise<ReceiptNeighbors> => {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user || !receipt.created_at) {
+  if (!receipt.created_at) {
     return { previous: null, next: null };
   }
 
@@ -379,31 +386,40 @@ export const fetchReceiptNeighbors = async (
   // truncates microseconds to milliseconds, which makes the `gt` filter match
   // the current receipt itself and leaves the Next button stuck on it.
   const createdAt = receipt.created_at;
-
+  const receiptTeamId = receipt.team_id ?? teamContext?.currentTeam?.id ?? null;
+  const currentUserId = (receipt.user_id as string | undefined) ?? null;
   const buildQuery = () => {
-    let query = supabase
-      .from("receipts")
-      .select("id, merchant, date, created_at");
+    let query = ((supabase as any).from("receipts") as any).select(
+      "id, merchant, date, created_at"
+    );
 
-    if (teamContext?.currentTeam?.id) {
-      query = query.eq("team_id", teamContext.currentTeam.id);
+    if (receiptTeamId) {
+      query = query.eq("team_id", receiptTeamId);
+    } else if (currentUserId) {
+      query = query.eq("user_id", currentUserId).is("team_id", null);
     } else {
-      query = query.eq("user_id", user.user.id).is("team_id", null);
+      query = query.is("team_id", null);
     }
 
     return query;
   };
 
+  const encodedCreatedAt = encodeURIComponent(createdAt);
+  const previousTieFilter = `and(created_at.eq.${encodedCreatedAt},id.lt.${receipt.id})`;
+  const nextTieFilter = `and(created_at.eq.${encodedCreatedAt},id.gt.${receipt.id})`;
+
   const [previousResult, nextResult] = await Promise.all([
     // Earlier upload: the receipt before this one in the batch ledger.
     buildQuery()
-      .lt("created_at", createdAt)
+      .or(`created_at.lt.${encodedCreatedAt},${previousTieFilter}`)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(1),
     // Later upload: the receipt after this one in the batch ledger.
     buildQuery()
-      .gt("created_at", createdAt)
+      .or(`created_at.gt.${encodedCreatedAt},${nextTieFilter}`)
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(1),
   ]);
 
@@ -412,7 +428,7 @@ export const fetchReceiptNeighbors = async (
       "Error fetching receipt neighbors:",
       previousResult.error || nextResult.error
     );
-    return { previous: null, next: null };
+    throw previousResult.error || nextResult.error;
   }
 
   return {
@@ -1042,6 +1058,10 @@ export const updateReceipt = async (
     // Cast the response data to Receipt type
     const receipt = responseData as unknown as Receipt;
 
+    // The receipt row is committed here. Invalidate immediately so a later
+    // line-items/embedding/RPC failure cannot leave derived counts stale.
+    void invalidateReceiptCaches(receipt.user_id);
+
     // Generate embeddings if not explicitly skipped and receipt is reviewed
     if (!options?.skipEmbeddings && receipt.status === 'reviewed') {
       try {
@@ -1050,14 +1070,6 @@ export const updateReceipt = async (
         console.error('Failed to generate embeddings:', embeddingError);
         // Continue with the update even if embedding fails
       }
-    }
-
-    // Invalidate caches after successful receipt update
-    try {
-      await CacheInvalidationService.onReceiptUpdated(receipt.user_id);
-    } catch (cacheError) {
-      console.warn('Cache invalidation failed:', cacheError);
-      // Don't fail the update if cache invalidation fails
     }
 
     return receipt;
@@ -1101,6 +1113,10 @@ export const updateReceiptWithLineItems = async (
 
     // Cast the response data to Receipt type
     const receipt = responseData as unknown as Receipt;
+
+    // The receipt row is committed here. Invalidate immediately so a later
+    // line-items/embedding/RPC failure cannot leave derived counts stale.
+    void invalidateReceiptCaches(receipt.user_id);
 
     // Update line items if provided
     if (lineItems && lineItems.length > 0) {
@@ -1176,16 +1192,6 @@ export const updateReceiptWithLineItems = async (
       if (reviewRewardError) {
         console.error('Failed to record receipt review reward:', reviewRewardError);
       }
-    }
-
-    // Invalidate caches after successful receipt update. The workspace
-    // navigation "Needs review" count is derived from receipt status, so a
-    // save that marks a receipt reviewed must refresh it (and the overview).
-    try {
-      await CacheInvalidationService.onReceiptUpdated(receipt.user_id);
-    } catch (cacheError) {
-      console.warn('Cache invalidation failed:', cacheError);
-      // Don't fail the update if cache invalidation fails
     }
 
     return receipt;
