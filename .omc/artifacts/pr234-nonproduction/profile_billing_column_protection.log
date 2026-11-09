@@ -1,0 +1,17 @@
+=== profile_billing_column_protection ===
+BEGIN
+DO
+DO
+CREATE TABLE
+INSERT 0 2
+INSERT 0 2
+DO
+DELETE 1
+SET
+DO
+RESET
+SET
+DO
+RESET
+DO
+ROLLBACK

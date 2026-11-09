@@ -24,28 +24,31 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 
 ## Stripe Production Cutover
 
-**Blocked:** The database half is now locally verified; the Stripe lifecycle is
-not. On 2026-11-06 the five billing SQL suites
+**Blocked on owner-gated cutover actions.** The database half and the local
+test-mode lifecycle are verified. On 2026-11-06 the five billing SQL suites
 (`stripe_webhook_claim_fencing`, `payment_state_fencing`,
 `stripe_checkout_locks`, `profile_billing_column_protection`,
 `batch_item_dispatch_config`) passed against a disposable PostgreSQL 15
 database built from a curated baseline (initial schema plus the subscription
 and billing-schema migrations) and the three hardening migrations (see
-`Verification status` below). CI is wired through the `sql-regression` job but
-has not been observed on this branch.
+`Verification status` below). The `sql-regression` job passed on `a316a8c` and
+`b1477e2`, and the 2026-11-07/08 test-mode lifecycle matrix ran against a
+local nonproduction stack (EVIDENCE.md). Production migrations, function
+deployment, and live keys remain owner-gated.
 
 Still blocking cutover:
 
-- Live/test-mode Stripe lifecycle behavior — Checkout, upgrade/proration
-  collection, cancel/resume, interval switch, payment failure/dunning, 3DS,
-  replayed and out-of-order webhook delivery, and a worker paused past its
-  lease — has not been exercised.
-- Two-session checkout-lock and webhook-claim races are not covered by the
-  single-session SQL suites.
+- Live-mode verification after cutover. The test-mode lifecycle matrix was
+  executed on 2026-11-07/08 against a local nonproduction stack (see
+  `.omc/artifacts/pr234-nonproduction/EVIDENCE.md`); repeat it against the
+  deployed functions before switching to live keys.
 - Paid upgrades still sync the target tier before the proration invoice is
   collected (see the proration limitation in `docs/api/stripe-integration.md`).
-- Legacy service-role JWT revocation/rotation and production Vault creation
-  require dashboard or management access and are not verified here.
+- Credential rotation/revocation and production Vault creation require
+  dashboard or management access and are not verified here. The exposed
+  `sb_secret_...` and legacy service-role values remain in Git history until
+  rotated and, if policy requires, purged
+  (`docs/runbooks/credential-history-purge.md`).
 - The app-wide TypeScript baseline remains non-zero; CI's root `tsc` command
   check is not evidence. Only the billing-specific diagnostics were fixed.
 
@@ -87,8 +90,8 @@ The `invitation-auth-regression` CI job continues to own
 `supabase/tests/invitation_acceptance_auth.sql` separately.
 
 CI status: `sql-regression` is wired in `.github/workflows/supabase-validate.yml`
-and runs the same runner. Executing it requires a push; the local run above is
-the execution evidence for this branch.
+and runs the same runner. It passed on `a316a8c` (job 127860977562) and on
+`b1477e2` (job 127931526225) alongside the two-session race checks.
 
 Complete these steps in order before switching to live Stripe keys. Do not skip
 the migration; the Edge Functions call RPCs and columns it creates.

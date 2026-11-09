@@ -134,10 +134,12 @@ and the harness asserts one owner, one claim, owner-scoped bind/release, stale
 token rejection, and expired-lock stealing. The `sql-regression` CI job runs
 both. CI execution is observed on `a316a8c` and later commits.
 
-These suites are single-session. Two-session checkout-lock and webhook-lease
-races, live Stripe lifecycle behavior (Checkout, proration collection,
-cancellation, dunning, 3DS), and webhook forwarding remain user-gated
-nonproduction checks before cutover.
+The suites are single-session; `.github/sql-regression/two-session-races.sh`
+covers the concurrent checkout-lock and webhook-lease races. The live Stripe
+lifecycle matrix (Checkout, proration collection, cancellation, dunning, 3DS)
+was executed against a local nonproduction stack on 2026-11-07/08 (see
+`.omc/artifacts/pr234-nonproduction/EVIDENCE.md`); repeat it against the
+deployed functions before cutover. Webhook forwarding remains user-gated.
 
 ### 3b. Webhook idempotency
 
@@ -475,9 +477,10 @@ stripe listen --forward-to localhost:54321/functions/v1/stripe-webhook
 
 Live Stripe lifecycle checks — Checkout concurrency, upgrade/proration
 collection, cancel/resume, payment failure and dunning, 3DS, and replayed or
-out-of-order webhook delivery — are **not** covered by the SQL suites and
-remain user-gated nonproduction tests. Do not mark this integration production
-ready on the strength of the SQL run alone.
+out-of-order webhook delivery — are **not** covered by the SQL suites. The
+matrix was executed against a local nonproduction stack on 2026-11-07/08;
+repeat it against the deployed functions before cutover. Do not mark this
+integration production ready on the strength of the SQL run alone.
 
 #### Running the lifecycle checks
 
@@ -522,7 +525,9 @@ Scenario matrix, all in test mode with a [test clock](https://docs.stripe.com/bi
 The SQL suites cover the fencing primitives behind these scenarios
 (`stripe_webhook_claim_fencing`, `payment_state_fencing`,
 `stripe_checkout_locks`), and `two-session-races.sh` covers concurrent claims
-and lock acquisition. The matrix above is the remaining live-service evidence.
+and lock acquisition. The matrix above was executed against a local
+nonproduction stack on 2026-11-07/08; repeat it against the deployed functions
+before cutover.
 
 Refuse to run any of it with an `sk_live_` key or against the production
 project ref.

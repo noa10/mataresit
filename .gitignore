@@ -112,9 +112,12 @@ opencode.json
 .kilo/
 
 # Agent runtime state (tool sessions, checkpoints, replay logs).
-# Use the directory form, not ".omc/*" — the latter is anchored to the repo
-# root and silently misses nested dirs such as supabase/functions/.omc/.
-.omc/
+# Ignore .omc contents at any depth, but keep the PR #234 evidence bundle
+# referenced by docs/BILLING_DEPLOYMENT_GUIDE.md tracked.
+**/.omc/*
+!/.omc/artifacts/
+/.omc/artifacts/*
+!/.omc/artifacts/pr234-nonproduction/
 .omo/
 .workbuddy-ai/
 
