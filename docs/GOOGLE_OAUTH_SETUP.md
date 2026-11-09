@@ -49,6 +49,10 @@ The application logs detailed auth information to the browser console:
   - `http://localhost:8080/auth`
   - `https://mataresit.com/auth`
   - `https://mataresit.com/**`
+  - `https://mataresit.vercel.app/auth`
+  - `https://mataresit.vercel.app/**`
+
+Keep the `mataresit.vercel.app` entries while it remains assigned as the rollback host (at least two weeks after the cutover).
 
 ### 2. Google Cloud Console
 - [ ] OAuth 2.0 Client ID created
@@ -113,6 +117,10 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 Ensure the hosted Supabase Auth settings include:
 - `https://mataresit.com`
 - `https://mataresit.com/**`
+- `https://mataresit.vercel.app`
+- `https://mataresit.vercel.app/**`
+
+Keep the `mataresit.vercel.app` entries for the rollback window; removing them breaks auth redirects if the Site URL is reverted.
 
 Keep the Google OAuth authorized redirect URI pointed at the Supabase callback
 (`https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`), not at the Vercel

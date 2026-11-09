@@ -4,7 +4,7 @@ This directory contains user guides, technical references, implementation notes,
 
 The [root README](../README.md) is the canonical product and setup overview. Use the source code and current configuration as the source of truth when an older document conflicts with it.
 
-The current temporary hosted frontend is [https://mataresit.com](https://mataresit.com); update this reference when the final canonical domain is selected.
+The canonical hosted frontend is [https://mataresit.com](https://mataresit.com); [https://mataresit.vercel.app](https://mataresit.vercel.app) remains assigned as the rollback/fallback host.
 
 ## Start here
 

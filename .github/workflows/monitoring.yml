@@ -44,7 +44,7 @@ permissions:
 # Declaring the environment per job makes secrets.* resolve.
 
 env:
-  DOMAIN: ${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
+  DOMAIN: ${{ vars.APP_DOMAIN || 'mataresit.com' }}
   TIMEOUT: ${{ github.event.inputs.timeout || '30' }}
   CACHE_VERSION: 'v1'
 
@@ -521,7 +521,7 @@ jobs:
         env:
           TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.com' }}
 
       - name: Monitor system resources
         continue-on-error: true
@@ -584,7 +584,7 @@ jobs:
 
       - name: Check Supabase security configuration (if configured)
         env:
-          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.com' }}
         run: |
           echo "Checking Supabase security configuration..."
 
@@ -612,7 +612,7 @@ jobs:
           echo "Checking security headers..."
 
           # Test security headers on main domain
-          DOMAIN="${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}"
+          DOMAIN="${{ vars.APP_DOMAIN || 'mataresit.com' }}"
 
           if curl -s -I "https://$DOMAIN" | grep -i "x-frame-options\|x-content-type-options\|x-xss-protection\|strict-transport-security"; then
             echo "✅ Security headers found"
@@ -721,7 +721,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TEST_SUPABASE_URL: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_URL || secrets.SUPABASE_URL }}
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.vercel.app' }}
+          APP_URL: https://${{ vars.APP_DOMAIN || 'mataresit.com' }}
 
       - name: Check notification channels
         run: |

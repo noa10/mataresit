@@ -31,3 +31,52 @@ describe("canonical origin", () => {
     }
   });
 });
+
+describe("canonical origin rollout documentation", () => {
+  it("defaults monitoring to the canonical host when APP_DOMAIN is unset", () => {
+    const workflow = read(".github/workflows/monitoring.yml");
+    const fallbacks = [...workflow.matchAll(/vars\.APP_DOMAIN \|\| '([^']+)'/g)].map(
+      (match) => match[1],
+    );
+
+    expect(fallbacks.length).toBeGreaterThan(0);
+    for (const fallback of fallbacks) {
+      expect(fallback).toBe("mataresit.com");
+    }
+  });
+
+  it("keeps the rollback origin in both OAuth allow-list checklists", () => {
+    const oauth = read("docs/GOOGLE_OAUTH_SETUP.md");
+    const development = oauth.slice(
+      oauth.indexOf("### 1. Supabase Configuration"),
+      oauth.indexOf("### 2. Google Cloud Console"),
+    );
+    const production = oauth.slice(
+      oauth.indexOf("### Redirect URLs for Production"),
+      oauth.indexOf("### Environment Variables", oauth.indexOf("### Redirect URLs for Production")),
+    );
+
+    for (const section of [development, production]) {
+      expect(section).toContain("https://mataresit.com");
+      expect(section).toContain("https://mataresit.vercel.app");
+    }
+  });
+
+  it("keeps the swagger source and public copies on the canonical origin", () => {
+    for (const path of ["docs/api/swagger-ui.html", "public/docs/api/swagger-ui.html"]) {
+      const swagger = read(path);
+
+      expect(swagger).toContain(CANONICAL_ORIGIN);
+      expect(swagger).not.toContain("mataresit.vercel.app");
+    }
+  });
+
+  it("describes the canonical frontend and rollback host as settled", () => {
+    const readme = read("docs/README.md");
+
+    expect(readme).toContain(`canonical hosted frontend is [${CANONICAL_ORIGIN}]`);
+    expect(readme).toContain("mataresit.vercel.app");
+    expect(readme).not.toContain("current temporary hosted frontend");
+    expect(readme).not.toContain("when the final canonical domain is selected");
+  });
+});
