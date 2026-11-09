@@ -126,7 +126,7 @@ psql -f validation/validate-phase3.sql "postgresql://postgres:$SUPABASE_DB_PASSW
 ## 🔄 Rollback Procedures
 
 ### Automated Rollback
-The deployment script includes automated rollback capabilities:
+The deployment script includes automated rollback capabilities. Each rollback runs the matching `rollback/rollback_phase*.sql` script and removes that migration version from the hosted migration history, so a later deployment re-applies it:
 
 ```bash
 # Rollback to specific phase

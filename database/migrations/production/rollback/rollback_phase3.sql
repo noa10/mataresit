@@ -14,6 +14,21 @@ BEGIN
     END IF;
 END $$;
 
+-- Create rollback log table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.migration_rollback_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    migration_name TEXT NOT NULL,
+    rollback_started_at TIMESTAMPTZ NOT NULL,
+    rollback_completed_at TIMESTAMPTZ,
+    rollback_reason TEXT,
+    rollback_initiated_by TEXT,
+    rollback_status TEXT DEFAULT 'in_progress',
+    backup_completed_at TIMESTAMPTZ,
+    records_backed_up INTEGER DEFAULT 0,
+    rollback_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create rollback log entry
 INSERT INTO public.migration_rollback_log (
     migration_name,
