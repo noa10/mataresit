@@ -112,9 +112,6 @@ opencode.json
 .kilo/
 
 # Agent runtime state (tool sessions, checkpoints, replay logs).
-# Use the directory form, not ".omc/*" — the latter is anchored to the repo
-# root and silently misses nested dirs such as supabase/functions/.omc/.
-.omc/
 .omo/
 .workbuddy-ai/
 
