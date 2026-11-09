@@ -58,6 +58,10 @@ import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButt
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { upsertCategoryRule } from "@/services/categoryRuleService";
 import { format, isValid, parse } from "date-fns";
+import {
+  hasReceiptChanges,
+  receiptValuesEqual,
+} from "@/lib/receipts/receiptChanges";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
 
@@ -111,39 +115,6 @@ const defaultConfidence: ReceiptConfidence = {
   tax: 0,
   payment_method: 0,
   line_items: 0,
-};
-
-const normalizeReceiptValue = (key: string, value: unknown): unknown => {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "number") return value;
-  if (typeof value === "boolean") return value;
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => ({
-        description: String(item?.description ?? ""),
-        amount: typeof item?.amount === "number" ? item.amount : Number(item?.amount) || 0,
-      }))
-      .sort((left, right) => left.description.localeCompare(right.description));
-  }
-  if (key === "currency") return normalizeCurrencyCode(String(value), "MYR");
-  return String(value);
-};
-
-const hasReceiptChanges = (
-  current: ReceiptWithDetails,
-  original: ReceiptWithDetails
-): boolean => {
-  const keys = new Set([
-    ...Object.keys(current),
-    ...Object.keys(original),
-  ]);
-
-  return Array.from(keys).some((key) => {
-    if (key === "updated_at" || key === "created_at") return false;
-    if (key === "confidence_scores" || key === "processing_status") return false;
-    return JSON.stringify(normalizeReceiptValue(key, (current as any)[key])) !==
-      JSON.stringify(normalizeReceiptValue(key, (original as any)[key]));
-  });
 };
 
 // Helper function to normalize confidence (handles decimal/percentage)
@@ -737,8 +708,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate, onDirtyChan
     setProcessingStatus(normalizedStatus);
   }, [receipt, isSaving]);
 
+  // The debounced values trail the receipt prop by up to 500 ms. Ignore the
+  // run triggered by switching receipts so the previous receipt's values are
+  // never treated as edits to the new one.
+  const debouncedReceiptIdRef = useRef(receipt.id);
+
   // Effect to update editedReceipt when debounced input values change
   useEffect(() => {
+    if (debouncedReceiptIdRef.current !== receipt.id) {
+      debouncedReceiptIdRef.current = receipt.id;
+      return;
+    }
+
     // Validate currency before updating editedReceipt
     const validatedCurrency = normalizeCurrencyCode(debouncedInputValues.currency, 'MYR');
 
@@ -762,7 +743,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate, onDirtyChan
       // Special handling for currency field
       if (field === 'currency') {
         // Only update if the validated currency is different from the original
-        if (validatedCurrency !== receipt.currency) {
+        if (!receiptValuesEqual('currency', validatedCurrency, receipt.currency)) {
           setEditedConfidence(prev => ({
             ...prev,
             [field]: 100 // Set confidence to 100% for edited fields
@@ -777,7 +758,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate, onDirtyChan
         }
       }
       // Handle other fields normally
-      else if (field in defaultConfidence && value !== receipt[field as keyof typeof receipt]) {
+      else if (
+        field in defaultConfidence &&
+        !receiptValuesEqual(field, value, receipt[field as keyof typeof receipt])
+      ) {
         setEditedConfidence(prev => ({
           ...prev,
           [field]: 100 // Set confidence to 100% for edited fields
