@@ -51,7 +51,10 @@ const createBuilder = () => {
     eq: vi.fn(() => builder),
     is: vi.fn(() => builder),
     or: vi.fn((filter: string) => {
-      comparator = filter.includes("created_at.lt.") ? "lt" : "gt";
+      comparator =
+        filter.startsWith("date.lt.") || filter.startsWith("created_at.lt.")
+          ? "lt"
+          : "gt";
       return builder;
     }),
     order: vi.fn(() => builder),
@@ -75,12 +78,15 @@ describe("fetchReceiptNeighbors", () => {
     hoisted.supabase.from.mockImplementation(() => createBuilder());
   });
 
-  it("maps previous to the earlier upload and next to the later upload", async () => {
+  it("maps previous to the earlier date and next to the later date", async () => {
+    const date = "2026-01-02";
     const createdAt = "2026-01-02T00:00:00.123456+00:00";
+    const encodedDate = encodeURIComponent(date);
     const encodedCreatedAt = encodeURIComponent(createdAt);
 
     const neighbors = await fetchReceiptNeighbors({
       id: "receipt-1",
+      date,
       created_at: createdAt,
       team_id: null,
       user_id: "user-1",
@@ -94,27 +100,65 @@ describe("fetchReceiptNeighbors", () => {
     );
 
     expect(previousBuilder.or).toHaveBeenCalledWith(
-      expect.stringContaining(`created_at.lt.${encodedCreatedAt}`)
+      `date.lt.${encodedDate},and(date.eq.${encodedDate},created_at.lt.${encodedCreatedAt}),and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.lt.receipt-1)`
     );
-    expect(previousBuilder.or).toHaveBeenCalledWith(
-      expect.stringContaining("id.lt.receipt-1")
-    );
-    expect(previousBuilder.order).toHaveBeenCalledWith("created_at", {
+    expect(previousBuilder.order).toHaveBeenNthCalledWith(1, "date", {
       ascending: false,
     });
-    expect(previousBuilder.order).toHaveBeenCalledWith("id", {
+    expect(previousBuilder.order).toHaveBeenNthCalledWith(2, "created_at", {
       ascending: false,
     });
+    expect(previousBuilder.order).toHaveBeenNthCalledWith(3, "id", {
+      ascending: false,
+    });
+
     expect(nextBuilder.or).toHaveBeenCalledWith(
-      expect.stringContaining(`created_at.gt.${encodedCreatedAt}`)
+      `date.gt.${encodedDate},and(date.eq.${encodedDate},created_at.gt.${encodedCreatedAt}),and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.gt.receipt-1)`
     );
-    expect(nextBuilder.or).toHaveBeenCalledWith(
-      expect.stringContaining("id.gt.receipt-1")
-    );
-    expect(nextBuilder.order).toHaveBeenCalledWith("created_at", {
+    expect(nextBuilder.order).toHaveBeenNthCalledWith(1, "date", {
       ascending: true,
     });
-    expect(nextBuilder.order).toHaveBeenCalledWith("id", {
+    expect(nextBuilder.order).toHaveBeenNthCalledWith(2, "created_at", {
+      ascending: true,
+    });
+    expect(nextBuilder.order).toHaveBeenNthCalledWith(3, "id", {
+      ascending: true,
+    });
+  });
+
+  it("falls back to upload order when the receipt has no date", async () => {
+    const createdAt = "2026-01-02T00:00:00.123456+00:00";
+    const encodedCreatedAt = encodeURIComponent(createdAt);
+
+    await fetchReceiptNeighbors({
+      id: "receipt-1",
+      date: null as any,
+      created_at: createdAt,
+      team_id: null,
+      user_id: "user-1",
+    });
+
+    const [previousBuilder, nextBuilder] = hoisted.supabase.from.mock.results.map(
+      (result) => result.value
+    );
+
+    expect(previousBuilder.or).toHaveBeenCalledWith(
+      `created_at.lt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.lt.receipt-1)`
+    );
+    expect(previousBuilder.order).toHaveBeenNthCalledWith(1, "created_at", {
+      ascending: false,
+    });
+    expect(previousBuilder.order).toHaveBeenNthCalledWith(2, "id", {
+      ascending: false,
+    });
+
+    expect(nextBuilder.or).toHaveBeenCalledWith(
+      `created_at.gt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.gt.receipt-1)`
+    );
+    expect(nextBuilder.order).toHaveBeenNthCalledWith(1, "created_at", {
+      ascending: true,
+    });
+    expect(nextBuilder.order).toHaveBeenNthCalledWith(2, "id", {
       ascending: true,
     });
   });
@@ -123,6 +167,7 @@ describe("fetchReceiptNeighbors", () => {
     await fetchReceiptNeighbors(
       {
         id: "receipt-1",
+        date: "2026-01-02",
         created_at: "2026-01-02T00:00:00Z",
         team_id: "receipt-team",
         user_id: "user-1",
@@ -153,6 +198,7 @@ describe("fetchReceiptNeighbors", () => {
     await expect(
       fetchReceiptNeighbors({
         id: "receipt-1",
+        date: "2026-01-02",
         created_at: "2026-01-02T00:00:00Z",
         team_id: null,
         user_id: "user-1",

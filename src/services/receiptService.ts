@@ -359,9 +359,10 @@ export const fetchReceiptsPage = async (
   };
 };
 
-// Fetch the receipts immediately before and after `receipt` in upload order
-// (oldest first), scoped to the receipt's own workspace. Used by the
-// individual receipt page for Previous/Next navigation.
+// Fetch the receipts immediately before and after `receipt` in receipt-date
+// order (oldest first), falling back to upload order for undated receipts.
+// Scoped to the receipt's own workspace. Used by the individual receipt page
+// for Previous/Next navigation.
 export interface ReceiptNeighbor {
   id: string;
   merchant: string | null;
@@ -375,7 +376,7 @@ export interface ReceiptNeighbors {
 }
 
 export const fetchReceiptNeighbors = async (
-  receipt: Pick<Receipt, "id" | "created_at" | "team_id" | "user_id">,
+  receipt: Pick<Receipt, "id" | "date" | "created_at" | "team_id" | "user_id">,
   teamContext?: { currentTeam: { id: string } | null }
 ): Promise<ReceiptNeighbors> => {
   if (!receipt.created_at) {
@@ -405,36 +406,75 @@ export const fetchReceiptNeighbors = async (
   };
 
   const encodedCreatedAt = encodeURIComponent(createdAt);
-  const previousTieFilter = `and(created_at.eq.${encodedCreatedAt},id.lt.${receipt.id})`;
-  const nextTieFilter = `and(created_at.eq.${encodedCreatedAt},id.gt.${receipt.id})`;
+  const encodedId = encodeURIComponent(receipt.id);
+  type NeighborQuery = ReturnType<typeof buildQuery>;
 
-  const [previousResult, nextResult] = await Promise.all([
-    // Earlier upload: the receipt before this one in the batch ledger.
+  const fetchPair = async (
+    previousQuery: NeighborQuery,
+    nextQuery: NeighborQuery
+  ) => {
+    const [previousResult, nextResult] = await Promise.all([
+      previousQuery,
+      nextQuery,
+    ]);
+
+    if (previousResult.error || nextResult.error) {
+      console.error(
+        "Error fetching receipt neighbors:",
+        previousResult.error || nextResult.error
+      );
+      throw previousResult.error || nextResult.error;
+    }
+
+    return {
+      previous:
+        (previousResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+      next: (nextResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+    };
+  };
+
+  // Follow the receipt date shown in the list; created_at and id only break
+  // ties between receipts that share a date.
+  if (receipt.date) {
+    const encodedDate = encodeURIComponent(receipt.date);
+    const previousTieFilter = `and(date.eq.${encodedDate},created_at.lt.${encodedCreatedAt})`;
+    const previousIdTieFilter = `and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.lt.${encodedId})`;
+    const nextTieFilter = `and(date.eq.${encodedDate},created_at.gt.${encodedCreatedAt})`;
+    const nextIdTieFilter = `and(date.eq.${encodedDate},created_at.eq.${encodedCreatedAt},id.gt.${encodedId})`;
+
+    return fetchPair(
+      buildQuery()
+        .or(`date.lt.${encodedDate},${previousTieFilter},${previousIdTieFilter}`)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1),
+      buildQuery()
+        .or(`date.gt.${encodedDate},${nextTieFilter},${nextIdTieFilter}`)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(1)
+    );
+  }
+
+  // No receipt date: fall back to upload order.
+  return fetchPair(
     buildQuery()
-      .or(`created_at.lt.${encodedCreatedAt},${previousTieFilter}`)
+      .or(
+        `created_at.lt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.lt.${encodedId})`
+      )
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(1),
-    // Later upload: the receipt after this one in the batch ledger.
     buildQuery()
-      .or(`created_at.gt.${encodedCreatedAt},${nextTieFilter}`)
+      .or(
+        `created_at.gt.${encodedCreatedAt},and(created_at.eq.${encodedCreatedAt},id.gt.${encodedId})`
+      )
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
-      .limit(1),
-  ]);
-
-  if (previousResult.error || nextResult.error) {
-    console.error(
-      "Error fetching receipt neighbors:",
-      previousResult.error || nextResult.error
-    );
-    throw previousResult.error || nextResult.error;
-  }
-
-  return {
-    previous: (previousResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
-    next: (nextResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
-  };
+      .limit(1)
+  );
 };
 
 // Fetch available currencies for filter options.
