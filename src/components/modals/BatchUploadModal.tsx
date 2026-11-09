@@ -41,17 +41,20 @@ export function BatchUploadModal({ onUploadComplete }: BatchUploadModalProps) {
     onUploadComplete?.();
   }, [onUploadComplete]);
 
-  const requestClose = useCallback(() => {
+  const requestClose = useCallback((): boolean => {
     if (hasActiveUpload) {
       setConfirmClose(true);
-      return;
+      return false;
     }
     closeModal();
+    return true;
   }, [closeModal, hasActiveUpload]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!open) requestClose();
+      if (!open) {
+        requestClose();
+      }
     },
     [requestClose]
   );

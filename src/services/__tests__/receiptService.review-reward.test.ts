@@ -6,6 +6,7 @@ const hoisted = vi.hoisted(() => ({
     rpc: vi.fn(),
   },
   generateEmbeddingsForReceipt: vi.fn(),
+  onReceiptUpdated: vi.fn(),
   receiptsTable: {
     update: vi.fn(),
   },
@@ -31,6 +32,15 @@ vi.mock("@/lib/ai-search", () => ({
   generateEmbeddingsForReceipt: hoisted.generateEmbeddingsForReceipt,
 }));
 
+vi.mock("@/services/cacheInvalidationService", () => ({
+  CacheInvalidationService: {
+    onReceiptUpdated: (userId: string) => {
+      hoisted.onReceiptUpdated(userId);
+      return Promise.resolve();
+    },
+  },
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
@@ -49,6 +59,7 @@ describe("updateReceiptWithLineItems review reward integration", () => {
     hoisted.receiptUpdateQuery.single.mockResolvedValue({
       data: {
         id: "receipt-1",
+        user_id: "user-1",
         merchant: "Coffee Shop",
         date: "2026-03-01",
         total: 12.5,
@@ -92,6 +103,7 @@ describe("updateReceiptWithLineItems review reward integration", () => {
     expect(hoisted.supabase.rpc).toHaveBeenCalledWith("record_receipt_review", {
       _receipt_id: "receipt-1",
     });
+    expect(hoisted.onReceiptUpdated).toHaveBeenCalledWith("user-1");
   });
 
   it("does not record the review reward when the save fails", async () => {
@@ -105,12 +117,30 @@ describe("updateReceiptWithLineItems review reward integration", () => {
     ).rejects.toEqual(expect.objectContaining({ message: "boom" }));
 
     expect(hoisted.supabase.rpc).not.toHaveBeenCalled();
+    expect(hoisted.onReceiptUpdated).not.toHaveBeenCalled();
+  });
+
+  it("invalidates caches when a later line-item write fails", async () => {
+    hoisted.lineItemsTable.insert.mockResolvedValueOnce({
+      error: { message: "line item RLS failure" },
+    });
+
+    await expect(
+      updateReceiptWithLineItems(
+        "receipt-1",
+        { status: "reviewed" },
+        [{ id: "line-1", receipt_id: "receipt-1", description: "Latte", amount: 12.5 }]
+      )
+    ).rejects.toThrow("Failed to update line items");
+
+    expect(hoisted.onReceiptUpdated).toHaveBeenCalledWith("user-1");
   });
 
   it("skips the review reward for non-reviewed saves", async () => {
     hoisted.receiptUpdateQuery.single.mockResolvedValueOnce({
       data: {
         id: "receipt-1",
+        user_id: "user-1",
         merchant: "Coffee Shop",
         date: "2026-03-01",
         total: 12.5,
@@ -126,5 +156,6 @@ describe("updateReceiptWithLineItems review reward integration", () => {
     await updateReceiptWithLineItems("receipt-1", { status: "unreviewed" });
 
     expect(hoisted.supabase.rpc).not.toHaveBeenCalled();
+    expect(hoisted.onReceiptUpdated).toHaveBeenCalledWith("user-1");
   });
 });

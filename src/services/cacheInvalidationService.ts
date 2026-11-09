@@ -52,6 +52,10 @@ export class CacheInvalidationService {
       queryKey: ['receipts']
     });
 
+    await queryClient.invalidateQueries({
+      queryKey: ['receipts', 'neighbors']
+    });
+
     // Invalidate team-specific receipt queries
     if (teamId) {
       await queryClient.invalidateQueries({
@@ -72,11 +76,6 @@ export class CacheInvalidationService {
 
     await queryClient.invalidateQueries({
       queryKey: ['receipt-counts']
-    });
-
-    // Force refetch instead of just invalidating
-    await queryClient.refetchQueries({
-      queryKey: ['receipts']
     });
 
     // Also invalidate user-specific usage stats if userId provided
@@ -167,10 +166,9 @@ export class CacheInvalidationService {
    */
   static async onReceiptUpdated(userId: string) {
     console.log('✏️ Receipt updated - invalidating related caches');
-    
+    await this.invalidateReceipts(userId);
     await Promise.all([
-      this.invalidateReceipts(userId),
-      this.invalidateAnalytics(userId),
+      this.invalidateAnalytics(),
       this.invalidateSearch(),
     ]);
   }

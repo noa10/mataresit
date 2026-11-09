@@ -115,6 +115,13 @@ export const clearReceiptCaches = (queryClient: any, receiptId?: string, teamId?
   queryClient.invalidateQueries({ queryKey: ['categories'] }); // Fallback for safety
 };
 
+const invalidateReceiptCaches = (userId?: string): void => {
+  const invalidation = CacheInvalidationService.onReceiptUpdated(userId ?? "");
+  void (invalidation as Promise<void> | undefined)?.catch?.((cacheError) => {
+    console.warn('Cache invalidation failed:', cacheError);
+  });
+};
+
 // TEAM COLLABORATION FIX: Test function to verify category access
 export const testCategoryAccess = async (receiptId: string = '3a7a81c1-a8ca-4e91-8aba-950f146d8cc6') => {
   console.log("🧪 Testing category access for receipt:", receiptId);
@@ -350,6 +357,128 @@ export const fetchReceiptsPage = async (
     hasNextPage: page < totalPages,
     hasPrevPage: page > 1,
   };
+};
+
+// Fetch the receipts immediately before and after `receipt` in receipt-date
+// order (oldest first), falling back to upload order for undated receipts.
+// Scoped to the receipt's own workspace. Used by the individual receipt page
+// for Previous/Next navigation.
+export interface ReceiptNeighbor {
+  id: string;
+  merchant: string | null;
+  date: string | null;
+  created_at: string;
+}
+
+export interface ReceiptNeighbors {
+  previous: ReceiptNeighbor | null;
+  next: ReceiptNeighbor | null;
+}
+
+export const fetchReceiptNeighbors = async (
+  receipt: Pick<Receipt, "id" | "date" | "created_at" | "team_id" | "user_id">,
+  teamContext?: { currentTeam: { id: string } | null }
+): Promise<ReceiptNeighbors> => {
+  if (!receipt.created_at) {
+    return { previous: null, next: null };
+  }
+
+  // Compare with the database's raw timestamp. Round-tripping through Date
+  // truncates microseconds to milliseconds, which makes the `gt` filter match
+  // the current receipt itself and leaves the Next button stuck on it.
+  const createdAt = receipt.created_at;
+  const receiptTeamId =
+    receipt.team_id !== undefined
+      ? receipt.team_id
+      : teamContext?.currentTeam?.id ?? null;
+  const currentUserId = receipt.user_id ?? null;
+  const buildQuery = () => {
+    let query = ((supabase as any).from("receipts") as any).select(
+      "id, merchant, date, created_at"
+    );
+
+    if (receiptTeamId) {
+      query = query.eq("team_id", receiptTeamId);
+    } else {
+      query = query.is("team_id", null);
+      if (currentUserId) {
+        query = query.eq("user_id", currentUserId);
+      }
+    }
+
+    return query;
+  };
+
+  // Pass filter values raw: supabase-js URL-encodes them once when building
+  // the request. Pre-encoding here would double-encode the timestamp
+  // (e.g. "+00:00" becomes "%2B00%3A00") and PostgREST rejects the filter.
+  type NeighborQuery = ReturnType<typeof buildQuery>;
+
+  const fetchPair = async (
+    previousQuery: NeighborQuery,
+    nextQuery: NeighborQuery
+  ) => {
+    const [previousResult, nextResult] = await Promise.all([
+      previousQuery,
+      nextQuery,
+    ]);
+
+    if (previousResult.error || nextResult.error) {
+      console.error(
+        "Error fetching receipt neighbors:",
+        previousResult.error || nextResult.error
+      );
+      throw previousResult.error || nextResult.error;
+    }
+
+    return {
+      previous:
+        (previousResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+      next: (nextResult.data?.[0] as ReceiptNeighbor | undefined) ?? null,
+    };
+  };
+
+  // Follow the receipt date shown in the list; created_at and id only break
+  // ties between receipts that share a date.
+  if (receipt.date) {
+    const previousTieFilter = `and(date.eq.${receipt.date},created_at.lt.${createdAt})`;
+    const previousIdTieFilter = `and(date.eq.${receipt.date},created_at.eq.${createdAt},id.lt.${receipt.id})`;
+    const nextTieFilter = `and(date.eq.${receipt.date},created_at.gt.${createdAt})`;
+    const nextIdTieFilter = `and(date.eq.${receipt.date},created_at.eq.${createdAt},id.gt.${receipt.id})`;
+
+    return fetchPair(
+      buildQuery()
+        .or(`date.lt.${receipt.date},${previousTieFilter},${previousIdTieFilter}`)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1),
+      buildQuery()
+        .or(`date.gt.${receipt.date},${nextTieFilter},${nextIdTieFilter}`)
+        .order("date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(1)
+    );
+  }
+
+  // No receipt date: fall back to upload order.
+  return fetchPair(
+    buildQuery()
+      .or(
+        `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${receipt.id})`
+      )
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1),
+    buildQuery()
+      .or(
+        `created_at.gt.${createdAt},and(created_at.eq.${createdAt},id.gt.${receipt.id})`
+      )
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(1)
+  );
 };
 
 // Fetch available currencies for filter options.
@@ -973,6 +1102,10 @@ export const updateReceipt = async (
     // Cast the response data to Receipt type
     const receipt = responseData as unknown as Receipt;
 
+    // The receipt row is committed here. Invalidate immediately so a later
+    // line-items/embedding/RPC failure cannot leave derived counts stale.
+    void invalidateReceiptCaches(receipt.user_id);
+
     // Generate embeddings if not explicitly skipped and receipt is reviewed
     if (!options?.skipEmbeddings && receipt.status === 'reviewed') {
       try {
@@ -981,14 +1114,6 @@ export const updateReceipt = async (
         console.error('Failed to generate embeddings:', embeddingError);
         // Continue with the update even if embedding fails
       }
-    }
-
-    // Invalidate caches after successful receipt update
-    try {
-      await CacheInvalidationService.onReceiptUpdated(receipt.user_id);
-    } catch (cacheError) {
-      console.warn('Cache invalidation failed:', cacheError);
-      // Don't fail the update if cache invalidation fails
     }
 
     return receipt;
@@ -1032,6 +1157,10 @@ export const updateReceiptWithLineItems = async (
 
     // Cast the response data to Receipt type
     const receipt = responseData as unknown as Receipt;
+
+    // The receipt row is committed here. Invalidate immediately so a later
+    // line-items/embedding/RPC failure cannot leave derived counts stale.
+    void invalidateReceiptCaches(receipt.user_id);
 
     // Update line items if provided
     if (lineItems && lineItems.length > 0) {

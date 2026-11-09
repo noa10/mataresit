@@ -11,7 +11,7 @@ interface BatchUploadZoneProps {
    * hook instance for standalone/test usage.
    */
   backgroundUpload?: BatchUploadHookReturn;
-  onRequestClose?: () => void;
+  onRequestClose?: () => boolean;
   onOpenReceipt?: (receiptId: string) => void;
 }
 

@@ -58,6 +58,10 @@ import { ClaimFromReceiptButton } from "@/components/claims/ClaimFromReceiptButt
 import { useReceiptsTranslation } from "@/contexts/LanguageContext";
 import { upsertCategoryRule } from "@/services/categoryRuleService";
 import { format, isValid, parse } from "date-fns";
+import {
+  hasReceiptChanges,
+  receiptValuesEqual,
+} from "@/lib/receipts/receiptChanges";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
 
@@ -88,6 +92,7 @@ export interface ReceiptViewerProps {
   receipt: ReceiptWithDetails;
   onDelete?: (deletedId: string) => void; // Notify parent of deletion
   onUpdate?: (updatedReceipt: ReceiptWithDetails) => void; // Notify parent of updates
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 // Define a type alias for the confidence structure in ReceiptWithDetails
@@ -338,7 +343,7 @@ const toDisplayDate = (value: string): string => {
 
 const MAG_ZOOM = 3;
 
-export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptViewerProps) {
+export default function ReceiptViewer({ receipt, onDelete, onUpdate, onDirtyChange }: ReceiptViewerProps) {
   // Get user settings for processing method
   const { settings } = useSettings();
   const { t } = useReceiptsTranslation();
@@ -531,6 +536,17 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
   // Use save status context for background save operations
   const { saveReceipt } = useSaveStatus();
   const { isSaving, status: saveStatus } = useReceiptSaveStatus(receipt.id);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    if (!isSaving) {
+      setHasUnsavedChanges(hasReceiptChanges(editedReceipt, receipt));
+    }
+  }, [editedReceipt, receipt, isSaving]);
+
+  useEffect(() => {
+    onDirtyChange?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onDirtyChange]);
 
   // Sync processing status with receipt prop changes
   useEffect(() => {
@@ -557,6 +573,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         is_business_expense: Boolean(receipt.is_business_expense)
       });
       setDateDisplayValue(toDisplayDate(receipt.date || ""));
+      setHasUnsavedChanges(false);
     }
   }, [receipt, isSaving]);
 
@@ -669,6 +686,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         paid_by_id: receipt.paid_by_id || null,
         is_business_expense: Boolean(receipt.is_business_expense)
       });
+      setHasUnsavedChanges(false);
     }
 
     // Initialize/Update editedConfidence when receipt changes
@@ -690,8 +708,18 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
     setProcessingStatus(normalizedStatus);
   }, [receipt, isSaving]);
 
+  // The debounced values trail the receipt prop by up to 500 ms. Ignore the
+  // run triggered by switching receipts so the previous receipt's values are
+  // never treated as edits to the new one.
+  const debouncedReceiptIdRef = useRef(receipt.id);
+
   // Effect to update editedReceipt when debounced input values change
   useEffect(() => {
+    if (debouncedReceiptIdRef.current !== receipt.id) {
+      debouncedReceiptIdRef.current = receipt.id;
+      return;
+    }
+
     // Validate currency before updating editedReceipt
     const validatedCurrency = normalizeCurrencyCode(debouncedInputValues.currency, 'MYR');
 
@@ -715,7 +743,7 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       // Special handling for currency field
       if (field === 'currency') {
         // Only update if the validated currency is different from the original
-        if (validatedCurrency !== receipt.currency) {
+        if (!receiptValuesEqual('currency', validatedCurrency, receipt.currency)) {
           setEditedConfidence(prev => ({
             ...prev,
             [field]: 100 // Set confidence to 100% for edited fields
@@ -730,7 +758,10 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
         }
       }
       // Handle other fields normally
-      else if (field in defaultConfidence && value !== receipt[field as keyof typeof receipt]) {
+      else if (
+        field in defaultConfidence &&
+        !receiptValuesEqual(field, value, receipt[field as keyof typeof receipt])
+      ) {
         setEditedConfidence(prev => ({
           ...prev,
           [field]: 100 // Set confidence to 100% for edited fields
@@ -925,11 +956,6 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
             onUpdate(updatedReceipt);
           }
 
-          // Invalidate queries to refresh data
-          queryClient.invalidateQueries({ queryKey: ['receipt', receipt.id] });
-          queryClient.invalidateQueries({ queryKey: ['receiptsForDay'] });
-          queryClient.invalidateQueries({ queryKey: ['receipts'] });
-
           // Fix processing status if needed
           if (receipt.processing_status !== 'complete') {
             fixProcessingStatus(receipt.id);
@@ -1110,6 +1136,8 @@ export default function ReceiptViewer({ receipt, onDelete, onUpdate }: ReceiptVi
       toast.error("Please enter a total amount");
       return;
     }
+
+    setHasUnsavedChanges(false);
 
     // Perform background save - non-blocking
     const operationId = performBackgroundSave();

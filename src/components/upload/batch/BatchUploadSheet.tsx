@@ -41,7 +41,7 @@ import "./batch-upload.css";
 interface BatchUploadSheetProps {
   upload: BatchUploadHookReturn;
   onUploadComplete?: () => void;
-  onRequestClose?: () => void;
+  onRequestClose?: () => boolean;
   onOpenReceipt?: (receiptId: string) => void;
 }
 
@@ -231,6 +231,16 @@ export function BatchUploadSheet({
       return;
     }
     navigate(`/receipt/${receiptId}`);
+  };
+
+  const handleGoToReceipts = () => {
+    const canClose = onRequestClose ? onRequestClose() : true;
+    if (!canClose) {
+      toast.info(t("batch.toast.closeBeforeReceipts"));
+      return;
+    }
+    setShowReceiptBrowser(false);
+    navigate("/receipts");
   };
 
   const handleOpenSettings = () => {
@@ -453,6 +463,7 @@ export function BatchUploadSheet({
         receiptIds={browserReceiptIds}
         isOpen={showReceiptBrowser}
         onClose={() => setShowReceiptBrowser(false)}
+        onGoToReceipts={handleGoToReceipts}
       />
 
       <AlertDialog

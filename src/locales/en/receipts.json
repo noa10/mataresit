@@ -213,6 +213,18 @@
       "format": "RM {{amount}}"
     }
   },
+  "navigation": {
+    "previous": "Previous",
+    "next": "Next",
+    "previousTitle": "Previous: {{merchant}}",
+    "nextTitle": "Next: {{merchant}}",
+    "noPrevious": "No previous receipt",
+    "noNext": "No next receipt",
+    "untitledReceipt": "Untitled receipt",
+    "ledgerOrder": "Browses the full ledger by receipt date; active filters are not applied.",
+    "unsavedChanges": "You have unsaved changes. Discard them and continue?",
+    "retry": "Retry"
+  },
   "batch": {
     "eyebrow": "Add to the ledger",
     "title": "Batch upload",
@@ -346,6 +358,9 @@
       "failedCount": "{{count}} failed",
       "readyOfTotal": "{{ready}} of {{total}} ready"
     },
+    "browser": {
+      "goToReceipts": "Go to Receipts"
+    },
     "tray": {
       "fullTitle": "This batch is full",
       "optimisingTitle": "Optimising your receipts",
@@ -377,7 +392,8 @@
       "confirm": "Clear batch"
     },
     "toast": {
-      "noPosted": "No posted receipts to open yet."
+      "noPosted": "No posted receipts to open yet.",
+      "closeBeforeReceipts": "Close the batch sheet before going to Receipts."
     },
     "modal": {
       "closeTitle": "Uploads are still running",

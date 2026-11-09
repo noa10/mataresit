@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { ReceiptWithDetails } from '@/types/receipt';
 import { fetchReceiptsByIds } from '@/services/receiptService';
 import { supabase } from '@/integrations/supabase/client';
 import ReceiptViewer from '@/components/ReceiptViewer';
 import { formatCurrencySafe } from '@/utils/currency';
+import { useReceiptsTranslation } from '@/contexts/LanguageContext';
 import { useTeam } from '@/contexts/TeamContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -31,9 +32,11 @@ interface DailyReceiptBrowserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onReceiptDeleted?: (deletedId: string) => void;
+  onGoToReceipts?: () => void;
 }
 
-const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted }) => {
+const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ date, receiptIds, isOpen, onClose, onReceiptDeleted, onGoToReceipts }) => {
+  const { t } = useReceiptsTranslation();
   const queryClient = useQueryClient();
   const { currentTeam } = useTeam();
   const isMobile = useIsMobile();
@@ -273,6 +276,18 @@ const DailyReceiptBrowserModal: React.FC<DailyReceiptBrowserModalProps> = ({ dat
 
           {/* Main Viewer Area */}
           <div className="flex-1 flex flex-col min-h-0">
+            {currentReceipt && onGoToReceipts ? (
+              <div className="flex items-center justify-end border-b border-border px-4 py-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGoToReceipts}
+                >
+                  {t("batch.browser.goToReceipts")}
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
+            ) : null}
             {currentReceipt ? (
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="p-4 min-h-full">

@@ -213,6 +213,18 @@
       "format": "RM {{amount}}"
     }
   },
+  "navigation": {
+    "previous": "Sebelumnya",
+    "next": "Seterusnya",
+    "previousTitle": "Sebelumnya: {{merchant}}",
+    "nextTitle": "Seterusnya: {{merchant}}",
+    "noPrevious": "Tiada resit sebelumnya",
+    "noNext": "Tiada resit seterusnya",
+    "untitledReceipt": "Resit tanpa tajuk",
+    "ledgerOrder": "Menelusuri seluruh lejar mengikut tarikh resit; penapis aktif tidak digunakan.",
+    "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Buang dan teruskan?",
+    "retry": "Cuba semula"
+  },
   "batch": {
     "eyebrow": "Tambah ke lejar",
     "title": "Muat naik kelompok",
@@ -346,6 +358,9 @@
       "failedCount": "{{count}} gagal",
       "readyOfTotal": "{{ready}} daripada {{total}} sedia"
     },
+    "browser": {
+      "goToReceipts": "Pergi ke Resit"
+    },
     "tray": {
       "fullTitle": "Kelompok ini penuh",
       "optimisingTitle": "Mengoptimumkan resit anda",
@@ -377,7 +392,8 @@
       "confirm": "Kosongkan kelompok"
     },
     "toast": {
-      "noPosted": "Belum ada resit dihantar untuk dibuka."
+      "noPosted": "Belum ada resit dihantar untuk dibuka.",
+      "closeBeforeReceipts": "Tutup helaian kelompok sebelum pergi ke Resit."
     },
     "modal": {
       "closeTitle": "Muat naik masih berjalan",
