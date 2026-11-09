@@ -13,7 +13,7 @@ The application includes English and Bahasa Malaysia localization, Malaysian cur
 
 > **Project status:** active development. This repository contains both the user-facing application and the backend infrastructure used to operate it. Some advanced features are plan-dependent or still being stabilized.
 >
-> **Temporary production URL:** [https://mataresit.vercel.app](https://mataresit.vercel.app). Replace this with the final canonical domain when it is ready.
+> **Production URL:** [https://mataresit.com](https://mataresit.com). The `mataresit.vercel.app` hostname remains assigned as a fallback.
 
 [Capabilities](#capabilities) · [Architecture](#architecture) · [Getting started](#getting-started) · [Deployment](#deployment-model) · [Contributing](#contributing)
 
@@ -268,9 +268,9 @@ The frontend is configured for Vercel:
 
 ### Backend
 
-Supabase provides the managed PostgreSQL database, Auth, Storage, Realtime, and Edge Functions. For the current temporary Vercel host, set the Vercel Production environment variable `VITE_SITE_URL=https://mataresit.vercel.app`, configure the hosted Supabase Auth **Site URL** as `https://mataresit.vercel.app`, and allow `https://mataresit.vercel.app/**` for redirects. Set the Supabase Edge Function secrets `SITE_URL` and `FRONTEND_URL` to the same origin, and configure a verified `FROM_EMAIL` for Resend.
+Supabase provides the managed PostgreSQL database, Auth, Storage, Realtime, and Edge Functions. Production runs on `https://mataresit.com`: set the Vercel Production environment variable `VITE_SITE_URL=https://mataresit.com`, configure the hosted Supabase Auth **Site URL** as `https://mataresit.com`, and allow `https://mataresit.com/**` (plus `https://www.mataresit.com/**` and the `mataresit.vercel.app` fallback) for redirects. Set the Supabase Edge Function secret `SITE_URL` to the same origin, and configure a verified `FROM_EMAIL` for Resend.
 
-When the final domain is selected, update the Vercel `VITE_SITE_URL`, hosted Supabase Auth Site URL/redirect allow-list, `SITE_URL`/`FRONTEND_URL` Edge Function secrets, GitHub `APP_DOMAIN`, and the canonical/sitemap references together.
+`mataresit.vercel.app` stays assigned and allow-listed as the rollback origin. The canonical/sitemap references, both `site-url` helpers and the redirect allow-lists must move together when the origin changes again.
 
 A production deployment must also configure:
 

@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://mataresit.vercel.app/sitemap.xml
+Sitemap: https://mataresit.com/sitemap.xml

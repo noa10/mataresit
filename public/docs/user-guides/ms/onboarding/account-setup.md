@@ -18,7 +18,7 @@ Panduan ini membawa anda melalui proses mencipta dan mengkonfigurasi akaun Matar
 ### Proses Mendaftar
 
 1. **Lawati Mataresit**
-   - Pergi ke [mataresit.vercel.app](https://mataresit.vercel.app)
+   - Pergi ke [mataresit.com](https://mataresit.com)
    - Klik "Daftar" atau "Mula Sekarang"
 
 2. **Pilih Kaedah Pengesahan**
@@ -362,7 +362,7 @@ Pelan akaun anda dipaparkan pada pengepala ruang kerja selepas maklumat langgana
 
 Jika anda menghadapi masalah semasa persediaan:
 
-1. **Semak Halaman Status**: [status](https://mataresit.vercel.app/status)
+1. **Semak Halaman Status**: [status](https://mataresit.com/status)
 2. **Semak Soalan Lazim**: Soalan persediaan biasa dan penyelesaiannya
 3. **Hubungi Sokongan**: Gunakan sembang dalam aplikasi atau e-mel
 4. **Bantuan Komuniti**: Forum dan perbincangan pengguna

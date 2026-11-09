@@ -18,7 +18,7 @@ This guide walks you through creating and configuring your Mataresit account wit
 ### Sign Up Process
 
 1. **Visit Mataresit**
-   - Go to [mataresit.vercel.app](https://mataresit.vercel.app)
+   - Go to [mataresit.com](https://mataresit.com)
    - Click "Sign Up" or "Get Started"
 
 2. **Choose Authentication Method**
@@ -362,7 +362,7 @@ Your account plan appears in the workspace header once subscription information 
 
 If you encounter issues during setup:
 
-1. **Check Status Page**: [status](https://mataresit.vercel.app/status)
+1. **Check Status Page**: [status](https://mataresit.com/status)
 2. **Review FAQ**: Common setup questions and solutions
 3. **Contact Support**: Use in-app chat or email
 4. **Community Help**: User forums and discussions

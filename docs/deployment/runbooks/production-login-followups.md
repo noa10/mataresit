@@ -13,7 +13,7 @@ The owner reported:
 
 Verified against the repo and live site by Hermes Agent:
 
-- **Zero** references to the retired `.co` domain remain in the repo (the many `mataresit.com` strings are a different, unrelated domain). `index.html` canonical, `public/robots.txt` sitemap, `public/sitemap.xml` and the `APP_DOMAIN` fallback all already use `https://mataresit.vercel.app`.
+- **Zero** references to the retired `.co` domain remain in the repo (the many `mataresit.com` strings were placeholders at the time; that domain was NXDOMAIN then but is owned as of 9 Nov 2026 — see `mataresit-com-cutover.md`). `index.html` canonical, `public/robots.txt` sitemap, `public/sitemap.xml` and the `APP_DOMAIN` fallback all already use `https://mataresit.vercel.app`.
 - The live HTML canonical is `https://mataresit.vercel.app/` and no deployed JS chunk contains the dead `.co` domain. `src/lib/site-url.ts` defaults to the same origin, so **the pending redeploy does not block the interactive login test** — it only bakes the explicit `VITE_SITE_URL` into the bundle.
 - `FRONTEND_URL` is not required: `supabase/functions/_shared/site-url.ts` `getFrontendUrl()` falls back to `SITE_URL`, and `normalizeSiteUrl()` strips trailing slashes, so `SITE_URL=https://mataresit.vercel.app/` is valid.
 - **`FROM_EMAIL` is misconfigured.** It is currently set to a URL. `supabase/functions/send-email/index.ts` and `send-team-invitation-email/index.ts` pass it straight into Resend's `from` field, which requires a **verified sender email address**; a URL is rejected. The expected form is in `docs/BILLING_SYSTEM_DOCUMENTATION.md`: `FROM_EMAIL=Mataresit <noreply@your-verified-domain>`.

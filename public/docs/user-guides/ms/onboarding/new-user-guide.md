@@ -20,7 +20,7 @@ Panduan menyeluruh ini akan membawa anda melalui semua yang perlu anda ketahui u
 
 ### Mencipta Akaun Anda
 
-1. **Lawati Mataresit**: Pergi ke [mataresit.vercel.app](https://mataresit.vercel.app)
+1. **Lawati Mataresit**: Pergi ke [mataresit.com](https://mataresit.com)
 2. **Daftar**: Klik "Daftar" dan pilih Google OAuth untuk pengesahan yang selamat
 3. **Sahkan E-mel**: Semak e-mel anda untuk pengesahan (jika diperlukan)
 4. **Lengkapkan Profil**: Tambah maklumat perniagaan dan keutamaan anda

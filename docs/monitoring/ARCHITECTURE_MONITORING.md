@@ -199,7 +199,7 @@ SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Application Domains (Auto-detected)
-DOMAIN=mataresit.vercel.app
+DOMAIN=mataresit.com
 API_DOMAIN=YOUR_PROJECT_REF.supabase.co
 
 # Kubernetes Configuration (Optional)

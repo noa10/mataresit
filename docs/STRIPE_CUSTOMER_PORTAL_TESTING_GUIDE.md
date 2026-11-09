@@ -24,10 +24,10 @@ SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
 # Site Configuration
 # Vercel Production environment:
-VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SITE_URL=https://mataresit.com
 # Supabase Edge Function secrets:
-FRONTEND_URL=https://mataresit.vercel.app
-SITE_URL=https://mataresit.vercel.app
+FRONTEND_URL=https://mataresit.com
+SITE_URL=https://mataresit.com
 ```
 
 ### 2. Configuration Steps
@@ -45,7 +45,7 @@ SITE_URL=https://mataresit.vercel.app
 **Objective**: Verify that users can access the Stripe Customer Portal from the billing preferences UI.
 
 **Test Steps**:
-1. **Navigate to Application**: http://localhost:5173 (development) or https://mataresit.vercel.app (production)
+1. **Navigate to Application**: http://localhost:5173 (development) or https://mataresit.com (production)
 2. **Login**: Use valid user credentials
 3. **Access Settings**: Click on user menu → Settings
 4. **Navigate to Billing**: Click on "Billing" tab (3rd tab with CreditCard icon)

@@ -20,7 +20,7 @@ This comprehensive guide will walk you through everything you need to know to ge
 
 ### Creating Your Account
 
-1. **Visit Mataresit**: Navigate to [mataresit.vercel.app](https://mataresit.vercel.app)
+1. **Visit Mataresit**: Navigate to [mataresit.com](https://mataresit.com)
 2. **Sign Up**: Click "Sign Up" and choose Google OAuth for secure authentication
 3. **Verify Email**: Check your email for verification (if required)
 4. **Complete Profile**: Add your business information and preferences

@@ -6,7 +6,7 @@ Welcome to the Mataresit API! This guide will help you get up and running with o
 
 ### 1. Get Your API Key
 
-1. Sign up at [mataresit.vercel.app](https://mataresit.vercel.app)
+1. Sign up at [mataresit.com](https://mataresit.com)
 2. Navigate to **Dashboard → API Keys**
 3. Click **"Create API Key"**
 4. Choose appropriate scopes for your use case
@@ -313,8 +313,8 @@ try {
 
 ## Support
 
-- **Documentation**: [docs](https://mataresit.vercel.app/docs)
-- **API Status**: [status](https://mataresit.vercel.app/status)
+- **Documentation**: [docs](https://mataresit.com/docs)
+- **API Status**: [status](https://mataresit.com/status)
 - **Support Email**: [api-support@mataresit.com](mailto:api-support@mataresit.com)
 - **Community**: [Discord](https://discord.gg/mataresit)
 

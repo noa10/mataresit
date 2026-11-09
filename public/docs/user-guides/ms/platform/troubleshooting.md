@@ -293,7 +293,7 @@ Panduan ini membantu anda menyelesaikan isu lazim yang mungkin anda hadapi semas
 ### Pilihan Layani Diri
 
 1. **Semak Halaman Status**
-   - Lawati [status](https://mataresit.vercel.app/status)
+   - Lawati [status](https://mataresit.com/status)
    - Periksa isu yang diketahui
    - Lihat jadual penyelenggaraan
 
