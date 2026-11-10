@@ -20,7 +20,8 @@ STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 
 # Database Access
-SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+# SUPABASE_SERVICE_ROLE_KEY is injected by Supabase for Edge Functions.
+# Do not create a SERVICE_ROLE_KEY secret — it was retired in PR #250.
 
 # Site Configuration
 # Vercel Production environment:
