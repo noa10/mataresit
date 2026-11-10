@@ -81,12 +81,11 @@ The Phase 5 database migration system implements three sequential phases:
 
 #### Validation Only
 ```bash
-# Validate all migrations without applying
+# Check Phase 5 migration files locally without any hosted-database call
 ./deploy-migrations.sh --validate-only
-
-# Validate specific phase
-./deploy-migrations.sh --migration 20250717000001_create_embedding_metrics_tables.sql --validate-only
 ```
+
+`--dry-run` and `--validate-only` check local migration file presence only. They do not validate SQL syntax, do not query migration history, and execute no migration DDL, including for pending migrations. The same flags apply to the whole Phase 5 set; `--migration` does not narrow validation.
 
 #### Rollback Operations
 ```bash
