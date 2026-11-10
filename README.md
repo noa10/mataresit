@@ -282,6 +282,10 @@ A production deployment must also configure:
 - Stripe products, webhook signing secrets, and webhook delivery
 - AI provider credentials
 
+### Production migration validation
+
+[`database/migrations/production/deploy-migrations.sh`](./database/migrations/production/deploy-migrations.sh) supports `--validate-only` and `--dry-run` for local migration checks. Both check only that each Phase 5 migration file exists locally; neither validates SQL syntax, and each makes zero `psql`, Supabase CLI, or `jq` calls and needs no database password. Normal deployment validates pending migration SQL syntax in a rolled-back transaction on the hosted database.
+
 ### Continuous integration
 
 The current GitHub workflows perform code quality checks, tests, builds, Supabase validation, security scanning, and scheduled monitoring. The Supabase validation workflow is validation-oriented; it does not replace the required production deployment steps.

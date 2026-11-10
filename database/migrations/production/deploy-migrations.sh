@@ -121,7 +121,7 @@ OPTIONS:
     --environment ENV       Target environment (production/staging/test)
     --dry-run              Check migration files without database calls
     --rollback PHASE       Rollback to specific phase (0, 1, 2, 3)
-    --validate-only        Only run validation checks
+    --validate-only        Check local migration file presence (no psql calls)
     --backup-first         Create backup before migration
     --force                Force migration even if validation fails
     --migration FILE       Deploy specific migration file
@@ -130,6 +130,12 @@ PHASES:
     Phase 1: Embedding metrics tables (monitoring)
     Phase 2: Queue system enhancements (processing)
     Phase 3: Batch upload optimization (performance)
+
+VALIDATION:
+    --dry-run and --validate-only check that each Phase 5 migration file exists locally.
+    Each checks file presence, not SQL syntax, and issues zero psql calls, including
+    for pending migrations. Normal deployment validates pending migration SQL
+    syntax in a rolled-back transaction on the hosted database.
 
 EXAMPLES:
     $0 --environment production --backup-first
@@ -193,6 +199,14 @@ done
 # Validate prerequisites
 validate_prerequisites() {
     log "Validating prerequisites..."
+
+    # --dry-run and --validate-only are file-only modes. They must not require
+    # hosted-database credentials, invoke the Supabase CLI, or attempt a login.
+    if [[ "$DRY_RUN" == "true" || "$VALIDATE_ONLY" == "true" ]]; then
+        mkdir -p "$BACKUP_DIR" "$ROLLBACK_DIR" "$VALIDATION_DIR"
+        success "File-only mode: skipped database tools, credentials, and Supabase connection checks"
+        return 0
+    fi
     
     # Check required tools
     local required_tools=("supabase" "psql" "jq")
@@ -271,9 +285,15 @@ create_backup() {
 # Validate migration files
 validate_migrations() {
     log "Validating migration files..."
-    
+
     local validation_failed=false
-    
+
+    # Dry runs and --validate-only check local file presence only: no psql
+    # calls, including for pending migrations, and no SQL syntax validation.
+    if [[ "$DRY_RUN" == "true" || "$VALIDATE_ONLY" == "true" ]]; then
+        log "Checking local migration file presence only (no psql calls, including for pending migrations); SQL syntax is not validated."
+    fi
+
     for migration in "${PHASE5_MIGRATIONS[@]}"; do
         local migration_file="$MIGRATIONS_DIR/$migration"
         
@@ -283,9 +303,10 @@ validate_migrations() {
             continue
         fi
 
-        # Dry runs must not touch the hosted database at all
-        if [[ "$DRY_RUN" == "true" ]]; then
-            success "Found migration file: $migration (dry run, database checks skipped)"
+        # Dry runs and --validate-only must not touch the hosted database at all
+        # and check file presence, not SQL syntax.
+        if [[ "$DRY_RUN" == "true" || "$VALIDATE_ONLY" == "true" ]]; then
+            success "Found migration file: $migration (file presence only; SQL syntax not validated)"
             continue
         fi
 
