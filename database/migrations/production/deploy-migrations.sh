@@ -43,10 +43,11 @@ PHASE5_MIGRATIONS=(
     "20250720000003_batch_upload_optimization.sql"
 )
 
-# Environment variables
+# Environment and target are fixed: this script always targets the hosted
+# project named below. A misleading ENVIRONMENT label must never change that.
 SUPABASE_PROJECT_ID="${SUPABASE_PROJECT_ID:-mpmkbtsufihzdelrlszs}"
 SUPABASE_DB_PASSWORD="${SUPABASE_DB_PASSWORD}"
-ENVIRONMENT="${ENVIRONMENT:-production}"
+ENVIRONMENT="production"
 
 # Hosted database connection
 REMOTE_DB_HOST="db.$SUPABASE_PROJECT_ID.supabase.co"
@@ -63,6 +64,19 @@ psql_remote() {
         --port "$REMOTE_DB_PORT" \
         --username "$REMOTE_DB_USER" \
         --dbname "$REMOTE_DB_NAME" \
+        "$@"
+}
+
+# Run pg_dump against the same explicitly named hosted project. Do not use the
+# Supabase CLI's independently linked project for backups.
+pg_dump_remote() {
+    PGPASSWORD="$SUPABASE_DB_PASSWORD" pg_dump \
+        --host "$REMOTE_DB_HOST" \
+        --port "$REMOTE_DB_PORT" \
+        --username "$REMOTE_DB_USER" \
+        --dbname "$REMOTE_DB_NAME" \
+        --no-owner \
+        --no-privileges \
         "$@"
 }
 
@@ -118,7 +132,7 @@ Usage: $0 [OPTIONS]
 
 OPTIONS:
     --help, -h              Show this help message
-    --environment ENV       Target environment (production/staging/test)
+    --environment ENV       Must be 'production'; other values are rejected
     --dry-run              Check migration files without database calls
     --rollback PHASE       Rollback to specific phase (0, 1, 2, 3)
     --validate-only        Check local migration file presence (no psql calls)
@@ -131,15 +145,19 @@ PHASES:
     Phase 2: Queue system enhancements (processing)
     Phase 3: Batch upload optimization (performance)
 
+TARGET:
+    The hosted project is named by SUPABASE_PROJECT_ID (default mpmkbtsufihzdelrlszs).
+    psql and pg_dump use that same host, never the Supabase CLI's linked project.
+
 VALIDATION:
     --dry-run and --validate-only check that each Phase 5 migration file exists locally.
-    Each checks file presence, not SQL syntax, and issues zero psql calls, including
-    for pending migrations. Normal deployment validates pending migration SQL
+    Each checks file presence, not SQL syntax, and issues zero psql, pg_dump,
+    Supabase CLI or jq calls. Normal deployment validates pending migration SQL
     syntax in a rolled-back transaction on the hosted database.
 
 EXAMPLES:
     $0 --environment production --backup-first
-    $0 --dry-run --environment staging
+    $0 --dry-run
     $0 --rollback 2 --environment production
     $0 --validate-only
 
@@ -161,7 +179,11 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --environment)
-            ENVIRONMENT="$2"
+            if [[ "$2" != "production" ]]; then
+                error "This script always targets the hosted project; refusing environment '$2'"
+                exit 2
+            fi
+            ENVIRONMENT="production"
             shift 2
             ;;
         --dry-run)
@@ -208,8 +230,11 @@ validate_prerequisites() {
         return 0
     fi
     
-    # Check required tools
-    local required_tools=("supabase" "psql" "jq")
+    # Check required tools. pg_dump is needed only when a backup is requested.
+    local required_tools=("psql" "jq")
+    if [[ "$BACKUP_FIRST" == "true" ]]; then
+        required_tools+=("pg_dump")
+    fi
     for tool in "${required_tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
             error "$tool is required but not installed"
@@ -223,14 +248,7 @@ validate_prerequisites() {
         exit 1
     fi
     
-    # Check Supabase connection
-    if ! supabase status &> /dev/null; then
-        warning "Supabase CLI not connected, attempting to connect..."
-        if ! supabase login; then
-            error "Failed to connect to Supabase"
-            exit 1
-        fi
-    fi
+    log "Target is the hosted project $SUPABASE_PROJECT_ID ($REMOTE_DB_HOST); no Supabase CLI link is used."
     
     # Create necessary directories
     mkdir -p "$BACKUP_DIR" "$ROLLBACK_DIR" "$VALIDATION_DIR"
@@ -253,8 +271,8 @@ create_backup() {
         return 0
     fi
     
-    # Create schema backup
-    if supabase db dump --schema-only --remote > "$backup_file.schema"; then
+    # Create schema backup against the explicitly named hosted project.
+    if pg_dump_remote --schema-only --file "$backup_file.schema"; then
         success "Schema backup created: $backup_file.schema"
     else
         error "Failed to create schema backup"
@@ -272,7 +290,7 @@ create_backup() {
     )
     
     for table in "${critical_tables[@]}"; do
-        if supabase db dump --data-only --table "$table" --remote >> "$backup_file.data" 2>/dev/null; then
+        if pg_dump_remote --data-only --table "public.$table" >> "$backup_file.data" 2>/dev/null; then
             log "Backed up table: $table"
         else
             warning "Table $table does not exist or backup failed"
@@ -447,18 +465,22 @@ rollback_phases() {
     local phase version rollback_file
 
     for phase in "$@"; do
+        local -a required_relations=()
         case "$phase" in
             "3")
                 version="20250720000003"
                 rollback_file="$ROLLBACK_DIR/rollback_phase3.sql"
+                required_relations=(batch_upload_sessions batch_upload_files api_quota_tracking)
                 ;;
             "2")
                 version="20250719000001"
                 rollback_file="$ROLLBACK_DIR/rollback_phase2.sql"
+                required_relations=(embedding_queue)
                 ;;
             "1")
                 version="20250717000001"
                 rollback_file="$ROLLBACK_DIR/rollback_phase1.sql"
+                required_relations=(embedding_performance_metrics embedding_hourly_stats embedding_daily_stats)
                 ;;
         esac
 
@@ -470,6 +492,23 @@ rollback_phases() {
         if [[ ! -f "$rollback_file" ]]; then
             error "Rollback script not found: $rollback_file"
             return 1
+        fi
+
+        # A recorded phase can still be partially deployed. Running its CTAS
+        # backup scripts against missing objects would abort the whole
+        # transaction, so clear the stale history row instead.
+        local relation missing_objects=false
+        for relation in "${required_relations[@]}"; do
+            if ! remote_relation_exists "$relation"; then
+                missing_objects=true
+                break
+            fi
+        done
+
+        if [[ "$missing_objects" == "true" ]]; then
+            warning "Phase $phase is recorded but its objects are missing; skipping rollback script and clearing its history row"
+            psql_args+=(--command "DELETE FROM supabase_migrations.schema_migrations WHERE version = '$version';")
+            continue
         fi
 
         log "Queuing rollback script: $(basename "$rollback_file")"

@@ -284,7 +284,7 @@ A production deployment must also configure:
 
 ### Production migration validation
 
-[`database/migrations/production/deploy-migrations.sh`](./database/migrations/production/deploy-migrations.sh) supports `--validate-only` and `--dry-run` for local migration checks. Both check only that each Phase 5 migration file exists locally; neither validates SQL syntax, and each makes zero `psql`, Supabase CLI, or `jq` calls and needs no database password. Normal deployment validates pending migration SQL syntax in a rolled-back transaction on the hosted database.
+[`database/migrations/production/deploy-migrations.sh`](./database/migrations/production/deploy-migrations.sh) supports `--validate-only` and `--dry-run` for local migration checks. Both check only that each Phase 5 migration file exists locally; neither validates SQL syntax, and each makes zero `psql`, `pg_dump`, Supabase CLI, or `jq` calls and needs no database password. Normal deployment validates pending migration SQL syntax in a rolled-back transaction on the hosted database. The script always targets the project named by `SUPABASE_PROJECT_ID`; `--environment` accepts only `production`, and backups use `pg_dump` against that same host, never the Supabase CLI's linked project.
 
 ### Continuous integration
 

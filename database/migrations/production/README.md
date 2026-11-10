@@ -85,7 +85,7 @@ The Phase 5 database migration system implements three sequential phases:
 ./deploy-migrations.sh --validate-only
 ```
 
-`--dry-run` and `--validate-only` check local migration file presence only. They do not validate SQL syntax, do not query migration history, execute no migration DDL, make no `psql`, Supabase CLI, or `jq` calls, and need no database password. The same flags apply to the whole Phase 5 set; `--migration` does not narrow validation.
+`--dry-run` and `--validate-only` check local migration file presence only. They do not validate SQL syntax, do not query migration history, execute no migration DDL, make no `psql`, `pg_dump`, Supabase CLI, or `jq` calls, and need no database password. The same flags apply to the whole Phase 5 set; `--migration` does not narrow validation. The script always targets the hosted project named by `SUPABASE_PROJECT_ID`; `--environment` accepts only `production`, and backups use `pg_dump` against that same host, never the Supabase CLI's linked project.
 
 #### Rollback Operations
 ```bash

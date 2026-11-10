@@ -37,7 +37,7 @@ class MigrationToolTest(unittest.TestCase):
             (rollback / f'rollback_phase{phase}.sql').write_text('-- mock rollback\n')
         self.bin = self.root / 'bin'
         self.bin.mkdir()
-        for command in ('supabase', 'psql', 'jq'):
+        for command in ('supabase', 'psql', 'pg_dump', 'jq'):
             executable = self.bin / command
             executable.write_text('''#!/usr/bin/python3
 import json, os, sys
@@ -46,7 +46,9 @@ with open(os.environ['CALL_LOG'], 'a') as f:
 if os.path.basename(sys.argv[0]) == 'psql':
     if os.environ.get('FAIL_PSQL') == '1': sys.exit(2)
     query = sys.argv[sys.argv.index('--command') + 1] if '--command' in sys.argv else ''
-    if 'schema_migrations' in query and (os.environ.get('APPLIED') == 'yes' or (os.environ.get('APPLIED') == 'phase2' and '20250719000001' in query)):
+    if 'to_regclass' in query:
+        print('f' if os.environ.get('MISSING_OBJECTS') == '1' else 't')
+    elif 'schema_migrations' in query and (os.environ.get('APPLIED') == 'yes' or (os.environ.get('APPLIED') == 'phase2' and '20250719000001' in query)):
         print('1')
 ''')
             executable.chmod(0o755)
@@ -64,7 +66,7 @@ if os.path.basename(sys.argv[0]) == 'psql':
         return result, calls
 
     def external_calls(self, calls):
-        return [c for c in calls if c[0] in ('supabase', 'psql', 'jq')]
+        return [c for c in calls if c[0] in ('supabase', 'psql', 'pg_dump', 'jq')]
 
     def test_validate_only_never_queries_or_executes_ddl_for_unapplied_migrations(self):
         result, calls = self.run_script('--validate-only', APPLIED='no')
@@ -97,6 +99,21 @@ if os.path.basename(sys.argv[0]) == 'psql':
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual([c for c in calls if c[0] == 'psql'], [])
 
+    def test_non_production_environment_is_rejected(self):
+        result, calls = self.run_script('--environment', 'staging')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.external_calls(calls), [])
+
+    def test_backup_uses_explicit_pg_dump_not_linked_cli(self):
+        result, calls = self.run_script('--backup-first', APPLIED='yes')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        pg = [c for c in calls if c[0] == 'pg_dump']
+        self.assertTrue(pg)
+        self.assertTrue(any('--host' in c and 'db.mock-only.supabase.co' in c for c in pg))
+        self.assertTrue(any('--schema-only' in c for c in pg))
+        self.assertTrue(any(any('public.embedding_performance_metrics' in arg for arg in c) for c in pg))
+        self.assertFalse(any(c[0] == 'supabase' for c in calls))
+
     def test_rollback_skips_phase_absent_from_history(self):
         result, calls = self.run_script('--rollback', '1', APPLIED='phase2')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -109,6 +126,14 @@ if os.path.basename(sys.argv[0]) == 'psql':
         result, calls = self.run_script('--rollback', '1', FAIL_PSQL='1')
         self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
         self.assertFalse(any(c[0] == 'psql' and '--single-transaction' in c for c in calls))
+
+    def test_rollback_skips_recorded_phase_with_missing_objects(self):
+        result, calls = self.run_script('--rollback', '1', APPLIED='yes', MISSING_OBJECTS='1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        writes = [c for c in calls if c[0] == 'psql' and '--single-transaction' in c]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0].count('--file'), 0)
+        self.assertTrue(any(any('DELETE FROM supabase_migrations.schema_migrations' in arg for arg in c) for c in writes))
 
     def test_rollback_uses_one_transaction_for_recorded_phases(self):
         result, calls = self.run_script('--rollback', '1', APPLIED='yes')
