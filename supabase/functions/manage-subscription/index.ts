@@ -249,6 +249,12 @@ async function resumeSubscription(
   }
 
   if (!subscription.cancel_at_period_end) {
+    // Stripe is already in the desired state, but a previous request may have
+    // updated Stripe and failed before syncing the profile. Repair the profile
+    // before reporting success so a stale cancel_at_period_end=true row does
+    // not block future plan changes.
+    await syncSubscriptionToProfile(supabaseAdmin, subscription, { cancelAtPeriodEnd: false });
+
     return jsonResponse({
       success: true,
       message: 'Subscription is already active',
@@ -359,6 +365,12 @@ async function changePlan(
         id: subscription.items.data[0].id,
         price: targetPriceId,
       }],
+      // Keep the metadata tier aligned with the new price. Webhook tier
+      // fallbacks must never grant entitlements from a stale metadata value.
+      metadata: {
+        tier: targetTier,
+        billing_interval: targetInterval,
+      },
       proration_behavior: 'create_prorations',
       cancel_at_period_end: false,
     },

@@ -523,6 +523,22 @@ jobs:
           curl -fsSL https://deno.land/x/install/install.sh | sh
           echo "$HOME/.deno/bin" >> $GITHUB_PATH
 
+      # These suites were previously unexecuted in CI. Keep the list explicit:
+      # unrelated shared modules contain pre-existing type errors that are out
+      # of scope for this gate.
+      - name: Run Stripe and shared Deno regression tests
+        run: |
+          deno test --config supabase/functions/deno.json --allow-env --allow-read \
+            supabase/functions/_shared/checkout-locks_test.ts \
+            supabase/functions/_shared/function-auth_test.ts \
+            supabase/functions/_shared/service-role_test.ts \
+            supabase/functions/_shared/stripe-config_test.ts \
+            supabase/functions/_shared/stripe-sync_test.ts \
+            supabase/functions/_shared/webhook-idempotency_test.ts \
+            supabase/functions/send-email/authorization_test.ts \
+            supabase/functions/stripe-webhook/claim_error_static_test.ts \
+            supabase/functions/stripe-webhook/fencing_static_test.ts
+
       - name: Validate Edge Functions
         run: |
           set -e  # Exit on any error

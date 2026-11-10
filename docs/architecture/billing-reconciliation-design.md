@@ -16,7 +16,8 @@ unfenced is deliberately documented as best-effort:
 - `invoice.finalized` writes `profiles.next_billing_date` directly
   (`supabase/functions/stripe-webhook/index.ts`, `handleInvoiceFinalized`);
 - `payment_method.attached` / `detached` and `setup_intent.succeeded` write
-  card display fields directly;
+  card display fields, and maintain the profile's active
+  `stripe_payment_method_id`, directly;
 - reminder scheduling, transactional emails, and audit rows happen outside the
   fence and are at-least-once;
 - `manage-subscription` admin syncs (`syncSubscriptionToProfile`) and the
@@ -40,11 +41,14 @@ profiles.stripe_subscription_id — the only subscription a write may target
 ```
 
 A reconciliation write must never touch a profile whose bound subscription id
-does not match the subscription whose state is being applied. This closes the
-residual limitation recorded in the PR: `apply_fenced_profile_status` can
-still update the display status of a profile whose `stripe_subscription_id`
-is NULL when a late event for a deleted subscription arrives — reconciliation
-never writes to an unbound profile, so the same late event cannot regress it.
+does not match the subscription whose state is being applied. The one
+exception is an authorized creation event rebinding a profile whose current
+subscription is `canceled` or `incomplete_expired` (cancel-then-resubscribe);
+it must be marked as a rebind explicitly. This closes the residual limitation
+recorded in the PR: `apply_fenced_profile_status` can still update the display
+status of a profile whose `stripe_subscription_id` is NULL when a late event
+for a deleted subscription arrives — reconciliation never writes to an
+unbound profile, so the same late event cannot regress it.
 
 ## 3. Inventory and risk classes
 
@@ -52,7 +56,7 @@ never writes to an unbound profile, so the same late event cannot regress it.
 |---|---|---|---|
 | Profile tier/status/binding, payment history, grace/retry, renewal tracking | `apply_fenced_*` RPCs | entitlement | fenced — shipped in this PR |
 | `invoice.finalized` → `profiles.next_billing_date` | `handleInvoiceFinalized` | bookkeeping | self-healing via reconciliation |
-| Card display fields | `payment_method.*` / `setup_intent.succeeded` handlers | bookkeeping | self-healing via reconciliation |
+| Card display fields + active payment-method pointer | `payment_method.*` / `setup_intent.succeeded` handlers | bookkeeping | self-healing via reconciliation |
 | Reminder scheduling + emails + audit rows | outside the fence | at-least-once | alerting only; not reconciled |
 | Admin syncs | `syncSubscriptionToProfile` | administrative | order-aware admin apply (§5) |
 
@@ -74,11 +78,16 @@ never writes to an unbound profile, so the same late event cannot regress it.
    concurrently delivered webhook can write newer state first and then be
    overwritten by a stale admin response, or the reverse. §5 makes admin
    applies order-aware.
-5. **Same-second event bursts** — `assert_stripe_event_order` rejects
-   distinct events created in the same second (fail closed). The
-   reconciliation pass doubles as the executor of the documented "manual
-   reconciliation": it reads Stripe truth and applies the newer snapshot,
-   resolving the burst without operator SQL.
+5. **Same-second event bursts** — event ids are opaque and do not establish
+   which same-second event is newer. The subscription fence returns `-2` for
+   a distinct same-second event; the webhook then re-reads the subscription
+   from Stripe and applies that authoritative snapshot with a current
+   timestamp. The payment family keeps a stable `(created, event id)` order
+   and no longer raises `serialization_failure`.
+   `20261110010000_stripe_fencing_regressions.sql` replaces the previous
+   fail-closed rule that left the losing delivery retrying forever.
+   `supabase/tests/stripe_fencing_regressions.sql` pins the ambiguity,
+   rebind, subscription scoping, and payment/renewal fencing regressions.
 
 ## 5. Design
 
