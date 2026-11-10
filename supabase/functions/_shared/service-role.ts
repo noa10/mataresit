@@ -1,9 +1,10 @@
 /**
  * Resolve the service-role key for an Edge Function.
  *
- * The injected SUPABASE_SERVICE_ROLE_KEY is the supported path while the
- * project still has legacy JWT keys enabled. SERVICE_ROLE_KEY is only a
- * fallback for functions whose runtime does not inject the built-in variable.
+ * SUPABASE_SERVICE_ROLE_KEY is injected into every Edge Function by the
+ * Supabase runtime, so it is the only name this module reads. The legacy
+ * SERVICE_ROLE_KEY secret is being retired — reading it hid a duplicate
+ * credential that had to be kept in sync by hand.
  *
  * New-format sb_secret_... keys are not a drop-in replacement here: these
  * functions pin supabase-js 2.7.1, which also sends the key as a Bearer token,
@@ -14,9 +15,5 @@
  * Never log the returned value.
  */
 export function getServiceRoleKey(): string | undefined {
-  const builtIn = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
-  if (builtIn) return builtIn;
-
-  const explicit = Deno.env.get('SERVICE_ROLE_KEY')?.trim();
-  return explicit || undefined;
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim() || undefined;
 }
