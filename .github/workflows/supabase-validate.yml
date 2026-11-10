@@ -530,6 +530,7 @@ jobs:
         run: |
           deno test --config supabase/functions/deno.json --allow-env --allow-read \
             supabase/functions/_shared/checkout-locks_test.ts \
+            supabase/functions/_shared/billing_schema_restore_static_test.ts \
             supabase/functions/_shared/function-auth_test.ts \
             supabase/functions/_shared/service-role_test.ts \
             supabase/functions/_shared/stripe-config_test.ts \

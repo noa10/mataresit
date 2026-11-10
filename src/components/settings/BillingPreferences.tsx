@@ -146,9 +146,7 @@ export function BillingPreferences() {
     if (!user) return;
 
     try {
-      const { data, error } = await (supabase.rpc as any)('get_billing_preferences', {
-        p_user_id: user.id
-      });
+      const { data, error } = await (supabase.rpc as any)('get_my_billing_preferences');
 
       if (error) {
         console.error('Error loading billing preferences:', error);

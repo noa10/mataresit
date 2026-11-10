@@ -129,6 +129,54 @@ Smoke test with a test-mode event (never a live charge): send one
 confirm a `stripe_webhook_events` row reaches `processed` and the profile row is
 fenced correctly.
 
+## 5a. Billing preferences and reminder compatibility
+
+Do this before step 6 and keep the window open until the frontend cache is
+invalidated.
+
+1. Record the hosted constraint shapes before pushing. The restore migration
+   drops every `CHECK` on `billing_email_schedule` that references
+   `scheduled_for` and a time source, not just the checked-in expression:
+
+   ```sql
+   select conname, pg_get_expr(conbin, conrelid) as definition
+   from pg_constraint
+   where conrelid = 'public.billing_email_schedule'::regclass
+     and contype = 'c';
+   ```
+
+   After the push, rerun this query. It must return no expression containing
+   both `scheduled_for` and `now()`/`CURRENT_TIMESTAMP` (or the other timestamp
+   functions). The migration raises and aborts if one survives; do not bypass
+   that failure.
+
+2. Record the hosted `mark_billing_reminder_sent` definition and signature:
+
+   ```sql
+   select p.oid::regprocedure as signature, pg_get_functiondef(p.oid) as definition
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'mark_billing_reminder_sent';
+   ```
+
+   The restore replaces the canonical
+   `mark_billing_reminder_sent(uuid,boolean,text)` with explicit
+   `billing_email_status` casts. If the hosted signature differs, stop and
+   inspect before continuing; do not create a second overload blindly.
+
+3. Deploy the frontend build in the same window, after the database push, then
+   invalidate the Vercel/CDN cache. The restore keeps the legacy
+   `get_billing_preferences(uuid)` as a self-scoped compatibility alias, so
+   already-open tabs and cached bundles continue to load their own preferences;
+   the new build uses `get_my_billing_preferences()` and quiet-hours fields.
+   Do not remove the legacy alias until the cache window has closed and
+   telemetry shows no legacy calls.
+
+4. Open Settings → Billing in a fresh tab and in an old/cached tab. Both must
+   load preferences; saving must not overwrite stored values with defaults. If
+   the old tab fails with `42501`, stop and verify the alias grant and the
+   authenticated self-scope check before proceeding.
+
 ## 6. Deploy the functions
 
 Schema alone does not restore the live application contract. The production
