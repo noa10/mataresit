@@ -149,7 +149,7 @@ the migration; the Edge Functions call RPCs and columns it creates.
       asset list from the HTML first:
 
       ```bash
-      SITE=https://mataresit.vercel.app   # deployment origin
+      SITE=https://mataresit.com   # deployment origin
       for p in $(curl -fsS "$SITE/" | grep -oE '/assets/[^"]+\.js' | sort -u); do
         curl -fsS "$SITE$p"
       done | grep -oE 'sb_publishable_[A-Za-z0-9_-]{20,}' | sort -u

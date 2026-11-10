@@ -47,8 +47,12 @@ The application logs detailed auth information to the browser console:
   - `http://localhost:5173/auth`
   - `http://localhost:3000/auth`
   - `http://localhost:8080/auth`
+  - `https://mataresit.com/auth`
+  - `https://mataresit.com/**`
   - `https://mataresit.vercel.app/auth`
   - `https://mataresit.vercel.app/**`
+
+Keep the `mataresit.vercel.app` entries while it remains assigned as the rollback host (at least two weeks after the cutover).
 
 ### 2. Google Cloud Console
 - [ ] OAuth 2.0 Client ID created
@@ -58,7 +62,7 @@ The application logs detailed auth information to the browser console:
 ### 3. Environment Variables
 ```bash
 # .env.local (leave VITE_SITE_URL unset for local-only development)
-VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SITE_URL=https://mataresit.com
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
@@ -67,7 +71,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ### Issue: "Redirect URL not allowed"
 **Cause:** The redirect URL is not in Supabase's allowed list
-**Solution:** Add the local URL for development or `https://mataresit.vercel.app/**` for the hosted frontend to Supabase Auth settings
+**Solution:** Add the local URL for development or `https://mataresit.com/**` for the hosted frontend to Supabase Auth settings
 
 ### Issue: "CORS error"
 **Cause:** Cross-origin request blocked
@@ -111,8 +115,12 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ### Redirect URLs for Production
 Ensure the hosted Supabase Auth settings include:
+- `https://mataresit.com`
+- `https://mataresit.com/**`
 - `https://mataresit.vercel.app`
 - `https://mataresit.vercel.app/**`
+
+Keep the `mataresit.vercel.app` entries for the rollback window; removing them breaks auth redirects if the Site URL is reverted.
 
 Keep the Google OAuth authorized redirect URI pointed at the Supabase callback
 (`https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`), not at the Vercel
@@ -121,7 +129,7 @@ frontend URL.
 ### Environment Variables
 Production should use:
 ```bash
-VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SITE_URL=https://mataresit.com
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=production_anon_key
 ```

@@ -110,6 +110,8 @@ export class RedirectUrlValidator {
     '127.0.0.1',
     '[::1]',
     '::1',
+    'mataresit.com',
+    'www.mataresit.com',
     'mataresit.vercel.app'
   ];
 

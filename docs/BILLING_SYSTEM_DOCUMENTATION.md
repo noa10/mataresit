@@ -361,11 +361,11 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_webhook_secret
 
 # Frontend Configuration (Vercel)
-VITE_SITE_URL=https://mataresit.vercel.app
+VITE_SITE_URL=https://mataresit.com
 
 # Supabase Edge Function URL secrets
-FRONTEND_URL=https://mataresit.vercel.app
-SITE_URL=https://mataresit.vercel.app
+FRONTEND_URL=https://mataresit.com
+SITE_URL=https://mataresit.com
 
 # Email Configuration
 EMAIL_SERVICE_API_KEY=your_email_service_key

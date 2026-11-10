@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = "https://mataresit.vercel.app";
+const DEFAULT_SITE_URL = "https://mataresit.com";
 
 const stripTrailingSlash = (value: string): string => value.trim().replace(/\/+$/, "");
 

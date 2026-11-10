@@ -82,7 +82,7 @@ Never place secrets in workflow YAML, logs, artifacts, or documentation.
 
 `monitoring.yml` runs scheduled health checks and can be dispatched manually. It checks the deployed frontend, Supabase services, Edge Functions, security headers, performance checks, and alerting paths. Notifications may create GitHub issues or use configured channels; do not assume Slack is enabled.
 
-Set the repository variable `APP_DOMAIN` to the current frontend host when it changes. Until then, monitoring defaults to `mataresit.vercel.app`.
+Set the repository variable `APP_DOMAIN` to the current frontend host when it changes. Until then, monitoring defaults to `mataresit.com`.
 
 ## Supabase deployment boundary
 

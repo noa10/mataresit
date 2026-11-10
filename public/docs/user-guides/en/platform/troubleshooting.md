@@ -293,7 +293,7 @@ This guide helps you resolve common issues you might encounter while using Matar
 ### Self-Service Options
 
 1. **Check Status Page**
-   - Visit [status](https://mataresit.vercel.app/status)
+   - Visit [status](https://mataresit.com/status)
    - Check for known issues
    - View maintenance schedules
 

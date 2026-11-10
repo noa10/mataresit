@@ -591,7 +591,7 @@ export default function TermsConditionsPage() {
                   </p>
                   <p className="text-muted-foreground mt-1 flex items-center gap-2">
                     <Globe className="h-4 w-4" />
-                    https://mataresit.vercel.app
+                    https://mataresit.com
                   </p>
                 </div>
               </div>

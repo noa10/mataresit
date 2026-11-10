@@ -31,6 +31,8 @@ export function AuthDebugger() {
     'http://localhost:8080/auth',
     'http://localhost:5173/auth',
     'http://localhost:3000/auth',
+    'https://mataresit.com/auth',
+    'https://www.mataresit.com/auth',
     'https://mataresit.vercel.app/auth',
   ];
 

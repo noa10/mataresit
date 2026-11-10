@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = "https://mataresit.vercel.app";
+const DEFAULT_SITE_URL = "https://mataresit.com";
 const LOCAL_SITE_URL = "http://localhost:5173";
 
 const getDefaultSiteUrl = (): string => {

@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://mataresit.vercel.app/</loc>
+    <loc>https://mataresit.com/</loc>
   </url>
   <url>
-    <loc>https://mataresit.vercel.app/auth</loc>
+    <loc>https://mataresit.com/auth</loc>
   </url>
   <url>
-    <loc>https://mataresit.vercel.app/pricing</loc>
+    <loc>https://mataresit.com/pricing</loc>
   </url>
   <url>
-    <loc>https://mataresit.vercel.app/docs</loc>
+    <loc>https://mataresit.com/docs</loc>
   </url>
   <url>
-    <loc>https://mataresit.vercel.app/status</loc>
+    <loc>https://mataresit.com/status</loc>
   </url>
 </urlset>
