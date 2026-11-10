@@ -17,13 +17,12 @@
 -- migration aborts with SQLSTATE 42883 before any billing hardening applies.
 --
 -- This migration is forward-only and idempotent:
---   1. recreate the missing functions exactly as 20250722000000 defines them;
+--   1. recreate the missing functions with fixes for the current schema;
 --   2. recreate the missing triggers;
 --   3. add the canonical seven-argument renewal-tracking function beside the
 --      unversioned eight-argument one, because the deployed older build may
 --      still call the latter;
---   4. revoke PUBLIC/anon/authenticated execute from every overload of the
---      billing RPCs and grant service_role only.
+--   4. restrict billing RPCs to service_role, except self-scoped preferences.
 --
 -- No credential values appear in this file. Never put a key in a tracked file.
 
@@ -128,6 +127,24 @@ BEGIN
   SET next_billing_date = next_renewal
   WHERE id = p_user_id;
 
+  PERFORM public.log_billing_event(
+    p_user_id,
+    'subscription_renewal_tracking_updated',
+    'Subscription renewal tracking updated',
+    NULL,
+    p_stripe_subscription_id,
+    NULL,
+    '{}',
+    jsonb_build_object(
+      'tracking_id', tracking_id,
+      'next_renewal_date', next_renewal,
+      'current_tier', p_current_tier,
+      'status', p_status
+    ),
+    '{}',
+    'system'
+  );
+
   RETURN tracking_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -146,9 +163,10 @@ DECLARE
   retry_interval INTEGER;
 BEGIN
   -- Get retry interval from billing preferences
-  SELECT COALESCE(retry_interval_hours, 24) INTO retry_interval
+  SELECT retry_interval_hours INTO retry_interval
   FROM public.billing_preferences
   WHERE user_id = p_user_id;
+  retry_interval := COALESCE(retry_interval, 24);
 
   -- Calculate next retry time
   next_retry := NOW() + (retry_interval || ' hours')::INTERVAL;
@@ -219,7 +237,7 @@ BEGIN
     bes.template_data,
     bes.language,
     p.email as user_email,
-    COALESCE(p.full_name, p.email) as user_name
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', p.first_name, p.last_name)), ''), p.email) as user_name
   FROM public.billing_email_schedule bes
   JOIN public.profiles p ON p.id = bes.user_id
   WHERE bes.status = 'scheduled'
@@ -436,6 +454,80 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Give the browser a self-scoped RPC without replacing the legacy service RPC.
+CREATE OR REPLACE FUNCTION public.get_my_billing_preferences()
+RETURNS TABLE (
+  auto_renewal_enabled BOOLEAN,
+  auto_renewal_frequency public.auto_renewal_frequency,
+  billing_email_enabled BOOLEAN,
+  reminder_days_before_renewal INTEGER[],
+  payment_failure_notifications BOOLEAN,
+  grace_period_notifications BOOLEAN,
+  max_payment_retry_attempts INTEGER,
+  retry_interval_hours INTEGER,
+  grace_period_days INTEGER,
+  preferred_language TEXT,
+  timezone TEXT,
+  quiet_hours_start TIME,
+  quiet_hours_end TIME
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    COALESCE(bp.auto_renewal_enabled, true),
+    COALESCE(bp.auto_renewal_frequency, 'monthly'::public.auto_renewal_frequency),
+    COALESCE(bp.billing_email_enabled, true),
+    COALESCE(bp.reminder_days_before_renewal, '{7,3,1}'::INTEGER[]),
+    COALESCE(bp.payment_failure_notifications, true),
+    COALESCE(bp.grace_period_notifications, true),
+    COALESCE(bp.max_payment_retry_attempts, 3),
+    COALESCE(bp.retry_interval_hours, 24),
+    COALESCE(bp.grace_period_days, 7),
+    COALESCE(bp.preferred_language, 'en'),
+    COALESCE(bp.timezone, 'UTC'),
+    bp.quiet_hours_start,
+    bp.quiet_hours_end
+  FROM (VALUES (1)) AS defaults(dummy)
+  LEFT JOIN public.billing_preferences bp ON bp.user_id = auth.uid();
+END;
+$$;
+
+-- The old time-dependent CHECK prevents updates after a reminder becomes due.
+-- Remove only that expression, preserving all unrelated schedule constraints.
+DO $$
+DECLARE
+  constraint_name TEXT;
+BEGIN
+  FOR constraint_name IN
+    SELECT conname FROM pg_constraint
+    WHERE conrelid = 'public.billing_email_schedule'::regclass
+      AND contype = 'c'
+      AND pg_get_expr(conbin, conrelid) = '(scheduled_for > now())'
+  LOOP
+    EXECUTE format('ALTER TABLE public.billing_email_schedule DROP CONSTRAINT %I', constraint_name);
+  END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.validate_billing_reminder_schedule()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' OR NEW.scheduled_for IS DISTINCT FROM OLD.scheduled_for)
+     AND NEW.scheduled_for <= NOW() THEN
+    RAISE EXCEPTION 'billing reminder must be scheduled in the future' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS validate_billing_reminder_schedule_trigger ON public.billing_email_schedule;
+CREATE TRIGGER validate_billing_reminder_schedule_trigger
+  BEFORE INSERT OR UPDATE OF scheduled_for ON public.billing_email_schedule
+  FOR EACH ROW EXECUTE FUNCTION public.validate_billing_reminder_schedule();
+
 COMMENT ON FUNCTION public.process_auto_renewal IS 'Processes auto-renewal for a specific subscription';
 COMMENT ON FUNCTION public.handle_renewal_failure IS 'Handles subscription renewal failure and initiates grace period';
 
@@ -448,6 +540,11 @@ CREATE TRIGGER create_billing_preferences_trigger
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.create_default_billing_preferences();
+
+-- The trigger only covers new users; restore defaults for users created while it was missing.
+INSERT INTO public.billing_preferences (user_id)
+SELECT id FROM auth.users
+ON CONFLICT (user_id) DO NOTHING;
 
 DROP TRIGGER IF EXISTS billing_preferences_updated_at_trigger ON public.billing_preferences;
 CREATE TRIGGER billing_preferences_updated_at_trigger
@@ -474,7 +571,7 @@ CREATE TRIGGER payment_retry_tracking_updated_at_trigger
   EXECUTE FUNCTION public.update_payment_retry_tracking_updated_at();
 
 -- ---------------------------------------------------------------------------
--- 3. Billing RPCs are service-role only.
+-- 3. Billing RPCs are service-role only, apart from self-scoped preferences.
 --
 -- This covers EVERY overload of each name, so the unversioned eight-argument
 -- renewal-tracking function loses its anon/authenticated execute grant even
@@ -507,6 +604,7 @@ BEGIN
         'update_billing_email_schedule_updated_at',
         'update_subscription_renewal_tracking_updated_at',
         'update_payment_retry_tracking_updated_at',
+        'validate_billing_reminder_schedule',
         'log_billing_event',
         'schedule_billing_reminder',
         'mark_billing_reminder_sent',
@@ -526,5 +624,8 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+REVOKE ALL ON FUNCTION public.get_my_billing_preferences() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_billing_preferences() TO authenticated;
 
 COMMIT;

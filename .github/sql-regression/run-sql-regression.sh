@@ -30,6 +30,7 @@ suite_list=(
   stripe_checkout_locks
   stripe_fencing_regressions
   profile_billing_column_protection
+  billing_schema_restore
   batch_item_dispatch_config
 )
 
@@ -150,7 +151,14 @@ if [[ "$mode" == "disposable" ]]; then
   run_file "initial schema" "${migrations_dir}/20231126000000_initial_schema.sql"
   run_file "profiles.email shim" "${scripts_dir}/email-column.sql"
   for migration in "${curated_migrations[@]:1}"; do
+    if [[ "$migration" == "20261103000000_restore_billing_schema_drift.sql" ]]; then
+      run_file "seed billing schema drift" "${scripts_dir}/billing-drift-setup.sql"
+    fi
     run_file "$migration" "${migrations_dir}/${migration}"
+    if [[ "$migration" == "20261103000000_restore_billing_schema_drift.sql" ]]; then
+      run_file "replay billing schema restore" "${migrations_dir}/${migration}"
+      run_file "verify billing schema drift restore" "${scripts_dir}/billing-drift-verification.sql"
+    fi
   done
 fi
 
