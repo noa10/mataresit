@@ -96,6 +96,19 @@ Deno.test('an unknown price preserves an explicit fallback tier', () => {
   assertEquals(getSubscriptionTier(subscription, 'pro'), 'pro');
 });
 
+Deno.test('an explicit fallback wins over stale subscription metadata', () => {
+  const subscription = makeSubscription({
+    items: {
+      data: [{ price: { id: 'price_unknown', recurring: { interval: 'month' } } }],
+    },
+    metadata: { tier: 'max' },
+  });
+
+  // manage-subscription changes the price without updating metadata in older
+  // subscriptions; the profile tier is the safer entitlement source.
+  assertEquals(getSubscriptionTier(subscription, 'pro'), 'pro');
+});
+
 Deno.test('an unknown price without a fallback still fails closed', () => {
   const subscription = makeSubscription({
     items: {
@@ -165,6 +178,26 @@ Deno.test('webhook sync uses the fenced RPC with claim and event order', async (
     new Date(claim.eventCreated * 1000).toISOString(),
   );
   assertEquals(admin.calls[0].params._stripe_subscription_id, 'sub_test_123');
+  assertEquals(admin.calls[0].params._allow_rebind, false);
+});
+
+Deno.test('webhook sync passes rebind and reconciled-order overrides', async () => {
+  const admin = makeAdmin();
+
+  await applyFencedStripeSubscriptionEvent(
+    admin,
+    makeSubscription(),
+    claim,
+    { tier: 'max' },
+    {
+      allowRebind: true,
+      eventCreatedAt: '2026-11-10T00:00:00.000Z',
+    },
+  );
+
+  assertEquals(admin.calls[0].params._allow_rebind, true);
+  assertEquals(admin.calls[0].params._event_created, '2026-11-10T00:00:00.000Z');
+  assertEquals(admin.calls[0].params._tier, 'max');
 });
 
 Deno.test('webhook sync requires a live claim identity', async () => {
@@ -245,6 +278,14 @@ Deno.test('an out-of-order, one-off, or superseded payment is recorded without a
   const outcome = await applyFencedStripePaymentEvent(admin, paymentEvent, claim);
 
   assertEquals(outcome, 'recorded');
+});
+
+Deno.test('a payment that arrives before the subscription binding is retryable', async () => {
+  const admin = makeAdmin({ data: 'unbound', error: null });
+
+  const outcome = await applyFencedStripePaymentEvent(admin, paymentEvent, claim);
+
+  assertEquals(outcome, 'unbound');
 });
 
 Deno.test('renewal tracking uses the fenced RPC with claim and period', async () => {

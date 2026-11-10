@@ -3,8 +3,9 @@
 -- Covers the production-readiness defects left after
 -- 20261106000000_stripe_checkout_locks_and_payment_fencing.sql:
 --
---  1. Distinct events created in the same second must get a deterministic
---     order instead of failing forever.
+--  1. Distinct events created in the same second report ambiguity instead of
+--     picking a lexical event-id winner; a reconciled apply with a current
+--     timestamp advances the watermark.
 --  2. A delayed event for a superseded subscription must not overwrite the
 --     profile's current subscription binding.
 --  3. A payment for a superseded subscription is recorded but cannot advance
@@ -40,7 +41,7 @@ BEGIN
     RAISE EXCEPTION 'This test needs the Supabase auth schema (auth.users, auth.role(), auth.uid()); never run it against production';
   END IF;
 
-  IF to_regprocedure('public.apply_fenced_stripe_subscription_event(text, uuid, timestamp with time zone, text, text, public.subscription_tier, public.subscription_status, timestamp with time zone, timestamp with time zone, timestamp with time zone, boolean, text)') IS NULL THEN
+  IF to_regprocedure('public.apply_fenced_stripe_subscription_event(text, uuid, timestamp with time zone, text, text, public.subscription_tier, public.subscription_status, timestamp with time zone, timestamp with time zone, timestamp with time zone, boolean, text, boolean)') IS NULL THEN
     RAISE EXCEPTION 'Missing apply_fenced_stripe_subscription_event; apply the billing migrations first';
   END IF;
 
@@ -87,9 +88,10 @@ VALUES ('00000000-0000-4000-8000-000000000013')
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 1. Same-second distinct events get a total order. The higher event id is
---    treated as newer; the lower one is skipped as stale; replaying the same
---    event remains accepted. Nothing raises, so Stripe does not retry forever.
+-- 1. Distinct same-second events report -2 instead of trusting lexical event
+--    ids. The caller re-reads Stripe and re-applies with a current timestamp;
+--    replaying the same event stays accepted; the original timestamp is stale
+--    afterwards.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -133,8 +135,53 @@ BEGIN
     v_created - INTERVAL '30 days', v_created + INTERVAL '30 days',
     NULL, true, 'monthly'
   );
+  IF v_applied <> -2 THEN
+    RAISE EXCEPTION 'same-second distinct event: expected -2 (ambiguous), got %', v_applied;
+  END IF;
+
+  SELECT subscription_tier, subscription_status INTO v_tier, v_status
+  FROM public.profiles WHERE id = v_user;
+  IF v_tier <> 'pro' OR v_status <> 'active' THEN
+    RAISE EXCEPTION 'same-second ambiguous event: profile changed unexpectedly (%, %)', v_tier, v_status;
+  END IF;
+
+  SELECT stripe_event_id INTO v_last_event
+  FROM public.stripe_subscription_event_order
+  WHERE stripe_subscription_id = v_subscription
+    AND event_family = 'subscription';
+  IF v_last_event <> 'evt_reg_same_a' THEN
+    RAISE EXCEPTION 'same-second ambiguity: watermark must stay on evt_reg_same_a, got %', v_last_event;
+  END IF;
+
+  -- Replaying the applied event is still idempotent.
+  v_applied := public.apply_fenced_stripe_subscription_event(
+    'evt_reg_same_a', v_token, v_created,
+    v_customer, v_subscription, 'pro', 'active',
+    v_created - INTERVAL '30 days', v_created + INTERVAL '30 days',
+    NULL, true, 'monthly'
+  );
   IF v_applied <> 1 THEN
-    RAISE EXCEPTION 'same-second higher id: expected 1, got %', v_applied;
+    RAISE EXCEPTION 'same-second replay: expected 1, got %', v_applied;
+  END IF;
+
+  -- The webhook reconciles by re-reading Stripe and applying with a current
+  -- timestamp; that snapshot wins over the ambiguous delivery.
+  v_applied := public.apply_fenced_stripe_subscription_event(
+    'evt_reg_same_b', v_token_b, v_created + INTERVAL '1 second',
+    v_customer, v_subscription, 'max', 'active',
+    v_created - INTERVAL '30 days', v_created + INTERVAL '30 days',
+    NULL, true, 'monthly'
+  );
+  IF v_applied <> 1 THEN
+    RAISE EXCEPTION 'same-second reconciled apply: expected 1, got %', v_applied;
+  END IF;
+
+  SELECT stripe_event_id INTO v_last_event
+  FROM public.stripe_subscription_event_order
+  WHERE stripe_subscription_id = v_subscription
+    AND event_family = 'subscription';
+  IF v_last_event <> 'evt_reg_same_b' THEN
+    RAISE EXCEPTION 'same-second reconciliation: watermark must move to evt_reg_same_b, got %', v_last_event;
   END IF;
 
   SELECT outcome, token INTO v_outcome, v_token
@@ -150,32 +197,13 @@ BEGIN
     NULL, true, 'monthly'
   );
   IF v_applied <> -1 THEN
-    RAISE EXCEPTION 'same-second lower id: expected -1 (stale), got %', v_applied;
+    RAISE EXCEPTION 'same-second stale event: expected -1, got %', v_applied;
   END IF;
 
   SELECT subscription_tier, subscription_status INTO v_tier, v_status
   FROM public.profiles WHERE id = v_user;
   IF v_tier <> 'max' OR v_status <> 'active' THEN
-    RAISE EXCEPTION 'same-second lower id: profile changed unexpectedly (%, %)', v_tier, v_status;
-  END IF;
-
-  SELECT stripe_event_id INTO v_last_event
-  FROM public.stripe_subscription_event_order
-  WHERE stripe_subscription_id = v_subscription
-    AND event_family = 'subscription';
-  IF v_last_event <> 'evt_reg_same_b' THEN
-    RAISE EXCEPTION 'same-second ordering: watermark must stay on evt_reg_same_b, got %', v_last_event;
-  END IF;
-
-  -- Replaying the same event is still idempotent.
-  v_applied := public.apply_fenced_stripe_subscription_event(
-    'evt_reg_same_b', v_token_b, v_created,
-    v_customer, v_subscription, 'max', 'active',
-    v_created - INTERVAL '30 days', v_created + INTERVAL '30 days',
-    NULL, true, 'monthly'
-  );
-  IF v_applied <> 1 THEN
-    RAISE EXCEPTION 'same-second replay: expected 1, got %', v_applied;
+    RAISE EXCEPTION 'same-second stale event: profile changed unexpectedly (%, %)', v_tier, v_status;
   END IF;
 END $$;
 
@@ -247,6 +275,52 @@ BEGIN
     RAISE EXCEPTION 'unbound subscription: expected sub_test_reg_new, got %', v_bound_subscription;
   END IF;
 
+  -- A canceled profile stays bound to its canceled subscription unless the
+  -- caller marks the event as an authorized rebind (cancel-then-resubscribe).
+  UPDATE public.profiles
+  SET subscription_status = 'canceled'
+  WHERE id = v_user;
+
+  SELECT outcome, token INTO v_outcome, v_token
+  FROM public.claim_stripe_webhook_event('evt_reg_rebind_blocked', 'customer.subscription.updated');
+  IF v_outcome <> 'claimed' THEN
+    RAISE EXCEPTION 'blocked rebind setup: expected claimed, got %', v_outcome;
+  END IF;
+
+  v_applied := public.apply_fenced_stripe_subscription_event(
+    'evt_reg_rebind_blocked', v_token, clock_timestamp(),
+    v_customer, 'sub_test_reg_rebound', 'max', 'active',
+    clock_timestamp() - INTERVAL '30 days', clock_timestamp() + INTERVAL '30 days',
+    NULL, false, 'monthly'
+  );
+  IF v_applied <> -1 THEN
+    RAISE EXCEPTION 'blocked rebind: expected -1, got %', v_applied;
+  END IF;
+
+  SELECT outcome, token INTO v_outcome, v_token
+  FROM public.claim_stripe_webhook_event('evt_reg_rebind', 'customer.subscription.created');
+  IF v_outcome <> 'claimed' THEN
+    RAISE EXCEPTION 'authorized rebind setup: expected claimed, got %', v_outcome;
+  END IF;
+
+  v_applied := public.apply_fenced_stripe_subscription_event(
+    'evt_reg_rebind', v_token, clock_timestamp(),
+    v_customer, 'sub_test_reg_rebound', 'max', 'active',
+    clock_timestamp() - INTERVAL '30 days', clock_timestamp() + INTERVAL '30 days',
+    NULL, false, 'monthly', true
+  );
+  IF v_applied <> 1 THEN
+    RAISE EXCEPTION 'authorized rebind: expected 1, got %', v_applied;
+  END IF;
+
+  SELECT stripe_subscription_id, subscription_status
+  INTO v_bound_subscription, v_status
+  FROM public.profiles WHERE id = v_user;
+  IF v_bound_subscription <> 'sub_test_reg_rebound' OR v_status <> 'active' THEN
+    RAISE EXCEPTION 'authorized rebind: profile did not take the new subscription (%, %)',
+      v_bound_subscription, v_status;
+  END IF;
+
   SELECT outcome, token INTO v_outcome, v_token
   FROM public.claim_stripe_webhook_event('evt_reg_unknown_customer', 'customer.subscription.created');
   IF v_outcome <> 'claimed' THEN
@@ -291,6 +365,7 @@ DECLARE
   v_succeeded TIMESTAMP WITH TIME ZONE;
   v_status public.subscription_status;
   v_last_event TEXT;
+  v_unbound_created TIMESTAMP WITH TIME ZONE;
 BEGIN
   INSERT INTO public.payment_retry_tracking (
     user_id, stripe_subscription_id, stripe_invoice_id, amount_cents, currency, status
@@ -371,6 +446,58 @@ BEGIN
     AND stripe_invoice_id = 'in_test_reg_current_pending';
   IF v_retry_status <> 'succeeded' OR v_succeeded IS NULL THEN
     RAISE EXCEPTION 'current payment: retry row was not closed (%, %)', v_retry_status, v_succeeded;
+  END IF;
+
+  -- Payment before subscription binding: record the fact, report a retryable
+  -- outcome, and apply normally once the profile is bound.
+  UPDATE public.profiles
+  SET stripe_subscription_id = NULL
+  WHERE id = v_user;
+
+  SELECT outcome, token INTO v_outcome, v_token
+  FROM public.claim_stripe_webhook_event('evt_reg_pay_unbound', 'invoice.payment_succeeded');
+  IF v_outcome <> 'claimed' THEN
+    RAISE EXCEPTION 'unbound payment setup: expected claimed, got %', v_outcome;
+  END IF;
+
+  v_unbound_created := clock_timestamp();
+  v_payment := public.apply_fenced_stripe_payment_event(
+    'evt_reg_pay_unbound', v_token, v_unbound_created,
+    v_customer, 'sub_test_reg_current', 'pi_test_reg_unbound',
+    4900, 'myr', 'pro',
+    v_unbound_created - INTERVAL '30 days', v_unbound_created
+  );
+  IF v_payment <> 'unbound' THEN
+    RAISE EXCEPTION 'unbound payment: expected unbound, got %', v_payment;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.payment_history WHERE stripe_payment_intent_id = 'pi_test_reg_unbound'
+  ) THEN
+    RAISE EXCEPTION 'unbound payment: the payment fact must still be recorded';
+  END IF;
+
+  SELECT stripe_event_id INTO v_last_event
+  FROM public.stripe_subscription_event_order
+  WHERE stripe_subscription_id = 'sub_test_reg_current'
+    AND event_family = 'payment';
+  IF v_last_event <> 'evt_reg_pay_current' THEN
+    RAISE EXCEPTION 'unbound payment: watermark moved to % before binding', v_last_event;
+  END IF;
+
+  UPDATE public.profiles
+  SET stripe_subscription_id = 'sub_test_reg_current',
+      subscription_status = 'active'
+  WHERE id = v_user;
+
+  v_payment := public.apply_fenced_stripe_payment_event(
+    'evt_reg_pay_unbound', v_token, v_unbound_created,
+    v_customer, 'sub_test_reg_current', 'pi_test_reg_unbound',
+    4900, 'myr', 'pro',
+    v_unbound_created - INTERVAL '30 days', v_unbound_created
+  );
+  IF v_payment <> 'applied' THEN
+    RAISE EXCEPTION 'unbound payment replay: expected applied, got %', v_payment;
   END IF;
 END $$;
 

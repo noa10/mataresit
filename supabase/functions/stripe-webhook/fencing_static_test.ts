@@ -20,19 +20,36 @@ Deno.test('subscription preferences are created inside the fenced transaction', 
   }
 });
 
-Deno.test('equal-timestamp events are ordered deterministically, not failed forever', async () => {
+Deno.test('same-second events are never ordered by lexical event id', async () => {
   const migration = await Deno.readTextFile(regressionMigrationUrl);
   const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.assert_stripe_event_order(');
   const end = migration.indexOf('\n$$;', start);
   const body = migration.slice(start, end);
 
   if (start < 0 || end < 0 ||
-    !body.includes('IF _event_created <> v_last_created THEN') ||
-    !body.includes('RETURN _event_created > v_last_created;') ||
-    !body.includes('RETURN _event_id > v_last_event_id;') ||
+    body.includes('RETURN _event_id > v_last_event_id;') ||
+    !body.includes('RETURN _event_created >= v_last_created;') ||
     body.includes("USING ERRCODE = 'serialization_failure'")) {
     throw new Error(
-      'Equal-timestamp Stripe events must get a stable total order without a retry-forever failure',
+      'Same-second Stripe events must not be ordered by opaque event ids or fail forever',
+    );
+  }
+});
+
+Deno.test('subscription same-second events are reported as ambiguous for reconciliation', async () => {
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
+  const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(');
+  const end = migration.indexOf('\n$$;', start);
+  const body = migration.slice(start, end);
+
+  // Event ids are not chronological. A distinct same-second event must not be
+  // applied or acknowledged on a lexical tie-break; the caller re-reads Stripe.
+  if (start < 0 || end < 0 ||
+    !body.includes('ELSIF _event_created = v_last_created THEN') ||
+    !body.includes('RETURN -2;') ||
+    body.includes('RETURN _event_id > v_last_event_id;')) {
+    throw new Error(
+      'A distinct same-second subscription event must return -2 instead of ordering by event id',
     );
   }
 });
@@ -184,9 +201,23 @@ Deno.test('subscription changes cannot replace a newer bound subscription', asyn
   if (start < 0 || end < 0 ||
     !body.includes('stripe_subscription_id IS NULL') ||
     !body.includes('OR stripe_subscription_id = _stripe_subscription_id') ||
-    !body.includes('RETURN -1;')) {
+    !body.includes('_allow_rebind') ||
+    !body.includes("subscription_status IN ('canceled', 'incomplete_expired')") ||
+    !body.includes('RETURN -1;') ||
+    !body.includes('RETURN -2;')) {
     throw new Error(
-      'A subscription event must only bind an unbound profile or update the profile already bound to it',
+      'A subscription event must only bind an unbound or canceled profile, or update the profile already bound to it',
+    );
+  }
+});
+
+Deno.test('a verified creation event can rebind a canceled profile', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+
+  if (!webhook.includes("allowRebind: event.type === 'customer.subscription.created'") ||
+    !webhook.includes('await handleSubscriptionChange(subscription, claim, { allowRebind: true });')) {
+    throw new Error(
+      'Only customer.subscription.created and checkout completion may rebind a canceled profile',
     );
   }
 });
@@ -199,9 +230,11 @@ Deno.test('payment state advances only after a profile row is actually updated',
 
   if (start < 0 || end < 0 ||
     !body.includes('GET DIAGNOSTICS v_profile_rows = ROW_COUNT;') ||
-    !body.includes("RETURN 'recorded';")) {
+    !body.includes("RETURN 'recorded';") ||
+    !body.includes('v_bound_subscription_id IS NULL') ||
+    !body.includes("RETURN 'unbound';")) {
     throw new Error(
-      'A payment for a superseded subscription must be recorded without advancing entitlement state',
+      'A superseded payment must be recorded without advancing state, and a payment before binding must be retryable',
     );
   }
 });
@@ -216,8 +249,12 @@ Deno.test('renewal writes are scoped to the profile current subscription', async
 
     if (start < 0 || end < 0 ||
       !body.includes('id = _user_id') ||
-      !body.includes('stripe_subscription_id = _stripe_subscription_id')) {
-      throw new Error(`${fn} must skip profiles bound to a different subscription`);
+      !body.includes('stripe_subscription_id = _stripe_subscription_id') ||
+      !body.includes('FOR UPDATE') ||
+      !body.includes('IF NOT FOUND THEN')) {
+      throw new Error(
+        `${fn} must lock and skip profiles bound to a different subscription`,
+      );
     }
   }
 });
@@ -231,9 +268,11 @@ Deno.test('payment method detach resolves the profile without a customer on the 
   if (start < 0 || end < 0 ||
     body.includes('paymentMethod.customer as string') ||
     !body.includes('stripe_payment_method_id') ||
-    !body.includes('paymentMethod.id')) {
+    !body.includes('paymentMethod.id') ||
+    !body.includes('PGRST116') ||
+    !body.includes('throw new Error(')) {
     throw new Error(
-      'payment_method.detached must identify the profile by the stored payment method id when Stripe omits the customer',
+      'payment_method.detached must identify the profile by the stored payment method id and retry lookup failures',
     );
   }
 });
@@ -268,9 +307,54 @@ Deno.test('checkout reuses an open session left by an ambiguous create failure',
     !recovery.includes('metadata?.user_id') ||
     !recovery.includes('metadata?.tier') ||
     !recovery.includes('metadata?.billing_interval') ||
+    !recovery.includes("expired.status !== 'expired'") ||
+    !recovery.includes('throw new Error(') ||
     !/bindCheckoutSession\(\s*supabaseAdmin,\s*user\.id,\s*lockToken,\s*reusable\.id/.test(checkout)) {
     throw new Error(
-      'create-checkout-session must recover a matching open session before creating a second payable session',
+      'create-checkout-session must recover a matching open session and fail closed when a conflicting session cannot be expired',
+    );
+  }
+});
+
+Deno.test('same-second subscription events are reconciled against Stripe', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+
+  if (!webhook.includes('if (syncedRows === -2)') ||
+    !webhook.includes('await stripe.subscriptions.retrieve(subscription.id)') ||
+    !webhook.includes('eventCreatedAt: new Date().toISOString()') ||
+    !webhook.includes('if (deletedRows === -2)') ||
+    !webhook.includes("if (paymentOutcome === 'unbound')")) {
+    throw new Error(
+      'Same-second subscription events must be re-read from Stripe, and unbound payments must retry',
+    );
+  }
+});
+
+Deno.test('the resolved tier is passed into the fenced subscription sync', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+  const start = webhook.indexOf('let syncedRows = await applyFencedStripeSubscriptionEvent(');
+  const end = webhook.indexOf('// Two distinct events created in the same second', start);
+  const body = webhook.slice(start, end);
+
+  if (start < 0 || end < 0 || !body.includes('{ tier: newTier }')) {
+    throw new Error(
+      'The fenced subscription sync must receive the resolved fallback tier instead of recomputing it without a fallback',
+    );
+  }
+});
+
+Deno.test('plan changes keep subscription metadata aligned with the new tier', async () => {
+  const manage = await Deno.readTextFile(manageSubscriptionUrl);
+  const start = manage.indexOf('async function changePlan(');
+  const end = manage.indexOf('async function createPortalSession(', start);
+  const body = manage.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    !body.includes('metadata: {') ||
+    !body.includes('tier: targetTier') ||
+    !body.includes('billing_interval: targetInterval')) {
+    throw new Error(
+      'changePlan must update subscription metadata so an unknown-price fallback cannot use a stale tier',
     );
   }
 });

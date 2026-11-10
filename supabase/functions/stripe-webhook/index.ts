@@ -169,6 +169,7 @@ serve(async (req) => {
           () => handleSubscriptionChange(
             event.data.object as Stripe.Subscription,
             activeClaim,
+            { allowRebind: event.type === 'customer.subscription.created' },
           ),
           customerId
         );
@@ -347,7 +348,7 @@ async function handleCheckoutSessionCompleted(
       // subscription before applying state.
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       console.log(`Retrieved subscription ${subscriptionId} for checkout session ${session.id}`);
-      await handleSubscriptionChange(subscription, claim);
+      await handleSubscriptionChange(subscription, claim, { allowRebind: true });
     } catch (error) {
       console.error(`Error processing subscription ${subscriptionId} from checkout session ${session.id}:`, error);
       throw error;
@@ -360,6 +361,7 @@ async function handleCheckoutSessionCompleted(
 async function handleSubscriptionChange(
   subscription: Stripe.Subscription,
   claim: WebhookClaimContext,
+  options: { allowRebind?: boolean } = {},
 ) {
   const customerId = subscription.customer as string;
 
@@ -374,8 +376,8 @@ async function handleSubscriptionChange(
     }))
   });
 
-  const status = resolveStripeStatusForDatabase(subscription.status);
-  const billingInterval = getSubscriptionBillingInterval(subscription);
+  let status = resolveStripeStatusForDatabase(subscription.status);
+  let billingInterval = getSubscriptionBillingInterval(subscription);
 
   let previousTier: string | null = null;
   let previousStatus: string | null = null;
@@ -399,7 +401,7 @@ async function handleSubscriptionChange(
   const fallbackTier: SubscriptionTier = isSubscriptionTier(previousTier)
     ? previousTier
     : 'free';
-  const newTier = getSubscriptionTier(subscription, fallbackTier);
+  let newTier = getSubscriptionTier(subscription, fallbackTier);
 
   const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
   const previousLevel = previousTier
@@ -431,15 +433,43 @@ async function handleSubscriptionChange(
   // subscription this database cannot attribute to a profile. Throwing marks
   // the event failed and returns 500, so Stripe retries instead of us reporting
   // success and dropping the entitlement.
-  const syncedRows = await applyFencedStripeSubscriptionEvent(
+  let syncedRows = await applyFencedStripeSubscriptionEvent(
     supabaseClient,
     subscription,
     claim,
+    { tier: newTier },
+    { allowRebind: options.allowRebind },
   );
+
+  // Two distinct events created in the same second have no authoritative order
+  // in the event payload. Re-read Stripe and apply that snapshot instead of
+  // trusting an arbitrary event-id tie-break.
+  if (syncedRows === -2) {
+    console.warn(
+      `Same-second subscription events for customer ${customerId}; ` +
+      `reconciling ${subscription.id} against current Stripe state`,
+    );
+    subscription = await stripe.subscriptions.retrieve(subscription.id);
+    status = resolveStripeStatusForDatabase(subscription.status);
+    billingInterval = getSubscriptionBillingInterval(subscription);
+    newTier = getSubscriptionTier(subscription, fallbackTier);
+
+    syncedRows = await applyFencedStripeSubscriptionEvent(
+      supabaseClient,
+      subscription,
+      claim,
+      { tier: newTier },
+      {
+        allowRebind: options.allowRebind,
+        eventCreatedAt: new Date().toISOString(),
+      },
+    );
+  }
+
   if (syncedRows < 0) {
     console.warn(
       `Skipped stale subscription event for customer ${customerId}: ` +
-      `profile is bound to a newer subscription than ${subscription.id}`,
+      `event is older or the profile is bound to a newer subscription than ${subscription.id}`,
     );
     return;
   }
@@ -487,7 +517,7 @@ async function handleSubscriptionDeleted(
   // be acknowledged. A zero-row sync means Stripe has a deleted subscription
   // this database cannot attribute to a profile: retry via 500 instead of
   // silently keeping a paid tier Stripe already cancelled.
-  const deletedRows = await applyFencedStripeSubscriptionEvent(
+  let deletedRows = await applyFencedStripeSubscriptionEvent(
     supabaseClient,
     subscription,
     claim,
@@ -498,6 +528,30 @@ async function handleSubscriptionDeleted(
       billingInterval: 'monthly',
     },
   );
+
+  if (deletedRows === -2) {
+    console.warn(
+      `Same-second deletion for customer ${customerId}; ` +
+      `reconciling ${subscription.id} against current Stripe state`,
+    );
+    const current = await stripe.subscriptions.retrieve(subscription.id);
+    const currentStatus = resolveStripeStatusForDatabase(current.status);
+    deletedRows = await applyFencedStripeSubscriptionEvent(
+      supabaseClient,
+      current,
+      claim,
+      {
+        tier: currentStatus === 'canceled' ? 'free' : getSubscriptionTier(current, 'free'),
+        status: currentStatus,
+        cancelAtPeriodEnd: Boolean(current.cancel_at_period_end),
+        billingInterval: currentStatus === 'canceled'
+          ? 'monthly'
+          : getSubscriptionBillingInterval(current),
+      },
+      { eventCreatedAt: new Date().toISOString() },
+    );
+  }
+
   if (deletedRows < 0) {
     console.warn(
       `Skipped stale deletion for customer ${customerId}: ` +
@@ -572,6 +626,15 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice, claim: WebhookCla
     },
     claim,
   );
+
+  if (paymentOutcome === 'unbound') {
+    // The subscription binding has not arrived yet. Throwing returns 500 so
+    // Stripe redelivers after customer.subscription.created binds the profile;
+    // acknowledging now would lose renewal tracking permanently.
+    throw new Error(
+      `Payment ${paymentIntentId} arrived before subscription ${subscriptionId} was bound to a profile`,
+    );
+  }
 
   if (paymentOutcome === 'recorded') {
     console.log(`Payment ${paymentIntentId} recorded without applying state (one-off, superseded, or out-of-order payment)`);
@@ -1141,7 +1204,16 @@ async function handlePaymentMethodDetached(paymentMethod: Stripe.PaymentMethod) 
 
   const { data: profile, error: profileError } = await profileQuery;
 
-  if (profileError || !profile) {
+  if (profileError && (profileError.code !== 'PGRST116' || !/0 rows/.test(profileError.details ?? ''))) {
+    // A database or transport failure is not a missing profile: throwing lets
+    // Stripe retry instead of permanently keeping the removed card on record.
+    throw new Error(
+      `Failed to look up profile for detached payment method ${paymentMethod.id}: ` +
+      profileError.message,
+    );
+  }
+
+  if (!profile) {
     // Legacy profiles predate stripe_payment_method_id and the event carries
     // no customer, so there is no safe row to clear. Acknowledge the event
     // instead of retrying it forever.

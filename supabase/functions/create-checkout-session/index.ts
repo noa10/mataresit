@@ -54,8 +54,9 @@ const isSimulatedId = (value: string | null | undefined): boolean =>
  * makes the retry idempotent on the object that already exists.
  *
  * Only a session for the same user, tier, and interval is reusable. Sessions
- * for another plan are expired best-effort so the user is not left with two
- * completable sessions for different plans.
+ * for another plan must be expired before a second payable session can exist;
+ * an expiration failure aborts the request instead of leaving two completable
+ * sessions.
  */
 async function findReusableCheckoutSession(
   stripe: Stripe,
@@ -85,10 +86,20 @@ async function findReusableCheckoutSession(
   for (const session of openSessions.data) {
     if (session.id === reusable?.id) continue;
     if (session.metadata?.user_id !== options.userId) continue;
+
+    let expired: Stripe.Checkout.Session;
     try {
-      await stripe.checkout.sessions.expire(session.id);
+      expired = await stripe.checkout.sessions.expire(session.id);
     } catch (expireError) {
-      console.warn(`Could not expire stale Checkout Session ${session.id}:`, expireError);
+      console.error(`Could not expire conflicting Checkout Session ${session.id}:`, expireError);
+      throw new Error(`Could not expire conflicting Checkout Session ${session.id}`);
+    }
+
+    if (expired.status !== 'expired') {
+      console.error(
+        `Checkout Session ${session.id} reported status ${expired.status} after expiration`,
+      );
+      throw new Error(`Checkout Session ${session.id} is still ${expired.status}`);
     }
   }
 

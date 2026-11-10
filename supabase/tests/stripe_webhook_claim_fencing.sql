@@ -351,10 +351,10 @@ BEGIN
     RAISE EXCEPTION 'older timestamp should be rejected regardless of event id';
   END IF;
   IF NOT public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_zz', v_created) THEN
-    RAISE EXCEPTION 'an equal-timestamp event with a higher id should be accepted';
+    RAISE EXCEPTION 'an equal-timestamp distinct event should be accepted in delivery order';
   END IF;
-  IF public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_a', v_created) THEN
-    RAISE EXCEPTION 'an equal-timestamp event with an id below the watermark should be stale';
+  IF NOT public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_a', v_created) THEN
+    RAISE EXCEPTION 'event ids are opaque; a lower id in the same second is not stale';
   END IF;
   IF NOT public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_a', v_created + INTERVAL '1 second') THEN
     RAISE EXCEPTION 'newer timestamp should be accepted regardless of event id';

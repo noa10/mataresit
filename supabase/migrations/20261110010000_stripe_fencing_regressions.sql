@@ -7,7 +7,9 @@
 --
 --  1. assert_stripe_event_order raised for distinct events created in the same
 --     second. Stripe timestamps have one-second resolution, so a same-second
---     burst retried forever and never advanced the watermark.
+--     burst retried forever and never advanced the watermark. The subscription
+--     fence now returns -2 for that ambiguity so the caller can re-read Stripe
+--     instead of trusting an arbitrary event-id order.
 --  2. apply_fenced_stripe_subscription_event updated a profile by customer id
 --     only, so a delayed event for a superseded subscription could replace the
 --     current subscription, tier, status, and period.
@@ -20,6 +22,8 @@
 --     could mark the active subscriber past_due.
 --  5. payment_method.detached events carry customer = null, leaving no safe way
 --     to find the profile and clear stale card fields.
+--  6. A canceled profile stayed bound to the canceled subscription id, so a
+--     legitimate new subscription could never take over the profile.
 --
 -- This migration does not change checkout locks or webhook claiming. It adds
 -- profiles.stripe_payment_method_id so attach/setup-intent handlers can store
@@ -127,15 +131,16 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 3. Deterministic event order.
+-- 3. Event order with explicit same-second ambiguity.
 --
--- Stripe `created` has one-second resolution. Two distinct events in the same
--- second therefore have no semantic order, but failing the later delivery
--- forever is worse than choosing a stable winner: the event is retried
--- indefinitely and the watermark never advances. Compare (created, event id)
--- as a total order instead. The id is used only as a tie-breaker; a replay of
--- the same event is still accepted, and a lower-id same-second delivery is
--- acknowledged as stale rather than raising.
+-- Stripe `created` has one-second resolution, and event ids are opaque: their
+-- lexical order does not establish which same-second event is newer. The
+-- generic order check therefore accepts a distinct same-second event in
+-- delivery order instead of inventing an order from its id. The subscription
+-- fence is stricter: it reports the ambiguity (-2) so the caller re-reads the
+-- subscription and applies that authoritative snapshot with a current
+-- timestamp. Replays of the same event are still accepted; strictly older
+-- events are stale.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.assert_stripe_event_order(
   _stripe_subscription_id TEXT,
@@ -173,11 +178,9 @@ BEGIN
     RETURN _event_created >= v_last_created;
   END IF;
 
-  IF _event_created <> v_last_created THEN
-    RETURN _event_created > v_last_created;
-  END IF;
-
-  RETURN _event_id > v_last_event_id;
+  -- Distinct same-second events have no authoritative order. Accept the
+  -- delivery instead of pretending the event id is chronological.
+  RETURN _event_created >= v_last_created;
 END;
 $$;
 
@@ -195,11 +198,25 @@ GRANT EXECUTE ON FUNCTION public.assert_stripe_event_order(TEXT, TEXT, TEXT, TIM
 -- for a superseded subscription returns -1 and is acknowledged: the newest
 -- subscription already owns the profile.
 --
+-- `_allow_rebind` lets a verified new subscription take over a profile whose
+-- current subscription was canceled (cancel-then-resubscribe). Without it, the
+-- first cancellation would block the paid replacement forever.
+--
 -- Returns:
 --   1  the profile was updated
 --   0  no profile matched the customer (retry/alert; data is missing)
---  -1  the profile is bound to a different subscription (stale, acknowledged)
+--  -1  the event is stale or the profile is bound to a different subscription
+--      (acknowledged)
+--  -2  two distinct events share a timestamp; the caller must re-read Stripe
+--      and re-apply the authoritative snapshot
 -- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.apply_fenced_stripe_subscription_event(
+  TEXT, UUID, TIMESTAMP WITH TIME ZONE, TEXT, TEXT,
+  public.subscription_tier, public.subscription_status,
+  TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE,
+  TIMESTAMP WITH TIME ZONE, BOOLEAN, TEXT
+);
+
 CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(
   _event_id TEXT,
   _claim_token UUID,
@@ -212,7 +229,8 @@ CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(
   _current_period_end TIMESTAMP WITH TIME ZONE,
   _trial_end TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   _cancel_at_period_end BOOLEAN DEFAULT false,
-  _billing_interval TEXT DEFAULT 'monthly'
+  _billing_interval TEXT DEFAULT 'monthly',
+  _allow_rebind BOOLEAN DEFAULT false
 )
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -221,6 +239,8 @@ SET search_path = public, pg_catalog
 AS $$
 DECLARE
   v_count INTEGER;
+  v_last_created TIMESTAMP WITH TIME ZONE;
+  v_last_event_id TEXT;
 BEGIN
   IF _claim_token IS NULL OR _event_created IS NULL THEN
     RAISE EXCEPTION 'A claim token and Stripe event timestamp are required';
@@ -233,10 +253,27 @@ BEGIN
 
   PERFORM public.assert_active_stripe_claim(_event_id, _claim_token);
 
-  IF NOT public.assert_stripe_event_order(
-    _stripe_subscription_id, 'subscription', _event_id, _event_created
-  ) THEN
+  INSERT INTO public.stripe_subscription_event_order (
+    stripe_subscription_id, event_family, stripe_event_id, stripe_event_created
+  )
+  VALUES (_stripe_subscription_id, 'subscription', _event_id, _event_created)
+  ON CONFLICT (stripe_subscription_id, event_family) DO NOTHING;
+
+  SELECT stripe_event_created, stripe_event_id
+  INTO v_last_created, v_last_event_id
+  FROM public.stripe_subscription_event_order
+  WHERE stripe_subscription_id = _stripe_subscription_id
+    AND event_family = 'subscription'
+  FOR UPDATE;
+
+  IF _event_id = v_last_event_id THEN
+    IF _event_created < v_last_created THEN
+      RETURN -1;
+    END IF;
+  ELSIF _event_created < v_last_created THEN
     RETURN -1;
+  ELSIF _event_created = v_last_created THEN
+    RETURN -2;
   END IF;
 
   UPDATE public.profiles
@@ -252,7 +289,9 @@ BEGIN
       updated_at = NOW()
   WHERE stripe_customer_id = _stripe_customer_id
     AND (stripe_subscription_id IS NULL
-         OR stripe_subscription_id = _stripe_subscription_id);
+         OR stripe_subscription_id = _stripe_subscription_id
+         OR (_allow_rebind
+             AND subscription_status IN ('canceled', 'incomplete_expired')));
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
 
@@ -291,14 +330,14 @@ REVOKE ALL ON FUNCTION public.apply_fenced_stripe_subscription_event(
   TEXT, UUID, TIMESTAMP WITH TIME ZONE, TEXT, TEXT,
   public.subscription_tier, public.subscription_status,
   TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE,
-  TIMESTAMP WITH TIME ZONE, BOOLEAN, TEXT
+  TIMESTAMP WITH TIME ZONE, BOOLEAN, TEXT, BOOLEAN
 ) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.apply_fenced_stripe_subscription_event(
   TEXT, UUID, TIMESTAMP WITH TIME ZONE, TEXT, TEXT,
   public.subscription_tier, public.subscription_status,
   TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE,
-  TIMESTAMP WITH TIME ZONE, BOOLEAN, TEXT
+  TIMESTAMP WITH TIME ZONE, BOOLEAN, TEXT, BOOLEAN
 ) TO service_role;
 
 -- ---------------------------------------------------------------------------
@@ -307,8 +346,9 @@ GRANT EXECUTE ON FUNCTION public.apply_fenced_stripe_subscription_event(
 -- The payment fact is recorded first: money collected must not be lost because
 -- the subscription moved on. The entitlement advance, retry-tracking close, and
 -- payment watermark then run only when the UPDATE matched the profile's current
--- subscription. A payment for a superseded subscription returns 'recorded', so
--- the caller does not run renewal tracking and overwrite next_billing_date.
+-- subscription. A payment for a superseded subscription returns 'recorded'.
+-- A payment that arrives before the subscription binding returns 'unbound';
+-- the caller retries so renewal tracking is not lost permanently.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_payment_event(
   _event_id TEXT,
@@ -330,6 +370,7 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_user_id UUID;
+  v_bound_subscription_id TEXT;
   v_inserted INTEGER := 0;
   v_profile_rows INTEGER := 0;
   v_in_order BOOLEAN;
@@ -344,7 +385,8 @@ BEGIN
 
   PERFORM public.assert_active_stripe_claim(_event_id, _claim_token);
 
-  SELECT id INTO v_user_id
+  SELECT id, stripe_subscription_id
+  INTO v_user_id, v_bound_subscription_id
   FROM public.profiles
   WHERE stripe_customer_id = _stripe_customer_id;
 
@@ -364,6 +406,14 @@ BEGIN
   DO NOTHING;
 
   GET DIAGNOSTICS v_inserted = ROW_COUNT;
+
+  -- Stripe can deliver invoice.payment_succeeded before the subscription event
+  -- that binds the profile. The payment is recorded, but entitlement state and
+  -- renewal tracking cannot apply yet; return a retryable outcome so the
+  -- caller returns 500 and Stripe redelivers after the binding.
+  IF _stripe_subscription_id IS NOT NULL AND v_bound_subscription_id IS NULL THEN
+    RETURN 'unbound';
+  END IF;
 
   IF _stripe_subscription_id IS NOT NULL THEN
     v_in_order := public.assert_stripe_event_order(
@@ -458,12 +508,15 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.profiles
-    WHERE id = _user_id
-      AND stripe_subscription_id = _stripe_subscription_id
-  ) THEN
+  -- Hold the profile row so a concurrent subscription sync cannot rebind it
+  -- between this check and handle_renewal_failure's update by user id.
+  PERFORM 1
+  FROM public.profiles
+  WHERE id = _user_id
+    AND stripe_subscription_id = _stripe_subscription_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RETURN;
   END IF;
 
@@ -616,12 +669,15 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.profiles
-    WHERE id = _user_id
-      AND stripe_subscription_id = _stripe_subscription_id
-  ) THEN
+  -- Hold the profile row so a concurrent subscription sync cannot rebind it
+  -- between this check and the tracking update by user id.
+  PERFORM 1
+  FROM public.profiles
+  WHERE id = _user_id
+    AND stripe_subscription_id = _stripe_subscription_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RETURN;
   END IF;
 

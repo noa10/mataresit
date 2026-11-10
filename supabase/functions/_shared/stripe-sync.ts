@@ -28,6 +28,20 @@ export interface WebhookClaimContext {
   eventCreated: number;
 }
 
+export interface FencedSubscriptionOptions {
+  /**
+   * Permit a profile whose current subscription is canceled or
+   * incomplete_expired to bind this subscription (cancel-then-resubscribe).
+   */
+  allowRebind?: boolean;
+  /**
+   * Order the apply by this timestamp instead of the event's `created` when
+   * re-applying an authoritative snapshot fetched after a same-second
+   * ambiguity.
+   */
+  eventCreatedAt?: string;
+}
+
 function getFirstPrice(subscription: any): any | null {
   return subscription?.items?.data?.[0]?.price ?? null;
 }
@@ -37,9 +51,11 @@ function getFirstPrice(subscription: any): any | null {
  *
  * A price the secrets do not know yet (a legacy, grandfathered, or newly
  * launched price) must not turn every webhook for that customer into a 500
- * before the payment is recorded. Use the tier recorded on the subscription
- * metadata, then the caller's fallback (normally the profile's current tier).
- * Direct administrative syncs pass no fallback and still fail closed.
+ * before the payment is recorded. Prefer the caller's fallback (normally the
+ * profile's current tier): subscription metadata is written at checkout and
+ * can be stale after a plan change, so it may not grant more than the profile
+ * already has. Metadata is used only when the caller has no fallback. Direct
+ * administrative syncs pass no fallback and still fail closed.
  */
 export function getSubscriptionTier(
   subscription: any,
@@ -48,20 +64,20 @@ export function getSubscriptionTier(
   try {
     return resolveTierFromPriceId(getFirstPrice(subscription)?.id);
   } catch (error) {
+    const priceId = getFirstPrice(subscription)?.id ?? '<missing>';
+    if (fallback) {
+      console.warn(
+        `Unrecognized Stripe price ID ${priceId}; preserving existing tier ${fallback}`,
+      );
+      return fallback;
+    }
     const metadataTier = subscription?.metadata?.tier;
     if (isSubscriptionTier(metadataTier)) {
       console.warn(
-        `Unrecognized Stripe price ID ${getFirstPrice(subscription)?.id ?? '<missing>'}; ` +
+        `Unrecognized Stripe price ID ${priceId}; ` +
         `using subscription metadata tier ${metadataTier}`,
       );
       return metadataTier;
-    }
-    if (fallback) {
-      console.warn(
-        `Unrecognized Stripe price ID ${getFirstPrice(subscription)?.id ?? '<missing>'}; ` +
-        `preserving existing tier ${fallback}`,
-      );
-      return fallback;
     }
     throw error;
   }
@@ -157,6 +173,7 @@ export async function applyFencedStripeSubscriptionEvent(
   subscription: any,
   claim: WebhookClaimContext,
   overrides: SubscriptionSyncOverrides = {},
+  options: FencedSubscriptionOptions = {},
 ): Promise<number> {
   if (!claim.eventId || !claim.claimToken) {
     throw new Error('Webhook subscription sync requires an active claim');
@@ -166,7 +183,8 @@ export async function applyFencedStripeSubscriptionEvent(
   const { data, error } = await supabaseAdmin.rpc('apply_fenced_stripe_subscription_event', {
     _event_id: claim.eventId,
     _claim_token: claim.claimToken,
-    _event_created: toEventTimestamp(claim.eventCreated),
+    _event_created: options.eventCreatedAt ?? toEventTimestamp(claim.eventCreated),
+    _allow_rebind: options.allowRebind ?? false,
     ...params,
   });
 
@@ -215,7 +233,7 @@ export async function applyFencedStripePaymentEvent(
   supabaseAdmin: any,
   event: FencedPaymentEvent,
   claim: WebhookClaimContext,
-): Promise<'applied' | 'recorded'> {
+): Promise<'applied' | 'recorded' | 'unbound'> {
   requireActiveClaim(claim, 'Webhook payment sync');
 
   const { data, error } = await supabaseAdmin.rpc('apply_fenced_stripe_payment_event', {
@@ -238,7 +256,7 @@ export async function applyFencedStripePaymentEvent(
     );
   }
 
-  if (data === 'applied' || data === 'recorded') {
+  if (data === 'applied' || data === 'recorded' || data === 'unbound') {
     return data;
   }
 

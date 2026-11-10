@@ -365,6 +365,12 @@ async function changePlan(
         id: subscription.items.data[0].id,
         price: targetPriceId,
       }],
+      // Keep the metadata tier aligned with the new price. Webhook tier
+      // fallbacks must never grant entitlements from a stale metadata value.
+      metadata: {
+        tier: targetTier,
+        billing_interval: targetInterval,
+      },
       proration_behavior: 'create_prorations',
       cancel_at_period_end: false,
     },
