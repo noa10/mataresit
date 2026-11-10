@@ -63,20 +63,28 @@ if os.path.basename(sys.argv[0]) == 'psql':
         calls = [json.loads(line) for line in self.call_log.read_text().splitlines()] if self.call_log.exists() else []
         return result, calls
 
+    def external_calls(self, calls):
+        return [c for c in calls if c[0] in ('supabase', 'psql', 'jq')]
+
     def test_validate_only_never_queries_or_executes_ddl_for_unapplied_migrations(self):
         result, calls = self.run_script('--validate-only', APPLIED='no')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual([c for c in calls if c[0] == 'psql'], [])
+        self.assertEqual(self.external_calls(calls), [])
 
     def test_validate_only_never_queries_applied_migrations(self):
         result, calls = self.run_script('--validate-only', APPLIED='yes')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual([c for c in calls if c[0] == 'psql'], [])
+        self.assertEqual(self.external_calls(calls), [])
 
     def test_dry_run_never_queries_database(self):
         result, calls = self.run_script('--dry-run')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual([c for c in calls if c[0] == 'psql'], [])
+        self.assertEqual(self.external_calls(calls), [])
+
+    def test_validate_only_needs_no_database_password(self):
+        result, calls = self.run_script('--validate-only', SUPABASE_DB_PASSWORD='')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.external_calls(calls), [])
 
     def test_probe_failure_aborts_without_migration_file_execution(self):
         result, calls = self.run_script(FAIL_PSQL='1')

@@ -199,6 +199,14 @@ done
 # Validate prerequisites
 validate_prerequisites() {
     log "Validating prerequisites..."
+
+    # --dry-run and --validate-only are file-only modes. They must not require
+    # hosted-database credentials, invoke the Supabase CLI, or attempt a login.
+    if [[ "$DRY_RUN" == "true" || "$VALIDATE_ONLY" == "true" ]]; then
+        mkdir -p "$BACKUP_DIR" "$ROLLBACK_DIR" "$VALIDATION_DIR"
+        success "File-only mode: skipped database tools, credentials, and Supabase connection checks"
+        return 0
+    fi
     
     # Check required tools
     local required_tools=("supabase" "psql" "jq")
