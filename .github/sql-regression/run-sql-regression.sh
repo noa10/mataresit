@@ -41,6 +41,7 @@ curated_migrations=(
   20250115000000_add_subscription_schema.sql
   20250120000000_fix_profiles_insert_policy.sql
   20250722000000_enhance_billing_system_schema.sql
+  20261103000000_restore_billing_schema_drift.sql
   20261104000000_stripe_production_hardening.sql
   20261104000001_batch_item_vault_trigger.sql
   20261106000000_stripe_checkout_locks_and_payment_fencing.sql
