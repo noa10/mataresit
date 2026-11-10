@@ -74,8 +74,9 @@ replace it with a new-format `sb_secret_...` key: these functions pin
 supabase-js 2.7.1, which sends the key as a Bearer token, and the platform
 rejects a non-JWT bearer when JWT verification is enabled. Migrating to
 `sb_secret_...` requires upgrading supabase-js and sending the key on the
-`apikey` header only. `SERVICE_ROLE_KEY` is used only as a fallback when the
-built-in variable is absent.
+`apikey` header only. The legacy `SERVICE_ROLE_KEY` secret is retired by PR
+#250 — do not recreate it; the runtime always injects
+`SUPABASE_SERVICE_ROLE_KEY`.
 
 ### 3. Database Migration
 

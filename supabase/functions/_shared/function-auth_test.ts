@@ -139,8 +139,11 @@ function fakeAdmin(options: FakeAdminOptions): SupabaseClient {
 async function withServiceKey(fn: () => Promise<void>): Promise<void> {
   const previousBuiltIn = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const previousExplicit = Deno.env.get('SERVICE_ROLE_KEY');
-  Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-key');
+  // Delete the retired secret during the callback so a stale local value cannot
+  // mask a regression; restore it afterwards because Deno.env is process-wide
+  // and later test modules may still be running with their own values.
   Deno.env.delete('SERVICE_ROLE_KEY');
+  Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'service-key');
 
   try {
     await fn();

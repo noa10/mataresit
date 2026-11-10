@@ -354,7 +354,9 @@ interface TestConfig {
 ```bash
 # Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_url
-SERVICE_ROLE_KEY=your_service_role_key
+# SUPABASE_SERVICE_ROLE_KEY is injected into every Edge Function by Supabase.
+# Do not set a duplicate SERVICE_ROLE_KEY / PROJECT_URL / VITE_SUPABASE_URL
+# Edge Function secret (retired in PR #250).
 
 # Stripe Configuration
 STRIPE_SECRET_KEY=your_stripe_secret_key

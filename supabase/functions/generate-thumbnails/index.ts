@@ -25,14 +25,10 @@ function addCorsHeaders(response: Response): Response {
   });
 }
 
-// Initialize Supabase client (will use service_role key from environment)
-const supabaseUrl = Deno.env.get('PROJECT_URL')!;
-const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!;
-
-// ---- ADD DEBUG LOGS ----
-console.log(`[DEBUG] Runtime PROJECT_URL: ${supabaseUrl ? supabaseUrl.substring(0, 20) + '...' : 'MISSING!'}`);
-console.log(`[DEBUG] Runtime SERVICE_ROLE_KEY: ${supabaseKey ? supabaseKey.substring(0, 10) + '...' : 'MISSING!'}`);
-// ---- END DEBUG LOGS ----
+// Initialize Supabase client. SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are
+// injected into every Edge Function by the Supabase runtime.
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

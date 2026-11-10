@@ -67,8 +67,23 @@ The agent verified everything up to the gateway but could not perform interactiv
 ## Credential cleanups — owner action
 
 - [ ] Rotate the service-role credentials that remain in Git history. This is the **same owner-gated credential-history purge** listed as a blocker on PR #234 — one decision covers both. The purge runbook is tracked on PR #234's branch (`docs/runbooks/credential-history-purge.md`) and lands on `main` when that PR merges.
-- [ ] Delete the stale `SERVICE_ROLE_KEY` and `VITE_SUPABASE_ANON_KEY` Edge Function secrets.
+- [ ] Delete the stale `SERVICE_ROLE_KEY`, `PROJECT_URL`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_PROJECT_ID` Edge Function secrets — **only after** every function in the redeploy inventory below runs the PR #250 bundle.
 - [ ] Move production secrets out of `.env.local` into the platform secret store.
+
+### Redeploy inventory for PR #250 (17 functions)
+
+Edge Functions bundle `_shared` at deploy time, so deleting the duplicate secrets before every importer is redeployed leaves a deployed bundle that still reads the old names. Derive the list from the checked-in import graph rather than counting by hand:
+
+```bash
+node scripts/derive-edge-function-importers.mjs \
+  _shared/service-role.ts _shared/api-auth.ts _shared/site-url.ts
+```
+
+That returns 16 transitive importers; `generate-thumbnails` is added because PR #250 edits it directly. `process-receipt` and `test-notification-filtering` reach `site-url.ts` through `_shared/notification-helper.ts`, and the latter also reaches `service-role.ts` through `_shared/function-auth.ts`.
+
+- `billing-alerting`, `billing-auto-renewal`, `billing-cron-jobs`, `billing-health-check`, `billing-monitor`, `billing-test-suite`
+- `create-checkout-session`, `email-scheduler`, `external-api`, `generate-thumbnails`, `manage-api-keys`, `manage-subscription`
+- `process-receipt`, `send-email`, `send-team-invitation-email`, `stripe-webhook`, `test-notification-filtering`
 
 ## Prevention
 

@@ -48,7 +48,7 @@ export async function validateApiKey(apiKey: string | null): Promise<ApiKeyValid
     // Initialize Supabase admin client
     // Environment variables are automatically available in Supabase Edge Functions
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing required environment variables:', {
@@ -116,7 +116,7 @@ function getSupabaseUrl(): string {
 }
 
 function getServiceRoleKey(): string {
-  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || '';
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
 function getAnonKey(): string {
