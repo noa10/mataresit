@@ -149,6 +149,16 @@ export const TIER_LIMITS = {
 } as const;
 
 /**
+ * Check whether a value is a database subscription tier.
+ *
+ * Stripe metadata and profile fallbacks are untyped at the boundary, so this
+ * guard keeps an unexpected string from being written to the tier enum.
+ */
+export function isSubscriptionTier(value: unknown): value is SubscriptionTier {
+  return value === 'free' || value === 'pro' || value === 'max';
+}
+
+/**
  * Map a Stripe price ID to a subscription tier.
  *
  * Returns null for an unknown price. Callers that update entitlements must use

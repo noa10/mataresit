@@ -331,8 +331,10 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 7. Event IDs are opaque: equal timestamps for distinct events are ambiguous.
--- Replays of the same event remain allowed, including after a partial commit.
+-- 7. Distinct events created in the same second get a stable total order: the
+-- higher event id is treated as newer, the lower one is stale, and replaying
+-- the same event remains allowed. Nothing raises, so a same-second burst does
+-- not retry forever.
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -348,11 +350,11 @@ BEGIN
   IF public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_newer_id', v_created - INTERVAL '1 second') THEN
     RAISE EXCEPTION 'older timestamp should be rejected regardless of event id';
   END IF;
-  IF NOT pg_temp.test_raises(format(
-    'SELECT public.assert_stripe_event_order(%L, %L, %L, %L::timestamptz)',
-    v_subscription, 'subscription', 'evt_a', v_created
-  )) THEN
-    RAISE EXCEPTION 'distinct events with equal timestamps must fail closed';
+  IF NOT public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_zz', v_created) THEN
+    RAISE EXCEPTION 'an equal-timestamp event with a higher id should be accepted';
+  END IF;
+  IF public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_a', v_created) THEN
+    RAISE EXCEPTION 'an equal-timestamp event with an id below the watermark should be stale';
   END IF;
   IF NOT public.assert_stripe_event_order(v_subscription, 'subscription', 'evt_a', v_created + INTERVAL '1 second') THEN
     RAISE EXCEPTION 'newer timestamp should be accepted regardless of event id';

@@ -359,6 +359,7 @@ DECLARE
   v_status public.subscription_status;
   v_grace TIMESTAMP WITH TIME ZONE;
   v_last_created TIMESTAMP WITH TIME ZONE;
+  v_last_event TEXT;
 BEGIN
   SELECT outcome, token INTO v_outcome, v_token
   FROM public.claim_stripe_webhook_event('evt_renewal_failure_1', 'invoice.payment_failed');
@@ -380,9 +381,10 @@ BEGIN
       v_status, v_grace;
   END IF;
 
-  -- An older failure event must be rejected, not allowed to overwrite the
-  -- state the newer event produced.
-  SELECT stripe_event_created INTO v_last_created
+  -- An older failure event is acknowledged as stale and must not create retry
+  -- tracking or extend the grace period the newer event produced.
+  SELECT stripe_event_created, stripe_event_id
+  INTO v_last_created, v_last_event
   FROM public.stripe_subscription_event_order
   WHERE stripe_subscription_id = 'sub_test_fencing_1'
     AND event_family = 'payment';
@@ -394,17 +396,26 @@ BEGIN
     RAISE EXCEPTION 'old renewal failure setup: expected claimed, got %', v_outcome;
   END IF;
 
-  BEGIN
-    PERFORM public.apply_fenced_renewal_failure(
-      'evt_renewal_failure_old_1', v_older_token,
-      v_last_created - INTERVAL '10 seconds', v_user,
-      'sub_test_fencing_1', 'card declined', 'in_test_fencing_old_1'
-    );
+  PERFORM public.apply_fenced_renewal_failure(
+    'evt_renewal_failure_old_1', v_older_token,
+    v_last_created - INTERVAL '10 seconds', v_user,
+    'sub_test_fencing_1', 'card declined', 'in_test_fencing_old_1'
+  );
 
-    RAISE EXCEPTION 'old renewal failure: the write must be rejected';
-  EXCEPTION
-    WHEN serialization_failure THEN NULL;
-  END;
+  SELECT COUNT(*) INTO v_rows
+  FROM public.payment_retry_tracking
+  WHERE stripe_invoice_id = 'in_test_fencing_old_1';
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'old renewal failure: no retry-tracking row may be written, got %', v_rows;
+  END IF;
+
+  SELECT stripe_event_id INTO v_last_event
+  FROM public.stripe_subscription_event_order
+  WHERE stripe_subscription_id = 'sub_test_fencing_1'
+    AND event_family = 'payment';
+  IF v_last_event <> 'evt_renewal_failure_1' THEN
+    RAISE EXCEPTION 'old renewal failure: the watermark must stay on the newer event, got %', v_last_event;
+  END IF;
 
   -- A repeat failure event for the same invoice short-circuits instead of
   -- duplicating retry rows (handle_renewal_failure is not replay-safe on its

@@ -44,6 +44,57 @@ const isSimulatedId = (value: string | null | undefined): boolean =>
     value?.startsWith('test_sub_'),
   );
 
+/**
+ * Recover a compatible open Checkout Session after an ambiguous failure.
+ *
+ * A Stripe create call can time out after Stripe has persisted a payable
+ * session but before the SDK returns it. The original request then has no
+ * createdSession to bind, releases its lock, and a retry with a new lock token
+ * would otherwise create a second payable session. Listing open sessions first
+ * makes the retry idempotent on the object that already exists.
+ *
+ * Only a session for the same user, tier, and interval is reusable. Sessions
+ * for another plan are expired best-effort so the user is not left with two
+ * completable sessions for different plans.
+ */
+async function findReusableCheckoutSession(
+  stripe: Stripe,
+  options: {
+    customerId: string;
+    userId: string;
+    tier: string;
+    billingInterval: string;
+  },
+): Promise<Stripe.Checkout.Session | null> {
+  const openSessions = await stripe.checkout.sessions.list({
+    customer: options.customerId,
+    status: 'open',
+    limit: 100,
+  });
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const reusable = openSessions.data.find((session) =>
+    session.client_reference_id === options.userId &&
+    session.metadata?.user_id === options.userId &&
+    session.metadata?.tier === options.tier &&
+    session.metadata?.billing_interval === options.billingInterval &&
+    typeof session.url === 'string' && session.url.length > 0 &&
+    typeof session.expires_at === 'number' && session.expires_at > nowSeconds
+  ) ?? null;
+
+  for (const session of openSessions.data) {
+    if (session.id === reusable?.id) continue;
+    if (session.metadata?.user_id !== options.userId) continue;
+    try {
+      await stripe.checkout.sessions.expire(session.id);
+    } catch (expireError) {
+      console.warn(`Could not expire stale Checkout Session ${session.id}:`, expireError);
+    }
+  }
+
+  return reusable;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -309,6 +360,13 @@ serve(async (req) => {
         }
       }
 
+      if (!customerId) {
+        // Defensive: the branch above always assigns a Stripe customer id.
+        await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+        console.error('Stripe customer id is missing after customer creation');
+        return jsonResponse({ error: 'Could not prepare your account for checkout' }, 500);
+      }
+
       // A second Checkout Session for an existing subscriber creates a second
       // subscription. Plan changes must go through manage-subscription.
       const existingSubscriptions = await stripe.subscriptions.list({
@@ -328,6 +386,49 @@ serve(async (req) => {
           code: 'SUBSCRIPTION_EXISTS',
           tier: targetTier,
         }, 409);
+      }
+
+      // A previous request can have created a payable session and then failed
+      // before it could bind it (for example a Stripe timeout after the create
+      // was persisted). Recover that session instead of opening a second one.
+      let reusable: Stripe.Checkout.Session | null = null;
+      try {
+        reusable = await findReusableCheckoutSession(stripe, {
+          customerId,
+          userId: user.id,
+          tier: targetTier,
+          billingInterval,
+        });
+      } catch (error) {
+        // Without the open-session check we cannot rule out a duplicate
+        // payable session, so fail closed. No session was created by this
+        // request, so the preparation lock can be released.
+        await releaseCheckoutLock(supabaseAdmin, user.id, { lockToken });
+        console.error('Could not check for an existing open Checkout Session', error);
+        return jsonResponse({ error: 'Could not start checkout. Please try again.' }, 500);
+      }
+
+      if (reusable?.url && reusable.expires_at) {
+        const bound = await bindCheckoutSession(
+          supabaseAdmin,
+          user.id,
+          lockToken,
+          reusable.id,
+          reusable.expires_at,
+        );
+
+        if (!bound) {
+          // The session is payable, so releasing the lock would allow a second
+          // one. Keep the lock and let it self-heal with the session.
+          console.error(`Failed to bind recovered Checkout Session ${reusable.id} to the checkout lock`);
+          return jsonResponse({ error: 'Could not start checkout. Please try again.' }, 500);
+        }
+
+        return jsonResponse({
+          sessionId: reusable.id,
+          url: reusable.url,
+          reused: true,
+        });
       }
 
       const baseUrl = getFrontendUrl();

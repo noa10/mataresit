@@ -16,7 +16,8 @@ unfenced is deliberately documented as best-effort:
 - `invoice.finalized` writes `profiles.next_billing_date` directly
   (`supabase/functions/stripe-webhook/index.ts`, `handleInvoiceFinalized`);
 - `payment_method.attached` / `detached` and `setup_intent.succeeded` write
-  card display fields directly;
+  card display fields, and maintain the profile's active
+  `stripe_payment_method_id`, directly;
 - reminder scheduling, transactional emails, and audit rows happen outside the
   fence and are at-least-once;
 - `manage-subscription` admin syncs (`syncSubscriptionToProfile`) and the
@@ -52,7 +53,7 @@ never writes to an unbound profile, so the same late event cannot regress it.
 |---|---|---|---|
 | Profile tier/status/binding, payment history, grace/retry, renewal tracking | `apply_fenced_*` RPCs | entitlement | fenced — shipped in this PR |
 | `invoice.finalized` → `profiles.next_billing_date` | `handleInvoiceFinalized` | bookkeeping | self-healing via reconciliation |
-| Card display fields | `payment_method.*` / `setup_intent.succeeded` handlers | bookkeeping | self-healing via reconciliation |
+| Card display fields + active payment-method pointer | `payment_method.*` / `setup_intent.succeeded` handlers | bookkeeping | self-healing via reconciliation |
 | Reminder scheduling + emails + audit rows | outside the fence | at-least-once | alerting only; not reconciled |
 | Admin syncs | `syncSubscriptionToProfile` | administrative | order-aware admin apply (§5) |
 
@@ -74,11 +75,15 @@ never writes to an unbound profile, so the same late event cannot regress it.
    concurrently delivered webhook can write newer state first and then be
    overwritten by a stale admin response, or the reverse. §5 makes admin
    applies order-aware.
-5. **Same-second event bursts** — `assert_stripe_event_order` rejects
-   distinct events created in the same second (fail closed). The
-   reconciliation pass doubles as the executor of the documented "manual
-   reconciliation": it reads Stripe truth and applies the newer snapshot,
-   resolving the burst without operator SQL.
+5. **Same-second event bursts** — `assert_stripe_event_order` applies a
+   deterministic total order over `(created, event id)`: distinct events
+   created in the same second are ordered by event id, and a replay of the
+   last applied event is accepted only when its `created` is not older.
+   `20261110010000_stripe_fencing_regressions.sql` replaces the previous
+   fail-closed rule that raised `serialization_failure` and left the losing
+   delivery retrying forever. `supabase/tests/stripe_fencing_regressions.sql`
+   pins the ordering, subscription scoping, and payment/renewal fencing
+   regressions.
 
 ## 5. Design
 

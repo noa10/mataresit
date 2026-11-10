@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-import { resolveStripeStatusForDatabase } from '../_shared/stripe-config.ts';
+import {
+  isSubscriptionTier,
+  resolveStripeStatusForDatabase,
+  type SubscriptionTier,
+} from '../_shared/stripe-config.ts';
 import {
   applyFencedProfileStatus,
   applyFencedRenewalFailure,
@@ -370,7 +374,6 @@ async function handleSubscriptionChange(
     }))
   });
 
-  const newTier = getSubscriptionTier(subscription);
   const status = resolveStripeStatusForDatabase(subscription.status);
   const billingInterval = getSubscriptionBillingInterval(subscription);
 
@@ -389,6 +392,14 @@ async function handleSubscriptionChange(
   } catch (error) {
     console.warn(`Could not fetch current tier for customer ${customerId}:`, error);
   }
+
+  // An unregistered price must not fail the whole delivery. Preserve the tier
+  // the profile already has (or the subscription metadata tier, which
+  // getSubscriptionTier prefers) until the price is added to the secrets.
+  const fallbackTier: SubscriptionTier = isSubscriptionTier(previousTier)
+    ? previousTier
+    : 'free';
+  const newTier = getSubscriptionTier(subscription, fallbackTier);
 
   const tierHierarchy = { 'free': 0, 'pro': 1, 'max': 2 };
   const previousLevel = previousTier
@@ -414,14 +425,24 @@ async function handleSubscriptionChange(
     isReactivation,
   });
 
-  // A zero-row sync means Stripe has a paid subscription this database cannot
-  // attribute to a profile. Throwing marks the event failed and returns 500, so
-  // Stripe retries instead of us reporting success and dropping the entitlement.
+  // A negative sync means a delayed event for a superseded subscription: the
+  // current subscription owns the profile, so acknowledge and skip all
+  // post-sync side effects. A zero-row sync means Stripe has a paid
+  // subscription this database cannot attribute to a profile. Throwing marks
+  // the event failed and returns 500, so Stripe retries instead of us reporting
+  // success and dropping the entitlement.
   const syncedRows = await applyFencedStripeSubscriptionEvent(
     supabaseClient,
     subscription,
     claim,
   );
+  if (syncedRows < 0) {
+    console.warn(
+      `Skipped stale subscription event for customer ${customerId}: ` +
+      `profile is bound to a newer subscription than ${subscription.id}`,
+    );
+    return;
+  }
   if (syncedRows === 0) {
     throw new Error(
       `No profile matched Stripe customer ${customerId} for subscription ${subscription.id}`,
@@ -462,9 +483,10 @@ async function handleSubscriptionDeleted(
 ) {
   const customerId = subscription.customer as string;
 
-  // A failed downgrade-to-free is worse than a failed upgrade: the user keeps a
-  // paid tier Stripe has already cancelled. Retry via 500 instead of reporting
-  // success.
+  // A negative sync is a delayed event for a superseded subscription and must
+  // be acknowledged. A zero-row sync means Stripe has a deleted subscription
+  // this database cannot attribute to a profile: retry via 500 instead of
+  // silently keeping a paid tier Stripe already cancelled.
   const deletedRows = await applyFencedStripeSubscriptionEvent(
     supabaseClient,
     subscription,
@@ -476,6 +498,13 @@ async function handleSubscriptionDeleted(
       billingInterval: 'monthly',
     },
   );
+  if (deletedRows < 0) {
+    console.warn(
+      `Skipped stale deletion for customer ${customerId}: ` +
+      `profile is bound to a newer subscription than ${subscription.id}`,
+    );
+    return;
+  }
   if (deletedRows === 0) {
     throw new Error(
       `No profile matched Stripe customer ${customerId} for deleted subscription ${subscription.id}`,
@@ -510,7 +539,10 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice, claim: WebhookCla
   }
 
   const subscriptionTier = subscription
-    ? getSubscriptionTier(subscription)
+    ? getSubscriptionTier(
+      subscription,
+      isSubscriptionTier(profile.subscription_tier) ? profile.subscription_tier : 'free',
+    )
     : (profile.subscription_tier ?? 'free');
   const billingInterval = subscription
     ? getSubscriptionBillingInterval(subscription)
@@ -1049,6 +1081,7 @@ async function handlePaymentMethodAttached(paymentMethod: Stripe.PaymentMethod) 
         .update({
           payment_method_brand: paymentMethod.card.brand,
           payment_method_last_four: paymentMethod.card.last4,
+          stripe_payment_method_id: paymentMethod.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', profile.id),
@@ -1082,29 +1115,57 @@ async function handlePaymentMethodAttached(paymentMethod: Stripe.PaymentMethod) 
  * Handle payment method detached
  */
 async function handlePaymentMethodDetached(paymentMethod: Stripe.PaymentMethod) {
-  const customerId = paymentMethod.customer as string;
+  // Stripe sends customer = null on payment_method.detached: the method is no
+  // longer attached to a customer. Fall back to the id stored on attach or
+  // setup_intent.succeeded, which is the only unambiguous profile key.
+  const customerId = typeof paymentMethod.customer === 'string'
+    ? paymentMethod.customer
+    : null;
 
-  console.log(`Processing payment method detached for customer ${customerId}, payment method ${paymentMethod.id}`);
+  console.log(
+    `Processing payment method detached for payment method ${paymentMethod.id}` +
+    ` (customer ${customerId ?? '<null>'})`,
+  );
 
-  // Get user profile
-  const { data: profile, error: profileError } = await supabaseClient
-    .from('profiles')
-    .select('*')
-    .eq('stripe_customer_id', customerId)
-    .single();
+  const profileQuery = customerId
+    ? supabaseClient
+      .from('profiles')
+      .select('id, payment_method_brand, payment_method_last_four, stripe_payment_method_id')
+      .eq('stripe_customer_id', customerId)
+      .single()
+    : supabaseClient
+      .from('profiles')
+      .select('id, payment_method_brand, payment_method_last_four, stripe_payment_method_id')
+      .eq('stripe_payment_method_id', paymentMethod.id)
+      .single();
+
+  const { data: profile, error: profileError } = await profileQuery;
 
   if (profileError || !profile) {
-    throw new Error(`Profile not found for customer ${customerId}: ${profileError?.message ?? 'no profile'}`);
+    // Legacy profiles predate stripe_payment_method_id and the event carries
+    // no customer, so there is no safe row to clear. Acknowledge the event
+    // instead of retrying it forever.
+    console.warn(
+      `No profile found for detached payment method ${paymentMethod.id}` +
+      ` (customer ${customerId ?? '<null>'}): ${profileError?.message ?? 'no profile'}`,
+    );
+    return;
   }
 
-  // Clear payment method info if this was the active one
-  if (profile.payment_method_last_four === paymentMethod.card?.last4) {
+  // Clear the stored card only when this is the method on the profile. The
+  // last-four fallback covers rows written before stripe_payment_method_id.
+  const isActiveMethod = profile.stripe_payment_method_id
+    ? profile.stripe_payment_method_id === paymentMethod.id
+    : profile.payment_method_last_four === paymentMethod.card?.last4;
+
+  if (isActiveMethod) {
     await requireSuccess(
       supabaseClient
         .from('profiles')
         .update({
           payment_method_brand: null,
           payment_method_last_four: null,
+          stripe_payment_method_id: null,
           updated_at: new Date().toISOString()
         })
         .eq('id', profile.id),
@@ -1164,6 +1225,7 @@ async function handleSetupIntentSucceeded(setupIntent: Stripe.SetupIntent) {
             .update({
               payment_method_brand: paymentMethod.card.brand,
               payment_method_last_four: paymentMethod.card.last4,
+              stripe_payment_method_id: paymentMethod.id,
               updated_at: new Date().toISOString()
             })
             .eq('id', profile.id),

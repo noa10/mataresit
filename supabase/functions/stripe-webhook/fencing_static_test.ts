@@ -1,10 +1,12 @@
 const migrationUrl = new URL('../../migrations/20261104000000_stripe_production_hardening.sql', import.meta.url);
 const checkoutMigrationUrl = new URL('../../migrations/20261106000000_stripe_checkout_locks_and_payment_fencing.sql', import.meta.url);
+const regressionMigrationUrl = new URL('../../migrations/20261110010000_stripe_fencing_regressions.sql', import.meta.url);
 const checkoutFunctionUrl = new URL('../create-checkout-session/index.ts', import.meta.url);
 const webhookUrl = new URL('./index.ts', import.meta.url);
+const manageSubscriptionUrl = new URL('../manage-subscription/index.ts', import.meta.url);
 
 Deno.test('subscription preferences are created inside the fenced transaction', async () => {
-  const migration = await Deno.readTextFile(migrationUrl);
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
   const webhook = await Deno.readTextFile(webhookUrl);
   const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(');
   const end = migration.indexOf('\n$$;', start);
@@ -18,17 +20,20 @@ Deno.test('subscription preferences are created inside the fenced transaction', 
   }
 });
 
-Deno.test('equal-timestamp events fail closed without ordering opaque IDs', async () => {
-  const migration = await Deno.readTextFile(migrationUrl);
+Deno.test('equal-timestamp events are ordered deterministically, not failed forever', async () => {
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
   const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.assert_stripe_event_order(');
   const end = migration.indexOf('\n$$;', start);
   const body = migration.slice(start, end);
 
   if (start < 0 || end < 0 ||
-    !body.includes('_event_created = v_last_created AND _event_id <> v_last_event_id') ||
-    !body.includes("USING ERRCODE = 'serialization_failure'") ||
-    /_event_id\s*[<>]\s*v_last_event_id/.test(body)) {
-    throw new Error('Ambiguous Stripe event ordering must fail closed');
+    !body.includes('IF _event_created <> v_last_created THEN') ||
+    !body.includes('RETURN _event_created > v_last_created;') ||
+    !body.includes('RETURN _event_id > v_last_event_id;') ||
+    body.includes("USING ERRCODE = 'serialization_failure'")) {
+    throw new Error(
+      'Equal-timestamp Stripe events must get a stable total order without a retry-forever failure',
+    );
   }
 });
 
@@ -78,7 +83,7 @@ Deno.test('checkout sessions are created only while holding the checkout lock', 
 
   // The Stripe session must be bound before the response reports success.
   const createIndex = checkout.indexOf('checkout.sessions.create(');
-  const bindIndex = checkout.indexOf('bindCheckoutSession(');
+  const bindIndex = checkout.indexOf('bindCheckoutSession(', createIndex);
   if (createIndex < 0 || bindIndex < 0 || bindIndex < createIndex) {
     throw new Error('The checkout lock must be bound after the session is created');
   }
@@ -139,19 +144,18 @@ Deno.test('the checkout lock cannot outlive the session it protects', async () =
 });
 
 Deno.test('payment fencing RPCs check the claim before every write', async () => {
-  const subscriptionMigration = await Deno.readTextFile(migrationUrl);
-  const checkoutMigration = await Deno.readTextFile(checkoutMigrationUrl);
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
 
-  for (const [migrationText, fn] of [
-    [subscriptionMigration, 'apply_fenced_stripe_subscription_event'],
-    [checkoutMigration, 'apply_fenced_stripe_payment_event'],
-    [checkoutMigration, 'apply_fenced_renewal_failure'],
-    [checkoutMigration, 'apply_fenced_profile_status'],
-    [checkoutMigration, 'apply_fenced_renewal_tracking'],
+  for (const fn of [
+    'apply_fenced_stripe_subscription_event',
+    'apply_fenced_stripe_payment_event',
+    'apply_fenced_renewal_failure',
+    'apply_fenced_profile_status',
+    'apply_fenced_renewal_tracking',
   ] as const) {
-    const start = migrationText.indexOf(`CREATE OR REPLACE FUNCTION public.${fn}(`);
-    const end = migrationText.indexOf('\n$$;', start);
-    const body = migrationText.slice(start, end);
+    const start = migration.indexOf(`CREATE OR REPLACE FUNCTION public.${fn}(`);
+    const end = migration.indexOf('\n$$;', start);
+    const body = migration.slice(start, end);
     const claimCheck = body.indexOf('PERFORM public.assert_active_stripe_claim(');
     // The first write of any kind: INSERT, UPDATE, or DELETE on a real table.
     const writeMatches = [
@@ -168,5 +172,122 @@ Deno.test('payment fencing RPCs check the claim before every write', async () =>
     if (firstWrite < 0 || claimCheck > firstWrite) {
       throw new Error(`${fn} must check the claim before writing`);
     }
+  }
+});
+
+Deno.test('subscription changes cannot replace a newer bound subscription', async () => {
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
+  const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_subscription_event(');
+  const end = migration.indexOf('\n$$;', start);
+  const body = migration.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    !body.includes('stripe_subscription_id IS NULL') ||
+    !body.includes('OR stripe_subscription_id = _stripe_subscription_id') ||
+    !body.includes('RETURN -1;')) {
+    throw new Error(
+      'A subscription event must only bind an unbound profile or update the profile already bound to it',
+    );
+  }
+});
+
+Deno.test('payment state advances only after a profile row is actually updated', async () => {
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
+  const start = migration.indexOf('CREATE OR REPLACE FUNCTION public.apply_fenced_stripe_payment_event(');
+  const end = migration.indexOf('\n$$;', start);
+  const body = migration.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    !body.includes('GET DIAGNOSTICS v_profile_rows = ROW_COUNT;') ||
+    !body.includes("RETURN 'recorded';")) {
+    throw new Error(
+      'A payment for a superseded subscription must be recorded without advancing entitlement state',
+    );
+  }
+});
+
+Deno.test('renewal writes are scoped to the profile current subscription', async () => {
+  const migration = await Deno.readTextFile(regressionMigrationUrl);
+
+  for (const fn of ['apply_fenced_renewal_failure', 'apply_fenced_renewal_tracking'] as const) {
+    const start = migration.indexOf(`CREATE OR REPLACE FUNCTION public.${fn}(`);
+    const end = migration.indexOf('\n$$;', start);
+    const body = migration.slice(start, end);
+
+    if (start < 0 || end < 0 ||
+      !body.includes('id = _user_id') ||
+      !body.includes('stripe_subscription_id = _stripe_subscription_id')) {
+      throw new Error(`${fn} must skip profiles bound to a different subscription`);
+    }
+  }
+});
+
+Deno.test('payment method detach resolves the profile without a customer on the event', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+  const start = webhook.indexOf('async function handlePaymentMethodDetached(');
+  const end = webhook.indexOf('async function handleSetupIntentSucceeded(');
+  const body = webhook.slice(start, end);
+
+  if (start < 0 || end < 0 ||
+    body.includes('paymentMethod.customer as string') ||
+    !body.includes('stripe_payment_method_id') ||
+    !body.includes('paymentMethod.id')) {
+    throw new Error(
+      'payment_method.detached must identify the profile by the stored payment method id when Stripe omits the customer',
+    );
+  }
+});
+
+Deno.test('payment method attach and setup record the Stripe payment method id', async () => {
+  const webhook = await Deno.readTextFile(webhookUrl);
+  const attachStart = webhook.indexOf('async function handlePaymentMethodAttached(');
+  const attachEnd = webhook.indexOf('async function handlePaymentMethodDetached(');
+  const setupStart = webhook.indexOf('async function handleSetupIntentSucceeded(');
+  const setupEnd = webhook.indexOf('/**\n * Enhanced webhook event logging', setupStart);
+  const attach = webhook.slice(attachStart, attachEnd);
+  const setup = webhook.slice(setupStart, setupEnd);
+
+  if (attachStart < 0 || attachEnd < 0 || setupStart < 0 || setupEnd < 0 ||
+    !attach.includes('stripe_payment_method_id: paymentMethod.id') ||
+    !setup.includes('stripe_payment_method_id: paymentMethod.id')) {
+    throw new Error('Attached card details must record the Stripe payment method id');
+  }
+});
+
+Deno.test('checkout reuses an open session left by an ambiguous create failure', async () => {
+  const checkout = await Deno.readTextFile(checkoutFunctionUrl);
+  const listIndex = checkout.indexOf('checkout.sessions.list(');
+  const createIndex = checkout.indexOf('checkout.sessions.create(');
+  const recoveryStart = checkout.indexOf('async function findReusableCheckoutSession(');
+  const recoveryEnd = checkout.indexOf('serve(async (req)', recoveryStart);
+  const recovery = checkout.slice(recoveryStart, recoveryEnd);
+
+  if (listIndex < 0 || createIndex < 0 || listIndex > createIndex ||
+    recoveryStart < 0 || recoveryEnd < 0 ||
+    !recovery.includes("status: 'open'") ||
+    !recovery.includes('metadata?.user_id') ||
+    !recovery.includes('metadata?.tier') ||
+    !recovery.includes('metadata?.billing_interval') ||
+    !/bindCheckoutSession\(\s*supabaseAdmin,\s*user\.id,\s*lockToken,\s*reusable\.id/.test(checkout)) {
+    throw new Error(
+      'create-checkout-session must recover a matching open session before creating a second payable session',
+    );
+  }
+});
+
+Deno.test('resuming an already-active subscription still repairs the profile', async () => {
+  const manage = await Deno.readTextFile(manageSubscriptionUrl);
+  const start = manage.indexOf('async function resumeSubscription(');
+  const end = manage.indexOf('async function changePlan(');
+  const body = manage.slice(start, end);
+  const earlyStart = body.indexOf('if (!subscription.cancel_at_period_end)');
+  const earlyEnd = body.indexOf('const updated = await stripe.subscriptions.update(', earlyStart);
+  const earlyReturn = body.slice(earlyStart, earlyEnd);
+
+  if (start < 0 || end < 0 || earlyStart < 0 || earlyEnd < 0 ||
+    !earlyReturn.includes('syncSubscriptionToProfile(')) {
+    throw new Error(
+      'resumeSubscription must sync the profile even when Stripe already reports cancel_at_period_end=false',
+    );
   }
 });

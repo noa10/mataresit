@@ -249,6 +249,12 @@ async function resumeSubscription(
   }
 
   if (!subscription.cancel_at_period_end) {
+    // Stripe is already in the desired state, but a previous request may have
+    // updated Stripe and failed before syncing the profile. Repair the profile
+    // before reporting success so a stale cancel_at_period_end=true row does
+    // not block future plan changes.
+    await syncSubscriptionToProfile(supabaseAdmin, subscription, { cancelAtPeriodEnd: false });
+
     return jsonResponse({
       success: true,
       message: 'Subscription is already active',

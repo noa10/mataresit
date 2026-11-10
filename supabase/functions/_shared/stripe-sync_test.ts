@@ -1,4 +1,8 @@
-import { assertEquals, assertRejects } from "https://deno.land/std@0.168.0/testing/asserts.ts";
+import {
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "https://deno.land/std@0.168.0/testing/asserts.ts";
 
 Deno.env.set('STRIPE_SECRET_KEY', 'sk_live_unit_test');
 Deno.env.set('STRIPE_PRO_MONTHLY_PRICE_ID', 'price_live_pro_monthly');
@@ -69,6 +73,41 @@ Deno.test('maps a subscription to tier and billing interval', () => {
 
   assertEquals(getSubscriptionTier(subscription), 'pro');
   assertEquals(getSubscriptionBillingInterval(subscription), 'monthly');
+});
+
+Deno.test('an unknown price uses the tier recorded on the subscription', () => {
+  const subscription = makeSubscription({
+    items: {
+      data: [{ price: { id: 'price_unknown', recurring: { interval: 'month' } } }],
+    },
+    metadata: { tier: 'max' },
+  });
+
+  assertEquals(getSubscriptionTier(subscription), 'max');
+});
+
+Deno.test('an unknown price preserves an explicit fallback tier', () => {
+  const subscription = makeSubscription({
+    items: {
+      data: [{ price: { id: 'price_unknown', recurring: { interval: 'month' } } }],
+    },
+  });
+
+  assertEquals(getSubscriptionTier(subscription, 'pro'), 'pro');
+});
+
+Deno.test('an unknown price without a fallback still fails closed', () => {
+  const subscription = makeSubscription({
+    items: {
+      data: [{ price: { id: 'price_unknown', recurring: { interval: 'month' } } }],
+    },
+  });
+
+  assertThrows(
+    () => getSubscriptionTier(subscription),
+    Error,
+    'Unrecognized Stripe price ID',
+  );
 });
 
 Deno.test('administrative sync writes through the direct service RPC', async () => {

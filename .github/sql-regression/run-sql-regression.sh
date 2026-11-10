@@ -28,6 +28,7 @@ suite_list=(
   stripe_webhook_claim_fencing
   payment_state_fencing
   stripe_checkout_locks
+  stripe_fencing_regressions
   profile_billing_column_protection
   batch_item_dispatch_config
 )
@@ -43,6 +44,7 @@ curated_migrations=(
   20261104000000_stripe_production_hardening.sql
   20261104000001_batch_item_vault_trigger.sql
   20261106000000_stripe_checkout_locks_and_payment_fencing.sql
+  20261110010000_stripe_fencing_regressions.sql
 )
 
 mkdir -p "$log_dir"

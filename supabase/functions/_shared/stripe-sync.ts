@@ -7,6 +7,7 @@
  */
 
 import {
+  isSubscriptionTier,
   resolveBillingIntervalFromPriceId,
   resolveStripeStatusForDatabase,
   resolveTierFromPriceId,
@@ -31,8 +32,39 @@ function getFirstPrice(subscription: any): any | null {
   return subscription?.items?.data?.[0]?.price ?? null;
 }
 
-export function getSubscriptionTier(subscription: any): SubscriptionTier {
-  return resolveTierFromPriceId(getFirstPrice(subscription)?.id);
+/**
+ * Resolve a subscription's tier.
+ *
+ * A price the secrets do not know yet (a legacy, grandfathered, or newly
+ * launched price) must not turn every webhook for that customer into a 500
+ * before the payment is recorded. Use the tier recorded on the subscription
+ * metadata, then the caller's fallback (normally the profile's current tier).
+ * Direct administrative syncs pass no fallback and still fail closed.
+ */
+export function getSubscriptionTier(
+  subscription: any,
+  fallback?: SubscriptionTier,
+): SubscriptionTier {
+  try {
+    return resolveTierFromPriceId(getFirstPrice(subscription)?.id);
+  } catch (error) {
+    const metadataTier = subscription?.metadata?.tier;
+    if (isSubscriptionTier(metadataTier)) {
+      console.warn(
+        `Unrecognized Stripe price ID ${getFirstPrice(subscription)?.id ?? '<missing>'}; ` +
+        `using subscription metadata tier ${metadataTier}`,
+      );
+      return metadataTier;
+    }
+    if (fallback) {
+      console.warn(
+        `Unrecognized Stripe price ID ${getFirstPrice(subscription)?.id ?? '<missing>'}; ` +
+        `preserving existing tier ${fallback}`,
+      );
+      return fallback;
+    }
+    throw error;
+  }
 }
 
 export function getSubscriptionBillingInterval(subscription: any): BillingInterval {
